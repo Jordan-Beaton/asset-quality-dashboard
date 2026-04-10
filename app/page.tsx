@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { supabase } from "../src/lib/supabase";
 
 type Asset = {
@@ -12,6 +13,7 @@ type Asset = {
   location: string | null;
   owner: string | null;
   status: string | null;
+  created_at?: string | null;
 };
 
 type Ncr = {
@@ -43,6 +45,90 @@ type ActionItem = {
   due_date: string | null;
 };
 
+function normaliseStatus(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase();
+}
+
+function isClosedLikeStatus(value: string | null | undefined) {
+  const status = normaliseStatus(value);
+  return status === "closed" || status === "complete" || status === "completed";
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(value: Date | null) {
+  if (!value) return "-";
+
+  return value.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getDaysFromToday(value: string | null | undefined) {
+  if (!value) return null;
+
+  const due = new Date(value);
+  if (Number.isNaN(due.getTime())) return null;
+
+  const today = new Date();
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+
+  const diffMs = due.getTime() - today.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+}
+
+function getManagementMessage(params: {
+  overdueActions: number;
+  dueNext7Days: number;
+  majorNcrs: number;
+  inactiveAssets: number;
+}) {
+  const { overdueActions, dueNext7Days, majorNcrs, inactiveAssets } = params;
+
+  if (
+    overdueActions === 0 &&
+    dueNext7Days === 0 &&
+    majorNcrs === 0 &&
+    inactiveAssets === 0
+  ) {
+    return {
+      tone: "good" as const,
+      title: "System looks under control",
+      text: "No overdue actions, no major NCRs open, and no inactive assets currently flagged.",
+    };
+  }
+
+  if (overdueActions > 0 || majorNcrs > 0) {
+    return {
+      tone: "risk" as const,
+      title: "Immediate follow-up recommended",
+      text: "There are overdue actions or open major NCRs that should be chased first.",
+    };
+  }
+
+  return {
+    tone: "watch" as const,
+    title: "Some items need monitoring",
+    text: "The dashboard is generally stable, but there are upcoming actions or inactive assets needing attention.",
+  };
+}
+
 export default function Home() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
@@ -50,6 +136,7 @@ export default function Home() {
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -79,6 +166,7 @@ export default function Home() {
       setNcrs(ncrRes.data || []);
       setCapas(capaRes.data || []);
       setActions(actionRes.data || []);
+      setLastRefreshed(new Date());
       setIsLoading(false);
     };
 
@@ -86,47 +174,58 @@ export default function Home() {
   }, []);
 
   const totalAssets = assets.length;
+
   const activeAssets = assets.filter(
-    (a) => (a.status || "").toLowerCase() === "active"
-  ).length;
-  const inactiveAssets = assets.filter(
-    (a) => (a.status || "").toLowerCase() !== "active"
+    (a) => normaliseStatus(a.status) === "active"
   ).length;
 
-  const openNcrs = ncrs.filter(
-    (n) => (n.status || "").toLowerCase() !== "closed"
+  const inactiveAssets = assets.filter(
+    (a) => normaliseStatus(a.status) !== "active"
   ).length;
-  const openCapas = capas.filter(
-    (c) => (c.status || "").toLowerCase() !== "closed"
-  ).length;
-  const openActions = actions.filter(
-    (a) => (a.status || "").toLowerCase() !== "closed"
-  ).length;
+
+  const openNcrs = ncrs.filter((n) => !isClosedLikeStatus(n.status)).length;
+
+  const openCapas = capas.filter((c) => !isClosedLikeStatus(c.status)).length;
+
+  const openActions = actions.filter((a) => !isClosedLikeStatus(a.status)).length;
 
   const overdueActions = actions.filter((action) => {
     if (!action.due_date) return false;
-    if ((action.status || "").toLowerCase() === "closed") return false;
+    if (isClosedLikeStatus(action.status)) return false;
 
-    const due = new Date(action.due_date);
-    const today = new Date();
-
-    due.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-
-    return due < today;
+    const days = getDaysFromToday(action.due_date);
+    return days !== null && days < 0;
   }).length;
+
+  const dueNext7DaysList = useMemo(() => {
+    return [...actions]
+      .filter((action) => {
+        if (!action.due_date) return false;
+        if (isClosedLikeStatus(action.status)) return false;
+
+        const days = getDaysFromToday(action.due_date);
+        return days !== null && days >= 0 && days <= 7;
+      })
+      .sort((a, b) => {
+        const aDate = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDate - bDate;
+      })
+      .slice(0, 8);
+  }, [actions]);
+
+  const dueNext7Days = dueNext7DaysList.length;
 
   const majorNcrs = ncrs.filter(
     (n) =>
-      (n.severity || "").toLowerCase() === "major" &&
-      (n.status || "").toLowerCase() !== "closed"
+      normaliseStatus(n.severity) === "major" && !isClosedLikeStatus(n.status)
   ).length;
 
   const openItems = openNcrs + openCapas + openActions;
 
   const assetsByLocation = useMemo(() => {
     const map = assets.reduce<Record<string, number>>((acc, asset) => {
-      const key = asset.location || "Unknown";
+      const key = asset.location?.trim() || "Unknown";
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
@@ -139,7 +238,33 @@ export default function Home() {
 
   const maxLocationCount = Math.max(...assetsByLocation.map((x) => x.count), 1);
 
-  const recentAssets = [...assets].slice(0, 6);
+  const recentAssets = useMemo(() => {
+    return [...assets]
+      .sort((a, b) => {
+        const aHasDate = !!a.created_at;
+        const bHasDate = !!b.created_at;
+
+        if (aHasDate && bHasDate) {
+          return (
+            new Date(b.created_at as string).getTime() -
+            new Date(a.created_at as string).getTime()
+          );
+        }
+
+        if (aHasDate && !bHasDate) return -1;
+        if (!aHasDate && bHasDate) return 1;
+
+        return (b.asset_code || "").localeCompare(a.asset_code || "");
+      })
+      .slice(0, 6);
+  }, [assets]);
+
+  const managementMessage = getManagementMessage({
+    overdueActions,
+    dueNext7Days,
+    majorNcrs,
+    inactiveAssets,
+  });
 
   return (
     <main>
@@ -150,6 +275,33 @@ export default function Home() {
           <p style={heroSubtitleStyle}>
             Live view of assets, NCRs, CAPAs and actions across the system.
           </p>
+
+          <div style={priorityStripStyle}>
+            <PriorityPill
+              label="Overdue Actions"
+              value={overdueActions}
+              tone={overdueActions > 0 ? "red" : "green"}
+              isLoading={isLoading}
+            />
+            <PriorityPill
+              label="Due in Next 7 Days"
+              value={dueNext7Days}
+              tone={dueNext7Days > 0 ? "amber" : "green"}
+              isLoading={isLoading}
+            />
+            <PriorityPill
+              label="Major NCRs"
+              value={majorNcrs}
+              tone={majorNcrs > 0 ? "red" : "green"}
+              isLoading={isLoading}
+            />
+            <PriorityPill
+              label="Inactive Assets"
+              value={inactiveAssets}
+              tone={inactiveAssets > 0 ? "amber" : "green"}
+              isLoading={isLoading}
+            />
+          </div>
         </div>
 
         <div style={heroMetaWrapStyle}>
@@ -162,7 +314,21 @@ export default function Home() {
 
           <div style={heroMetaCardStyle}>
             <div style={heroMetaLabelStyle}>Open Items</div>
-            <div style={heroMetaValueStyle}>{openItems}</div>
+            <div style={heroMetaValueStyle}>{isLoading ? "—" : openItems}</div>
+          </div>
+
+          <div style={heroMetaCardStyle}>
+            <div style={heroMetaLabelStyle}>Last Refreshed</div>
+            <div style={heroMetaValueStyleSmall}>
+              {isLoading ? "Loading..." : formatDateTime(lastRefreshed)}
+            </div>
+          </div>
+
+          <div style={heroMetaCardStyle}>
+            <div style={heroMetaLabelStyle}>Management View</div>
+            <div style={heroMetaValueStyleSmall}>
+              {isLoading ? "Preparing summary..." : managementMessage.title}
+            </div>
           </div>
         </div>
       </section>
@@ -217,32 +383,34 @@ export default function Home() {
 
       <section style={twoColumnGridStyle}>
         <SectionCard
-          title="Attention Required"
-          subtitle="Items that may need follow-up first."
+          title="Management Focus"
+          subtitle="Fast read for what needs attention first."
         >
-          <div style={stackStyle}>
-            <AttentionItem
-              label="Major NCRs"
-              value={majorNcrs}
-              tone={majorNcrs > 0 ? "red" : "green"}
-              isLoading={isLoading}
-            />
-            <AttentionItem
-              label="Overdue Actions"
+          <ManagementCallout
+            tone={managementMessage.tone}
+            title={managementMessage.title}
+            text={managementMessage.text}
+          />
+
+          <div style={stackCompactStyle}>
+            <SnapshotRow
+              label="Overdue actions requiring chase-up"
               value={overdueActions}
-              tone={overdueActions > 0 ? "red" : "green"}
               isLoading={isLoading}
             />
-            <AttentionItem
-              label="Inactive Assets"
+            <SnapshotRow
+              label="Actions due within 7 days"
+              value={dueNext7Days}
+              isLoading={isLoading}
+            />
+            <SnapshotRow
+              label="Open major NCRs"
+              value={majorNcrs}
+              isLoading={isLoading}
+            />
+            <SnapshotRow
+              label="Inactive assets in register"
               value={inactiveAssets}
-              tone={inactiveAssets > 0 ? "amber" : "green"}
-              isLoading={isLoading}
-            />
-            <AttentionItem
-              label="Open CAPAs"
-              value={openCapas}
-              tone={openCapas > 0 ? "amber" : "green"}
               isLoading={isLoading}
             />
           </div>
@@ -272,6 +440,100 @@ export default function Home() {
               href="/reports"
               title="Reports"
               description="Build monthly management reports."
+            />
+          </div>
+        </SectionCard>
+      </section>
+
+      <section style={twoColumnGridStyle}>
+        <SectionCard
+          title="Actions Due in Next 7 Days"
+          subtitle="Live action list for near-term follow-up."
+          action={
+            <Link href="/actions" style={sectionLinkStyle}>
+              View all actions →
+            </Link>
+          }
+        >
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading upcoming actions...</p>
+          ) : dueNext7DaysList.length === 0 ? (
+            <p style={emptyTextStyle}>No open actions due in the next 7 days.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={tableHeadStyle}>Action No.</th>
+                    <th style={tableHeadStyle}>Title</th>
+                    <th style={tableHeadStyle}>Owner</th>
+                    <th style={tableHeadStyle}>Due Date</th>
+                    <th style={tableHeadStyle}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dueNext7DaysList.map((action) => {
+                    const days = getDaysFromToday(action.due_date);
+
+                    return (
+                      <tr key={action.id} style={tableRowStyle}>
+                        <td style={tableCellStyle}>{action.action_number || "-"}</td>
+                        <td style={tableCellStyle}>{action.title || "-"}</td>
+                        <td style={tableCellStyle}>{action.owner || "-"}</td>
+                        <td style={tableCellStyle}>
+                          <div style={{ display: "grid", gap: "4px" }}>
+                            <span>{formatDate(action.due_date)}</span>
+                            <span style={tableSubTextStyle}>
+                              {days === 0
+                                ? "Due today"
+                                : days === 1
+                                ? "Due tomorrow"
+                                : days !== null
+                                ? `Due in ${days} days`
+                                : "-"}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={tableCellStyle}>
+                          <StatusBadge value={action.status || "Unknown"} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Attention Required"
+          subtitle="Items that may need follow-up first."
+        >
+          <div style={stackStyle}>
+            <AttentionItem
+              label="Major NCRs"
+              value={majorNcrs}
+              tone={majorNcrs > 0 ? "red" : "green"}
+              isLoading={isLoading}
+            />
+            <AttentionItem
+              label="Overdue Actions"
+              value={overdueActions}
+              tone={overdueActions > 0 ? "red" : "green"}
+              isLoading={isLoading}
+            />
+            <AttentionItem
+              label="Inactive Assets"
+              value={inactiveAssets}
+              tone={inactiveAssets > 0 ? "amber" : "green"}
+              isLoading={isLoading}
+            />
+            <AttentionItem
+              label="Open CAPAs"
+              value={openCapas}
+              tone={openCapas > 0 ? "amber" : "green"}
+              isLoading={isLoading}
             />
           </div>
         </SectionCard>
@@ -323,8 +585,8 @@ export default function Home() {
       </section>
 
       <SectionCard
-        title="Asset Register Snapshot"
-        subtitle="A quick view of current records in the asset register."
+        title="Recent Asset Records"
+        subtitle="Most recent asset entries shown first where created dates are available."
         action={
           <Link href="/assets" style={sectionLinkStyle}>
             View full register →
@@ -346,6 +608,7 @@ export default function Home() {
                   <th style={tableHeadStyle}>Location</th>
                   <th style={tableHeadStyle}>Owner</th>
                   <th style={tableHeadStyle}>Status</th>
+                  <th style={tableHeadStyle}>Created</th>
                 </tr>
               </thead>
               <tbody>
@@ -359,6 +622,7 @@ export default function Home() {
                     <td style={tableCellStyle}>
                       <StatusBadge value={asset.status || "Unknown"} />
                     </td>
+                    <td style={tableCellStyle}>{formatDate(asset.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -378,8 +642,8 @@ function SectionCard({
 }: {
   title: string;
   subtitle?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
 }) {
   return (
     <section style={panelStyle}>
@@ -415,6 +679,53 @@ function StatCard({
     >
       <div style={statCardLabelStyle}>{title}</div>
       <div style={statCardValueStyle}>{isLoading ? "—" : value}</div>
+    </div>
+  );
+}
+
+function PriorityPill({
+  label,
+  value,
+  tone,
+  isLoading,
+}: {
+  label: string;
+  value: number;
+  tone: "green" | "amber" | "red";
+  isLoading?: boolean;
+}) {
+  const toneMap = {
+    green: {
+      bg: "rgba(220, 252, 231, 0.18)",
+      border: "rgba(220, 252, 231, 0.32)",
+      text: "#ecfdf5",
+    },
+    amber: {
+      bg: "rgba(254, 243, 199, 0.16)",
+      border: "rgba(254, 243, 199, 0.32)",
+      text: "#fef3c7",
+    },
+    red: {
+      bg: "rgba(254, 226, 226, 0.16)",
+      border: "rgba(254, 226, 226, 0.32)",
+      text: "#fee2e2",
+    },
+  };
+
+  const colours = toneMap[tone];
+
+  return (
+    <div
+      style={{
+        ...priorityPillStyle,
+        background: colours.bg,
+        border: `1px solid ${colours.border}`,
+      }}
+    >
+      <div style={priorityPillLabelStyle}>{label}</div>
+      <div style={{ ...priorityPillValueStyle, color: colours.text }}>
+        {isLoading ? "—" : value}
+      </div>
     </div>
   );
 }
@@ -523,15 +834,79 @@ function SnapshotRow({
   );
 }
 
+function ManagementCallout({
+  tone,
+  title,
+  text,
+}: {
+  tone: "good" | "watch" | "risk";
+  title: string;
+  text: string;
+}) {
+  const toneMap = {
+    good: {
+      bg: "#ecfdf5",
+      border: "#22c55e",
+      title: "#166534",
+      text: "#166534",
+    },
+    watch: {
+      bg: "#fffbeb",
+      border: "#f59e0b",
+      title: "#92400e",
+      text: "#92400e",
+    },
+    risk: {
+      bg: "#fef2f2",
+      border: "#ef4444",
+      title: "#991b1b",
+      text: "#991b1b",
+    },
+  };
+
+  const colours = toneMap[tone];
+
+  return (
+    <div
+      style={{
+        background: colours.bg,
+        border: `1px solid ${colours.border}`,
+        borderRadius: "14px",
+        padding: "14px 16px",
+        marginBottom: "14px",
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 700,
+          color: colours.title,
+          marginBottom: "6px",
+        }}
+      >
+        {title}
+      </div>
+      <div
+        style={{
+          color: colours.text,
+          fontSize: "14px",
+          lineHeight: 1.5,
+        }}
+      >
+        {text}
+      </div>
+    </div>
+  );
+}
+
 function StatusBadge({ value }: { value: string }) {
-  const lower = value.toLowerCase();
+  const lower = normaliseStatus(value);
 
   const styles =
     lower === "active"
       ? { background: "#dcfce7", color: "#166534" }
       : lower === "inactive"
       ? { background: "#e5e7eb", color: "#374151" }
-      : lower === "closed"
+      : lower === "closed" || lower === "complete" || lower === "completed"
       ? { background: "#dcfce7", color: "#166534" }
       : lower === "open"
       ? { background: "#dbeafe", color: "#1d4ed8" }
@@ -556,7 +931,7 @@ function StatusBadge({ value }: { value: string }) {
   );
 }
 
-const heroStyle: React.CSSProperties = {
+const heroStyle: CSSProperties = {
   background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
   color: "white",
   borderRadius: "20px",
@@ -570,11 +945,11 @@ const heroStyle: React.CSSProperties = {
   flexWrap: "wrap",
 };
 
-const heroContentStyle: React.CSSProperties = {
-  flex: "1 1 520px",
+const heroContentStyle: CSSProperties = {
+  flex: "1 1 560px",
 };
 
-const eyebrowStyle: React.CSSProperties = {
+const eyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
   letterSpacing: "0.08em",
@@ -583,13 +958,13 @@ const eyebrowStyle: React.CSSProperties = {
   marginBottom: "8px",
 };
 
-const heroTitleStyle: React.CSSProperties = {
+const heroTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "30px",
   lineHeight: 1.1,
 };
 
-const heroSubtitleStyle: React.CSSProperties = {
+const heroSubtitleStyle: CSSProperties = {
   marginTop: "10px",
   marginBottom: 0,
   fontSize: "15px",
@@ -597,7 +972,32 @@ const heroSubtitleStyle: React.CSSProperties = {
   color: "rgba(255,255,255,0.92)",
 };
 
-const heroMetaWrapStyle: React.CSSProperties = {
+const priorityStripStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: "12px",
+  marginTop: "18px",
+};
+
+const priorityPillStyle: CSSProperties = {
+  borderRadius: "14px",
+  padding: "12px 14px",
+  minHeight: "78px",
+};
+
+const priorityPillLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 700,
+  color: "rgba(255,255,255,0.86)",
+  marginBottom: "8px",
+};
+
+const priorityPillValueStyle: CSSProperties = {
+  fontSize: "24px",
+  fontWeight: 800,
+};
+
+const heroMetaWrapStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(180px, 1fr))",
   gap: "12px",
@@ -605,26 +1005,32 @@ const heroMetaWrapStyle: React.CSSProperties = {
   flex: "1 1 320px",
 };
 
-const heroMetaCardStyle: React.CSSProperties = {
+const heroMetaCardStyle: CSSProperties = {
   background: "rgba(255,255,255,0.08)",
   border: "1px solid rgba(255,255,255,0.12)",
   borderRadius: "14px",
   padding: "12px 14px",
 };
 
-const heroMetaLabelStyle: React.CSSProperties = {
+const heroMetaLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
   opacity: 0.82,
   marginBottom: "6px",
 };
 
-const heroMetaValueStyle: React.CSSProperties = {
+const heroMetaValueStyle: CSSProperties = {
   fontSize: "18px",
   fontWeight: 700,
 };
 
-const errorBannerStyle: React.CSSProperties = {
+const heroMetaValueStyleSmall: CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 700,
+  lineHeight: 1.4,
+};
+
+const errorBannerStyle: CSSProperties = {
   background: "#fef2f2",
   color: "#991b1b",
   border: "1px solid #fecaca",
@@ -633,14 +1039,14 @@ const errorBannerStyle: React.CSSProperties = {
   marginBottom: "20px",
 };
 
-const statsGridStyle: React.CSSProperties = {
+const statsGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
 };
 
-const statCardStyle: React.CSSProperties = {
+const statCardStyle: CSSProperties = {
   background: "white",
   borderRadius: "16px",
   padding: "16px 18px",
@@ -648,27 +1054,27 @@ const statCardStyle: React.CSSProperties = {
   minHeight: "108px",
 };
 
-const statCardLabelStyle: React.CSSProperties = {
+const statCardLabelStyle: CSSProperties = {
   fontSize: "13px",
   color: "#64748b",
   fontWeight: 600,
 };
 
-const statCardValueStyle: React.CSSProperties = {
+const statCardValueStyle: CSSProperties = {
   fontSize: "30px",
   fontWeight: 700,
   color: "#0f172a",
   marginTop: "10px",
 };
 
-const twoColumnGridStyle: React.CSSProperties = {
+const twoColumnGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
   gap: "20px",
   marginBottom: "20px",
 };
 
-const panelStyle: React.CSSProperties = {
+const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "20px",
@@ -676,7 +1082,7 @@ const panelStyle: React.CSSProperties = {
   marginBottom: "20px",
 };
 
-const sectionHeaderRowStyle: React.CSSProperties = {
+const sectionHeaderRowStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "flex-start",
@@ -685,42 +1091,42 @@ const sectionHeaderRowStyle: React.CSSProperties = {
   flexWrap: "wrap",
 };
 
-const sectionTitleStyle: React.CSSProperties = {
+const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
   color: "#0f172a",
 };
 
-const sectionSubtitleStyle: React.CSSProperties = {
+const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
   color: "#64748b",
   fontSize: "14px",
 };
 
-const sectionLinkStyle: React.CSSProperties = {
+const sectionLinkStyle: CSSProperties = {
   textDecoration: "none",
   color: "#0f766e",
   fontWeight: 700,
   fontSize: "14px",
 };
 
-const stackStyle: React.CSSProperties = {
+const stackStyle: CSSProperties = {
   display: "grid",
   gap: "12px",
 };
 
-const stackCompactStyle: React.CSSProperties = {
+const stackCompactStyle: CSSProperties = {
   display: "grid",
   gap: "10px",
 };
 
-const quickLinksGridStyle: React.CSSProperties = {
+const quickLinksGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
   gap: "12px",
 };
 
-const quickLinkCardStyle: React.CSSProperties = {
+const quickLinkCardStyle: CSSProperties = {
   textDecoration: "none",
   background: "#f8fafc",
   border: "1px solid #e2e8f0",
@@ -733,26 +1139,26 @@ const quickLinkCardStyle: React.CSSProperties = {
   color: "#0f172a",
 };
 
-const quickLinkTitleStyle: React.CSSProperties = {
+const quickLinkTitleStyle: CSSProperties = {
   fontWeight: 700,
   fontSize: "16px",
   marginBottom: "6px",
 };
 
-const quickLinkDescriptionStyle: React.CSSProperties = {
+const quickLinkDescriptionStyle: CSSProperties = {
   color: "#64748b",
   fontSize: "14px",
   lineHeight: 1.5,
 };
 
-const quickLinkArrowStyle: React.CSSProperties = {
+const quickLinkArrowStyle: CSSProperties = {
   marginTop: "16px",
   fontSize: "13px",
   fontWeight: 700,
   color: "#0f766e",
 };
 
-const snapshotRowStyle: React.CSSProperties = {
+const snapshotRowStyle: CSSProperties = {
   background: "#f8fafc",
   border: "1px solid #e2e8f0",
   borderRadius: "10px",
@@ -762,34 +1168,34 @@ const snapshotRowStyle: React.CSSProperties = {
   alignItems: "center",
 };
 
-const snapshotLabelStyle: React.CSSProperties = {
+const snapshotLabelStyle: CSSProperties = {
   color: "#334155",
   fontWeight: 600,
 };
 
-const snapshotValueStyle: React.CSSProperties = {
+const snapshotValueStyle: CSSProperties = {
   color: "#0f172a",
 };
 
-const emptyTextStyle: React.CSSProperties = {
+const emptyTextStyle: CSSProperties = {
   color: "#64748b",
   margin: 0,
 };
 
-const locationRowStyle: React.CSSProperties = {
+const locationRowStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr auto",
   alignItems: "center",
   gap: "16px",
 };
 
-const locationNameStyle: React.CSSProperties = {
+const locationNameStyle: CSSProperties = {
   fontWeight: 600,
   color: "#0f172a",
   marginBottom: "6px",
 };
 
-const locationBarTrackStyle: React.CSSProperties = {
+const locationBarTrackStyle: CSSProperties = {
   width: "100%",
   height: "10px",
   background: "#e2e8f0",
@@ -797,39 +1203,45 @@ const locationBarTrackStyle: React.CSSProperties = {
   overflow: "hidden",
 };
 
-const locationBarFillStyle: React.CSSProperties = {
+const locationBarFillStyle: CSSProperties = {
   height: "100%",
   background: "#0f766e",
   borderRadius: "999px",
 };
 
-const locationCountStyle: React.CSSProperties = {
+const locationCountStyle: CSSProperties = {
   fontWeight: 700,
   color: "#0f172a",
   minWidth: "18px",
   textAlign: "right",
 };
 
-const tableStyle: React.CSSProperties = {
+const tableStyle: CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
 };
 
-const tableHeadStyle: React.CSSProperties = {
+const tableHeadStyle: CSSProperties = {
   textAlign: "left",
   padding: "12px 10px",
   borderBottom: "1px solid #e2e8f0",
   color: "#475569",
   fontSize: "13px",
+  whiteSpace: "nowrap",
 };
 
-const tableRowStyle: React.CSSProperties = {
+const tableRowStyle: CSSProperties = {
   background: "white",
 };
 
-const tableCellStyle: React.CSSProperties = {
+const tableCellStyle: CSSProperties = {
   padding: "14px 10px",
   borderBottom: "1px solid #f1f5f9",
   color: "#0f172a",
   verticalAlign: "middle",
+};
+
+const tableSubTextStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#64748b",
 };
