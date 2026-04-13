@@ -908,13 +908,13 @@ export default function NcrCapaPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: showCreatePanel ? "1.35fr 1fr" : "1fr",
+            gridTemplateColumns: showCreatePanel ? "minmax(0, 1.2fr) minmax(360px, 0.95fr)" : "1fr",
             gap: 20,
             alignItems: "start",
             marginBottom: 20,
           }}
         >
-          <div style={{ ...whiteCard, padding: 22 }}>
+          <div style={{ ...whiteCard, padding: 22, height: "100%" }}>
             <div
               style={{
                 display: "flex",
@@ -965,6 +965,7 @@ export default function NcrCapaPage() {
                         border: state === "overdue" ? "1px solid #fca5a5" : state === "soon" ? "1px solid #fcd34d" : "1px solid #dbe3ec",
                         background: state === "overdue" ? "#fff1f2" : state === "soon" ? "#fff7ed" : "#ffffff",
                         cursor: "pointer",
+                        minHeight: 168,
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10 }}>
@@ -1179,7 +1180,7 @@ export default function NcrCapaPage() {
           )}
         </div>
 
-        <div style={{ ...whiteCard, padding: 22, marginBottom: 20 }}>
+        <div style={{ ...whiteCard, padding: 22, marginBottom: 20, marginTop: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
             <div>
               <div style={sectionLabel}>Register</div>
