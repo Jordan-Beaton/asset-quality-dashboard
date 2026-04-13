@@ -1,1849 +1,1661 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
 import { supabase } from "../../src/lib/supabase";
 
 type Ncr = {
   id: string;
   ncr_number: string | null;
   title: string | null;
+  description: string | null;
   severity: string | null;
   status: string | null;
   owner: string | null;
   area: string | null;
   due_date: string | null;
-  project?: string | null;
-  source_type?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+  created_at: string | null;
+  project: string | null;
+  source_type: string | null;
 };
 
 type Capa = {
   id: string;
   capa_number: string | null;
   title: string | null;
+  description: string | null;
   status: string | null;
   owner: string | null;
-  linked_to: string | null;
   due_date: string | null;
-  project?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
-type CombinedRecord = {
-  id: string;
-  recordType: "NCR" | "CAPA";
-  recordNumber: string;
-  title: string;
+  created_at: string | null;
+  linked_to: string | null;
   project: string | null;
-  owner: string | null;
-  status: string | null;
-  dueDate: string | null;
-  updatedAt: string | null;
-  sourceType: string | null;
-  severity: string | null;
-  linkedTo: string | null;
 };
 
-type NcrForm = {
+type CombinedRow = {
+  type: "NCR" | "CAPA";
+  id: string;
+  number: string;
   title: string;
+  description: string;
   severity: string;
   status: string;
   owner: string;
   area: string;
   due_date: string;
+  created_at: string;
   project: string;
   source_type: string;
-};
-
-type CapaForm = {
-  title: string;
-  status: string;
-  owner: string;
   linked_to: string;
-  due_date: string;
-  project: string;
 };
 
-const emptyNcrForm: NcrForm = {
-  title: "",
-  severity: "Minor",
-  status: "Open",
-  owner: "",
-  area: "",
-  due_date: "",
-  project: "",
-  source_type: "Internal",
+const pageWrap: React.CSSProperties = {
+  minHeight: "100%",
+  background: "transparent",
+  padding: 0,
 };
 
-const emptyCapaForm: CapaForm = {
-  title: "",
-  status: "Open",
-  owner: "",
-  linked_to: "",
-  due_date: "",
-  project: "",
+const shell: React.CSSProperties = {
+  width: "100%",
+  margin: 0,
 };
 
-function normaliseStatus(value: string | null | undefined) {
-  return (value || "").trim().toLowerCase();
-}
+const heroCard: React.CSSProperties = {
+  background: "linear-gradient(135deg, #15766e 0%, #136c65 58%, #0f5f59 100%)",
+  color: "#ffffff",
+  borderRadius: 22,
+  padding: 26,
+  boxShadow: "0 10px 24px rgba(15, 23, 42, 0.08)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  marginBottom: 22,
+};
 
-function isClosedLikeStatus(value: string | null | undefined) {
-  const status = normaliseStatus(value);
-  return status === "closed" || status === "complete" || status === "completed";
-}
+const whiteCard: React.CSSProperties = {
+  background: "#f8fafc",
+  borderRadius: 20,
+  border: "1px solid #d7dee7",
+  boxShadow: "0 4px 14px rgba(15, 23, 42, 0.04)",
+};
 
-function extractNumber(value: string | null | undefined) {
-  if (!value) return null;
-  const match = value.match(/(\d+)/);
-  if (!match) return null;
+const sectionLabel: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 800,
+  color: "#64748b",
+  marginBottom: 6,
+  letterSpacing: 0.3,
+  textTransform: "uppercase",
+};
 
-  const num = Number(match[1]);
-  return Number.isNaN(num) ? null : num;
-}
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#ffffff",
+  outline: "none",
+  fontSize: 14,
+  color: "#0f172a",
+  boxSizing: "border-box",
+};
 
-function getNextAvailableNumber(values: Array<string | null | undefined>, prefix: "NCR" | "CAPA") {
-  const used = new Set(
-    values
-      .map((value) => extractNumber(value))
-      .filter((num): num is number => num !== null && num > 0)
-  );
+const textareaStyle: React.CSSProperties = {
+  ...inputStyle,
+  minHeight: 100,
+  resize: "vertical",
+  fontFamily: "inherit",
+};
 
-  let next = 1;
-  while (used.has(next)) {
-    next += 1;
-  }
+const labelStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: "#475569",
+  marginBottom: 6,
+  display: "block",
+  letterSpacing: 0.2,
+  textTransform: "uppercase",
+};
 
-  return `${prefix}-${String(next).padStart(3, "0")}`;
-}
+const primaryButton: React.CSSProperties = {
+  padding: "12px 16px",
+  borderRadius: 12,
+  border: "none",
+  background: "#2563eb",
+  color: "#ffffff",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const secondaryButton: React.CSSProperties = {
+  padding: "12px 16px",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#ffffff",
+  color: "#0f172a",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const ghostButton: React.CSSProperties = {
+  padding: "10px 14px",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.18)",
+  background: "rgba(255,255,255,0.08)",
+  color: "#ffffff",
+  fontWeight: 700,
+  cursor: "pointer",
+};
 
 function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString();
 }
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return "-";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function getDaysFromToday(value: string | null | undefined) {
-  if (!value) return null;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
+function dueState(date: string | null | undefined) {
+  if (!date) return "none";
   const today = new Date();
-  date.setHours(0, 0, 0, 0);
+  const due = new Date(date);
   today.setHours(0, 0, 0, 0);
-
-  const diffMs = date.getTime() - today.getTime();
-  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+  due.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return "overdue";
+  if (diff <= 7) return "soon";
+  return "ok";
 }
 
-function getDueLabel(value: string | null | undefined, status: string | null | undefined) {
-  if (!value) return "-";
-  if (isClosedLikeStatus(status)) return "Closed";
-
-  const days = getDaysFromToday(value);
-
-  if (days === null) return "-";
-  if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
-  if (days === 0) return "Due today";
-  if (days === 1) return "Due tomorrow";
-  return `Due in ${days} days`;
+function getStatusTone(status: string) {
+  const value = (status || "").toLowerCase();
+  if (value.includes("open")) return { bg: "#fee2e2", color: "#991b1b" };
+  if (value.includes("progress")) return { bg: "#fef3c7", color: "#92400e" };
+  if (value.includes("hold")) return { bg: "#ede9fe", color: "#5b21b6" };
+  if (value.includes("closed")) return { bg: "#dcfce7", color: "#166534" };
+  if (value.includes("complete")) return { bg: "#dcfce7", color: "#166534" };
+  return { bg: "#e2e8f0", color: "#334155" };
 }
 
-function isOverdue(dueDate: string | null | undefined, status: string | null | undefined) {
-  if (!dueDate) return false;
-  if (isClosedLikeStatus(status)) return false;
-
-  const days = getDaysFromToday(dueDate);
-  return days !== null && days < 0;
+function getSeverityTone(severity: string) {
+  const value = (severity || "").toLowerCase();
+  if (value.includes("high") || value.includes("major") || value.includes("critical")) {
+    return { bg: "#fee2e2", color: "#991b1b" };
+  }
+  if (value.includes("medium")) return { bg: "#fef3c7", color: "#92400e" };
+  if (value.includes("low") || value.includes("minor")) return { bg: "#dcfce7", color: "#166534" };
+  return { bg: "#e2e8f0", color: "#334155" };
 }
 
-function sortByPrefixedNumber(a: string | null | undefined, b: string | null | undefined) {
-  const aNum = extractNumber(a);
-  const bNum = extractNumber(b);
+function getTypeTone(type: "NCR" | "CAPA") {
+  return type === "NCR"
+    ? { bg: "#dbeafe", color: "#1d4ed8", border: "#93c5fd" }
+    : { bg: "#ede9fe", color: "#6d28d9", border: "#c4b5fd" };
+}
 
-  if (aNum !== null && bNum !== null) return aNum - bNum;
-  if (aNum !== null) return -1;
-  if (bNum !== null) return 1;
+function buildNextNumber(prefix: string, values: (string | null)[]) {
+  const used = new Set<number>();
 
-  return (a || "").localeCompare(b || "");
+  values.forEach((value) => {
+    if (!value) return;
+    const match = value.match(/(\d+)$/);
+    if (!match) return;
+    used.add(Number(match[1]));
+  });
+
+  let next = 1;
+  while (used.has(next)) next += 1;
+
+  return `${prefix}-${String(next).padStart(3, "0")}`;
 }
 
 export default function NcrCapaPage() {
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
-  const [message, setMessage] = useState("Loading NCR / CAPA data...");
-  const [isLoading, setIsLoading] = useState(true);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-
-  const [ncrForm, setNcrForm] = useState<NcrForm>(emptyNcrForm);
-  const [capaForm, setCapaForm] = useState<CapaForm>(emptyCapaForm);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [activeCreateTab, setActiveCreateTab] = useState<"NCR" | "CAPA">("NCR");
+  const [showCreatePanel, setShowCreatePanel] = useState(true);
+  const [selectedRow, setSelectedRow] = useState<CombinedRow | null>(null);
+  const [refreshStamp, setRefreshStamp] = useState<string>("");
 
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("");
-  const [projectFilter, setProjectFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [severityFilter, setSeverityFilter] = useState("All");
+  const [sourceFilter, setSourceFilter] = useState("All");
+  const [projectFilter, setProjectFilter] = useState("All");
+  const [showAttentionOnly, setShowAttentionOnly] = useState(false);
 
-  const [editingNcrId, setEditingNcrId] = useState<string | null>(null);
-  const [editingCapaId, setEditingCapaId] = useState<string | null>(null);
+  const [newNcr, setNewNcr] = useState({
+    title: "",
+    description: "",
+    severity: "Medium",
+    status: "Open",
+    owner: "",
+    area: "",
+    due_date: "",
+    project: "",
+    source_type: "Internal",
+  });
 
-  const [editNcrForm, setEditNcrForm] = useState<NcrForm>(emptyNcrForm);
-  const [editCapaForm, setEditCapaForm] = useState<CapaForm>(emptyCapaForm);
+  const [newCapa, setNewCapa] = useState({
+    title: "",
+    description: "",
+    status: "Open",
+    owner: "",
+    due_date: "",
+    linked_to: "",
+    project: "",
+  });
 
-  async function loadData(showLoadedMessage = true) {
-    setIsLoading(true);
+  const [editRow, setEditRow] = useState<CombinedRow | null>(null);
 
-    const [ncrRes, capaRes] = await Promise.all([
-      supabase.from("ncrs").select("*"),
-      supabase.from("capas").select("*"),
+  async function loadData() {
+    setLoading(true);
+
+    const [{ data: ncrData, error: ncrError }, { data: capaData, error: capaError }] = await Promise.all([
+      supabase.from("ncrs").select("*").order("created_at", { ascending: false }),
+      supabase.from("capas").select("*").order("created_at", { ascending: false }),
     ]);
 
-    if (ncrRes.error || capaRes.error) {
-      setMessage(`Error: ${ncrRes.error?.message || capaRes.error?.message || "Unknown error"}`);
-      setIsLoading(false);
-      return;
-    }
+    if (ncrError) console.error("Error loading NCRs:", ncrError.message);
+    if (capaError) console.error("Error loading CAPAs:", capaError.message);
 
-    const sortedNcrs = [...(ncrRes.data || [])].sort((a, b) =>
-      sortByPrefixedNumber(a.ncr_number, b.ncr_number)
-    );
-
-    const sortedCapas = [...(capaRes.data || [])].sort((a, b) =>
-      sortByPrefixedNumber(a.capa_number, b.capa_number)
-    );
-
-    setNcrs(sortedNcrs);
-    setCapas(sortedCapas);
-    setLastRefreshed(new Date());
-    setIsLoading(false);
-
-    if (showLoadedMessage) {
-      setMessage("NCR / CAPA data loaded successfully.");
-    }
+    setNcrs((ncrData as Ncr[]) || []);
+    setCapas((capaData as Capa[]) || []);
+    setRefreshStamp(new Date().toLocaleString());
+    setLoading(false);
   }
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const nextNcrNumber = useMemo(() => {
-    return getNextAvailableNumber(ncrs.map((x) => x.ncr_number), "NCR");
-  }, [ncrs]);
+  useEffect(() => {
+    setEditRow(selectedRow);
+  }, [selectedRow]);
 
-  const nextCapaNumber = useMemo(() => {
-    return getNextAvailableNumber(capas.map((x) => x.capa_number), "CAPA");
-  }, [capas]);
-
-  const openNcrs = ncrs.filter((n) => !isClosedLikeStatus(n.status)).length;
-  const closedNcrs = ncrs.filter((n) => isClosedLikeStatus(n.status)).length;
-  const openCapas = capas.filter((c) => !isClosedLikeStatus(c.status)).length;
-  const closedCapas = capas.filter((c) => isClosedLikeStatus(c.status)).length;
-
-  const majorOpenNcrs = ncrs.filter(
-    (n) =>
-      (n.severity || "").toLowerCase() === "major" &&
-      !isClosedLikeStatus(n.status)
-  ).length;
-
-  const internalNcrs = ncrs.filter(
-    (n) => (n.source_type || "").toLowerCase() === "internal"
-  ).length;
-
-  const supplierNcrs = ncrs.filter(
-    (n) => (n.source_type || "").toLowerCase() === "supplier"
-  ).length;
-
-  const externalNcrs = ncrs.filter(
-    (n) => (n.source_type || "").toLowerCase() === "external"
-  ).length;
-
-  const overdueRecords = [
-    ...ncrs.filter((n) => isOverdue(n.due_date, n.status)),
-    ...capas.filter((c) => isOverdue(c.due_date, c.status)),
-  ].length;
-
-  const dueThisWeek = [
-    ...ncrs.filter((n) => {
-      if (!n.due_date || isClosedLikeStatus(n.status)) return false;
-      const days = getDaysFromToday(n.due_date);
-      return days !== null && days >= 0 && days <= 7;
-    }),
-    ...capas.filter((c) => {
-      if (!c.due_date || isClosedLikeStatus(c.status)) return false;
-      const days = getDaysFromToday(c.due_date);
-      return days !== null && days >= 0 && days <= 7;
-    }),
-  ].length;
-
-  const ncrLookup = useMemo(() => {
-    return new Map(
-      ncrs.map((ncr) => [ncr.ncr_number || "", ncr])
-    );
-  }, [ncrs]);
-
-  const combinedRecords = useMemo<CombinedRecord[]>(() => {
-    const mappedNcrs: CombinedRecord[] = ncrs.map((ncr) => ({
-      id: ncr.id,
-      recordType: "NCR",
-      recordNumber: ncr.ncr_number || "-",
-      title: ncr.title || "-",
-      project: ncr.project || null,
-      owner: ncr.owner || null,
-      status: ncr.status || null,
-      dueDate: ncr.due_date || null,
-      updatedAt: ncr.updated_at || ncr.created_at || null,
-      sourceType: ncr.source_type || null,
-      severity: ncr.severity || null,
-      linkedTo: null,
+  const combinedRows = useMemo<CombinedRow[]>(() => {
+    const mappedNcrs: CombinedRow[] = ncrs.map((n) => ({
+      type: "NCR",
+      id: n.id,
+      number: n.ncr_number || "NCR-???",
+      title: n.title || "",
+      description: n.description || "",
+      severity: n.severity || "—",
+      status: n.status || "Open",
+      owner: n.owner || "",
+      area: n.area || "",
+      due_date: n.due_date || "",
+      created_at: n.created_at || "",
+      project: n.project || "",
+      source_type: n.source_type || "Internal",
+      linked_to: "",
     }));
 
-    const mappedCapas: CombinedRecord[] = capas.map((capa) => {
-      const linkedNcr = capa.linked_to ? ncrLookup.get(capa.linked_to) : null;
-
-      return {
-        id: capa.id,
-        recordType: "CAPA",
-        recordNumber: capa.capa_number || "-",
-        title: capa.title || "-",
-        project: capa.project || linkedNcr?.project || null,
-        owner: capa.owner || null,
-        status: capa.status || null,
-        dueDate: capa.due_date || null,
-        updatedAt: capa.updated_at || capa.created_at || null,
-        sourceType: linkedNcr?.source_type || null,
-        severity: null,
-        linkedTo: capa.linked_to || null,
-      };
-    });
+    const mappedCapas: CombinedRow[] = capas.map((c) => ({
+      type: "CAPA",
+      id: c.id,
+      number: c.capa_number || "CAPA-???",
+      title: c.title || "",
+      description: c.description || "",
+      severity: "—",
+      status: c.status || "Open",
+      owner: c.owner || "",
+      area: "",
+      due_date: c.due_date || "",
+      created_at: c.created_at || "",
+      project: c.project || "",
+      source_type: "",
+      linked_to: c.linked_to || "",
+    }));
 
     return [...mappedNcrs, ...mappedCapas].sort((a, b) => {
-      if (a.recordType !== b.recordType) {
-        return a.recordType === "NCR" ? -1 : 1;
-      }
-
-      return sortByPrefixedNumber(a.recordNumber, b.recordNumber);
+      const aTime = new Date(a.created_at || 0).getTime();
+      const bTime = new Date(b.created_at || 0).getTime();
+      return bTime - aTime;
     });
-  }, [ncrs, capas, ncrLookup]);
+  }, [ncrs, capas]);
 
-  const filteredRecords = useMemo(() => {
-    const lower = search.toLowerCase();
+  const projectOptions = useMemo(() => {
+    const values = new Set<string>();
+    combinedRows.forEach((row) => {
+      if (row.project?.trim()) values.add(row.project.trim());
+    });
+    return ["All", ...Array.from(values).sort()];
+  }, [combinedRows]);
 
-    return combinedRecords.filter((record) => {
+  const filteredRows = useMemo(() => {
+    return combinedRows.filter((row) => {
+      const q = search.trim().toLowerCase();
+
       const matchesSearch =
-        !search ||
-        record.recordNumber.toLowerCase().includes(lower) ||
-        (record.title || "").toLowerCase().includes(lower) ||
-        (record.project || "").toLowerCase().includes(lower) ||
-        (record.owner || "").toLowerCase().includes(lower) ||
-        (record.sourceType || "").toLowerCase().includes(lower) ||
-        (record.linkedTo || "").toLowerCase().includes(lower);
+        !q ||
+        row.number.toLowerCase().includes(q) ||
+        row.title.toLowerCase().includes(q) ||
+        row.description.toLowerCase().includes(q) ||
+        row.owner.toLowerCase().includes(q) ||
+        row.project.toLowerCase().includes(q) ||
+        row.linked_to.toLowerCase().includes(q);
 
-      const matchesType = !typeFilter || record.recordType === typeFilter;
-      const matchesStatus = !statusFilter || (record.status || "") === statusFilter;
-      const matchesSource = !sourceFilter || (record.sourceType || "") === sourceFilter;
-      const matchesProject = !projectFilter || (record.project || "") === projectFilter;
+      const matchesType = typeFilter === "All" || row.type === typeFilter;
+      const matchesStatus = statusFilter === "All" || row.status === statusFilter;
+      const matchesSeverity = severityFilter === "All" || row.severity === severityFilter;
+      const matchesSource =
+        sourceFilter === "All" || (row.type === "NCR" && row.source_type === sourceFilter);
+      const matchesProject = projectFilter === "All" || row.project === projectFilter;
+      const attention = dueState(row.due_date) === "overdue" || row.status === "Open";
+      const matchesAttention = !showAttentionOnly || attention;
 
-      return matchesSearch && matchesType && matchesStatus && matchesSource && matchesProject;
+      return (
+        matchesSearch &&
+        matchesType &&
+        matchesStatus &&
+        matchesSeverity &&
+        matchesSource &&
+        matchesProject &&
+        matchesAttention
+      );
     });
-  }, [combinedRecords, search, typeFilter, statusFilter, sourceFilter, projectFilter]);
+  }, [
+    combinedRows,
+    search,
+    typeFilter,
+    statusFilter,
+    severityFilter,
+    sourceFilter,
+    projectFilter,
+    showAttentionOnly,
+  ]);
 
-  const priorityViewItems = useMemo(() => {
-    return combinedRecords
-      .filter((record) => isOverdue(record.dueDate, record.status))
+  const kpis = useMemo(() => {
+    const totalNcrs = ncrs.length;
+    const totalCapas = capas.length;
+    const openNcrs = ncrs.filter((n) => (n.status || "").toLowerCase() === "open").length;
+    const openCapas = capas.filter((c) => (c.status || "").toLowerCase() === "open").length;
+    const overdue = combinedRows.filter((row) => dueState(row.due_date) === "overdue").length;
+    const dueSoon = combinedRows.filter((row) => dueState(row.due_date) === "soon").length;
+
+    return {
+      totalNcrs,
+      totalCapas,
+      openItems: openNcrs + openCapas,
+      overdue,
+      dueSoon,
+    };
+  }, [ncrs, capas, combinedRows]);
+
+  const attentionItems = useMemo(() => {
+    return combinedRows
+      .filter((row) => {
+        const state = dueState(row.due_date);
+        return state === "overdue" || state === "soon" || row.status === "Open";
+      })
       .sort((a, b) => {
-        const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-        const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-        return aTime - bTime;
+        const aState = dueState(a.due_date);
+        const bState = dueState(b.due_date);
+        const aRank = aState === "overdue" ? 0 : aState === "soon" ? 1 : 2;
+        const bRank = bState === "overdue" ? 0 : bState === "soon" ? 1 : 2;
+        return aRank - bRank;
       })
-      .slice(0, 5);
-  }, [combinedRecords]);
+      .slice(0, 6);
+  }, [combinedRows]);
 
-  const dueSoonItems = useMemo(() => {
-    return combinedRecords
-      .filter((record) => {
-        if (!record.dueDate || isClosedLikeStatus(record.status)) return false;
-        const days = getDaysFromToday(record.dueDate);
-        return days !== null && days >= 0 && days <= 7;
-      })
-      .sort((a, b) => {
-        const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-        const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-        return aTime - bTime;
-      })
-      .slice(0, 5);
-  }, [combinedRecords]);
-
-  const uniqueProjects = useMemo(() => {
-    return [...new Set(combinedRecords.map((r) => r.project).filter(Boolean))].sort();
-  }, [combinedRecords]);
-
-  async function addNcr(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!ncrForm.title.trim()) {
-      setMessage("NCR title is required.");
+  async function createNcr() {
+    if (!newNcr.title.trim()) {
+      alert("Please enter an NCR title.");
       return;
     }
 
-    const ncrNumberToUse = getNextAvailableNumber(ncrs.map((x) => x.ncr_number), "NCR");
+    setSaving(true);
+
+    const nextNumber = buildNextNumber(
+      "NCR",
+      ncrs.map((n) => n.ncr_number)
+    );
 
     const { error } = await supabase.from("ncrs").insert([
       {
-        ncr_number: ncrNumberToUse,
-        title: ncrForm.title.trim(),
-        severity: ncrForm.severity,
-        status: ncrForm.status,
-        owner: ncrForm.owner.trim() || null,
-        area: ncrForm.area.trim() || null,
-        due_date: ncrForm.due_date || null,
-        project: ncrForm.project.trim() || null,
-        source_type: ncrForm.source_type,
+        ncr_number: nextNumber,
+        title: newNcr.title.trim(),
+        description: newNcr.description.trim() || null,
+        severity: newNcr.severity,
+        status: newNcr.status,
+        owner: newNcr.owner.trim() || null,
+        area: newNcr.area.trim() || null,
+        due_date: newNcr.due_date || null,
+        project: newNcr.project.trim() || null,
+        source_type: newNcr.source_type,
       },
     ]);
 
+    setSaving(false);
+
     if (error) {
-      setMessage(`Add NCR failed: ${error.message}`);
+      alert(`Error creating NCR: ${error.message}`);
       return;
     }
 
-    setNcrForm(emptyNcrForm);
-    setMessage(`${ncrNumberToUse} added successfully.`);
-    await loadData(false);
+    setNewNcr({
+      title: "",
+      description: "",
+      severity: "Medium",
+      status: "Open",
+      owner: "",
+      area: "",
+      due_date: "",
+      project: "",
+      source_type: "Internal",
+    });
+
+    await loadData();
   }
 
-  async function addCapa(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!capaForm.title.trim()) {
-      setMessage("CAPA title is required.");
+  async function createCapa() {
+    if (!newCapa.title.trim()) {
+      alert("Please enter a CAPA title.");
       return;
     }
 
-    const capaNumberToUse = getNextAvailableNumber(capas.map((x) => x.capa_number), "CAPA");
+    setSaving(true);
+
+    const nextNumber = buildNextNumber(
+      "CAPA",
+      capas.map((c) => c.capa_number)
+    );
 
     const { error } = await supabase.from("capas").insert([
       {
-        capa_number: capaNumberToUse,
-        title: capaForm.title.trim(),
-        status: capaForm.status,
-        owner: capaForm.owner.trim() || null,
-        linked_to: capaForm.linked_to.trim() || null,
-        due_date: capaForm.due_date || null,
-        project: capaForm.project.trim() || null,
+        capa_number: nextNumber,
+        title: newCapa.title.trim(),
+        description: newCapa.description.trim() || null,
+        status: newCapa.status,
+        owner: newCapa.owner.trim() || null,
+        due_date: newCapa.due_date || null,
+        linked_to: newCapa.linked_to.trim() || null,
+        project: newCapa.project.trim() || null,
       },
     ]);
 
+    setSaving(false);
+
     if (error) {
-      setMessage(`Add CAPA failed: ${error.message}`);
+      alert(`Error creating CAPA: ${error.message}`);
       return;
     }
 
-    setCapaForm(emptyCapaForm);
-    setMessage(`${capaNumberToUse} added successfully.`);
-    await loadData(false);
-  }
-
-  function startEditNcr(ncr: Ncr) {
-    setEditingCapaId(null);
-    setEditingNcrId(ncr.id);
-    setEditNcrForm({
-      title: ncr.title || "",
-      severity: ncr.severity || "Minor",
-      status: ncr.status || "Open",
-      owner: ncr.owner || "",
-      area: ncr.area || "",
-      due_date: ncr.due_date || "",
-      project: ncr.project || "",
-      source_type: ncr.source_type || "Internal",
+    setNewCapa({
+      title: "",
+      description: "",
+      status: "Open",
+      owner: "",
+      due_date: "",
+      linked_to: "",
+      project: "",
     });
+
+    await loadData();
   }
 
-  function startEditCapa(capa: Capa) {
-    setEditingNcrId(null);
-    setEditingCapaId(capa.id);
-    setEditCapaForm({
-      title: capa.title || "",
-      status: capa.status || "Open",
-      owner: capa.owner || "",
-      linked_to: capa.linked_to || "",
-      due_date: capa.due_date || "",
-      project: capa.project || "",
-    });
-  }
+  async function saveEdit() {
+    if (!editRow) return;
 
-  async function saveNcr(id: string) {
-    if (!editNcrForm.title.trim()) {
-      setMessage("NCR title is required.");
-      return;
+    setSaving(true);
+
+    if (editRow.type === "NCR") {
+      const { error } = await supabase
+        .from("ncrs")
+        .update({
+          title: editRow.title || null,
+          description: editRow.description || null,
+          severity: editRow.severity || null,
+          status: editRow.status || null,
+          owner: editRow.owner || null,
+          area: editRow.area || null,
+          due_date: editRow.due_date || null,
+          project: editRow.project || null,
+          source_type: editRow.source_type || "Internal",
+        })
+        .eq("id", editRow.id);
+
+      if (error) {
+        setSaving(false);
+        alert(`Error saving NCR: ${error.message}`);
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("capas")
+        .update({
+          title: editRow.title || null,
+          description: editRow.description || null,
+          status: editRow.status || null,
+          owner: editRow.owner || null,
+          due_date: editRow.due_date || null,
+          linked_to: editRow.linked_to || null,
+          project: editRow.project || null,
+        })
+        .eq("id", editRow.id);
+
+      if (error) {
+        setSaving(false);
+        alert(`Error saving CAPA: ${error.message}`);
+        return;
+      }
     }
 
-    const { error } = await supabase
-      .from("ncrs")
-      .update({
-        title: editNcrForm.title.trim(),
-        severity: editNcrForm.severity,
-        status: editNcrForm.status,
-        owner: editNcrForm.owner.trim() || null,
-        area: editNcrForm.area.trim() || null,
-        due_date: editNcrForm.due_date || null,
-        project: editNcrForm.project.trim() || null,
-        source_type: editNcrForm.source_type,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+    setSaving(false);
+    await loadData();
+    setSelectedRow(null);
+    setEditRow(null);
+  }
+
+  async function deleteSelected() {
+    if (!selectedRow) return;
+
+    const confirmed = window.confirm(`Delete ${selectedRow.number}?`);
+    if (!confirmed) return;
+
+    setSaving(true);
+
+    const table = selectedRow.type === "NCR" ? "ncrs" : "capas";
+    const { error } = await supabase.from(table).delete().eq("id", selectedRow.id);
+
+    setSaving(false);
 
     if (error) {
-      setMessage(`Update NCR failed: ${error.message}`);
+      alert(`Error deleting record: ${error.message}`);
       return;
     }
 
-    setEditingNcrId(null);
-    setMessage("NCR updated successfully.");
-    await loadData(false);
+    setSelectedRow(null);
+    setEditRow(null);
+    await loadData();
   }
 
-  async function saveCapa(id: string) {
-    if (!editCapaForm.title.trim()) {
-      setMessage("CAPA title is required.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("capas")
-      .update({
-        title: editCapaForm.title.trim(),
-        status: editCapaForm.status,
-        owner: editCapaForm.owner.trim() || null,
-        linked_to: editCapaForm.linked_to.trim() || null,
-        due_date: editCapaForm.due_date || null,
-        project: editCapaForm.project.trim() || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (error) {
-      setMessage(`Update CAPA failed: ${error.message}`);
-      return;
-    }
-
-    setEditingCapaId(null);
-    setMessage("CAPA updated successfully.");
-    await loadData(false);
-  }
-
-  async function deleteNcr(id: string) {
-    if (!window.confirm("Delete this NCR?")) return;
-
-    const { error } = await supabase.from("ncrs").delete().eq("id", id);
-
-    if (error) {
-      setMessage(`Delete NCR failed: ${error.message}`);
-      return;
-    }
-
-    setMessage("NCR deleted successfully.");
-    await loadData(false);
-  }
-
-  async function deleteCapa(id: string) {
-    if (!window.confirm("Delete this CAPA?")) return;
-
-    const { error } = await supabase.from("capas").delete().eq("id", id);
-
-    if (error) {
-      setMessage(`Delete CAPA failed: ${error.message}`);
-      return;
-    }
-
-    setMessage("CAPA deleted successfully.");
-    await loadData(false);
-  }
-
-  function clearFilters() {
-    setSearch("");
-    setTypeFilter("");
-    setStatusFilter("");
-    setSourceFilter("");
-    setProjectFilter("");
-  }
+  const statusOptions = ["Open", "In Progress", "On Hold", "Closed"];
+  const severityOptions = ["Low", "Medium", "High"];
+  const sourceOptions = ["Internal", "Supplier", "External"];
 
   return (
-    <main>
-      <section style={heroStyle}>
-        <div style={{ flex: "1 1 620px" }}>
-          <div style={eyebrowStyle}>Quality Register</div>
-          <h1 style={heroTitleStyle}>NCR / CAPA</h1>
-          <p style={heroSubtitleStyle}>
-            One joined-up quality view, while keeping NCRs and CAPAs properly separate behind the scenes.
-          </p>
+    <div style={pageWrap}>
+      <div style={shell}>
+        <div style={heroCard}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 16,
+              flexWrap: "wrap",
+              alignItems: "flex-start",
+            }}
+          >
+            <div style={{ maxWidth: 760 }}>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.10)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: 0.3,
+                  marginBottom: 14,
+                }}
+              >
+                QUALITY COMMAND CENTRE
+              </div>
 
-          <div style={priorityStripStyle}>
-            <HeroPill label="Open NCRs" value={openNcrs} tone={openNcrs > 0 ? "red" : "green"} />
-            <HeroPill label="Open CAPAs" value={openCapas} tone={openCapas > 0 ? "amber" : "green"} />
-            <HeroPill label="Major Open NCRs" value={majorOpenNcrs} tone={majorOpenNcrs > 0 ? "red" : "green"} />
-            <HeroPill label="Overdue Items" value={overdueRecords} tone={overdueRecords > 0 ? "red" : "green"} />
-          </div>
-        </div>
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: 30,
+                  lineHeight: 1.1,
+                  fontWeight: 800,
+                  letterSpacing: "-0.03em",
+                }}
+              >
+                NCR / CAPA Register
+              </h1>
 
-        <div style={heroMetaWrapStyle}>
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Next NCR Number</div>
-            <div style={heroMetaValueStyle}>{nextNcrNumber}</div>
-          </div>
-
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Next CAPA Number</div>
-            <div style={heroMetaValueStyle}>{nextCapaNumber}</div>
-          </div>
-
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Due This Week</div>
-            <div style={heroMetaValueStyle}>{dueThisWeek}</div>
-          </div>
-
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Last Refreshed</div>
-            <div style={heroMetaValueStyleSmall}>
-              {isLoading ? "Loading..." : formatDateTime(lastRefreshed?.toISOString())}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div style={topUtilityRowStyle}>
-        <Link href="/" style={backLinkStyle}>
-          ← Back to Dashboard
-        </Link>
-
-        <div style={statusBannerInlineStyle}>
-          <strong>Status:</strong> {message}
-        </div>
-      </div>
-
-      <section style={statsGridStyle}>
-        <StatCard title="Internal NCRs" value={internalNcrs} accent="#2563eb" />
-        <StatCard title="Supplier NCRs" value={supplierNcrs} accent="#f59e0b" />
-        <StatCard title="External NCRs" value={externalNcrs} accent="#0f766e" />
-        <StatCard title="Closed NCRs" value={closedNcrs} accent="#16a34a" />
-        <StatCard title="Closed CAPAs" value={closedCapas} accent="#64748b" />
-      </section>
-
-      <section style={twoColumnGridStyle}>
-        <SectionCard
-          title="Create NCR"
-          subtitle="Log the issue properly first, including source and project."
-        >
-          <form onSubmit={addNcr}>
-            <div style={formGridStyle}>
-              <Field label="NCR Number">
-                <input value={nextNcrNumber} readOnly style={readOnlyInputStyle} />
-              </Field>
-
-              <Field label="Source Type">
-                <select
-                  value={ncrForm.source_type}
-                  onChange={(e) => setNcrForm({ ...ncrForm, source_type: e.target.value })}
-                  style={inputStyle}
-                >
-                  <option value="Internal">Internal</option>
-                  <option value="Supplier">Supplier</option>
-                  <option value="External">External</option>
-                </select>
-              </Field>
-
-              <Field label="Project">
-                <input
-                  placeholder="e.g. Wadden Sea"
-                  value={ncrForm.project}
-                  onChange={(e) => setNcrForm({ ...ncrForm, project: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Title">
-                <input
-                  placeholder="Enter NCR title"
-                  value={ncrForm.title}
-                  onChange={(e) => setNcrForm({ ...ncrForm, title: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Severity">
-                <select
-                  value={ncrForm.severity}
-                  onChange={(e) => setNcrForm({ ...ncrForm, severity: e.target.value })}
-                  style={inputStyle}
-                >
-                  <option value="Minor">Minor</option>
-                  <option value="Major">Major</option>
-                </select>
-              </Field>
-
-              <Field label="Status">
-                <select
-                  value={ncrForm.status}
-                  onChange={(e) => setNcrForm({ ...ncrForm, status: e.target.value })}
-                  style={inputStyle}
-                >
-                  <option value="Open">Open</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Closed">Closed</option>
-                </select>
-              </Field>
-
-              <Field label="Owner">
-                <input
-                  placeholder="Enter owner"
-                  value={ncrForm.owner}
-                  onChange={(e) => setNcrForm({ ...ncrForm, owner: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Area">
-                <input
-                  placeholder="Enter area"
-                  value={ncrForm.area}
-                  onChange={(e) => setNcrForm({ ...ncrForm, area: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Due Date">
-                <input
-                  type="date"
-                  value={ncrForm.due_date}
-                  onChange={(e) => setNcrForm({ ...ncrForm, due_date: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
+              <p
+                style={{
+                  margin: "12px 0 0 0",
+                  color: "rgba(255,255,255,0.88)",
+                  fontSize: 15,
+                  lineHeight: 1.6,
+                  maxWidth: 700,
+                }}
+              >
+                Joined-up working register for non-conformances and corrective actions.
+                Separate records in the database, but one practical view for tracking,
+                review and follow-up.
+              </p>
             </div>
 
-            <div style={formFooterStyle}>
-              <button type="submit" style={primaryButtonStyle}>
-                Add NCR
-              </button>
-              <span style={helperTextStyle}>
-                NCR numbering fills the next available slot automatically.
-              </span>
-            </div>
-          </form>
-        </SectionCard>
-
-        <SectionCard
-          title="Create CAPA"
-          subtitle="Raise the response record separately, with its own numbering."
-        >
-          <form onSubmit={addCapa}>
-            <div style={formGridStyle}>
-              <Field label="CAPA Number">
-                <input value={nextCapaNumber} readOnly style={readOnlyInputStyle} />
-              </Field>
-
-              <Field label="Linked NCR">
-                <input
-                  placeholder="e.g. NCR-001"
-                  value={capaForm.linked_to}
-                  onChange={(e) => setCapaForm({ ...capaForm, linked_to: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Project">
-                <input
-                  placeholder="e.g. Wadden Sea"
-                  value={capaForm.project}
-                  onChange={(e) => setCapaForm({ ...capaForm, project: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Title">
-                <input
-                  placeholder="Enter CAPA title"
-                  value={capaForm.title}
-                  onChange={(e) => setCapaForm({ ...capaForm, title: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Status">
-                <select
-                  value={capaForm.status}
-                  onChange={(e) => setCapaForm({ ...capaForm, status: e.target.value })}
-                  style={inputStyle}
-                >
-                  <option value="Open">Open</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Closed">Closed</option>
-                  <option value="Complete">Complete</option>
-                </select>
-              </Field>
-
-              <Field label="Owner">
-                <input
-                  placeholder="Enter owner"
-                  value={capaForm.owner}
-                  onChange={(e) => setCapaForm({ ...capaForm, owner: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Due Date">
-                <input
-                  type="date"
-                  value={capaForm.due_date}
-                  onChange={(e) => setCapaForm({ ...capaForm, due_date: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-            </div>
-
-            <div style={formFooterStyle}>
-              <button type="submit" style={primaryButtonStyle}>
-                Add CAPA
-              </button>
-              <span style={helperTextStyle}>
-                CAPA numbering is separate from NCR numbering.
-              </span>
-            </div>
-          </form>
-        </SectionCard>
-      </section>
-
-      <section style={twoColumnGridStyle}>
-        <SectionCard
-          title="Priority View"
-          subtitle="What needs chasing right now."
-        >
-          <MiniListCard
-            title="Overdue First"
-            emptyText="No overdue NCRs or CAPAs."
-            items={priorityViewItems.map((record) => ({
-              id: record.id,
-              line1: `${record.recordNumber} — ${record.title}`,
-              line2: `${record.recordType} · ${record.project || "No project"} · ${record.owner || "No owner"} · ${getDueLabel(record.dueDate, record.status)}`,
-              tone: "red" as const,
-            }))}
-          />
-        </SectionCard>
-
-        <SectionCard
-          title="Due This Week"
-          subtitle="Items approaching their due date."
-        >
-          <MiniListCard
-            title="Upcoming"
-            emptyText="No open NCRs or CAPAs due this week."
-            items={dueSoonItems.map((record) => ({
-              id: record.id,
-              line1: `${record.recordNumber} — ${record.title}`,
-              line2: `${record.recordType} · ${record.project || "No project"} · ${record.owner || "No owner"} · ${getDueLabel(record.dueDate, record.status)}`,
-              tone: "amber" as const,
-            }))}
-          />
-        </SectionCard>
-      </section>
-
-      <SectionCard
-        title="Combined Quality Register"
-        subtitle="Single working register for NCRs and CAPAs, while keeping separate numbering and record logic."
-        action={
-          <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
-            Clear Filters
-          </button>
-        }
-      >
-        <div style={filterBarStyle}>
-          <input
-            placeholder="Search number / title / project / owner / source / linked NCR"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={inputStyle}
-          />
-
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={inputStyle}>
-            <option value="">All Types</option>
-            <option value="NCR">NCR</option>
-            <option value="CAPA">CAPA</option>
-          </select>
-
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={inputStyle}>
-            <option value="">All Status</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Closed">Closed</option>
-            <option value="Complete">Complete</option>
-          </select>
-
-          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={inputStyle}>
-            <option value="">All Sources</option>
-            <option value="Internal">Internal</option>
-            <option value="Supplier">Supplier</option>
-            <option value="External">External</option>
-          </select>
-
-          <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} style={inputStyle}>
-            <option value="">All Projects</option>
-            {uniqueProjects.map((project) => (
-              <option key={String(project)} value={String(project)}>
-                {String(project)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div style={tableInfoRowStyle}>
-          <span>
-            Showing <strong>{filteredRecords.length}</strong> of <strong>{combinedRecords.length}</strong> records
-          </span>
-        </div>
-
-        <div style={{ overflowX: "auto" }}>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={tableHeadStyle}>Record No.</th>
-                <th style={tableHeadStyle}>Type</th>
-                <th style={tableHeadStyle}>Source</th>
-                <th style={tableHeadStyle}>Project</th>
-                <th style={tableHeadStyle}>Title</th>
-                <th style={tableHeadStyle}>Owner</th>
-                <th style={tableHeadStyle}>Severity</th>
-                <th style={tableHeadStyle}>Status</th>
-                <th style={tableHeadStyle}>Due Date</th>
-                <th style={tableHeadStyle}>Linked NCR</th>
-                <th style={tableHeadStyle}>Updated</th>
-                <th style={tableHeadStyle}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={12} style={emptyTableCellStyle}>
-                    No records match the current filters.
-                  </td>
-                </tr>
-              ) : (
-                filteredRecords.map((record) => {
-                  const overdue = isOverdue(record.dueDate, record.status);
-
-                  if (record.recordType === "NCR") {
-                    const ncr = ncrs.find((x) => x.id === record.id);
-                    if (!ncr) return null;
-
-                    return (
-                      <tr
-                        key={`${record.recordType}-${record.id}`}
-                        style={{
-                          ...tableRowStyle,
-                          background: overdue ? "#fff7f7" : "white",
-                        }}
-                      >
-                        {editingNcrId === ncr.id ? (
-                          <>
-                            <td style={tableCellStyle}>
-                              <div style={readOnlyTableCellStyle}>{ncr.ncr_number || "-"}</div>
-                            </td>
-                            <td style={tableCellStyle}>
-                              <RecordTypeBadge value="NCR" />
-                            </td>
-                            <td style={tableCellStyle}>
-                              <select
-                                value={editNcrForm.source_type}
-                                onChange={(e) => setEditNcrForm({ ...editNcrForm, source_type: e.target.value })}
-                                style={smallInputStyle}
-                              >
-                                <option value="Internal">Internal</option>
-                                <option value="Supplier">Supplier</option>
-                                <option value="External">External</option>
-                              </select>
-                            </td>
-                            <td style={tableCellStyle}>
-                              <input
-                                value={editNcrForm.project}
-                                onChange={(e) => setEditNcrForm({ ...editNcrForm, project: e.target.value })}
-                                style={smallInputStyle}
-                              />
-                            </td>
-                            <td style={tableCellStyle}>
-                              <input
-                                value={editNcrForm.title}
-                                onChange={(e) => setEditNcrForm({ ...editNcrForm, title: e.target.value })}
-                                style={smallInputStyle}
-                              />
-                            </td>
-                            <td style={tableCellStyle}>
-                              <input
-                                value={editNcrForm.owner}
-                                onChange={(e) => setEditNcrForm({ ...editNcrForm, owner: e.target.value })}
-                                style={smallInputStyle}
-                              />
-                            </td>
-                            <td style={tableCellStyle}>
-                              <select
-                                value={editNcrForm.severity}
-                                onChange={(e) => setEditNcrForm({ ...editNcrForm, severity: e.target.value })}
-                                style={smallInputStyle}
-                              >
-                                <option value="Minor">Minor</option>
-                                <option value="Major">Major</option>
-                              </select>
-                            </td>
-                            <td style={tableCellStyle}>
-                              <select
-                                value={editNcrForm.status}
-                                onChange={(e) => setEditNcrForm({ ...editNcrForm, status: e.target.value })}
-                                style={smallInputStyle}
-                              >
-                                <option value="Open">Open</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Closed">Closed</option>
-                              </select>
-                            </td>
-                            <td style={tableCellStyle}>
-                              <input
-                                type="date"
-                                value={editNcrForm.due_date}
-                                onChange={(e) => setEditNcrForm({ ...editNcrForm, due_date: e.target.value })}
-                                style={smallInputStyle}
-                              />
-                            </td>
-                            <td style={tableCellStyle}>-</td>
-                            <td style={tableCellStyle}>{formatDateTime(ncr.updated_at || ncr.created_at)}</td>
-                            <td style={tableCellStyle}>
-                              <div style={actionButtonsWrapStyle}>
-                                <button type="button" onClick={() => saveNcr(ncr.id)} style={miniButtonStyle}>
-                                  Save
-                                </button>
-                                <button type="button" onClick={() => setEditingNcrId(null)} style={miniButtonGreyStyle}>
-                                  Cancel
-                                </button>
-                              </div>
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td style={tableCellStyle}>
-                              <div style={recordNumberStyle}>{ncr.ncr_number || "-"}</div>
-                            </td>
-                            <td style={tableCellStyle}>
-                              <RecordTypeBadge value="NCR" />
-                            </td>
-                            <td style={tableCellStyle}>
-                              <SourceBadge value={ncr.source_type || "Unknown"} />
-                            </td>
-                            <td style={tableCellStyle}>{ncr.project || "-"}</td>
-                            <td style={tableCellStyle}>
-                              <div style={primaryCellTextStyle}>{ncr.title || "-"}</div>
-                              <div style={secondaryCellTextStyle}>{ncr.area || " "}</div>
-                            </td>
-                            <td style={tableCellStyle}>{ncr.owner || "-"}</td>
-                            <td style={tableCellStyle}>
-                              <SeverityBadge value={ncr.severity || "Unknown"} />
-                            </td>
-                            <td style={tableCellStyle}>
-                              <StatusBadge value={ncr.status || "Unknown"} />
-                            </td>
-                            <td style={tableCellStyle}>
-                              <div style={primaryCellTextStyle}>{formatDate(ncr.due_date)}</div>
-                              <div
-                                style={{
-                                  ...secondaryCellTextStyle,
-                                  color: overdue ? "#b91c1c" : "#64748b",
-                                  fontWeight: overdue ? 700 : 500,
-                                }}
-                              >
-                                {getDueLabel(ncr.due_date, ncr.status)}
-                              </div>
-                            </td>
-                            <td style={tableCellStyle}>-</td>
-                            <td style={tableCellStyle}>{formatDateTime(ncr.updated_at || ncr.created_at)}</td>
-                            <td style={tableCellStyle}>
-                              <div style={actionButtonsWrapStyle}>
-                                <button type="button" onClick={() => startEditNcr(ncr)} style={miniButtonStyle}>
-                                  Edit
-                                </button>
-                                <button type="button" onClick={() => deleteNcr(ncr.id)} style={miniButtonDeleteStyle}>
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    );
-                  }
-
-                  const capa = capas.find((x) => x.id === record.id);
-                  if (!capa) return null;
-
-                  return (
-                    <tr
-                      key={`${record.recordType}-${record.id}`}
-                      style={{
-                        ...tableRowStyle,
-                        background: overdue ? "#fff7f7" : "white",
-                      }}
-                    >
-                      {editingCapaId === capa.id ? (
-                        <>
-                          <td style={tableCellStyle}>
-                            <div style={readOnlyTableCellStyle}>{capa.capa_number || "-"}</div>
-                          </td>
-                          <td style={tableCellStyle}>
-                            <RecordTypeBadge value="CAPA" />
-                          </td>
-                          <td style={tableCellStyle}>
-                            {record.sourceType ? <SourceBadge value={record.sourceType} /> : "-"}
-                          </td>
-                          <td style={tableCellStyle}>
-                            <input
-                              value={editCapaForm.project}
-                              onChange={(e) => setEditCapaForm({ ...editCapaForm, project: e.target.value })}
-                              style={smallInputStyle}
-                            />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <input
-                              value={editCapaForm.title}
-                              onChange={(e) => setEditCapaForm({ ...editCapaForm, title: e.target.value })}
-                              style={smallInputStyle}
-                            />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <input
-                              value={editCapaForm.owner}
-                              onChange={(e) => setEditCapaForm({ ...editCapaForm, owner: e.target.value })}
-                              style={smallInputStyle}
-                            />
-                          </td>
-                          <td style={tableCellStyle}>-</td>
-                          <td style={tableCellStyle}>
-                            <select
-                              value={editCapaForm.status}
-                              onChange={(e) => setEditCapaForm({ ...editCapaForm, status: e.target.value })}
-                              style={smallInputStyle}
-                            >
-                              <option value="Open">Open</option>
-                              <option value="In Progress">In Progress</option>
-                              <option value="Closed">Closed</option>
-                              <option value="Complete">Complete</option>
-                            </select>
-                          </td>
-                          <td style={tableCellStyle}>
-                            <input
-                              type="date"
-                              value={editCapaForm.due_date}
-                              onChange={(e) => setEditCapaForm({ ...editCapaForm, due_date: e.target.value })}
-                              style={smallInputStyle}
-                            />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <input
-                              value={editCapaForm.linked_to}
-                              onChange={(e) => setEditCapaForm({ ...editCapaForm, linked_to: e.target.value })}
-                              style={smallInputStyle}
-                            />
-                          </td>
-                          <td style={tableCellStyle}>{formatDateTime(capa.updated_at || capa.created_at)}</td>
-                          <td style={tableCellStyle}>
-                            <div style={actionButtonsWrapStyle}>
-                              <button type="button" onClick={() => saveCapa(capa.id)} style={miniButtonStyle}>
-                                Save
-                              </button>
-                              <button type="button" onClick={() => setEditingCapaId(null)} style={miniButtonGreyStyle}>
-                                Cancel
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td style={tableCellStyle}>
-                            <div style={recordNumberStyle}>{capa.capa_number || "-"}</div>
-                          </td>
-                          <td style={tableCellStyle}>
-                            <RecordTypeBadge value="CAPA" />
-                          </td>
-                          <td style={tableCellStyle}>
-                            {record.sourceType ? <SourceBadge value={record.sourceType} /> : "-"}
-                          </td>
-                          <td style={tableCellStyle}>{capa.project || record.project || "-"}</td>
-                          <td style={tableCellStyle}>
-                            <div style={primaryCellTextStyle}>{capa.title || "-"}</div>
-                            <div style={secondaryCellTextStyle}>
-                              {capa.linked_to ? `Linked to ${capa.linked_to}` : "Not linked"}
-                            </div>
-                          </td>
-                          <td style={tableCellStyle}>{capa.owner || "-"}</td>
-                          <td style={tableCellStyle}>-</td>
-                          <td style={tableCellStyle}>
-                            <StatusBadge value={capa.status || "Unknown"} />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <div style={primaryCellTextStyle}>{formatDate(capa.due_date)}</div>
-                            <div
-                              style={{
-                                ...secondaryCellTextStyle,
-                                color: overdue ? "#b91c1c" : "#64748b",
-                                fontWeight: overdue ? 700 : 500,
-                              }}
-                            >
-                              {getDueLabel(capa.due_date, capa.status)}
-                            </div>
-                          </td>
-                          <td style={tableCellStyle}>{capa.linked_to || "-"}</td>
-                          <td style={tableCellStyle}>{formatDateTime(capa.updated_at || capa.created_at)}</td>
-                          <td style={tableCellStyle}>
-                            <div style={actionButtonsWrapStyle}>
-                              <button type="button" onClick={() => startEditCapa(capa)} style={miniButtonStyle}>
-                                Edit
-                              </button>
-                              <button type="button" onClick={() => deleteCapa(capa.id)} style={miniButtonDeleteStyle}>
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
-    </main>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <label style={fieldWrapStyle}>
-      <span style={fieldLabelStyle}>{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function SectionCard({
-  title,
-  subtitle,
-  action,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section style={panelStyle}>
-      <div style={sectionHeaderRowStyle}>
-        <div>
-          <h2 style={sectionTitleStyle}>{title}</h2>
-          {subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}
-        </div>
-        {action || null}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  accent,
-}: {
-  title: string;
-  value: number;
-  accent: string;
-}) {
-  return (
-    <div
-      style={{
-        ...statCardStyle,
-        borderTop: `4px solid ${accent}`,
-      }}
-    >
-      <div style={statCardLabelStyle}>{title}</div>
-      <div style={statCardValueStyle}>{value}</div>
-    </div>
-  );
-}
-
-function HeroPill({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "green" | "amber" | "red";
-}) {
-  const tones = {
-    green: { bg: "rgba(220,252,231,0.15)", border: "rgba(220,252,231,0.26)", text: "#dcfce7" },
-    amber: { bg: "rgba(254,243,199,0.15)", border: "rgba(254,243,199,0.28)", text: "#fef3c7" },
-    red: { bg: "rgba(254,226,226,0.15)", border: "rgba(254,226,226,0.28)", text: "#fee2e2" },
-  };
-
-  const colours = tones[tone];
-
-  return (
-    <div
-      style={{
-        ...heroPillStyle,
-        background: colours.bg,
-        border: `1px solid ${colours.border}`,
-      }}
-    >
-      <div style={heroPillLabelStyle}>{label}</div>
-      <div style={{ ...heroPillValueStyle, color: colours.text }}>{value}</div>
-    </div>
-  );
-}
-
-function MiniListCard({
-  title,
-  emptyText,
-  items,
-}: {
-  title: string;
-  emptyText: string;
-  items: Array<{
-    id: string;
-    line1: string;
-    line2: string;
-    tone: "red" | "amber";
-  }>;
-}) {
-  return (
-    <div style={miniListCardStyle}>
-      <h3 style={miniListTitleStyle}>{title}</h3>
-
-      {items.length === 0 ? (
-        <p style={emptyTextStyle}>{emptyText}</p>
-      ) : (
-        <div style={miniListWrapStyle}>
-          {items.map((item) => (
             <div
-              key={item.id}
               style={{
-                ...miniListItemStyle,
-                borderLeft: item.tone === "red" ? "4px solid #dc2626" : "4px solid #f59e0b",
-                background: item.tone === "red" ? "#fef2f2" : "#fffbeb",
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                alignItems: "center",
               }}
             >
-              <div style={miniListLine1Style}>{item.line1}</div>
-              <div style={miniListLine2Style}>{item.line2}</div>
+              <button style={ghostButton} onClick={() => setShowCreatePanel((prev) => !prev)}>
+                {showCreatePanel ? "Hide create panel" : "Show create panel"}
+              </button>
+              <button style={ghostButton} onClick={loadData}>
+                Refresh
+              </button>
             </div>
-          ))}
+          </div>
+
+          <div
+            style={{
+              marginTop: 22,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 14,
+            }}
+          >
+            {[
+              { label: "Open items", value: kpis.openItems, accent: "#f59e0b" },
+              { label: "Overdue", value: kpis.overdue, accent: "#ef4444" },
+              { label: "Due in 7 days", value: kpis.dueSoon, accent: "#22c55e" },
+              { label: "NCRs", value: kpis.totalNcrs, accent: "#60a5fa" },
+              { label: "CAPAs", value: kpis.totalCapas, accent: "#c084fc" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  background: "rgba(255,255,255,0.10)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  borderRadius: 16,
+                  padding: 16,
+                }}
+              >
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.78)", marginBottom: 8 }}>
+                  {item.label}
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: "#ffffff" }}>{item.value}</div>
+                <div
+                  style={{
+                    marginTop: 10,
+                    height: 5,
+                    borderRadius: 999,
+                    background: "rgba(255,255,255,0.10)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      background: item.accent,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              fontSize: 12,
+              color: "rgba(255,255,255,0.76)",
+            }}
+          >
+            Last refreshed: {refreshStamp || "—"}
+          </div>
         </div>
-      )}
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: showCreatePanel ? "1.25fr 0.95fr" : "1fr",
+            gap: 20,
+            alignItems: "start",
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ ...whiteCard, padding: 22 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 16,
+                alignItems: "center",
+                marginBottom: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div style={sectionLabel}>Attention board</div>
+                <h2 style={{ margin: 0, fontSize: 22, color: "#0f172a", fontWeight: 400 }}>
+                  Items needing eyes on
+                </h2>
+              </div>
+
+              <button
+                style={{
+                  ...secondaryButton,
+                  background: showAttentionOnly ? "#0f172a" : "#f8fafc",
+                  color: showAttentionOnly ? "#ffffff" : "#0f172a",
+                  borderColor: showAttentionOnly ? "#0f172a" : "#cbd5e1",
+                }}
+                onClick={() => setShowAttentionOnly((prev) => !prev)}
+              >
+                {showAttentionOnly ? "Showing attention only" : "Focus attention only"}
+              </button>
+            </div>
+
+            {attentionItems.length === 0 ? (
+              <div
+                style={{
+                  padding: 18,
+                  borderRadius: 16,
+                  background: "#ffffff",
+                  border: "1px dashed #cbd5e1",
+                  color: "#475569",
+                }}
+              >
+                No immediate attention items.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                  gap: 14,
+                }}
+              >
+                {attentionItems.map((item) => {
+                  const state = dueState(item.due_date);
+                  const typeTone = getTypeTone(item.type);
+
+                  return (
+                    <button
+                      key={`${item.type}-${item.id}`}
+                      onClick={() => setSelectedRow(item)}
+                      style={{
+                        textAlign: "left",
+                        padding: 16,
+                        borderRadius: 18,
+                        border:
+                          state === "overdue"
+                            ? "1px solid #fca5a5"
+                            : state === "soon"
+                            ? "1px solid #fcd34d"
+                            : "1px solid #dbe3ec",
+                        background:
+                          state === "overdue"
+                            ? "#fff1f2"
+                            : state === "soon"
+                            ? "#fff7ed"
+                            : "#ffffff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          alignItems: "center",
+                          marginBottom: 10,
+                        }}
+                      >
+                        <span
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            background: typeTone.bg,
+                            color: typeTone.color,
+                            fontWeight: 800,
+                            fontSize: 12,
+                            border: `1px solid ${typeTone.border}`,
+                          }}
+                        >
+                          {item.type}
+                        </span>
+
+                        <span
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            background:
+                              state === "overdue"
+                                ? "#fee2e2"
+                                : state === "soon"
+                                ? "#fef3c7"
+                                : getStatusTone(item.status).bg,
+                            color:
+                              state === "overdue"
+                                ? "#991b1b"
+                                : state === "soon"
+                                ? "#92400e"
+                                : getStatusTone(item.status).color,
+                            fontWeight: 800,
+                            fontSize: 12,
+                          }}
+                        >
+                          {state === "overdue"
+                            ? "Overdue"
+                            : state === "soon"
+                            ? "Due soon"
+                            : item.status}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: 13, color: "#64748b", fontWeight: 800, marginBottom: 8 }}>
+                        {item.number}
+                      </div>
+
+                      <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>
+                        {item.title || "Untitled"}
+                      </div>
+
+                      <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
+                        {item.project ? `Project: ${item.project}` : "No project assigned"}
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 10,
+                          fontSize: 13,
+                          color: "#475569",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 10,
+                        }}
+                      >
+                        <span>{item.owner || "No owner"}</span>
+                        <span>{formatDate(item.due_date)}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {showCreatePanel && (
+            <div style={{ ...whiteCard, padding: 22 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  alignItems: "center",
+                  marginBottom: 16,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <div style={sectionLabel}>Create</div>
+                  <h2 style={{ margin: 0, fontSize: 22, color: "#0f172a", fontWeight: 400 }}>
+                    Add quality record
+                  </h2>
+                </div>
+
+                <div
+                  style={{
+                    display: "inline-flex",
+                    background: "#e9eef5",
+                    borderRadius: 14,
+                    padding: 4,
+                    border: "1px solid #d3dce8",
+                  }}
+                >
+                  <button
+                    onClick={() => setActiveCreateTab("NCR")}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: "none",
+                      cursor: "pointer",
+                      fontWeight: 800,
+                      background: activeCreateTab === "NCR" ? "#2563eb" : "transparent",
+                      color: activeCreateTab === "NCR" ? "#ffffff" : "#1e3a8a",
+                    }}
+                  >
+                    New NCR
+                  </button>
+                  <button
+                    onClick={() => setActiveCreateTab("CAPA")}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: "none",
+                      cursor: "pointer",
+                      fontWeight: 800,
+                      background: activeCreateTab === "CAPA" ? "#7c3aed" : "transparent",
+                      color: activeCreateTab === "CAPA" ? "#ffffff" : "#5b21b6",
+                    }}
+                  >
+                    New CAPA
+                  </button>
+                </div>
+              </div>
+
+              {activeCreateTab === "NCR" ? (
+                <div
+                  style={{
+                    padding: 18,
+                    borderRadius: 18,
+                    background: "#eef4fb",
+                    border: "1px solid #d3dfef",
+                  }}
+                >
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={labelStyle}>Title</label>
+                      <input
+                        style={inputStyle}
+                        value={newNcr.title}
+                        onChange={(e) => setNewNcr({ ...newNcr, title: e.target.value })}
+                        placeholder="e.g. Weld record incomplete"
+                      />
+                    </div>
+
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={labelStyle}>Description</label>
+                      <textarea
+                        style={textareaStyle}
+                        value={newNcr.description}
+                        onChange={(e) => setNewNcr({ ...newNcr, description: e.target.value })}
+                        placeholder="Add details, evidence, impact, or context"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Project</label>
+                      <input
+                        style={inputStyle}
+                        value={newNcr.project}
+                        onChange={(e) => setNewNcr({ ...newNcr, project: e.target.value })}
+                        placeholder="Project name"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Owner</label>
+                      <input
+                        style={inputStyle}
+                        value={newNcr.owner}
+                        onChange={(e) => setNewNcr({ ...newNcr, owner: e.target.value })}
+                        placeholder="Owner"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Severity</label>
+                      <select
+                        style={inputStyle}
+                        value={newNcr.severity}
+                        onChange={(e) => setNewNcr({ ...newNcr, severity: e.target.value })}
+                      >
+                        {severityOptions.map((option) => (
+                          <option key={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Status</label>
+                      <select
+                        style={inputStyle}
+                        value={newNcr.status}
+                        onChange={(e) => setNewNcr({ ...newNcr, status: e.target.value })}
+                      >
+                        {statusOptions.map((option) => (
+                          <option key={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Source type</label>
+                      <select
+                        style={inputStyle}
+                        value={newNcr.source_type}
+                        onChange={(e) => setNewNcr({ ...newNcr, source_type: e.target.value })}
+                      >
+                        {sourceOptions.map((option) => (
+                          <option key={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Area</label>
+                      <input
+                        style={inputStyle}
+                        value={newNcr.area}
+                        onChange={(e) => setNewNcr({ ...newNcr, area: e.target.value })}
+                        placeholder="Area / department"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Due date</label>
+                      <input
+                        type="date"
+                        style={inputStyle}
+                        value={newNcr.due_date}
+                        onChange={(e) => setNewNcr({ ...newNcr, due_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button style={primaryButton} onClick={createNcr} disabled={saving}>
+                      {saving ? "Saving..." : "Create NCR"}
+                    </button>
+                    <button
+                      style={secondaryButton}
+                      onClick={() =>
+                        setNewNcr({
+                          title: "",
+                          description: "",
+                          severity: "Medium",
+                          status: "Open",
+                          owner: "",
+                          area: "",
+                          due_date: "",
+                          project: "",
+                          source_type: "Internal",
+                        })
+                      }
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: 18,
+                    borderRadius: 18,
+                    background: "#f3efff",
+                    border: "1px solid #ddd6fe",
+                  }}
+                >
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={labelStyle}>Title</label>
+                      <input
+                        style={inputStyle}
+                        value={newCapa.title}
+                        onChange={(e) => setNewCapa({ ...newCapa, title: e.target.value })}
+                        placeholder="e.g. Update inspection sign-off workflow"
+                      />
+                    </div>
+
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={labelStyle}>Description</label>
+                      <textarea
+                        style={textareaStyle}
+                        value={newCapa.description}
+                        onChange={(e) => setNewCapa({ ...newCapa, description: e.target.value })}
+                        placeholder="Add corrective / preventive action details"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Project</label>
+                      <input
+                        style={inputStyle}
+                        value={newCapa.project}
+                        onChange={(e) => setNewCapa({ ...newCapa, project: e.target.value })}
+                        placeholder="Project name"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Owner</label>
+                      <input
+                        style={inputStyle}
+                        value={newCapa.owner}
+                        onChange={(e) => setNewCapa({ ...newCapa, owner: e.target.value })}
+                        placeholder="Owner"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Status</label>
+                      <select
+                        style={inputStyle}
+                        value={newCapa.status}
+                        onChange={(e) => setNewCapa({ ...newCapa, status: e.target.value })}
+                      >
+                        {statusOptions.map((option) => (
+                          <option key={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Linked NCR</label>
+                      <input
+                        style={inputStyle}
+                        value={newCapa.linked_to}
+                        onChange={(e) => setNewCapa({ ...newCapa, linked_to: e.target.value })}
+                        placeholder="e.g. NCR-004"
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Due date</label>
+                      <input
+                        type="date"
+                        style={inputStyle}
+                        value={newCapa.due_date}
+                        onChange={(e) => setNewCapa({ ...newCapa, due_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button style={{ ...primaryButton, background: "#7c3aed" }} onClick={createCapa} disabled={saving}>
+                      {saving ? "Saving..." : "Create CAPA"}
+                    </button>
+                    <button
+                      style={secondaryButton}
+                      onClick={() =>
+                        setNewCapa({
+                          title: "",
+                          description: "",
+                          status: "Open",
+                          owner: "",
+                          due_date: "",
+                          linked_to: "",
+                          project: "",
+                        })
+                      }
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ ...whiteCard, padding: 22 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 16,
+              alignItems: "center",
+              flexWrap: "wrap",
+              marginBottom: 18,
+            }}
+          >
+            <div>
+              <div style={sectionLabel}>Register</div>
+              <h2 style={{ margin: 0, fontSize: 24, color: "#0f172a", fontWeight: 400 }}>
+                Combined working register
+              </h2>
+            </div>
+
+            <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>
+              {filteredRows.length} record{filteredRows.length === 1 ? "" : "s"} shown
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr repeat(5, minmax(120px, 1fr))",
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <input
+              style={inputStyle}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search number, title, owner, project, linked NCR..."
+            />
+
+            <select style={inputStyle} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+              <option>All</option>
+              <option>NCR</option>
+              <option>CAPA</option>
+            </select>
+
+            <select style={inputStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option>All</option>
+              {statusOptions.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+
+            <select style={inputStyle} value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)}>
+              <option>All</option>
+              {severityOptions.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+
+            <select style={inputStyle} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+              <option>All</option>
+              {sourceOptions.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+
+            <select style={inputStyle} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+              {projectOptions.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+
+          {loading ? (
+            <div
+              style={{
+                padding: 22,
+                borderRadius: 16,
+                background: "#ffffff",
+                border: "1px dashed #cbd5e1",
+                color: "#475569",
+              }}
+            >
+              Loading NCR / CAPA records...
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div
+              style={{
+                padding: 22,
+                borderRadius: 16,
+                background: "#ffffff",
+                border: "1px dashed #cbd5e1",
+                color: "#475569",
+              }}
+            >
+              No matching records found.
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1.45fr 400px", gap: 18, alignItems: "start" }}>
+              <div
+                style={{
+                  border: "1px solid #d7dee7",
+                  borderRadius: 18,
+                  overflow: "hidden",
+                  background: "#ffffff",
+                }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1.9fr 0.9fr 0.9fr 1fr 1fr 0.8fr",
+                    gap: 12,
+                    padding: "14px 16px",
+                    background: "#f8fafc",
+                    borderBottom: "1px solid #e5e7eb",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: "#64748b",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.3,
+                  }}
+                >
+                  <div>Record</div>
+                  <div>Status</div>
+                  <div>Priority</div>
+                  <div>Owner</div>
+                  <div>Project</div>
+                  <div>Due</div>
+                </div>
+
+                <div style={{ maxHeight: 760, overflowY: "auto" }}>
+                  {filteredRows.map((row) => {
+                    const typeTone = getTypeTone(row.type);
+                    const statusTone = getStatusTone(row.status);
+                    const severityTone = getSeverityTone(row.severity);
+                    const dueTone = dueState(row.due_date);
+                    const active = selectedRow?.id === row.id && selectedRow?.type === row.type;
+
+                    return (
+                      <button
+                        key={`${row.type}-${row.id}`}
+                        onClick={() => setSelectedRow(row)}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          display: "grid",
+                          gridTemplateColumns: "1.9fr 0.9fr 0.9fr 1fr 1fr 0.8fr",
+                          gap: 12,
+                          padding: "16px",
+                          border: "none",
+                          borderBottom: "1px solid #eef2f7",
+                          background: active ? "#eff6ff" : "#ffffff",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                              marginBottom: 8,
+                            }}
+                          >
+                            <span
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: 999,
+                                background: typeTone.bg,
+                                color: typeTone.color,
+                                border: `1px solid ${typeTone.border}`,
+                                fontSize: 12,
+                                fontWeight: 800,
+                              }}
+                            >
+                              {row.type}
+                            </span>
+                            <span style={{ fontSize: 12, fontWeight: 800, color: "#64748b" }}>
+                              {row.number}
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", marginBottom: 6 }}>
+                            {row.title || "Untitled"}
+                          </div>
+
+                          <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.45 }}>
+                            {row.description || "No description"}
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 14,
+                              flexWrap: "wrap",
+                              marginTop: 10,
+                              fontSize: 12,
+                              color: "#64748b",
+                            }}
+                          >
+                            {row.type === "NCR" && <span>Source: {row.source_type || "Internal"}</span>}
+                            {row.type === "NCR" && row.area && <span>Area: {row.area}</span>}
+                            {row.type === "CAPA" && row.linked_to && <span>Linked to: {row.linked_to}</span>}
+                            <span>Created: {formatDate(row.created_at)}</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span
+                            style={{
+                              padding: "7px 10px",
+                              borderRadius: 999,
+                              background: statusTone.bg,
+                              color: statusTone.color,
+                              fontSize: 12,
+                              fontWeight: 800,
+                              display: "inline-block",
+                            }}
+                          >
+                            {row.status}
+                          </span>
+                        </div>
+
+                        <div>
+                          {row.type === "NCR" ? (
+                            <span
+                              style={{
+                                padding: "7px 10px",
+                                borderRadius: 999,
+                                background: severityTone.bg,
+                                color: severityTone.color,
+                                fontSize: 12,
+                                fontWeight: 800,
+                                display: "inline-block",
+                              }}
+                            >
+                              {row.severity}
+                            </span>
+                          ) : (
+                            <span style={{ color: "#94a3b8", fontSize: 13 }}>—</span>
+                          )}
+                        </div>
+
+                        <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 700 }}>
+                          {row.owner || "—"}
+                        </div>
+
+                        <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 700 }}>
+                          {row.project || "—"}
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 800,
+                            color:
+                              dueTone === "overdue"
+                                ? "#b91c1c"
+                                : dueTone === "soon"
+                                ? "#a16207"
+                                : "#0f172a",
+                          }}
+                        >
+                          {formatDate(row.due_date)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #d7dee7",
+                  borderRadius: 18,
+                  background: "#ffffff",
+                  minHeight: 400,
+                  position: "sticky",
+                  top: 16,
+                }}
+              >
+                {!selectedRow || !editRow ? (
+                  <div style={{ padding: 22 }}>
+                    <div style={sectionLabel}>Edit panel</div>
+                    <h3 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 600 }}>
+                      Select a record
+                    </h3>
+                    <p style={{ color: "#475569", lineHeight: 1.6 }}>
+                      Click any NCR or CAPA from the register to review and edit it here.
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ padding: 22 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        marginBottom: 14,
+                      }}
+                    >
+                      <div>
+                        <div style={sectionLabel}>Edit panel</div>
+                        <h3 style={{ margin: 0, fontSize: 20, color: "#0f172a", fontWeight: 600 }}>
+                          {editRow.number}
+                        </h3>
+                      </div>
+
+                      <span
+                        style={{
+                          padding: "7px 10px",
+                          borderRadius: 999,
+                          background: getTypeTone(editRow.type).bg,
+                          color: getTypeTone(editRow.type).color,
+                          border: `1px solid ${getTypeTone(editRow.type).border}`,
+                          fontWeight: 800,
+                          fontSize: 12,
+                        }}
+                      >
+                        {editRow.type}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "grid", gap: 12 }}>
+                      <div>
+                        <label style={labelStyle}>Title</label>
+                        <input
+                          style={inputStyle}
+                          value={editRow.title}
+                          onChange={(e) => setEditRow({ ...editRow, title: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Description</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.description}
+                          onChange={(e) => setEditRow({ ...editRow, description: e.target.value })}
+                        />
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <label style={labelStyle}>Status</label>
+                          <select
+                            style={inputStyle}
+                            value={editRow.status}
+                            onChange={(e) => setEditRow({ ...editRow, status: e.target.value })}
+                          >
+                            {statusOptions.map((option) => (
+                              <option key={option}>{option}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Owner</label>
+                          <input
+                            style={inputStyle}
+                            value={editRow.owner}
+                            onChange={(e) => setEditRow({ ...editRow, owner: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Project</label>
+                          <input
+                            style={inputStyle}
+                            value={editRow.project}
+                            onChange={(e) => setEditRow({ ...editRow, project: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Due date</label>
+                          <input
+                            type="date"
+                            style={inputStyle}
+                            value={editRow.due_date ? editRow.due_date.slice(0, 10) : ""}
+                            onChange={(e) => setEditRow({ ...editRow, due_date: e.target.value })}
+                          />
+                        </div>
+
+                        {editRow.type === "NCR" && (
+                          <>
+                            <div>
+                              <label style={labelStyle}>Severity</label>
+                              <select
+                                style={inputStyle}
+                                value={editRow.severity}
+                                onChange={(e) => setEditRow({ ...editRow, severity: e.target.value })}
+                              >
+                                {severityOptions.map((option) => (
+                                  <option key={option}>{option}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label style={labelStyle}>Source type</label>
+                              <select
+                                style={inputStyle}
+                                value={editRow.source_type}
+                                onChange={(e) => setEditRow({ ...editRow, source_type: e.target.value })}
+                              >
+                                {sourceOptions.map((option) => (
+                                  <option key={option}>{option}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div style={{ gridColumn: "1 / -1" }}>
+                              <label style={labelStyle}>Area</label>
+                              <input
+                                style={inputStyle}
+                                value={editRow.area}
+                                onChange={(e) => setEditRow({ ...editRow, area: e.target.value })}
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {editRow.type === "CAPA" && (
+                          <div style={{ gridColumn: "1 / -1" }}>
+                            <label style={labelStyle}>Linked NCR</label>
+                            <input
+                              style={inputStyle}
+                              value={editRow.linked_to}
+                              onChange={(e) => setEditRow({ ...editRow, linked_to: e.target.value })}
+                              placeholder="e.g. NCR-002"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 18 }}>
+                      <button style={primaryButton} onClick={saveEdit} disabled={saving}>
+                        {saving ? "Saving..." : "Save changes"}
+                      </button>
+                      <button
+                        style={secondaryButton}
+                        onClick={() => {
+                          setSelectedRow(null);
+                          setEditRow(null);
+                        }}
+                      >
+                        Close
+                      </button>
+                      <button
+                        style={{
+                          ...secondaryButton,
+                          borderColor: "#fecaca",
+                          color: "#b91c1c",
+                          background: "#fff5f5",
+                        }}
+                        onClick={deleteSelected}
+                        disabled={saving}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
-
-function RecordTypeBadge({ value }: { value: string }) {
-  const styles =
-    value === "NCR"
-      ? { background: "#fee2e2", color: "#991b1b" }
-      : { background: "#dbeafe", color: "#1d4ed8" };
-
-  return <span style={{ ...badgeStyle, ...styles }}>{value}</span>;
-}
-
-function SourceBadge({ value }: { value: string }) {
-  const lower = value.toLowerCase();
-
-  const styles =
-    lower === "internal"
-      ? { background: "#dbeafe", color: "#1d4ed8" }
-      : lower === "supplier"
-      ? { background: "#fef3c7", color: "#92400e" }
-      : lower === "external"
-      ? { background: "#dcfce7", color: "#166534" }
-      : { background: "#e5e7eb", color: "#374151" };
-
-  return <span style={{ ...badgeStyle, ...styles }}>{value}</span>;
-}
-
-function StatusBadge({ value }: { value: string }) {
-  const lower = value.toLowerCase();
-
-  const styles =
-    lower === "closed" || lower === "complete" || lower === "completed"
-      ? { background: "#dcfce7", color: "#166534" }
-      : lower === "open"
-      ? { background: "#dbeafe", color: "#1d4ed8" }
-      : lower === "in progress"
-      ? { background: "#fef3c7", color: "#92400e" }
-      : { background: "#e5e7eb", color: "#374151" };
-
-  return <span style={{ ...badgeStyle, ...styles }}>{value}</span>;
-}
-
-function SeverityBadge({ value }: { value: string }) {
-  const lower = value.toLowerCase();
-
-  const styles =
-    lower === "major"
-      ? { background: "#fee2e2", color: "#991b1b" }
-      : lower === "minor"
-      ? { background: "#fef3c7", color: "#92400e" }
-      : { background: "#e5e7eb", color: "#374151" };
-
-  return <span style={{ ...badgeStyle, ...styles }}>{value}</span>;
-}
-
-const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
-  color: "white",
-  borderRadius: "22px",
-  padding: "28px 30px",
-  marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(15, 118, 110, 0.14)",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "24px",
-  alignItems: "flex-start",
-  flexWrap: "wrap",
-};
-
-const eyebrowStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 700,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  opacity: 0.8,
-  marginBottom: "10px",
-};
-
-const heroTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "34px",
-  lineHeight: 1.08,
-};
-
-const heroSubtitleStyle: CSSProperties = {
-  marginTop: "10px",
-  marginBottom: 0,
-  fontSize: "16px",
-  maxWidth: "760px",
-  color: "rgba(255,255,255,0.92)",
-};
-
-const priorityStripStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-  gap: "12px",
-  marginTop: "18px",
-};
-
-const heroPillStyle: CSSProperties = {
-  borderRadius: "14px",
-  padding: "12px 14px",
-  minHeight: "82px",
-};
-
-const heroPillLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 700,
-  color: "rgba(255,255,255,0.88)",
-  marginBottom: "8px",
-};
-
-const heroPillValueStyle: CSSProperties = {
-  fontSize: "26px",
-  fontWeight: 800,
-};
-
-const heroMetaWrapStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(180px, 1fr))",
-  gap: "12px",
-  minWidth: "340px",
-  flex: "1 1 340px",
-};
-
-const heroMetaCardStyle: CSSProperties = {
-  background: "rgba(255,255,255,0.10)",
-  border: "1px solid rgba(255,255,255,0.14)",
-  borderRadius: "14px",
-  padding: "14px 16px",
-};
-
-const heroMetaLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 700,
-  opacity: 0.82,
-  marginBottom: "6px",
-};
-
-const heroMetaValueStyle: CSSProperties = {
-  fontSize: "18px",
-  fontWeight: 700,
-};
-
-const heroMetaValueStyleSmall: CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 700,
-  lineHeight: 1.4,
-};
-
-const topUtilityRowStyle: CSSProperties = {
-  marginBottom: "20px",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "12px",
-  flexWrap: "wrap",
-};
-
-const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
-  fontWeight: 700,
-  textDecoration: "none",
-};
-
-const statusBannerInlineStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "12px",
-  padding: "12px 16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
-};
-
-const statsGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-  gap: "16px",
-  marginBottom: "20px",
-};
-
-const statCardStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "16px",
-  padding: "18px 20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-
-const statCardLabelStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#64748b",
-  fontWeight: 600,
-};
-
-const statCardValueStyle: CSSProperties = {
-  fontSize: "34px",
-  fontWeight: 700,
-  color: "#0f172a",
-  marginTop: "8px",
-};
-
-const twoColumnGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "20px",
-  marginBottom: "20px",
-};
-
-const panelStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "18px",
-  padding: "20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  marginBottom: "20px",
-};
-
-const sectionHeaderRowStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "flex-start",
-  gap: "16px",
-  marginBottom: "16px",
-  flexWrap: "wrap",
-};
-
-const sectionTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "20px",
-  color: "#0f172a",
-};
-
-const sectionSubtitleStyle: CSSProperties = {
-  margin: "6px 0 0",
-  color: "#64748b",
-  fontSize: "14px",
-};
-
-const fieldWrapStyle: CSSProperties = {
-  display: "grid",
-  gap: "6px",
-};
-
-const fieldLabelStyle: CSSProperties = {
-  fontSize: "13px",
-  fontWeight: 700,
-  color: "#334155",
-};
-
-const formGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "14px",
-};
-
-const inputStyle: CSSProperties = {
-  padding: "11px 12px",
-  borderRadius: "10px",
-  border: "1px solid #cbd5e1",
-  background: "white",
-  color: "#0f172a",
-  width: "100%",
-};
-
-const readOnlyInputStyle: CSSProperties = {
-  padding: "11px 12px",
-  borderRadius: "10px",
-  border: "1px solid #cbd5e1",
-  background: "#f8fafc",
-  color: "#334155",
-  width: "100%",
-  fontWeight: 700,
-};
-
-const smallInputStyle: CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: "8px",
-  border: "1px solid #cbd5e1",
-  width: "100%",
-  background: "white",
-  color: "#0f172a",
-};
-
-const formFooterStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "12px",
-  flexWrap: "wrap",
-  marginTop: "16px",
-};
-
-const helperTextStyle: CSSProperties = {
-  color: "#64748b",
-  fontSize: "13px",
-};
-
-const primaryButtonStyle: CSSProperties = {
-  background: "#0f766e",
-  color: "white",
-  border: "none",
-  padding: "11px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: 700,
-};
-
-const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
-  border: "none",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: 700,
-};
-
-const miniButtonStyle: CSSProperties = {
-  background: "#2563eb",
-  color: "white",
-  border: "none",
-  padding: "8px 12px",
-  borderRadius: "8px",
-  cursor: "pointer",
-  fontWeight: 700,
-};
-
-const miniButtonGreyStyle: CSSProperties = {
-  background: "#64748b",
-  color: "white",
-  border: "none",
-  padding: "8px 12px",
-  borderRadius: "8px",
-  cursor: "pointer",
-  fontWeight: 700,
-};
-
-const miniButtonDeleteStyle: CSSProperties = {
-  background: "#dc2626",
-  color: "white",
-  border: "none",
-  padding: "8px 12px",
-  borderRadius: "8px",
-  cursor: "pointer",
-  fontWeight: 700,
-};
-
-const filterBarStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
-  gap: "12px",
-  marginBottom: "16px",
-};
-
-const tableInfoRowStyle: CSSProperties = {
-  marginBottom: "12px",
-  color: "#475569",
-  fontSize: "14px",
-};
-
-const tableStyle: CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-};
-
-const tableHeadStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "12px 10px",
-  borderBottom: "1px solid #e2e8f0",
-  color: "#475569",
-  fontSize: "13px",
-  whiteSpace: "nowrap",
-};
-
-const tableRowStyle: CSSProperties = {
-  transition: "background 0.2s ease",
-};
-
-const tableCellStyle: CSSProperties = {
-  padding: "14px 10px",
-  borderBottom: "1px solid #f1f5f9",
-  color: "#0f172a",
-  verticalAlign: "middle",
-};
-
-const readOnlyTableCellStyle: CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: "8px",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  fontWeight: 700,
-  color: "#334155",
-};
-
-const primaryCellTextStyle: CSSProperties = {
-  fontWeight: 600,
-  color: "#0f172a",
-};
-
-const secondaryCellTextStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "#64748b",
-  marginTop: "4px",
-};
-
-const recordNumberStyle: CSSProperties = {
-  fontWeight: 800,
-  color: "#0f766e",
-  whiteSpace: "nowrap",
-};
-
-const emptyTableCellStyle: CSSProperties = {
-  padding: "24px 10px",
-  textAlign: "center",
-  color: "#64748b",
-};
-
-const actionButtonsWrapStyle: CSSProperties = {
-  display: "flex",
-  gap: "8px",
-  flexWrap: "wrap",
-};
-
-const badgeStyle: CSSProperties = {
-  padding: "5px 10px",
-  borderRadius: "999px",
-  fontSize: "12px",
-  fontWeight: 700,
-  display: "inline-block",
-  whiteSpace: "nowrap",
-};
-
-const miniListCardStyle: CSSProperties = {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  borderRadius: "14px",
-  padding: "14px",
-};
-
-const miniListTitleStyle: CSSProperties = {
-  marginTop: 0,
-  marginBottom: "12px",
-  fontSize: "16px",
-  color: "#0f172a",
-};
-
-const miniListWrapStyle: CSSProperties = {
-  display: "grid",
-  gap: "10px",
-};
-
-const miniListItemStyle: CSSProperties = {
-  borderRadius: "12px",
-  padding: "12px 14px",
-};
-
-const miniListLine1Style: CSSProperties = {
-  fontWeight: 700,
-  color: "#0f172a",
-  fontSize: "14px",
-};
-
-const miniListLine2Style: CSSProperties = {
-  color: "#64748b",
-  fontSize: "13px",
-  marginTop: "4px",
-  lineHeight: 1.45,
-};
-
-const emptyTextStyle: CSSProperties = {
-  color: "#64748b",
-  margin: 0,
-};
