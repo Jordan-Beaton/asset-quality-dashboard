@@ -18,6 +18,18 @@ type ActionItem = {
   updated_at?: string | null;
 };
 
+type EvidenceFile = {
+  id: string;
+  record_type: "ACTION" | "NCR" | "CAPA";
+  record_id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  content_type: string | null;
+  notes: string | null;
+  uploaded_at: string;
+};
+
 type ActionForm = {
   title: string;
   project: string;
@@ -102,6 +114,20 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
+function formatFileSize(bytes: number | null | undefined) {
+  if (!bytes || bytes <= 0) return "-";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`;
+}
+
 function getDaysFromToday(value: string | null | undefined) {
   if (!value) return null;
 
@@ -134,13 +160,22 @@ function getDueLabel(value: string | null | undefined) {
   return `Due in ${days} days`;
 }
 
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 export default function ActionsPage() {
   const [actions, setActions] = useState<ActionItem[]>([]);
+  const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
   const [message, setMessage] = useState("Loading actions...");
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   const [form, setForm] = useState<ActionForm>(emptyForm);
+  const [createFiles, setCreateFiles] = useState<File[]>([]);
+  const [createEvidenceNotes, setCreateEvidenceNotes] = useState("");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -151,18 +186,35 @@ export default function ActionsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ActionForm>(emptyForm);
 
+  const [selectedEvidenceAction, setSelectedEvidenceAction] = useState<ActionItem | null>(null);
+  const [selectedEvidenceFiles, setSelectedEvidenceFiles] = useState<File[]>([]);
+  const [selectedEvidenceNotes, setSelectedEvidenceNotes] = useState("");
+
   async function loadActions(showLoadedMessage = true) {
     setIsLoading(true);
 
-    const { data, error } = await supabase.from("actions").select("*");
+    const [{ data: actionsData, error: actionsError }, { data: evidenceData, error: evidenceError }] = await Promise.all([
+      supabase.from("actions").select("*"),
+      supabase
+        .from("evidence_files")
+        .select("*")
+        .eq("record_type", "ACTION")
+        .order("uploaded_at", { ascending: false }),
+    ]);
 
-    if (error) {
-      setMessage(`Error: ${error.message}`);
+    if (actionsError) {
+      setMessage(`Error: ${actionsError.message}`);
       setIsLoading(false);
       return;
     }
 
-    const sorted = [...(data || [])].sort((a, b) => {
+    if (evidenceError) {
+      setMessage(`Evidence load failed: ${evidenceError.message}`);
+      setIsLoading(false);
+      return;
+    }
+
+    const sorted = [...(actionsData || [])].sort((a, b) => {
       const aNum = extractActionNumber(a.action_number);
       const bNum = extractActionNumber(b.action_number);
 
@@ -174,6 +226,7 @@ export default function ActionsPage() {
     });
 
     setActions(sorted);
+    setEvidenceFiles((evidenceData as EvidenceFile[]) || []);
     setLastRefreshed(new Date());
     setIsLoading(false);
 
@@ -190,12 +243,24 @@ export default function ActionsPage() {
     return getNextAvailableActionNumber(actions);
   }, [actions]);
 
+  const evidenceCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    evidenceFiles.forEach((file) => {
+      map.set(file.record_id, (map.get(file.record_id) || 0) + 1);
+    });
+    return map;
+  }, [evidenceFiles]);
+
+  const selectedActionEvidence = useMemo(() => {
+    if (!selectedEvidenceAction) return [];
+    return evidenceFiles.filter((file) => file.record_id === selectedEvidenceAction.id);
+  }, [evidenceFiles, selectedEvidenceAction]);
+
   const openActions = actions.filter((a) => !isClosedLikeStatus(a.status)).length;
   const closedActions = actions.filter((a) => isClosedLikeStatus(a.status)).length;
   const overdueActions = actions.filter((a) => isOverdue(a)).length;
   const highPriorityOpen = actions.filter(
-    (a) =>
-      (a.priority || "").toLowerCase() === "high" && !isClosedLikeStatus(a.status)
+    (a) => (a.priority || "").toLowerCase() === "high" && !isClosedLikeStatus(a.status)
   ).length;
 
   const dueThisWeek = actions.filter((a) => {
@@ -222,13 +287,7 @@ export default function ActionsPage() {
       const matchesOwner = !ownerFilter || (action.owner || "") === ownerFilter;
       const matchesProject = !projectFilter || (action.project || "") === projectFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesPriority &&
-        matchesOwner &&
-        matchesProject
-      );
+      return matchesSearch && matchesStatus && matchesPriority && matchesOwner && matchesProject;
     });
   }, [actions, search, statusFilter, priorityFilter, ownerFilter, projectFilter]);
 
@@ -268,6 +327,64 @@ export default function ActionsPage() {
     return [...new Set(actions.map((a) => a.project).filter(Boolean))].sort();
   }, [actions]);
 
+  function handleCreateFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []);
+    setCreateFiles(files);
+  }
+
+  function handleSelectedEvidenceFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []);
+    setSelectedEvidenceFiles(files);
+  }
+
+  async function uploadEvidenceForRecord(recordId: string, files: File[], notes: string) {
+    if (!files.length) return { ok: true as const };
+
+    const metadataRows: Array<{
+      record_type: "ACTION";
+      record_id: string;
+      file_name: string;
+      file_path: string;
+      file_size: number;
+      content_type: string;
+      notes: string | null;
+    }> = [];
+
+    for (const file of files) {
+      const safeName = sanitizeFileName(file.name);
+      const filePath = `ACTION/${recordId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("quality-evidence")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        return { ok: false as const, message: uploadError.message };
+      }
+
+      metadataRows.push({
+        record_type: "ACTION",
+        record_id: recordId,
+        file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        content_type: file.type || "application/octet-stream",
+        notes: notes.trim() || null,
+      });
+    }
+
+    const { error: metadataError } = await supabase.from("evidence_files").insert(metadataRows);
+
+    if (metadataError) {
+      return { ok: false as const, message: metadataError.message };
+    }
+
+    return { ok: true as const };
+  }
+
   async function addAction(e: React.FormEvent) {
     e.preventDefault();
 
@@ -276,26 +393,47 @@ export default function ActionsPage() {
       return;
     }
 
+    setIsSaving(true);
+
     const actionNumberToUse = getNextAvailableActionNumber(actions);
 
-    const { error } = await supabase.from("actions").insert([
-      {
-        action_number: actionNumberToUse,
-        title: form.title.trim(),
-        project: form.project.trim() || null,
-        owner: form.owner.trim() || null,
-        priority: form.priority,
-        status: form.status,
-        due_date: form.due_date || null,
-      },
-    ]);
+    const { data, error } = await supabase
+      .from("actions")
+      .insert([
+        {
+          action_number: actionNumberToUse,
+          title: form.title.trim(),
+          project: form.project.trim() || null,
+          owner: form.owner.trim() || null,
+          priority: form.priority,
+          status: form.status,
+          due_date: form.due_date || null,
+        },
+      ])
+      .select("*")
+      .single();
 
-    if (error) {
-      setMessage(`Add action failed: ${error.message}`);
+    if (error || !data) {
+      setIsSaving(false);
+      setMessage(`Add action failed: ${error?.message || "Unknown error"}`);
       return;
     }
 
+    if (createFiles.length > 0) {
+      const uploadResult = await uploadEvidenceForRecord(data.id, createFiles, createEvidenceNotes);
+
+      if (!uploadResult.ok) {
+        setIsSaving(false);
+        setMessage(`Action created, but evidence upload failed: ${uploadResult.message}`);
+        await loadActions(false);
+        return;
+      }
+    }
+
     setForm(emptyForm);
+    setCreateFiles([]);
+    setCreateEvidenceNotes("");
+    setIsSaving(false);
     setMessage(`Action ${actionNumberToUse} added successfully.`);
     await loadActions(false);
   }
@@ -318,6 +456,8 @@ export default function ActionsPage() {
       return;
     }
 
+    setIsSaving(true);
+
     const { error } = await supabase
       .from("actions")
       .update({
@@ -331,6 +471,8 @@ export default function ActionsPage() {
       })
       .eq("id", id);
 
+    setIsSaving(false);
+
     if (error) {
       setMessage(`Update failed: ${error.message}`);
       return;
@@ -342,7 +484,7 @@ export default function ActionsPage() {
   }
 
   async function deleteAction(id: string) {
-    if (!window.confirm("Delete this action?")) return;
+    if (!window.confirm("Delete this action? This does not automatically delete evidence files.")) return;
 
     const { error } = await supabase.from("actions").delete().eq("id", id);
 
@@ -351,7 +493,82 @@ export default function ActionsPage() {
       return;
     }
 
+    if (selectedEvidenceAction?.id === id) {
+      setSelectedEvidenceAction(null);
+      setSelectedEvidenceFiles([]);
+      setSelectedEvidenceNotes("");
+    }
+
     setMessage("Action deleted successfully.");
+    await loadActions(false);
+  }
+
+  async function uploadEvidenceToSelectedAction() {
+    if (!selectedEvidenceAction) {
+      setMessage("Select an action first.");
+      return;
+    }
+
+    if (selectedEvidenceFiles.length === 0) {
+      setMessage("Select at least one evidence file to upload.");
+      return;
+    }
+
+    setIsUploadingEvidence(true);
+
+    const uploadResult = await uploadEvidenceForRecord(
+      selectedEvidenceAction.id,
+      selectedEvidenceFiles,
+      selectedEvidenceNotes
+    );
+
+    setIsUploadingEvidence(false);
+
+    if (!uploadResult.ok) {
+      setMessage(`Evidence upload failed: ${uploadResult.message}`);
+      return;
+    }
+
+    setSelectedEvidenceFiles([]);
+    setSelectedEvidenceNotes("");
+    setMessage("Evidence uploaded successfully.");
+    await loadActions(false);
+  }
+
+  async function openEvidence(file: EvidenceFile) {
+    const { data, error } = await supabase.storage
+      .from("quality-evidence")
+      .createSignedUrl(file.file_path, 300);
+
+    if (error || !data?.signedUrl) {
+      setMessage(`Could not open file: ${error?.message || "Unknown error"}`);
+      return;
+    }
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function deleteEvidence(file: EvidenceFile) {
+    const confirmed = window.confirm(`Delete evidence file \"${file.file_name}\"?`);
+    if (!confirmed) return;
+
+    const { error: storageError } = await supabase.storage
+      .from("quality-evidence")
+      .remove([file.file_path]);
+
+    if (storageError) {
+      setMessage(`File delete failed: ${storageError.message}`);
+      return;
+    }
+
+    const { error: metadataError } = await supabase.from("evidence_files").delete().eq("id", file.id);
+
+    if (metadataError) {
+      setMessage(`Evidence record delete failed: ${metadataError.message}`);
+      return;
+    }
+
+    setMessage("Evidence deleted successfully.");
     await loadActions(false);
   }
 
@@ -370,31 +587,15 @@ export default function ActionsPage() {
           <div style={eyebrowStyle}>Action Register</div>
           <h1 style={heroTitleStyle}>Actions</h1>
           <p style={heroSubtitleStyle}>
-            Track ownership, due dates, priorities and progress in one place.
+            Track ownership, due dates, priorities, progress and supporting evidence in one place.
             Built for real follow-up, not just record keeping.
           </p>
 
           <div style={priorityStripStyle}>
-            <HeroPill
-              label="Open"
-              value={openActions}
-              tone={openActions > 0 ? "blue" : "neutral"}
-            />
-            <HeroPill
-              label="Overdue"
-              value={overdueActions}
-              tone={overdueActions > 0 ? "red" : "green"}
-            />
-            <HeroPill
-              label="Due This Week"
-              value={dueThisWeek}
-              tone={dueThisWeek > 0 ? "amber" : "green"}
-            />
-            <HeroPill
-              label="High Priority Open"
-              value={highPriorityOpen}
-              tone={highPriorityOpen > 0 ? "red" : "green"}
-            />
+            <HeroPill label="Open" value={openActions} tone={openActions > 0 ? "blue" : "neutral"} />
+            <HeroPill label="Overdue" value={overdueActions} tone={overdueActions > 0 ? "red" : "green"} />
+            <HeroPill label="Due This Week" value={dueThisWeek} tone={dueThisWeek > 0 ? "amber" : "green"} />
+            <HeroPill label="High Priority Open" value={highPriorityOpen} tone={highPriorityOpen > 0 ? "red" : "green"} />
           </div>
         </div>
 
@@ -419,8 +620,8 @@ export default function ActionsPage() {
           </div>
 
           <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Closed / Complete</div>
-            <div style={heroMetaValueStyleSmall}>{closedActions}</div>
+            <div style={heroMetaLabelStyle}>Evidence Files</div>
+            <div style={heroMetaValueStyleSmall}>{evidenceFiles.length}</div>
           </div>
         </div>
       </section>
@@ -439,14 +640,11 @@ export default function ActionsPage() {
         <StatCard title="Open Actions" value={openActions} accent="#2563eb" />
         <StatCard title="Closed / Complete" value={closedActions} accent="#16a34a" />
         <StatCard title="Overdue Actions" value={overdueActions} accent="#dc2626" />
-        <StatCard title="Due This Week" value={dueThisWeek} accent="#f59e0b" />
+        <StatCard title="Evidence Files" value={evidenceFiles.length} accent="#7c3aed" />
       </section>
 
       <section style={twoColumnGridStyle}>
-        <SectionCard
-          title="Create Action"
-          subtitle="Add a new action with automatic numbering and project tracking."
-        >
+        <SectionCard title="Create Action" subtitle="Add a new action with automatic numbering, project tracking and optional evidence upload.">
           <form onSubmit={addAction}>
             <div style={formGridStyle}>
               <Field label="Action Number">
@@ -481,11 +679,7 @@ export default function ActionsPage() {
               </Field>
 
               <Field label="Priority">
-                <select
-                  value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                  style={inputStyle}
-                >
+                <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} style={inputStyle}>
                   <option value="Low">Low</option>
                   <option value="Medium">Medium</option>
                   <option value="High">High</option>
@@ -493,11 +687,7 @@ export default function ActionsPage() {
               </Field>
 
               <Field label="Status">
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}
-                  style={inputStyle}
-                >
+                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={inputStyle}>
                   <option value="Open">Open</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Closed">Closed</option>
@@ -506,30 +696,37 @@ export default function ActionsPage() {
               </Field>
 
               <Field label="Due Date">
-                <input
-                  type="date"
-                  value={form.due_date}
-                  onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-                  style={inputStyle}
+                <input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} style={inputStyle} />
+              </Field>
+
+              <Field label="Evidence Files (optional)">
+                <input type="file" multiple onChange={handleCreateFileChange} style={inputStyle} />
+              </Field>
+
+              <Field label="Evidence Notes (optional)">
+                <textarea
+                  placeholder="Add a note for the uploaded evidence"
+                  value={createEvidenceNotes}
+                  onChange={(e) => setCreateEvidenceNotes(e.target.value)}
+                  style={textAreaStyle}
                 />
               </Field>
             </div>
 
+            <SelectedFilesList files={createFiles} />
+
             <div style={formFooterStyle}>
-              <button type="submit" style={primaryButtonStyle}>
-                Add Action
+              <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Add Action"}
               </button>
               <span style={helperTextStyle}>
-                Numbering fills the next available slot automatically.
+                Numbering fills the next available slot automatically. Evidence uploads after the action is created.
               </span>
             </div>
           </form>
         </SectionCard>
 
-        <SectionCard
-          title="Priority View"
-          subtitle="What needs chasing right now."
-        >
+        <SectionCard title="Priority View" subtitle="What needs chasing right now.">
           <div style={listGridStyle}>
             <MiniListCard
               title="Overdue First"
@@ -624,6 +821,7 @@ export default function ActionsPage() {
                 <th style={tableHeadStyle}>Priority</th>
                 <th style={tableHeadStyle}>Status</th>
                 <th style={tableHeadStyle}>Due Date</th>
+                <th style={tableHeadStyle}>Evidence</th>
                 <th style={tableHeadStyle}>Updated</th>
                 <th style={tableHeadStyle}>Actions</th>
               </tr>
@@ -631,20 +829,22 @@ export default function ActionsPage() {
             <tbody>
               {filteredActions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={emptyTableCellStyle}>
+                  <td colSpan={10} style={emptyTableCellStyle}>
                     No actions match the current filters.
                   </td>
                 </tr>
               ) : (
                 filteredActions.map((action) => {
                   const overdue = isOverdue(action);
+                  const evidenceCount = evidenceCountMap.get(action.id) || 0;
+                  const evidenceActive = selectedEvidenceAction?.id === action.id;
 
                   return (
                     <tr
                       key={action.id}
                       style={{
                         ...tableRowStyle,
-                        background: overdue ? "#fff7f7" : "white",
+                        background: overdue ? "#fff7f7" : evidenceActive ? "#f5f3ff" : "white",
                       }}
                     >
                       {editingId === action.id ? (
@@ -653,43 +853,23 @@ export default function ActionsPage() {
                             <div style={readOnlyTableCellStyle}>{action.action_number || "-"}</div>
                           </td>
                           <td style={tableCellStyle}>
-                            <input
-                              value={editForm.title}
-                              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                              style={smallInputStyle}
-                            />
+                            <input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} style={smallInputStyle} />
                           </td>
                           <td style={tableCellStyle}>
-                            <input
-                              value={editForm.project}
-                              onChange={(e) => setEditForm({ ...editForm, project: e.target.value })}
-                              style={smallInputStyle}
-                            />
+                            <input value={editForm.project} onChange={(e) => setEditForm({ ...editForm, project: e.target.value })} style={smallInputStyle} />
                           </td>
                           <td style={tableCellStyle}>
-                            <input
-                              value={editForm.owner}
-                              onChange={(e) => setEditForm({ ...editForm, owner: e.target.value })}
-                              style={smallInputStyle}
-                            />
+                            <input value={editForm.owner} onChange={(e) => setEditForm({ ...editForm, owner: e.target.value })} style={smallInputStyle} />
                           </td>
                           <td style={tableCellStyle}>
-                            <select
-                              value={editForm.priority}
-                              onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
-                              style={smallInputStyle}
-                            >
+                            <select value={editForm.priority} onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })} style={smallInputStyle}>
                               <option value="Low">Low</option>
                               <option value="Medium">Medium</option>
                               <option value="High">High</option>
                             </select>
                           </td>
                           <td style={tableCellStyle}>
-                            <select
-                              value={editForm.status}
-                              onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                              style={smallInputStyle}
-                            >
+                            <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} style={smallInputStyle}>
                               <option value="Open">Open</option>
                               <option value="In Progress">In Progress</option>
                               <option value="Closed">Closed</option>
@@ -697,17 +877,15 @@ export default function ActionsPage() {
                             </select>
                           </td>
                           <td style={tableCellStyle}>
-                            <input
-                              type="date"
-                              value={editForm.due_date}
-                              onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
-                              style={smallInputStyle}
-                            />
+                            <input type="date" value={editForm.due_date} onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })} style={smallInputStyle} />
+                          </td>
+                          <td style={tableCellStyle}>
+                            <span style={evidenceCountBadgeStyle}>{evidenceCount}</span>
                           </td>
                           <td style={tableCellStyle}>{formatDateTime(action.updated_at || action.created_at)}</td>
                           <td style={tableCellStyle}>
                             <div style={actionButtonsWrapStyle}>
-                              <button type="button" onClick={() => saveEdit(action.id)} style={miniButtonStyle}>
+                              <button type="button" onClick={() => saveEdit(action.id)} style={miniButtonStyle} disabled={isSaving}>
                                 Save
                               </button>
                               <button type="button" onClick={() => setEditingId(null)} style={miniButtonGreyStyle}>
@@ -723,9 +901,7 @@ export default function ActionsPage() {
                           </td>
                           <td style={tableCellStyle}>
                             <div style={primaryCellTextStyle}>{action.title || "-"}</div>
-                            <div style={secondaryCellTextStyle}>
-                              {overdue ? getDueLabel(action.due_date) : " "}
-                            </div>
+                            <div style={secondaryCellTextStyle}>{overdue ? getDueLabel(action.due_date) : " "}</div>
                           </td>
                           <td style={tableCellStyle}>{action.project || "-"}</td>
                           <td style={tableCellStyle}>{action.owner || "-"}</td>
@@ -748,12 +924,16 @@ export default function ActionsPage() {
                             </div>
                           </td>
                           <td style={tableCellStyle}>
-                            {formatDateTime(action.updated_at || action.created_at)}
+                            <span style={evidenceCountBadgeStyle}>{evidenceCount}</span>
                           </td>
+                          <td style={tableCellStyle}>{formatDateTime(action.updated_at || action.created_at)}</td>
                           <td style={tableCellStyle}>
                             <div style={actionButtonsWrapStyle}>
                               <button type="button" onClick={() => startEdit(action)} style={miniButtonStyle}>
                                 Edit
+                              </button>
+                              <button type="button" onClick={() => setSelectedEvidenceAction(action)} style={miniButtonPurpleStyle}>
+                                Evidence
                               </button>
                               <button type="button" onClick={() => deleteAction(action.id)} style={miniButtonDeleteStyle}>
                                 Delete
@@ -770,17 +950,102 @@ export default function ActionsPage() {
           </table>
         </div>
       </SectionCard>
+
+      <SectionCard
+        title={selectedEvidenceAction ? `Evidence Manager — ${selectedEvidenceAction.action_number || "Action"}` : "Evidence Manager"}
+        subtitle={
+          selectedEvidenceAction
+            ? "Upload follow-up evidence, preview files and remove anything no longer needed."
+            : "Select the Evidence button on any action to manage files."
+        }
+        action={
+          selectedEvidenceAction ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedEvidenceAction(null);
+                setSelectedEvidenceFiles([]);
+                setSelectedEvidenceNotes("");
+              }}
+              style={secondaryButtonStyle}
+            >
+              Close Evidence Panel
+            </button>
+          ) : null
+        }
+      >
+        {!selectedEvidenceAction ? (
+          <div style={emptyEvidencePanelStyle}>No action selected for evidence management.</div>
+        ) : (
+          <div style={evidencePanelGridStyle}>
+            <div style={evidenceUploadCardStyle}>
+              <div style={evidencePanelHeadingStyle}>Upload Evidence</div>
+              <div style={evidenceMetaTextStyle}>
+                Add one or more files against <strong>{selectedEvidenceAction.action_number || "this action"}</strong>.
+              </div>
+
+              <div style={evidenceFieldWrapStyle}>
+                <label style={fieldLabelStyle}>Select files</label>
+                <input type="file" multiple onChange={handleSelectedEvidenceFileChange} style={inputStyle} />
+              </div>
+
+              <div style={evidenceFieldWrapStyle}>
+                <label style={fieldLabelStyle}>Evidence Notes (optional)</label>
+                <textarea
+                  placeholder="Add a note for the uploaded evidence"
+                  value={selectedEvidenceNotes}
+                  onChange={(e) => setSelectedEvidenceNotes(e.target.value)}
+                  style={textAreaStyle}
+                />
+              </div>
+
+              <SelectedFilesList files={selectedEvidenceFiles} />
+
+              <div style={formFooterStyle}>
+                <button type="button" onClick={uploadEvidenceToSelectedAction} style={primaryButtonStyle} disabled={isUploadingEvidence}>
+                  {isUploadingEvidence ? "Uploading..." : "Upload Evidence"}
+                </button>
+              </div>
+            </div>
+
+            <div style={evidenceListCardStyle}>
+              <div style={evidencePanelHeadingStyle}>Attached Files</div>
+
+              {selectedActionEvidence.length === 0 ? (
+                <p style={emptyTextStyle}>No evidence attached to this action yet.</p>
+              ) : (
+                <div style={evidenceListWrapStyle}>
+                  {selectedActionEvidence.map((file) => (
+                    <div key={file.id} style={evidenceItemStyle}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={evidenceFileNameStyle}>{file.file_name}</div>
+                        <div style={evidenceMetaTextStyle}>
+                          {formatFileSize(file.file_size)} · {file.content_type || "Unknown type"} · Uploaded {formatDateTime(file.uploaded_at)}
+                        </div>
+                        {file.notes ? <div style={evidenceNoteStyle}>Note: {file.notes}</div> : null}
+                      </div>
+
+                      <div style={actionButtonsWrapStyle}>
+                        <button type="button" onClick={() => openEvidence(file)} style={miniButtonStyle}>
+                          Open
+                        </button>
+                        <button type="button" onClick={() => deleteEvidence(file)} style={miniButtonDeleteStyle}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </SectionCard>
     </main>
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label style={fieldWrapStyle}>
       <span style={fieldLabelStyle}>{label}</span>
@@ -814,15 +1079,7 @@ function SectionCard({
   );
 }
 
-function StatCard({
-  title,
-  value,
-  accent,
-}: {
-  title: string;
-  value: number;
-  accent: string;
-}) {
+function StatCard({ title, value, accent }: { title: string; value: number; accent: string }) {
   return (
     <div
       style={{
@@ -910,6 +1167,23 @@ function MiniListCard({
   );
 }
 
+function SelectedFilesList({ files }: { files: File[] }) {
+  if (files.length === 0) {
+    return <div style={selectedFilesEmptyStyle}>No files selected.</div>;
+  }
+
+  return (
+    <div style={selectedFilesWrapStyle}>
+      {files.map((file, index) => (
+        <div key={`${file.name}-${index}`} style={selectedFileChipStyle}>
+          <span>{file.name}</span>
+          <span style={selectedFileMetaStyle}>{formatFileSize(file.size)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StatusBadge({ value }: { value: string }) {
   const lower = normaliseStatus(value);
 
@@ -922,11 +1196,7 @@ function StatusBadge({ value }: { value: string }) {
       ? { background: "#fef3c7", color: "#92400e" }
       : { background: "#e5e7eb", color: "#374151" };
 
-  return (
-    <span style={{ ...badgeStyle, ...styles }}>
-      {value}
-    </span>
-  );
+  return <span style={{ ...badgeStyle, ...styles }}>{value}</span>;
 }
 
 function PriorityBadge({ value }: { value: string }) {
@@ -941,11 +1211,7 @@ function PriorityBadge({ value }: { value: string }) {
       ? { background: "#dcfce7", color: "#166534" }
       : { background: "#e5e7eb", color: "#374151" };
 
-  return (
-    <span style={{ ...badgeStyle, ...styles }}>
-      {value}
-    </span>
-  );
+  return <span style={{ ...badgeStyle, ...styles }}>{value}</span>;
 }
 
 const heroStyle: CSSProperties = {
@@ -1144,6 +1410,14 @@ const inputStyle: CSSProperties = {
   background: "white",
   color: "#0f172a",
   width: "100%",
+  boxSizing: "border-box",
+};
+
+const textAreaStyle: CSSProperties = {
+  ...inputStyle,
+  minHeight: "92px",
+  resize: "vertical",
+  fontFamily: "Arial, Helvetica, sans-serif",
 };
 
 const readOnlyInputStyle: CSSProperties = {
@@ -1154,6 +1428,7 @@ const readOnlyInputStyle: CSSProperties = {
   color: "#334155",
   width: "100%",
   fontWeight: 700,
+  boxSizing: "border-box",
 };
 
 const smallInputStyle: CSSProperties = {
@@ -1163,6 +1438,7 @@ const smallInputStyle: CSSProperties = {
   width: "100%",
   background: "white",
   color: "#0f172a",
+  boxSizing: "border-box",
 };
 
 const formFooterStyle: CSSProperties = {
@@ -1210,6 +1486,16 @@ const miniButtonStyle: CSSProperties = {
 
 const miniButtonGreyStyle: CSSProperties = {
   background: "#64748b",
+  color: "white",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const miniButtonPurpleStyle: CSSProperties = {
+  background: "#7c3aed",
   color: "white",
   border: "none",
   padding: "8px 12px",
@@ -1358,4 +1644,122 @@ const badgeStyle: CSSProperties = {
 const emptyTextStyle: CSSProperties = {
   color: "#64748b",
   margin: 0,
+};
+
+const selectedFilesWrapStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+  marginTop: "14px",
+};
+
+const selectedFileChipStyle: CSSProperties = {
+  display: "inline-flex",
+  gap: "8px",
+  alignItems: "center",
+  padding: "8px 10px",
+  borderRadius: "999px",
+  background: "#eef2ff",
+  color: "#3730a3",
+  fontSize: "12px",
+  fontWeight: 700,
+};
+
+const selectedFileMetaStyle: CSSProperties = {
+  opacity: 0.8,
+};
+
+const selectedFilesEmptyStyle: CSSProperties = {
+  marginTop: "14px",
+  fontSize: "13px",
+  color: "#64748b",
+};
+
+const evidenceCountBadgeStyle: CSSProperties = {
+  display: "inline-block",
+  minWidth: "32px",
+  textAlign: "center",
+  padding: "5px 10px",
+  borderRadius: "999px",
+  background: "#ede9fe",
+  color: "#6d28d9",
+  fontWeight: 800,
+  fontSize: "12px",
+};
+
+const emptyEvidencePanelStyle: CSSProperties = {
+  padding: "18px",
+  borderRadius: "14px",
+  background: "#f8fafc",
+  border: "1px dashed #cbd5e1",
+  color: "#64748b",
+};
+
+const evidencePanelGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "0.95fr 1.05fr",
+  gap: "18px",
+};
+
+const evidenceUploadCardStyle: CSSProperties = {
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  padding: "16px",
+};
+
+const evidenceListCardStyle: CSSProperties = {
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  padding: "16px",
+};
+
+const evidencePanelHeadingStyle: CSSProperties = {
+  fontSize: "16px",
+  fontWeight: 700,
+  color: "#0f172a",
+  marginBottom: "10px",
+};
+
+const evidenceMetaTextStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#64748b",
+  lineHeight: 1.45,
+};
+
+const evidenceFieldWrapStyle: CSSProperties = {
+  display: "grid",
+  gap: "6px",
+  marginTop: "14px",
+};
+
+const evidenceListWrapStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+};
+
+const evidenceItemStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "14px",
+  padding: "14px",
+  borderRadius: "12px",
+  background: "white",
+  border: "1px solid #e2e8f0",
+};
+
+const evidenceFileNameStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 700,
+  color: "#0f172a",
+  wordBreak: "break-word",
+};
+
+const evidenceNoteStyle: CSSProperties = {
+  marginTop: "6px",
+  fontSize: "13px",
+  color: "#475569",
+  lineHeight: 1.45,
 };
