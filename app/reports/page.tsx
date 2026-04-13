@@ -12,6 +12,8 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 type Asset = {
   id: string;
@@ -71,6 +73,27 @@ const emptyForm = {
   next_steps: "",
 };
 
+function formatDate(value: string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("en-GB");
+}
+
+function isClosedStatus(value: string | null | undefined) {
+  const normal = (value || "").trim().toLowerCase();
+  return normal === "closed" || normal === "complete" || normal === "completed";
+}
+
+function toDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ReportsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
@@ -79,6 +102,8 @@ export default function ReportsPage() {
   const [reports, setReports] = useState<MonthlyReport[]>([]);
   const [message, setMessage] = useState("Loading reports dashboard...");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [logoFileName, setLogoFileName] = useState("/enshore-logo.png");
 
   const [form, setForm] = useState(emptyForm);
 
@@ -91,13 +116,7 @@ export default function ReportsPage() {
       supabase.from("monthly_reports").select("*").order("created_at", { ascending: false }),
     ]);
 
-    if (
-      assetsRes.error ||
-      ncrsRes.error ||
-      capasRes.error ||
-      actionsRes.error ||
-      reportsRes.error
-    ) {
+    if (assetsRes.error || ncrsRes.error || capasRes.error || actionsRes.error || reportsRes.error) {
       setMessage(
         `Error: ${
           assetsRes.error?.message ||
@@ -123,13 +142,13 @@ export default function ReportsPage() {
   }, []);
 
   const totalAssets = assets.length;
-  const openNcrs = ncrs.filter((n) => (n.status || "").toLowerCase() !== "closed").length;
-  const openCapas = capas.filter((c) => (c.status || "").toLowerCase() !== "closed").length;
-  const openActions = actions.filter((a) => (a.status || "").toLowerCase() !== "closed").length;
+  const openNcrs = ncrs.filter((n) => !isClosedStatus(n.status)).length;
+  const openCapas = capas.filter((c) => !isClosedStatus(c.status)).length;
+  const openActions = actions.filter((a) => !isClosedStatus(a.status)).length;
 
   const overdueActions = actions.filter((action) => {
     if (!action.due_date) return false;
-    if ((action.status || "").toLowerCase() === "closed") return false;
+    if (isClosedStatus(action.status)) return false;
 
     const due = new Date(action.due_date);
     const today = new Date();
@@ -140,9 +159,7 @@ export default function ReportsPage() {
   }).length;
 
   const majorOpenNcrs = ncrs.filter(
-    (n) =>
-      (n.severity || "").toLowerCase() === "major" &&
-      (n.status || "").toLowerCase() !== "closed"
+    (n) => (n.severity || "").toLowerCase() === "major" && !isClosedStatus(n.status)
   ).length;
 
   const ncrStatusChart = useMemo(() => {
@@ -180,6 +197,50 @@ export default function ReportsPage() {
     }, {});
     return Object.entries(groups).map(([name, value]) => ({ name, value }));
   }, [assets]);
+
+  const openNcrRows = useMemo(
+    () =>
+      ncrs
+        .filter((n) => !isClosedStatus(n.status))
+        .map((n) => [
+          n.ncr_number || "-",
+          n.title || "-",
+          n.severity || "-",
+          n.status || "-",
+          n.owner || "-",
+          n.area || "-",
+        ]),
+    [ncrs]
+  );
+
+  const openCapaRows = useMemo(
+    () =>
+      capas
+        .filter((c) => !isClosedStatus(c.status))
+        .map((c) => [
+          c.capa_number || "-",
+          c.title || "-",
+          c.status || "-",
+          c.owner || "-",
+          c.linked_to || "-",
+        ]),
+    [capas]
+  );
+
+  const openActionRows = useMemo(
+    () =>
+      actions
+        .filter((a) => !isClosedStatus(a.status))
+        .map((a) => [
+          a.action_number || "-",
+          a.title || "-",
+          a.priority || "-",
+          a.status || "-",
+          a.owner || "-",
+          formatDate(a.due_date),
+        ]),
+    [actions]
+  );
 
   function resetForm() {
     setForm(emptyForm);
@@ -278,6 +339,198 @@ export default function ReportsPage() {
     await loadData();
   }
 
+  async function generatePdfReport() {
+    try {
+      setIsGeneratingPdf(true);
+
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      const reportTitle = form.month_label?.trim() || `Management Report - ${new Date().toLocaleDateString("en-GB")}`;
+      const generatedAt = new Date().toLocaleString("en-GB");
+
+      try {
+        const logoResponse = await fetch(logoFileName);
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const logoFile = new File([logoBlob], "enshore-logo.png", { type: logoBlob.type || "image/png" });
+          const logoDataUrl = await toDataUrl(logoFile);
+          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 22);
+        }
+      } catch {
+        // Intentionally ignore logo fetch errors so PDF still generates.
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(20);
+      doc.text("Asset Quality Management Report", pageWidth - margin, 18, { align: "right" });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(71, 85, 105);
+      doc.text(reportTitle, pageWidth - margin, 25, { align: "right" });
+      doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 31, { align: "right" });
+
+      doc.setDrawColor(15, 118, 110);
+      doc.setLineWidth(0.7);
+      doc.line(margin, 37, pageWidth - margin, 37);
+
+      let y = 45;
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(13);
+      doc.text("Executive Summary", margin, y);
+      y += 6;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10.5);
+      doc.setTextColor(51, 65, 85);
+
+      const summaryText = form.summary?.trim()
+        ? form.summary.trim()
+        : "This report provides a live snapshot of assets, NCRs, CAPAs and actions across the quality dashboard.";
+      const summaryLines = doc.splitTextToSize(summaryText, pageWidth - margin * 2);
+      doc.text(summaryLines, margin, y);
+      y += summaryLines.length * 4.7 + 5;
+
+      const kpiRows = [
+        ["Total Assets", String(totalAssets), "Open NCRs", String(openNcrs)],
+        ["Open CAPAs", String(openCapas), "Open Actions", String(openActions)],
+        ["Overdue Actions", String(overdueActions), "Major Open NCRs", String(majorOpenNcrs)],
+      ];
+
+      autoTable(doc, {
+        startY: y,
+        theme: "grid",
+        body: kpiRows,
+        styles: {
+          fontSize: 10,
+          cellPadding: 3.5,
+          textColor: [15, 23, 42],
+          lineColor: [203, 213, 225],
+          lineWidth: 0.2,
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { fontStyle: "bold", fillColor: [240, 249, 255] },
+          1: { halign: "center", fontStyle: "bold" },
+          2: { fontStyle: "bold", fillColor: [240, 249, 255] },
+          3: { halign: "center", fontStyle: "bold" },
+        },
+        margin: { left: margin, right: margin },
+      });
+
+      y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y;
+      y += 8;
+
+      const sectionText = (label: string, text: string | null, fallback: string) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(15, 23, 42);
+        doc.text(label, margin, y);
+        y += 5;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10.3);
+        doc.setTextColor(71, 85, 105);
+        const lines = doc.splitTextToSize(text?.trim() || fallback, pageWidth - margin * 2);
+        doc.text(lines, margin, y);
+        y += lines.length * 4.5 + 6;
+      };
+
+      sectionText("Wins", form.wins, "No wins recorded for this report.");
+      sectionText("Risks", form.risks, "No risks recorded for this report.");
+      sectionText("Next Steps", form.next_steps, "No next steps recorded for this report.");
+
+      const ensurePageSpace = (neededHeight: number) => {
+        if (y + neededHeight > pageHeight - 18) {
+          doc.addPage();
+          y = 18;
+        }
+      };
+
+      ensurePageSpace(18);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Open NCR Register", margin, y);
+      y += 4;
+
+      autoTable(doc, {
+        startY: y + 2,
+        head: [["NCR No.", "Title", "Severity", "Status", "Owner", "Area"]],
+        body: openNcrRows.length ? openNcrRows : [["-", "No open NCRs", "-", "-", "-", "-"]],
+        theme: "grid",
+        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: margin, right: margin },
+      });
+
+      y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 10;
+      ensurePageSpace(18);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text("Open CAPA Register", margin, y);
+      y += 4;
+
+      autoTable(doc, {
+        startY: y + 2,
+        head: [["CAPA No.", "Title", "Status", "Owner", "Linked NCR"]],
+        body: openCapaRows.length ? openCapaRows : [["-", "No open CAPAs", "-", "-", "-"]],
+        theme: "grid",
+        headStyles: { fillColor: [124, 58, 237], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: margin, right: margin },
+      });
+
+      y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 10;
+      ensurePageSpace(18);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text("Open Actions Register", margin, y);
+      y += 4;
+
+      autoTable(doc, {
+        startY: y + 2,
+        head: [["Action No.", "Title", "Priority", "Status", "Owner", "Due Date"]],
+        body: openActionRows.length ? openActionRows : [["-", "No open actions", "-", "-", "-", "-"]],
+        theme: "grid",
+        headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: margin, right: margin },
+      });
+
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i += 1) {
+        doc.setPage(i);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Enshore Subsea · ${reportTitle}`, margin, pageHeight - 8);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+      }
+
+      const pdfBlob = doc.output("blob");
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      window.open(pdfUrl, "_blank", "noopener,noreferrer");
+      doc.save(`${reportTitle.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-")}.pdf`);
+      setMessage("PDF generated successfully.");
+    } catch (error) {
+      console.error(error);
+      setMessage("PDF generation failed.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }
+
   return (
     <main>
       <section style={heroStyle}>
@@ -286,7 +539,7 @@ export default function ReportsPage() {
           <h1 style={heroTitleStyle}>Reports</h1>
           <p style={heroSubtitleStyle}>
             Build monthly management summaries using the current live system data,
-            track saved reports, and present quality performance clearly.
+            track saved reports, and generate a professional PDF fit for internal or client-facing review.
           </p>
         </div>
 
@@ -302,10 +555,19 @@ export default function ReportsPage() {
         </div>
       </section>
 
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
         <Link href="/" style={backLinkStyle}>
           ← Back to Dashboard
         </Link>
+
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button type="button" style={secondaryButtonStyle} onClick={() => setLogoFileName("/enshore-logo.png")}>
+            Use /enshore-logo.png
+          </button>
+          <button type="button" style={pdfButtonStyle} onClick={generatePdfReport} disabled={isGeneratingPdf}>
+            {isGeneratingPdf ? "Generating PDF..." : "Generate PDF Report"}
+          </button>
+        </div>
       </div>
 
       <section style={statsGridStyle}>
@@ -532,18 +794,10 @@ export default function ReportsPage() {
                     </td>
                     <td style={tableCellStyle}>
                       <div style={actionButtonsWrapStyle}>
-                        <button
-                          type="button"
-                          style={miniButtonStyle}
-                          onClick={() => handleEdit(report)}
-                        >
+                        <button type="button" style={miniButtonStyle} onClick={() => handleEdit(report)}>
                           Edit
                         </button>
-                        <button
-                          type="button"
-                          style={miniButtonDeleteStyle}
-                          onClick={() => handleDelete(report.id)}
-                        >
+                        <button type="button" style={miniButtonDeleteStyle} onClick={() => handleDelete(report.id)}>
                           Delete
                         </button>
                       </div>
@@ -559,15 +813,7 @@ export default function ReportsPage() {
   );
 }
 
-function StatCard({
-  title,
-  value,
-  accent,
-}: {
-  title: string;
-  value: number;
-  accent: string;
-}) {
+function StatCard({ title, value, accent }: { title: string; value: number; accent: string }) {
   return (
     <div
       style={{
@@ -579,9 +825,7 @@ function StatCard({
       }}
     >
       <div style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>{title}</div>
-      <div style={{ fontSize: "34px", fontWeight: 700, color: "#0f172a", marginTop: "8px" }}>
-        {value}
-      </div>
+      <div style={{ fontSize: "34px", fontWeight: 700, color: "#0f172a", marginTop: "8px" }}>{value}</div>
     </div>
   );
 }
@@ -764,6 +1008,16 @@ const primaryButtonStyle: React.CSSProperties = {
 const secondaryButtonStyle: React.CSSProperties = {
   background: "#e2e8f0",
   color: "#0f172a",
+  border: "none",
+  padding: "10px 16px",
+  borderRadius: "10px",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const pdfButtonStyle: React.CSSProperties = {
+  background: "#1d4ed8",
+  color: "white",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
