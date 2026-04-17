@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import {
   ResponsiveContainer,
@@ -14,6 +15,7 @@ import {
 } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { supabase } from "../../src/lib/supabase";
 
 type AuditType = "Internal" | "External" | "Supplier";
 type AuditStatus = "Planned" | "In Progress" | "Completed" | "Overdue" | "Cancelled";
@@ -47,6 +49,7 @@ type AuditRecord = {
   report_file_size: number | null;
   report_uploaded_at: string;
   report_url: string;
+  report_storage_path: string;
 };
 
 type FindingRecord = {
@@ -92,188 +95,94 @@ type FindingForm = {
   corrective_action: string;
 };
 
-const seedAudits: AuditRecord[] = [
-  {
-    id: "1",
-    audit_number: "INT-26-001",
-    title: "Blyth Base Internal QMS Audit",
-    audit_type: "Internal",
-    auditee: "Blyth Base",
-    lead_auditor: "Jordan Beaton",
-    audit_date: "2026-04-10",
-    audit_month: "2026-04",
-    status: "In Progress",
-    standards: ["ISO 9001:2015"],
-    procedure_reference: "ENS-HSEQ-PRO-001",
-    certification_body: "",
-    location: "Blyth",
-    findings: { major: 0, minor: 2, ofi: 1, obs: 1 },
-    linked_ncrs: ["NCR-001"],
-    linked_actions: ["ACT-003", "ACT-007"],
-    report_file_name: "",
-    report_file_size: null,
-    report_uploaded_at: "",
-    report_url: "",
-  },
-  {
-    id: "2",
-    audit_number: "SUP-26-001",
-    title: "Supplier Audit - TrackOne",
-    audit_type: "Supplier",
-    auditee: "TrackOne",
-    lead_auditor: "Jordan Beaton",
-    audit_date: "2026-04-04",
-    audit_month: "2026-04",
-    status: "Completed",
-    standards: ["ISO 9001:2015"],
-    procedure_reference: "",
-    certification_body: "",
-    location: "Supplier Site",
-    findings: { major: 0, minor: 1, ofi: 1, obs: 1 },
-    linked_ncrs: ["NCR-004", "NCR-006"],
-    linked_actions: ["ACT-009"],
-    report_file_name: "",
-    report_file_size: null,
-    report_uploaded_at: "",
-    report_url: "",
-  },
-  {
-    id: "3",
-    audit_number: "EXT-26-001",
-    title: "LRQA Surveillance Audit",
-    audit_type: "External",
-    auditee: "Enshore Management System",
-    lead_auditor: "LRQA",
-    audit_date: "2026-05-22",
-    audit_month: "2026-05",
-    status: "Planned",
-    standards: ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018"],
-    procedure_reference: "",
-    certification_body: "LRQA",
-    location: "Blyth",
-    findings: { major: 0, minor: 0, ofi: 0, obs: 0 },
-    linked_ncrs: [],
-    linked_actions: [],
-    report_file_name: "",
-    report_file_size: null,
-    report_uploaded_at: "",
-    report_url: "",
-  },
-  {
-    id: "4",
-    audit_number: "INT-26-002",
-    title: "Business Continuity Follow-up",
-    audit_type: "Internal",
-    auditee: "Onshore Operations",
-    lead_auditor: "Jordan Beaton",
-    audit_date: "2026-03-18",
-    audit_month: "2026-03",
-    status: "Overdue",
-    standards: ["ISO 9001:2015"],
-    procedure_reference: "ENS-OPS-PRO-001",
-    certification_body: "",
-    location: "Blyth / Darlington",
-    findings: { major: 1, minor: 1, ofi: 0, obs: 0 },
-    linked_ncrs: ["NCR-010"],
-    linked_actions: ["ACT-011", "ACT-012"],
-    report_file_name: "",
-    report_file_size: null,
-    report_uploaded_at: "",
-    report_url: "",
-  },
-  {
-    id: "5",
-    audit_number: "SUP-26-002",
-    title: "Supplier Audit - Parkburn",
-    audit_type: "Supplier",
-    auditee: "Parkburn",
-    lead_auditor: "Jordan Beaton",
-    audit_date: "2026-06-11",
-    audit_month: "2026-06",
-    status: "Planned",
-    standards: ["ISO 9001:2015"],
-    procedure_reference: "",
-    certification_body: "",
-    location: "Supplier Site",
-    findings: { major: 0, minor: 0, ofi: 0, obs: 0 },
-    linked_ncrs: [],
-    linked_actions: [],
-    report_file_name: "",
-    report_file_size: null,
-    report_uploaded_at: "",
-    report_url: "",
-  },
-  {
-    id: "6",
-    audit_number: "INT-26-003",
-    title: "Calibration Process Internal Audit",
-    audit_type: "Internal",
-    auditee: "Workshop / QC",
-    lead_auditor: "Jordan Beaton",
-    audit_date: "2026-07-09",
-    audit_month: "2026-07",
-    status: "Planned",
-    standards: ["ISO 9001:2015"],
-    procedure_reference: "ENS-AST-PRO-010",
-    certification_body: "",
-    location: "Blyth",
-    findings: { major: 0, minor: 0, ofi: 0, obs: 0 },
-    linked_ncrs: [],
-    linked_actions: [],
-    report_file_name: "",
-    report_file_size: null,
-    report_uploaded_at: "",
-    report_url: "",
-  },
-];
+type AuditFileRow = {
+  id: string;
+  audit_id: string;
+  file_name: string | null;
+  file_path: string | null;
+  file_size: number | null;
+  uploaded_at: string | null;
+};
 
-const seedFindings: FindingRecord[] = [
-  {
-    id: "1",
-    audit_id: "1",
-    reference: "F-001",
-    clause: "7.5",
+type AuditFindingRow = {
+  id: string;
+  audit_id: string;
+  reference: string | null;
+  clause: string | null;
+  category: string | null;
+  description: string | null;
+  owner: string | null;
+  status: string | null;
+  due_date: string | null;
+  closure_date: string | null;
+  root_cause: string | null;
+  containment_action: string | null;
+  corrective_action: string | null;
+};
+
+type AuditLinkOption = {
+  id: string;
+  label: string;
+};
+
+const STORAGE_BUCKET = "audit-evidence";
+
+function createEmptyAudit(): AuditForm {
+  return {
+    title: "",
+    audit_type: "Internal",
+    auditee: "",
+    lead_auditor: "",
+    audit_date: new Date().toISOString().slice(0, 10),
+    audit_month: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`,
+    status: "Planned",
+    standards: ["ISO 9001:2015"],
+    procedure_reference: "",
+    certification_body: "",
+    location: "",
+  };
+}
+
+function createEmptyFinding(): FindingForm {
+  return {
+    clause: "",
     category: "Minor",
-    description: "Document review dates were not consistently updated across controlled records.",
-    owner: "D. Wardman",
+    description: "",
+    owner: "",
     status: "Open",
-    due_date: "2026-04-24",
+    due_date: "",
     closure_date: "",
-    root_cause: "Document control ownership and review cadence were not consistently applied.",
-    containment_action: "Affected records identified and flagged for immediate review.",
-    corrective_action: "Assign document owners and implement a scheduled review tracker.",
-  },
-  {
-    id: "2",
-    audit_id: "1",
-    reference: "F-002",
-    clause: "7.1.5",
-    category: "OBS",
-    description: "Calibration evidence was available but not centrally referenced against the active asset register.",
-    owner: "J. Beaton",
-    status: "In Progress",
-    due_date: "2026-04-30",
-    closure_date: "",
-    root_cause: "Calibration evidence is stored locally without a single register reference point.",
-    containment_action: "Current calibration certificates checked during the audit.",
-    corrective_action: "Add calibration evidence reference fields into the asset register.",
-  },
-  {
-    id: "3",
-    audit_id: "4",
-    reference: "F-001",
-    clause: "9.1 / Continuity Planning",
-    category: "Major",
-    description: "Location updates remained incomplete and recent exercise evidence was not available for review.",
-    owner: "Operations",
-    status: "Open",
-    due_date: "2026-04-22",
-    closure_date: "",
-    root_cause: "Business continuity ownership and review discipline were not fully maintained after organisational changes.",
-    containment_action: "Outdated continuity records identified and highlighted to management.",
-    corrective_action: "Reissue location coverage, assign owner, and complete a recorded exercise.",
-  },
-];
+    root_cause: "",
+    containment_action: "",
+    corrective_action: "",
+  };
+}
+
+function createDefaultAuditRecord(form?: Partial<AuditRecord>): AuditRecord {
+  return {
+    id: form?.id || "",
+    audit_number: form?.audit_number || "",
+    title: form?.title || "",
+    audit_type: form?.audit_type || "Internal",
+    auditee: form?.auditee || "",
+    lead_auditor: form?.lead_auditor || "",
+    audit_date: form?.audit_date || "",
+    audit_month: form?.audit_month || "",
+    status: form?.status || "Planned",
+    standards: form?.standards || [],
+    procedure_reference: form?.procedure_reference || "",
+    certification_body: form?.certification_body || "",
+    location: form?.location || "",
+    findings: form?.findings || { major: 0, minor: 0, ofi: 0, obs: 0 },
+    linked_ncrs: form?.linked_ncrs || [],
+    linked_actions: form?.linked_actions || [],
+    report_file_name: form?.report_file_name || "",
+    report_file_size: form?.report_file_size ?? null,
+    report_uploaded_at: form?.report_uploaded_at || "",
+    report_url: form?.report_url || "",
+    report_storage_path: form?.report_storage_path || "",
+  };
+}
 
 function getAuditPrefix(type: AuditType) {
   if (type === "Internal") return "INT";
@@ -430,6 +339,148 @@ function compareText(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
+function sanitizeFileName(name: string) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function normaliseAuditStatus(value: string | null | undefined): AuditStatus {
+  const input = (value || "").trim().toLowerCase();
+
+  if (input === "planned") return "Planned";
+  if (input === "in progress") return "In Progress";
+  if (input === "completed") return "Completed";
+  if (input === "overdue") return "Overdue";
+  if (input === "cancelled") return "Cancelled";
+
+  return "Planned";
+}
+
+function normaliseAuditType(value: string | null | undefined): AuditType {
+  const input = (value || "").trim().toLowerCase();
+
+  if (input === "external") return "External";
+  if (input === "supplier") return "Supplier";
+  return "Internal";
+}
+
+function normaliseFindingCategory(value: string | null | undefined): FindingSeverity {
+  const input = (value || "").trim().toLowerCase();
+
+  if (input === "major") return "Major";
+  if (input === "ofi") return "OFI";
+  if (input === "obs") return "OBS";
+  return "Minor";
+}
+
+function normaliseFindingStatus(value: string | null | undefined): FindingStatus {
+  const input = (value || "").trim().toLowerCase();
+
+  if (input === "closed") return "Closed";
+  if (input === "in progress") return "In Progress";
+  return "Open";
+}
+
+function parseStandards(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function unknownArrayToOptions(
+  data: unknown,
+  primaryKeys: string[],
+  secondaryKeys: string[]
+): AuditLinkOption[] {
+  if (!Array.isArray(data)) return [];
+
+  return data
+    .map((row) => {
+      if (typeof row !== "object" || row === null) return null;
+
+      const obj = row as Record<string, unknown>;
+      const fallbackId = String(obj["id"] ?? "").trim();
+      const primary =
+        primaryKeys.map((key) => String(obj[key] ?? "").trim()).find(Boolean) || fallbackId;
+      const secondary =
+        secondaryKeys.map((key) => String(obj[key] ?? "").trim()).find(Boolean) || "";
+
+      if (!primary) return null;
+
+      return {
+        id: primary,
+        label: secondary ? `${primary} - ${secondary}` : primary,
+      };
+    })
+    .filter((item): item is AuditLinkOption => Boolean(item?.id));
+}
+
+async function tryLoadNcrOptions(): Promise<AuditLinkOption[]> {
+  const attempts = [
+    { table: "ncrs", columns: "id,ncr_number,title" },
+    { table: "ncrs", columns: "id,ncr_number,description" },
+    { table: "ncr_capa", columns: "id,ncr_number,title" },
+    { table: "ncr_capa", columns: "id,reference,title" },
+  ];
+
+  for (const attempt of attempts) {
+    const result = await supabase.from(attempt.table).select(attempt.columns).limit(250);
+    if (result.error) continue;
+
+    const mapped = unknownArrayToOptions(
+      result.data as unknown,
+      ["ncr_number", "reference", "id"],
+      ["title", "description"]
+    );
+
+    if (mapped.length > 0) return mapped;
+  }
+
+  return [];
+}
+
+async function tryLoadActionOptions(): Promise<AuditLinkOption[]> {
+  const attempts = [
+    { table: "actions", columns: "id,action_number,title" },
+    { table: "actions", columns: "id,action_id,title" },
+    { table: "actions", columns: "id,reference,title" },
+    { table: "actions", columns: "id,action_number,description" },
+  ];
+
+  for (const attempt of attempts) {
+    const result = await supabase.from(attempt.table).select(attempt.columns).limit(250);
+    if (result.error) continue;
+
+    const mapped = unknownArrayToOptions(
+      result.data as unknown,
+      ["action_number", "action_id", "reference", "id"],
+      ["title", "description"]
+    );
+
+    if (mapped.length > 0) return mapped;
+  }
+
+  return [];
+}
+
+async function createSignedFileUrl(path: string) {
+  if (!path) return "";
+
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) return "";
+  return data.signedUrl;
+}
+
 function MultiSelectStandards({
   selected,
   onToggle,
@@ -465,63 +516,182 @@ function MultiSelectStandards({
 }
 
 export default function AuditsPage() {
-  const [audits, setAudits] = useState<AuditRecord[]>(seedAudits);
-  const [findings, setFindings] = useState<FindingRecord[]>(seedFindings);
-  const [selectedAuditId, setSelectedAuditId] = useState<string>(seedAudits[0]?.id || "");
-  const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const linkedSearch = searchParams.get("search")?.trim() || "";
+
+  const [audits, setAudits] = useState<AuditRecord[]>([]);
+  const [findings, setFindings] = useState<FindingRecord[]>([]);
+  const [selectedAuditId, setSelectedAuditId] = useState<string>("");
+  const [search, setSearch] = useState(linkedSearch);
   const [statusFilter, setStatusFilter] = useState<AuditStatus | "All">("All");
   const [typeFilter, setTypeFilter] = useState<AuditType | "All">("All");
   const [monthFilter, setMonthFilter] = useState<string>("All");
   const [sortKey, setSortKey] = useState<SortKey>("audit_month");
   const [sortAsc, setSortAsc] = useState<boolean>(true);
-  const [message, setMessage] = useState("Audit dashboard ready.");
+  const [message, setMessage] = useState("Loading audits...");
   const [showFindingForm, setShowFindingForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUploadingReport, setIsUploadingReport] = useState(false);
+  const [isSavingLinks, setIsSavingLinks] = useState(false);
 
-  const [form, setForm] = useState<AuditForm>({
-    title: "",
-    audit_type: "Internal",
-    auditee: "",
-    lead_auditor: "",
-    audit_date: "2026-04-14",
-    audit_month: "2026-04",
-    status: "Planned",
-    standards: ["ISO 9001:2015"],
-    procedure_reference: "",
-    certification_body: "",
-    location: "",
-  });
+  const [form, setForm] = useState<AuditForm>(createEmptyAudit());
+  const [detailForm, setDetailForm] = useState<AuditForm>(createEmptyAudit());
+  const [findingForm, setFindingForm] = useState<FindingForm>(createEmptyFinding());
 
-  const [detailForm, setDetailForm] = useState<AuditForm>({
-    title: "",
-    audit_type: "Internal",
-    auditee: "",
-    lead_auditor: "",
-    audit_date: "",
-    audit_month: "",
-    status: "Planned",
-    standards: [],
-    procedure_reference: "",
-    certification_body: "",
-    location: "",
-  });
-
-  const [findingForm, setFindingForm] = useState<FindingForm>({
-    clause: "",
-    category: "Minor",
-    description: "",
-    owner: "",
-    status: "Open",
-    due_date: "",
-    closure_date: "",
-    root_cause: "",
-    containment_action: "",
-    corrective_action: "",
-  });
+  const [ncrOptions, setNcrOptions] = useState<AuditLinkOption[]>([]);
+  const [actionOptions, setActionOptions] = useState<AuditLinkOption[]>([]);
+  const [selectedNcrToAdd, setSelectedNcrToAdd] = useState("");
+  const [selectedActionToAdd, setSelectedActionToAdd] = useState("");
 
   const computedAuditNumber = useMemo(
     () => buildNextAuditNumber(form.audit_type, form.audit_date, audits),
     [form.audit_type, form.audit_date, audits]
   );
+
+  useEffect(() => {
+    setSearch(linkedSearch);
+  }, [linkedSearch]);
+
+  async function loadLinkOptions() {
+    const [loadedNcrs, loadedActions] = await Promise.all([tryLoadNcrOptions(), tryLoadActionOptions()]);
+    setNcrOptions(loadedNcrs);
+    setActionOptions(loadedActions);
+  }
+
+  async function loadAudits(showLoadedMessage = true) {
+    setIsLoading(true);
+
+    const [auditRes, findingRes, fileRes] = await Promise.all([
+      supabase.from("audits").select("*").order("audit_date", { ascending: false }),
+      supabase.from("audit_findings").select("*").order("reference", { ascending: true }),
+      supabase.from("audit_files").select("id,audit_id,file_name,file_path,file_size,uploaded_at"),
+    ]);
+
+    if (auditRes.error) {
+      setMessage(`Load audits failed: ${auditRes.error.message}`);
+      setIsLoading(false);
+      return;
+    }
+
+    if (findingRes.error) {
+      setMessage(`Load findings failed: ${findingRes.error.message}`);
+      setIsLoading(false);
+      return;
+    }
+
+    if (fileRes.error) {
+      setMessage(`Load audit files failed: ${fileRes.error.message}`);
+      setIsLoading(false);
+      return;
+    }
+
+    const fileRows = ((fileRes.data || []) as AuditFileRow[]).reduce<Record<string, AuditFileRow>>((acc, row) => {
+      if (!row.audit_id) return acc;
+
+      const current = acc[row.audit_id];
+      const rowTime = new Date(row.uploaded_at || 0).getTime();
+      const currentTime = new Date(current?.uploaded_at || 0).getTime();
+
+      if (!current || rowTime >= currentTime) {
+        acc[row.audit_id] = row;
+      }
+
+      return acc;
+    }, {});
+
+    const findingRows = ((findingRes.data || []) as AuditFindingRow[]).map((row) => ({
+      id: row.id,
+      audit_id: row.audit_id,
+      reference: row.reference || "F-001",
+      clause: row.clause || "",
+      category: normaliseFindingCategory(row.category),
+      description: row.description || "",
+      owner: row.owner || "",
+      status: normaliseFindingStatus(row.status),
+      due_date: row.due_date || "",
+      closure_date: row.closure_date || "",
+      root_cause: row.root_cause || "",
+      containment_action: row.containment_action || "",
+      corrective_action: row.corrective_action || "",
+    }));
+
+    const auditRows = ((auditRes.data || []) as Record<string, unknown>[]).map((row) => {
+      const auditId = String(row.id || "");
+      const linkedFile = fileRows[auditId];
+      const mappedFindings = countFindingsForAudit(auditId, findingRows);
+
+      return createDefaultAuditRecord({
+        id: auditId,
+        audit_number: String(row.audit_number || ""),
+        title: String(row.title || ""),
+        audit_type: normaliseAuditType(String(row.audit_type || "")),
+        auditee: String(row.auditee || ""),
+        lead_auditor: String(row.lead_auditor || ""),
+        audit_date: String(row.audit_date || ""),
+        audit_month: String(row.audit_month || ""),
+        status: normaliseAuditStatus(String(row.status || "")),
+        standards: parseStandards(row.standards),
+        procedure_reference: String(row.procedure_reference || ""),
+        certification_body: String(row.certification_body || ""),
+        location: String(row.location || ""),
+        findings: mappedFindings,
+        linked_ncrs: Array.isArray(row.linked_ncrs)
+          ? (row.linked_ncrs as unknown[]).map((item) => String(item || "")).filter(Boolean)
+          : [],
+        linked_actions: Array.isArray(row.linked_actions)
+          ? (row.linked_actions as unknown[]).map((item) => String(item || "")).filter(Boolean)
+          : [],
+        report_file_name: linkedFile?.file_name || "",
+        report_file_size: linkedFile?.file_size ?? null,
+        report_uploaded_at: linkedFile?.uploaded_at || "",
+        report_storage_path: linkedFile?.file_path || "",
+      });
+    });
+
+    const signedUrls = await Promise.all(
+      auditRows.map(async (audit) => ({
+        id: audit.id,
+        url: audit.report_storage_path ? await createSignedFileUrl(audit.report_storage_path) : "",
+      }))
+    );
+
+    const urlMap = signedUrls.reduce<Record<string, string>>((acc, item) => {
+      acc[item.id] = item.url;
+      return acc;
+    }, {});
+
+    const hydratedAudits = auditRows.map((audit) => ({
+      ...audit,
+      report_url: urlMap[audit.id] || "",
+    }));
+
+    setFindings(findingRows);
+    setAudits(hydratedAudits);
+    setSelectedAuditId((current) => current || hydratedAudits[0]?.id || "");
+    setIsLoading(false);
+
+    if (showLoadedMessage) {
+      if (linkedSearch) {
+        const searchLower = linkedSearch.toLowerCase();
+        const matchCount = hydratedAudits.filter(
+          (audit) =>
+            audit.audit_number.toLowerCase() === searchLower ||
+            audit.title.toLowerCase().includes(searchLower) ||
+            audit.linked_ncrs.some((item) => item.toLowerCase() === searchLower) ||
+            audit.linked_actions.some((item) => item.toLowerCase() === searchLower)
+        ).length;
+        setMessage(`Loaded audits successfully. ${matchCount} linked match${matchCount === 1 ? "" : "es"} found for "${linkedSearch}".`);
+      } else {
+        setMessage("Audit dashboard ready.");
+      }
+    }
+  }
+
+  useEffect(() => {
+    void (async () => {
+      await Promise.all([loadAudits(), loadLinkOptions()]);
+    })();
+  }, []);
 
   const monthOptions = useMemo(() => {
     return Array.from(new Set(audits.map((audit) => audit.audit_month))).sort();
@@ -558,8 +728,27 @@ export default function AuditsPage() {
       certification_body: selectedAudit.certification_body,
       location: selectedAudit.location,
     });
+    setSelectedNcrToAdd("");
+    setSelectedActionToAdd("");
     setShowFindingForm(false);
   }, [selectedAudit]);
+
+  useEffect(() => {
+    if (!linkedSearch || audits.length === 0) return;
+
+    const value = linkedSearch.toLowerCase();
+    const match = audits.find(
+      (audit) =>
+        audit.audit_number.toLowerCase() === value ||
+        audit.title.toLowerCase().includes(value) ||
+        audit.linked_ncrs.some((item) => item.toLowerCase() === value) ||
+        audit.linked_actions.some((item) => item.toLowerCase() === value)
+    );
+
+    if (match) {
+      setSelectedAuditId(match.id);
+    }
+  }, [linkedSearch, audits]);
 
   useEffect(() => {
     if (form.audit_type === "Supplier") {
@@ -607,7 +796,9 @@ export default function AuditsPage() {
         audit.location.toLowerCase().includes(lower) ||
         buildStandardsLabel(audit).toLowerCase().includes(lower) ||
         audit.procedure_reference.toLowerCase().includes(lower) ||
-        audit.certification_body.toLowerCase().includes(lower);
+        audit.certification_body.toLowerCase().includes(lower) ||
+        audit.linked_ncrs.some((item) => item.toLowerCase().includes(lower)) ||
+        audit.linked_actions.some((item) => item.toLowerCase().includes(lower));
 
       const matchesStatus = statusFilter === "All" || audit.status === statusFilter;
       const matchesType = typeFilter === "All" || audit.audit_type === typeFilter;
@@ -761,9 +952,7 @@ export default function AuditsPage() {
       const exists = prev.standards.includes(value);
       return {
         ...prev,
-        standards: exists
-          ? prev.standards.filter((item) => item !== value)
-          : [...prev.standards, value],
+        standards: exists ? prev.standards.filter((item) => item !== value) : [...prev.standards, value],
       };
     });
   }
@@ -773,9 +962,7 @@ export default function AuditsPage() {
       const exists = prev.standards.includes(value);
       return {
         ...prev,
-        standards: exists
-          ? prev.standards.filter((item) => item !== value)
-          : [...prev.standards, value],
+        standards: exists ? prev.standards.filter((item) => item !== value) : [...prev.standards, value],
       };
     });
   }
@@ -798,7 +985,7 @@ export default function AuditsPage() {
     return "";
   }
 
-  function createAudit(e: React.FormEvent) {
+  async function createAudit(e: React.FormEvent) {
     e.preventDefault();
 
     const validationError = validateAuditForm(form);
@@ -807,46 +994,59 @@ export default function AuditsPage() {
       return;
     }
 
-    const newAudit: AuditRecord = {
-      id: String(Date.now()),
-      audit_number: computedAuditNumber,
-      title: form.title.trim(),
-      audit_type: form.audit_type,
-      auditee: form.auditee.trim(),
-      lead_auditor: form.lead_auditor.trim(),
-      audit_date: form.audit_date,
-      audit_month: form.audit_month,
-      status: form.status,
-      standards: [...form.standards],
-      procedure_reference: form.procedure_reference.trim(),
-      certification_body: form.certification_body.trim(),
-      location: form.location.trim() || "-",
-      findings: { major: 0, minor: 0, ofi: 0, obs: 0 },
-      linked_ncrs: [],
-      linked_actions: [],
-      report_file_name: "",
-      report_file_size: null,
-      report_uploaded_at: "",
-      report_url: "",
-    };
+    const nextAuditDate = form.audit_date;
+    const parsedDate = new Date(nextAuditDate);
+    const nextMonth = Number.isNaN(parsedDate.getTime())
+      ? form.audit_month
+      : `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, "0")}`;
 
-    const nextAudits = [newAudit, ...audits];
-    setAudits(nextAudits);
-    setSelectedAuditId(newAudit.id);
-    setForm((prev) => ({
-      ...prev,
-      title: "",
-      auditee: "",
-      lead_auditor: "",
-      status: "Planned",
-      location: "",
-      procedure_reference: prev.audit_type === "Internal" ? "" : prev.procedure_reference,
-      certification_body: prev.audit_type === "External" ? "" : prev.certification_body,
-    }));
-    setMessage(`${newAudit.audit_number} created successfully.`);
+    const newAuditNumber = buildNextAuditNumber(form.audit_type, form.audit_date, audits);
+
+    const { data, error } = await supabase
+      .from("audits")
+      .insert([
+        {
+          audit_number: newAuditNumber,
+          title: form.title.trim(),
+          audit_type: form.audit_type,
+          auditee: form.auditee.trim(),
+          lead_auditor: form.lead_auditor.trim(),
+          audit_date: nextAuditDate,
+          audit_month: nextMonth,
+          status: form.status,
+          standards: form.standards,
+          procedure_reference: form.procedure_reference.trim() || null,
+          certification_body: form.certification_body.trim() || null,
+          location: form.location.trim() || null,
+          linked_ncrs: [],
+          linked_actions: [],
+        },
+      ])
+      .select("id")
+      .single();
+
+    if (error || !data?.id) {
+      setMessage(`Create audit failed: ${error?.message || "Unknown error"}`);
+      return;
+    }
+
+    setSelectedAuditId(String(data.id));
+    setForm({
+      ...createEmptyAudit(),
+      audit_date: form.audit_date,
+      audit_month: nextMonth,
+      audit_type: form.audit_type,
+      standards:
+        form.audit_type === "External"
+          ? ["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018"]
+          : ["ISO 9001:2015"],
+    });
+
+    await loadAudits(false);
+    setMessage(`${newAuditNumber} created successfully.`);
   }
 
-  function saveAuditChanges() {
+  async function saveAuditChanges() {
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
@@ -864,71 +1064,148 @@ export default function AuditsPage() {
       ? detailForm.audit_month
       : `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, "0")}`;
 
-    setAudits((prev) =>
-      prev.map((audit) =>
-        audit.id === selectedAudit.id
-          ? {
-              ...audit,
-              title: detailForm.title.trim(),
-              audit_type: detailForm.audit_type,
-              auditee: detailForm.auditee.trim(),
-              lead_auditor: detailForm.lead_auditor.trim(),
-              audit_date: nextAuditDate,
-              audit_month: nextMonth,
-              status: detailForm.status,
-              standards: [...detailForm.standards],
-              procedure_reference: detailForm.procedure_reference.trim(),
-              certification_body: detailForm.certification_body.trim(),
-              location: detailForm.location.trim() || "-",
-            }
-          : audit
-      )
-    );
+    const { error } = await supabase
+      .from("audits")
+      .update({
+        title: detailForm.title.trim(),
+        audit_type: detailForm.audit_type,
+        auditee: detailForm.auditee.trim(),
+        lead_auditor: detailForm.lead_auditor.trim(),
+        audit_date: nextAuditDate,
+        audit_month: nextMonth,
+        status: detailForm.status,
+        standards: detailForm.standards,
+        procedure_reference: detailForm.procedure_reference.trim() || null,
+        certification_body: detailForm.certification_body.trim() || null,
+        location: detailForm.location.trim() || null,
+      })
+      .eq("id", selectedAudit.id);
 
+    if (error) {
+      setMessage(`Update failed: ${error.message}`);
+      return;
+    }
+
+    await loadAudits(false);
     setMessage(`${selectedAudit.audit_number} updated successfully.`);
   }
 
-  function updateAuditInline(
-    auditId: string,
-    field: keyof AuditRecord,
-    value: string
-  ) {
-    setAudits((prev) =>
-      prev.map((audit) => {
-        if (audit.id !== auditId) return audit;
-
-        if (field === "lead_auditor") {
-          return { ...audit, lead_auditor: value };
-        }
-
-        if (field === "audit_month") {
-          return { ...audit, audit_month: value };
-        }
-
-        return { ...audit, [field]: value };
-      })
-    );
-
-    setMessage("Audit schedule updated.");
-  }
-
-  function deleteSelectedAudit() {
+  async function saveLinkedItems(nextNcrs: string[], nextActions: string[]) {
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
     }
 
-    if (selectedAudit.report_url) {
-      URL.revokeObjectURL(selectedAudit.report_url);
+    setIsSavingLinks(true);
+
+    const { error } = await supabase
+      .from("audits")
+      .update({
+        linked_ncrs: nextNcrs,
+        linked_actions: nextActions,
+      })
+      .eq("id", selectedAudit.id);
+
+    setIsSavingLinks(false);
+
+    if (error) {
+      setMessage(`Save linked items failed: ${error.message}`);
+      return;
+    }
+
+    await loadAudits(false);
+    setMessage("Linked items updated.");
+  }
+
+  async function addLinkedNcr() {
+    if (!selectedAudit || !selectedNcrToAdd) return;
+
+    if (selectedAudit.linked_ncrs.includes(selectedNcrToAdd)) {
+      setSelectedNcrToAdd("");
+      return;
+    }
+
+    await saveLinkedItems([...selectedAudit.linked_ncrs, selectedNcrToAdd], [...selectedAudit.linked_actions]);
+    setSelectedNcrToAdd("");
+  }
+
+  async function addLinkedAction() {
+    if (!selectedAudit || !selectedActionToAdd) return;
+
+    if (selectedAudit.linked_actions.includes(selectedActionToAdd)) {
+      setSelectedActionToAdd("");
+      return;
+    }
+
+    await saveLinkedItems([...selectedAudit.linked_ncrs], [...selectedAudit.linked_actions, selectedActionToAdd]);
+    setSelectedActionToAdd("");
+  }
+
+  async function removeLinkedNcr(reference: string) {
+    if (!selectedAudit) return;
+
+    await saveLinkedItems(
+      selectedAudit.linked_ncrs.filter((item) => item !== reference),
+      [...selectedAudit.linked_actions]
+    );
+  }
+
+  async function removeLinkedAction(reference: string) {
+    if (!selectedAudit) return;
+
+    await saveLinkedItems(
+      [...selectedAudit.linked_ncrs],
+      selectedAudit.linked_actions.filter((item) => item !== reference)
+    );
+  }
+
+  async function updateAuditInline(auditId: string, field: keyof AuditRecord, value: string) {
+    const existing = audits.find((audit) => audit.id === auditId);
+    if (!existing) return;
+
+    const payload: Record<string, unknown> = {};
+
+    if (field === "lead_auditor") {
+      payload.lead_auditor = value;
+    } else if (field === "audit_month") {
+      payload.audit_month = value;
+    } else {
+      payload[field] = value;
+    }
+
+    const { error } = await supabase.from("audits").update(payload).eq("id", auditId);
+
+    if (error) {
+      setMessage(`Audit schedule update failed: ${error.message}`);
+      return;
+    }
+
+    await loadAudits(false);
+    setMessage("Audit schedule updated.");
+  }
+
+  async function deleteSelectedAudit() {
+    if (!selectedAudit) {
+      setMessage("Select an audit first.");
+      return;
+    }
+
+    const confirmDelete = window.confirm(`Delete ${selectedAudit.audit_number}?`);
+    if (!confirmDelete) return;
+
+    if (selectedAudit.report_storage_path) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([selectedAudit.report_storage_path]);
+    }
+
+    const { error } = await supabase.from("audits").delete().eq("id", selectedAudit.id);
+
+    if (error) {
+      setMessage(`Delete failed: ${error.message}`);
+      return;
     }
 
     const deletingAuditNumber = selectedAudit.audit_number;
-    const remainingAudits = audits.filter((audit) => audit.id !== selectedAudit.id);
-    const remainingFindings = findings.filter((finding) => finding.audit_id !== selectedAudit.id);
-
-    setAudits(remainingAudits);
-    setFindings(remainingFindings);
-    setSelectedAuditId(remainingAudits[0]?.id || "");
+    await loadAudits(false);
     setShowFindingForm(false);
     setMessage(`${deletingAuditNumber} deleted.`);
   }
@@ -940,22 +1217,14 @@ export default function AuditsPage() {
     }
 
     setFindingForm({
-      clause: "",
-      category: "Minor",
-      description: "",
+      ...createEmptyFinding(),
       owner: selectedAudit.auditee,
-      status: "Open",
-      due_date: "",
-      closure_date: "",
-      root_cause: "",
-      containment_action: "",
-      corrective_action: "",
     });
     setShowFindingForm(true);
     setMessage(`Ready to raise a finding against ${selectedAudit.audit_number}.`);
   }
 
-  function createFinding(e: React.FormEvent) {
+  async function createFinding(e: React.FormEvent) {
     e.preventDefault();
 
     if (!selectedAudit) {
@@ -974,100 +1243,89 @@ export default function AuditsPage() {
     }
 
     const reference = buildNextFindingReference(selectedAudit.id, findings);
-
     const finalClosureDate =
       findingForm.status === "Closed"
         ? findingForm.closure_date || new Date().toISOString().slice(0, 10)
         : "";
 
-    const newFinding: FindingRecord = {
-      id: String(Date.now()),
-      audit_id: selectedAudit.id,
-      reference,
-      clause: findingForm.clause.trim(),
-      category: findingForm.category,
-      description: findingForm.description.trim(),
-      owner: findingForm.owner.trim() || selectedAudit.auditee,
-      status: findingForm.status,
-      due_date: findingForm.due_date,
-      closure_date: finalClosureDate,
-      root_cause: findingForm.root_cause.trim(),
-      containment_action: findingForm.containment_action.trim(),
-      corrective_action: findingForm.corrective_action.trim(),
-    };
+    const { error } = await supabase.from("audit_findings").insert([
+      {
+        audit_id: selectedAudit.id,
+        reference,
+        clause: findingForm.clause.trim(),
+        category: findingForm.category,
+        description: findingForm.description.trim(),
+        owner: findingForm.owner.trim() || selectedAudit.auditee,
+        status: findingForm.status,
+        due_date: findingForm.due_date || null,
+        closure_date: finalClosureDate || null,
+        root_cause: findingForm.root_cause.trim() || null,
+        containment_action: findingForm.containment_action.trim() || null,
+        corrective_action: findingForm.corrective_action.trim() || null,
+      },
+    ]);
 
-    const nextFindings = [...findings, newFinding];
-    setFindings(nextFindings);
-
-    const nextCounts = countFindingsForAudit(selectedAudit.id, nextFindings);
-    setAudits((prev) =>
-      prev.map((audit) =>
-        audit.id === selectedAudit.id
-          ? {
-              ...audit,
-              findings: nextCounts,
-            }
-          : audit
-      )
-    );
+    if (error) {
+      setMessage(`Save finding failed: ${error.message}`);
+      return;
+    }
 
     setShowFindingForm(false);
+    setFindingForm(createEmptyFinding());
+    await loadAudits(false);
     setMessage(`${reference} raised against ${selectedAudit.audit_number}.`);
   }
 
-  function updateFindingField(
+  async function updateFindingField(
     findingId: string,
     field: keyof FindingRecord,
     value: string
   ) {
-    const updatedFindings = findings.map((finding) => {
-      if (finding.id !== findingId) return finding;
+    const current = findings.find((finding) => finding.id === findingId);
+    if (!current) return;
 
-      if (field === "status") {
-        const nextStatus = value as FindingStatus;
-        return {
-          ...finding,
-          status: nextStatus,
-          closure_date:
-            nextStatus === "Closed"
-              ? finding.closure_date || new Date().toISOString().slice(0, 10)
-              : "",
-        };
-      }
+    const payload: Record<string, unknown> = {};
 
-      if (field === "category") {
-        return {
-          ...finding,
-          category: value as FindingSeverity,
-        };
-      }
-
-      return {
-        ...finding,
-        [field]: value,
-      };
-    });
-
-    setFindings(updatedFindings);
-
-    if (selectedAudit) {
-      const nextCounts = countFindingsForAudit(selectedAudit.id, updatedFindings);
-      setAudits((prev) =>
-        prev.map((audit) =>
-          audit.id === selectedAudit.id
-            ? {
-                ...audit,
-                findings: nextCounts,
-              }
-            : audit
-        )
-      );
+    if (field === "status") {
+      const nextStatus = value as FindingStatus;
+      payload.status = nextStatus;
+      payload.closure_date =
+        nextStatus === "Closed"
+          ? current.closure_date || new Date().toISOString().slice(0, 10)
+          : null;
+    } else if (field === "category") {
+      payload.category = value as FindingSeverity;
+    } else {
+      payload[field] = value || null;
     }
 
+    const { error } = await supabase.from("audit_findings").update(payload).eq("id", findingId);
+
+    if (error) {
+      setMessage(`Finding update failed: ${error.message}`);
+      return;
+    }
+
+    await loadAudits(false);
     setMessage("Finding updated.");
   }
 
-  function handleReportUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function uploadFileToStorage(auditId: string, file: File) {
+    const safeName = sanitizeFileName(file.name);
+    const path = `audits/${auditId}/${Date.now()}-${safeName}`;
+
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+      upsert: true,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return path;
+  }
+
+  async function handleReportUpload(event: React.ChangeEvent<HTMLInputElement>) {
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
@@ -1076,54 +1334,60 @@ export default function AuditsPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const objectUrl = URL.createObjectURL(file);
+    setIsUploadingReport(true);
 
-    setAudits((prev) =>
-      prev.map((audit) => {
-        if (audit.id !== selectedAudit.id) return audit;
+    try {
+      if (selectedAudit.report_storage_path) {
+        await supabase.storage.from(STORAGE_BUCKET).remove([selectedAudit.report_storage_path]);
+      }
 
-        if (audit.report_url) {
-          URL.revokeObjectURL(audit.report_url);
-        }
+      const path = await uploadFileToStorage(selectedAudit.id, file);
 
-        return {
-          ...audit,
-          report_file_name: file.name,
-          report_file_size: file.size,
-          report_uploaded_at: new Date().toISOString(),
-          report_url: objectUrl,
-        };
-      })
-    );
+      await supabase.from("audit_files").delete().eq("audit_id", selectedAudit.id);
 
-    event.target.value = "";
-    setMessage(`Audit report uploaded to ${selectedAudit.audit_number}.`);
+      const { error } = await supabase.from("audit_files").insert([
+        {
+          audit_id: selectedAudit.id,
+          file_name: file.name,
+          file_path: path,
+          file_size: file.size,
+          uploaded_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      await loadAudits(false);
+      setMessage(`Audit report uploaded to ${selectedAudit.audit_number}.`);
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Audit report upload failed: ${err.message}`);
+    } finally {
+      setIsUploadingReport(false);
+      event.target.value = "";
+    }
   }
 
-  function removeReport() {
+  async function removeReport() {
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
     }
 
-    if (selectedAudit.report_url) {
-      URL.revokeObjectURL(selectedAudit.report_url);
+    if (selectedAudit.report_storage_path) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([selectedAudit.report_storage_path]);
     }
 
-    setAudits((prev) =>
-      prev.map((audit) =>
-        audit.id === selectedAudit.id
-          ? {
-              ...audit,
-              report_file_name: "",
-              report_file_size: null,
-              report_uploaded_at: "",
-              report_url: "",
-            }
-          : audit
-      )
-    );
+    const { error } = await supabase.from("audit_files").delete().eq("audit_id", selectedAudit.id);
 
+    if (error) {
+      setMessage(`Remove report failed: ${error.message}`);
+      return;
+    }
+
+    await loadAudits(false);
     setMessage(`Audit report removed from ${selectedAudit.audit_number}.`);
   }
 
@@ -1190,8 +1454,7 @@ export default function AuditsPage() {
       },
     });
 
-    let y =
-      (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 47;
+    let y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 47;
     y += 10;
 
     doc.setFont("helvetica", "bold");
@@ -1244,8 +1507,7 @@ export default function AuditsPage() {
       },
     });
 
-    let nextY =
-      (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
+    let nextY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
 
     scopedFindings.forEach((finding) => {
       if (nextY > pageHeight - 70) {
@@ -1281,8 +1543,7 @@ export default function AuditsPage() {
         },
       });
 
-      nextY =
-        (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY;
+      nextY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY;
     });
 
     const pageCount = doc.getNumberOfPages();
@@ -1339,6 +1600,12 @@ export default function AuditsPage() {
           <strong>Status:</strong> {message}
         </div>
       </div>
+
+      {linkedSearch ? (
+        <section style={linkedSearchBannerStyle}>
+          <strong>Linked search:</strong> showing results for "{linkedSearch}"
+        </section>
+      ) : null}
 
       <section style={statsGridStyle}>
         <StatCard title="Planned Audits" value={kpis.planned} accent="#2563eb" />
@@ -1608,7 +1875,7 @@ export default function AuditsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={toolbarSearchStyle}
-              placeholder="Search audit number, title, auditor, standard..."
+              placeholder="Search audit number, title, auditor, standard, linked NCR/action..."
             />
 
             <div style={toolbarFiltersStyle}>
@@ -1677,6 +1944,11 @@ export default function AuditsPage() {
             <div style={programmeBodyStyle}>
               {filteredAudits.map((audit) => {
                 const active = selectedAuditId === audit.id;
+                const linkedMatch =
+                  !!linkedSearch &&
+                  (audit.audit_number.toLowerCase() === linkedSearch.toLowerCase() ||
+                    audit.linked_ncrs.some((item) => item.toLowerCase() === linkedSearch.toLowerCase()) ||
+                    audit.linked_actions.some((item) => item.toLowerCase() === linkedSearch.toLowerCase()));
 
                 return (
                   <button
@@ -1685,11 +1957,14 @@ export default function AuditsPage() {
                     onClick={() => setSelectedAuditId(audit.id)}
                     style={{
                       ...programmeRowStyle,
-                      background: active ? "#eff6ff" : "#ffffff",
+                      background: active ? "#eff6ff" : linkedMatch ? "#ecfeff" : "#ffffff",
                       borderLeft: active ? "4px solid #0f766e" : "4px solid transparent",
                     }}
                   >
-                    <div style={programmePrimaryStyle}>{audit.audit_number}</div>
+                    <div style={programmePrimaryStyle}>
+                      {audit.audit_number}
+                      {linkedMatch ? <div style={linkedMatchTagStyle}>Linked match</div> : null}
+                    </div>
 
                     <div style={programmeTitleCellStyle}>
                       <div style={programmeTitleStyle}>{audit.title}</div>
@@ -1701,7 +1976,7 @@ export default function AuditsPage() {
                       <input
                         type="month"
                         value={audit.audit_month}
-                        onChange={(e) => updateAuditInline(audit.id, "audit_month", e.target.value)}
+                        onChange={(e) => void updateAuditInline(audit.id, "audit_month", e.target.value)}
                         style={inlineInputStyle}
                       />
                     </div>
@@ -1709,7 +1984,7 @@ export default function AuditsPage() {
                     <div onClick={(e) => e.stopPropagation()}>
                       <input
                         value={audit.lead_auditor}
-                        onChange={(e) => updateAuditInline(audit.id, "lead_auditor", e.target.value)}
+                        onChange={(e) => void updateAuditInline(audit.id, "lead_auditor", e.target.value)}
                         style={inlineInputStyle}
                       />
                     </div>
@@ -1763,7 +2038,7 @@ export default function AuditsPage() {
 
                 <div style={topUploadButtonsStyle}>
                   <label style={uploadButtonStyle}>
-                    Upload report
+                    {isUploadingReport ? "Uploading..." : "Upload report"}
                     <input
                       type="file"
                       accept=".pdf,.doc,.docx,.xlsx,.xls,.png,.jpg,.jpeg"
@@ -1946,16 +2221,70 @@ export default function AuditsPage() {
               <div style={detailSectionStyle}>
                 <div style={detailSectionTitleStyle}>Linked Items</div>
 
+                <div style={linkPickerGridStyle}>
+                  <Field label="Add Linked NCR">
+                    <div style={pickerRowStyle}>
+                      <select
+                        value={selectedNcrToAdd}
+                        onChange={(e) => setSelectedNcrToAdd(e.target.value)}
+                        style={inputStyle}
+                      >
+                        <option value="">Select NCR</option>
+                        {ncrOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={() => void addLinkedNcr()}
+                        disabled={isSavingLinks}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </Field>
+
+                  <Field label="Add Linked Action">
+                    <div style={pickerRowStyle}>
+                      <select
+                        value={selectedActionToAdd}
+                        onChange={(e) => setSelectedActionToAdd(e.target.value)}
+                        style={inputStyle}
+                      >
+                        <option value="">Select Action</option>
+                        {actionOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={() => void addLinkedAction()}
+                        disabled={isSavingLinks}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </Field>
+                </div>
+
                 <div style={linkedBlocksGridStyle}>
-                  <DetailLinkGroup
+                  <EditableLinkGroup
                     title="Linked NCRs"
                     items={selectedAudit.linked_ncrs}
                     hrefBuilder={(item) => `/ncr-capa?search=${encodeURIComponent(item)}`}
+                    onRemove={(item) => void removeLinkedNcr(item)}
                   />
-                  <DetailLinkGroup
+                  <EditableLinkGroup
                     title="Linked Actions"
                     items={selectedAudit.linked_actions}
                     hrefBuilder={(item) => `/actions?search=${encodeURIComponent(item)}`}
+                    onRemove={(item) => void removeLinkedAction(item)}
                   />
                 </div>
               </div>
@@ -2136,7 +2465,7 @@ export default function AuditsPage() {
                             <Field label="Category">
                               <select
                                 value={finding.category}
-                                onChange={(e) => updateFindingField(finding.id, "category", e.target.value)}
+                                onChange={(e) => void updateFindingField(finding.id, "category", e.target.value)}
                                 style={inputStyle}
                               >
                                 <option value="Major">Major</option>
@@ -2149,7 +2478,7 @@ export default function AuditsPage() {
                             <Field label="Status">
                               <select
                                 value={finding.status}
-                                onChange={(e) => updateFindingField(finding.id, "status", e.target.value)}
+                                onChange={(e) => void updateFindingField(finding.id, "status", e.target.value)}
                                 style={inputStyle}
                               >
                                 <option value="Open">Open</option>
@@ -2161,7 +2490,7 @@ export default function AuditsPage() {
                             <Field label="Clause / Reference">
                               <input
                                 value={finding.clause}
-                                onChange={(e) => updateFindingField(finding.id, "clause", e.target.value)}
+                                onChange={(e) => void updateFindingField(finding.id, "clause", e.target.value)}
                                 style={inputStyle}
                               />
                             </Field>
@@ -2169,7 +2498,7 @@ export default function AuditsPage() {
                             <Field label="Owner">
                               <input
                                 value={finding.owner}
-                                onChange={(e) => updateFindingField(finding.id, "owner", e.target.value)}
+                                onChange={(e) => void updateFindingField(finding.id, "owner", e.target.value)}
                                 style={inputStyle}
                               />
                             </Field>
@@ -2178,7 +2507,7 @@ export default function AuditsPage() {
                               <input
                                 type="date"
                                 value={finding.due_date}
-                                onChange={(e) => updateFindingField(finding.id, "due_date", e.target.value)}
+                                onChange={(e) => void updateFindingField(finding.id, "due_date", e.target.value)}
                                 style={inputStyle}
                               />
                             </Field>
@@ -2187,7 +2516,7 @@ export default function AuditsPage() {
                               <input
                                 type="date"
                                 value={finding.closure_date}
-                                onChange={(e) => updateFindingField(finding.id, "closure_date", e.target.value)}
+                                onChange={(e) => void updateFindingField(finding.id, "closure_date", e.target.value)}
                                 style={inputStyle}
                               />
                             </Field>
@@ -2196,7 +2525,7 @@ export default function AuditsPage() {
                               <Field label="Description">
                                 <textarea
                                   value={finding.description}
-                                  onChange={(e) => updateFindingField(finding.id, "description", e.target.value)}
+                                  onChange={(e) => void updateFindingField(finding.id, "description", e.target.value)}
                                   style={textareaStyle}
                                 />
                               </Field>
@@ -2206,7 +2535,7 @@ export default function AuditsPage() {
                               <Field label="Root Cause">
                                 <textarea
                                   value={finding.root_cause}
-                                  onChange={(e) => updateFindingField(finding.id, "root_cause", e.target.value)}
+                                  onChange={(e) => void updateFindingField(finding.id, "root_cause", e.target.value)}
                                   style={textareaStyle}
                                 />
                               </Field>
@@ -2217,7 +2546,7 @@ export default function AuditsPage() {
                                 <textarea
                                   value={finding.containment_action}
                                   onChange={(e) =>
-                                    updateFindingField(finding.id, "containment_action", e.target.value)
+                                    void updateFindingField(finding.id, "containment_action", e.target.value)
                                   }
                                   style={textareaStyle}
                                 />
@@ -2229,7 +2558,7 @@ export default function AuditsPage() {
                                 <textarea
                                   value={finding.corrective_action}
                                   onChange={(e) =>
-                                    updateFindingField(finding.id, "corrective_action", e.target.value)
+                                    void updateFindingField(finding.id, "corrective_action", e.target.value)
                                   }
                                   style={textareaStyle}
                                 />
@@ -2332,14 +2661,16 @@ function HeroMetaCard({
   );
 }
 
-function DetailLinkGroup({
+function EditableLinkGroup({
   title,
   items,
   hrefBuilder,
+  onRemove,
 }: {
   title: string;
   items: string[];
   hrefBuilder: (item: string) => string;
+  onRemove: (item: string) => void;
 }) {
   return (
     <div style={detailTagGroupStyle}>
@@ -2349,9 +2680,14 @@ function DetailLinkGroup({
           <span style={detailTagMutedStyle}>None linked</span>
         ) : (
           items.map((item) => (
-            <Link key={item} href={hrefBuilder(item)} style={detailTagLinkStyle}>
-              {item}
-            </Link>
+            <span key={item} style={editablePillWrapStyle}>
+              <Link href={hrefBuilder(item)} style={detailTagLinkStyle}>
+                {item}
+              </Link>
+              <button type="button" style={pillRemoveButtonStyle} onClick={() => onRemove(item)}>
+                ×
+              </button>
+            </span>
           ))
         )}
       </div>
@@ -2404,6 +2740,59 @@ function SortChip({
     </button>
   );
 }
+
+const linkedSearchBannerStyle: CSSProperties = {
+  background: "#ecfeff",
+  border: "1px solid #a5f3fc",
+  borderRadius: "12px",
+  padding: "12px 16px",
+  color: "#155e75",
+  marginBottom: "20px",
+};
+
+const linkedMatchTagStyle: CSSProperties = {
+  display: "inline-block",
+  marginTop: "6px",
+  padding: "4px 8px",
+  borderRadius: "999px",
+  background: "#ccfbf1",
+  color: "#115e59",
+  fontWeight: 800,
+  fontSize: "11px",
+};
+
+const editablePillWrapStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "4px",
+  background: "#dbeafe",
+  borderRadius: "999px",
+  paddingRight: "6px",
+};
+
+const pillRemoveButtonStyle: CSSProperties = {
+  background: "transparent",
+  border: "none",
+  color: "#1d4ed8",
+  fontWeight: 800,
+  cursor: "pointer",
+  fontSize: "14px",
+  lineHeight: 1,
+};
+
+const linkPickerGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "12px",
+  marginBottom: "14px",
+};
+
+const pickerRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  alignItems: "center",
+};
 
 const heroStyle: CSSProperties = {
   background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",

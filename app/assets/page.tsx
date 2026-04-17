@@ -123,6 +123,7 @@ type AssetFileRow = {
   reference: string | null;
   file_name: string;
   file_path: string;
+  file_size: number | null;
   uploaded_at: string;
 };
 
@@ -230,9 +231,13 @@ function generateHiddenAssetCode(name: string) {
     .slice(0, 6);
 
   const now = new Date();
-  const stamp = `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(
-    now.getDate()
-  ).padStart(2, "0")}${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+  const stamp = `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}${String(now.getDate()).padStart(2, "0")}${String(now.getHours()).padStart(
+    2,
+    "0"
+  )}${String(now.getMinutes()).padStart(2, "0")}`;
 
   return `AST-${cleaned || "GEN"}-${stamp}`;
 }
@@ -258,14 +263,10 @@ function unknownArrayToOptions(
       const fallbackId = String(obj["id"] ?? "").trim();
 
       const primary =
-        primaryKeys
-          .map((key) => String(obj[key] ?? "").trim())
-          .find(Boolean) || fallbackId;
+        primaryKeys.map((key) => String(obj[key] ?? "").trim()).find(Boolean) || fallbackId;
 
       const secondary =
-        secondaryKeys
-          .map((key) => String(obj[key] ?? "").trim())
-          .find(Boolean) || "";
+        secondaryKeys.map((key) => String(obj[key] ?? "").trim()).find(Boolean) || "";
 
       return {
         id: primary || fallbackId,
@@ -290,10 +291,11 @@ async function tryLoadNcrOptions(): Promise<LinkedOption[]> {
 
     if (result.error) continue;
 
-    const mapped = unknownArrayToOptions(result.data as unknown, ["ncr_number", "reference", "id"], [
-      "title",
-      "description",
-    ]);
+    const mapped = unknownArrayToOptions(
+      result.data as unknown,
+      ["ncr_number", "reference", "id"],
+      ["title", "description"]
+    );
 
     if (mapped.length > 0) return mapped;
   }
@@ -303,8 +305,10 @@ async function tryLoadNcrOptions(): Promise<LinkedOption[]> {
 
 async function tryLoadActionOptions(): Promise<LinkedOption[]> {
   const attempts = [
+    { table: "actions", columns: "id,action_number,title" },
     { table: "actions", columns: "id,action_id,title" },
     { table: "actions", columns: "id,reference,title" },
+    { table: "actions", columns: "id,action_number,description" },
     { table: "actions", columns: "id,action_id,description" },
     { table: "actions", columns: "id,reference,description" },
   ];
@@ -314,10 +318,11 @@ async function tryLoadActionOptions(): Promise<LinkedOption[]> {
 
     if (result.error) continue;
 
-    const mapped = unknownArrayToOptions(result.data as unknown, ["action_id", "reference", "id"], [
-      "title",
-      "description",
-    ]);
+    const mapped = unknownArrayToOptions(
+      result.data as unknown,
+      ["action_number", "action_id", "reference", "id"],
+      ["title", "description"]
+    );
 
     if (mapped.length > 0) return mapped;
   }
@@ -354,13 +359,13 @@ export default function AssetsPage() {
 
   const [qualityByAssetId, setQualityByAssetId] = useState<Record<string, AssetQualityRecord>>({});
   const [isSavingQuality, setIsSavingQuality] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
 
   async function loadAssets() {
-    const { data, error } = await supabase
-      .from("assets")
-      .select("*")
-      .order("name", { ascending: true });
+    const { data, error } = await supabase.from("assets").select("*").order("name", {
+      ascending: true,
+    });
 
     if (error) {
       setMessage(`Error: ${error.message}`);
@@ -412,7 +417,7 @@ export default function AssetsPage() {
         .in("asset_id", assetIds),
       supabase
         .from("asset_files")
-        .select("id,asset_id,file_type,reference,file_name,file_path,uploaded_at")
+        .select("id,asset_id,file_type,reference,file_name,file_path,file_size,uploaded_at")
         .in("asset_id", assetIds),
     ]);
 
@@ -483,6 +488,7 @@ export default function AssetsPage() {
 
         if (fileRow.file_type === "image") {
           next[fileRow.asset_id].image_name = fileRow.file_name;
+          next[fileRow.asset_id].image_size = fileRow.file_size || null;
           next[fileRow.asset_id].image_uploaded_at = fileRow.uploaded_at;
           next[fileRow.asset_id].image_path = fileRow.file_path;
         }
@@ -513,7 +519,7 @@ export default function AssetsPage() {
 
     void (async () => {
       const url = await createSignedFileUrl(imagePath);
-      setSelectedImageUrl(url);
+      setSelectedImageUrl(url ? `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}` : "");
     })();
   }, [selectedAssetId, qualityByAssetId]);
 
@@ -669,11 +675,16 @@ export default function AssetsPage() {
     setSelectedAssetId(newAsset.id);
     setForm(emptyForm);
 
-    const { error: qualityError } = await supabase.from("asset_quality").upsert({
-      asset_id: newAsset.id,
-      quality_notes: null,
-      last_quality_review: null,
-    });
+    const { error: qualityError } = await supabase.from("asset_quality").upsert(
+      {
+        asset_id: newAsset.id,
+        quality_notes: null,
+        last_quality_review: null,
+      },
+      {
+        onConflict: "asset_id",
+      }
+    );
 
     if (qualityError) {
       setMessage(`Asset added, but quality row failed: ${qualityError.message}`);
@@ -768,6 +779,7 @@ export default function AssetsPage() {
     const remainingAssets = assets.filter((asset) => asset.id !== selectedAsset.id);
     setAssets(remainingAssets);
     setSelectedAssetId(remainingAssets[0]?.id || "");
+    setSelectedImageUrl("");
 
     setMessage("Asset deleted successfully.");
   }
@@ -778,6 +790,7 @@ export default function AssetsPage() {
 
     const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
       upsert: true,
+      contentType: file.type || undefined,
     });
 
     if (error) {
@@ -787,7 +800,7 @@ export default function AssetsPage() {
     return path;
   }
 
-  async function upsertAssetImageRecord(assetId: string, fileName: string, path: string) {
+  async function upsertAssetImageRecord(assetId: string, file: File, path: string) {
     const { error: deleteOldError } = await supabase
       .from("asset_files")
       .delete()
@@ -802,8 +815,10 @@ export default function AssetsPage() {
       asset_id: assetId,
       file_type: "image",
       reference: null,
-      file_name: fileName,
+      file_name: file.name,
       file_path: path,
+      file_size: file.size,
+      uploaded_at: new Date().toISOString(),
     });
 
     if (error) {
@@ -820,21 +835,40 @@ export default function AssetsPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const isValidImage =
+      file.type.startsWith("image/") ||
+      /\.(png|jpg|jpeg|webp|gif|bmp)$/i.test(file.name);
+
+    if (!isValidImage) {
+      setMessage("Please upload a valid image file.");
+      event.target.value = "";
+      return;
+    }
+
+    setIsUploadingImage(true);
+
     try {
       const oldPath = selectedQuality.image_path;
       const path = await uploadFileToStorage(selectedAsset.id, "image", file);
-      await upsertAssetImageRecord(selectedAsset.id, file.name, path);
+      await upsertAssetImageRecord(selectedAsset.id, file, path);
 
-      if (oldPath) {
+      if (oldPath && oldPath !== path) {
         await supabase.storage.from(STORAGE_BUCKET).remove([oldPath]);
       }
 
       await loadQualityData(assets.map((asset) => asset.id));
+
+      const refreshedUrl = await createSignedFileUrl(path);
+      setSelectedImageUrl(
+        refreshedUrl ? `${refreshedUrl}${refreshedUrl.includes("?") ? "&" : "?"}t=${Date.now()}` : ""
+      );
+
       setMessage("Asset image uploaded.");
     } catch (error) {
       const err = error as Error;
       setMessage(`Image upload failed: ${err.message}`);
     } finally {
+      setIsUploadingImage(false);
       event.target.value = "";
     }
   }
@@ -861,6 +895,7 @@ export default function AssetsPage() {
         return;
       }
 
+      setSelectedImageUrl("");
       await loadQualityData(assets.map((asset) => asset.id));
       setMessage("Asset image removed.");
     } catch (error) {
@@ -1019,6 +1054,22 @@ export default function AssetsPage() {
     }
   }
 
+  async function openStoredFile(path: string) {
+    if (!path) {
+      setMessage("No file path available.");
+      return;
+    }
+
+    const signedUrl = await createSignedFileUrl(path);
+
+    if (!signedUrl) {
+      setMessage("Could not open file.");
+      return;
+    }
+
+    window.open(signedUrl, "_blank", "noopener,noreferrer");
+  }
+
   function removeCalibrationRecord(id: string) {
     setQualityDraft((prev) => ({
       ...prev,
@@ -1039,14 +1090,22 @@ export default function AssetsPage() {
       return;
     }
 
+    const asset = selectedAsset;
     setIsSavingQuality(true);
 
     try {
-      const { error: qualityError } = await supabase.from("asset_quality").upsert({
-        asset_id: selectedAsset.id,
-        quality_notes: qualityDraft.quality_notes.trim() || null,
-        last_quality_review: qualityDraft.last_quality_review || null,
-      });
+      const { error: qualityError } = await supabase
+        .from("asset_quality")
+        .upsert(
+          {
+            asset_id: asset.id,
+            quality_notes: qualityDraft.quality_notes.trim() || null,
+            last_quality_review: qualityDraft.last_quality_review || null,
+          },
+          {
+            onConflict: "asset_id",
+          }
+        );
 
       if (qualityError) {
         throw new Error(qualityError.message);
@@ -1055,7 +1114,7 @@ export default function AssetsPage() {
       const { error: deleteNcrError } = await supabase
         .from("asset_ncr_links")
         .delete()
-        .eq("asset_id", selectedAsset.id);
+        .eq("asset_id", asset.id);
 
       if (deleteNcrError) {
         throw new Error(deleteNcrError.message);
@@ -1064,7 +1123,7 @@ export default function AssetsPage() {
       if (qualityDraft.linked_ncrs.length > 0) {
         const { error: insertNcrError } = await supabase.from("asset_ncr_links").insert(
           qualityDraft.linked_ncrs.map((reference) => ({
-            asset_id: selectedAsset.id,
+            asset_id: asset.id,
             ncr_reference: reference,
           }))
         );
@@ -1077,7 +1136,7 @@ export default function AssetsPage() {
       const { error: deleteActionError } = await supabase
         .from("asset_action_links")
         .delete()
-        .eq("asset_id", selectedAsset.id);
+        .eq("asset_id", asset.id);
 
       if (deleteActionError) {
         throw new Error(deleteActionError.message);
@@ -1086,7 +1145,7 @@ export default function AssetsPage() {
       if (qualityDraft.linked_actions.length > 0) {
         const { error: insertActionError } = await supabase.from("asset_action_links").insert(
           qualityDraft.linked_actions.map((reference) => ({
-            asset_id: selectedAsset.id,
+            asset_id: asset.id,
             action_reference: reference,
           }))
         );
@@ -1096,10 +1155,12 @@ export default function AssetsPage() {
         }
       }
 
-      const existingQuality = qualityByAssetId[selectedAsset.id] || createDefaultQualityRecord();
+      const existingQuality = qualityByAssetId[asset.id] || createDefaultQualityRecord();
+
       const existingCalibrationPaths = existingQuality.calibration_records
         .map((record) => record.file_path)
         .filter(Boolean);
+
       const existingInspectionPaths = existingQuality.inspection_records
         .map((record) => record.file_path)
         .filter(Boolean);
@@ -1107,6 +1168,7 @@ export default function AssetsPage() {
       const nextCalibrationPaths = qualityDraft.calibration_records
         .map((record) => record.file_path)
         .filter(Boolean);
+
       const nextInspectionPaths = qualityDraft.inspection_records
         .map((record) => record.file_path)
         .filter(Boolean);
@@ -1114,6 +1176,7 @@ export default function AssetsPage() {
       const calibrationPathsToRemove = existingCalibrationPaths.filter(
         (path) => !nextCalibrationPaths.includes(path)
       );
+
       const inspectionPathsToRemove = existingInspectionPaths.filter(
         (path) => !nextInspectionPaths.includes(path)
       );
@@ -1121,7 +1184,7 @@ export default function AssetsPage() {
       const { error: deleteCalError } = await supabase
         .from("asset_calibration_records")
         .delete()
-        .eq("asset_id", selectedAsset.id);
+        .eq("asset_id", asset.id);
 
       if (deleteCalError) {
         throw new Error(deleteCalError.message);
@@ -1130,7 +1193,7 @@ export default function AssetsPage() {
       const { error: deleteCalFilesError } = await supabase
         .from("asset_files")
         .delete()
-        .eq("asset_id", selectedAsset.id)
+        .eq("asset_id", asset.id)
         .eq("file_type", "calibration");
 
       if (deleteCalFilesError) {
@@ -1139,7 +1202,7 @@ export default function AssetsPage() {
 
       if (qualityDraft.calibration_records.length > 0) {
         const calibrationRows = qualityDraft.calibration_records.map((record) => ({
-          asset_id: selectedAsset.id,
+          asset_id: asset.id,
           reference: record.reference || "Unreferenced",
           file_name: record.file_name || null,
           file_path: record.file_path || null,
@@ -1158,11 +1221,13 @@ export default function AssetsPage() {
         const calibrationFileRows = qualityDraft.calibration_records
           .filter((record) => record.file_path && record.file_name)
           .map((record) => ({
-            asset_id: selectedAsset.id,
+            asset_id: asset.id,
             file_type: "calibration",
             reference: record.reference || null,
             file_name: record.file_name,
             file_path: record.file_path,
+            file_size: record.file_size || null,
+            uploaded_at: record.uploaded_at || new Date().toISOString(),
           }));
 
         if (calibrationFileRows.length > 0) {
@@ -1179,7 +1244,7 @@ export default function AssetsPage() {
       const { error: deleteInspError } = await supabase
         .from("asset_inspection_records")
         .delete()
-        .eq("asset_id", selectedAsset.id);
+        .eq("asset_id", asset.id);
 
       if (deleteInspError) {
         throw new Error(deleteInspError.message);
@@ -1188,7 +1253,7 @@ export default function AssetsPage() {
       const { error: deleteInspFilesError } = await supabase
         .from("asset_files")
         .delete()
-        .eq("asset_id", selectedAsset.id)
+        .eq("asset_id", asset.id)
         .eq("file_type", "inspection");
 
       if (deleteInspFilesError) {
@@ -1197,7 +1262,7 @@ export default function AssetsPage() {
 
       if (qualityDraft.inspection_records.length > 0) {
         const inspectionRows = qualityDraft.inspection_records.map((record) => ({
-          asset_id: selectedAsset.id,
+          asset_id: asset.id,
           reference: record.reference || "Unreferenced",
           file_name: record.file_name || null,
           file_path: record.file_path || null,
@@ -1216,11 +1281,13 @@ export default function AssetsPage() {
         const inspectionFileRows = qualityDraft.inspection_records
           .filter((record) => record.file_path && record.file_name)
           .map((record) => ({
-            asset_id: selectedAsset.id,
+            asset_id: asset.id,
             file_type: "inspection",
             reference: record.reference || null,
             file_name: record.file_name,
             file_path: record.file_path,
+            file_size: record.file_size || null,
+            uploaded_at: record.uploaded_at || new Date().toISOString(),
           }));
 
         if (inspectionFileRows.length > 0) {
@@ -1235,11 +1302,12 @@ export default function AssetsPage() {
       }
 
       const storageRemovals = [...calibrationPathsToRemove, ...inspectionPathsToRemove];
+
       if (storageRemovals.length > 0) {
         await supabase.storage.from(STORAGE_BUCKET).remove(storageRemovals);
       }
 
-      await loadQualityData(assets.map((asset) => asset.id));
+      await loadQualityData(assets.map((assetItem) => assetItem.id));
       setMessage("Asset quality section updated.");
     } catch (error) {
       const err = error as Error;
@@ -1263,7 +1331,8 @@ export default function AssetsPage() {
           <div style={eyebrowStyle}>Asset Register</div>
           <h1 style={heroTitleStyle}>Assets</h1>
           <p style={heroSubtitleStyle}>
-            Live asset register with a dedicated quality workspace, image upload, and direct linking to NCRs, actions, calibrations and inspections.
+            Live asset register with a dedicated quality workspace, image upload, and direct linking
+            to NCRs, actions, calibrations and inspections.
           </p>
 
           <div style={heroPillGridStyle}>
@@ -1277,7 +1346,10 @@ export default function AssetsPage() {
         <div style={heroMetaWrapStyle}>
           <HeroMetaCard label="Filtered Results" value={filteredAssets.length} />
           <HeroMetaCard label="Current Selection" value={selectedAsset?.name || "None"} compact />
-          <HeroMetaCard label="Quality Links" value={selectedAsset ? countQualityLinks(selectedQuality) : 0} />
+          <HeroMetaCard
+            label="Quality Links"
+            value={selectedAsset ? countQualityLinks(selectedQuality) : 0}
+          />
           <HeroMetaCard label="Image" value={selectedQuality.image_name ? "Uploaded" : "Not set"} compact />
         </div>
       </section>
@@ -1396,7 +1468,9 @@ export default function AssetsPage() {
           </div>
 
           <div style={qualityIntroBoxStyle}>
-            Use the <strong>Quality</strong> section in the asset detail panel to connect each asset to NCRs, actions, calibration records and inspections without oversimplifying complex assemblies.
+            Use the <strong>Quality</strong> section in the asset detail panel to connect each
+            asset to NCRs, actions, calibration records and inspections without oversimplifying
+            complex assemblies.
           </div>
         </SectionCard>
       </section>
@@ -1461,7 +1535,11 @@ export default function AssetsPage() {
             />
 
             <div style={toolbarFiltersStyle}>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={toolbarSelectStyle}>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={toolbarSelectStyle}
+              >
                 <option value="">All Status</option>
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
@@ -1469,7 +1547,11 @@ export default function AssetsPage() {
                 <option value="Under Maintenance">Under Maintenance</option>
               </select>
 
-              <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} style={toolbarSelectStyle}>
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                style={toolbarSelectStyle}
+              >
                 <option value="">All Locations</option>
                 {uniqueLocations.map((location) => (
                   <option key={String(location)} value={String(location)}>
@@ -1478,7 +1560,11 @@ export default function AssetsPage() {
                 ))}
               </select>
 
-              <select value={ownerFilter} onChange={(e) => setOwnerFilter(e.target.value)} style={toolbarSelectStyle}>
+              <select
+                value={ownerFilter}
+                onChange={(e) => setOwnerFilter(e.target.value)}
+                style={toolbarSelectStyle}
+              >
                 <option value="">All Owners</option>
                 {uniqueOwners.map((owner) => (
                   <option key={String(owner)} value={String(owner)}>
@@ -1518,7 +1604,8 @@ export default function AssetsPage() {
                     style={{
                       ...registerRowStyle,
                       background: selectedAssetId === asset.id ? "#eff6ff" : "#ffffff",
-                      borderLeft: selectedAssetId === asset.id ? "4px solid #0f766e" : "4px solid transparent",
+                      borderLeft:
+                        selectedAssetId === asset.id ? "4px solid #0f766e" : "4px solid transparent",
                     }}
                   >
                     <div style={registerPrimaryStyle}>{asset.name || "-"}</div>
@@ -1563,7 +1650,11 @@ export default function AssetsPage() {
               <div style={imageStripStyle}>
                 <div style={imagePreviewWrapStyle}>
                   {selectedImageUrl ? (
-                    <img src={selectedImageUrl} alt={selectedQuality.image_name || "Asset"} style={imagePreviewStyle} />
+                    <img
+                      src={selectedImageUrl}
+                      alt={selectedQuality.image_name || "Asset"}
+                      style={imagePreviewStyle}
+                    />
                   ) : (
                     <div style={imagePlaceholderStyle}>No image uploaded</div>
                   )}
@@ -1574,18 +1665,21 @@ export default function AssetsPage() {
                   <div style={imageMetaFileStyle}>{selectedQuality.image_name || "Not set"}</div>
                   <div style={imageMetaSubStyle}>
                     {selectedQuality.image_name
-                      ? `${formatFileSize(selectedQuality.image_size)} • Uploaded ${formatDateTime(selectedQuality.image_uploaded_at)}`
+                      ? `${formatFileSize(selectedQuality.image_size)} • Uploaded ${formatDateTime(
+                          selectedQuality.image_uploaded_at
+                        )}`
                       : "Upload a visual reference for the asset."}
                   </div>
 
                   <div style={buttonRowStyle}>
-                    <label style={uploadButtonStyle}>
-                      Upload image
+                    <label style={{ ...uploadButtonStyle, opacity: isUploadingImage ? 0.7 : 1 }}>
+                      {isUploadingImage ? "Uploading..." : "Upload image"}
                       <input
                         type="file"
-                        accept=".png,.jpg,.jpeg,.webp"
+                        accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp"
                         onChange={handleImageUpload}
                         style={{ display: "none" }}
+                        disabled={isUploadingImage}
                       />
                     </label>
 
@@ -1675,8 +1769,18 @@ export default function AssetsPage() {
                 <div style={qualityMiniGridStyle}>
                   <MiniMetricCard label="NCRs" value={qualityDraft.linked_ncrs.length} tone="#991b1b" bg="#fee2e2" />
                   <MiniMetricCard label="Actions" value={qualityDraft.linked_actions.length} tone="#1d4ed8" bg="#dbeafe" />
-                  <MiniMetricCard label="Calibration" value={qualityDraft.calibration_records.length} tone="#92400e" bg="#fef3c7" />
-                  <MiniMetricCard label="Inspection" value={qualityDraft.inspection_records.length} tone="#166534" bg="#dcfce7" />
+                  <MiniMetricCard
+                    label="Calibration"
+                    value={qualityDraft.calibration_records.length}
+                    tone="#92400e"
+                    bg="#fef3c7"
+                  />
+                  <MiniMetricCard
+                    label="Inspection"
+                    value={qualityDraft.inspection_records.length}
+                    tone="#166534"
+                    bg="#dcfce7"
+                  />
                 </div>
 
                 <div style={linkPickerGridStyle}>
@@ -1771,6 +1875,16 @@ export default function AssetsPage() {
                                     style={{ display: "none" }}
                                   />
                                 </label>
+
+                                {record.file_path ? (
+                                  <button
+                                    type="button"
+                                    style={reportLinkButtonStyle as CSSProperties}
+                                    onClick={() => void openStoredFile(record.file_path)}
+                                  >
+                                    Open file
+                                  </button>
+                                ) : null}
                               </div>
                             </Field>
 
@@ -1787,9 +1901,15 @@ export default function AssetsPage() {
                           </div>
 
                           <div style={recordMetaStyle}>
-                            <span><strong>File:</strong> {record.file_name || "-"}</span>
-                            <span><strong>Size:</strong> {formatFileSize(record.file_size)}</span>
-                            <span><strong>Uploaded:</strong> {formatDateTime(record.uploaded_at)}</span>
+                            <span>
+                              <strong>File:</strong> {record.file_name || "-"}
+                            </span>
+                            <span>
+                              <strong>Size:</strong> {formatFileSize(record.file_size)}
+                            </span>
+                            <span>
+                              <strong>Uploaded:</strong> {formatDateTime(record.uploaded_at)}
+                            </span>
                           </div>
 
                           <div style={buttonRowStyle}>
@@ -1842,6 +1962,16 @@ export default function AssetsPage() {
                                     style={{ display: "none" }}
                                   />
                                 </label>
+
+                                {record.file_path ? (
+                                  <button
+                                    type="button"
+                                    style={reportLinkButtonStyle as CSSProperties}
+                                    onClick={() => void openStoredFile(record.file_path)}
+                                  >
+                                    Open file
+                                  </button>
+                                ) : null}
                               </div>
                             </Field>
 
@@ -1858,9 +1988,15 @@ export default function AssetsPage() {
                           </div>
 
                           <div style={recordMetaStyle}>
-                            <span><strong>File:</strong> {record.file_name || "-"}</span>
-                            <span><strong>Size:</strong> {formatFileSize(record.file_size)}</span>
-                            <span><strong>Uploaded:</strong> {formatDateTime(record.uploaded_at)}</span>
+                            <span>
+                              <strong>File:</strong> {record.file_name || "-"}
+                            </span>
+                            <span>
+                              <strong>Size:</strong> {formatFileSize(record.file_size)}
+                            </span>
+                            <span>
+                              <strong>Uploaded:</strong> {formatDateTime(record.uploaded_at)}
+                            </span>
                           </div>
 
                           <div style={buttonRowStyle}>
@@ -1883,7 +2019,9 @@ export default function AssetsPage() {
                     <input
                       type="date"
                       value={qualityDraft.last_quality_review}
-                      onChange={(e) => setQualityDraft({ ...qualityDraft, last_quality_review: e.target.value })}
+                      onChange={(e) =>
+                        setQualityDraft({ ...qualityDraft, last_quality_review: e.target.value })
+                      }
                       style={inputStyle}
                     />
                   </Field>
@@ -2388,6 +2526,8 @@ const reportLinkButtonStyle: CSSProperties = {
   fontWeight: 700,
   textDecoration: "none",
   whiteSpace: "nowrap",
+  border: "none",
+  cursor: "pointer",
 };
 
 const qualityOverviewGridStyle: CSSProperties = {

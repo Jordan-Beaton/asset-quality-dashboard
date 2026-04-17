@@ -24,6 +24,7 @@ type Ncr = {
   status: string | null;
   owner: string | null;
   area: string | null;
+  created_at?: string | null;
 };
 
 type Capa = {
@@ -33,6 +34,7 @@ type Capa = {
   status: string | null;
   owner: string | null;
   linked_to: string | null;
+  created_at?: string | null;
 };
 
 type ActionItem = {
@@ -43,6 +45,34 @@ type ActionItem = {
   priority: string | null;
   status: string | null;
   due_date: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+type AuditRecord = {
+  id: string;
+  audit_number: string | null;
+  title: string | null;
+  audit_type: string | null;
+  auditee: string | null;
+  lead_auditor: string | null;
+  audit_date: string | null;
+  audit_month: string | null;
+  status: string | null;
+  location: string | null;
+  created_at?: string | null;
+};
+
+type AssetQualityRow = {
+  id: string;
+  asset_id: string;
+};
+
+type AuditFindingRow = {
+  id: string;
+  audit_id: string;
+  category: string | null;
+  status: string | null;
 };
 
 function normaliseStatus(value: string | null | undefined) {
@@ -93,39 +123,65 @@ function getDaysFromToday(value: string | null | undefined) {
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
 }
 
+function formatAuditMonth(value: string | null | undefined) {
+  if (!value) return "-";
+
+  const [year, month] = value.split("-");
+  if (!year || !month) return value;
+
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function getManagementMessage(params: {
   overdueActions: number;
   dueNext7Days: number;
   majorNcrs: number;
   inactiveAssets: number;
+  overdueAudits: number;
+  openMajorFindings: number;
 }) {
-  const { overdueActions, dueNext7Days, majorNcrs, inactiveAssets } = params;
+  const {
+    overdueActions,
+    dueNext7Days,
+    majorNcrs,
+    inactiveAssets,
+    overdueAudits,
+    openMajorFindings,
+  } = params;
 
   if (
     overdueActions === 0 &&
     dueNext7Days === 0 &&
     majorNcrs === 0 &&
-    inactiveAssets === 0
+    inactiveAssets === 0 &&
+    overdueAudits === 0 &&
+    openMajorFindings === 0
   ) {
     return {
       tone: "good" as const,
       title: "System looks under control",
-      text: "No overdue actions, no major NCRs open, and no inactive assets currently flagged.",
+      text: "No overdue actions, overdue audits, or open major quality issues are currently showing.",
     };
   }
 
-  if (overdueActions > 0 || majorNcrs > 0) {
+  if (overdueActions > 0 || majorNcrs > 0 || overdueAudits > 0 || openMajorFindings > 0) {
     return {
       tone: "risk" as const,
       title: "Immediate follow-up recommended",
-      text: "There are overdue actions or open major NCRs that should be chased first.",
+      text: "There are overdue actions, overdue audits, or major open quality issues that need chasing first.",
     };
   }
 
   return {
     tone: "watch" as const,
     title: "Some items need monitoring",
-    text: "The dashboard is generally stable, but there are upcoming actions or inactive assets needing attention.",
+    text: "The dashboard is generally stable, but there are near-term items and inactive assets that still need attention.",
   };
 }
 
@@ -134,6 +190,9 @@ export default function Home() {
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
+  const [audits, setAudits] = useState<AuditRecord[]>([]);
+  const [auditFindings, setAuditFindings] = useState<AuditFindingRow[]>([]);
+  const [assetQualityRows, setAssetQualityRows] = useState<AssetQualityRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -143,45 +202,66 @@ export default function Home() {
       setIsLoading(true);
       setError(null);
 
-      const [assetRes, ncrRes, capaRes, actionRes] = await Promise.all([
+      const [
+        assetRes,
+        ncrRes,
+        capaRes,
+        actionRes,
+        auditRes,
+        findingRes,
+        assetQualityRes,
+      ] = await Promise.all([
         supabase.from("assets").select("*"),
         supabase.from("ncrs").select("*"),
         supabase.from("capas").select("*"),
         supabase.from("actions").select("*"),
+        supabase.from("audits").select("*"),
+        supabase.from("audit_findings").select("*"),
+        supabase.from("asset_quality").select("id,asset_id"),
       ]);
 
-      if (assetRes.error || ncrRes.error || capaRes.error || actionRes.error) {
+      if (
+        assetRes.error ||
+        ncrRes.error ||
+        capaRes.error ||
+        actionRes.error ||
+        auditRes.error ||
+        findingRes.error ||
+        assetQualityRes.error
+      ) {
         setError(
           assetRes.error?.message ||
             ncrRes.error?.message ||
             capaRes.error?.message ||
             actionRes.error?.message ||
+            auditRes.error?.message ||
+            findingRes.error?.message ||
+            assetQualityRes.error?.message ||
             "Failed to load dashboard data."
         );
         setIsLoading(false);
         return;
       }
 
-      setAssets(assetRes.data || []);
-      setNcrs(ncrRes.data || []);
-      setCapas(capaRes.data || []);
-      setActions(actionRes.data || []);
+      setAssets((assetRes.data || []) as Asset[]);
+      setNcrs((ncrRes.data || []) as Ncr[]);
+      setCapas((capaRes.data || []) as Capa[]);
+      setActions((actionRes.data || []) as ActionItem[]);
+      setAudits((auditRes.data || []) as AuditRecord[]);
+      setAuditFindings((findingRes.data || []) as AuditFindingRow[]);
+      setAssetQualityRows((assetQualityRes.data || []) as AssetQualityRow[]);
       setLastRefreshed(new Date());
       setIsLoading(false);
     };
 
-    fetchData();
+    void fetchData();
   }, []);
 
   const totalAssets = assets.length;
 
-  const activeAssets = assets.filter(
-    (a) => normaliseStatus(a.status) === "active"
-  ).length;
+  const activeAssets = assets.filter((a) => normaliseStatus(a.status) === "active").length;
 
-  const inactiveAssets = assets.filter(
-    (a) => normaliseStatus(a.status) !== "active"
-  ).length;
+  const inactiveAssets = assets.filter((a) => normaliseStatus(a.status) !== "active").length;
 
   const openNcrs = ncrs.filter((n) => !isClosedLikeStatus(n.status)).length;
 
@@ -217,11 +297,27 @@ export default function Home() {
   const dueNext7Days = dueNext7DaysList.length;
 
   const majorNcrs = ncrs.filter(
-    (n) =>
-      normaliseStatus(n.severity) === "major" && !isClosedLikeStatus(n.status)
+    (n) => normaliseStatus(n.severity) === "major" && !isClosedLikeStatus(n.status)
   ).length;
 
-  const openItems = openNcrs + openCapas + openActions;
+  const totalAudits = audits.length;
+  const plannedAudits = audits.filter((a) => normaliseStatus(a.status) === "planned").length;
+  const inProgressAudits = audits.filter((a) => normaliseStatus(a.status) === "in progress").length;
+  const overdueAudits = audits.filter((a) => normaliseStatus(a.status) === "overdue").length;
+  const completedAudits = audits.filter((a) => normaliseStatus(a.status) === "completed").length;
+
+  const totalAuditFindings = auditFindings.length;
+  const openAuditFindings = auditFindings.filter((f) => normaliseStatus(f.status) !== "closed").length;
+  const openMajorFindings = auditFindings.filter(
+    (f) => normaliseStatus(f.category) === "major" && normaliseStatus(f.status) !== "closed"
+  ).length;
+
+  const qualityLinkedAssets = useMemo(() => {
+    const linkedIds = new Set(assetQualityRows.map((row) => row.asset_id));
+    return assets.filter((asset) => linkedIds.has(asset.id)).length;
+  }, [assetQualityRows, assets]);
+
+  const openItems = openNcrs + openCapas + openActions + openAuditFindings;
 
   const assetsByLocation = useMemo(() => {
     const map = assets.reduce<Record<string, number>>((acc, asset) => {
@@ -259,11 +355,52 @@ export default function Home() {
       .slice(0, 6);
   }, [assets]);
 
+  const priorityActions = useMemo(() => {
+    return [...actions]
+      .filter((action) => !isClosedLikeStatus(action.status))
+      .sort((a, b) => {
+        const aOverdue = getDaysFromToday(a.due_date);
+        const bOverdue = getDaysFromToday(b.due_date);
+        const aRank = aOverdue !== null && aOverdue < 0 ? 0 : 1;
+        const bRank = bOverdue !== null && bOverdue < 0 ? 0 : 1;
+
+        if (aRank !== bRank) return aRank - bRank;
+
+        const aDate = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDate - bDate;
+      })
+      .slice(0, 6);
+  }, [actions]);
+
+  const auditAttentionList = useMemo(() => {
+    return [...audits]
+      .filter((audit) => {
+        const status = normaliseStatus(audit.status);
+        return status === "overdue" || status === "planned" || status === "in progress";
+      })
+      .sort((a, b) => {
+        const aStatus = normaliseStatus(a.status);
+        const bStatus = normaliseStatus(b.status);
+        const aRank = aStatus === "overdue" ? 0 : aStatus === "in progress" ? 1 : 2;
+        const bRank = bStatus === "overdue" ? 0 : bStatus === "in progress" ? 1 : 2;
+
+        if (aRank !== bRank) return aRank - bRank;
+
+        const aDate = a.audit_date ? new Date(a.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.audit_date ? new Date(b.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDate - bDate;
+      })
+      .slice(0, 6);
+  }, [audits]);
+
   const managementMessage = getManagementMessage({
     overdueActions,
     dueNext7Days,
     majorNcrs,
     inactiveAssets,
+    overdueAudits,
+    openMajorFindings,
   });
 
   return (
@@ -271,9 +408,10 @@ export default function Home() {
       <section style={heroStyle}>
         <div style={heroContentStyle}>
           <div style={eyebrowStyle}>Dashboard Overview</div>
-          <h1 style={heroTitleStyle}>Asset Quality Dashboard</h1>
+          <h1 style={heroTitleStyle}>Quality Management Dashboard</h1>
           <p style={heroSubtitleStyle}>
-            Live view of assets, NCRs, CAPAs and actions across the system.
+            Live view of assets, NCRs, CAPAs, audits and actions across the system.
+            Built to show where attention is needed first.
           </p>
 
           <div style={priorityStripStyle}>
@@ -290,15 +428,15 @@ export default function Home() {
               isLoading={isLoading}
             />
             <PriorityPill
-              label="Major NCRs"
-              value={majorNcrs}
-              tone={majorNcrs > 0 ? "red" : "green"}
+              label="Overdue Audits"
+              value={overdueAudits}
+              tone={overdueAudits > 0 ? "red" : "green"}
               isLoading={isLoading}
             />
             <PriorityPill
-              label="Inactive Assets"
-              value={inactiveAssets}
-              tone={inactiveAssets > 0 ? "amber" : "green"}
+              label="Major Open Findings"
+              value={openMajorFindings}
+              tone={openMajorFindings > 0 ? "red" : "green"}
               isLoading={isLoading}
             />
           </div>
@@ -335,57 +473,22 @@ export default function Home() {
 
       {error && (
         <section style={errorBannerStyle}>
-          <strong style={{ display: "block", marginBottom: "4px" }}>
-            Dashboard error
-          </strong>
+          <strong style={{ display: "block", marginBottom: "4px" }}>Dashboard error</strong>
           <span>{error}</span>
         </section>
       )}
 
       <section style={statsGridStyle}>
-        <StatCard
-          title="Total Assets"
-          value={totalAssets}
-          accent="#0f766e"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Active Assets"
-          value={activeAssets}
-          accent="#16a34a"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Open NCRs"
-          value={openNcrs}
-          accent="#dc2626"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Open CAPAs"
-          value={openCapas}
-          accent="#f59e0b"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Open Actions"
-          value={openActions}
-          accent="#2563eb"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Overdue Actions"
-          value={overdueActions}
-          accent="#b91c1c"
-          isLoading={isLoading}
-        />
+        <StatCard title="Total Assets" value={totalAssets} accent="#0f766e" isLoading={isLoading} />
+        <StatCard title="Quality Linked Assets" value={qualityLinkedAssets} accent="#0891b2" isLoading={isLoading} />
+        <StatCard title="Open NCRs" value={openNcrs} accent="#dc2626" isLoading={isLoading} />
+        <StatCard title="Open CAPAs" value={openCapas} accent="#f59e0b" isLoading={isLoading} />
+        <StatCard title="Open Actions" value={openActions} accent="#2563eb" isLoading={isLoading} />
+        <StatCard title="Open Audit Findings" value={openAuditFindings} accent="#7c3aed" isLoading={isLoading} />
       </section>
 
-      <section style={twoColumnGridStyle}>
-        <SectionCard
-          title="Management Focus"
-          subtitle="Fast read for what needs attention first."
-        >
+      <section style={threeColumnGridStyle}>
+        <SectionCard title="Management Focus" subtitle="Fast read for what needs attention first.">
           <ManagementCallout
             tone={managementMessage.tone}
             title={managementMessage.title}
@@ -393,61 +496,38 @@ export default function Home() {
           />
 
           <div style={stackCompactStyle}>
-            <SnapshotRow
-              label="Overdue actions requiring chase-up"
-              value={overdueActions}
-              isLoading={isLoading}
-            />
-            <SnapshotRow
-              label="Actions due within 7 days"
-              value={dueNext7Days}
-              isLoading={isLoading}
-            />
-            <SnapshotRow
-              label="Open major NCRs"
-              value={majorNcrs}
-              isLoading={isLoading}
-            />
-            <SnapshotRow
-              label="Inactive assets in register"
-              value={inactiveAssets}
-              isLoading={isLoading}
-            />
+            <SnapshotRow label="Overdue actions requiring chase-up" value={overdueActions} isLoading={isLoading} />
+            <SnapshotRow label="Overdue audits requiring action" value={overdueAudits} isLoading={isLoading} />
+            <SnapshotRow label="Open major NCRs" value={majorNcrs} isLoading={isLoading} />
+            <SnapshotRow label="Open major audit findings" value={openMajorFindings} isLoading={isLoading} />
+            <SnapshotRow label="Inactive assets in register" value={inactiveAssets} isLoading={isLoading} />
           </div>
         </SectionCard>
 
-        <SectionCard
-          title="Quick Navigation"
-          subtitle="Jump straight into the main working areas."
-        >
+        <SectionCard title="Quick Navigation" subtitle="Jump straight into the main working areas.">
           <div style={quickLinksGridStyle}>
-            <QuickLinkCard
-              href="/assets"
-              title="Assets"
-              description="Register and manage assets."
-            />
-            <QuickLinkCard
-              href="/ncr-capa"
-              title="NCR / CAPA"
-              description="Review nonconformances and CAPAs."
-            />
-            <QuickLinkCard
-              href="/actions"
-              title="Actions"
-              description="Track owners, due dates and status."
-            />
-            <QuickLinkCard
-              href="/reports"
-              title="Reports"
-              description="Build monthly management reports."
-            />
+            <QuickLinkCard href="/assets" title="Assets" description="Register assets and quality records." />
+            <QuickLinkCard href="/ncr-capa" title="NCR / CAPA" description="Review nonconformances and CAPAs." />
+            <QuickLinkCard href="/audits" title="Audits" description="Manage audit schedule, detail and findings." />
+            <QuickLinkCard href="/actions" title="Actions" description="Track owners, due dates and evidence." />
+            <QuickLinkCard href="/reports" title="Reports" description="Build management and audit summaries." />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Audit Snapshot" subtitle="Current audit programme position.">
+          <div style={stackCompactStyle}>
+            <SnapshotRow label="Total audits" value={totalAudits} isLoading={isLoading} />
+            <SnapshotRow label="Planned audits" value={plannedAudits} isLoading={isLoading} />
+            <SnapshotRow label="In progress audits" value={inProgressAudits} isLoading={isLoading} />
+            <SnapshotRow label="Completed audits" value={completedAudits} isLoading={isLoading} />
+            <SnapshotRow label="Open audit findings" value={openAuditFindings} isLoading={isLoading} />
           </div>
         </SectionCard>
       </section>
 
       <section style={twoColumnGridStyle}>
         <SectionCard
-          title="Actions Due in Next 7 Days"
+          title="Priority Actions"
           subtitle="Live action list for near-term follow-up."
           action={
             <Link href="/actions" style={sectionLinkStyle}>
@@ -456,9 +536,9 @@ export default function Home() {
           }
         >
           {isLoading ? (
-            <p style={emptyTextStyle}>Loading upcoming actions...</p>
-          ) : dueNext7DaysList.length === 0 ? (
-            <p style={emptyTextStyle}>No open actions due in the next 7 days.</p>
+            <p style={emptyTextStyle}>Loading priority actions...</p>
+          ) : priorityActions.length === 0 ? (
+            <p style={emptyTextStyle}>No open actions currently requiring attention.</p>
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={tableStyle}>
@@ -472,25 +552,40 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {dueNext7DaysList.map((action) => {
+                  {priorityActions.map((action) => {
                     const days = getDaysFromToday(action.due_date);
+                    const overdue = days !== null && days < 0;
 
                     return (
-                      <tr key={action.id} style={tableRowStyle}>
+                      <tr
+                        key={action.id}
+                        style={{
+                          ...tableRowStyle,
+                          background: overdue ? "#fff7f7" : "white",
+                        }}
+                      >
                         <td style={tableCellStyle}>{action.action_number || "-"}</td>
                         <td style={tableCellStyle}>{action.title || "-"}</td>
                         <td style={tableCellStyle}>{action.owner || "-"}</td>
                         <td style={tableCellStyle}>
                           <div style={{ display: "grid", gap: "4px" }}>
                             <span>{formatDate(action.due_date)}</span>
-                            <span style={tableSubTextStyle}>
-                              {days === 0
+                            <span
+                              style={{
+                                ...tableSubTextStyle,
+                                color: overdue ? "#b91c1c" : "#64748b",
+                                fontWeight: overdue ? 700 : 500,
+                              }}
+                            >
+                              {days === null
+                                ? "-"
+                                : days < 0
+                                ? `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`
+                                : days === 0
                                 ? "Due today"
                                 : days === 1
                                 ? "Due tomorrow"
-                                : days !== null
-                                ? `Due in ${days} days`
-                                : "-"}
+                                : `Due in ${days} days`}
                             </span>
                           </div>
                         </td>
@@ -507,9 +602,41 @@ export default function Home() {
         </SectionCard>
 
         <SectionCard
-          title="Attention Required"
-          subtitle="Items that may need follow-up first."
+          title="Audit Attention"
+          subtitle="Programme items that may need follow-up first."
+          action={
+            <Link href="/audits" style={sectionLinkStyle}>
+              View all audits →
+            </Link>
+          }
         >
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading audits...</p>
+          ) : auditAttentionList.length === 0 ? (
+            <p style={emptyTextStyle}>No audits currently flagged for attention.</p>
+          ) : (
+            <div style={stackStyle}>
+              {auditAttentionList.map((audit) => (
+                <div key={audit.id} style={auditAttentionItemStyle}>
+                  <div style={auditAttentionTopStyle}>
+                    <span style={auditMiniTagStyle}>{audit.audit_type || "Audit"}</span>
+                    <StatusBadge value={audit.status || "Unknown"} />
+                  </div>
+                  <div style={auditAttentionNumberStyle}>{audit.audit_number || "-"}</div>
+                  <div style={auditAttentionTitleStyle}>{audit.title || "-"}</div>
+                  <div style={auditAttentionMetaStyle}>
+                    <span>{audit.auditee || "-"}</span>
+                    <span>{formatDate(audit.audit_date)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </section>
+
+      <section style={twoColumnGridStyle}>
+        <SectionCard title="Attention Required" subtitle="Items that may need follow-up first.">
           <div style={stackStyle}>
             <AttentionItem
               label="Major NCRs"
@@ -521,6 +648,12 @@ export default function Home() {
               label="Overdue Actions"
               value={overdueActions}
               tone={overdueActions > 0 ? "red" : "green"}
+              isLoading={isLoading}
+            />
+            <AttentionItem
+              label="Overdue Audits"
+              value={overdueAudits}
+              tone={overdueAudits > 0 ? "red" : "green"}
               isLoading={isLoading}
             />
             <AttentionItem
@@ -537,26 +670,8 @@ export default function Home() {
             />
           </div>
         </SectionCard>
-      </section>
 
-      <section style={twoColumnGridStyle}>
-        <SectionCard
-          title="Operational Snapshot"
-          subtitle="Current totals across key areas."
-        >
-          <div style={stackCompactStyle}>
-            <SnapshotRow label="Assets in system" value={totalAssets} isLoading={isLoading} />
-            <SnapshotRow label="Open NCRs" value={openNcrs} isLoading={isLoading} />
-            <SnapshotRow label="Open CAPAs" value={openCapas} isLoading={isLoading} />
-            <SnapshotRow label="Open Actions" value={openActions} isLoading={isLoading} />
-            <SnapshotRow label="Overdue actions" value={overdueActions} isLoading={isLoading} />
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Assets by Location"
-          subtitle="Top locations currently holding assets."
-        >
+        <SectionCard title="Assets by Location" subtitle="Top locations currently holding assets.">
           <div style={stackCompactStyle}>
             {isLoading ? (
               <p style={emptyTextStyle}>Loading location data...</p>
@@ -584,47 +699,102 @@ export default function Home() {
         </SectionCard>
       </section>
 
+      <section style={twoColumnGridStyle}>
+        <SectionCard title="Operational Snapshot" subtitle="Current totals across key areas.">
+          <div style={stackCompactStyle}>
+            <SnapshotRow label="Assets in system" value={totalAssets} isLoading={isLoading} />
+            <SnapshotRow label="Quality linked assets" value={qualityLinkedAssets} isLoading={isLoading} />
+            <SnapshotRow label="Open NCRs" value={openNcrs} isLoading={isLoading} />
+            <SnapshotRow label="Open CAPAs" value={openCapas} isLoading={isLoading} />
+            <SnapshotRow label="Open Actions" value={openActions} isLoading={isLoading} />
+            <SnapshotRow label="Open audit findings" value={openAuditFindings} isLoading={isLoading} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Recent Asset Records" subtitle="Most recent asset entries shown first where created dates are available.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading asset records...</p>
+          ) : recentAssets.length === 0 ? (
+            <p style={emptyTextStyle}>No asset records found.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={tableHeadStyle}>Code</th>
+                    <th style={tableHeadStyle}>Name</th>
+                    <th style={tableHeadStyle}>Location</th>
+                    <th style={tableHeadStyle}>Owner</th>
+                    <th style={tableHeadStyle}>Status</th>
+                    <th style={tableHeadStyle}>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentAssets.map((asset) => (
+                    <tr key={asset.id} style={tableRowStyle}>
+                      <td style={tableCellStyle}>{asset.asset_code || "-"}</td>
+                      <td style={tableCellStyle}>{asset.name || "-"}</td>
+                      <td style={tableCellStyle}>{asset.location || "-"}</td>
+                      <td style={tableCellStyle}>{asset.owner || "-"}</td>
+                      <td style={tableCellStyle}>
+                        <StatusBadge value={asset.status || "Unknown"} />
+                      </td>
+                      <td style={tableCellStyle}>{formatDate(asset.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SectionCard>
+      </section>
+
       <SectionCard
-        title="Recent Asset Records"
-        subtitle="Most recent asset entries shown first where created dates are available."
+        title="Upcoming Audits"
+        subtitle="Month and date view of the next audits in the programme."
         action={
-          <Link href="/assets" style={sectionLinkStyle}>
-            View full register →
+          <Link href="/audits" style={sectionLinkStyle}>
+            Open audits module →
           </Link>
         }
       >
         {isLoading ? (
-          <p style={emptyTextStyle}>Loading asset records...</p>
-        ) : recentAssets.length === 0 ? (
-          <p style={emptyTextStyle}>No asset records found.</p>
+          <p style={emptyTextStyle}>Loading audits...</p>
+        ) : audits.length === 0 ? (
+          <p style={emptyTextStyle}>No audits found.</p>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  <th style={tableHeadStyle}>Code</th>
-                  <th style={tableHeadStyle}>Name</th>
-                  <th style={tableHeadStyle}>Description</th>
-                  <th style={tableHeadStyle}>Location</th>
-                  <th style={tableHeadStyle}>Owner</th>
+                  <th style={tableHeadStyle}>Audit No.</th>
+                  <th style={tableHeadStyle}>Title</th>
+                  <th style={tableHeadStyle}>Type</th>
+                  <th style={tableHeadStyle}>Scheduled</th>
+                  <th style={tableHeadStyle}>Audit Date</th>
                   <th style={tableHeadStyle}>Status</th>
-                  <th style={tableHeadStyle}>Created</th>
                 </tr>
               </thead>
               <tbody>
-                {recentAssets.map((asset) => (
-                  <tr key={asset.id} style={tableRowStyle}>
-                    <td style={tableCellStyle}>{asset.asset_code || "-"}</td>
-                    <td style={tableCellStyle}>{asset.name || "-"}</td>
-                    <td style={tableCellStyle}>{asset.description || "-"}</td>
-                    <td style={tableCellStyle}>{asset.location || "-"}</td>
-                    <td style={tableCellStyle}>{asset.owner || "-"}</td>
-                    <td style={tableCellStyle}>
-                      <StatusBadge value={asset.status || "Unknown"} />
-                    </td>
-                    <td style={tableCellStyle}>{formatDate(asset.created_at)}</td>
-                  </tr>
-                ))}
+                {[...audits]
+                  .sort((a, b) => {
+                    const aDate = a.audit_date ? new Date(a.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
+                    const bDate = b.audit_date ? new Date(b.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
+                    return aDate - bDate;
+                  })
+                  .slice(0, 8)
+                  .map((audit) => (
+                    <tr key={audit.id} style={tableRowStyle}>
+                      <td style={tableCellStyle}>{audit.audit_number || "-"}</td>
+                      <td style={tableCellStyle}>{audit.title || "-"}</td>
+                      <td style={tableCellStyle}>{audit.audit_type || "-"}</td>
+                      <td style={tableCellStyle}>{formatAuditMonth(audit.audit_month)}</td>
+                      <td style={tableCellStyle}>{formatDate(audit.audit_date)}</td>
+                      <td style={tableCellStyle}>
+                        <StatusBadge value={audit.status || "Unknown"} />
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -912,6 +1082,10 @@ function StatusBadge({ value }: { value: string }) {
       ? { background: "#dbeafe", color: "#1d4ed8" }
       : lower === "in progress"
       ? { background: "#fef3c7", color: "#92400e" }
+      : lower === "planned"
+      ? { background: "#dbeafe", color: "#1d4ed8" }
+      : lower === "overdue"
+      ? { background: "#fee2e2", color: "#991b1b" }
       : { background: "#e5e7eb", color: "#374151" };
 
   return (
@@ -968,7 +1142,7 @@ const heroSubtitleStyle: CSSProperties = {
   marginTop: "10px",
   marginBottom: 0,
   fontSize: "15px",
-  maxWidth: "680px",
+  maxWidth: "700px",
   color: "rgba(255,255,255,0.92)",
 };
 
@@ -1070,6 +1244,13 @@ const statCardValueStyle: CSSProperties = {
 const twoColumnGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
+  gap: "20px",
+  marginBottom: "20px",
+};
+
+const threeColumnGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr 1fr",
   gap: "20px",
   marginBottom: "20px",
 };
@@ -1242,6 +1423,56 @@ const tableCellStyle: CSSProperties = {
 };
 
 const tableSubTextStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#64748b",
+};
+
+const auditAttentionItemStyle: CSSProperties = {
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: "12px",
+  padding: "14px 16px",
+};
+
+const auditAttentionTopStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+  alignItems: "center",
+  flexWrap: "wrap",
+  marginBottom: "10px",
+};
+
+const auditMiniTagStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  background: "#e0f2fe",
+  color: "#075985",
+  borderRadius: "999px",
+  padding: "5px 10px",
+  fontSize: "12px",
+  fontWeight: 700,
+};
+
+const auditAttentionNumberStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#64748b",
+  marginBottom: "6px",
+};
+
+const auditAttentionTitleStyle: CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 700,
+  color: "#0f172a",
+  marginBottom: "8px",
+};
+
+const auditAttentionMetaStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+  flexWrap: "wrap",
   fontSize: "12px",
   color: "#64748b",
 };

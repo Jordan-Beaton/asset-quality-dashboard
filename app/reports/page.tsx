@@ -54,6 +54,32 @@ type ActionItem = {
   due_date: string | null;
 };
 
+type AuditRecord = {
+  id: string;
+  audit_number: string | null;
+  title: string | null;
+  audit_type: string | null;
+  auditee: string | null;
+  lead_auditor: string | null;
+  audit_date: string | null;
+  audit_month: string | null;
+  status: string | null;
+  location: string | null;
+};
+
+type AuditFinding = {
+  id: string;
+  audit_id: string;
+  reference: string | null;
+  clause: string | null;
+  category: string | null;
+  description: string | null;
+  owner: string | null;
+  status: string | null;
+  due_date: string | null;
+  closure_date: string | null;
+};
+
 type MonthlyReport = {
   id: string;
   month_label: string;
@@ -77,12 +103,57 @@ function formatDate(value: string | null | undefined) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("en-GB");
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatAuditMonth(value: string | null | undefined) {
+  if (!value) return "-";
+  const [year, month] = value.split("-");
+  if (!year || !month) return value;
+
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
+  });
 }
 
 function isClosedStatus(value: string | null | undefined) {
   const normal = (value || "").trim().toLowerCase();
   return normal === "closed" || normal === "complete" || normal === "completed";
+}
+
+function getDaysFromToday(value: string | null | undefined) {
+  if (!value) return null;
+
+  const due = new Date(value);
+  if (Number.isNaN(due.getTime())) return null;
+
+  const today = new Date();
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+
+  const diffMs = due.getTime() - today.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
 }
 
 function toDataUrl(file: File) {
@@ -94,57 +165,88 @@ function toDataUrl(file: File) {
   });
 }
 
+function getAuditStatusTone(status: string | null | undefined) {
+  const value = (status || "").toLowerCase();
+  if (value.includes("overdue")) return { bg: "#fee2e2", color: "#991b1b" };
+  if (value.includes("progress")) return { bg: "#fef3c7", color: "#92400e" };
+  if (value.includes("planned")) return { bg: "#dbeafe", color: "#1d4ed8" };
+  if (value.includes("completed") || value.includes("closed")) return { bg: "#dcfce7", color: "#166534" };
+  if (value.includes("cancelled")) return { bg: "#e2e8f0", color: "#334155" };
+  return { bg: "#e2e8f0", color: "#334155" };
+}
+
 export default function ReportsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
+  const [audits, setAudits] = useState<AuditRecord[]>([]);
+  const [auditFindings, setAuditFindings] = useState<AuditFinding[]>([]);
   const [reports, setReports] = useState<MonthlyReport[]>([]);
   const [message, setMessage] = useState("Loading reports dashboard...");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [logoFileName, setLogoFileName] = useState("/enshore-logo.png");
+  const [lastRefreshed, setLastRefreshed] = useState<string>("");
 
   const [form, setForm] = useState(emptyForm);
 
   async function loadData() {
-    const [assetsRes, ncrsRes, capasRes, actionsRes, reportsRes] = await Promise.all([
-      supabase.from("assets").select("*"),
-      supabase.from("ncrs").select("*"),
-      supabase.from("capas").select("*"),
-      supabase.from("actions").select("*"),
-      supabase.from("monthly_reports").select("*").order("created_at", { ascending: false }),
-    ]);
+    const [assetsRes, ncrsRes, capasRes, actionsRes, auditsRes, findingsRes, reportsRes] =
+      await Promise.all([
+        supabase.from("assets").select("*"),
+        supabase.from("ncrs").select("*"),
+        supabase.from("capas").select("*"),
+        supabase.from("actions").select("*"),
+        supabase.from("audits").select("*"),
+        supabase.from("audit_findings").select("*"),
+        supabase.from("monthly_reports").select("*").order("created_at", { ascending: false }),
+      ]);
 
-    if (assetsRes.error || ncrsRes.error || capasRes.error || actionsRes.error || reportsRes.error) {
+    if (
+      assetsRes.error ||
+      ncrsRes.error ||
+      capasRes.error ||
+      actionsRes.error ||
+      auditsRes.error ||
+      findingsRes.error ||
+      reportsRes.error
+    ) {
       setMessage(
         `Error: ${
           assetsRes.error?.message ||
           ncrsRes.error?.message ||
           capasRes.error?.message ||
           actionsRes.error?.message ||
+          auditsRes.error?.message ||
+          findingsRes.error?.message ||
           reportsRes.error?.message
         }`
       );
       return;
     }
 
-    setAssets(assetsRes.data || []);
-    setNcrs(ncrsRes.data || []);
-    setCapas(capasRes.data || []);
-    setActions(actionsRes.data || []);
-    setReports(reportsRes.data || []);
+    setAssets((assetsRes.data || []) as Asset[]);
+    setNcrs((ncrsRes.data || []) as Ncr[]);
+    setCapas((capasRes.data || []) as Capa[]);
+    setActions((actionsRes.data || []) as ActionItem[]);
+    setAudits((auditsRes.data || []) as AuditRecord[]);
+    setAuditFindings((findingsRes.data || []) as AuditFinding[]);
+    setReports((reportsRes.data || []) as MonthlyReport[]);
+    setLastRefreshed(new Date().toLocaleString("en-GB"));
     setMessage("Reports dashboard loaded successfully.");
   }
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const totalAssets = assets.length;
   const openNcrs = ncrs.filter((n) => !isClosedStatus(n.status)).length;
   const openCapas = capas.filter((c) => !isClosedStatus(c.status)).length;
   const openActions = actions.filter((a) => !isClosedStatus(a.status)).length;
+  const totalAudits = audits.length;
+  const openAuditFindings = auditFindings.filter((finding) => !isClosedStatus(finding.status)).length;
 
   const overdueActions = actions.filter((action) => {
     if (!action.due_date) return false;
@@ -160,6 +262,13 @@ export default function ReportsPage() {
 
   const majorOpenNcrs = ncrs.filter(
     (n) => (n.severity || "").toLowerCase() === "major" && !isClosedStatus(n.status)
+  ).length;
+
+  const overdueAudits = audits.filter((audit) => (audit.status || "").toLowerCase() === "overdue").length;
+
+  const majorOpenAuditFindings = auditFindings.filter(
+    (finding) =>
+      (finding.category || "").toLowerCase() === "major" && !isClosedStatus(finding.status)
   ).length;
 
   const ncrStatusChart = useMemo(() => {
@@ -197,6 +306,24 @@ export default function ReportsPage() {
     }, {});
     return Object.entries(groups).map(([name, value]) => ({ name, value }));
   }, [assets]);
+
+  const auditStatusChart = useMemo(() => {
+    const groups = audits.reduce<Record<string, number>>((acc, audit) => {
+      const key = audit.status || "Unknown";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(groups).map(([name, value]) => ({ name, value }));
+  }, [audits]);
+
+  const auditTypeChart = useMemo(() => {
+    const groups = audits.reduce<Record<string, number>>((acc, audit) => {
+      const key = audit.audit_type || "Unknown";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(groups).map(([name, value]) => ({ name, value }));
+  }, [audits]);
 
   const openNcrRows = useMemo(
     () =>
@@ -241,6 +368,58 @@ export default function ReportsPage() {
         ]),
     [actions]
   );
+
+  const auditRows = useMemo(
+    () =>
+      audits.map((audit) => [
+        audit.audit_number || "-",
+        audit.title || "-",
+        audit.audit_type || "-",
+        audit.status || "-",
+        formatAuditMonth(audit.audit_month),
+        formatDate(audit.audit_date),
+      ]),
+    [audits]
+  );
+
+  const auditFindingRows = useMemo(
+    () =>
+      auditFindings
+        .filter((finding) => !isClosedStatus(finding.status))
+        .map((finding) => {
+          const parentAudit = audits.find((audit) => audit.id === finding.audit_id);
+          return [
+            parentAudit?.audit_number || "-",
+            finding.reference || "-",
+            finding.category || "-",
+            finding.status || "-",
+            finding.owner || "-",
+            formatDate(finding.due_date),
+          ];
+        }),
+    [auditFindings, audits]
+  );
+
+  const auditAttentionList = useMemo(() => {
+    return [...audits]
+      .filter((audit) => {
+        const status = (audit.status || "").toLowerCase();
+        return status === "overdue" || status === "planned" || status === "in progress";
+      })
+      .sort((a, b) => {
+        const aStatus = (a.status || "").toLowerCase();
+        const bStatus = (b.status || "").toLowerCase();
+        const aRank = aStatus === "overdue" ? 0 : aStatus === "in progress" ? 1 : 2;
+        const bRank = bStatus === "overdue" ? 0 : bStatus === "in progress" ? 1 : 2;
+
+        if (aRank !== bRank) return aRank - bRank;
+
+        const aDate = a.audit_date ? new Date(a.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.audit_date ? new Date(b.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDate - bDate;
+      })
+      .slice(0, 6);
+  }, [audits]);
 
   function resetForm() {
     setForm(emptyForm);
@@ -294,6 +473,10 @@ export default function ReportsPage() {
       open_actions: openActions,
       overdue_actions: overdueActions,
       major_open_ncrs: majorOpenNcrs,
+      total_audits: totalAudits,
+      overdue_audits: overdueAudits,
+      open_audit_findings: openAuditFindings,
+      major_open_audit_findings: majorOpenAuditFindings,
     };
 
     if (editingId) {
@@ -347,25 +530,28 @@ export default function ReportsPage() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 14;
-      const reportTitle = form.month_label?.trim() || `Management Report - ${new Date().toLocaleDateString("en-GB")}`;
+      const reportTitle =
+        form.month_label?.trim() || `Management Report - ${new Date().toLocaleDateString("en-GB")}`;
       const generatedAt = new Date().toLocaleString("en-GB");
 
       try {
         const logoResponse = await fetch(logoFileName);
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
-          const logoFile = new File([logoBlob], "enshore-logo.png", { type: logoBlob.type || "image/png" });
+          const logoFile = new File([logoBlob], "enshore-logo.png", {
+            type: logoBlob.type || "image/png",
+          });
           const logoDataUrl = await toDataUrl(logoFile);
           doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 22);
         }
       } catch {
-        // Intentionally ignore logo fetch errors so PDF still generates.
+        // Ignore logo fetch errors so the PDF still generates.
       }
 
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.setFontSize(20);
-      doc.text("Asset Quality Management Report", pageWidth - margin, 18, { align: "right" });
+      doc.text("Quality Management Report", pageWidth - margin, 18, { align: "right" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(11);
@@ -391,7 +577,7 @@ export default function ReportsPage() {
 
       const summaryText = form.summary?.trim()
         ? form.summary.trim()
-        : "This report provides a live snapshot of assets, NCRs, CAPAs and actions across the quality dashboard.";
+        : "This report provides a live snapshot of assets, NCRs, CAPAs, audits and actions across the quality dashboard.";
       const summaryLines = doc.splitTextToSize(summaryText, pageWidth - margin * 2);
       doc.text(summaryLines, margin, y);
       y += summaryLines.length * 4.7 + 5;
@@ -400,6 +586,8 @@ export default function ReportsPage() {
         ["Total Assets", String(totalAssets), "Open NCRs", String(openNcrs)],
         ["Open CAPAs", String(openCapas), "Open Actions", String(openActions)],
         ["Overdue Actions", String(overdueActions), "Major Open NCRs", String(majorOpenNcrs)],
+        ["Total Audits", String(totalAudits), "Overdue Audits", String(overdueAudits)],
+        ["Open Audit Findings", String(openAuditFindings), "Major Open Findings", String(majorOpenAuditFindings)],
       ];
 
       autoTable(doc, {
@@ -508,6 +696,46 @@ export default function ReportsPage() {
         margin: { left: margin, right: margin },
       });
 
+      y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 10;
+      ensurePageSpace(18);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text("Audit Programme Register", margin, y);
+      y += 4;
+
+      autoTable(doc, {
+        startY: y + 2,
+        head: [["Audit No.", "Title", "Type", "Status", "Month", "Audit Date"]],
+        body: auditRows.length ? auditRows : [["-", "No audits", "-", "-", "-", "-"]],
+        theme: "grid",
+        headStyles: { fillColor: [8, 145, 178], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: margin, right: margin },
+      });
+
+      y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 10;
+      ensurePageSpace(18);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text("Open Audit Findings", margin, y);
+      y += 4;
+
+      autoTable(doc, {
+        startY: y + 2,
+        head: [["Audit No.", "Ref", "Category", "Status", "Owner", "Due Date"]],
+        body: auditFindingRows.length
+          ? auditFindingRows
+          : [["-", "-", "No open audit findings", "-", "-", "-"]],
+        theme: "grid",
+        headStyles: { fillColor: [124, 58, 237], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: margin, right: margin },
+      });
+
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i += 1) {
         doc.setPage(i);
@@ -515,7 +743,9 @@ export default function ReportsPage() {
         doc.setFontSize(9);
         doc.setTextColor(100, 116, 139);
         doc.text(`Enshore Subsea · ${reportTitle}`, margin, pageHeight - 8);
-        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, {
+          align: "right",
+        });
       }
 
       const pdfBlob = doc.output("blob");
@@ -539,7 +769,7 @@ export default function ReportsPage() {
           <h1 style={heroTitleStyle}>Reports</h1>
           <p style={heroSubtitleStyle}>
             Build monthly management summaries using the current live system data,
-            track saved reports, and generate a professional PDF fit for internal or client-facing review.
+            now including audits and audit findings as part of the reporting pack.
           </p>
         </div>
 
@@ -550,21 +780,46 @@ export default function ReportsPage() {
           </div>
           <div style={heroMetaCardStyle}>
             <div style={heroMetaLabelStyle}>Open Items</div>
-            <div style={heroMetaValueStyle}>{openNcrs + openCapas + openActions}</div>
+            <div style={heroMetaValueStyle}>{openNcrs + openCapas + openActions + openAuditFindings}</div>
+          </div>
+          <div style={heroMetaCardStyle}>
+            <div style={heroMetaLabelStyle}>Audit Programme</div>
+            <div style={heroMetaValueStyle}>{totalAudits}</div>
+          </div>
+          <div style={heroMetaCardStyle}>
+            <div style={heroMetaLabelStyle}>Last Refreshed</div>
+            <div style={heroMetaValueStyle}>{lastRefreshed || "-"}</div>
           </div>
         </div>
       </section>
 
-      <div style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+      <div
+        style={{
+          marginBottom: "20px",
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "12px",
+          flexWrap: "wrap",
+        }}
+      >
         <Link href="/" style={backLinkStyle}>
           ← Back to Dashboard
         </Link>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <button type="button" style={secondaryButtonStyle} onClick={() => setLogoFileName("/enshore-logo.png")}>
+          <button
+            type="button"
+            style={secondaryButtonStyle}
+            onClick={() => setLogoFileName("/enshore-logo.png")}
+          >
             Use /enshore-logo.png
           </button>
-          <button type="button" style={pdfButtonStyle} onClick={generatePdfReport} disabled={isGeneratingPdf}>
+          <button
+            type="button"
+            style={pdfButtonStyle}
+            onClick={() => void generatePdfReport()}
+            disabled={isGeneratingPdf}
+          >
             {isGeneratingPdf ? "Generating PDF..." : "Generate PDF Report"}
           </button>
         </div>
@@ -576,6 +831,7 @@ export default function ReportsPage() {
         <StatCard title="Open CAPAs" value={openCapas} accent="#f59e0b" />
         <StatCard title="Open Actions" value={openActions} accent="#2563eb" />
         <StatCard title="Overdue Actions" value={overdueActions} accent="#b91c1c" />
+        <StatCard title="Overdue Audits" value={overdueAudits} accent="#7c3aed" />
       </section>
 
       <section style={statusBannerStyle}>
@@ -590,7 +846,7 @@ export default function ReportsPage() {
                 {editingId ? "Edit Monthly Report" : "Create Monthly Report"}
               </h2>
               <p style={sectionSubtitleStyle}>
-                Build an executive summary using live asset, NCR, CAPA and action data.
+                Build an executive summary using live asset, NCR, CAPA, audit and action data.
               </p>
             </div>
           </div>
@@ -664,6 +920,79 @@ export default function ReportsPage() {
             <SnapshotRow label="Open CAPAs" value={openCapas} />
             <SnapshotRow label="Open Actions" value={openActions} />
             <SnapshotRow label="Overdue Actions" value={overdueActions} />
+            <SnapshotRow label="Total Audits" value={totalAudits} />
+            <SnapshotRow label="Overdue Audits" value={overdueAudits} />
+            <SnapshotRow label="Open Audit Findings" value={openAuditFindings} />
+            <SnapshotRow label="Major Open Findings" value={majorOpenAuditFindings} />
+          </div>
+        </div>
+      </section>
+
+      <section style={twoColumnGridStyle}>
+        <div style={panelStyle}>
+          <div style={sectionHeaderRowStyle}>
+            <div>
+              <h2 style={sectionTitleStyle}>Audit Attention</h2>
+              <p style={sectionSubtitleStyle}>
+                Current audits that are overdue, in progress, or still planned.
+              </p>
+            </div>
+          </div>
+
+          {auditAttentionList.length === 0 ? (
+            <p style={emptyTextStyle}>No audits currently flagged for attention.</p>
+          ) : (
+            <div style={{ display: "grid", gap: "12px" }}>
+              {auditAttentionList.map((audit) => {
+                const tone = getAuditStatusTone(audit.status);
+                return (
+                  <div key={audit.id} style={auditAttentionCardStyle}>
+                    <div style={auditAttentionTopStyle}>
+                      <div>
+                        <div style={auditAttentionNumberStyle}>{audit.audit_number || "-"}</div>
+                        <div style={auditAttentionTitleStyle}>{audit.title || "-"}</div>
+                      </div>
+                      <span
+                        style={{
+                          ...statusBadgeStyle,
+                          background: tone.bg,
+                          color: tone.color,
+                        }}
+                      >
+                        {audit.status || "Unknown"}
+                      </span>
+                    </div>
+
+                    <div style={auditAttentionMetaGridStyle}>
+                      <span><strong>Type:</strong> {audit.audit_type || "-"}</span>
+                      <span><strong>Month:</strong> {formatAuditMonth(audit.audit_month)}</span>
+                      <span><strong>Date:</strong> {formatDate(audit.audit_date)}</span>
+                      <span><strong>Auditee:</strong> {audit.auditee || "-"}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={panelStyle}>
+          <div style={sectionHeaderRowStyle}>
+            <div>
+              <h2 style={sectionTitleStyle}>Open Registers Snapshot</h2>
+              <p style={sectionSubtitleStyle}>
+                Quick live position across the main modules.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: "12px" }}>
+            <SnapshotRow label="Open NCRs" value={openNcrs} />
+            <SnapshotRow label="Open CAPAs" value={openCapas} />
+            <SnapshotRow label="Open Actions" value={openActions} />
+            <SnapshotRow label="Open Audit Findings" value={openAuditFindings} />
+            <SnapshotRow label="Overdue Actions" value={overdueActions} />
+            <SnapshotRow label="Overdue Audits" value={overdueAudits} />
           </div>
         </div>
       </section>
@@ -752,6 +1081,48 @@ export default function ReportsPage() {
             </ResponsiveContainer>
           </div>
         </div>
+
+        <div style={panelStyle}>
+          <div style={sectionHeaderRowStyle}>
+            <div>
+              <h2 style={sectionTitleStyle}>Audit Status</h2>
+              <p style={sectionSubtitleStyle}>Current audit programme status split.</p>
+            </div>
+          </div>
+
+          <div style={{ width: "100%", height: 300 }}>
+            <ResponsiveContainer>
+              <BarChart data={auditStatusChart}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#7c3aed" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div style={panelStyle}>
+          <div style={sectionHeaderRowStyle}>
+            <div>
+              <h2 style={sectionTitleStyle}>Audit Type Split</h2>
+              <p style={sectionSubtitleStyle}>Internal, external and supplier audit view.</p>
+            </div>
+          </div>
+
+          <div style={{ width: "100%", height: 300 }}>
+            <ResponsiveContainer>
+              <BarChart data={auditTypeChart}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="#0891b2" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </section>
 
       <section style={panelStyle}>
@@ -789,15 +1160,13 @@ export default function ReportsPage() {
                     <td style={tableCellStyle}>{report.wins || "-"}</td>
                     <td style={tableCellStyle}>{report.risks || "-"}</td>
                     <td style={tableCellStyle}>{report.next_steps || "-"}</td>
-                    <td style={tableCellStyle}>
-                      {report.created_at ? new Date(report.created_at).toLocaleString() : "-"}
-                    </td>
+                    <td style={tableCellStyle}>{formatDateTime(report.created_at)}</td>
                     <td style={tableCellStyle}>
                       <div style={actionButtonsWrapStyle}>
                         <button type="button" style={miniButtonStyle} onClick={() => handleEdit(report)}>
                           Edit
                         </button>
-                        <button type="button" style={miniButtonDeleteStyle} onClick={() => handleDelete(report.id)}>
+                        <button type="button" style={miniButtonDeleteStyle} onClick={() => void handleDelete(report.id)}>
                           Delete
                         </button>
                       </div>
@@ -825,7 +1194,9 @@ function StatCard({ title, value, accent }: { title: string; value: number; acce
       }}
     >
       <div style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>{title}</div>
-      <div style={{ fontSize: "34px", fontWeight: 700, color: "#0f172a", marginTop: "8px" }}>{value}</div>
+      <div style={{ fontSize: "34px", fontWeight: 700, color: "#0f172a", marginTop: "8px" }}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -921,7 +1292,7 @@ const backLinkStyle: React.CSSProperties = {
 
 const statsGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
 };
@@ -1080,4 +1451,51 @@ const actionButtonsWrapStyle: React.CSSProperties = {
   display: "flex",
   gap: "8px",
   flexWrap: "wrap",
+};
+
+const auditAttentionCardStyle: React.CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  padding: "14px",
+  background: "#f8fafc",
+};
+
+const auditAttentionTopStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "flex-start",
+  flexWrap: "wrap",
+  marginBottom: "10px",
+};
+
+const auditAttentionNumberStyle: React.CSSProperties = {
+  fontSize: "12px",
+  color: "#64748b",
+  fontWeight: 800,
+  marginBottom: "4px",
+};
+
+const auditAttentionTitleStyle: React.CSSProperties = {
+  fontSize: "16px",
+  color: "#0f172a",
+  fontWeight: 700,
+};
+
+const auditAttentionMetaGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "8px 12px",
+  fontSize: "13px",
+  color: "#475569",
+};
+
+const statusBadgeStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "6px 10px",
+  borderRadius: "999px",
+  fontSize: "12px",
+  fontWeight: 800,
+  whiteSpace: "nowrap",
 };
