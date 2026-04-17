@@ -1,10 +1,27 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(request: Request) {
   try {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const fromEmail = process.env.DOCUMENT_NOTIFICATIONS_FROM_EMAIL;
+
+    if (!resendApiKey) {
+      return NextResponse.json(
+        { error: "Missing RESEND_API_KEY environment variable." },
+        { status: 500 }
+      );
+    }
+
+    if (!fromEmail) {
+      return NextResponse.json(
+        { error: "Missing DOCUMENT_NOTIFICATIONS_FROM_EMAIL environment variable." },
+        { status: 500 }
+      );
+    }
+
+    const resend = new Resend(resendApiKey);
+
     const body = await request.json();
 
     const {
@@ -17,16 +34,15 @@ export async function POST(request: Request) {
       message,
     } = body;
 
-    // ✅ DEBUG LOG (you will see this in terminal)
     console.log("EMAIL TRIGGERED", {
       eventType,
       documentNumber,
       recipientEmails,
     });
 
-    if (!recipientEmails || recipientEmails.length === 0) {
+    if (!recipientEmails || !Array.isArray(recipientEmails) || recipientEmails.length === 0) {
       return NextResponse.json(
-        { error: "No recipients provided" },
+        { error: "No recipients provided." },
         { status: 400 }
       );
     }
@@ -39,18 +55,18 @@ export async function POST(request: Request) {
       superseded: `${documentNumber} superseded`,
     };
 
-    const subject =
-      subjectMap[eventType] || `${documentNumber} update`;
+    const subject = subjectMap[eventType] || `${documentNumber} update`;
 
     const html = `
-      <div style="font-family: Arial, sans-serif;">
-        <h2>${subject}</h2>
-        <p><strong>Document:</strong> ${documentNumber}</p>
-        <p><strong>Title:</strong> ${documentTitle}</p>
-        <p><strong>Event:</strong> ${eventType}</p>
+      <div style="font-family: Arial, Helvetica, sans-serif; color: #0f172a;">
+        <h2 style="margin-bottom: 12px;">${subject}</h2>
+        <p><strong>Document:</strong> ${documentNumber || "-"}</p>
+        <p><strong>Title:</strong> ${documentTitle || "-"}</p>
+        <p><strong>Event:</strong> ${eventType || "-"}</p>
+        <p><strong>Originator:</strong> ${originatorName || "-"} (${originatorEmail || "-"})</p>
         ${
           message
-            ? `<p><strong>Message:</strong> ${message}</p>`
+            ? `<p><strong>Message:</strong><br/>${String(message).replace(/\n/g, "<br/>")}</p>`
             : ""
         }
         <br/>
@@ -59,7 +75,7 @@ export async function POST(request: Request) {
     `;
 
     const sendResult = await resend.emails.send({
-      from: process.env.DOCUMENT_NOTIFICATIONS_FROM_EMAIL!,
+      from: fromEmail,
       to: recipientEmails,
       subject,
       html,
