@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import {
@@ -515,7 +515,7 @@ function MultiSelectStandards({
   );
 }
 
-export default function AuditsPage() {
+function AuditsPageContent() {
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
 
@@ -3555,3 +3555,10 @@ const emptyTextStyle: CSSProperties = {
   color: "#64748b",
   margin: 0,
 };
+export default function AuditsPage() {
+  return (
+    <Suspense fallback={<main style={{ padding: "24px" }}>Loading audits...</main>}>
+      <AuditsPageContent />
+    </Suspense>
+  );
+}
