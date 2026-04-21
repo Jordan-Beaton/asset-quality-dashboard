@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
@@ -181,7 +181,7 @@ function matchesSearchTerm(action: ActionItem, query: string) {
   );
 }
 
-export default function ActionsPage() {
+function ActionsPageContent() {
   const searchParams = useSearchParams();
 
   const [actions, setActions] = useState<ActionItem[]>([]);
@@ -1932,3 +1932,10 @@ const evidenceNoteStyle: CSSProperties = {
   color: "#475569",
   lineHeight: 1.45,
 };
+export default function ActionsPage() {
+  return (
+    <Suspense fallback={<main style={{ padding: "24px" }}>Loading actions...</main>}>
+      <ActionsPageContent />
+    </Suspense>
+  );
+}
