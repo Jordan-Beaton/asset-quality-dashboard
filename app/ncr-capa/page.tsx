@@ -71,16 +71,16 @@ type CombinedRow = {
 };
 
 function formatDate(value: string | null | undefined) {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("en-GB");
 }
 
 function formatDateTime(value: string | null | undefined) {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString("en-GB", {
     day: "2-digit",
     month: "short",
@@ -134,6 +134,21 @@ function getSeverityTone(severity: string) {
   if (value.includes("medium")) return { bg: "#fef3c7", color: "#92400e" };
   if (value.includes("low") || value.includes("minor")) return { bg: "#dcfce7", color: "#166534" };
   return { bg: "#e2e8f0", color: "#334155" };
+}
+
+function getSeverityDisplay(severity: string | null | undefined) {
+  const value = (severity || "").trim().toLowerCase();
+  if (value === "high" || value === "major" || value === "critical") return "High";
+  if (value === "medium" || value === "minor") return "Medium";
+  if (value === "low" || value === "ofi" || value === "obs") return "Low";
+  return "Low";
+}
+
+function getSeverityRank(severity: string | null | undefined) {
+  const display = getSeverityDisplay(severity);
+  if (display === "High") return 0;
+  if (display === "Medium") return 1;
+  return 2;
 }
 
 function getTypeTone(type: "NCR" | "CAPA") {
@@ -239,12 +254,12 @@ function NcrCapaPageContent() {
   const [message, setMessage] = useState("");
 
   const [search, setSearch] = useState(linkedSearch);
-  const [typeFilter, setTypeFilter] = useState(linkedType);
   const [statusFilter, setStatusFilter] = useState(linkedStatus);
   const [severityFilter, setSeverityFilter] = useState(linkedSeverity);
   const [sourceFilter, setSourceFilter] = useState(linkedSource);
   const [projectFilter, setProjectFilter] = useState(linkedProject);
   const [showAttentionOnly, setShowAttentionOnly] = useState(false);
+  const [activeLogTab, setActiveLogTab] = useState<"NCR" | "CAPA">(linkedType === "CAPA" ? "CAPA" : "NCR");
 
   const [ncrOptions, setNcrOptions] = useState<LinkedOption[]>([]);
   const [newLinkedNcrToAdd, setNewLinkedNcrToAdd] = useState("");
@@ -333,7 +348,7 @@ function NcrCapaPageContent() {
       number: n.ncr_number || "NCR-???",
       title: n.title || "",
       description: n.description || "",
-      severity: n.severity || "—",
+      severity: n.severity || "-",
       status: n.status || "Open",
       owner: n.owner || "",
       area: n.area || "",
@@ -350,7 +365,7 @@ function NcrCapaPageContent() {
       number: c.capa_number || "CAPA-???",
       title: c.title || "",
       description: c.description || "",
-      severity: "—",
+      severity: "-",
       status: c.status || "Open",
       owner: c.owner || "",
       area: "",
@@ -380,6 +395,7 @@ function NcrCapaPageContent() {
     );
 
     if (match) {
+      setActiveLogTab(match.type);
       setSelectedRow((current) => (current?.id === match.id ? current : match));
     }
   }, [linkedSearch, combinedRows]);
@@ -421,10 +437,12 @@ function NcrCapaPageContent() {
         row.project.toLowerCase().includes(q) ||
         row.linked_to.toLowerCase().includes(q);
 
-      const matchesType = typeFilter === "All" || row.type === typeFilter;
+      const matchesType = row.type === activeLogTab;
       const matchesStatus = statusFilter === "All" || row.status === statusFilter;
-      const matchesSeverity = severityFilter === "All" || row.severity === severityFilter;
-      const matchesSource = sourceFilter === "All" || (row.type === "NCR" && row.source_type === sourceFilter);
+      const matchesSeverity =
+        activeLogTab === "CAPA" || severityFilter === "All" || row.severity === severityFilter;
+      const matchesSource =
+        activeLogTab === "CAPA" || sourceFilter === "All" || row.source_type === sourceFilter;
       const matchesProject = projectFilter === "All" || row.project === projectFilter;
       const matchesOverdueOnly = !linkedOverdueOnly || dueState(row.due_date) === "overdue";
 
@@ -445,13 +463,13 @@ function NcrCapaPageContent() {
   }, [
     combinedRows,
     search,
-    typeFilter,
     statusFilter,
     severityFilter,
     sourceFilter,
     projectFilter,
     linkedOverdueOnly,
     showAttentionOnly,
+    activeLogTab,
   ]);
 
   const kpis = useMemo(() => {
@@ -472,21 +490,34 @@ function NcrCapaPageContent() {
     };
   }, [ncrs, capas, combinedRows, evidenceFiles]);
 
-  const attentionItems = useMemo(() => {
-    return combinedRows
-      .filter((row) => {
-        const state = dueState(row.due_date);
-        return state === "overdue" || state === "soon" || row.status === "Open";
+  const topRaisedNcrs = useMemo(() => {
+    return [...ncrs]
+      .sort((a, b) => {
+        const severityRank = getSeverityRank(a.severity) - getSeverityRank(b.severity);
+        if (severityRank !== 0) return severityRank;
+
+        const aTime = new Date(a.created_at || 0).getTime();
+        const bTime = new Date(b.created_at || 0).getTime();
+        return bTime - aTime;
       })
+      .slice(0, 5);
+  }, [ncrs]);
+
+  const topUpcomingCapas = useMemo(() => {
+    return [...capas]
       .sort((a, b) => {
         const aState = dueState(a.due_date);
         const bState = dueState(b.due_date);
         const aRank = aState === "overdue" ? 0 : aState === "soon" ? 1 : 2;
         const bRank = bState === "overdue" ? 0 : bState === "soon" ? 1 : 2;
-        return aRank - bRank;
+        if (aRank !== bRank) return aRank - bRank;
+
+        const aTime = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bTime = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aTime - bTime;
       })
-      .slice(0, 6);
-  }, [combinedRows]);
+      .slice(0, 5);
+  }, [capas]);
 
   const newCapaLinkedItems = useMemo(() => {
     return newCapa.linked_to
@@ -996,69 +1027,7 @@ function NcrCapaPageContent() {
       </section>
 
       <section style={topGridStyle}>
-        <SectionCard title="Attention Board" subtitle="Items needing eyes on first.">
-          {attentionItems.length === 0 ? (
-            <div style={emptyBoardStyle}>No immediate attention items.</div>
-          ) : (
-            <div style={attentionGridStyle}>
-              {attentionItems.map((item) => {
-                const state = dueState(item.due_date);
-                const typeTone = getTypeTone(item.type);
-                const evidenceCount = evidenceCountMap.get(`${item.type}-${item.id}`) || 0;
-                const isActive = selectedRow?.id === item.id && selectedRow?.type === item.type;
-
-                return (
-                  <button
-                    key={`${item.type}-${item.id}`}
-                    type="button"
-                    onClick={() => setSelectedRow(item)}
-                    style={{
-                      ...attentionCardStyle,
-                      border: state === "overdue" ? "1px solid #fca5a5" : state === "soon" ? "1px solid #fcd34d" : "1px solid #dbe3ec",
-                      background:
-                        state === "overdue"
-                          ? "#fff1f2"
-                          : state === "soon"
-                          ? "#fff7ed"
-                          : isActive
-                          ? "#eff6ff"
-                          : "#ffffff",
-                    }}
-                  >
-                    <div style={attentionHeaderStyle}>
-                      <span
-                        style={{
-                          ...miniTagStyle,
-                          background: typeTone.bg,
-                          color: typeTone.color,
-                          border: `1px solid ${typeTone.border}`,
-                        }}
-                      >
-                        {item.type}
-                      </span>
-
-                      <span style={{ ...miniTagStyle, background: "#ede9fe", color: "#6d28d9" }}>
-                        {evidenceCount} file{evidenceCount === 1 ? "" : "s"}
-                      </span>
-                    </div>
-
-                    <div style={attentionNumberStyle}>{item.number}</div>
-                    <div style={attentionTitleStyle}>{item.title || "Untitled"}</div>
-                    <div style={attentionMetaRowStyle}>
-                      <span>{item.project ? `Project: ${item.project}` : "No project"}</span>
-                    </div>
-                    <div style={attentionMetaFooterStyle}>
-                      <span>{item.owner || "No owner"}</span>
-                      <span>{formatDate(item.due_date)}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </SectionCard>
-
-        {showCreatePanel && (
+        {showCreatePanel ? (
           <SectionCard title="Add Quality Record" subtitle="Create a new NCR or CAPA.">
             <div style={createTabWrapStyle}>
               <button
@@ -1335,7 +1304,7 @@ function NcrCapaPageContent() {
                               style={pillRemoveButtonStyle}
                               onClick={() => removeLinkedNcrFromNewCapa(item)}
                             >
-                              ×
+                              x
                             </button>
                           </span>
                         ))
@@ -1394,26 +1363,167 @@ function NcrCapaPageContent() {
               </div>
             )}
           </SectionCard>
+        ) : (
+          <SectionCard title="Add Quality Record" subtitle="Create a new NCR or CAPA.">
+            <div style={emptyBoardStyle}>Create panel hidden. Use the button above to show it again.</div>
+          </SectionCard>
         )}
+
+        <div style={sidePanelStackStyle}>
+          <SectionCard
+            title="Top 5 Raised NCRs by Severity"
+            subtitle="High first, then Medium, then Low, with newest NCRs first within each severity."
+          >
+            {topRaisedNcrs.length === 0 ? (
+              <div style={emptyBoardStyle}>No NCRs available yet.</div>
+            ) : (
+              <div style={compactInsightListStyle}>
+                {topRaisedNcrs.map((item) => {
+                  const severityLabel = getSeverityDisplay(item.severity);
+                  const severityTone = getSeverityTone(severityLabel);
+                  const evidenceCount = evidenceCountMap.get(`NCR-${item.id}`) || 0;
+                  const matchingRow = combinedRows.find((row) => row.type === "NCR" && row.id === item.id) || null;
+
+                  return (
+                    <div key={item.id} style={compactInsightCardStyle}>
+                      <div style={compactInsightHeaderStyle}>
+                        <span
+                          style={{
+                            ...badgeStyle,
+                            background: severityTone.bg,
+                            color: severityTone.color,
+                          }}
+                        >
+                          {severityLabel}
+                        </span>
+                        <button
+                          type="button"
+                          style={secondaryButtonSmall}
+                          onClick={() => {
+                            setActiveLogTab("NCR");
+                            if (matchingRow) setSelectedRow(matchingRow);
+                          }}
+                        >
+                          Quick view
+                        </button>
+                      </div>
+                      <div style={attentionNumberStyle}>{item.ncr_number || "NCR-???"}</div>
+                      <div style={attentionTitleStyle}>{item.title || "Untitled NCR"}</div>
+                      <div style={compactInsightMetaLineStyle}>
+                        <span>{item.owner || "No owner"}</span>
+                        <span>{formatDate(item.created_at)}</span>
+                      </div>
+                      <div style={compactInsightMetaLineStyle}>
+                        <span>{item.project || item.area || "No project / area"}</span>
+                        <span>{evidenceCount} file{evidenceCount === 1 ? "" : "s"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Top 5 Upcoming CAPA Due Dates" subtitle="Overdue CAPAs first, then the nearest due dates.">
+            {topUpcomingCapas.length === 0 ? (
+              <div style={emptyBoardStyle}>No CAPAs available yet.</div>
+            ) : (
+              <div style={compactInsightListStyle}>
+                {topUpcomingCapas.map((item) => {
+                  const dueDate = item.due_date ? new Date(item.due_date) : null;
+                  const today = new Date();
+                  dueDate?.setHours(0, 0, 0, 0);
+                  today.setHours(0, 0, 0, 0);
+                  const dueDays = dueDate
+                    ? Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                    : null;
+                  const state = dueState(item.due_date);
+                  const dueBadgeStyle =
+                    state === "overdue"
+                      ? { background: "#fee2e2", color: "#991b1b" }
+                      : state === "soon"
+                      ? { background: "#fef3c7", color: "#92400e" }
+                      : { background: "#dcfce7", color: "#166534" };
+                  const matchingRow = combinedRows.find((row) => row.type === "CAPA" && row.id === item.id) || null;
+
+                  return (
+                    <div key={item.id} style={compactInsightCardStyle}>
+                      <div style={compactInsightHeaderStyle}>
+                        <span style={{ ...badgeStyle, ...dueBadgeStyle }}>
+                          {dueDays === null
+                            ? "No due date"
+                            : dueDays < 0
+                            ? `Overdue by ${Math.abs(dueDays)}d`
+                            : dueDays === 0
+                            ? "Due today"
+                            : `${dueDays}d to due`}
+                        </span>
+                        <button
+                          type="button"
+                          style={secondaryButtonSmall}
+                          onClick={() => {
+                            setActiveLogTab("CAPA");
+                            if (matchingRow) setSelectedRow(matchingRow);
+                          }}
+                        >
+                          Quick view
+                        </button>
+                      </div>
+                      <div style={attentionNumberStyle}>{item.capa_number || "CAPA-???"}</div>
+                      <div style={attentionTitleStyle}>{item.title || "Untitled CAPA"}</div>
+                      <div style={compactInsightMetaLineStyle}>
+                        <span>{item.owner || "No owner"}</span>
+                        <span>{formatDate(item.due_date)}</span>
+                      </div>
+                      <div style={compactInsightMetaLineStyle}>
+                        <span>{item.project || "No project"}</span>
+                        <span>{item.linked_to || "No linked NCR"}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </SectionCard>
+        </div>
       </section>
 
       <section style={workspaceGridStyle}>
-        <SectionCard title="Combined Working Register" subtitle="Search, filter and select any NCR or CAPA.">
+        <SectionCard title="NCR / CAPA Log" subtitle="Table-led working register for day-to-day review, update, and evidence handling.">
           <div style={toolbarStyle}>
+            <div style={createTabWrapStyle}>
+              <button
+                type="button"
+                onClick={() => setActiveLogTab("NCR")}
+                style={{
+                  ...createTabButtonStyle,
+                  background: activeLogTab === "NCR" ? "#2563eb" : "transparent",
+                  color: activeLogTab === "NCR" ? "#ffffff" : "#1e3a8a",
+                }}
+              >
+                NCR View
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveLogTab("CAPA")}
+                style={{
+                  ...createTabButtonStyle,
+                  background: activeLogTab === "CAPA" ? "#7c3aed" : "transparent",
+                  color: activeLogTab === "CAPA" ? "#ffffff" : "#5b21b6",
+                }}
+              >
+                CAPA View
+              </button>
+            </div>
+
             <input
               style={toolbarSearchStyle}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search number, title, owner, project, linked NCR..."
+              placeholder={`Search ${activeLogTab === "NCR" ? "NCR" : "CAPA"} number, title, owner, project...`}
             />
 
             <div style={toolbarFiltersStyle}>
-              <select style={toolbarSelectStyle} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-                <option>All</option>
-                <option>NCR</option>
-                <option>CAPA</option>
-              </select>
-
               <select style={toolbarSelectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option>All</option>
                 {statusOptions.map((option) => (
@@ -1421,19 +1531,27 @@ function NcrCapaPageContent() {
                 ))}
               </select>
 
-              <select style={toolbarSelectStyle} value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)}>
-                <option>All</option>
-                {severityOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
+              {activeLogTab === "NCR" ? (
+                <>
+                  <select
+                    style={toolbarSelectStyle}
+                    value={severityFilter}
+                    onChange={(e) => setSeverityFilter(e.target.value)}
+                  >
+                    <option>All</option>
+                    {severityOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
 
-              <select style={toolbarSelectStyle} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
-                <option>All</option>
-                {sourceOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
+                  <select style={toolbarSelectStyle} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+                    <option>All</option>
+                    {sourceOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
 
               <select style={toolbarSelectStyle} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
                 {projectOptions.map((option) => (
@@ -1456,7 +1574,8 @@ function NcrCapaPageContent() {
           </div>
 
           <div style={tableInfoRowStyle}>
-            Showing <strong>{filteredRows.length}</strong> of <strong>{combinedRows.length}</strong> records
+            Showing <strong>{filteredRows.length}</strong> of{" "}
+            <strong>{activeLogTab === "NCR" ? ncrs.length : capas.length}</strong> {activeLogTab} records
           </div>
 
           {loading ? (
@@ -1466,23 +1585,33 @@ function NcrCapaPageContent() {
           ) : (
             <div style={registerTableWrapStyle}>
               <div style={registerHeadStyle}>
-                <div>Record</div>
-                <div>Status</div>
-                <div>Priority</div>
-                <div>Owner</div>
-                <div>Project</div>
-                <div>Due</div>
-                <div>Files</div>
+                {activeLogTab === "NCR" ? (
+                  <>
+                    <div>NCR No.</div>
+                    <div>Title</div>
+                    <div>Severity</div>
+                    <div>Owner</div>
+                    <div>Due Date</div>
+                    <div>Status</div>
+                  </>
+                ) : (
+                  <>
+                    <div>CAPA No.</div>
+                    <div>Title</div>
+                    <div>Owner</div>
+                    <div>Due Date</div>
+                    <div>Status</div>
+                    <div>Linked NCR</div>
+                  </>
+                )}
               </div>
 
               <div style={registerBodyStyle}>
                 {filteredRows.map((row) => {
-                  const typeTone = getTypeTone(row.type);
                   const statusTone = getStatusTone(row.status);
-                  const severityTone = getSeverityTone(row.severity);
+                  const severityTone = getSeverityTone(getSeverityDisplay(row.severity));
                   const dueTone = dueState(row.due_date);
                   const active = selectedRow?.id === row.id && selectedRow?.type === row.type;
-                  const evidenceCount = evidenceCountMap.get(`${row.type}-${row.id}`) || 0;
 
                   return (
                     <button
@@ -1495,44 +1624,21 @@ function NcrCapaPageContent() {
                         borderLeft: active ? "4px solid #0f766e" : "4px solid transparent",
                       }}
                     >
+                      <div style={registerSimpleTextStyle}>{row.number}</div>
+
                       <div>
-                        <div style={registerRecordTagRowStyle}>
-                          <span
-                            style={{
-                              ...registerTagStyle,
-                              background: typeTone.bg,
-                              color: typeTone.color,
-                              border: `1px solid ${typeTone.border}`,
-                            }}
-                          >
-                            {row.type}
-                          </span>
-                          <span style={registerRecordNumberStyle}>{row.number}</span>
-                        </div>
                         <div style={registerTitleStyle}>{row.title || "Untitled"}</div>
-                        <div style={registerDescriptionStyle}>{row.description || "No description"}</div>
+                        <div style={registerDescriptionStyle}>
+                          {row.description || (row.type === "NCR" ? "No NCR description" : "No CAPA description")}
+                        </div>
                         <div style={registerMetaStyle}>
-                          {row.type === "NCR" && <span>Source: {row.source_type || "Internal"}</span>}
+                          {row.project ? <span>Project: {row.project}</span> : null}
                           {row.type === "NCR" && row.area && <span>Area: {row.area}</span>}
-                          {row.type === "CAPA" && row.linked_to && <span>Linked to: {row.linked_to}</span>}
                           <span>Created: {formatDate(row.created_at)}</span>
                         </div>
                       </div>
-
-                      <div>
-                        <span
-                          style={{
-                            ...badgeStyle,
-                            background: statusTone.bg,
-                            color: statusTone.color,
-                          }}
-                        >
-                          {row.status}
-                        </span>
-                      </div>
-
-                      <div>
-                        {row.type === "NCR" ? (
+                      {activeLogTab === "NCR" ? (
+                        <div>
                           <span
                             style={{
                               ...badgeStyle,
@@ -1540,33 +1646,74 @@ function NcrCapaPageContent() {
                               color: severityTone.color,
                             }}
                           >
-                            {row.severity}
+                            {getSeverityDisplay(row.severity)}
                           </span>
-                        ) : (
-                          <span style={mutedTextStyle}>—</span>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div style={registerSimpleTextStyle}>{row.owner || "-"}</div>
+                      )}
 
-                      <div style={registerSimpleTextStyle}>{row.owner || "—"}</div>
-                      <div style={registerSimpleTextStyle}>{row.project || "—"}</div>
+                      {activeLogTab === "NCR" ? (
+                        <div style={registerSimpleTextStyle}>{row.owner || "-"}</div>
+                      ) : (
+                        <div
+                          style={{
+                            ...registerSimpleTextStyle,
+                            color:
+                              dueTone === "overdue"
+                                ? "#b91c1c"
+                                : dueTone === "soon"
+                                ? "#a16207"
+                                : "#0f172a",
+                          }}
+                        >
+                          {formatDate(row.due_date)}
+                        </div>
+                      )}
 
-                      <div
-                        style={{
-                          ...registerSimpleTextStyle,
-                          color:
-                            dueTone === "overdue"
-                              ? "#b91c1c"
-                              : dueTone === "soon"
-                              ? "#a16207"
-                              : "#0f172a",
-                        }}
-                      >
-                        {formatDate(row.due_date)}
-                      </div>
+                      {activeLogTab === "NCR" ? (
+                        <div
+                          style={{
+                            ...registerSimpleTextStyle,
+                            color:
+                              dueTone === "overdue"
+                                ? "#b91c1c"
+                                : dueTone === "soon"
+                                ? "#a16207"
+                                : "#0f172a",
+                          }}
+                        >
+                          {formatDate(row.due_date)}
+                        </div>
+                      ) : (
+                        <div>
+                          <span
+                            style={{
+                              ...badgeStyle,
+                              background: statusTone.bg,
+                              color: statusTone.color,
+                            }}
+                          >
+                            {row.status}
+                          </span>
+                        </div>
+                      )}
 
-                      <div>
-                        <span style={fileCountBadgeStyle}>{evidenceCount}</span>
-                      </div>
+                      {activeLogTab === "NCR" ? (
+                        <div>
+                          <span
+                            style={{
+                              ...badgeStyle,
+                              background: statusTone.bg,
+                              color: statusTone.color,
+                            }}
+                          >
+                            {row.status}
+                          </span>
+                        </div>
+                      ) : (
+                        <div style={registerSimpleTextStyle}>{row.linked_to || "-"}</div>
+                      )}
                     </button>
                   );
                 })}
@@ -1575,11 +1722,9 @@ function NcrCapaPageContent() {
           )}
         </SectionCard>
 
-        <div style={sidePanelStackStyle}>
-          <SectionCard title="Edit Panel" subtitle="Review and update the selected record.">
-            {!selectedRow || !editRow ? (
-              <div style={emptyBoardStyle}>Select a record from the register to edit it here.</div>
-            ) : (
+        {selectedRow && editRow ? (
+          <div style={sidePanelStackStyle}>
+            <SectionCard title="Detail Panel" subtitle="Review and update the selected record.">
               <div>
                 <div style={editHeaderStyle}>
                   <div>
@@ -1736,7 +1881,7 @@ function NcrCapaPageContent() {
                                   style={pillRemoveButtonStyle}
                                   onClick={() => removeLinkedNcrFromEditCapa(item)}
                                 >
-                                  ×
+                                  x
                                 </button>
                               </span>
                             ))
@@ -1759,7 +1904,7 @@ function NcrCapaPageContent() {
                       setEditRow(null);
                     }}
                   >
-                    Close
+                    Hide Panel
                   </button>
                   <button
                     type="button"
@@ -1776,13 +1921,9 @@ function NcrCapaPageContent() {
                   </button>
                 </div>
               </div>
-            )}
-          </SectionCard>
+            </SectionCard>
 
-          <SectionCard title="Evidence Manager" subtitle="Upload, preview or remove evidence for the selected record.">
-            {!selectedRow ? (
-              <div style={emptyBoardStyle}>Select a record to manage evidence.</div>
-            ) : (
+            <SectionCard title="Evidence" subtitle="Upload, preview or remove evidence for the selected record.">
               <div>
                 <div style={editHeaderStyle}>
                   <div>
@@ -1840,7 +1981,7 @@ function NcrCapaPageContent() {
                         <div style={{ minWidth: 0 }}>
                           <div style={evidenceFileNameStyle}>{file.file_name}</div>
                           <div style={evidenceMetaTextStyle}>
-                            {formatFileSize(file.file_size)} · {file.content_type || "Unknown type"} · Uploaded{" "}
+                            {formatFileSize(file.file_size)} | {file.content_type || "Unknown type"} | Uploaded{" "}
                             {formatDateTime(file.uploaded_at)}
                           </div>
                           {file.notes ? <div style={evidenceNoteStyle}>Note: {file.notes}</div> : null}
@@ -1868,9 +2009,9 @@ function NcrCapaPageContent() {
                   )}
                 </div>
               </div>
-            )}
-          </SectionCard>
-        </div>
+            </SectionCard>
+          </div>
+        ) : null}
       </section>
     </main>
   );
@@ -2146,7 +2287,7 @@ const topGridStyle: CSSProperties = {
 
 const workspaceGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.45fr 0.95fr",
+  gridTemplateColumns: "1fr",
   gap: "20px",
   alignItems: "start",
 };
@@ -2257,35 +2398,6 @@ const buttonRowStyle: CSSProperties = {
   marginTop: "16px",
 };
 
-const attentionGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "14px",
-};
-
-const attentionCardStyle: CSSProperties = {
-  textAlign: "left",
-  padding: 16,
-  borderRadius: 16,
-  cursor: "pointer",
-};
-
-const attentionHeaderStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 8,
-  alignItems: "center",
-  marginBottom: 10,
-};
-
-const miniTagStyle: CSSProperties = {
-  padding: "6px 10px",
-  borderRadius: 999,
-  fontWeight: 800,
-  fontSize: 12,
-  display: "inline-block",
-};
-
 const attentionNumberStyle: CSSProperties = {
   fontSize: 13,
   color: "#64748b",
@@ -2298,21 +2410,6 @@ const attentionTitleStyle: CSSProperties = {
   fontWeight: 800,
   color: "#0f172a",
   marginBottom: 8,
-};
-
-const attentionMetaRowStyle: CSSProperties = {
-  fontSize: 13,
-  color: "#475569",
-  lineHeight: 1.5,
-};
-
-const attentionMetaFooterStyle: CSSProperties = {
-  marginTop: 10,
-  fontSize: 13,
-  color: "#475569",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 10,
 };
 
 const emptyBoardStyle: CSSProperties = {
@@ -2423,6 +2520,37 @@ const toolbarFiltersStyle: CSSProperties = {
   flexWrap: "wrap",
 };
 
+const compactInsightListStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+};
+
+const compactInsightCardStyle: CSSProperties = {
+  borderRadius: "16px",
+  border: "1px solid #dbe3ec",
+  padding: "14px",
+  background: "#f8fafc",
+};
+
+const compactInsightHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+  alignItems: "center",
+  marginBottom: "10px",
+  flexWrap: "wrap",
+};
+
+const compactInsightMetaLineStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+  color: "#475569",
+  fontSize: "13px",
+  lineHeight: 1.45,
+  flexWrap: "wrap",
+};
+
 const tableInfoRowStyle: CSSProperties = {
   marginBottom: "12px",
   color: "#475569",
@@ -2437,7 +2565,7 @@ const registerTableWrapStyle: CSSProperties = {
 
 const registerHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.7fr 0.9fr 0.9fr 1fr 1fr 0.8fr 0.7fr",
+  gridTemplateColumns: "1.1fr 2.3fr 1fr 1fr 1fr 1.1fr",
   gap: "12px",
   padding: "14px 16px",
   background: "#f8fafc",
@@ -2459,7 +2587,7 @@ const registerRowStyle: CSSProperties = {
   width: "100%",
   textAlign: "left",
   display: "grid",
-  gridTemplateColumns: "1.7fr 0.9fr 0.9fr 1fr 1fr 0.8fr 0.7fr",
+  gridTemplateColumns: "1.1fr 2.3fr 1fr 1fr 1fr 1.1fr",
   gap: "12px",
   padding: "16px",
   border: "none",
@@ -2468,26 +2596,12 @@ const registerRowStyle: CSSProperties = {
   alignItems: "start",
 };
 
-const registerRecordTagRowStyle: CSSProperties = {
-  display: "flex",
-  gap: "8px",
-  alignItems: "center",
-  flexWrap: "wrap",
-  marginBottom: "8px",
-};
-
 const registerTagStyle: CSSProperties = {
   padding: "6px 10px",
   borderRadius: "999px",
   fontSize: "12px",
   fontWeight: 800,
   display: "inline-block",
-};
-
-const registerRecordNumberStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 800,
-  color: "#64748b",
 };
 
 const registerTitleStyle: CSSProperties = {
@@ -2517,18 +2631,6 @@ const registerSimpleTextStyle: CSSProperties = {
   fontSize: "13px",
   color: "#0f172a",
   fontWeight: 700,
-};
-
-const fileCountBadgeStyle: CSSProperties = {
-  display: "inline-block",
-  minWidth: 32,
-  textAlign: "center",
-  padding: "6px 10px",
-  borderRadius: 999,
-  background: "#ede9fe",
-  color: "#6d28d9",
-  fontSize: 12,
-  fontWeight: 800,
 };
 
 const editHeaderStyle: CSSProperties = {
@@ -2609,3 +2711,5 @@ export default function NcrCapaPage() {
     </Suspense>
   );
 }
+
+

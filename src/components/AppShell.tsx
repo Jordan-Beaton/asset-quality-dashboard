@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase } from "../lib/supabase";
@@ -12,6 +13,7 @@ const navItems = [
   { href: "/", label: "Dashboard" },
   { href: "/assets", label: "Assets" },
   { href: "/documents", label: "Documents" },
+  { href: "/moc", label: "MOC" },
   { href: "/ncr-capa", label: "NCR / CAPA" },
   { href: "/audits", label: "Audits" },
   { href: "/actions", label: "Actions" },
@@ -51,25 +53,36 @@ export default function AppShell({ children }: AppShellProps) {
             flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-            <div
-              style={{
-                color: "white",
-                fontWeight: 700,
-                fontSize: "20px",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              Quality Dashboard
-            </div>
-            <div
-              style={{
-                color: "rgba(255,255,255,0.75)",
-                fontSize: "12px",
-                fontWeight: 500,
-              }}
-            >
-              Quality management system
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+            <Image
+              src="/enshore-logo.png"
+              alt="Enshore"
+              width={128}
+              height={32}
+              priority
+              style={{ width: "128px", height: "auto", objectFit: "contain" }}
+            />
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <div
+                style={{
+                  color: "white",
+                  fontWeight: 700,
+                  fontSize: "20px",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                Quality Dashboard
+              </div>
+              <div
+                style={{
+                  color: "rgba(255,255,255,0.75)",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                }}
+              >
+                Quality management system
+              </div>
             </div>
           </div>
 

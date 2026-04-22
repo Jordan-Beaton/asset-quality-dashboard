@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
@@ -586,7 +585,7 @@ export default function Home() {
       <section style={heroStyle}>
         <div style={heroCopyStyle}>
           <div style={eyebrowStyle}>Quality Dashboard</div>
-          <h1 style={heroTitleStyle}>Operational quality view across NCRs, CAPAs, audits, actions, and documents</h1>
+          <h1 style={heroTitleStyle}>Operational quality view across MOCs, NCRs, CAPAs, audits, actions, and documents</h1>
           <p style={heroSubtitleStyle}>
             Compact management view for launch monitoring, built around live workloads, trends, and the next items that need follow-up.
           </p>
@@ -676,8 +675,18 @@ export default function Home() {
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     activeDot={{ r: 5, cursor: "pointer" }}
-                    onClick={(data: any) =>
-                      router.push(buildHref("/actions", { createdMonth: data?.payload?.rawMonth || "" }))
+                    onClick={(data: unknown) =>
+                      router.push(
+                        buildHref("/actions", {
+                          createdMonth:
+                            typeof data === "object" &&
+                            data !== null &&
+                            "payload" in data &&
+                            typeof (data as { payload?: { rawMonth?: string } }).payload?.rawMonth === "string"
+                              ? (data as { payload?: { rawMonth?: string } }).payload?.rawMonth || ""
+                              : "",
+                        })
+                      )
                     }
                   />
                   <Line
@@ -687,8 +696,19 @@ export default function Home() {
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     activeDot={{ r: 5, cursor: "pointer" }}
-                    onClick={(data: any) =>
-                      router.push(buildHref("/actions", { status: "Closed", closedMonth: data?.payload?.rawMonth || "" }))
+                    onClick={(data: unknown) =>
+                      router.push(
+                        buildHref("/actions", {
+                          status: "Closed",
+                          closedMonth:
+                            typeof data === "object" &&
+                            data !== null &&
+                            "payload" in data &&
+                            typeof (data as { payload?: { rawMonth?: string } }).payload?.rawMonth === "string"
+                              ? (data as { payload?: { rawMonth?: string } }).payload?.rawMonth || ""
+                              : "",
+                        })
+                      )
                     }
                   />
                 </LineChart>
