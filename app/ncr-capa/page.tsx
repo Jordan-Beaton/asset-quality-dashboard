@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { supabase } from "../../src/lib/supabase";
 
@@ -216,7 +216,7 @@ async function tryLoadNcrOptions(): Promise<LinkedOption[]> {
   return [];
 }
 
-export default function NcrCapaPage() {
+function NcrCapaPageContent() {
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedType = searchParams.get("type")?.trim() || "All";
@@ -2598,3 +2598,10 @@ const badgeStyle: CSSProperties = {
   display: "inline-block",
   whiteSpace: "nowrap",
 };
+export default function NcrCapaPage() {
+  return (
+    <Suspense fallback={<main style={{ padding: "24px" }}>Loading NCR / CAPA...</main>}>
+      <NcrCapaPageContent />
+    </Suspense>
+  );
+}
