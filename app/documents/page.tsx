@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { supabase } from "../../src/lib/supabase";
 
@@ -398,7 +398,7 @@ function uniqueEmails(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
-export default function DocumentsPage() {
+function DocumentsPageContent() {
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "";
@@ -3070,3 +3070,10 @@ const revisionNoteStyle: CSSProperties = {
   color: "#475569",
   lineHeight: 1.5,
 };
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={<main style={{ padding: "24px" }}>Loading documents...</main>}>
+      <DocumentsPageContent />
+    </Suspense>
+  );
+}
