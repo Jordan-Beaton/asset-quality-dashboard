@@ -1847,7 +1847,7 @@ function AuditsPageContent() {
                         <span>{item.auditNumbers.join(", ")}</span>
                       </div>
                     </div>
-                    <span style={getFrequencyBadgeStyle(item.frequency)}>{item.frequency}</span>
+                    <span style={getFrequencyBadgeStyle(item.frequency as "Reduce" | "Maintain" | "Increase")}>{item.frequency}</span>
                   </div>
                 ))}
               </div>
