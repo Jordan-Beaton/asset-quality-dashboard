@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { supabase } from "../../src/lib/supabase";
@@ -398,16 +399,24 @@ function uniqueEmails(values: string[]) {
 }
 
 export default function DocumentsPage() {
+  const searchParams = useSearchParams();
+  const linkedSearch = searchParams.get("search")?.trim() || "";
+  const linkedStatus = searchParams.get("status")?.trim() || "";
+  const linkedType = searchParams.get("type")?.trim() || "";
+  const linkedOwner = searchParams.get("owner")?.trim() || "";
+  const linkedReview = searchParams.get("review")?.trim() || "";
+  const linkedApproval = searchParams.get("approval")?.trim() || "";
+
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [revisionsByDocumentId, setRevisionsByDocumentId] = useState<Record<string, DocumentRevisionRow[]>>({});
   const [contacts, setContacts] = useState<NotificationContactRow[]>([]);
   const [message, setMessage] = useState("Loading documents...");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("");
-  const [reviewFilter, setReviewFilter] = useState("");
-  const [approvalFilter, setApprovalFilter] = useState("");
+  const [search, setSearch] = useState(linkedSearch);
+  const [statusFilter, setStatusFilter] = useState(linkedStatus);
+  const [typeFilter, setTypeFilter] = useState(linkedType);
+  const [ownerFilter, setOwnerFilter] = useState(linkedOwner);
+  const [reviewFilter, setReviewFilter] = useState(linkedReview);
+  const [approvalFilter, setApprovalFilter] = useState(linkedApproval);
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [showDetailPanel, setShowDetailPanel] = useState(false);
 

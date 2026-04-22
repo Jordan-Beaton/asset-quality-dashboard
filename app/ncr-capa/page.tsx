@@ -224,6 +224,7 @@ function NcrCapaPageContent() {
   const linkedSeverity = searchParams.get("severity")?.trim() || "All";
   const linkedSource = searchParams.get("source")?.trim() || "All";
   const linkedProject = searchParams.get("project")?.trim() || "All";
+  const linkedOverdueOnly = searchParams.get("overdue") === "1";
 
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
@@ -425,6 +426,7 @@ function NcrCapaPageContent() {
       const matchesSeverity = severityFilter === "All" || row.severity === severityFilter;
       const matchesSource = sourceFilter === "All" || (row.type === "NCR" && row.source_type === sourceFilter);
       const matchesProject = projectFilter === "All" || row.project === projectFilter;
+      const matchesOverdueOnly = !linkedOverdueOnly || dueState(row.due_date) === "overdue";
 
       const attention = dueState(row.due_date) === "overdue" || row.status === "Open";
       const matchesAttention = !showAttentionOnly || attention;
@@ -436,6 +438,7 @@ function NcrCapaPageContent() {
         matchesSeverity &&
         matchesSource &&
         matchesProject &&
+        matchesOverdueOnly &&
         matchesAttention
       );
     });
@@ -447,6 +450,7 @@ function NcrCapaPageContent() {
     severityFilter,
     sourceFilter,
     projectFilter,
+    linkedOverdueOnly,
     showAttentionOnly,
   ]);
 

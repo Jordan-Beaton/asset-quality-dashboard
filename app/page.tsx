@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { supabase } from "../src/lib/supabase";
-
-type Asset = {
-  id: string;
-  asset_code: string | null;
-  name: string | null;
-  description: string | null;
-  location: string | null;
-  owner: string | null;
-  status: string | null;
-  created_at?: string | null;
-};
 
 type Ncr = {
   id: string;
@@ -24,6 +27,7 @@ type Ncr = {
   status: string | null;
   owner: string | null;
   area: string | null;
+  due_date?: string | null;
   created_at?: string | null;
 };
 
@@ -34,7 +38,9 @@ type Capa = {
   status: string | null;
   owner: string | null;
   linked_to: string | null;
+  due_date?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type ActionItem = {
@@ -63,16 +69,21 @@ type AuditRecord = {
   created_at?: string | null;
 };
 
-type AssetQualityRow = {
-  id: string;
-  asset_id: string;
-};
-
 type AuditFindingRow = {
   id: string;
   audit_id: string;
   category: string | null;
   status: string | null;
+  description?: string | null;
+  clause?: string | null;
+  reference?: string | null;
+};
+
+type DocumentSummary = {
+  id: string;
+  status: string | null;
+  review_approval_status: string | null;
+  next_review_date: string | null;
 };
 
 function normaliseStatus(value: string | null | undefined) {
@@ -109,6 +120,21 @@ function formatDateTime(value: Date | null) {
   });
 }
 
+function formatAuditMonth(value: string | null | undefined) {
+  if (!value) return "-";
+
+  const [year, month] = value.split("-");
+  if (!year || !month) return value;
+
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-GB", {
+    month: "short",
+    year: "2-digit",
+  });
+}
+
 function getDaysFromToday(value: string | null | undefined) {
   if (!value) return null;
 
@@ -121,68 +147,6 @@ function getDaysFromToday(value: string | null | undefined) {
 
   const diffMs = due.getTime() - today.getTime();
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
-}
-
-function formatAuditMonth(value: string | null | undefined) {
-  if (!value) return "-";
-
-  const [year, month] = value.split("-");
-  if (!year || !month) return value;
-
-  const date = new Date(Number(year), Number(month) - 1, 1);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleDateString("en-GB", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function getManagementMessage(params: {
-  overdueActions: number;
-  dueNext7Days: number;
-  majorNcrs: number;
-  inactiveAssets: number;
-  overdueAudits: number;
-  openMajorFindings: number;
-}) {
-  const {
-    overdueActions,
-    dueNext7Days,
-    majorNcrs,
-    inactiveAssets,
-    overdueAudits,
-    openMajorFindings,
-  } = params;
-
-  if (
-    overdueActions === 0 &&
-    dueNext7Days === 0 &&
-    majorNcrs === 0 &&
-    inactiveAssets === 0 &&
-    overdueAudits === 0 &&
-    openMajorFindings === 0
-  ) {
-    return {
-      tone: "good" as const,
-      title: "System looks under control",
-      text: "No overdue actions, overdue audits, or open major quality issues are currently showing.",
-    };
-  }
-
-  if (overdueActions > 0 || majorNcrs > 0 || overdueAudits > 0 || openMajorFindings > 0) {
-    return {
-      tone: "risk" as const,
-      title: "Immediate follow-up recommended",
-      text: "There are overdue actions, overdue audits, or major open quality issues that need chasing first.",
-    };
-  }
-
-  return {
-    tone: "watch" as const,
-    title: "Some items need monitoring",
-    text: "The dashboard is generally stable, but there are near-term items and inactive assets that still need attention.",
-  };
 }
 
 function buildHref(path: string, params?: Record<string, string | number | null | undefined>) {
@@ -198,14 +162,68 @@ function buildHref(path: string, params?: Record<string, string | number | null 
   return query ? `${path}?${query}` : path;
 }
 
+function monthKey(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(key: string) {
+  const [year, month] = key.split("-");
+  if (!year || !month) return key;
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return key;
+  return date.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+}
+
+function getPriorityRank(value: string | null | undefined) {
+  const priority = normaliseStatus(value);
+  if (priority === "critical") return 0;
+  if (priority === "high") return 1;
+  if (priority === "medium") return 2;
+  if (priority === "low") return 3;
+  return 4;
+}
+
+function buildFindingRepeatKey(finding: AuditFindingRow) {
+  const description = (finding.description || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const clause = (finding.clause || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const reference = (finding.reference || "").trim().toLowerCase();
+  return description || clause || reference;
+}
+
+function getRiskFrequency(score: number, totalAudits: number) {
+  if (score <= 10) {
+    return totalAudits > 1 ? "Reduce" : "Maintain";
+  }
+  if (score <= 20) {
+    return "Maintain";
+  }
+  return "Increase";
+}
+
+function getDocumentBucket(document: DocumentSummary) {
+  const status = normaliseStatus(document.status);
+  const approval = normaliseStatus(document.review_approval_status);
+  const reviewDays = getDaysFromToday(document.next_review_date);
+
+  if (reviewDays !== null && reviewDays < 0) return "Overdue";
+  if (approval === "approved" || status === "live" || status === "approved") return "Approved";
+  if (status === "under review" || approval === "pending review" || approval === "reviewed") {
+    return "Under Review";
+  }
+  return "Draft";
+}
+
 export default function Home() {
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const router = useRouter();
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [auditFindings, setAuditFindings] = useState<AuditFindingRow[]>([]);
-  const [assetQualityRows, setAssetQualityRows] = useState<AssetQualityRow[]>([]);
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -223,6 +241,7 @@ export default function Home() {
         auditRes,
         findingRes,
         assetQualityRes,
+        documentRes,
       ] = await Promise.all([
         supabase.from("assets").select("*"),
         supabase.from("ncrs").select("*"),
@@ -231,6 +250,7 @@ export default function Home() {
         supabase.from("audits").select("*"),
         supabase.from("audit_findings").select("*"),
         supabase.from("asset_quality").select("id,asset_id"),
+        supabase.from("documents").select("id,status,review_approval_status,next_review_date"),
       ]);
 
       if (
@@ -240,7 +260,8 @@ export default function Home() {
         actionRes.error ||
         auditRes.error ||
         findingRes.error ||
-        assetQualityRes.error
+        assetQualityRes.error ||
+        documentRes.error
       ) {
         setError(
           assetRes.error?.message ||
@@ -250,19 +271,19 @@ export default function Home() {
             auditRes.error?.message ||
             findingRes.error?.message ||
             assetQualityRes.error?.message ||
+            documentRes.error?.message ||
             "Failed to load dashboard data."
         );
         setIsLoading(false);
         return;
       }
 
-      setAssets((assetRes.data || []) as Asset[]);
       setNcrs((ncrRes.data || []) as Ncr[]);
       setCapas((capaRes.data || []) as Capa[]);
       setActions((actionRes.data || []) as ActionItem[]);
       setAudits((auditRes.data || []) as AuditRecord[]);
       setAuditFindings((findingRes.data || []) as AuditFindingRow[]);
-      setAssetQualityRows((assetQualityRes.data || []) as AssetQualityRow[]);
+      setDocuments((documentRes.data || []) as DocumentSummary[]);
       setLastRefreshed(new Date());
       setIsLoading(false);
     };
@@ -270,286 +291,527 @@ export default function Home() {
     void fetchData();
   }, []);
 
-  const totalAssets = assets.length;
-
-  const activeAssets = assets.filter((a) => normaliseStatus(a.status) === "active").length;
-
-  const inactiveAssets = assets.filter((a) => normaliseStatus(a.status) !== "active").length;
-
-  const openNcrs = ncrs.filter((n) => !isClosedLikeStatus(n.status)).length;
-
-  const openCapas = capas.filter((c) => !isClosedLikeStatus(c.status)).length;
-
-  const openActions = actions.filter((a) => !isClosedLikeStatus(a.status)).length;
+  const openNcrs = ncrs.filter((item) => !isClosedLikeStatus(item.status)).length;
+  const openCapas = capas.filter((item) => !isClosedLikeStatus(item.status)).length;
+  const openActions = actions.filter((item) => !isClosedLikeStatus(item.status)).length;
+  const openAuditFindings = auditFindings.filter((item) => !isClosedLikeStatus(item.status)).length;
 
   const overdueActions = actions.filter((action) => {
-    if (!action.due_date) return false;
     if (isClosedLikeStatus(action.status)) return false;
-
     const days = getDaysFromToday(action.due_date);
     return days !== null && days < 0;
   }).length;
 
-  const dueNext7DaysList = useMemo(() => {
-    return [...actions]
-      .filter((action) => {
-        if (!action.due_date) return false;
-        if (isClosedLikeStatus(action.status)) return false;
+  const overdueDocuments = documents.filter((doc) => getDocumentBucket(doc) === "Overdue").length;
 
-        const days = getDaysFromToday(action.due_date);
-        return days !== null && days >= 0 && days <= 7;
-      })
-      .sort((a, b) => {
-        const aDate = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
-        const bDate = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
-        return aDate - bDate;
-      })
-      .slice(0, 8);
+  const overdueNcrCapas = [...ncrs, ...capas].filter((item) => {
+    if (isClosedLikeStatus(item.status)) return false;
+    const days = getDaysFromToday(item.due_date || null);
+    return days !== null && days < 0;
+  }).length;
+
+  const ncrCapaStatusData = useMemo(
+    () => [
+      {
+        name: "NCR",
+        Open: ncrs.filter((item) => !isClosedLikeStatus(item.status)).length,
+        Closed: ncrs.filter((item) => isClosedLikeStatus(item.status)).length,
+      },
+      {
+        name: "CAPA",
+        Open: capas.filter((item) => !isClosedLikeStatus(item.status)).length,
+        Closed: capas.filter((item) => isClosedLikeStatus(item.status)).length,
+      },
+    ],
+    [ncrs, capas]
+  );
+
+  const actionsTrendData = useMemo(() => {
+    const keys = new Set<string>();
+    const openedMap: Record<string, number> = {};
+    const closedMap: Record<string, number> = {};
+
+    actions.forEach((action) => {
+      const openedKey = monthKey(action.created_at);
+      if (openedKey) {
+        keys.add(openedKey);
+        openedMap[openedKey] = (openedMap[openedKey] || 0) + 1;
+      }
+
+      if (isClosedLikeStatus(action.status)) {
+        const closedKey = monthKey(action.updated_at || action.created_at);
+        if (closedKey) {
+          keys.add(closedKey);
+          closedMap[closedKey] = (closedMap[closedKey] || 0) + 1;
+        }
+      }
+    });
+
+    return [...keys]
+      .sort()
+      .slice(-6)
+      .map((key) => ({
+        month: monthLabel(key),
+        rawMonth: key,
+        Opened: openedMap[key] || 0,
+        Closed: closedMap[key] || 0,
+      }));
   }, [actions]);
 
-  const dueNext7Days = dueNext7DaysList.length;
+  const findingsBreakdownData = useMemo(() => {
+    const counts = {
+      Major: 0,
+      Minor: 0,
+      OFI: 0,
+      OBS: 0,
+    };
 
-  const majorNcrs = ncrs.filter(
-    (n) => normaliseStatus(n.severity) === "major" && !isClosedLikeStatus(n.status)
-  ).length;
+    auditFindings.forEach((finding) => {
+      const category = (finding.category || "").trim();
+      if (category === "Major" || category === "Minor" || category === "OFI" || category === "OBS") {
+        counts[category] += 1;
+      }
+    });
 
-  const totalAudits = audits.length;
-  const plannedAudits = audits.filter((a) => normaliseStatus(a.status) === "planned").length;
-  const inProgressAudits = audits.filter((a) => normaliseStatus(a.status) === "in progress").length;
-  const overdueAudits = audits.filter((a) => normaliseStatus(a.status) === "overdue").length;
-  const completedAudits = audits.filter((a) => normaliseStatus(a.status) === "completed").length;
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [auditFindings]);
 
-  const totalAuditFindings = auditFindings.length;
-  const openAuditFindings = auditFindings.filter((f) => normaliseStatus(f.status) !== "closed").length;
-  const openMajorFindings = auditFindings.filter(
-    (f) => normaliseStatus(f.category) === "major" && normaliseStatus(f.status) !== "closed"
-  ).length;
+  const documentStatusData = useMemo(() => {
+    const counts = {
+      Draft: 0,
+      "Under Review": 0,
+      Approved: 0,
+      Overdue: 0,
+    };
 
-  const qualityLinkedAssets = useMemo(() => {
-    const linkedIds = new Set(assetQualityRows.map((row) => row.asset_id));
-    return assets.filter((asset) => linkedIds.has(asset.id)).length;
-  }, [assetQualityRows, assets]);
+    documents.forEach((document) => {
+      counts[getDocumentBucket(document)] += 1;
+    });
 
-  const openItems = openNcrs + openCapas + openActions + openAuditFindings;
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [documents]);
 
-  const assetsByLocation = useMemo(() => {
-    const map = assets.reduce<Record<string, number>>((acc, asset) => {
-      const key = asset.location?.trim() || "Unknown";
+  const topProblemAreas = useMemo(() => {
+    const repeatCounts = auditFindings.reduce<Record<string, number>>((acc, finding) => {
+      const key = buildFindingRepeatKey(finding);
+      if (!key) return acc;
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
 
-    return Object.entries(map)
-      .map(([location, count]) => ({ location, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4);
-  }, [assets]);
+    const grouped = new Map<
+      string,
+      {
+        label: string;
+        auditNumbers: string[];
+        totalAudits: number;
+        major: number;
+        minor: number;
+        ofiObs: number;
+        totalFindings: number;
+        repeatFindings: number;
+        riskScore: number;
+        frequency: "Reduce" | "Maintain" | "Increase";
+      }
+    >();
 
-  const maxLocationCount = Math.max(...assetsByLocation.map((x) => x.count), 1);
+    audits.forEach((audit) => {
+      const label = (audit.title || audit.auditee || audit.audit_number || "Untitled Audit").trim();
+      if (!grouped.has(label)) {
+        grouped.set(label, {
+          label,
+          auditNumbers: [],
+          totalAudits: 0,
+          major: 0,
+          minor: 0,
+          ofiObs: 0,
+          totalFindings: 0,
+          repeatFindings: 0,
+          riskScore: 0,
+          frequency: "Maintain",
+        });
+      }
 
-  const recentAssets = useMemo(() => {
-    return [...assets]
-      .sort((a, b) => {
-        const aHasDate = !!a.created_at;
-        const bHasDate = !!b.created_at;
+      const current = grouped.get(label)!;
+      current.totalAudits += 1;
+      current.auditNumbers.push(audit.audit_number || "-");
+    });
 
-        if (aHasDate && bHasDate) {
-          return (
-            new Date(b.created_at as string).getTime() -
-            new Date(a.created_at as string).getTime()
-          );
-        }
+    auditFindings.forEach((finding) => {
+      const parent = audits.find((audit) => audit.id === finding.audit_id);
+      if (!parent) return;
 
-        if (aHasDate && !bHasDate) return -1;
-        if (!aHasDate && bHasDate) return 1;
+      const label = (parent.title || parent.auditee || parent.audit_number || "Untitled Audit").trim();
+      const current = grouped.get(label);
+      if (!current) return;
 
-        return (b.asset_code || "").localeCompare(a.asset_code || "");
+      const category = normaliseStatus(finding.category);
+      if (category === "major") current.major += 1;
+      else if (category === "minor") current.minor += 1;
+      else if (category === "ofi" || category === "obs") current.ofiObs += 1;
+
+      current.totalFindings += 1;
+      const key = buildFindingRepeatKey(finding);
+      if (key && (repeatCounts[key] || 0) > 1) {
+        current.repeatFindings += 1;
+      }
+    });
+
+    return [...grouped.values()]
+      .map((item) => {
+        const riskScore =
+          item.totalAudits * 1 +
+          item.major * 5 +
+          item.minor * 3 +
+          item.ofiObs * 1 +
+          item.repeatFindings * 2;
+
+        return {
+          ...item,
+          riskScore,
+          frequency: getRiskFrequency(riskScore, item.totalAudits),
+        };
       })
-      .slice(0, 6);
-  }, [assets]);
+      .sort((a, b) => {
+        if (b.totalFindings !== a.totalFindings) return b.totalFindings - a.totalFindings;
+        if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
+        return a.label.localeCompare(b.label);
+      })
+      .slice(0, 5);
+  }, [audits, auditFindings]);
 
   const priorityActions = useMemo(() => {
     return [...actions]
       .filter((action) => !isClosedLikeStatus(action.status))
       .sort((a, b) => {
-        const aOverdue = getDaysFromToday(a.due_date);
-        const bOverdue = getDaysFromToday(b.due_date);
-        const aRank = aOverdue !== null && aOverdue < 0 ? 0 : 1;
-        const bRank = bOverdue !== null && bOverdue < 0 ? 0 : 1;
+        const aDays = getDaysFromToday(a.due_date);
+        const bDays = getDaysFromToday(b.due_date);
+        const aOverdueRank = aDays !== null && aDays < 0 ? 0 : 1;
+        const bOverdueRank = bDays !== null && bDays < 0 ? 0 : 1;
+        if (aOverdueRank !== bOverdueRank) return aOverdueRank - bOverdueRank;
 
-        if (aRank !== bRank) return aRank - bRank;
+        const priorityRank = getPriorityRank(a.priority) - getPriorityRank(b.priority);
+        if (priorityRank !== 0) return priorityRank;
 
         const aDate = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
         const bDate = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
         return aDate - bDate;
       })
-      .slice(0, 6);
+      .slice(0, 5);
   }, [actions]);
 
-  const auditAttentionList = useMemo(() => {
-    return [...audits]
+  const upcomingAudits = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const future = audits
       .filter((audit) => {
-        const status = normaliseStatus(audit.status);
-        return status === "overdue" || status === "planned" || status === "in progress";
+        if (!audit.audit_date) return false;
+        const date = new Date(audit.audit_date);
+        if (Number.isNaN(date.getTime())) return false;
+        date.setHours(0, 0, 0, 0);
+        return date >= today && normaliseStatus(audit.status) !== "completed";
       })
+      .sort((a, b) => new Date(a.audit_date || "").getTime() - new Date(b.audit_date || "").getTime())
+      .slice(0, 5);
+
+    if (future.length > 0) return future;
+
+    return [...audits]
       .sort((a, b) => {
-        const aStatus = normaliseStatus(a.status);
-        const bStatus = normaliseStatus(b.status);
-        const aRank = aStatus === "overdue" ? 0 : aStatus === "in progress" ? 1 : 2;
-        const bRank = bStatus === "overdue" ? 0 : bStatus === "in progress" ? 1 : 2;
-
-        if (aRank !== bRank) return aRank - bRank;
-
         const aDate = a.audit_date ? new Date(a.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
         const bDate = b.audit_date ? new Date(b.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
         return aDate - bDate;
       })
-      .slice(0, 6);
+      .slice(0, 5);
   }, [audits]);
 
-  const managementMessage = getManagementMessage({
-    overdueActions,
-    dueNext7Days,
-    majorNcrs,
-    inactiveAssets,
-    overdueAudits,
-    openMajorFindings,
-  });
+  const kpis = [
+    {
+      label: "Open NCRs",
+      value: openNcrs,
+      accent: "#dc2626",
+      href: buildHref("/ncr-capa", { type: "NCR", status: "Open" }),
+    },
+    {
+      label: "Open CAPAs",
+      value: openCapas,
+      accent: "#f59e0b",
+      href: buildHref("/ncr-capa", { type: "CAPA", status: "Open" }),
+    },
+    {
+      label: "Open Actions",
+      value: openActions,
+      accent: "#2563eb",
+      href: buildHref("/actions", { status: "Open" }),
+    },
+    {
+      label: "Open Audit Findings",
+      value: openAuditFindings,
+      accent: "#7c3aed",
+      href: buildHref("/audits", { findingStatus: "Open" }),
+    },
+    {
+      label: "Overdue Actions",
+      value: overdueActions,
+      accent: "#b91c1c",
+      href: buildHref("/actions", { overdue: 1 }),
+    },
+    {
+      label: "Overdue Documents",
+      value: overdueDocuments,
+      accent: "#0f766e",
+      href: buildHref("/documents", { review: "Overdue" }),
+    },
+  ];
+
+  function openDocumentStatusBucket(bucket: string) {
+    if (bucket === "Draft") {
+      router.push(buildHref("/documents", { status: "Draft" }));
+      return;
+    }
+    if (bucket === "Under Review") {
+      router.push(buildHref("/documents", { status: "Under Review" }));
+      return;
+    }
+    if (bucket === "Approved") {
+      router.push(buildHref("/documents", { approval: "Approved" }));
+      return;
+    }
+    router.push(buildHref("/documents", { review: "Overdue" }));
+  }
 
   return (
     <main>
       <section style={heroStyle}>
-        <div style={heroContentStyle}>
-          <div style={eyebrowStyle}>Dashboard Overview</div>
-          <h1 style={heroTitleStyle}>Quality Management Dashboard</h1>
+        <div style={heroCopyStyle}>
+          <div style={eyebrowStyle}>Quality Dashboard</div>
+          <h1 style={heroTitleStyle}>Operational quality view across NCRs, CAPAs, audits, actions, and documents</h1>
           <p style={heroSubtitleStyle}>
-            Live view of assets, NCRs, CAPAs, audits and actions across the system.
-            Built to show where attention is needed first.
+            Compact management view for launch monitoring, built around live workloads, trends, and the next items that need follow-up.
           </p>
-
-          <div style={priorityStripStyle}>
-            <PriorityPill
-              label="Overdue Actions"
-              value={overdueActions}
-              tone={overdueActions > 0 ? "red" : "green"}
-              isLoading={isLoading}
-              href={buildHref("/actions", { overdue: 1 })}
-            />
-            <PriorityPill
-              label="Due in Next 7 Days"
-              value={dueNext7Days}
-              tone={dueNext7Days > 0 ? "amber" : "green"}
-              isLoading={isLoading}
-              href={buildHref("/actions", { dueWindow: 7 })}
-            />
-            <PriorityPill
-              label="Overdue Audits"
-              value={overdueAudits}
-              tone={overdueAudits > 0 ? "red" : "green"}
-              isLoading={isLoading}
-              href={buildHref("/audits", { status: "Overdue" })}
-            />
-            <PriorityPill
-              label="Major Open Findings"
-              value={openMajorFindings}
-              tone={openMajorFindings > 0 ? "red" : "green"}
-              isLoading={isLoading}
-              href={buildHref("/audits", { findingStatus: "Open", findingCategory: "Major" })}
-            />
-          </div>
         </div>
 
-        <div style={heroMetaWrapStyle}>
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>System Status</div>
-            <div style={heroMetaValueStyle}>
-              {error ? "Connection issue" : isLoading ? "Loading data" : "Connected"}
-            </div>
-          </div>
-
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Open Items</div>
-            <div style={heroMetaValueStyle}>{isLoading ? "-" : openItems}</div>
-          </div>
-
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Last Refreshed</div>
-            <div style={heroMetaValueStyleSmall}>
-              {isLoading ? "Loading..." : formatDateTime(lastRefreshed)}
-            </div>
-          </div>
-
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Management View</div>
-            <div style={heroMetaValueStyleSmall}>
-              {isLoading ? "Preparing summary..." : managementMessage.title}
-            </div>
-          </div>
+        <div style={heroMetaRowStyle}>
+          <MetaChip label="System" value={error ? "Issue" : isLoading ? "Loading" : "Connected"} />
+          <MetaChip label="Last Refreshed" value={isLoading ? "Loading..." : formatDateTime(lastRefreshed)} />
         </div>
       </section>
 
-      {error && (
+      {error ? (
         <section style={errorBannerStyle}>
           <strong style={{ display: "block", marginBottom: "4px" }}>Dashboard error</strong>
           <span>{error}</span>
         </section>
-      )}
+      ) : null}
 
-      <section style={statsGridStyle}>
-        <StatCard title="Total Assets" value={totalAssets} accent="#0f766e" isLoading={isLoading} href="/assets" />
-        <StatCard title="Quality Linked Assets" value={qualityLinkedAssets} accent="#0891b2" isLoading={isLoading} href={buildHref("/assets", { qualityLinked: 1 })} />
-        <StatCard title="Open NCRs" value={openNcrs} accent="#dc2626" isLoading={isLoading} href={buildHref("/ncr-capa", { type: "NCR", status: "Open" })} />
-        <StatCard title="Open CAPAs" value={openCapas} accent="#f59e0b" isLoading={isLoading} href={buildHref("/ncr-capa", { type: "CAPA", status: "Open" })} />
-        <StatCard title="Open Actions" value={openActions} accent="#2563eb" isLoading={isLoading} href={buildHref("/actions", { status: "Open" })} />
-        <StatCard title="Open Audit Findings" value={openAuditFindings} accent="#7c3aed" isLoading={isLoading} href={buildHref("/audits", { findingStatus: "Open" })} />
-      </section>
-
-      <section style={threeColumnGridStyle}>
-        <SectionCard title="Management Focus" subtitle="Fast read for what needs attention first.">
-          <ManagementCallout
-            tone={managementMessage.tone}
-            title={managementMessage.title}
-            text={managementMessage.text}
+      <section style={kpiGridStyle}>
+        {kpis.map((item) => (
+          <StatCard
+            key={item.label}
+            title={item.label}
+            value={item.value}
+            accent={item.accent}
+            isLoading={isLoading}
+            href={item.href}
           />
+        ))}
+      </section>
 
-          <div style={stackCompactStyle}>
-            <SnapshotRow label="Overdue actions requiring chase-up" value={overdueActions} isLoading={isLoading} href={buildHref("/actions", { overdue: 1 })} />
-            <SnapshotRow label="Overdue audits requiring action" value={overdueAudits} isLoading={isLoading} href={buildHref("/audits", { status: "Overdue" })} />
-            <SnapshotRow label="Open major NCRs" value={majorNcrs} isLoading={isLoading} href={buildHref("/ncr-capa", { type: "NCR", status: "Open", severity: "High" })} />
-            <SnapshotRow label="Open major audit findings" value={openMajorFindings} isLoading={isLoading} href={buildHref("/audits", { findingStatus: "Open", findingCategory: "Major" })} />
-            <SnapshotRow label="Inactive assets in register" value={inactiveAssets} isLoading={isLoading} href={buildHref("/assets", { status: "Inactive" })} />
-          </div>
+      <section style={chartGridStyle}>
+        <SectionCard title="NCR/CAPA Status" subtitle="Open versus closed by record type.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ncrCapaStatusData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar
+                    dataKey="Open"
+                    stackId="status"
+                    fill="#dc2626"
+                    radius={[6, 6, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data: { name?: string }) =>
+                      router.push(buildHref("/ncr-capa", { type: data?.name || "", status: "Open" }))
+                    }
+                  />
+                  <Bar
+                    dataKey="Closed"
+                    stackId="status"
+                    fill="#16a34a"
+                    radius={[6, 6, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data: { name?: string }) =>
+                      router.push(buildHref("/ncr-capa", { type: data?.name || "", status: "Closed" }))
+                    }
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </SectionCard>
 
-        <SectionCard title="Quick Navigation" subtitle="Jump straight into the main working areas.">
-          <div style={quickLinksGridStyle}>
-            <QuickLinkCard href="/assets" title="Assets" description="Register assets and quality records." />
-            <QuickLinkCard href="/ncr-capa" title="NCR / CAPA" description="Review nonconformances and CAPAs." />
-            <QuickLinkCard href="/audits" title="Audits" description="Manage audit schedule, detail and findings." />
-            <QuickLinkCard href="/actions" title="Actions" description="Track owners, due dates and evidence." />
-            <QuickLinkCard href="/documents" title="Documents" description="Open controlled documents and revisions." />
-            <QuickLinkCard href="/reports" title="Reports" description="Build management and audit summaries." />
-          </div>
+        <SectionCard title="Actions Trend" subtitle="Monthly opened versus closed actions.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={actionsTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="Opened"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                    dot={{ r: 4, cursor: "pointer" }}
+                    activeDot={{ r: 5, cursor: "pointer" }}
+                    onClick={(data: { rawMonth?: string }) =>
+                      router.push(buildHref("/actions", { createdMonth: data?.rawMonth || "" }))
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Closed"
+                    stroke="#16a34a"
+                    strokeWidth={3}
+                    dot={{ r: 4, cursor: "pointer" }}
+                    activeDot={{ r: 5, cursor: "pointer" }}
+                    onClick={(data: { rawMonth?: string }) =>
+                      router.push(buildHref("/actions", { status: "Closed", closedMonth: data?.rawMonth || "" }))
+                    }
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </SectionCard>
 
-        <SectionCard title="Audit Snapshot" subtitle="Current audit programme position.">
+        <SectionCard title="Audit Findings Breakdown" subtitle="Major, Minor, OFI and OBS totals.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={findingsBreakdownData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar
+                    dataKey="value"
+                    radius={[6, 6, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data: { name?: string }) =>
+                      router.push(buildHref("/audits", { findingCategory: data?.name || "" }))
+                    }
+                  >
+                    {findingsBreakdownData.map((entry) => (
+                      <Cell key={entry.name} fill={getFindingBarColor(entry.name)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Document Status" subtitle="Draft, under review, approved, and overdue review positions.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={documentStatusData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar
+                    dataKey="value"
+                    fill="#0f766e"
+                    radius={[6, 6, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data: { name?: string }) => openDocumentStatusBucket(data?.name || "")}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </SectionCard>
+      </section>
+
+      <section style={insightGridStyle}>
+        <SectionCard title="Top Problem Areas" subtitle="Current highest-finding audit areas using the existing risk scoring approach.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading insight...</p>
+          ) : topProblemAreas.length === 0 ? (
+            <p style={emptyTextStyle}>No audit findings available yet.</p>
+          ) : (
+            <div style={stackCompactStyle}>
+              {topProblemAreas.map((item, index) => (
+                <Link
+                  key={item.label}
+                  href={buildHref("/audits", { search: item.label })}
+                  style={compactInsightLinkStyle}
+                >
+                  <div style={compactInsightRankStyle}>#{index + 1}</div>
+                  <div style={compactInsightBodyStyle}>
+                    <div style={compactInsightTitleStyle}>{item.label}</div>
+                    <div style={compactInsightMetaStyle}>
+                      <span>{item.totalFindings} findings</span>
+                      <span>Risk {item.riskScore}</span>
+                      <span>{item.auditNumbers.join(", ")}</span>
+                    </div>
+                  </div>
+                  <span style={getFrequencyBadgeStyle(item.frequency)}>{item.frequency}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Overdue Work" subtitle="Current overdue workload across actions, NCR/CAPA, and documents.">
           <div style={stackCompactStyle}>
-            <SnapshotRow label="Total audits" value={totalAudits} isLoading={isLoading} href="/audits" />
-            <SnapshotRow label="Planned audits" value={plannedAudits} isLoading={isLoading} href={buildHref("/audits", { status: "Planned" })} />
-            <SnapshotRow label="In progress audits" value={inProgressAudits} isLoading={isLoading} href={buildHref("/audits", { status: "In Progress" })} />
-            <SnapshotRow label="Completed audits" value={completedAudits} isLoading={isLoading} href={buildHref("/audits", { status: "Completed" })} />
-            <SnapshotRow label="Open audit findings" value={openAuditFindings} isLoading={isLoading} href={buildHref("/audits", { findingStatus: "Open" })} />
+            <SummaryRow
+              label="Overdue Actions"
+              value={overdueActions}
+              href={buildHref("/actions", { overdue: 1 })}
+              isLoading={isLoading}
+            />
+            <SummaryRow
+              label="Overdue NCR/CAPA"
+              value={overdueNcrCapas}
+              href={buildHref("/ncr-capa", { status: "Open" })}
+              isLoading={isLoading}
+            />
+            <SummaryRow
+              label="Overdue Documents"
+              value={overdueDocuments}
+              href={buildHref("/documents", { status: "Overdue" })}
+              isLoading={isLoading}
+            />
           </div>
         </SectionCard>
       </section>
 
-      <section style={twoColumnGridStyle}>
+      <section style={bottomGridStyle}>
         <SectionCard
           title="Priority Actions"
-          subtitle="Live action list for near-term follow-up."
+          subtitle="Top five overdue or high-priority actions."
           action={
             <Link href="/actions" style={sectionLinkStyle}>
-              View all actions {"->"}
+              Open actions {"->"}
             </Link>
           }
         >
@@ -558,275 +820,81 @@ export default function Home() {
           ) : priorityActions.length === 0 ? (
             <p style={emptyTextStyle}>No open actions currently requiring attention.</p>
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={tableHeadStyle}>Action No.</th>
-                    <th style={tableHeadStyle}>Title</th>
-                    <th style={tableHeadStyle}>Owner</th>
-                    <th style={tableHeadStyle}>Due Date</th>
-                    <th style={tableHeadStyle}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {priorityActions.map((action) => {
-                    const days = getDaysFromToday(action.due_date);
-                    const overdue = days !== null && days < 0;
-
-                    return (
-                      <tr
-                        key={action.id}
-                        style={{
-                          ...tableRowStyle,
-                          background: overdue ? "#fff7f7" : "white",
-                        }}
-                      >
-                        <td style={tableCellStyle}>{action.action_number || "-"}</td>
-                        <td style={tableCellStyle}>{action.title || "-"}</td>
-                        <td style={tableCellStyle}>{action.owner || "-"}</td>
-                        <td style={tableCellStyle}>
-                          <div style={{ display: "grid", gap: "4px" }}>
-                            <span>{formatDate(action.due_date)}</span>
-                            <span
-                              style={{
-                                ...tableSubTextStyle,
-                                color: overdue ? "#b91c1c" : "#64748b",
-                                fontWeight: overdue ? 700 : 500,
-                              }}
-                            >
-                              {days === null
-                                ? "-"
-                                : days < 0
-                                ? `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`
-                                : days === 0
-                                ? "Due today"
-                                : days === 1
-                                ? "Due tomorrow"
-                                : `Due in ${days} days`}
-                            </span>
-                          </div>
-                        </td>
-                        <td style={tableCellStyle}>
-                          <StatusBadge value={action.status || "Unknown"} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div style={stackCompactStyle}>
+              {priorityActions.map((action) => {
+                const days = getDaysFromToday(action.due_date);
+                const overdue = days !== null && days < 0;
+                return (
+                  <Link
+                    key={action.id}
+                    href={buildHref("/actions", { search: action.action_number || "" })}
+                    style={{
+                      ...workItemStyle,
+                      background: overdue ? "#fff7f7" : "#f8fafc",
+                    }}
+                  >
+                    <div style={workItemTopStyle}>
+                      <div style={workItemNumberStyle}>{action.action_number || "-"}</div>
+                      <StatusBadge value={action.status || "Unknown"} />
+                    </div>
+                    <div style={workItemTitleStyle}>{action.title || "-"}</div>
+                    <div style={workItemMetaStyle}>
+                      <span>{action.owner || "-"}</span>
+                      <span>{action.priority || "Unrated"}</span>
+                      <span>
+                        {days === null
+                          ? "No due date"
+                          : days < 0
+                          ? `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`
+                          : days === 0
+                          ? "Due today"
+                          : `Due in ${days} day${days === 1 ? "" : "s"}`}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </SectionCard>
 
         <SectionCard
-          title="Audit Attention"
-          subtitle="Programme items that may need follow-up first."
+          title="Upcoming Audits"
+          subtitle="Next five scheduled audits."
           action={
             <Link href="/audits" style={sectionLinkStyle}>
-              View all audits {"->"}
+              Open audits {"->"}
             </Link>
           }
         >
           {isLoading ? (
             <p style={emptyTextStyle}>Loading audits...</p>
-          ) : auditAttentionList.length === 0 ? (
-            <p style={emptyTextStyle}>No audits currently flagged for attention.</p>
+          ) : upcomingAudits.length === 0 ? (
+            <p style={emptyTextStyle}>No audits found.</p>
           ) : (
-            <div style={stackStyle}>
-              {auditAttentionList.map((audit) => (
-                <div key={audit.id} style={auditAttentionItemStyle}>
-                  <div style={auditAttentionTopStyle}>
-                    <span style={auditMiniTagStyle}>{audit.audit_type || "Audit"}</span>
+            <div style={stackCompactStyle}>
+              {upcomingAudits.map((audit) => (
+                <Link
+                  key={audit.id}
+                  href={buildHref("/audits", { search: audit.audit_number || audit.title || "" })}
+                  style={workItemStyle}
+                >
+                  <div style={workItemTopStyle}>
+                    <div style={workItemNumberStyle}>{audit.audit_number || "-"}</div>
                     <StatusBadge value={audit.status || "Unknown"} />
                   </div>
-                  <div style={auditAttentionNumberStyle}>{audit.audit_number || "-"}</div>
-                  <div style={auditAttentionTitleStyle}>{audit.title || "-"}</div>
-                  <div style={auditAttentionMetaStyle}>
-                    <span>{audit.auditee || "-"}</span>
+                  <div style={workItemTitleStyle}>{audit.title || "-"}</div>
+                  <div style={workItemMetaStyle}>
+                    <span>{audit.audit_type || "-"}</span>
+                    <span>{formatAuditMonth(audit.audit_month)}</span>
                     <span>{formatDate(audit.audit_date)}</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
         </SectionCard>
       </section>
-
-      <section style={twoColumnGridStyle}>
-        <SectionCard title="Attention Required" subtitle="Items that may need follow-up first.">
-          <div style={stackStyle}>
-            <AttentionItem
-              label="Major NCRs"
-              value={majorNcrs}
-              tone={majorNcrs > 0 ? "red" : "green"}
-              isLoading={isLoading}
-              href={buildHref("/ncr-capa", { type: "NCR", status: "Open", severity: "High" })}
-            />
-            <AttentionItem
-              label="Overdue Actions"
-              value={overdueActions}
-              tone={overdueActions > 0 ? "red" : "green"}
-              isLoading={isLoading}
-              href={buildHref("/actions", { overdue: 1 })}
-            />
-            <AttentionItem
-              label="Overdue Audits"
-              value={overdueAudits}
-              tone={overdueAudits > 0 ? "red" : "green"}
-              isLoading={isLoading}
-              href={buildHref("/audits", { status: "Overdue" })}
-            />
-            <AttentionItem
-              label="Inactive Assets"
-              value={inactiveAssets}
-              tone={inactiveAssets > 0 ? "amber" : "green"}
-              isLoading={isLoading}
-              href={buildHref("/assets", { status: "Inactive" })}
-            />
-            <AttentionItem
-              label="Open CAPAs"
-              value={openCapas}
-              tone={openCapas > 0 ? "amber" : "green"}
-              isLoading={isLoading}
-              href={buildHref("/ncr-capa", { type: "CAPA", status: "Open" })}
-            />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Assets by Location" subtitle="Top locations currently holding assets.">
-          <div style={stackCompactStyle}>
-            {isLoading ? (
-              <p style={emptyTextStyle}>Loading location data...</p>
-            ) : assetsByLocation.length === 0 ? (
-              <p style={emptyTextStyle}>No asset location data available.</p>
-            ) : (
-              assetsByLocation.map((item) => (
-                <Link
-                  key={item.location}
-                  href={buildHref("/assets", { location: item.location })}
-                  style={{ ...locationRowStyle, textDecoration: "none" }}
-                >
-                  <div>
-                    <div style={locationNameStyle}>{item.location}</div>
-                    <div style={locationBarTrackStyle}>
-                      <div
-                        style={{
-                          ...locationBarFillStyle,
-                          width: `${Math.max((item.count / maxLocationCount) * 100, 8)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div style={locationCountStyle}>{item.count}</div>
-                </Link>
-              ))
-            )}
-          </div>
-        </SectionCard>
-      </section>
-
-      <section style={twoColumnGridStyle}>
-        <SectionCard title="Operational Snapshot" subtitle="Current totals across key areas.">
-          <div style={stackCompactStyle}>
-            <SnapshotRow label="Assets in system" value={totalAssets} isLoading={isLoading} href="/assets" />
-            <SnapshotRow label="Quality linked assets" value={qualityLinkedAssets} isLoading={isLoading} href={buildHref("/assets", { qualityLinked: 1 })} />
-            <SnapshotRow label="Open NCRs" value={openNcrs} isLoading={isLoading} href={buildHref("/ncr-capa", { type: "NCR", status: "Open" })} />
-            <SnapshotRow label="Open CAPAs" value={openCapas} isLoading={isLoading} href={buildHref("/ncr-capa", { type: "CAPA", status: "Open" })} />
-            <SnapshotRow label="Open Actions" value={openActions} isLoading={isLoading} href={buildHref("/actions", { status: "Open" })} />
-            <SnapshotRow label="Open audit findings" value={openAuditFindings} isLoading={isLoading} href={buildHref("/audits", { findingStatus: "Open" })} />
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Recent Asset Records" subtitle="Most recent asset entries shown first where created dates are available.">
-          {isLoading ? (
-            <p style={emptyTextStyle}>Loading asset records...</p>
-          ) : recentAssets.length === 0 ? (
-            <p style={emptyTextStyle}>No asset records found.</p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={tableHeadStyle}>Code</th>
-                    <th style={tableHeadStyle}>Name</th>
-                    <th style={tableHeadStyle}>Location</th>
-                    <th style={tableHeadStyle}>Owner</th>
-                    <th style={tableHeadStyle}>Status</th>
-                    <th style={tableHeadStyle}>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentAssets.map((asset) => (
-                    <tr key={asset.id} style={tableRowStyle}>
-                      <td style={tableCellStyle}>{asset.asset_code || "-"}</td>
-                      <td style={tableCellStyle}>{asset.name || "-"}</td>
-                      <td style={tableCellStyle}>{asset.location || "-"}</td>
-                      <td style={tableCellStyle}>{asset.owner || "-"}</td>
-                      <td style={tableCellStyle}>
-                        <StatusBadge value={asset.status || "Unknown"} />
-                      </td>
-                      <td style={tableCellStyle}>{formatDate(asset.created_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
-      </section>
-
-      <SectionCard
-        title="Upcoming Audits"
-        subtitle="Month and date view of the next audits in the programme."
-        action={
-          <Link href="/audits" style={sectionLinkStyle}>
-            Open audits module {"->"}
-          </Link>
-        }
-      >
-        {isLoading ? (
-          <p style={emptyTextStyle}>Loading audits...</p>
-        ) : audits.length === 0 ? (
-          <p style={emptyTextStyle}>No audits found.</p>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={tableHeadStyle}>Audit No.</th>
-                  <th style={tableHeadStyle}>Title</th>
-                  <th style={tableHeadStyle}>Type</th>
-                  <th style={tableHeadStyle}>Scheduled</th>
-                  <th style={tableHeadStyle}>Audit Date</th>
-                  <th style={tableHeadStyle}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...audits]
-                  .sort((a, b) => {
-                    const aDate = a.audit_date ? new Date(a.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
-                    const bDate = b.audit_date ? new Date(b.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
-                    return aDate - bDate;
-                  })
-                  .slice(0, 8)
-                  .map((audit) => (
-                    <tr key={audit.id} style={tableRowStyle}>
-                      <td style={tableCellStyle}>{audit.audit_number || "-"}</td>
-                      <td style={tableCellStyle}>{audit.title || "-"}</td>
-                      <td style={tableCellStyle}>{audit.audit_type || "-"}</td>
-                      <td style={tableCellStyle}>{formatAuditMonth(audit.audit_month)}</td>
-                      <td style={tableCellStyle}>{formatDate(audit.audit_date)}</td>
-                      <td style={tableCellStyle}>
-                        <StatusBadge value={audit.status || "Unknown"} />
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </SectionCard>
     </main>
   );
 }
@@ -849,7 +917,7 @@ function SectionCard({
           <h2 style={sectionTitleStyle}>{title}</h2>
           {subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}
         </div>
-        {action ? action : null}
+        {action || null}
       </div>
       {children}
     </section>
@@ -881,245 +949,63 @@ function StatCard({
     </div>
   );
 
-  return href ? <Link href={href} style={{ textDecoration: "none" }}>{content}</Link> : content;
-}
-
-function PriorityPill({
-  label,
-  value,
-  tone,
-  isLoading,
-  href,
-}: {
-  label: string;
-  value: number;
-  tone: "green" | "amber" | "red";
-  isLoading?: boolean;
-  href?: string;
-}) {
-  const toneMap = {
-    green: {
-      bg: "rgba(220, 252, 231, 0.18)",
-      border: "rgba(220, 252, 231, 0.32)",
-      text: "#ecfdf5",
-    },
-    amber: {
-      bg: "rgba(254, 243, 199, 0.16)",
-      border: "rgba(254, 243, 199, 0.32)",
-      text: "#fef3c7",
-    },
-    red: {
-      bg: "rgba(254, 226, 226, 0.16)",
-      border: "rgba(254, 226, 226, 0.32)",
-      text: "#fee2e2",
-    },
-  };
-
-  const colours = toneMap[tone];
-
-  const content = (
-    <div
-      style={{
-        ...priorityPillStyle,
-        background: colours.bg,
-        border: `1px solid ${colours.border}`,
-      }}
-    >
-      <div style={priorityPillLabelStyle}>{label}</div>
-      <div style={{ ...priorityPillValueStyle, color: colours.text }}>
-        {isLoading ? "-" : value}
-      </div>
-    </div>
-  );
-
-  return href ? <Link href={href} style={{ textDecoration: "none" }}>{content}</Link> : content;
-}
-
-function AttentionItem({
-  label,
-  value,
-  tone,
-  isLoading,
-  href,
-}: {
-  label: string;
-  value: number;
-  tone: "green" | "amber" | "red";
-  isLoading?: boolean;
-  href?: string;
-}) {
-  const toneMap = {
-    green: {
-      bg: "#f0fdf4",
-      border: "#22c55e",
-      text: "#166534",
-      pillBg: "#dcfce7",
-    },
-    amber: {
-      bg: "#fffbeb",
-      border: "#f59e0b",
-      text: "#92400e",
-      pillBg: "#fef3c7",
-    },
-    red: {
-      bg: "#fef2f2",
-      border: "#ef4444",
-      text: "#991b1b",
-      pillBg: "#fee2e2",
-    },
-  };
-
-  const colours = toneMap[tone];
-
-  const content = (
-    <div
-      style={{
-        background: colours.bg,
-        borderLeft: `4px solid ${colours.border}`,
-        borderRadius: "12px",
-        padding: "14px 16px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: "12px",
-      }}
-    >
-      <span style={{ color: colours.text, fontWeight: 600 }}>{label}</span>
-      <span
-        style={{
-          background: colours.pillBg,
-          color: colours.text,
-          fontWeight: 700,
-          fontSize: "14px",
-          minWidth: "36px",
-          height: "32px",
-          borderRadius: "999px",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "0 10px",
-        }}
-      >
-        {isLoading ? "-" : value}
-      </span>
-    </div>
-  );
-
-  return href ? <Link href={href} style={{ textDecoration: "none" }}>{content}</Link> : content;
-}
-
-function QuickLinkCard({
-  href,
-  title,
-  description,
-}: {
-  href: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Link href={href} style={quickLinkCardStyle}>
-      <div style={quickLinkTitleStyle}>{title}</div>
-      <div style={quickLinkDescriptionStyle}>{description}</div>
-      <div style={quickLinkArrowStyle}>Open {"->"}</div>
+  return href ? (
+    <Link href={href} style={{ textDecoration: "none" }}>
+      {content}
     </Link>
+  ) : (
+    content
   );
 }
 
-function SnapshotRow({
+function SummaryRow({
   label,
   value,
-  isLoading,
   href,
+  isLoading,
 }: {
   label: string;
   value: number;
-  isLoading?: boolean;
   href?: string;
+  isLoading?: boolean;
 }) {
   const content = (
-    <div style={snapshotRowStyle}>
-      <span style={snapshotLabelStyle}>{label}</span>
-      <strong style={snapshotValueStyle}>{isLoading ? "-" : value}</strong>
+    <div style={summaryRowStyle}>
+      <span style={summaryRowLabelStyle}>{label}</span>
+      <strong style={summaryRowValueStyle}>{isLoading ? "-" : value}</strong>
     </div>
   );
 
-  return href ? <Link href={href} style={{ textDecoration: "none" }}>{content}</Link> : content;
+  return href ? (
+    <Link href={href} style={{ textDecoration: "none" }}>
+      {content}
+    </Link>
+  ) : (
+    content
+  );
 }
 
-function ManagementCallout({
-  tone,
-  title,
-  text,
-}: {
-  tone: "good" | "watch" | "risk";
-  title: string;
-  text: string;
-}) {
-  const toneMap = {
-    good: {
-      bg: "#ecfdf5",
-      border: "#22c55e",
-      title: "#166534",
-      text: "#166534",
-    },
-    watch: {
-      bg: "#fffbeb",
-      border: "#f59e0b",
-      title: "#92400e",
-      text: "#92400e",
-    },
-    risk: {
-      bg: "#fef2f2",
-      border: "#ef4444",
-      title: "#991b1b",
-      text: "#991b1b",
-    },
-  };
-
-  const colours = toneMap[tone];
-
+function MetaChip({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      style={{
-        background: colours.bg,
-        border: `1px solid ${colours.border}`,
-        borderRadius: "14px",
-        padding: "14px 16px",
-        marginBottom: "14px",
-      }}
-    >
-      <div
-        style={{
-          fontWeight: 700,
-          color: colours.title,
-          marginBottom: "6px",
-        }}
-      >
-        {title}
-      </div>
-      <div
-        style={{
-          color: colours.text,
-          fontSize: "14px",
-          lineHeight: 1.5,
-        }}
-      >
-        {text}
-      </div>
+    <div style={metaChipStyle}>
+      <div style={metaChipLabelStyle}>{label}</div>
+      <div style={metaChipValueStyle}>{value}</div>
     </div>
   );
+}
+
+function getFindingBarColor(name: string) {
+  if (name === "Major") return "#b91c1c";
+  if (name === "Minor") return "#f59e0b";
+  if (name === "OFI") return "#16a34a";
+  return "#2563eb";
 }
 
 function StatusBadge({ value }: { value: string }) {
   const lower = normaliseStatus(value);
 
   const styles =
-    lower === "active"
-      ? { background: "#dcfce7", color: "#166534" }
-      : lower === "inactive"
-      ? { background: "#e5e7eb", color: "#374151" }
-      : lower === "closed" || lower === "complete" || lower === "completed"
+    lower === "closed" || lower === "complete" || lower === "completed"
       ? { background: "#dcfce7", color: "#166534" }
       : lower === "open"
       ? { background: "#dbeafe", color: "#1d4ed8" }
@@ -1148,22 +1034,30 @@ function StatusBadge({ value }: { value: string }) {
   );
 }
 
+function getFrequencyBadgeStyle(frequency: "Reduce" | "Maintain" | "Increase"): CSSProperties {
+  if (frequency === "Increase") {
+    return { ...badgeStyle, background: "#fee2e2", color: "#991b1b" };
+  }
+  if (frequency === "Reduce") {
+    return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
+  }
+  return { ...badgeStyle, background: "#fef3c7", color: "#92400e" };
+}
+
 const heroStyle: CSSProperties = {
   background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
   color: "white",
   borderRadius: "20px",
-  padding: "24px 26px",
-  marginBottom: "20px",
+  padding: "22px 24px",
+  marginBottom: "18px",
   boxShadow: "0 10px 24px rgba(15, 118, 110, 0.14)",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "20px",
-  alignItems: "flex-start",
-  flexWrap: "wrap",
+  display: "grid",
+  gap: "16px",
 };
 
-const heroContentStyle: CSSProperties = {
-  flex: "1 1 560px",
+const heroCopyStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
 };
 
 const eyebrowStyle: CSSProperties = {
@@ -1172,76 +1066,46 @@ const eyebrowStyle: CSSProperties = {
   letterSpacing: "0.08em",
   textTransform: "uppercase",
   opacity: 0.82,
-  marginBottom: "8px",
 };
 
 const heroTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "30px",
   lineHeight: 1.1,
+  maxWidth: "960px",
 };
 
 const heroSubtitleStyle: CSSProperties = {
-  marginTop: "10px",
-  marginBottom: 0,
+  margin: 0,
   fontSize: "15px",
-  maxWidth: "700px",
+  maxWidth: "860px",
   color: "rgba(255,255,255,0.92)",
+  lineHeight: 1.5,
 };
 
-const priorityStripStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+const heroMetaRowStyle: CSSProperties = {
+  display: "flex",
   gap: "12px",
-  marginTop: "18px",
+  flexWrap: "wrap",
+  alignItems: "flex-start",
 };
 
-const priorityPillStyle: CSSProperties = {
-  borderRadius: "14px",
-  padding: "12px 14px",
-  minHeight: "78px",
-};
-
-const priorityPillLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 700,
-  color: "rgba(255,255,255,0.86)",
-  marginBottom: "8px",
-};
-
-const priorityPillValueStyle: CSSProperties = {
-  fontSize: "24px",
-  fontWeight: 800,
-};
-
-const heroMetaWrapStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(180px, 1fr))",
-  gap: "12px",
-  minWidth: "320px",
-  flex: "1 1 320px",
-};
-
-const heroMetaCardStyle: CSSProperties = {
-  background: "rgba(255,255,255,0.08)",
+const metaChipStyle: CSSProperties = {
+  background: "rgba(255,255,255,0.1)",
   border: "1px solid rgba(255,255,255,0.12)",
   borderRadius: "14px",
   padding: "12px 14px",
+  flex: "0 1 220px",
 };
 
-const heroMetaLabelStyle: CSSProperties = {
+const metaChipLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
-  opacity: 0.82,
+  opacity: 0.8,
   marginBottom: "6px",
 };
 
-const heroMetaValueStyle: CSSProperties = {
-  fontSize: "18px",
-  fontWeight: 700,
-};
-
-const heroMetaValueStyleSmall: CSSProperties = {
+const metaChipValueStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 700,
   lineHeight: 1.4,
@@ -1253,14 +1117,14 @@ const errorBannerStyle: CSSProperties = {
   border: "1px solid #fecaca",
   borderRadius: "14px",
   padding: "14px 16px",
-  marginBottom: "20px",
+  marginBottom: "18px",
 };
 
-const statsGridStyle: CSSProperties = {
+const kpiGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-  gap: "16px",
-  marginBottom: "20px",
+  gap: "12px",
+  marginBottom: "18px",
 };
 
 const statCardStyle: CSSProperties = {
@@ -1268,13 +1132,14 @@ const statCardStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "16px 18px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  minHeight: "108px",
+  minHeight: "104px",
 };
 
 const statCardLabelStyle: CSSProperties = {
   fontSize: "13px",
   color: "#64748b",
   fontWeight: 600,
+  lineHeight: 1.4,
 };
 
 const statCardValueStyle: CSSProperties = {
@@ -1284,26 +1149,31 @@ const statCardValueStyle: CSSProperties = {
   marginTop: "10px",
 };
 
-const twoColumnGridStyle: CSSProperties = {
+const chartGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
-  gap: "20px",
-  marginBottom: "20px",
+  gap: "18px",
+  marginBottom: "18px",
 };
 
-const threeColumnGridStyle: CSSProperties = {
+const insightGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr 1fr",
-  gap: "20px",
-  marginBottom: "20px",
+  gridTemplateColumns: "1.2fr 0.8fr",
+  gap: "18px",
+  marginBottom: "18px",
+};
+
+const bottomGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "18px",
 };
 
 const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
-  padding: "20px",
+  padding: "18px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  marginBottom: "20px",
 };
 
 const sectionHeaderRowStyle: CSSProperties = {
@@ -1311,7 +1181,7 @@ const sectionHeaderRowStyle: CSSProperties = {
   justifyContent: "space-between",
   alignItems: "flex-start",
   gap: "16px",
-  marginBottom: "16px",
+  marginBottom: "14px",
   flexWrap: "wrap",
 };
 
@@ -1325,6 +1195,7 @@ const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
   color: "#64748b",
   fontSize: "14px",
+  lineHeight: 1.45,
 };
 
 const sectionLinkStyle: CSSProperties = {
@@ -1334,71 +1205,10 @@ const sectionLinkStyle: CSSProperties = {
   fontSize: "14px",
 };
 
-const stackStyle: CSSProperties = {
-  display: "grid",
-  gap: "12px",
-};
-
-const stackCompactStyle: CSSProperties = {
-  display: "grid",
-  gap: "10px",
-};
-
-const quickLinksGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "12px",
-};
-
-const quickLinkCardStyle: CSSProperties = {
-  textDecoration: "none",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  borderRadius: "14px",
-  padding: "16px",
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "space-between",
-  minHeight: "132px",
-  color: "#0f172a",
-};
-
-const quickLinkTitleStyle: CSSProperties = {
-  fontWeight: 700,
-  fontSize: "16px",
-  marginBottom: "6px",
-};
-
-const quickLinkDescriptionStyle: CSSProperties = {
-  color: "#64748b",
-  fontSize: "14px",
-  lineHeight: 1.5,
-};
-
-const quickLinkArrowStyle: CSSProperties = {
-  marginTop: "16px",
-  fontSize: "13px",
-  fontWeight: 700,
-  color: "#0f766e",
-};
-
-const snapshotRowStyle: CSSProperties = {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  borderRadius: "10px",
-  padding: "12px 14px",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-};
-
-const snapshotLabelStyle: CSSProperties = {
-  color: "#334155",
-  fontWeight: 600,
-};
-
-const snapshotValueStyle: CSSProperties = {
-  color: "#0f172a",
+const chartWrapStyle: CSSProperties = {
+  width: "100%",
+  minHeight: "300px",
+  height: "320px",
 };
 
 const emptyTextStyle: CSSProperties = {
@@ -1406,117 +1216,126 @@ const emptyTextStyle: CSSProperties = {
   margin: 0,
 };
 
-const locationRowStyle: CSSProperties = {
+const stackCompactStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr auto",
+  gap: "10px",
+};
+
+const compactInsightLinkStyle: CSSProperties = {
+  textDecoration: "none",
+  display: "flex",
   alignItems: "center",
-  gap: "16px",
-};
-
-const locationNameStyle: CSSProperties = {
-  fontWeight: 600,
+  gap: "12px",
+  padding: "12px 14px",
+  borderRadius: "14px",
+  border: "1px solid #e2e8f0",
+  background: "#f8fafc",
   color: "#0f172a",
-  marginBottom: "6px",
 };
 
-const locationBarTrackStyle: CSSProperties = {
-  width: "100%",
-  height: "10px",
-  background: "#e2e8f0",
+const compactInsightRankStyle: CSSProperties = {
+  width: "34px",
+  height: "34px",
   borderRadius: "999px",
-  overflow: "hidden",
+  background: "#dbeafe",
+  color: "#1d4ed8",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: "12px",
+  fontWeight: 800,
+  flexShrink: 0,
 };
 
-const locationBarFillStyle: CSSProperties = {
-  height: "100%",
-  background: "#0f766e",
-  borderRadius: "999px",
+const compactInsightBodyStyle: CSSProperties = {
+  minWidth: 0,
+  flex: 1,
 };
 
-const locationCountStyle: CSSProperties = {
-  fontWeight: 700,
+const compactInsightTitleStyle: CSSProperties = {
+  fontWeight: 800,
+  fontSize: "14px",
   color: "#0f172a",
-  minWidth: "18px",
-  textAlign: "right",
+  marginBottom: "4px",
 };
 
-const tableStyle: CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-};
-
-const tableHeadStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "12px 10px",
-  borderBottom: "1px solid #e2e8f0",
-  color: "#475569",
-  fontSize: "13px",
-  whiteSpace: "nowrap",
-};
-
-const tableRowStyle: CSSProperties = {
-  background: "white",
-};
-
-const tableCellStyle: CSSProperties = {
-  padding: "14px 10px",
-  borderBottom: "1px solid #f1f5f9",
-  color: "#0f172a",
-  verticalAlign: "middle",
-};
-
-const tableSubTextStyle: CSSProperties = {
+const compactInsightMetaStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
   fontSize: "12px",
   color: "#64748b",
+  lineHeight: 1.4,
 };
 
-const auditAttentionItemStyle: CSSProperties = {
+const summaryRowStyle: CSSProperties = {
   background: "#f8fafc",
   border: "1px solid #e2e8f0",
   borderRadius: "12px",
-  padding: "14px 16px",
-};
-
-const auditAttentionTopStyle: CSSProperties = {
+  padding: "12px 14px",
   display: "flex",
   justifyContent: "space-between",
-  gap: "10px",
+  alignItems: "center",
+  gap: "12px",
+  color: "#0f172a",
+};
+
+const summaryRowLabelStyle: CSSProperties = {
+  color: "#334155",
+  fontWeight: 600,
+};
+
+const summaryRowValueStyle: CSSProperties = {
+  color: "#0f172a",
+};
+
+const workItemStyle: CSSProperties = {
+  textDecoration: "none",
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  padding: "14px 16px",
+  color: "#0f172a",
+  display: "grid",
+  gap: "8px",
+};
+
+const workItemTopStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
   alignItems: "center",
   flexWrap: "wrap",
-  marginBottom: "10px",
 };
 
-const auditMiniTagStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  background: "#e0f2fe",
-  color: "#075985",
-  borderRadius: "999px",
-  padding: "5px 10px",
-  fontSize: "12px",
-  fontWeight: 700,
-};
-
-const auditAttentionNumberStyle: CSSProperties = {
+const workItemNumberStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
   color: "#64748b",
-  marginBottom: "6px",
 };
 
-const auditAttentionTitleStyle: CSSProperties = {
+const workItemTitleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 700,
   color: "#0f172a",
-  marginBottom: "8px",
+  lineHeight: 1.4,
 };
 
-const auditAttentionMetaStyle: CSSProperties = {
+const workItemMetaStyle: CSSProperties = {
   display: "flex",
-  justifyContent: "space-between",
   gap: "10px",
   flexWrap: "wrap",
   fontSize: "12px",
   color: "#64748b",
 };
 
+const badgeStyle: CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: "999px",
+  fontSize: "12px",
+  fontWeight: 700,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  whiteSpace: "nowrap",
+};

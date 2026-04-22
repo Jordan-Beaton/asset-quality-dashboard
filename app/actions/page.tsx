@@ -163,6 +163,13 @@ function getDueLabel(value: string | null | undefined) {
   return `Due in ${days} days`;
 }
 
+function getMonthKey(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
@@ -190,6 +197,8 @@ function ActionsPageContent() {
   const linkedProject = searchParams.get("project")?.trim() || "";
   const showOverdueOnly = searchParams.get("overdue") === "1";
   const dueWindow = Number(searchParams.get("dueWindow") || "0");
+  const linkedCreatedMonth = searchParams.get("createdMonth")?.trim() || "";
+  const linkedClosedMonth = searchParams.get("closedMonth")?.trim() || "";
 
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
@@ -306,6 +315,12 @@ function ActionsPageContent() {
       const matchesOwner = !ownerFilter || (action.owner || "") === ownerFilter;
       const matchesProject = !projectFilter || (action.project || "") === projectFilter;
       const matchesOverdue = !showOverdueOnly || isOverdue(action);
+      const matchesCreatedMonth =
+        !linkedCreatedMonth || getMonthKey(action.created_at) === linkedCreatedMonth;
+      const matchesClosedMonth =
+        !linkedClosedMonth ||
+        (isClosedLikeStatus(action.status) &&
+          getMonthKey(action.updated_at || action.created_at) === linkedClosedMonth);
       const matchesDueWindow =
         dueWindow <= 0 ||
         (() => {
@@ -321,6 +336,8 @@ function ActionsPageContent() {
         matchesOwner &&
         matchesProject &&
         matchesOverdue &&
+        matchesCreatedMonth &&
+        matchesClosedMonth &&
         matchesDueWindow
       );
     });
@@ -332,6 +349,8 @@ function ActionsPageContent() {
     ownerFilter,
     projectFilter,
     showOverdueOnly,
+    linkedCreatedMonth,
+    linkedClosedMonth,
     dueWindow,
   ]);
 
