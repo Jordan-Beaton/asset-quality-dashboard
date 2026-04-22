@@ -676,8 +676,8 @@ export default function Home() {
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     activeDot={{ r: 5, cursor: "pointer" }}
-                    onClick={(data: { rawMonth?: string }) =>
-                      router.push(buildHref("/actions", { createdMonth: data?.rawMonth || "" }))
+                    onClick={(data: any) =>
+                      router.push(buildHref("/actions", { createdMonth: data?.payload?.rawMonth || "" }))
                     }
                   />
                   <Line
@@ -687,8 +687,8 @@ export default function Home() {
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     activeDot={{ r: 5, cursor: "pointer" }}
-                    onClick={(data: { rawMonth?: string }) =>
-                      router.push(buildHref("/actions", { status: "Closed", closedMonth: data?.rawMonth || "" }))
+                    onClick={(data: any) =>
+                      router.push(buildHref("/actions", { status: "Closed", closedMonth: data?.payload?.rawMonth || "" }))
                     }
                   />
                 </LineChart>
@@ -774,7 +774,7 @@ export default function Home() {
                       <span>{item.auditNumbers.join(", ")}</span>
                     </div>
                   </div>
-                  <span style={getFrequencyBadgeStyle(item.frequency)}>{item.frequency}</span>
+                  <span style={getFrequencyBadgeStyle(item.frequency as "Reduce" | "Maintain" | "Increase")}>{item.frequency}</span>
                 </Link>
               ))}
             </div>
