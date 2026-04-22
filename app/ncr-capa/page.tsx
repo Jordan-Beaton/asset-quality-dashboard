@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { supabase } from "../../src/lib/supabase";
+
+export const dynamic = "force-dynamic";
 
 type Ncr = {
   id: string;
@@ -214,6 +217,14 @@ async function tryLoadNcrOptions(): Promise<LinkedOption[]> {
 }
 
 export default function NcrCapaPage() {
+  const searchParams = useSearchParams();
+  const linkedSearch = searchParams.get("search")?.trim() || "";
+  const linkedType = searchParams.get("type")?.trim() || "All";
+  const linkedStatus = searchParams.get("status")?.trim() || "All";
+  const linkedSeverity = searchParams.get("severity")?.trim() || "All";
+  const linkedSource = searchParams.get("source")?.trim() || "All";
+  const linkedProject = searchParams.get("project")?.trim() || "All";
+
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
@@ -226,12 +237,12 @@ export default function NcrCapaPage() {
   const [refreshStamp, setRefreshStamp] = useState<string>("");
   const [message, setMessage] = useState("");
 
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [severityFilter, setSeverityFilter] = useState("All");
-  const [sourceFilter, setSourceFilter] = useState("All");
-  const [projectFilter, setProjectFilter] = useState("All");
+  const [search, setSearch] = useState(linkedSearch);
+  const [typeFilter, setTypeFilter] = useState(linkedType);
+  const [statusFilter, setStatusFilter] = useState(linkedStatus);
+  const [severityFilter, setSeverityFilter] = useState(linkedSeverity);
+  const [sourceFilter, setSourceFilter] = useState(linkedSource);
+  const [projectFilter, setProjectFilter] = useState(linkedProject);
   const [showAttentionOnly, setShowAttentionOnly] = useState(false);
 
   const [ncrOptions, setNcrOptions] = useState<LinkedOption[]>([]);
@@ -355,6 +366,22 @@ export default function NcrCapaPage() {
       return bTime - aTime;
     });
   }, [ncrs, capas]);
+
+  useEffect(() => {
+    if (!linkedSearch || combinedRows.length === 0) return;
+
+    const value = linkedSearch.toLowerCase();
+    const match = combinedRows.find(
+      (row) =>
+        row.number.toLowerCase() === value ||
+        row.title.toLowerCase().includes(value) ||
+        row.linked_to.toLowerCase().includes(value)
+    );
+
+    if (match) {
+      setSelectedRow((current) => (current?.id === match.id ? current : match));
+    }
+  }, [linkedSearch, combinedRows]);
 
   const evidenceCountMap = useMemo(() => {
     const map = new Map<string, number>();

@@ -1,0 +1,49 @@
+{
+  "workbook_path": "Z:\\HSEQS\\15 - Audit Reports\\ENS-HSEQ-SCH-001 HSEQ Audit Schedule 07.01.2026 Rev C.xlsx",
+  "target_year": 2026,
+  "audit_report": {
+    "sheet": "Audit Schedule",
+    "in_scope_rows": 28,
+    "staged_rows": 28,
+    "held_back_rows": 0,
+    "manual_reference_corrections_applied": [],
+    "duplicate_audit_numbers_after_corrections": {}
+  },
+  "finding_report": {
+    "sheet": "Audit Findings",
+    "in_scope_rows": 56,
+    "staged_rows": 54,
+    "held_back_rows": 2,
+    "manual_reference_corrections_applied": [],
+    "unresolved_parent_references_after_corrections": []
+  },
+  "summary": {
+    "staged_audits": 28,
+    "staged_findings": 54,
+    "held_back_rows": 2,
+    "audits_without_findings": [
+      "INT-26-003",
+      "INT-26-004",
+      "INT-26-005",
+      "INT-26-006",
+      "INT-26-007",
+      "INT-26-008",
+      "INT-26-009",
+      "INT-26-010",
+      "INT-26-013",
+      "INT-26-014",
+      "SUP-26-002",
+      "SUP-26-004",
+      "SUP-26-005",
+      "SUP-26-006",
+      "SUP-26-007",
+      "SUP-26-008",
+      "SUP-26-009",
+      "SUP-26-010",
+      "SUP-26-011"
+    ],
+    "held_back_by_reason": {
+      "Missing Audit Reference": 2
+    }
+  }
+}

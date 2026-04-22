@@ -183,6 +183,13 @@ function matchesSearchTerm(action: ActionItem, query: string) {
 
 function ActionsPageContent() {
   const searchParams = useSearchParams();
+  const linkedSearch = searchParams.get("search")?.trim() || "";
+  const linkedStatus = searchParams.get("status")?.trim() || "";
+  const linkedPriority = searchParams.get("priority")?.trim() || "";
+  const linkedOwner = searchParams.get("owner")?.trim() || "";
+  const linkedProject = searchParams.get("project")?.trim() || "";
+  const showOverdueOnly = searchParams.get("overdue") === "1";
+  const dueWindow = Number(searchParams.get("dueWindow") || "0");
 
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
@@ -196,11 +203,11 @@ function ActionsPageContent() {
   const [createFiles, setCreateFiles] = useState<File[]>([]);
   const [createEvidenceNotes, setCreateEvidenceNotes] = useState("");
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("");
-  const [projectFilter, setProjectFilter] = useState("");
+  const [search, setSearch] = useState(linkedSearch);
+  const [statusFilter, setStatusFilter] = useState(linkedStatus);
+  const [priorityFilter, setPriorityFilter] = useState(linkedPriority);
+  const [ownerFilter, setOwnerFilter] = useState(linkedOwner);
+  const [projectFilter, setProjectFilter] = useState(linkedProject);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ActionForm>(emptyForm);
@@ -259,13 +266,6 @@ function ActionsPageContent() {
     void loadActions();
   }, []);
 
-  useEffect(() => {
-    const linkedSearch = searchParams.get("search") || "";
-    if (linkedSearch.trim()) {
-      setSearch(linkedSearch.trim());
-    }
-  }, [searchParams]);
-
   const nextActionNumber = useMemo(() => {
     return getNextAvailableActionNumber(actions);
   }, [actions]);
@@ -305,10 +305,35 @@ function ActionsPageContent() {
       const matchesPriority = !priorityFilter || (action.priority || "") === priorityFilter;
       const matchesOwner = !ownerFilter || (action.owner || "") === ownerFilter;
       const matchesProject = !projectFilter || (action.project || "") === projectFilter;
+      const matchesOverdue = !showOverdueOnly || isOverdue(action);
+      const matchesDueWindow =
+        dueWindow <= 0 ||
+        (() => {
+          if (!action.due_date || isClosedLikeStatus(action.status)) return false;
+          const days = getDaysFromToday(action.due_date);
+          return days !== null && days >= 0 && days <= dueWindow;
+        })();
 
-      return matchesSearch && matchesStatus && matchesPriority && matchesOwner && matchesProject;
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesPriority &&
+        matchesOwner &&
+        matchesProject &&
+        matchesOverdue &&
+        matchesDueWindow
+      );
     });
-  }, [actions, search, statusFilter, priorityFilter, ownerFilter, projectFilter]);
+  }, [
+    actions,
+    search,
+    statusFilter,
+    priorityFilter,
+    ownerFilter,
+    projectFilter,
+    showOverdueOnly,
+    dueWindow,
+  ]);
 
   const overdueList = useMemo(() => {
     return [...actions]

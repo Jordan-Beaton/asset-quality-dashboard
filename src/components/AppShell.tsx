@@ -60,7 +60,7 @@ export default function AppShell({ children }: AppShellProps) {
                 letterSpacing: "-0.01em",
               }}
             >
-              AQL Dashboard
+              Quality Dashboard
             </div>
             <div
               style={{
@@ -69,7 +69,7 @@ export default function AppShell({ children }: AppShellProps) {
                 fontWeight: 500,
               }}
             >
-              Asset Quality Lead system
+              Quality management system
             </div>
           </div>
 

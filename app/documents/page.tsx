@@ -416,7 +416,6 @@ export default function DocumentsPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
-  const [selectedDocumentUrl, setSelectedDocumentUrl] = useState("");
   const [nextSequence, setNextSequence] = useState(1);
 
   async function loadDocuments() {
@@ -586,20 +585,6 @@ export default function DocumentsPage() {
       comments: selectedDocument.comments || "",
     });
   }, [selectedDocument]);
-
-  useEffect(() => {
-    const path = selectedDocument?.file_path || "";
-
-    if (!path) {
-      setSelectedDocumentUrl("");
-      return;
-    }
-
-    void (async () => {
-      const url = await createSignedFileUrl(path);
-      setSelectedDocumentUrl(url);
-    })();
-  }, [selectedDocument?.file_path]);
 
   const totalDocuments = documents.length;
   const liveDocuments = documents.filter((doc) => (doc.status || "").trim().toLowerCase() === "live").length;
@@ -776,6 +761,22 @@ export default function DocumentsPage() {
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
+  }
+
+  async function openDocumentFile(path: string) {
+    if (!path) {
+      setMessage("No controlled copy uploaded for this document.");
+      return;
+    }
+
+    const signedUrl = await createSignedFileUrl(path);
+
+    if (!signedUrl) {
+      setMessage("Could not open the controlled copy.");
+      return;
+    }
+
+    window.open(signedUrl, "_blank", "noopener,noreferrer");
   }
 
   async function addDocument(e: React.FormEvent) {
@@ -2000,15 +2001,14 @@ const payload = {
                     />
                   </label>
 
-                  {selectedDocumentUrl ? (
-                    <a
-                      href={selectedDocumentUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                  {selectedDocument.file_path ? (
+                    <button
+                      type="button"
                       style={reportLinkButtonStyle}
+                      onClick={() => void openDocumentFile(selectedDocument.file_path || "")}
                     >
                       Open / Download
-                    </a>
+                    </button>
                   ) : null}
 
                   <button type="button" style={secondaryButtonStyle} onClick={issueNextRevision}>
@@ -2313,7 +2313,11 @@ const payload = {
                 ) : (
                   <div style={revisionListStyle}>
                     {selectedRevisions.map((revision) => (
-                      <RevisionRow key={revision.id} revision={revision} />
+                      <RevisionRow
+                        key={revision.id}
+                        revision={revision}
+                        onOpenFile={(path) => void openDocumentFile(path)}
+                      />
                     ))}
                   </div>
                 )}
@@ -2326,21 +2330,13 @@ const payload = {
   );
 }
 
-function RevisionRow({ revision }: { revision: DocumentRevisionRow }) {
-  const [signedUrl, setSignedUrl] = useState("");
-
-  useEffect(() => {
-    if (!revision.file_path) {
-      setSignedUrl("");
-      return;
-    }
-
-    void (async () => {
-      const url = await createSignedFileUrl(revision.file_path || "");
-      setSignedUrl(url);
-    })();
-  }, [revision.file_path]);
-
+function RevisionRow({
+  revision,
+  onOpenFile,
+}: {
+  revision: DocumentRevisionRow;
+  onOpenFile: (path: string) => void;
+}) {
   return (
     <div style={revisionCardStyle}>
       <div style={revisionTopRowStyle}>
@@ -2363,10 +2359,14 @@ function RevisionRow({ revision }: { revision: DocumentRevisionRow }) {
             </span>
           )}
 
-          {signedUrl ? (
-            <a href={signedUrl} target="_blank" rel="noreferrer" style={reportLinkButtonStyle}>
+          {revision.file_path ? (
+            <button
+              type="button"
+              onClick={() => onOpenFile(revision.file_path || "")}
+              style={reportLinkButtonStyle}
+            >
               Open / Download
-            </a>
+            </button>
           ) : null}
         </div>
       </div>

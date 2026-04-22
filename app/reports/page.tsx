@@ -522,7 +522,7 @@ export default function ReportsPage() {
     await loadData();
   }
 
-  async function generatePdfReport() {
+  async function generatePdfReport(sourceReport?: MonthlyReport) {
     try {
       setIsGeneratingPdf(true);
 
@@ -530,8 +530,11 @@ export default function ReportsPage() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 14;
+      const reportSource = sourceReport || null;
       const reportTitle =
-        form.month_label?.trim() || `Management Report - ${new Date().toLocaleDateString("en-GB")}`;
+        reportSource?.month_label?.trim() ||
+        form.month_label?.trim() ||
+        `Management Report - ${new Date().toLocaleDateString("en-GB")}`;
       const generatedAt = new Date().toLocaleString("en-GB");
 
       try {
@@ -575,7 +578,9 @@ export default function ReportsPage() {
       doc.setFontSize(10.5);
       doc.setTextColor(51, 65, 85);
 
-      const summaryText = form.summary?.trim()
+      const summaryText = reportSource?.summary?.trim()
+        ? reportSource.summary.trim()
+        : form.summary?.trim()
         ? form.summary.trim()
         : "This report provides a live snapshot of assets, NCRs, CAPAs, audits and actions across the quality dashboard.";
       const summaryLines = doc.splitTextToSize(summaryText, pageWidth - margin * 2);
@@ -629,9 +634,9 @@ export default function ReportsPage() {
         y += lines.length * 4.5 + 6;
       };
 
-      sectionText("Wins", form.wins, "No wins recorded for this report.");
-      sectionText("Risks", form.risks, "No risks recorded for this report.");
-      sectionText("Next Steps", form.next_steps, "No next steps recorded for this report.");
+      sectionText("Wins", reportSource?.wins || form.wins, "No wins recorded for this report.");
+      sectionText("Risks", reportSource?.risks || form.risks, "No risks recorded for this report.");
+      sectionText("Next Steps", reportSource?.next_steps || form.next_steps, "No next steps recorded for this report.");
 
       const ensurePageSpace = (neededHeight: number) => {
         if (y + neededHeight > pageHeight - 18) {
@@ -1163,6 +1168,9 @@ export default function ReportsPage() {
                     <td style={tableCellStyle}>{formatDateTime(report.created_at)}</td>
                     <td style={tableCellStyle}>
                       <div style={actionButtonsWrapStyle}>
+                        <button type="button" style={miniButtonStyle} onClick={() => void generatePdfReport(report)}>
+                          PDF
+                        </button>
                         <button type="button" style={miniButtonStyle} onClick={() => handleEdit(report)}>
                           Edit
                         </button>

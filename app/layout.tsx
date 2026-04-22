@@ -3,8 +3,8 @@ import "./globals.css";
 import AppShell from "../src/components/AppShell";
 
 export const metadata: Metadata = {
-  title: "Asset Quality Dashboard",
-  description: "Asset Quality Lead web app",
+  title: "Quality Dashboard",
+  description: "Quality management system",
 };
 
 export default function RootLayout({

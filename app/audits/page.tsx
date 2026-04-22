@@ -1,18 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { supabase } from "../../src/lib/supabase";
@@ -275,24 +266,6 @@ function formatFileSize(value: number | null) {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getMonthStart(value: string) {
-  if (!value) return null;
-  const [year, month] = value.split("-");
-  if (!year || !month) return null;
-  const date = new Date(Number(year), Number(month) - 1, 1);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function getMonthDifference(monthKey: string) {
-  const target = getMonthStart(monthKey);
-  if (!target) return null;
-
-  const now = new Date();
-  const current = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  return (target.getFullYear() - current.getFullYear()) * 12 + (target.getMonth() - current.getMonth());
-}
-
 function getStatusTone(status: string) {
   const value = status.toLowerCase();
 
@@ -310,6 +283,16 @@ function getFindingTone(category: FindingSeverity) {
   if (category === "Minor") return { bg: "#fef3c7", color: "#92400e" };
   if (category === "OBS") return { bg: "#dbeafe", color: "#1d4ed8" };
   return { bg: "#dcfce7", color: "#166534" };
+}
+
+function getFrequencyBadgeStyle(frequency: "Reduce" | "Maintain" | "Increase"): CSSProperties {
+  if (frequency === "Increase") {
+    return { ...badgeStyle, background: "#fee2e2", color: "#991b1b" };
+  }
+  if (frequency === "Reduce") {
+    return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
+  }
+  return { ...badgeStyle, background: "#fef3c7", color: "#92400e" };
 }
 
 function countFindingsForAudit(auditId: string, findings: FindingRecord[]) {
@@ -337,6 +320,26 @@ function getTotalFindings(audit: AuditRecord) {
 
 function compareText(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function getAreaLabel(audit: AuditRecord) {
+  return audit.title.trim() || audit.audit_number.trim() || "Untitled Audit";
+}
+
+function buildFindingRepeatKey(finding: FindingRecord) {
+  const description = finding.description.trim().toLowerCase().replace(/\s+/g, " ");
+  const clause = finding.clause.trim().toLowerCase().replace(/\s+/g, " ");
+  return description || clause || finding.reference.trim().toLowerCase();
+}
+
+function getRiskFrequency(score: number, totalAudits: number) {
+  if (score <= 10) {
+    return totalAudits > 1 ? "Reduce" : "Maintain";
+  }
+  if (score <= 20) {
+    return "Maintain";
+  }
+  return "Increase";
 }
 
 function sanitizeFileName(name: string) {
@@ -518,19 +521,23 @@ function MultiSelectStandards({
 function AuditsPageContent() {
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
+  const linkedStatus = searchParams.get("status")?.trim() || "All";
+  const linkedType = searchParams.get("type")?.trim() || "All";
+  const linkedMonth = searchParams.get("month")?.trim() || "All";
+  const linkedFindingStatus = searchParams.get("findingStatus")?.trim() || "All";
+  const linkedFindingCategory = searchParams.get("findingCategory")?.trim() || "All";
 
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [findings, setFindings] = useState<FindingRecord[]>([]);
   const [selectedAuditId, setSelectedAuditId] = useState<string>("");
   const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState<AuditStatus | "All">("All");
-  const [typeFilter, setTypeFilter] = useState<AuditType | "All">("All");
-  const [monthFilter, setMonthFilter] = useState<string>("All");
+  const [statusFilter, setStatusFilter] = useState<AuditStatus | "All">(linkedStatus as AuditStatus | "All");
+  const [typeFilter, setTypeFilter] = useState<AuditType | "All">(linkedType as AuditType | "All");
+  const [monthFilter, setMonthFilter] = useState<string>(linkedMonth);
   const [sortKey, setSortKey] = useState<SortKey>("audit_month");
   const [sortAsc, setSortAsc] = useState<boolean>(true);
   const [message, setMessage] = useState("Loading audits...");
   const [showFindingForm, setShowFindingForm] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isUploadingReport, setIsUploadingReport] = useState(false);
   const [isSavingLinks, setIsSavingLinks] = useState(false);
 
@@ -542,15 +549,12 @@ function AuditsPageContent() {
   const [actionOptions, setActionOptions] = useState<AuditLinkOption[]>([]);
   const [selectedNcrToAdd, setSelectedNcrToAdd] = useState("");
   const [selectedActionToAdd, setSelectedActionToAdd] = useState("");
+  const programmeSectionRef = useRef<HTMLDivElement | null>(null);
 
   const computedAuditNumber = useMemo(
     () => buildNextAuditNumber(form.audit_type, form.audit_date, audits),
     [form.audit_type, form.audit_date, audits]
   );
-
-  useEffect(() => {
-    setSearch(linkedSearch);
-  }, [linkedSearch]);
 
   async function loadLinkOptions() {
     const [loadedNcrs, loadedActions] = await Promise.all([tryLoadNcrOptions(), tryLoadActionOptions()]);
@@ -559,8 +563,6 @@ function AuditsPageContent() {
   }
 
   async function loadAudits(showLoadedMessage = true) {
-    setIsLoading(true);
-
     const [auditRes, findingRes, fileRes] = await Promise.all([
       supabase.from("audits").select("*").order("audit_date", { ascending: false }),
       supabase.from("audit_findings").select("*").order("reference", { ascending: true }),
@@ -569,19 +571,16 @@ function AuditsPageContent() {
 
     if (auditRes.error) {
       setMessage(`Load audits failed: ${auditRes.error.message}`);
-      setIsLoading(false);
       return;
     }
 
     if (findingRes.error) {
       setMessage(`Load findings failed: ${findingRes.error.message}`);
-      setIsLoading(false);
       return;
     }
 
     if (fileRes.error) {
       setMessage(`Load audit files failed: ${fileRes.error.message}`);
-      setIsLoading(false);
       return;
     }
 
@@ -668,8 +667,6 @@ function AuditsPageContent() {
     setFindings(findingRows);
     setAudits(hydratedAudits);
     setSelectedAuditId((current) => current || hydratedAudits[0]?.id || "");
-    setIsLoading(false);
-
     if (showLoadedMessage) {
       if (linkedSearch) {
         const searchLower = linkedSearch.toLowerCase();
@@ -803,8 +800,22 @@ function AuditsPageContent() {
       const matchesStatus = statusFilter === "All" || audit.status === statusFilter;
       const matchesType = typeFilter === "All" || audit.audit_type === typeFilter;
       const matchesMonth = monthFilter === "All" || audit.audit_month === monthFilter;
+      const scopedFindings = findings.filter((finding) => finding.audit_id === audit.id);
+      const matchesFindingStatus =
+        linkedFindingStatus === "All" ||
+        scopedFindings.some((finding) => finding.status === linkedFindingStatus);
+      const matchesFindingCategory =
+        linkedFindingCategory === "All" ||
+        scopedFindings.some((finding) => finding.category === linkedFindingCategory);
 
-      return matchesSearch && matchesStatus && matchesType && matchesMonth;
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesType &&
+        matchesMonth &&
+        matchesFindingStatus &&
+        matchesFindingCategory
+      );
     });
 
     const sorted = [...base].sort((a, b) => {
@@ -837,7 +848,18 @@ function AuditsPageContent() {
     });
 
     return sorted;
-  }, [audits, search, statusFilter, typeFilter, monthFilter, sortKey, sortAsc]);
+  }, [
+    audits,
+    findings,
+    search,
+    statusFilter,
+    typeFilter,
+    monthFilter,
+    linkedFindingStatus,
+    linkedFindingCategory,
+    sortKey,
+    sortAsc,
+  ]);
 
   const kpis = useMemo(() => {
     const planned = audits.filter((audit) => audit.status === "Planned").length;
@@ -850,92 +872,143 @@ function AuditsPageContent() {
     return { planned, inProgress, overdue, completed, totalMajor, openFindings };
   }, [audits, findings]);
 
-  const auditsByTypeChart = useMemo(() => {
-    const counts = { Internal: 0, External: 0, Supplier: 0 };
+  const findingRepeatCountByKey = useMemo(() => {
+    return findings.reduce<Record<string, number>>((acc, finding) => {
+      const repeatKey = buildFindingRepeatKey(finding);
+      if (!repeatKey) return acc;
+      acc[repeatKey] = (acc[repeatKey] || 0) + 1;
+      return acc;
+    }, {});
+  }, [findings]);
+
+  const auditRiskById = useMemo(() => {
+    return audits.reduce<
+      Record<
+        string,
+        {
+          repeatFindings: number;
+          riskScore: number;
+          frequency: "Reduce" | "Maintain" | "Increase";
+        }
+      >
+    >((acc, audit) => {
+      const auditFindings = findings.filter((finding) => finding.audit_id === audit.id);
+      const repeatFindings = auditFindings.filter((finding) => {
+        const repeatKey = buildFindingRepeatKey(finding);
+        return repeatKey ? (findingRepeatCountByKey[repeatKey] || 0) > 1 : false;
+      }).length;
+      const riskScore =
+        1 +
+        audit.findings.major * 5 +
+        audit.findings.minor * 3 +
+        (audit.findings.ofi + audit.findings.obs) * 1 +
+        repeatFindings * 2;
+
+      acc[audit.id] = {
+        repeatFindings,
+        riskScore,
+        frequency: getRiskFrequency(riskScore, 1),
+      };
+
+      return acc;
+    }, {});
+  }, [audits, findings, findingRepeatCountByKey]);
+
+  const riskAreaReview = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        label: string;
+        auditNumbers: string[];
+        totalAudits: number;
+        major: number;
+        minor: number;
+        ofiObs: number;
+        repeatFindings: number;
+        totalFindings: number;
+        riskScore: number;
+        frequency: "Reduce" | "Maintain" | "Increase";
+      }
+    >();
 
     audits.forEach((audit) => {
-      counts[audit.audit_type] += 1;
+      const label = getAreaLabel(audit);
+      const current = grouped.get(label) || {
+        label,
+        auditNumbers: [],
+        totalAudits: 0,
+        major: 0,
+        minor: 0,
+        ofiObs: 0,
+        repeatFindings: 0,
+        totalFindings: 0,
+        riskScore: 0,
+        frequency: "Maintain" as const,
+      };
+
+      current.totalAudits += 1;
+      current.auditNumbers.push(audit.audit_number);
+      current.major += audit.findings.major;
+      current.minor += audit.findings.minor;
+      current.ofiObs += audit.findings.ofi + audit.findings.obs;
+      current.totalFindings += getTotalFindings(audit);
+      grouped.set(label, current);
     });
-
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [audits]);
-
-  const findingsBySeverityChart = useMemo(() => {
-    const counts: Record<FindingSeverity, number> = {
-      Major: 0,
-      Minor: 0,
-      OFI: 0,
-      OBS: 0,
-    };
-
-    findings.forEach((finding) => {
-      counts[finding.category] += 1;
-    });
-
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [findings]);
-
-  const findingsByStatusChart = useMemo(() => {
-    const counts = {
-      Open: 0,
-      "In Progress": 0,
-      Closed: 0,
-    };
-
-    findings.forEach((finding) => {
-      counts[finding.status] += 1;
-    });
-
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [findings]);
-
-  const findingsByAuditTypeChart = useMemo(() => {
-    const counts = {
-      Internal: 0,
-      External: 0,
-      Supplier: 0,
-    };
 
     findings.forEach((finding) => {
       const parentAudit = audits.find((audit) => audit.id === finding.audit_id);
       if (!parentAudit) return;
-      counts[parentAudit.audit_type] += 1;
+
+      const label = getAreaLabel(parentAudit);
+      const current = grouped.get(label);
+      if (!current) return;
+
+      const repeatKey = buildFindingRepeatKey(finding);
+      if (!repeatKey) return;
+
+      const duplicateCount = findingRepeatCountByKey[repeatKey] || 0;
+      if (duplicateCount > 1) {
+        current.repeatFindings += 1;
+      }
     });
 
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [findings, audits]);
+    return [...grouped.values()]
+      .map((item) => {
+        const riskScore =
+          item.totalAudits * 1 +
+          item.major * 5 +
+          item.minor * 3 +
+          item.ofiObs * 1 +
+          item.repeatFindings * 2;
 
-  const statusChart = useMemo(() => {
-    const counts: Record<AuditStatus, number> = {
-      Planned: 0,
-      "In Progress": 0,
-      Completed: 0,
-      Overdue: 0,
-      Cancelled: 0,
-    };
-
-    audits.forEach((audit) => {
-      counts[audit.status] += 1;
-    });
-
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [audits]);
-
-  const attentionAudits = useMemo(() => {
-    return audits
-      .filter((audit) => {
-        const monthDiff = getMonthDifference(audit.audit_month);
-        const isUpcoming = audit.status === "Planned" && monthDiff !== null && monthDiff >= 0 && monthDiff <= 2;
-        const isOverdue = audit.status === "Overdue";
-        return isUpcoming || isOverdue;
+        return {
+          ...item,
+          auditNumbers: item.auditNumbers.sort(compareText),
+          riskScore,
+          frequency: getRiskFrequency(riskScore, item.totalAudits),
+        };
       })
       .sort((a, b) => {
-        if (a.status === "Overdue" && b.status !== "Overdue") return -1;
-        if (a.status !== "Overdue" && b.status === "Overdue") return 1;
-        return compareText(a.audit_date, b.audit_date);
-      })
-      .slice(0, 6);
-  }, [audits]);
+        if (b.totalFindings !== a.totalFindings) return b.totalFindings - a.totalFindings;
+        if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
+        return compareText(a.label, b.label);
+      });
+  }, [audits, findings, findingRepeatCountByKey]);
+
+  const topProblemAreas = useMemo(() => {
+    return riskAreaReview.slice(0, 5).map((item) => ({
+      name: item.label,
+      findings: item.totalFindings,
+      riskScore: item.riskScore,
+      frequency: item.frequency,
+      totalAudits: item.totalAudits,
+      major: item.major,
+      minor: item.minor,
+      ofiObs: item.ofiObs,
+      repeatFindings: item.repeatFindings,
+      auditNumbers: item.auditNumbers,
+    }));
+  }, [riskAreaReview]);
 
   function setSort(nextKey: SortKey) {
     if (sortKey === nextKey) {
@@ -945,6 +1018,14 @@ function AuditsPageContent() {
 
     setSortKey(nextKey);
     setSortAsc(true);
+  }
+
+  function hideDetailPanel() {
+    setSelectedAuditId("");
+    setShowFindingForm(false);
+    window.requestAnimationFrame(() => {
+      programmeSectionRef.current?.focus();
+    });
   }
 
   function toggleStandard(value: string) {
@@ -1159,31 +1240,6 @@ function AuditsPageContent() {
     );
   }
 
-  async function updateAuditInline(auditId: string, field: keyof AuditRecord, value: string) {
-    const existing = audits.find((audit) => audit.id === auditId);
-    if (!existing) return;
-
-    const payload: Record<string, unknown> = {};
-
-    if (field === "lead_auditor") {
-      payload.lead_auditor = value;
-    } else if (field === "audit_month") {
-      payload.audit_month = value;
-    } else {
-      payload[field] = value;
-    }
-
-    const { error } = await supabase.from("audits").update(payload).eq("id", auditId);
-
-    if (error) {
-      setMessage(`Audit schedule update failed: ${error.message}`);
-      return;
-    }
-
-    await loadAudits(false);
-    setMessage("Audit schedule updated.");
-  }
-
   async function deleteSelectedAudit() {
     if (!selectedAudit) {
       setMessage("Select an audit first.");
@@ -1389,6 +1445,22 @@ function AuditsPageContent() {
 
     await loadAudits(false);
     setMessage(`Audit report removed from ${selectedAudit.audit_number}.`);
+  }
+
+  async function openSelectedAuditReport() {
+    if (!selectedAudit?.report_storage_path) {
+      setMessage("No report uploaded for this audit.");
+      return;
+    }
+
+    const signedUrl = await createSignedFileUrl(selectedAudit.report_storage_path);
+
+    if (!signedUrl) {
+      setMessage(`Could not open report for ${selectedAudit.audit_number}.`);
+      return;
+    }
+
+    window.open(signedUrl, "_blank", "noopener,noreferrer");
   }
 
   function generateAuditPdf() {
@@ -1603,7 +1675,7 @@ function AuditsPageContent() {
 
       {linkedSearch ? (
         <section style={linkedSearchBannerStyle}>
-          <strong>Linked search:</strong> showing results for "{linkedSearch}"
+          <strong>Linked search:</strong> showing results for &quot;{linkedSearch}&quot;
         </section>
       ) : null}
 
@@ -1617,259 +1689,175 @@ function AuditsPageContent() {
       </section>
 
       <section style={topGridStyle}>
-        <SectionCard
-          title="Create Audit"
-          subtitle="Create the next audit. Numbering is automatic from type and audit date."
-        >
-          <form onSubmit={createAudit}>
-            <div style={formGridStyle}>
-              <Field label="Audit Type">
-                <select
-                  value={form.audit_type}
-                  onChange={(e) => setForm((prev) => ({ ...prev, audit_type: e.target.value as AuditType }))}
-                  style={inputStyle}
-                >
-                  <option value="Internal">Internal</option>
-                  <option value="External">External</option>
-                  <option value="Supplier">Supplier</option>
-                </select>
-              </Field>
-
-              <Field label="Audit Number">
-                <input value={computedAuditNumber} readOnly style={readOnlyInputStyle} />
-              </Field>
-
-              <Field label="Audit Title">
-                <input
-                  value={form.title}
-                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="e.g. Supplier Audit - Parkburn"
-                />
-              </Field>
-
-              <Field label="Auditee">
-                <input
-                  value={form.auditee}
-                  onChange={(e) => setForm((prev) => ({ ...prev, auditee: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="Department / Supplier / Site"
-                />
-              </Field>
-
-              <Field label="Lead Auditor">
-                <input
-                  value={form.lead_auditor}
-                  onChange={(e) => setForm((prev) => ({ ...prev, lead_auditor: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="Lead auditor"
-                />
-              </Field>
-
-              <Field label={form.audit_type === "External" ? "Certification Body" : "Location"}>
-                {form.audit_type === "External" ? (
-                  <input
-                    value={form.certification_body}
-                    onChange={(e) => setForm((prev) => ({ ...prev, certification_body: e.target.value }))}
+        <div style={summaryPanelGridStyle}>
+          <SectionCard
+            title="Create Audit"
+            subtitle="Create the next audit. Numbering is automatic from type and audit date."
+          >
+            <form onSubmit={createAudit}>
+              <div style={createAuditGridStyle}>
+                <Field label="Audit Type">
+                  <select
+                    value={form.audit_type}
+                    onChange={(e) => setForm((prev) => ({ ...prev, audit_type: e.target.value as AuditType }))}
                     style={inputStyle}
-                    placeholder="e.g. LRQA"
-                  />
-                ) : (
+                  >
+                    <option value="Internal">Internal</option>
+                    <option value="External">External</option>
+                    <option value="Supplier">Supplier</option>
+                  </select>
+                </Field>
+
+                <Field label="Audit Number">
+                  <input value={computedAuditNumber} readOnly style={readOnlyInputStyle} />
+                </Field>
+
+                <Field label="Title / Function">
                   <input
-                    value={form.location}
-                    onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
+                    value={form.title}
+                    onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
                     style={inputStyle}
-                    placeholder="Blyth / Supplier Site / Remote"
+                    placeholder="e.g. Supplier Audit - Parkburn"
                   />
+                </Field>
+
+                <Field label="Auditee">
+                  <input
+                    value={form.auditee}
+                    onChange={(e) => setForm((prev) => ({ ...prev, auditee: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="Department / Supplier / Site"
+                  />
+                </Field>
+
+                <Field label="Lead Auditor">
+                  <input
+                    value={form.lead_auditor}
+                    onChange={(e) => setForm((prev) => ({ ...prev, lead_auditor: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="Lead auditor"
+                  />
+                </Field>
+
+                <Field label={form.audit_type === "External" ? "Certification Body" : "Location"}>
+                  {form.audit_type === "External" ? (
+                    <input
+                      value={form.certification_body}
+                      onChange={(e) => setForm((prev) => ({ ...prev, certification_body: e.target.value }))}
+                      style={inputStyle}
+                      placeholder="e.g. LRQA"
+                    />
+                  ) : (
+                    <input
+                      value={form.location}
+                      onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
+                      style={inputStyle}
+                      placeholder="Blyth / Supplier Site / Remote"
+                    />
+                  )}
+                </Field>
+
+                <Field label="Audit Date">
+                  <input
+                    type="date"
+                    value={form.audit_date}
+                    onChange={(e) => setForm((prev) => ({ ...prev, audit_date: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </Field>
+
+                <Field label="Scheduled Month">
+                  <input value={formatMonth(form.audit_month)} readOnly style={readOnlyInputStyle} />
+                </Field>
+
+                <Field label="Status">
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value as AuditStatus }))}
+                    style={inputStyle}
+                  >
+                    <option value="Planned">Planned</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Overdue">Overdue</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </Field>
+
+                {form.audit_type === "Internal" && (
+                  <Field label="Procedure Reference">
+                    <input
+                      value={form.procedure_reference}
+                      onChange={(e) => setForm((prev) => ({ ...prev, procedure_reference: e.target.value }))}
+                      style={inputStyle}
+                      placeholder="e.g. ENS-HSEQ-PRO-001"
+                    />
+                  </Field>
                 )}
-              </Field>
 
-              <Field label="Audit Date">
-                <input
-                  type="date"
-                  value={form.audit_date}
-                  onChange={(e) => setForm((prev) => ({ ...prev, audit_date: e.target.value }))}
-                  style={inputStyle}
-                />
-              </Field>
+                {form.audit_type === "External" && (
+                  <Field label="Audit Location">
+                    <input
+                      value={form.location}
+                      onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
+                      style={inputStyle}
+                      placeholder="Blyth / Remote / Site"
+                    />
+                  </Field>
+                )}
 
-              <Field label="Audit Month">
-                <input value={formatMonth(form.audit_month)} readOnly style={readOnlyInputStyle} />
-              </Field>
-
-              <Field label="Status">
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value as AuditStatus }))}
-                  style={inputStyle}
-                >
-                  <option value="Planned">Planned</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Overdue">Overdue</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </Field>
-
-              {form.audit_type === "Internal" && (
-                <Field label="Procedure Reference">
-                  <input
-                    value={form.procedure_reference}
-                    onChange={(e) => setForm((prev) => ({ ...prev, procedure_reference: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="e.g. ENS-HSEQ-PRO-001"
-                  />
-                </Field>
-              )}
-
-              {form.audit_type === "External" && (
-                <Field label="Audit Location">
-                  <input
-                    value={form.location}
-                    onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="Blyth / Remote / Site"
-                  />
-                </Field>
-              )}
-
-              <div style={{ gridColumn: "1 / -1" }}>
-                <Field label="Standards">
-                  <MultiSelectStandards
-                    selected={form.standards}
-                    onToggle={toggleStandard}
-                    options={["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018"]}
-                  />
-                </Field>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="Standards">
+                    <MultiSelectStandards
+                      selected={form.standards}
+                      onToggle={toggleStandard}
+                      options={["ISO 9001:2015", "ISO 14001:2015", "ISO 45001:2018"]}
+                    />
+                  </Field>
+                </div>
               </div>
-            </div>
 
-            <div style={formFooterStyle}>
-              <button type="submit" style={primaryButtonStyle}>
-                Create Audit
-              </button>
-              <span style={helperTextStyle}>
-                Internal = standards + procedure. Supplier = ISO only. External = certification audit.
-              </span>
-            </div>
-          </form>
-        </SectionCard>
-
-        <SectionCard title="Attention Board" subtitle="Upcoming and overdue items only.">
-          <div style={attentionGridStyle}>
-            {attentionAudits.length === 0 ? (
-              <div style={emptyBoardStyle}>No upcoming or overdue audits currently flagged.</div>
-            ) : (
-              attentionAudits.map((audit) => (
-                <button
-                  key={audit.id}
-                  type="button"
-                  onClick={() => setSelectedAuditId(audit.id)}
-                  style={{
-                    ...attentionCardStyle,
-                    background: selectedAuditId === audit.id ? "#eff6ff" : "#ffffff",
-                    borderColor: selectedAuditId === audit.id ? "#93c5fd" : "#e2e8f0",
-                  }}
-                >
-                  <div style={attentionHeaderStyle}>
-                    <span style={miniTagStyle}>{audit.audit_type}</span>
-                    <span
-                      style={{
-                        ...miniTagStyle,
-                        background: getStatusTone(audit.status).bg,
-                        color: getStatusTone(audit.status).color,
-                      }}
-                    >
-                      {audit.status}
-                    </span>
-                  </div>
-
-                  <div style={attentionNumberStyle}>{audit.audit_number}</div>
-                  <div style={attentionTitleStyle}>{audit.title}</div>
-                  <div style={attentionMetaRowStyle}>
-                    <span>{formatMonth(audit.audit_month)}</span>
-                    <span>{formatDate(audit.audit_date)}</span>
-                  </div>
+              <div style={createAuditFooterStyle}>
+                <div style={createAuditHintStyle}>
+                  Internal = standards + procedure. Supplier = ISO only. External = certification audit.
+                </div>
+                <button type="submit" style={primaryButtonStyle}>
+                  Create Audit
                 </button>
-              ))
+              </div>
+            </form>
+          </SectionCard>
+
+          <SectionCard
+            title="Top 5 Problem Audits / Areas"
+            subtitle="Compact management view of the highest findings and frequency outcome."
+          >
+            {topProblemAreas.length === 0 ? (
+              <p style={emptyTextStyle}>No audit findings available yet.</p>
+            ) : (
+              <div style={compactProblemListStyle}>
+                {topProblemAreas.map((item, index) => (
+                  <div key={item.name} style={compactProblemRowStyle}>
+                    <div style={compactProblemRankStyle}>#{index + 1}</div>
+                    <div style={compactProblemBodyStyle}>
+                      <div style={compactProblemTitleStyle}>{item.name}</div>
+                      <div style={compactProblemMetaStyle}>
+                        <span>{item.findings} findings</span>
+                        <span>Risk {item.riskScore}</span>
+                        <span>{item.auditNumbers.join(", ")}</span>
+                      </div>
+                    </div>
+                    <span style={getFrequencyBadgeStyle(item.frequency)}>{item.frequency}</span>
+                  </div>
+                ))}
+              </div>
             )}
-          </div>
-        </SectionCard>
+          </SectionCard>
+        </div>
       </section>
 
-      <section style={chartGridStyleFour}>
-        <SectionCard title="Audit Types" subtitle="Programme split by audit type.">
-          <div style={chartWrapStyle}>
-            <ResponsiveContainer>
-              <BarChart data={auditsByTypeChart}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#0f766e" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Audit Status" subtitle="Current programme status.">
-          <div style={chartWrapStyle}>
-            <ResponsiveContainer>
-              <BarChart data={statusChart}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#2563eb" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Findings by Category" subtitle="Major, Minor, OFI and OBS.">
-          <div style={chartWrapStyle}>
-            <ResponsiveContainer>
-              <BarChart data={findingsBySeverityChart}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#7c3aed" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Findings by Status / Type" subtitle="Open vs closed, plus internal/external/supplier split.">
-          <div style={dualMiniChartsWrapStyle}>
-            <div style={miniChartWrapStyle}>
-              <ResponsiveContainer>
-                <BarChart data={findingsByStatusChart}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#0f766e" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div style={miniChartWrapStyle}>
-              <ResponsiveContainer>
-                <BarChart data={findingsByAuditTypeChart}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </SectionCard>
-      </section>
-
-      <section style={workspaceGridStyle}>
-        <SectionCard title="Audit Programme" subtitle="Cleaner month-based schedule. Exact audit date and status sit in the audit detail panel.">
+      <section style={tableLayoutStyle}>
+        <SectionCard title="Audit Programme" subtitle="Main working view with schedule, findings summary, and risk-based frequency outcome.">
           <div style={toolbarStyle}>
             <input
               value={search}
@@ -1931,14 +1919,20 @@ function AuditsPageContent() {
             Showing <strong>{filteredAudits.length}</strong> of <strong>{audits.length}</strong> audits
           </div>
 
-          <div style={programmeTableWrapStyle}>
+          <div ref={programmeSectionRef} tabIndex={-1} style={programmeTableWrapStyle}>
             <div style={programmeHeadStyle}>
               <div>Audit No.</div>
-              <div>Title</div>
+              <div>Title / Function</div>
               <div>Type</div>
               <div>Scheduled</div>
-              <div>Lead</div>
-              <div>Findings</div>
+              <div>Audit Date</div>
+              <div>Lead Auditor</div>
+              <div>Major</div>
+              <div>Minor</div>
+              <div>OFI/OBS</div>
+              <div>Risk Score</div>
+              <div>Frequency Outcome</div>
+              <div>Status</div>
             </div>
 
             <div style={programmeBodyStyle}>
@@ -1971,25 +1965,29 @@ function AuditsPageContent() {
                     </div>
 
                     <div style={programmeTypeCellStyle}>{audit.audit_type}</div>
-
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="month"
-                        value={audit.audit_month}
-                        onChange={(e) => void updateAuditInline(audit.id, "audit_month", e.target.value)}
-                        style={inlineInputStyle}
-                      />
+                    <div style={programmeCellMutedStyle}>{formatMonth(audit.audit_month)}</div>
+                    <div style={programmeCellMutedStyle}>{formatDate(audit.audit_date)}</div>
+                    <div style={programmeLeadCellStyle}>{audit.lead_auditor || "-"}</div>
+                    <div style={programmeFindingsStyle}>{audit.findings.major}</div>
+                    <div style={programmeFindingsStyle}>{audit.findings.minor}</div>
+                    <div style={programmeFindingsStyle}>{audit.findings.ofi + audit.findings.obs}</div>
+                    <div style={programmeRiskCellStyle}>{auditRiskById[audit.id]?.riskScore ?? 1}</div>
+                    <div>
+                      <span style={getFrequencyBadgeStyle(auditRiskById[audit.id]?.frequency || "Maintain")}>
+                        {auditRiskById[audit.id]?.frequency || "Maintain"}
+                      </span>
                     </div>
-
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <input
-                        value={audit.lead_auditor}
-                        onChange={(e) => void updateAuditInline(audit.id, "lead_auditor", e.target.value)}
-                        style={inlineInputStyle}
-                      />
+                    <div>
+                      <span
+                        style={{
+                          ...badgeStyle,
+                          background: getStatusTone(audit.status).bg,
+                          color: getStatusTone(audit.status).color,
+                        }}
+                      >
+                        {audit.status}
+                      </span>
                     </div>
-
-                    <div style={programmeFindingsStyle}>{getTotalFindings(audit)}</div>
                   </button>
                 );
               })}
@@ -1997,10 +1995,8 @@ function AuditsPageContent() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Audit Detail" subtitle="Editable workspace with audit report upload pinned at the top.">
-          {!selectedAudit ? (
-            <div style={emptyDetailStyle}>Select an audit from the programme to open it here.</div>
-          ) : (
+        {selectedAudit ? (
+          <SectionCard title="Audit Detail" subtitle="Editable workspace for the selected audit.">
             <div style={detailWorkspaceStyle}>
               <div style={detailTopBarStyle}>
                 <div>
@@ -2018,6 +2014,9 @@ function AuditsPageContent() {
                   >
                     {selectedAudit.status}
                   </span>
+                  <button type="button" style={secondaryButtonStyle} onClick={hideDetailPanel}>
+                    Hide Panel
+                  </button>
                 </div>
               </div>
 
@@ -2047,15 +2046,14 @@ function AuditsPageContent() {
                     />
                   </label>
 
-                  {selectedAudit.report_url ? (
-                    <a
-                      href={selectedAudit.report_url}
-                      target="_blank"
-                      rel="noreferrer"
+                  {selectedAudit.report_storage_path ? (
+                    <button
+                      type="button"
+                      onClick={() => void openSelectedAuditReport()}
                       style={reportLinkButtonStyle}
                     >
                       Open report
-                    </a>
+                    </button>
                   ) : null}
 
                   {selectedAudit.report_file_name ? (
@@ -2572,8 +2570,8 @@ function AuditsPageContent() {
                 )}
               </div>
             </div>
-          )}
-        </SectionCard>
+          </SectionCard>
+        ) : null}
       </section>
     </main>
   );
@@ -2940,34 +2938,20 @@ const statValueStyle: CSSProperties = {
 
 const topGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.05fr 0.95fr",
-  gap: "20px",
+  gridTemplateColumns: "minmax(0, 1fr)",
+  gap: "18px",
   marginBottom: "20px",
 };
 
-const chartGridStyleFour: CSSProperties = {
+const summaryPanelGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "1.3fr 0.9fr",
   gap: "20px",
-  marginBottom: "20px",
 };
 
-const dualMiniChartsWrapStyle: CSSProperties = {
+const tableLayoutStyle: CSSProperties = {
   display: "grid",
-  gap: "12px",
-  height: "280px",
-};
-
-const miniChartWrapStyle: CSSProperties = {
-  width: "100%",
-  height: "134px",
-};
-
-const workspaceGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1.45fr 0.95fr",
   gap: "20px",
-  alignItems: "start",
 };
 
 const panelStyle: CSSProperties = {
@@ -2994,9 +2978,9 @@ const sectionSubtitleStyle: CSSProperties = {
   fontSize: "14px",
 };
 
-const formGridStyle: CSSProperties = {
+const createAuditGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   gap: "14px",
 };
 
@@ -3034,18 +3018,6 @@ const readOnlyInputStyle: CSSProperties = {
   fontWeight: 700,
 };
 
-const inlineInputStyle: CSSProperties = {
-  width: "100%",
-  minWidth: 0,
-  padding: "7px 8px",
-  borderRadius: "8px",
-  border: "1px solid #cbd5e1",
-  background: "#ffffff",
-  color: "#0f172a",
-  fontSize: "12px",
-  boxSizing: "border-box",
-};
-
 const textareaStyle: CSSProperties = {
   width: "100%",
   minHeight: "96px",
@@ -3059,17 +3031,20 @@ const textareaStyle: CSSProperties = {
   boxSizing: "border-box",
 };
 
-const formFooterStyle: CSSProperties = {
+const createAuditFooterStyle: CSSProperties = {
   display: "flex",
-  alignItems: "center",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
   gap: "12px",
   flexWrap: "wrap",
-  marginTop: "16px",
+  marginTop: "14px",
 };
 
-const helperTextStyle: CSSProperties = {
+const createAuditHintStyle: CSSProperties = {
   color: "#64748b",
   fontSize: "13px",
+  maxWidth: "620px",
+  lineHeight: 1.5,
 };
 
 const primaryButtonStyle: CSSProperties = {
@@ -3141,70 +3116,55 @@ const chipButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const attentionGridStyle: CSSProperties = {
+const compactProblemListStyle: CSSProperties = {
   display: "grid",
-  gap: "14px",
+  gap: "10px",
 };
 
-const attentionCardStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "16px",
-  borderRadius: "16px",
-  border: "1px solid #e2e8f0",
-  cursor: "pointer",
-};
-
-const attentionHeaderStyle: CSSProperties = {
+const compactProblemRowStyle: CSSProperties = {
   display: "flex",
+  alignItems: "center",
   justifyContent: "space-between",
-  gap: "8px",
-  marginBottom: "10px",
-};
-
-const miniTagStyle: CSSProperties = {
-  display: "inline-block",
-  padding: "6px 10px",
-  borderRadius: "999px",
+  gap: "12px",
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  padding: "12px 14px",
   background: "#f8fafc",
-  color: "#334155",
-  fontWeight: 700,
+};
+
+const compactProblemRankStyle: CSSProperties = {
+  width: "34px",
+  height: "34px",
+  borderRadius: "999px",
+  background: "#e0f2fe",
+  color: "#0369a1",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
   fontSize: "12px",
-};
-
-const attentionNumberStyle: CSSProperties = {
-  color: "#64748b",
-  fontSize: "13px",
   fontWeight: 700,
-  marginBottom: "6px",
 };
 
-const attentionTitleStyle: CSSProperties = {
+const compactProblemBodyStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+};
+
+const compactProblemTitleStyle: CSSProperties = {
   color: "#0f172a",
   fontWeight: 800,
-  fontSize: "16px",
-  marginBottom: "6px",
+  fontSize: "14px",
+  lineHeight: 1.35,
+  marginBottom: "4px",
 };
 
-const attentionMetaRowStyle: CSSProperties = {
+const compactProblemMetaStyle: CSSProperties = {
   display: "flex",
-  justifyContent: "space-between",
   gap: "10px",
-  marginTop: "10px",
+  flexWrap: "wrap",
   color: "#64748b",
   fontSize: "12px",
-};
-
-const emptyBoardStyle: CSSProperties = {
-  border: "1px dashed #cbd5e1",
-  borderRadius: "14px",
-  padding: "20px",
-  color: "#64748b",
-  background: "#f8fafc",
-};
-
-const chartWrapStyle: CSSProperties = {
-  width: "100%",
-  height: 280,
+  lineHeight: 1.4,
 };
 
 const toolbarStyle: CSSProperties = {
@@ -3263,7 +3223,7 @@ const programmeTableWrapStyle: CSSProperties = {
 
 const programmeHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "0.95fr 2.8fr 1fr 1.25fr 1.1fr 0.6fr",
+  gridTemplateColumns: "1fr 2.4fr 0.9fr 1.15fr 1fr 1fr 0.6fr 0.6fr 0.8fr 0.85fr 1fr 0.95fr",
   gap: "12px",
   padding: "14px 16px",
   background: "#f8fafc",
@@ -3285,7 +3245,7 @@ const programmeRowStyle: CSSProperties = {
   width: "100%",
   textAlign: "left",
   display: "grid",
-  gridTemplateColumns: "0.95fr 2.8fr 1fr 1.25fr 1.1fr 0.6fr",
+  gridTemplateColumns: "1fr 2.4fr 0.9fr 1.15fr 1fr 1fr 0.6fr 0.6fr 0.8fr 0.85fr 1fr 0.95fr",
   gap: "12px",
   padding: "14px 16px",
   borderTop: "none",
@@ -3326,6 +3286,20 @@ const programmeTypeCellStyle: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
+const programmeCellMutedStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#475569",
+  lineHeight: 1.35,
+};
+
+const programmeLeadCellStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#0f172a",
+  lineHeight: 1.35,
+  minWidth: 0,
+  overflowWrap: "anywhere",
+};
+
 const programmeFindingsStyle: CSSProperties = {
   fontSize: "13px",
   color: "#0f172a",
@@ -3333,12 +3307,11 @@ const programmeFindingsStyle: CSSProperties = {
   textAlign: "center",
 };
 
-const emptyDetailStyle: CSSProperties = {
-  border: "1px dashed #cbd5e1",
-  borderRadius: "16px",
-  padding: "24px",
-  color: "#64748b",
-  background: "#f8fafc",
+const programmeRiskCellStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 800,
+  color: "#0f172a",
+  textAlign: "center",
 };
 
 const detailWorkspaceStyle: CSSProperties = {

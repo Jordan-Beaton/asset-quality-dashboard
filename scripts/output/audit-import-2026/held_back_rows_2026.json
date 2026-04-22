@@ -1,0 +1,48 @@
+[
+  {
+    "sheet": "Audit Findings",
+    "row_number": 212,
+    "reason": "Missing Audit Reference",
+    "source": {
+      "Year": 2026,
+      "Function": null,
+      "Audit Reference": null,
+      "Audit Date": null,
+      "NCR ID": null,
+      "Finding": null,
+      "Audit Type": null,
+      "Auditor(s)": null,
+      "Responsible Person": null,
+      "Failure": null,
+      "Correction / Containment Action": null,
+      "Root Cause": null,
+      "Corrective Action": null,
+      "Estimated Close Out": null,
+      "Close Out Date": null,
+      "Complete": false
+    }
+  },
+  {
+    "sheet": "Audit Findings",
+    "row_number": 213,
+    "reason": "Missing Audit Reference",
+    "source": {
+      "Year": 2026,
+      "Function": null,
+      "Audit Reference": null,
+      "Audit Date": null,
+      "NCR ID": null,
+      "Finding": null,
+      "Audit Type": null,
+      "Auditor(s)": null,
+      "Responsible Person": null,
+      "Failure": null,
+      "Correction / Containment Action": null,
+      "Root Cause": null,
+      "Corrective Action": null,
+      "Estimated Close Out": null,
+      "Close Out Date": null,
+      "Complete": false
+    }
+  }
+]

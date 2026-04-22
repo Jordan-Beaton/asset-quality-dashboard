@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import {
@@ -17,6 +18,8 @@ import {
   CartesianGrid,
 } from "recharts";
 import { supabase } from "../../src/lib/supabase";
+
+export const dynamic = "force-dynamic";
 
 type AssetStatus = "Active" | "Inactive" | "Quarantine" | "Under Maintenance";
 
@@ -340,6 +343,13 @@ async function createSignedFileUrl(path: string) {
 }
 
 export default function AssetsPage() {
+  const searchParams = useSearchParams();
+  const linkedSearch = searchParams.get("search")?.trim() || "";
+  const linkedStatus = searchParams.get("status")?.trim() || "";
+  const linkedLocation = searchParams.get("location")?.trim() || "";
+  const linkedOwner = searchParams.get("owner")?.trim() || "";
+  const qualityLinkedOnly = searchParams.get("qualityLinked") === "1";
+
   const [assets, setAssets] = useState<Asset[]>([]);
   const [message, setMessage] = useState("Loading assets...");
   const [search, setSearch] = useState("");
@@ -347,6 +357,7 @@ export default function AssetsPage() {
   const [locationFilter, setLocationFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
+  const [qualityLinkedAssetIds, setQualityLinkedAssetIds] = useState<string[]>([]);
 
   const [form, setForm] = useState<AssetForm>(emptyForm);
   const [detailForm, setDetailForm] = useState<AssetForm>(emptyForm);
@@ -428,6 +439,9 @@ export default function AssetsPage() {
     });
 
     if (!qualityRes.error) {
+      setQualityLinkedAssetIds(
+        ((qualityRes.data as AssetQualityRow[] | null) || []).map((row) => row.asset_id)
+      );
       (qualityRes.data as AssetQualityRow[] | null)?.forEach((row) => {
         next[row.asset_id] = {
           ...(next[row.asset_id] || createDefaultQualityRecord()),
@@ -510,6 +524,13 @@ export default function AssetsPage() {
   }, [assets]);
 
   useEffect(() => {
+    setSearch(linkedSearch);
+    setStatusFilter(linkedStatus);
+    setLocationFilter(linkedLocation);
+    setOwnerFilter(linkedOwner);
+  }, [linkedSearch, linkedStatus, linkedLocation, linkedOwner]);
+
+  useEffect(() => {
     const imagePath = selectedAssetId ? qualityByAssetId[selectedAssetId]?.image_path || "" : "";
 
     if (!imagePath) {
@@ -549,8 +570,24 @@ export default function AssetsPage() {
       result = result.filter((a) => a.owner === ownerFilter);
     }
 
+    if (qualityLinkedOnly) {
+      const linkedIds = new Set(qualityLinkedAssetIds);
+      result = result.filter((asset) => linkedIds.has(asset.id));
+    }
+
     return result;
-  }, [assets, search, statusFilter, locationFilter, ownerFilter]);
+  }, [assets, search, statusFilter, locationFilter, ownerFilter, qualityLinkedOnly, qualityLinkedAssetIds]);
+
+  useEffect(() => {
+    if (filteredAssets.length === 0) {
+      setSelectedAssetId("");
+      return;
+    }
+
+    if (!filteredAssets.some((asset) => asset.id === selectedAssetId)) {
+      setSelectedAssetId(filteredAssets[0].id);
+    }
+  }, [filteredAssets, selectedAssetId]);
 
   const selectedAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) || null,
@@ -1683,15 +1720,14 @@ export default function AssetsPage() {
                       />
                     </label>
 
-                    {selectedImageUrl ? (
-                      <a
-                        href={selectedImageUrl}
-                        target="_blank"
-                        rel="noreferrer"
+                    {selectedQuality.image_path ? (
+                      <button
+                        type="button"
+                        onClick={() => void openStoredFile(selectedQuality.image_path)}
                         style={reportLinkButtonStyle}
                       >
                         Open image
-                      </a>
+                      </button>
                     ) : null}
 
                     {selectedQuality.image_name ? (

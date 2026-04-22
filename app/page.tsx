@@ -185,6 +185,19 @@ function getManagementMessage(params: {
   };
 }
 
+function buildHref(path: string, params?: Record<string, string | number | null | undefined>) {
+  if (!params) return path;
+
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === "") return;
+    search.set(key, String(value));
+  });
+
+  const query = search.toString();
+  return query ? `${path}?${query}` : path;
+}
+
 export default function Home() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
@@ -420,24 +433,28 @@ export default function Home() {
               value={overdueActions}
               tone={overdueActions > 0 ? "red" : "green"}
               isLoading={isLoading}
+              href={buildHref("/actions", { overdue: 1 })}
             />
             <PriorityPill
               label="Due in Next 7 Days"
               value={dueNext7Days}
               tone={dueNext7Days > 0 ? "amber" : "green"}
               isLoading={isLoading}
+              href={buildHref("/actions", { dueWindow: 7 })}
             />
             <PriorityPill
               label="Overdue Audits"
               value={overdueAudits}
               tone={overdueAudits > 0 ? "red" : "green"}
               isLoading={isLoading}
+              href={buildHref("/audits", { status: "Overdue" })}
             />
             <PriorityPill
               label="Major Open Findings"
               value={openMajorFindings}
               tone={openMajorFindings > 0 ? "red" : "green"}
               isLoading={isLoading}
+              href={buildHref("/audits", { findingStatus: "Open", findingCategory: "Major" })}
             />
           </div>
         </div>
@@ -452,7 +469,7 @@ export default function Home() {
 
           <div style={heroMetaCardStyle}>
             <div style={heroMetaLabelStyle}>Open Items</div>
-            <div style={heroMetaValueStyle}>{isLoading ? "—" : openItems}</div>
+            <div style={heroMetaValueStyle}>{isLoading ? "-" : openItems}</div>
           </div>
 
           <div style={heroMetaCardStyle}>
@@ -479,12 +496,12 @@ export default function Home() {
       )}
 
       <section style={statsGridStyle}>
-        <StatCard title="Total Assets" value={totalAssets} accent="#0f766e" isLoading={isLoading} />
-        <StatCard title="Quality Linked Assets" value={qualityLinkedAssets} accent="#0891b2" isLoading={isLoading} />
-        <StatCard title="Open NCRs" value={openNcrs} accent="#dc2626" isLoading={isLoading} />
-        <StatCard title="Open CAPAs" value={openCapas} accent="#f59e0b" isLoading={isLoading} />
-        <StatCard title="Open Actions" value={openActions} accent="#2563eb" isLoading={isLoading} />
-        <StatCard title="Open Audit Findings" value={openAuditFindings} accent="#7c3aed" isLoading={isLoading} />
+        <StatCard title="Total Assets" value={totalAssets} accent="#0f766e" isLoading={isLoading} href="/assets" />
+        <StatCard title="Quality Linked Assets" value={qualityLinkedAssets} accent="#0891b2" isLoading={isLoading} href={buildHref("/assets", { qualityLinked: 1 })} />
+        <StatCard title="Open NCRs" value={openNcrs} accent="#dc2626" isLoading={isLoading} href={buildHref("/ncr-capa", { type: "NCR", status: "Open" })} />
+        <StatCard title="Open CAPAs" value={openCapas} accent="#f59e0b" isLoading={isLoading} href={buildHref("/ncr-capa", { type: "CAPA", status: "Open" })} />
+        <StatCard title="Open Actions" value={openActions} accent="#2563eb" isLoading={isLoading} href={buildHref("/actions", { status: "Open" })} />
+        <StatCard title="Open Audit Findings" value={openAuditFindings} accent="#7c3aed" isLoading={isLoading} href={buildHref("/audits", { findingStatus: "Open" })} />
       </section>
 
       <section style={threeColumnGridStyle}>
@@ -496,11 +513,11 @@ export default function Home() {
           />
 
           <div style={stackCompactStyle}>
-            <SnapshotRow label="Overdue actions requiring chase-up" value={overdueActions} isLoading={isLoading} />
-            <SnapshotRow label="Overdue audits requiring action" value={overdueAudits} isLoading={isLoading} />
-            <SnapshotRow label="Open major NCRs" value={majorNcrs} isLoading={isLoading} />
-            <SnapshotRow label="Open major audit findings" value={openMajorFindings} isLoading={isLoading} />
-            <SnapshotRow label="Inactive assets in register" value={inactiveAssets} isLoading={isLoading} />
+            <SnapshotRow label="Overdue actions requiring chase-up" value={overdueActions} isLoading={isLoading} href={buildHref("/actions", { overdue: 1 })} />
+            <SnapshotRow label="Overdue audits requiring action" value={overdueAudits} isLoading={isLoading} href={buildHref("/audits", { status: "Overdue" })} />
+            <SnapshotRow label="Open major NCRs" value={majorNcrs} isLoading={isLoading} href={buildHref("/ncr-capa", { type: "NCR", status: "Open", severity: "High" })} />
+            <SnapshotRow label="Open major audit findings" value={openMajorFindings} isLoading={isLoading} href={buildHref("/audits", { findingStatus: "Open", findingCategory: "Major" })} />
+            <SnapshotRow label="Inactive assets in register" value={inactiveAssets} isLoading={isLoading} href={buildHref("/assets", { status: "Inactive" })} />
           </div>
         </SectionCard>
 
@@ -510,17 +527,18 @@ export default function Home() {
             <QuickLinkCard href="/ncr-capa" title="NCR / CAPA" description="Review nonconformances and CAPAs." />
             <QuickLinkCard href="/audits" title="Audits" description="Manage audit schedule, detail and findings." />
             <QuickLinkCard href="/actions" title="Actions" description="Track owners, due dates and evidence." />
+            <QuickLinkCard href="/documents" title="Documents" description="Open controlled documents and revisions." />
             <QuickLinkCard href="/reports" title="Reports" description="Build management and audit summaries." />
           </div>
         </SectionCard>
 
         <SectionCard title="Audit Snapshot" subtitle="Current audit programme position.">
           <div style={stackCompactStyle}>
-            <SnapshotRow label="Total audits" value={totalAudits} isLoading={isLoading} />
-            <SnapshotRow label="Planned audits" value={plannedAudits} isLoading={isLoading} />
-            <SnapshotRow label="In progress audits" value={inProgressAudits} isLoading={isLoading} />
-            <SnapshotRow label="Completed audits" value={completedAudits} isLoading={isLoading} />
-            <SnapshotRow label="Open audit findings" value={openAuditFindings} isLoading={isLoading} />
+            <SnapshotRow label="Total audits" value={totalAudits} isLoading={isLoading} href="/audits" />
+            <SnapshotRow label="Planned audits" value={plannedAudits} isLoading={isLoading} href={buildHref("/audits", { status: "Planned" })} />
+            <SnapshotRow label="In progress audits" value={inProgressAudits} isLoading={isLoading} href={buildHref("/audits", { status: "In Progress" })} />
+            <SnapshotRow label="Completed audits" value={completedAudits} isLoading={isLoading} href={buildHref("/audits", { status: "Completed" })} />
+            <SnapshotRow label="Open audit findings" value={openAuditFindings} isLoading={isLoading} href={buildHref("/audits", { findingStatus: "Open" })} />
           </div>
         </SectionCard>
       </section>
@@ -531,7 +549,7 @@ export default function Home() {
           subtitle="Live action list for near-term follow-up."
           action={
             <Link href="/actions" style={sectionLinkStyle}>
-              View all actions →
+              View all actions {"->"}
             </Link>
           }
         >
@@ -606,7 +624,7 @@ export default function Home() {
           subtitle="Programme items that may need follow-up first."
           action={
             <Link href="/audits" style={sectionLinkStyle}>
-              View all audits →
+              View all audits {"->"}
             </Link>
           }
         >
@@ -643,30 +661,35 @@ export default function Home() {
               value={majorNcrs}
               tone={majorNcrs > 0 ? "red" : "green"}
               isLoading={isLoading}
+              href={buildHref("/ncr-capa", { type: "NCR", status: "Open", severity: "High" })}
             />
             <AttentionItem
               label="Overdue Actions"
               value={overdueActions}
               tone={overdueActions > 0 ? "red" : "green"}
               isLoading={isLoading}
+              href={buildHref("/actions", { overdue: 1 })}
             />
             <AttentionItem
               label="Overdue Audits"
               value={overdueAudits}
               tone={overdueAudits > 0 ? "red" : "green"}
               isLoading={isLoading}
+              href={buildHref("/audits", { status: "Overdue" })}
             />
             <AttentionItem
               label="Inactive Assets"
               value={inactiveAssets}
               tone={inactiveAssets > 0 ? "amber" : "green"}
               isLoading={isLoading}
+              href={buildHref("/assets", { status: "Inactive" })}
             />
             <AttentionItem
               label="Open CAPAs"
               value={openCapas}
               tone={openCapas > 0 ? "amber" : "green"}
               isLoading={isLoading}
+              href={buildHref("/ncr-capa", { type: "CAPA", status: "Open" })}
             />
           </div>
         </SectionCard>
@@ -679,7 +702,11 @@ export default function Home() {
               <p style={emptyTextStyle}>No asset location data available.</p>
             ) : (
               assetsByLocation.map((item) => (
-                <div key={item.location} style={locationRowStyle}>
+                <Link
+                  key={item.location}
+                  href={buildHref("/assets", { location: item.location })}
+                  style={{ ...locationRowStyle, textDecoration: "none" }}
+                >
                   <div>
                     <div style={locationNameStyle}>{item.location}</div>
                     <div style={locationBarTrackStyle}>
@@ -692,7 +719,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div style={locationCountStyle}>{item.count}</div>
-                </div>
+                </Link>
               ))
             )}
           </div>
@@ -702,12 +729,12 @@ export default function Home() {
       <section style={twoColumnGridStyle}>
         <SectionCard title="Operational Snapshot" subtitle="Current totals across key areas.">
           <div style={stackCompactStyle}>
-            <SnapshotRow label="Assets in system" value={totalAssets} isLoading={isLoading} />
-            <SnapshotRow label="Quality linked assets" value={qualityLinkedAssets} isLoading={isLoading} />
-            <SnapshotRow label="Open NCRs" value={openNcrs} isLoading={isLoading} />
-            <SnapshotRow label="Open CAPAs" value={openCapas} isLoading={isLoading} />
-            <SnapshotRow label="Open Actions" value={openActions} isLoading={isLoading} />
-            <SnapshotRow label="Open audit findings" value={openAuditFindings} isLoading={isLoading} />
+            <SnapshotRow label="Assets in system" value={totalAssets} isLoading={isLoading} href="/assets" />
+            <SnapshotRow label="Quality linked assets" value={qualityLinkedAssets} isLoading={isLoading} href={buildHref("/assets", { qualityLinked: 1 })} />
+            <SnapshotRow label="Open NCRs" value={openNcrs} isLoading={isLoading} href={buildHref("/ncr-capa", { type: "NCR", status: "Open" })} />
+            <SnapshotRow label="Open CAPAs" value={openCapas} isLoading={isLoading} href={buildHref("/ncr-capa", { type: "CAPA", status: "Open" })} />
+            <SnapshotRow label="Open Actions" value={openActions} isLoading={isLoading} href={buildHref("/actions", { status: "Open" })} />
+            <SnapshotRow label="Open audit findings" value={openAuditFindings} isLoading={isLoading} href={buildHref("/audits", { findingStatus: "Open" })} />
           </div>
         </SectionCard>
 
@@ -754,7 +781,7 @@ export default function Home() {
         subtitle="Month and date view of the next audits in the programme."
         action={
           <Link href="/audits" style={sectionLinkStyle}>
-            Open audits module →
+            Open audits module {"->"}
           </Link>
         }
       >
@@ -834,13 +861,15 @@ function StatCard({
   value,
   accent,
   isLoading,
+  href,
 }: {
   title: string;
   value: number;
   accent: string;
   isLoading?: boolean;
+  href?: string;
 }) {
-  return (
+  const content = (
     <div
       style={{
         ...statCardStyle,
@@ -848,9 +877,11 @@ function StatCard({
       }}
     >
       <div style={statCardLabelStyle}>{title}</div>
-      <div style={statCardValueStyle}>{isLoading ? "—" : value}</div>
+      <div style={statCardValueStyle}>{isLoading ? "-" : value}</div>
     </div>
   );
+
+  return href ? <Link href={href} style={{ textDecoration: "none" }}>{content}</Link> : content;
 }
 
 function PriorityPill({
@@ -858,11 +889,13 @@ function PriorityPill({
   value,
   tone,
   isLoading,
+  href,
 }: {
   label: string;
   value: number;
   tone: "green" | "amber" | "red";
   isLoading?: boolean;
+  href?: string;
 }) {
   const toneMap = {
     green: {
@@ -884,7 +917,7 @@ function PriorityPill({
 
   const colours = toneMap[tone];
 
-  return (
+  const content = (
     <div
       style={{
         ...priorityPillStyle,
@@ -894,10 +927,12 @@ function PriorityPill({
     >
       <div style={priorityPillLabelStyle}>{label}</div>
       <div style={{ ...priorityPillValueStyle, color: colours.text }}>
-        {isLoading ? "—" : value}
+        {isLoading ? "-" : value}
       </div>
     </div>
   );
+
+  return href ? <Link href={href} style={{ textDecoration: "none" }}>{content}</Link> : content;
 }
 
 function AttentionItem({
@@ -905,11 +940,13 @@ function AttentionItem({
   value,
   tone,
   isLoading,
+  href,
 }: {
   label: string;
   value: number;
   tone: "green" | "amber" | "red";
   isLoading?: boolean;
+  href?: string;
 }) {
   const toneMap = {
     green: {
@@ -934,7 +971,7 @@ function AttentionItem({
 
   const colours = toneMap[tone];
 
-  return (
+  const content = (
     <div
       style={{
         background: colours.bg,
@@ -963,10 +1000,12 @@ function AttentionItem({
           padding: "0 10px",
         }}
       >
-        {isLoading ? "—" : value}
+        {isLoading ? "-" : value}
       </span>
     </div>
   );
+
+  return href ? <Link href={href} style={{ textDecoration: "none" }}>{content}</Link> : content;
 }
 
 function QuickLinkCard({
@@ -982,7 +1021,7 @@ function QuickLinkCard({
     <Link href={href} style={quickLinkCardStyle}>
       <div style={quickLinkTitleStyle}>{title}</div>
       <div style={quickLinkDescriptionStyle}>{description}</div>
-      <div style={quickLinkArrowStyle}>Open →</div>
+      <div style={quickLinkArrowStyle}>Open {"->"}</div>
     </Link>
   );
 }
@@ -991,17 +1030,21 @@ function SnapshotRow({
   label,
   value,
   isLoading,
+  href,
 }: {
   label: string;
   value: number;
   isLoading?: boolean;
+  href?: string;
 }) {
-  return (
+  const content = (
     <div style={snapshotRowStyle}>
       <span style={snapshotLabelStyle}>{label}</span>
-      <strong style={snapshotValueStyle}>{isLoading ? "—" : value}</strong>
+      <strong style={snapshotValueStyle}>{isLoading ? "-" : value}</strong>
     </div>
   );
+
+  return href ? <Link href={href} style={{ textDecoration: "none" }}>{content}</Link> : content;
 }
 
 function ManagementCallout({
@@ -1476,3 +1519,4 @@ const auditAttentionMetaStyle: CSSProperties = {
   fontSize: "12px",
   color: "#64748b",
 };
+
