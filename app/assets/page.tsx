@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import {
   ResponsiveContainer,
@@ -20,7 +20,6 @@ import {
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
-
 type AssetStatus = "Active" | "Inactive" | "Quarantine" | "Under Maintenance";
 
 type Asset = {
@@ -342,7 +341,7 @@ async function createSignedFileUrl(path: string) {
   return data.signedUrl;
 }
 
-export default function AssetsPage() {
+function AssetsPageContent() {
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "";
@@ -2948,3 +2947,10 @@ const badgeStyle: CSSProperties = {
   display: "inline-block",
   whiteSpace: "nowrap",
 };
+export default function AssetsPage() {
+  return (
+    <Suspense fallback={<main style={{ padding: "24px" }}>Loading assets...</main>}>
+      <AssetsPageContent />
+    </Suspense>
+  );
+}
