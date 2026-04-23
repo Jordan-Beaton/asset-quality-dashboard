@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
@@ -114,6 +115,16 @@ type MocSignoffRow = {
   signoff_date: string;
 };
 
+type MocAttachment = {
+  id: string;
+  moc_report_id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  content_type: string | null;
+  uploaded_at: string;
+};
+
 type MocStarterForm = {
   moc_report_title: string;
   project_worksite_address: string;
@@ -152,6 +163,21 @@ type PdfImageMeta = {
 
 const mocStatusOptions: MocStatus[] = ["Draft", "In Review", "Approved", "Closed"];
 const mocViewOptions: MocViewFilter[] = ["All", "Recent", "Expired Temporary", "Expiry Soon", "Draft Ageing"];
+const actionPlanStatusOptions = ["Open", "Ongoing", "Complete", "Hold"] as const;
+const MOC_ATTACHMENT_BUCKET = "quality-evidence";
+const allowedMocAttachmentExtensions = [
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".csv",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".txt",
+] as const;
 
 const defaultReviewParties = [
   "HSE",
@@ -216,6 +242,14 @@ function normaliseYesNoNa(value: string | null | undefined): YesNoNa {
 
 function normaliseApprovedChoice(value: string | null | undefined): ApprovedChoice {
   return (value || "").trim().toLowerCase() === "no" ? "No" : "Yes";
+}
+
+function normaliseActionPlanStatus(value: string | null | undefined) {
+  const text = (value || "").trim().toLowerCase();
+  if (text === "ongoing") return "Ongoing";
+  if (text === "complete" || text === "completed") return "Complete";
+  if (text === "hold" || text === "on hold") return "Hold";
+  return "Open";
 }
 
 function buildNextMocNumber(values: string[]) {
@@ -303,7 +337,7 @@ function createActionItem(sortOrder: number): MocActionPlanItem {
     description: "",
     responsible_person: "",
     target_date: "",
-    status: "",
+    status: "Open",
   };
 }
 
@@ -575,6 +609,22 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
 }
 
+function sanitizeFileName(name: string) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
+function isAllowedMocAttachment(file: File) {
+  const lowerName = file.name.toLowerCase();
+  return allowedMocAttachmentExtensions.some((extension) => lowerName.endsWith(extension));
+}
+
+function formatFileSize(value: number | null | undefined) {
+  if (!value || value <= 0) return "Unknown size";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function getNoticeColours(tone: NoticeTone) {
   if (tone === "success") return { bg: "#ecfdf5", border: "#a7f3d0", text: "#166534" };
   if (tone === "warning") return { bg: "#fffbeb", border: "#fde68a", text: "#92400e" };
@@ -707,9 +757,12 @@ function MOCPageContent() {
   const [reviewRows, setReviewRows] = useState<MocReviewRow[]>([]);
   const [acceptanceRows, setAcceptanceRows] = useState<MocSignoffRow[]>([]);
   const [closeoutRows, setCloseoutRows] = useState<MocSignoffRow[]>([]);
+  const [attachments, setAttachments] = useState<MocAttachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const [attachmentActionId, setAttachmentActionId] = useState("");
   const [showCreatePanel, setShowCreatePanel] = useState(true);
   const [message, setMessage] = useState("Loading MOC register...");
   const [messageTone, setMessageTone] = useState<NoticeTone>("neutral");
@@ -755,6 +808,13 @@ function MOCPageContent() {
     () => reports.find((report) => report.id === selectedReportId) || null,
     [reports, selectedReportId]
   );
+
+  const selectedReportAttachments = useMemo(() => {
+    if (!selectedReportId) return [];
+    return attachments
+      .filter((item) => item.moc_report_id === selectedReportId)
+      .sort((a, b) => new Date(b.uploaded_at || 0).getTime() - new Date(a.uploaded_at || 0).getTime());
+  }, [attachments, selectedReportId]);
 
   const filteredReports = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -804,10 +864,15 @@ function MOCPageContent() {
   }, [reports]);
   const statusBannerColours = getNoticeColours(messageTone);
   const nextWorkflowStatus = getNextWorkflowStatus(detailReport.status);
-  const canEditMainFields = detailReport.status === "Draft" || detailReport.status === "In Review";
+  const canEditCoreFields = detailReport.status === "Draft" || detailReport.status === "In Review";
+  const canEditImplementationFields =
+    detailReport.status === "Draft" || detailReport.status === "In Review" || detailReport.status === "Approved";
   const canEditStructural = detailReport.status === "Draft";
+  const canEditImplementationStructure = detailReport.status === "Draft";
+  const canEditReviewSections = detailReport.status === "Draft" || detailReport.status === "In Review";
   const canEditCloseout = detailReport.status !== "Closed";
   const canEditCloseoutStructure = detailReport.status === "Draft" || detailReport.status === "Approved";
+  const canManageAttachments = detailReport.status !== "Closed";
   const canSaveDetail = Boolean(selectedReportId) && detailReport.status !== "Closed";
   const detailWorkflowMessage =
     detailReport.status === "Draft"
@@ -815,7 +880,7 @@ function MOCPageContent() {
       : detailReport.status === "In Review"
       ? "In Review records allow content edits only. Structural row changes are locked."
       : detailReport.status === "Approved"
-      ? "Approved records are read-only except for close-out completion."
+      ? "Approved records stay live for implementation and close-out updates, but proposal and review structure is locked."
       : "Closed records are fully locked.";
 
   useEffect(() => {
@@ -863,6 +928,7 @@ function MOCPageContent() {
       reviewRes,
       acceptanceRes,
       closeoutRes,
+      attachmentsRes,
     ] = await Promise.all([
       supabase.from("moc_reports").select("*").order("updated_at", { ascending: false }),
       supabase.from("moc_action_plan_items").select("*").order("sort_order", { ascending: true }),
@@ -871,6 +937,7 @@ function MOCPageContent() {
       supabase.from("moc_review_endorsement_rows").select("*").order("sort_order", { ascending: true }),
       supabase.from("moc_acceptance_rows").select("*").order("sort_order", { ascending: true }),
       supabase.from("moc_closeout_rows").select("*").order("sort_order", { ascending: true }),
+      supabase.from("moc_attachments").select("*").order("uploaded_at", { ascending: false }),
     ]);
 
     if (
@@ -880,7 +947,8 @@ function MOCPageContent() {
       riskDocsRes.error ||
       reviewRes.error ||
       acceptanceRes.error ||
-      closeoutRes.error
+      closeoutRes.error ||
+      attachmentsRes.error
     ) {
       showMessage(
         `MOC load failed: ${
@@ -891,6 +959,7 @@ function MOCPageContent() {
           reviewRes.error?.message ||
           acceptanceRes.error?.message ||
           closeoutRes.error?.message ||
+          attachmentsRes.error?.message ||
           "Unknown error"
         }`,
         "error"
@@ -904,6 +973,7 @@ function MOCPageContent() {
         reviewRows: [] as MocReviewRow[],
         acceptanceRows: [] as MocSignoffRow[],
         closeoutRows: [] as MocSignoffRow[],
+        attachments: [] as MocAttachment[],
       };
     }
 
@@ -916,7 +986,7 @@ function MOCPageContent() {
       description: String(row.description || ""),
       responsible_person: String(row.responsible_person || ""),
       target_date: String(row.target_date || ""),
-      status: String(row.status || ""),
+      status: normaliseActionPlanStatus(String(row.status || "")),
     }));
     const nextAffectedDocuments = ((affectedDocsRes.data || []) as Record<string, unknown>[]).map((row) => ({
       id: String(row.id || ""),
@@ -968,6 +1038,15 @@ function MOCPageContent() {
       signature: String(row.signature || ""),
       signoff_date: String(row.signoff_date || ""),
     }));
+    const nextAttachments = ((attachmentsRes.data || []) as Record<string, unknown>[]).map((row) => ({
+      id: String(row.id || ""),
+      moc_report_id: String(row.moc_report_id || ""),
+      file_name: String(row.file_name || ""),
+      file_path: String(row.file_path || ""),
+      file_size: row.file_size == null ? null : Number(row.file_size),
+      content_type: row.content_type == null ? null : String(row.content_type),
+      uploaded_at: String(row.uploaded_at || ""),
+    }));
 
     setReports(nextReports);
     setActionPlanItems(nextActionItems);
@@ -976,6 +1055,7 @@ function MOCPageContent() {
     setReviewRows(nextReviewRows);
     setAcceptanceRows(nextAcceptanceRows);
     setCloseoutRows(nextCloseoutRows);
+    setAttachments(nextAttachments);
     setRefreshStamp(new Date().toLocaleString("en-GB"));
     showMessage("MOC register loaded.");
     setLoading(false);
@@ -988,6 +1068,7 @@ function MOCPageContent() {
       reviewRows: nextReviewRows,
       acceptanceRows: nextAcceptanceRows,
       closeoutRows: nextCloseoutRows,
+      attachments: nextAttachments,
     };
   }, [showMessage]);
 
@@ -1588,6 +1669,142 @@ function MOCPageContent() {
 
   function moveCloseoutRow(index: number, direction: -1 | 1) {
     setDetailCloseoutRows((prev) => syncSimpleOrders(moveArrayItem(prev, index, direction)));
+  }
+
+  async function handleAttachmentUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!selectedReportId) {
+      showMessage("Select an MOC first.", "warning");
+      return;
+    }
+
+    if (!canManageAttachments) {
+      showMessage("Closed MOCs are locked and attachments cannot be changed.", "warning");
+      return;
+    }
+
+    const files = Array.from(event.target.files || []);
+    event.currentTarget.value = "";
+
+    if (!files.length) return;
+
+    const invalidFile = files.find((file) => !isAllowedMocAttachment(file));
+    if (invalidFile) {
+      showMessage(
+        `Unsupported file type for "${invalidFile.name}". Allowed files: ${allowedMocAttachmentExtensions.join(", ")}.`,
+        "warning"
+      );
+      return;
+    }
+
+    setUploadingAttachments(true);
+
+    try {
+      const uploadedPaths: string[] = [];
+      const metadataRows: Array<{
+        moc_report_id: string;
+        file_name: string;
+        file_path: string;
+        file_size: number;
+        content_type: string;
+      }> = [];
+
+      for (const file of files) {
+        const safeName = sanitizeFileName(file.name);
+        const filePath = `MOC/${selectedReportId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(MOC_ATTACHMENT_BUCKET)
+          .upload(filePath, file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw new Error(uploadError.message);
+        }
+
+        uploadedPaths.push(filePath);
+
+        metadataRows.push({
+          moc_report_id: selectedReportId,
+          file_name: file.name,
+          file_path: filePath,
+          file_size: file.size,
+          content_type: file.type || "application/octet-stream",
+        });
+      }
+
+      const { error: metadataError } = await supabase.from("moc_attachments").insert(metadataRows);
+      if (metadataError) {
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from(MOC_ATTACHMENT_BUCKET).remove(uploadedPaths);
+        }
+        throw new Error(metadataError.message);
+      }
+
+      const loaded = await loadData();
+      openBundle(selectedReportId, loaded);
+      showMessage(
+        files.length === 1 ? `Uploaded "${files[0].name}".` : `Uploaded ${files.length} supporting documents.`,
+        "success"
+      );
+    } catch (error) {
+      showMessage(`Attachment upload failed: ${getErrorMessage(error)}`, "error");
+    } finally {
+      setUploadingAttachments(false);
+    }
+  }
+
+  async function openAttachment(file: MocAttachment) {
+    setAttachmentActionId(file.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from(MOC_ATTACHMENT_BUCKET)
+        .createSignedUrl(file.file_path, 300);
+
+      if (error || !data?.signedUrl) {
+        throw new Error(error?.message || "Could not create file link.");
+      }
+
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      showMessage(`Could not open attachment: ${getErrorMessage(error)}`, "error");
+    } finally {
+      setAttachmentActionId("");
+    }
+  }
+
+  async function removeAttachment(file: MocAttachment) {
+    if (!canManageAttachments) {
+      showMessage("Closed MOCs are locked and attachments cannot be removed.", "warning");
+      return;
+    }
+
+    const confirmed = window.confirm(`Remove supporting document "${file.file_name}"?`);
+    if (!confirmed) return;
+
+    setAttachmentActionId(file.id);
+    try {
+      const { error: storageError } = await supabase.storage.from(MOC_ATTACHMENT_BUCKET).remove([file.file_path]);
+      if (storageError) {
+        throw new Error(storageError.message);
+      }
+
+      const { error: metadataError } = await supabase.from("moc_attachments").delete().eq("id", file.id);
+      if (metadataError) {
+        throw new Error(metadataError.message);
+      }
+
+      const loaded = await loadData();
+      if (selectedReportId) {
+        openBundle(selectedReportId, loaded);
+      }
+      showMessage(`Removed "${file.file_name}".`, "success");
+    } catch (error) {
+      showMessage(`Attachment delete failed: ${getErrorMessage(error)}`, "error");
+    } finally {
+      setAttachmentActionId("");
+    }
   }
 
   let pdfPageDecorator: ((doc: jsPDF) => void) | null = null;
@@ -2490,7 +2707,7 @@ function MOCPageContent() {
 
             <div style={subSectionStackStyle}>
               <DetailSubsection title="A. MOC REPORT DETAILS">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
                 <div style={detailFormGridStyle}>
                   <Field label="MOC Report No.">
                     <input value={detailReport.moc_report_no} readOnly style={readOnlyInputStyle} />
@@ -2549,7 +2766,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="B. CHANGE IDENTIFICATION">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <Field label="Description of the change (proposed change)">
@@ -2638,8 +2855,12 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="C. ACTION PLAN">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
-                <RepeatTableToolbar onAdd={addActionRow} label="Add Action Row" disabled={!canEditStructural} />
+                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
+                <RepeatTableToolbar
+                  onAdd={addActionRow}
+                  label="Add Action Row"
+                  disabled={!canEditImplementationStructure}
+                />
                 <div style={tableEditorWrapStyle}>
                   <div style={actionPlanHeadStyle}>
                     <div>No</div>
@@ -2653,8 +2874,8 @@ function MOCPageContent() {
                     <div key={`${row.id || "new"}-${index}`} style={actionPlanRowStyle}>
                       <input
                         value={row.action_no}
-                        onChange={(e) => updateActionRow(index, "action_no", e.target.value)}
-                        style={inputStyle}
+                        readOnly
+                        style={readOnlyInputStyle}
                       />
                       <input
                         value={row.description}
@@ -2672,23 +2893,29 @@ function MOCPageContent() {
                         onChange={(e) => updateActionRow(index, "target_date", e.target.value)}
                         style={inputStyle}
                       />
-                      <input
-                        value={row.status}
+                      <select
+                        value={normaliseActionPlanStatus(row.status)}
                         onChange={(e) => updateActionRow(index, "status", e.target.value)}
                         style={inputStyle}
-                      />
+                      >
+                        {actionPlanStatusOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
                       <div style={rowActionsWrapStyle}>
                         <RowOrderControls
                           index={index}
                           total={detailActionItems.length}
                           onMove={(direction) => moveActionRow(index, direction)}
-                          disabled={!canEditStructural}
+                          disabled={!canEditImplementationStructure}
                         />
                         <button
                           type="button"
                           style={removeRowButtonStyle}
                           onClick={() => removeActionRow(index)}
-                          disabled={!canEditStructural}
+                          disabled={!canEditImplementationStructure}
                         >
                           Remove
                         </button>
@@ -2700,7 +2927,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="D. CHANGE IMPACT">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
                 <div style={impactGridStyle}>
                   <ImpactToggle
                     label="Health & Safety"
@@ -2790,7 +3017,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="E. AFFECTED DOCUMENTATION">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
                 <RepeatTableToolbar onAdd={addAffectedDocumentRow} label="Add Document Row" disabled={!canEditStructural} />
                 <SimpleDocumentTable
                   rows={detailAffectedDocuments}
@@ -2803,7 +3030,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="F. RISK MANAGEMENT">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
                 <RepeatTableToolbar onAdd={addRiskDocumentRow} label="Add Risk Document Row" disabled={!canEditStructural} />
                 <SimpleDocumentTable
                   rows={detailRiskDocuments}
@@ -2883,7 +3110,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="G. HAZARDS & MITIGATING ACTIONS">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
                 <div style={detailFormGridStyle}>
                   <div>
                     <Field label="Describe potential Hazards & Risks">
@@ -2908,7 +3135,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="H. COST REVIEW">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
                 <Field label="Description of cost impact (incl. future savings)">
                   <textarea
                     value={detailReport.cost_review_description}
@@ -2920,7 +3147,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="I. SCHEDULE REVIEW">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
                 <Field label="Description of the schedule impact (incl. future savings)">
                   <textarea
                     value={detailReport.schedule_review_description}
@@ -2932,7 +3159,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="J. SUPPORTING DOCUMENTATION AND INFORMATION">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <Field label="Supporting documentation and information">
@@ -2964,8 +3191,77 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
+              <DetailSubsection title="Supporting Documents">
+                <div style={attachmentSectionIntroStyle}>
+                  Upload and manage MOC-specific supporting files such as procedures, drawings, HIRAs, client documents, screenshots, or implementation evidence.
+                </div>
+
+                <div style={attachmentToolbarStyle}>
+                  <label
+                    htmlFor="moc-attachment-upload"
+                    style={{
+                      ...secondaryButtonStyle,
+                      opacity: uploadingAttachments || !canManageAttachments ? 0.6 : 1,
+                      cursor: uploadingAttachments || !canManageAttachments ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {uploadingAttachments ? "Uploading..." : "Upload Document"}
+                    <input
+                      id="moc-attachment-upload"
+                      type="file"
+                      multiple
+                      accept={allowedMocAttachmentExtensions.join(",")}
+                      onChange={(event) => void handleAttachmentUpload(event)}
+                      style={hiddenFileInputStyle}
+                      disabled={uploadingAttachments || !canManageAttachments}
+                    />
+                  </label>
+                  <div style={attachmentToolbarHintStyle}>
+                    {canManageAttachments
+                      ? "Files remain attached to this MOC record and can be opened or removed here."
+                      : "Closed MOCs are read-only. Supporting documents can still be viewed."}
+                  </div>
+                </div>
+
+                {selectedReportAttachments.length === 0 ? (
+                  <div style={attachmentEmptyStateStyle}>No supporting documents uploaded for this MOC yet.</div>
+                ) : (
+                  <div style={attachmentListStyle}>
+                    {selectedReportAttachments.map((file) => (
+                      <div key={file.id} style={attachmentRowStyle}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={attachmentFileNameStyle}>{file.file_name}</div>
+                          <div style={attachmentMetaStyle}>
+                            {formatFileSize(file.file_size)} | {file.content_type || "Unknown type"} | Uploaded{" "}
+                            {formatDateTime(file.uploaded_at)}
+                          </div>
+                        </div>
+                        <div style={attachmentActionsStyle}>
+                          <button
+                            type="button"
+                            style={secondaryButtonSmall}
+                            onClick={() => void openAttachment(file)}
+                            disabled={attachmentActionId === file.id}
+                          >
+                            Open / Download
+                          </button>
+                          <button
+                            type="button"
+                            style={removeRowButtonStyle}
+                            onClick={() => void removeAttachment(file)}
+                            disabled={!canManageAttachments || attachmentActionId === file.id}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </DetailSubsection>
+
               <DetailSubsection title="K. REVIEW AND ENDORSEMENT">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditReviewSections}>
                 <RepeatTableToolbar onAdd={addReviewRow} label="Add Review Row" disabled={!canEditStructural} />
                 <div style={reviewTableWrapStyle}>
                   <div style={reviewHeadStyle}>
@@ -3023,6 +3319,8 @@ function MOCPageContent() {
                         value={row.signature}
                         onTextChange={(value) => updateReviewRow(index, "signature", value)}
                         onFileSelect={(file) => uploadReviewSignature(index, file)}
+                        inputId={`moc-review-signature-${index}`}
+                        disabled={!canEditReviewSections}
                       />
                       <input
                         type="date"
@@ -3058,7 +3356,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="L. MOC CHANGE ACCEPTANCE">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <fieldset style={fieldsetResetStyle} disabled={!canEditReviewSections}>
                 <RepeatTableToolbar onAdd={addAcceptanceRow} label="Add Acceptance Row" disabled={!canEditStructural} />
                 <SimpleSignoffTable
                   rows={detailAcceptanceRows}
@@ -3066,7 +3364,8 @@ function MOCPageContent() {
                   onRemove={removeAcceptanceRow}
                   onMove={moveAcceptanceRow}
                   onSignatureUpload={uploadAcceptanceSignature}
-                  disabled={!canEditStructural}
+                  disabled={!canEditReviewSections}
+                  inputIdPrefix="moc-acceptance-signature"
                 />
                 </fieldset>
               </DetailSubsection>
@@ -3085,6 +3384,7 @@ function MOCPageContent() {
                   onMove={moveCloseoutRow}
                   onSignatureUpload={uploadCloseoutSignature}
                   disabled={!canEditCloseoutStructure}
+                  inputIdPrefix="moc-closeout-signature"
                 />
                 </fieldset>
               </DetailSubsection>
@@ -3238,10 +3538,14 @@ function SignatureFieldInput({
   value,
   onTextChange,
   onFileSelect,
+  inputId,
+  disabled,
 }: {
   value: string;
   onTextChange: (value: string) => void;
   onFileSelect: (file: File | null) => void;
+  inputId: string;
+  disabled?: boolean;
 }) {
   const usingImage = isDataImageUrl(value);
 
@@ -3253,19 +3557,46 @@ function SignatureFieldInput({
         style={inputStyle}
         placeholder={usingImage ? "Signature image stored" : "Typed signature"}
       />
+      {usingImage ? (
+        <div style={signaturePreviewStyle}>
+          <Image
+            src={value}
+            alt="Stored signature preview"
+            width={64}
+            height={28}
+            unoptimized
+            style={signatureImageThumbStyle}
+          />
+          <span style={signaturePreviewTextStyle}>Signature image attached</span>
+        </div>
+      ) : (
+        <div style={signatureHintStyle}>Type a signature or upload a stored signature image.</div>
+      )}
       <div style={signatureFieldActionsStyle}>
         <input
+          id={inputId}
           type="file"
           accept="image/*"
           onChange={(e) => {
             onFileSelect(e.target.files?.[0] || null);
             e.currentTarget.value = "";
           }}
-          style={signatureFileInputStyle}
+          style={hiddenFileInputStyle}
+          disabled={disabled}
         />
+        <label
+          htmlFor={inputId}
+          style={{
+            ...signatureButtonStyle,
+            opacity: disabled ? 0.55 : 1,
+            cursor: disabled ? "not-allowed" : "pointer",
+          }}
+        >
+          {usingImage ? "Replace Signature" : "Upload Signature"}
+        </label>
         {usingImage ? (
-          <button type="button" style={rowMoveButtonStyle} onClick={() => onTextChange("")}>
-            Clear Image
+          <button type="button" style={rowMoveButtonStyle} onClick={() => onTextChange("")} disabled={disabled}>
+            Clear Signature
           </button>
         ) : null}
       </div>
@@ -3323,6 +3654,7 @@ function SimpleSignoffTable({
   onMove,
   onSignatureUpload,
   disabled,
+  inputIdPrefix,
 }: {
   rows: MocSignoffRow[];
   onChange: (index: number, key: keyof MocSignoffRow, value: string | number) => void;
@@ -3330,6 +3662,7 @@ function SimpleSignoffTable({
   onMove: (index: number, direction: -1 | 1) => void;
   onSignatureUpload: (index: number, file: File | null) => void;
   disabled?: boolean;
+  inputIdPrefix: string;
 }) {
   return (
     <div style={tableEditorWrapStyle}>
@@ -3350,6 +3683,8 @@ function SimpleSignoffTable({
             value={row.signature}
             onTextChange={(value) => onChange(index, "signature", value)}
             onFileSelect={(file) => onSignatureUpload(index, file)}
+            inputId={`${inputIdPrefix}-${index}`}
+            disabled={disabled}
           />
           <input
             type="date"
@@ -3875,47 +4210,69 @@ const simpleDocRowStyle: CSSProperties = {
 
 const reviewTableWrapStyle: CSSProperties = {
   display: "grid",
-  gap: "10px",
+  gap: "12px",
 };
 
 const reviewHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "0.6fr 0.6fr 1.1fr 1fr 1fr 0.8fr 1fr 0.9fr 1.1fr 1.15fr",
-  gap: "8px",
+  gridTemplateColumns: "0.65fr 0.65fr 1.15fr 1fr 1fr 0.85fr 1.35fr 0.95fr 1.05fr 1.1fr",
+  gap: "10px",
+  padding: "10px 12px",
+  borderRadius: "14px",
+  border: "1px solid #d7dee7",
+  background: "#f8fafc",
   fontSize: "12px",
   fontWeight: 800,
   color: "#64748b",
   textTransform: "uppercase",
+  letterSpacing: 0.3,
 };
 
 const reviewRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "0.6fr 0.6fr 1.1fr 1fr 1fr 0.8fr 1fr 0.9fr 1.1fr 1.15fr",
-  gap: "8px",
+  gridTemplateColumns: "0.65fr 0.65fr 1.15fr 1fr 1fr 0.85fr 1.35fr 0.95fr 1.05fr 1.1fr",
+  gap: "10px",
   alignItems: "center",
+  padding: "12px",
+  borderRadius: "14px",
+  border: "1px solid #d7dee7",
+  background: "#ffffff",
 };
 
 const checkboxCellStyle: CSSProperties = {
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
+  minHeight: "42px",
+  borderRadius: "10px",
+  border: "1px solid #cbd5e1",
+  background: "#ffffff",
 };
 
 const simpleSignoffHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.2fr 1fr 1fr 1fr 0.9fr 1.15fr",
+  gridTemplateColumns: "1.25fr 1fr 1fr 1.3fr 0.95fr 1.1fr",
   gap: "10px",
+  padding: "10px 12px",
+  borderRadius: "14px",
+  border: "1px solid #d7dee7",
+  background: "#f8fafc",
   fontSize: "12px",
   fontWeight: 800,
   color: "#64748b",
   textTransform: "uppercase",
+  letterSpacing: 0.3,
 };
 
 const simpleSignoffRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.2fr 1fr 1fr 1fr 0.9fr 1.15fr",
+  gridTemplateColumns: "1.25fr 1fr 1fr 1.3fr 0.95fr 1.1fr",
   gap: "10px",
   alignItems: "center",
+  padding: "12px",
+  borderRadius: "14px",
+  border: "1px solid #d7dee7",
+  background: "#ffffff",
 };
 
 const rowActionsWrapStyle: CSSProperties = {
@@ -3934,6 +4291,18 @@ const signatureFieldStackStyle: CSSProperties = {
   gap: "6px",
 };
 
+const hiddenFileInputStyle: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
 const signatureFieldActionsStyle: CSSProperties = {
   display: "flex",
   gap: "6px",
@@ -3941,9 +4310,48 @@ const signatureFieldActionsStyle: CSSProperties = {
   flexWrap: "wrap",
 };
 
-const signatureFileInputStyle: CSSProperties = {
-  maxWidth: "100%",
+const signatureButtonStyle: CSSProperties = {
+  padding: "8px 10px",
+  borderRadius: 8,
+  border: "1px solid #93c5fd",
+  background: "#eff6ff",
+  color: "#1d4ed8",
+  fontWeight: 700,
+  cursor: "pointer",
   fontSize: "12px",
+  lineHeight: 1.2,
+};
+
+const signaturePreviewStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  minHeight: "38px",
+  padding: "8px 10px",
+  borderRadius: "10px",
+  border: "1px solid #d7dee7",
+  background: "#f8fafc",
+};
+
+const signatureImageThumbStyle: CSSProperties = {
+  width: "64px",
+  height: "28px",
+  objectFit: "contain",
+  borderRadius: "6px",
+  background: "#ffffff",
+  border: "1px solid #cbd5e1",
+  padding: "2px",
+};
+
+const signaturePreviewTextStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 700,
+  color: "#475569",
+};
+
+const signatureHintStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#64748b",
 };
 
 const rowMoveButtonStyle: CSSProperties = {
@@ -4069,6 +4477,71 @@ const detailButtonRowStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   marginTop: "20px",
+};
+
+const attachmentSectionIntroStyle: CSSProperties = {
+  marginBottom: "12px",
+  color: "#475569",
+  fontSize: "14px",
+  lineHeight: 1.5,
+};
+
+const attachmentToolbarStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "center",
+  flexWrap: "wrap",
+  marginBottom: "14px",
+};
+
+const attachmentToolbarHintStyle: CSSProperties = {
+  color: "#64748b",
+  fontSize: "13px",
+};
+
+const attachmentEmptyStateStyle: CSSProperties = {
+  padding: "16px",
+  borderRadius: "14px",
+  border: "1px dashed #cbd5e1",
+  background: "#ffffff",
+  color: "#475569",
+};
+
+const attachmentListStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const attachmentRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "center",
+  flexWrap: "wrap",
+  padding: "14px 16px",
+  borderRadius: "14px",
+  border: "1px solid #d7dee7",
+  background: "#ffffff",
+};
+
+const attachmentFileNameStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 800,
+  color: "#0f172a",
+  overflowWrap: "anywhere",
+};
+
+const attachmentMetaStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "12px",
+  color: "#64748b",
+};
+
+const attachmentActionsStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
 };
 
 const emptyBoardStyle: CSSProperties = {

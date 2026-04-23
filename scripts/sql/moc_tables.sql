@@ -114,3 +114,16 @@ create table if not exists public.moc_closeout_rows (
   signature text,
   signoff_date date
 );
+
+create table if not exists public.moc_attachments (
+  id uuid primary key default gen_random_uuid(),
+  moc_report_id uuid not null references public.moc_reports(id) on delete cascade,
+  file_name text not null,
+  file_path text not null,
+  file_size bigint,
+  content_type text,
+  uploaded_at timestamptz default now()
+);
+
+create index if not exists moc_attachments_moc_report_id_idx
+  on public.moc_attachments(moc_report_id);
