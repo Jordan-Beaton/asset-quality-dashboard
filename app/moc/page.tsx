@@ -15,6 +15,7 @@ type ChangeType = "Permanent" | "Temporary";
 type YesNoNa = "Yes" | "No" | "N/A";
 type ApprovedChoice = "Yes" | "No";
 type NoticeTone = "neutral" | "success" | "warning" | "error";
+type MocViewFilter = "All" | "Recent" | "Expired Temporary" | "Expiry Soon" | "Draft Ageing";
 
 type MocReport = {
   id: string;
@@ -150,6 +151,7 @@ type PdfImageMeta = {
 };
 
 const mocStatusOptions: MocStatus[] = ["Draft", "In Review", "Approved", "Closed"];
+const mocViewOptions: MocViewFilter[] = ["All", "Recent", "Expired Temporary", "Expiry Soon", "Draft Ageing"];
 
 const defaultReviewParties = [
   "HSE",
@@ -580,6 +582,90 @@ function getNoticeColours(tone: NoticeTone) {
   return { bg: "#ffffff", border: "#e2e8f0", text: "#0f172a" };
 }
 
+function getCreatedOrUpdatedTime(report: MocReport) {
+  return new Date(report.created_at || report.updated_at || 0).getTime();
+}
+
+function isRecentMoc(report: MocReport) {
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() - 30);
+  const date = new Date(report.created_at || report.updated_at || 0);
+  return !Number.isNaN(date.getTime()) && date >= threshold;
+}
+
+function isExpiredTemporary(report: MocReport) {
+  if (report.change_type !== "Temporary" || report.status === "Closed") return false;
+  const days = getDaysFromToday(report.temporary_valid_to);
+  return days !== null && days < 0;
+}
+
+function isNearingTemporaryExpiry(report: MocReport) {
+  if (report.change_type !== "Temporary" || report.status === "Closed") return false;
+  const days = getDaysFromToday(report.temporary_valid_to);
+  return days !== null && days >= 0 && days <= 7;
+}
+
+function isDraftAged(report: MocReport) {
+  if (report.status !== "Draft") return false;
+  const created = new Date(report.created_at || report.updated_at || 0);
+  if (Number.isNaN(created.getTime())) return false;
+  const today = new Date();
+  created.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const diffMs = today.getTime() - created.getTime();
+  return diffMs / (1000 * 60 * 60 * 24) > 14;
+}
+
+function getTemporaryValidityLabel(report: MocReport) {
+  if (report.change_type !== "Temporary") return "";
+  const days = getDaysFromToday(report.temporary_valid_to);
+  if (!report.temporary_valid_to) return "No validity end set";
+  if (days === null) return `Valid to ${formatDate(report.temporary_valid_to)}`;
+  if (days < 0) {
+    return `Expired ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago`;
+  }
+  if (days === 0) return "Expires today";
+  if (days <= 14) return `Expires in ${days} day${days === 1 ? "" : "s"}`;
+  return `Valid to ${formatDate(report.temporary_valid_to)}`;
+}
+
+function getTemporaryValidityTone(report: MocReport) {
+  if (isExpiredTemporary(report)) return { color: "#b91c1c" };
+  if (isNearingTemporaryExpiry(report)) return { color: "#b45309" };
+  return { color: "#475569" };
+}
+
+function getNextWorkflowStatus(status: MocStatus): MocStatus | null {
+  if (status === "Draft") return "In Review";
+  if (status === "In Review") return "Approved";
+  if (status === "Approved") return "Closed";
+  return null;
+}
+
+function getWorkflowButtonLabel(status: MocStatus) {
+  if (status === "Draft") return "Submit for Review";
+  if (status === "In Review") return "Approve";
+  if (status === "Approved") return "Close";
+  return "";
+}
+
+function buildMocHref(params?: Record<string, string | number | null | undefined>) {
+  if (!params) return "/moc";
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === "") return;
+    search.set(key, String(value));
+  });
+  const query = search.toString();
+  return query ? `/moc?${query}` : "/moc";
+}
+
+function parseMocStatusFilter(value: string | null | undefined): "All" | "Active" | MocStatus {
+  if (value === "Active") return "Active";
+  if (value === "Draft" || value === "In Review" || value === "Approved" || value === "Closed") return value;
+  return "All";
+}
+
 function buildRegisterUpdatedAt(report: MocReport) {
   return report.updated_at || report.created_at || "";
 }
@@ -588,6 +674,9 @@ function MOCPageContent() {
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "All";
+  const linkedChangeType = searchParams.get("change_type")?.trim() || "All";
+  const linkedRecent = searchParams.get("recent")?.trim() || "";
+  const linkedAttention = searchParams.get("attention")?.trim() || "";
 
   const [reports, setReports] = useState<MocReport[]>([]);
   const [actionPlanItems, setActionPlanItems] = useState<MocActionPlanItem[]>([]);
@@ -604,7 +693,21 @@ function MOCPageContent() {
   const [messageTone, setMessageTone] = useState<NoticeTone>("neutral");
   const [refreshStamp, setRefreshStamp] = useState("");
   const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState(linkedStatus === "All" ? "All" : normaliseStatus(linkedStatus));
+  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | MocStatus>(parseMocStatusFilter(linkedStatus));
+  const [changeTypeFilter, setChangeTypeFilter] = useState<"All" | ChangeType>(
+    linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All"
+  );
+  const [viewFilter, setViewFilter] = useState<MocViewFilter>(
+    linkedAttention === "expired-temporary"
+      ? "Expired Temporary"
+      : linkedAttention === "expiry-soon"
+      ? "Expiry Soon"
+      : linkedAttention === "draft-ageing"
+      ? "Draft Ageing"
+      : linkedRecent === "1"
+      ? "Recent"
+      : "All"
+  );
   const [selectedReportId, setSelectedReportId] = useState("");
   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());
   const [detailReport, setDetailReport] = useState<MocReport>(createEmptyReport());
@@ -633,7 +736,8 @@ function MOCPageContent() {
 
   const filteredReports = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return reports.filter((report) => {
+    return [...reports]
+      .filter((report) => {
       const matchesSearch =
         !query ||
         report.moc_report_no.toLowerCase().includes(query) ||
@@ -641,10 +745,20 @@ function MOCPageContent() {
         report.project_worksite_address.toLowerCase().includes(query) ||
         report.moc_coordinator_name.toLowerCase().includes(query) ||
         report.responsible_manager_name.toLowerCase().includes(query);
-      const matchesStatus = statusFilter === "All" || report.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [reports, search, statusFilter]);
+      const matchesStatus =
+        statusFilter === "All" ||
+        (statusFilter === "Active" ? report.status !== "Closed" : report.status === statusFilter);
+      const matchesChangeType = changeTypeFilter === "All" || report.change_type === changeTypeFilter;
+      const matchesView =
+        viewFilter === "All" ||
+        (viewFilter === "Recent" && isRecentMoc(report)) ||
+        (viewFilter === "Expired Temporary" && isExpiredTemporary(report)) ||
+        (viewFilter === "Expiry Soon" && isNearingTemporaryExpiry(report)) ||
+        (viewFilter === "Draft Ageing" && isDraftAged(report));
+      return matchesSearch && matchesStatus && matchesChangeType && matchesView;
+    })
+      .sort((a, b) => getCreatedOrUpdatedTime(b) - getCreatedOrUpdatedTime(a));
+  }, [reports, search, statusFilter, changeTypeFilter, viewFilter]);
 
   const openCount = useMemo(
     () => reports.filter((report) => report.status !== "Closed").length,
@@ -658,15 +772,46 @@ function MOCPageContent() {
     () => reports.filter((report) => report.status === "Approved").length,
     [reports]
   );
+  const inReviewCount = useMemo(
+    () => reports.filter((report) => report.status === "In Review").length,
+    [reports]
+  );
+  const expirySoonCount = useMemo(() => reports.filter((report) => isNearingTemporaryExpiry(report)).length, [reports]);
   const recentCount = useMemo(() => {
-    const threshold = new Date();
-    threshold.setDate(threshold.getDate() - 30);
-    return reports.filter((report) => {
-      const date = new Date(report.created_at || report.updated_at || 0);
-      return !Number.isNaN(date.getTime()) && date >= threshold;
-    }).length;
+    return reports.filter((report) => isRecentMoc(report)).length;
   }, [reports]);
   const statusBannerColours = getNoticeColours(messageTone);
+  const nextWorkflowStatus = getNextWorkflowStatus(detailReport.status);
+  const canEditMainFields = detailReport.status === "Draft" || detailReport.status === "In Review";
+  const canEditStructural = detailReport.status === "Draft";
+  const canEditCloseout = detailReport.status !== "Closed";
+  const canEditCloseoutStructure = detailReport.status === "Draft" || detailReport.status === "Approved";
+  const canSaveDetail = Boolean(selectedReportId) && detailReport.status !== "Closed";
+  const detailWorkflowMessage =
+    detailReport.status === "Draft"
+      ? "Draft records are fully editable."
+      : detailReport.status === "In Review"
+      ? "In Review records allow content edits only. Structural row changes are locked."
+      : detailReport.status === "Approved"
+      ? "Approved records are read-only except for close-out completion."
+      : "Closed records are fully locked.";
+
+  useEffect(() => {
+    setSearch(linkedSearch);
+    setStatusFilter(parseMocStatusFilter(linkedStatus));
+    setChangeTypeFilter(linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All");
+    setViewFilter(
+      linkedAttention === "expired-temporary"
+        ? "Expired Temporary"
+        : linkedAttention === "expiry-soon"
+        ? "Expiry Soon"
+        : linkedAttention === "draft-ageing"
+        ? "Draft Ageing"
+        : linkedRecent === "1"
+        ? "Recent"
+        : "All"
+    );
+  }, [linkedAttention, linkedChangeType, linkedRecent, linkedSearch, linkedStatus]);
 
   async function handleSignatureFile(
     file: File | null,
@@ -1060,7 +1205,7 @@ function MOCPageContent() {
         moc_coordinator_name: starterForm.moc_coordinator_name,
         responsible_manager_name: starterForm.responsible_manager_name,
         change_type: starterForm.change_type,
-        status: starterForm.status,
+        status: "Draft",
       };
 
       const insertRes = await supabase
@@ -1115,7 +1260,10 @@ function MOCPageContent() {
 
   async function saveSelectedMoc() {
     if (!selectedReportId) return;
-
+    if (detailReport.status === "Closed") {
+      showMessage("Closed MOCs are locked and cannot be edited.", "warning");
+      return;
+    }
     setSaving(true);
     const previousBundle = getBundleFromData(selectedReportId);
     try {
@@ -1133,6 +1281,66 @@ function MOCPageContent() {
       const loaded = await loadData();
       openBundle(selectedReportId, loaded);
       showMessage(`Saved ${detailReport.moc_report_no}.`, "success");
+    } catch (error) {
+      if (previousBundle) {
+        try {
+          await restoreBundle(previousBundle);
+          await loadData();
+          openBundle(selectedReportId);
+          showMessage(
+            `Partial failure while saving ${detailReport.moc_report_no}. Previous saved data was restored. ${getErrorMessage(
+              error
+            )}`,
+            "warning"
+          );
+        } catch (restoreError) {
+          console.error(`[MOC] Failed restoring previous bundle for ${selectedReportId}`, restoreError);
+          showMessage(
+            `Partial failure while saving ${detailReport.moc_report_no}. Restore also failed: ${getErrorMessage(
+              restoreError
+            )}`,
+            "warning"
+          );
+        }
+      } else {
+        showMessage(getErrorMessage(error), "error");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function progressSelectedMoc(nextStatus: MocStatus) {
+    if (!selectedReportId) return;
+
+    const allowedNext = getNextWorkflowStatus(detailReport.status);
+    if (allowedNext !== nextStatus) {
+      showMessage(`Status cannot move directly from ${detailReport.status} to ${nextStatus}.`, "warning");
+      return;
+    }
+
+    setSaving(true);
+    const previousBundle = getBundleFromData(selectedReportId);
+    const nextReport = { ...detailReport, status: nextStatus };
+    const nextBundle = {
+      ...buildCurrentDetailBundle(),
+      report: nextReport,
+    };
+    try {
+      const updateRes = await supabase
+        .from("moc_reports")
+        .update(buildParentPayload(nextReport))
+        .eq("id", selectedReportId);
+
+      if (updateRes.error) {
+        throw new Error(updateRes.error.message);
+      }
+
+      await persistChildTables(selectedReportId, nextBundle);
+
+      const loaded = await loadData();
+      openBundle(selectedReportId, loaded);
+      showMessage(`${detailReport.moc_report_no} moved to ${nextStatus}.`, "success");
     } catch (error) {
       if (previousBundle) {
         try {
@@ -1974,10 +2182,24 @@ function MOCPageContent() {
       </div>
 
       <section style={kpiRowStyle}>
-        <CompactMetricCard title="Active MOCs" value={openCount} accent="#f59e0b" />
-        <CompactMetricCard title="Temporary MOCs" value={temporaryCount} accent="#2563eb" />
-        <CompactMetricCard title="Approved MOCs" value={approvedCount} accent="#dc2626" />
-        <CompactMetricCard title="Recently Created" value={recentCount} accent="#16a34a" />
+        <Link href={buildMocHref({ status: "Active" })} style={metricLinkStyle}>
+          <CompactMetricCard title="Active MOCs" value={openCount} accent="#f59e0b" />
+        </Link>
+        <Link href={buildMocHref({ change_type: "Temporary" })} style={metricLinkStyle}>
+          <CompactMetricCard title="Temporary MOCs" value={temporaryCount} accent="#2563eb" />
+        </Link>
+        <Link href={buildMocHref({ status: "In Review" })} style={metricLinkStyle}>
+          <CompactMetricCard title="In Review" value={inReviewCount} accent="#7c3aed" />
+        </Link>
+        <Link href={buildMocHref({ status: "Approved" })} style={metricLinkStyle}>
+          <CompactMetricCard title="Approved MOCs" value={approvedCount} accent="#dc2626" />
+        </Link>
+        <Link href={buildMocHref({ attention: "expiry-soon" })} style={metricLinkStyle}>
+          <CompactMetricCard title="Expiry in 7 Days" value={expirySoonCount} accent="#b45309" />
+        </Link>
+        <Link href={buildMocHref({ recent: 1 })} style={metricLinkStyle}>
+          <CompactMetricCard title="Recently Created" value={recentCount} accent="#16a34a" />
+        </Link>
       </section>
 
       <section style={topGridStyle}>
@@ -1989,17 +2211,7 @@ function MOCPageContent() {
               </Field>
 
               <Field label="Status">
-                <select
-                  value={starterForm.status}
-                  onChange={(e) => setStarterForm((prev) => ({ ...prev, status: e.target.value as MocStatus }))}
-                  style={inputStyle}
-                >
-                  {mocStatusOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                <input value="Draft" readOnly style={readOnlyInputStyle} />
               </Field>
 
               <div style={{ gridColumn: "1 / -1" }}>
@@ -2090,9 +2302,30 @@ function MOCPageContent() {
             <div style={toolbarFiltersStyle}>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={toolbarSelectStyle}>
                 <option value="All">All statuses</option>
+                <option value="Active">Active</option>
                 {mocStatusOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={changeTypeFilter}
+                onChange={(e) => setChangeTypeFilter(e.target.value as "All" | ChangeType)}
+                style={toolbarSelectStyle}
+              >
+                <option value="All">All change types</option>
+                <option value="Permanent">Permanent</option>
+                <option value="Temporary">Temporary</option>
+              </select>
+              <select
+                value={viewFilter}
+                onChange={(e) => setViewFilter(e.target.value as MocViewFilter)}
+                style={toolbarSelectStyle}
+              >
+                {mocViewOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === "Recent" ? "Recently Created" : option}
                   </option>
                 ))}
               </select>
@@ -2106,7 +2339,17 @@ function MOCPageContent() {
           {loading ? (
             <div style={emptyBoardStyle}>Loading MOC records...</div>
           ) : filteredReports.length === 0 ? (
-            <div style={emptyBoardStyle}>No MOC records found.</div>
+            <div style={emptyBoardStyle}>
+              {viewFilter === "Expired Temporary"
+                ? "No expired temporary MOCs match the current filters."
+                : viewFilter === "Expiry Soon"
+                ? "No temporary MOCs nearing expiry match the current filters."
+                : viewFilter === "Draft Ageing"
+                ? "No draft MOCs older than 14 days match the current filters."
+                : viewFilter === "Recent"
+                ? "No recently created MOCs match the current filters."
+                : "No MOC records match the current filters."}
+            </div>
           ) : (
             <div style={registerTableWrapStyle}>
               <div style={mocRegisterHeadStyle}>
@@ -2152,6 +2395,11 @@ function MOCPageContent() {
                         <span style={{ ...badgeStyle, background: typeTone.bg, color: typeTone.color }}>
                           {report.change_type}
                         </span>
+                        {report.change_type === "Temporary" ? (
+                          <div style={{ ...temporaryMetaStyle, ...getTemporaryValidityTone(report) }}>
+                            {getTemporaryValidityLabel(report)}
+                          </div>
+                        ) : null}
                       </div>
                       <div>
                         <span style={{ ...badgeStyle, background: statusTone.bg, color: statusTone.color }}>
@@ -2186,6 +2434,7 @@ function MOCPageContent() {
               <div>
                 <div style={detailRecordNumberStyle}>{detailReport.moc_report_no}</div>
                 <h3 style={detailRecordTitleStyle}>{detailReport.moc_report_title || "Untitled MOC"}</h3>
+                <div style={detailWorkflowHintStyle}>{detailWorkflowMessage}</div>
               </div>
               <div style={detailHeaderActionsStyle}>
                 <span
@@ -2197,6 +2446,16 @@ function MOCPageContent() {
                 >
                   {detailReport.status}
                 </span>
+                {nextWorkflowStatus ? (
+                  <button
+                    type="button"
+                    style={workflowButtonStyle}
+                    onClick={() => void progressSelectedMoc(nextWorkflowStatus)}
+                    disabled={saving}
+                  >
+                    {getWorkflowButtonLabel(detailReport.status)}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   style={secondaryButtonStyle}
@@ -2209,22 +2468,13 @@ function MOCPageContent() {
 
             <div style={subSectionStackStyle}>
               <DetailSubsection title="A. MOC REPORT DETAILS">
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
                 <div style={detailFormGridStyle}>
                   <Field label="MOC Report No.">
                     <input value={detailReport.moc_report_no} readOnly style={readOnlyInputStyle} />
                   </Field>
                   <Field label="Status">
-                    <select
-                      value={detailReport.status}
-                      onChange={(e) => updateDetailField("status", e.target.value as MocStatus)}
-                      style={inputStyle}
-                    >
-                      {mocStatusOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                    <input value={detailReport.status} readOnly style={readOnlyInputStyle} />
                   </Field>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <Field label="MOC Report Title">
@@ -2273,9 +2523,11 @@ function MOCPageContent() {
                     />
                   </Field>
                 </div>
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="B. CHANGE IDENTIFICATION">
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <Field label="Description of the change (proposed change)">
@@ -2307,7 +2559,9 @@ function MOCPageContent() {
                               ...segmentedButtonFillStyle,
                               background: detailReport.change_type === option ? "#0f766e" : "transparent",
                               color: detailReport.change_type === option ? "#ffffff" : "#0f172a",
+                              opacity: canEditStructural ? 1 : 0.65,
                             }}
+                            disabled={!canEditStructural}
                             onClick={() => updateDetailField("change_type", option)}
                           >
                             {option}
@@ -2334,6 +2588,11 @@ function MOCPageContent() {
                       </Field>
                     </div>
                   </div>
+                  {detailReport.change_type === "Temporary" ? (
+                    <div style={detailTemporaryHintStyle}>
+                      {getTemporaryValidityLabel(detailReport) || "Set temporary validity dates to track expiry."}
+                    </div>
+                  ) : null}
                   <div style={{ gridColumn: "1 / -1" }}>
                     <Field label="How will the change be implemented?">
                       <textarea
@@ -2353,10 +2612,12 @@ function MOCPageContent() {
                     </Field>
                   </div>
                 </div>
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="C. ACTION PLAN">
-                <RepeatTableToolbar onAdd={addActionRow} label="Add Action Row" />
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <RepeatTableToolbar onAdd={addActionRow} label="Add Action Row" disabled={!canEditStructural} />
                 <div style={tableEditorWrapStyle}>
                   <div style={actionPlanHeadStyle}>
                     <div>No</div>
@@ -2399,17 +2660,25 @@ function MOCPageContent() {
                           index={index}
                           total={detailActionItems.length}
                           onMove={(direction) => moveActionRow(index, direction)}
+                          disabled={!canEditStructural}
                         />
-                        <button type="button" style={removeRowButtonStyle} onClick={() => removeActionRow(index)}>
+                        <button
+                          type="button"
+                          style={removeRowButtonStyle}
+                          onClick={() => removeActionRow(index)}
+                          disabled={!canEditStructural}
+                        >
                           Remove
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="D. CHANGE IMPACT">
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
                 <div style={impactGridStyle}>
                   <ImpactToggle
                     label="Health & Safety"
@@ -2495,25 +2764,31 @@ function MOCPageContent() {
                     </Field>
                   </div>
                 ) : null}
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="E. AFFECTED DOCUMENTATION">
-                <RepeatTableToolbar onAdd={addAffectedDocumentRow} label="Add Document Row" />
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <RepeatTableToolbar onAdd={addAffectedDocumentRow} label="Add Document Row" disabled={!canEditStructural} />
                 <SimpleDocumentTable
                   rows={detailAffectedDocuments}
                   onChange={updateAffectedDocumentRow}
                   onRemove={removeAffectedDocumentRow}
                   onMove={moveAffectedDocumentRow}
+                  disabled={!canEditStructural}
                 />
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="F. RISK MANAGEMENT">
-                <RepeatTableToolbar onAdd={addRiskDocumentRow} label="Add Risk Document Row" />
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <RepeatTableToolbar onAdd={addRiskDocumentRow} label="Add Risk Document Row" disabled={!canEditStructural} />
                 <SimpleDocumentTable
                   rows={detailRiskDocuments}
                   onChange={updateRiskDocumentRow}
                   onRemove={removeRiskDocumentRow}
                   onMove={moveRiskDocumentRow}
+                  disabled={!canEditStructural}
                 />
 
                 <div style={{ marginTop: 16 }} />
@@ -2582,9 +2857,11 @@ function MOCPageContent() {
                     </Field>
                   </div>
                 </div>
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="G. HAZARDS & MITIGATING ACTIONS">
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
                 <div style={detailFormGridStyle}>
                   <div>
                     <Field label="Describe potential Hazards & Risks">
@@ -2605,9 +2882,11 @@ function MOCPageContent() {
                     </Field>
                   </div>
                 </div>
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="H. COST REVIEW">
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
                 <Field label="Description of cost impact (incl. future savings)">
                   <textarea
                     value={detailReport.cost_review_description}
@@ -2615,9 +2894,11 @@ function MOCPageContent() {
                     style={textareaStyle}
                   />
                 </Field>
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="I. SCHEDULE REVIEW">
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
                 <Field label="Description of the schedule impact (incl. future savings)">
                   <textarea
                     value={detailReport.schedule_review_description}
@@ -2625,9 +2906,11 @@ function MOCPageContent() {
                     style={textareaStyle}
                   />
                 </Field>
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="J. SUPPORTING DOCUMENTATION AND INFORMATION">
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <Field label="Supporting documentation and information">
@@ -2656,10 +2939,12 @@ function MOCPageContent() {
                     </label>
                   </Field>
                 </div>
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="K. REVIEW AND ENDORSEMENT">
-                <RepeatTableToolbar onAdd={addReviewRow} label="Add Review Row" />
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <RepeatTableToolbar onAdd={addReviewRow} label="Add Review Row" disabled={!canEditStructural} />
                 <div style={reviewTableWrapStyle}>
                   <div style={reviewHeadStyle}>
                     <div>Approve</div>
@@ -2733,41 +3018,63 @@ function MOCPageContent() {
                           index={index}
                           total={detailReviewRows.length}
                           onMove={(direction) => moveReviewRow(index, direction)}
+                          disabled={!canEditStructural}
                         />
-                        <button type="button" style={removeRowButtonStyle} onClick={() => removeReviewRow(index)}>
+                        <button
+                          type="button"
+                          style={removeRowButtonStyle}
+                          onClick={() => removeReviewRow(index)}
+                          disabled={!canEditStructural}
+                        >
                           Remove
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="L. MOC CHANGE ACCEPTANCE">
-                <RepeatTableToolbar onAdd={addAcceptanceRow} label="Add Acceptance Row" />
+                <fieldset style={fieldsetResetStyle} disabled={!canEditMainFields}>
+                <RepeatTableToolbar onAdd={addAcceptanceRow} label="Add Acceptance Row" disabled={!canEditStructural} />
                 <SimpleSignoffTable
                   rows={detailAcceptanceRows}
                   onChange={updateAcceptanceRow}
                   onRemove={removeAcceptanceRow}
                   onMove={moveAcceptanceRow}
                   onSignatureUpload={uploadAcceptanceSignature}
+                  disabled={!canEditStructural}
                 />
+                </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="M. MOC CLOSE-OUT VERIFICATION">
-                <RepeatTableToolbar onAdd={addCloseoutRow} label="Add Close-Out Row" />
+                <fieldset style={fieldsetResetStyle} disabled={!canEditCloseout}>
+                <RepeatTableToolbar
+                  onAdd={addCloseoutRow}
+                  label="Add Close-Out Row"
+                  disabled={!canEditCloseoutStructure}
+                />
                 <SimpleSignoffTable
                   rows={detailCloseoutRows}
                   onChange={updateCloseoutRow}
                   onRemove={removeCloseoutRow}
                   onMove={moveCloseoutRow}
                   onSignatureUpload={uploadCloseoutSignature}
+                  disabled={!canEditCloseoutStructure}
                 />
+                </fieldset>
               </DetailSubsection>
             </div>
 
             <div style={detailButtonRowStyle}>
-              <button type="button" style={primaryButtonStyle} onClick={() => void saveSelectedMoc()} disabled={saving}>
+              <button
+                type="button"
+                style={primaryButtonStyle}
+                onClick={() => void saveSelectedMoc()}
+                disabled={saving || !canSaveDetail}
+              >
                 {saving ? "Saving..." : "Save MOC"}
               </button>
               <button
@@ -2853,10 +3160,10 @@ function DetailSubsection({ title, children }: { title: string; children: ReactN
   );
 }
 
-function RepeatTableToolbar({ onAdd, label }: { onAdd: () => void; label: string }) {
+function RepeatTableToolbar({ onAdd, label, disabled }: { onAdd: () => void; label: string; disabled?: boolean }) {
   return (
     <div style={repeatToolbarStyle}>
-      <button type="button" style={secondaryButtonStyle} onClick={onAdd}>
+      <button type="button" style={secondaryButtonStyle} onClick={onAdd} disabled={disabled}>
         {label}
       </button>
     </div>
@@ -2867,17 +3174,19 @@ function RowOrderControls({
   index,
   total,
   onMove,
+  disabled,
 }: {
   index: number;
   total: number;
   onMove: (direction: -1 | 1) => void;
+  disabled?: boolean;
 }) {
   return (
     <div style={rowActionsStyle}>
-      <button type="button" style={rowMoveButtonStyle} onClick={() => onMove(-1)} disabled={index === 0}>
+      <button type="button" style={rowMoveButtonStyle} onClick={() => onMove(-1)} disabled={disabled || index === 0}>
         Up
       </button>
-      <button type="button" style={rowMoveButtonStyle} onClick={() => onMove(1)} disabled={index === total - 1}>
+      <button type="button" style={rowMoveButtonStyle} onClick={() => onMove(1)} disabled={disabled || index === total - 1}>
         Down
       </button>
     </div>
@@ -2947,11 +3256,13 @@ function SimpleDocumentTable({
   onChange,
   onRemove,
   onMove,
+  disabled,
 }: {
   rows: MocDocumentRow[];
   onChange: (index: number, key: keyof MocDocumentRow, value: string) => void;
   onRemove: (index: number) => void;
   onMove: (index: number, direction: -1 | 1) => void;
+  disabled?: boolean;
 }) {
   return (
     <div style={tableEditorWrapStyle}>
@@ -2967,8 +3278,13 @@ function SimpleDocumentTable({
           <input value={row.title} onChange={(e) => onChange(index, "title", e.target.value)} style={inputStyle} />
           <input value={row.rev} onChange={(e) => onChange(index, "rev", e.target.value)} style={inputStyle} />
           <div style={rowActionsWrapStyle}>
-            <RowOrderControls index={index} total={rows.length} onMove={(direction) => onMove(index, direction)} />
-            <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)}>
+            <RowOrderControls
+              index={index}
+              total={rows.length}
+              onMove={(direction) => onMove(index, direction)}
+              disabled={disabled}
+            />
+            <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
               Remove
             </button>
           </div>
@@ -2984,12 +3300,14 @@ function SimpleSignoffTable({
   onRemove,
   onMove,
   onSignatureUpload,
+  disabled,
 }: {
   rows: MocSignoffRow[];
   onChange: (index: number, key: keyof MocSignoffRow, value: string | number) => void;
   onRemove: (index: number) => void;
   onMove: (index: number, direction: -1 | 1) => void;
   onSignatureUpload: (index: number, file: File | null) => void;
+  disabled?: boolean;
 }) {
   return (
     <div style={tableEditorWrapStyle}>
@@ -3018,8 +3336,13 @@ function SimpleSignoffTable({
             style={inputStyle}
           />
           <div style={rowActionsWrapStyle}>
-            <RowOrderControls index={index} total={rows.length} onMove={(direction) => onMove(index, direction)} />
-            <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)}>
+            <RowOrderControls
+              index={index}
+              total={rows.length}
+              onMove={(direction) => onMove(index, direction)}
+              disabled={disabled}
+            />
+            <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
               Remove
             </button>
           </div>
@@ -3146,6 +3469,10 @@ const kpiRowStyle: CSSProperties = {
   gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "14px",
   marginBottom: "18px",
+};
+
+const metricLinkStyle: CSSProperties = {
+  textDecoration: "none",
 };
 
 const compactMetricCardStyle: CSSProperties = {
@@ -3387,6 +3714,13 @@ const registerSimpleTextStyle: CSSProperties = {
   fontWeight: 700,
 };
 
+const temporaryMetaStyle: CSSProperties = {
+  marginTop: "6px",
+  fontSize: "12px",
+  fontWeight: 700,
+  lineHeight: 1.35,
+};
+
 const detailHeaderStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
@@ -3408,11 +3742,35 @@ const detailRecordTitleStyle: CSSProperties = {
   color: "#0f172a",
 };
 
+const detailWorkflowHintStyle: CSSProperties = {
+  marginTop: "8px",
+  fontSize: "13px",
+  color: "#64748b",
+  lineHeight: 1.45,
+};
+
 const detailHeaderActionsStyle: CSSProperties = {
   display: "flex",
   gap: "10px",
   flexWrap: "wrap",
   alignItems: "center",
+};
+
+const workflowButtonStyle: CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: 10,
+  border: "1px solid #0f766e",
+  background: "#0f766e",
+  color: "#ffffff",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const fieldsetResetStyle: CSSProperties = {
+  margin: 0,
+  padding: 0,
+  border: "none",
+  minWidth: 0,
 };
 
 const subSectionStackStyle: CSSProperties = {
@@ -3432,6 +3790,19 @@ const detailSectionTitleStyle: CSSProperties = {
   fontWeight: 800,
   color: "#0f172a",
   marginBottom: "14px",
+};
+
+const detailTemporaryHintStyle: CSSProperties = {
+  gridColumn: "1 / -1",
+  marginTop: "-2px",
+  marginBottom: "2px",
+  padding: "10px 12px",
+  borderRadius: "10px",
+  border: "1px solid #fde68a",
+  background: "#fffbeb",
+  color: "#92400e",
+  fontSize: "13px",
+  fontWeight: 700,
 };
 
 const repeatToolbarStyle: CSSProperties = {

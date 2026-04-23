@@ -85,6 +85,17 @@ type DocumentSummary = {
   next_review_date: string | null;
 };
 
+type MocRecord = {
+  id: string;
+  moc_report_no: string | null;
+  moc_report_title: string | null;
+  change_type: string | null;
+  status: string | null;
+  temporary_valid_to: string | null;
+  created_at: string | null;
+  updated_at?: string | null;
+};
+
 function normaliseStatus(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
 }
@@ -176,6 +187,18 @@ function monthLabel(key: string) {
   return date.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
 }
 
+function dateMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getAuditMonthKey(audit: AuditRecord) {
+  if (audit.audit_month && /^\d{4}-\d{2}$/.test(audit.audit_month)) {
+    return audit.audit_month;
+  }
+
+  return monthKey(audit.audit_date);
+}
+
 function getPriorityRank(value: string | null | undefined) {
   const priority = normaliseStatus(value);
   if (priority === "critical") return 0;
@@ -215,6 +238,30 @@ function getDocumentBucket(document: DocumentSummary) {
   return "Draft";
 }
 
+function isExpiredTemporaryMoc(record: MocRecord) {
+  if ((record.change_type || "") !== "Temporary") return false;
+  if (normaliseStatus(record.status) === "closed") return false;
+  const days = getDaysFromToday(record.temporary_valid_to);
+  return days !== null && days < 0;
+}
+
+function isNearingTemporaryMoc(record: MocRecord) {
+  if ((record.change_type || "") !== "Temporary") return false;
+  if (normaliseStatus(record.status) === "closed") return false;
+  const days = getDaysFromToday(record.temporary_valid_to);
+  return days !== null && days >= 0 && days <= 7;
+}
+
+function isDraftAgedMoc(record: MocRecord) {
+  if (normaliseStatus(record.status) !== "draft") return false;
+  const created = new Date(record.created_at || record.updated_at || 0);
+  if (Number.isNaN(created.getTime())) return false;
+  const today = new Date();
+  created.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return (today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24) > 14;
+}
+
 export default function Home() {
   const router = useRouter();
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
@@ -223,6 +270,7 @@ export default function Home() {
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [auditFindings, setAuditFindings] = useState<AuditFindingRow[]>([]);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const [mocs, setMocs] = useState<MocRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -241,6 +289,7 @@ export default function Home() {
         findingRes,
         assetQualityRes,
         documentRes,
+        mocRes,
       ] = await Promise.all([
         supabase.from("assets").select("*"),
         supabase.from("ncrs").select("*"),
@@ -250,6 +299,9 @@ export default function Home() {
         supabase.from("audit_findings").select("*"),
         supabase.from("asset_quality").select("id,asset_id"),
         supabase.from("documents").select("id,status,review_approval_status,next_review_date"),
+        supabase
+          .from("moc_reports")
+          .select("id,moc_report_no,moc_report_title,change_type,status,temporary_valid_to,created_at,updated_at"),
       ]);
 
       if (
@@ -260,7 +312,8 @@ export default function Home() {
         auditRes.error ||
         findingRes.error ||
         assetQualityRes.error ||
-        documentRes.error
+        documentRes.error ||
+        mocRes.error
       ) {
         setError(
           assetRes.error?.message ||
@@ -271,6 +324,7 @@ export default function Home() {
             findingRes.error?.message ||
             assetQualityRes.error?.message ||
             documentRes.error?.message ||
+            mocRes.error?.message ||
             "Failed to load dashboard data."
         );
         setIsLoading(false);
@@ -283,6 +337,7 @@ export default function Home() {
       setAudits((auditRes.data || []) as AuditRecord[]);
       setAuditFindings((findingRes.data || []) as AuditFindingRow[]);
       setDocuments((documentRes.data || []) as DocumentSummary[]);
+      setMocs((mocRes.data || []) as MocRecord[]);
       setLastRefreshed(new Date());
       setIsLoading(false);
     };
@@ -294,6 +349,9 @@ export default function Home() {
   const openCapas = capas.filter((item) => !isClosedLikeStatus(item.status)).length;
   const openActions = actions.filter((item) => !isClosedLikeStatus(item.status)).length;
   const openAuditFindings = auditFindings.filter((item) => !isClosedLikeStatus(item.status)).length;
+  const openMocs = mocs.filter((item) => normaliseStatus(item.status) !== "closed").length;
+  const temporaryMocs = mocs.filter((item) => (item.change_type || "") === "Temporary").length;
+  const inReviewMocs = mocs.filter((item) => normaliseStatus(item.status) === "in review").length;
 
   const overdueActions = actions.filter((action) => {
     if (isClosedLikeStatus(action.status)) return false;
@@ -302,6 +360,9 @@ export default function Home() {
   }).length;
 
   const overdueDocuments = documents.filter((doc) => getDocumentBucket(doc) === "Overdue").length;
+  const expiredTemporaryMocs = mocs.filter((item) => isExpiredTemporaryMoc(item)).length;
+  const nearingTemporaryMocs = mocs.filter((item) => isNearingTemporaryMoc(item)).length;
+  const agedDraftMocs = mocs.filter((item) => isDraftAgedMoc(item)).length;
 
   const overdueNcrCapas = [...ncrs, ...capas].filter((item) => {
     if (isClosedLikeStatus(item.status)) return false;
@@ -389,6 +450,40 @@ export default function Home() {
 
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [documents]);
+
+  const mocStatusData = useMemo(() => {
+    const counts = {
+      Draft: 0,
+      "In Review": 0,
+      Approved: 0,
+      Closed: 0,
+    };
+
+    mocs.forEach((moc) => {
+      const status = moc.status || "Draft";
+      if (status === "Draft" || status === "In Review" || status === "Approved" || status === "Closed") {
+        counts[status] += 1;
+      }
+    });
+
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [mocs]);
+
+  const mocChangeTypeData = useMemo(() => {
+    const counts = {
+      Permanent: 0,
+      Temporary: 0,
+    };
+
+    mocs.forEach((moc) => {
+      const type = moc.change_type || "Permanent";
+      if (type === "Permanent" || type === "Temporary") {
+        counts[type] += 1;
+      }
+    });
+
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [mocs]);
 
   const topProblemAreas = useMemo(() => {
     const repeatCounts = auditFindings.reduce<Record<string, number>>((acc, finding) => {
@@ -499,31 +594,44 @@ export default function Home() {
       .slice(0, 5);
   }, [actions]);
 
-  const upcomingAudits = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const currentMonthAuditKey = useMemo(() => dateMonthKey(new Date()), []);
 
-    const future = audits
-      .filter((audit) => {
-        if (!audit.audit_date) return false;
-        const date = new Date(audit.audit_date);
-        if (Number.isNaN(date.getTime())) return false;
-        date.setHours(0, 0, 0, 0);
-        return date >= today && normaliseStatus(audit.status) !== "completed";
-      })
-      .sort((a, b) => new Date(a.audit_date || "").getTime() - new Date(b.audit_date || "").getTime())
-      .slice(0, 5);
+  const nextMonthAuditKey = useMemo(() => {
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    return dateMonthKey(nextMonth);
+  }, []);
 
-    if (future.length > 0) return future;
-
+  const currentMonthAudits = useMemo(() => {
     return [...audits]
+      .filter((audit) => getAuditMonthKey(audit) === currentMonthAuditKey)
       .sort((a, b) => {
         const aDate = a.audit_date ? new Date(a.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
         const bDate = b.audit_date ? new Date(b.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
-        return aDate - bDate;
-      })
-      .slice(0, 5);
-  }, [audits]);
+        if (aDate !== bDate) return aDate - bDate;
+        return (a.audit_number || a.title || "").localeCompare(b.audit_number || b.title || "");
+      });
+  }, [audits, currentMonthAuditKey]);
+
+  const nextMonthAudits = useMemo(() => {
+    return [...audits]
+      .filter((audit) => getAuditMonthKey(audit) === nextMonthAuditKey)
+      .sort((a, b) => {
+        const aDate = a.audit_date ? new Date(a.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.audit_date ? new Date(b.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
+        if (aDate !== bDate) return aDate - bDate;
+        return (a.audit_number || a.title || "").localeCompare(b.audit_number || b.title || "");
+      });
+  }, [audits, nextMonthAuditKey]);
+
+  const currentMonthCompletedAudits = useMemo(() => {
+    return currentMonthAudits.filter((audit) => normaliseStatus(audit.status) === "completed").length;
+  }, [currentMonthAudits]);
+
+  const currentMonthOutstandingAudits = currentMonthAudits.length - currentMonthCompletedAudits;
+  const currentMonthCompletionRate = currentMonthAudits.length
+    ? Math.round((currentMonthCompletedAudits / currentMonthAudits.length) * 100)
+    : 0;
 
   const kpis = [
     {
@@ -549,6 +657,24 @@ export default function Home() {
       value: openAuditFindings,
       accent: "#7c3aed",
       href: buildHref("/audits", { findingStatus: "Open" }),
+    },
+    {
+      label: "Open MOCs",
+      value: openMocs,
+      accent: "#0f766e",
+      href: buildHref("/moc", { status: "Active" }),
+    },
+    {
+      label: "Temporary MOCs",
+      value: temporaryMocs,
+      accent: "#2563eb",
+      href: buildHref("/moc", { change_type: "Temporary" }),
+    },
+    {
+      label: "MOCs In Review",
+      value: inReviewMocs,
+      accent: "#7c3aed",
+      href: buildHref("/moc", { status: "In Review" }),
     },
     {
       label: "Overdue Actions",
@@ -578,6 +704,10 @@ export default function Home() {
       return;
     }
     router.push(buildHref("/documents", { review: "Overdue" }));
+  }
+
+  function openMocStatusBucket(bucket: string) {
+    router.push(buildHref("/moc", { status: bucket === "Closed" ? "Closed" : bucket }));
   }
 
   return (
@@ -769,6 +899,59 @@ export default function Home() {
             </div>
           )}
         </SectionCard>
+
+        <SectionCard title="MOC Status" subtitle="Draft, in review, approved, and closed MOC positions.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mocStatusData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar
+                    dataKey="value"
+                    fill="#0f766e"
+                    radius={[6, 6, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data: { name?: string }) => openMocStatusBucket(data?.name || "")}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="MOC Change Type" subtitle="Permanent versus temporary change records.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mocChangeTypeData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar
+                    dataKey="value"
+                    radius={[6, 6, 0, 0]}
+                    cursor="pointer"
+                    onClick={(data: { name?: string }) =>
+                      router.push(buildHref("/moc", { change_type: data?.name || "" }))
+                    }
+                  >
+                    {mocChangeTypeData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.name === "Temporary" ? "#f59e0b" : "#2563eb"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </SectionCard>
       </section>
 
       <section style={insightGridStyle}>
@@ -778,14 +961,14 @@ export default function Home() {
           ) : topProblemAreas.length === 0 ? (
             <p style={emptyTextStyle}>No audit findings available yet.</p>
           ) : (
-            <div style={stackCompactStyle}>
+            <div style={topProblemAreasStackStyle}>
               {topProblemAreas.map((item, index) => (
                 <Link
                   key={item.label}
                   href={buildHref("/audits", { search: item.label })}
-                  style={compactInsightLinkStyle}
+                  style={topProblemAreaLinkStyle}
                 >
-                  <div style={compactInsightRankStyle}>#{index + 1}</div>
+                  <div style={topProblemAreaRankStyle}>#{index + 1}</div>
                   <div style={compactInsightBodyStyle}>
                     <div style={compactInsightTitleStyle}>{item.label}</div>
                     <div style={compactInsightMetaStyle}>
@@ -801,7 +984,7 @@ export default function Home() {
           )}
         </SectionCard>
 
-        <SectionCard title="Overdue Work" subtitle="Current overdue workload across actions, NCR/CAPA, and documents.">
+        <SectionCard title="Overdue Work & MOC Attention" subtitle="Current overdue workload plus management visibility for temporary and ageing MOCs.">
           <div style={stackCompactStyle}>
             <SummaryRow
               label="Overdue Actions"
@@ -820,6 +1003,27 @@ export default function Home() {
               value={overdueDocuments}
               href={buildHref("/documents", { status: "Overdue" })}
               isLoading={isLoading}
+            />
+            <SummaryRow
+              label="Expired Temporary MOCs"
+              value={expiredTemporaryMocs}
+              href={buildHref("/moc", { attention: "expired-temporary" })}
+              isLoading={isLoading}
+              tone="critical"
+            />
+            <SummaryRow
+              label="Temporary MOCs Near Expiry"
+              value={nearingTemporaryMocs}
+              href={buildHref("/moc", { attention: "expiry-soon" })}
+              isLoading={isLoading}
+              tone="warning"
+            />
+            <SummaryRow
+              label="Draft MOCs > 14 Days"
+              value={agedDraftMocs}
+              href={buildHref("/moc", { attention: "draft-ageing" })}
+              isLoading={isLoading}
+              tone="warning"
             />
           </div>
         </SectionCard>
@@ -879,38 +1083,99 @@ export default function Home() {
         </SectionCard>
 
         <SectionCard
-          title="Upcoming Audits"
-          subtitle="Next five scheduled audits."
+          title="Current Month Planned Audits"
+          subtitle={`Live view for ${monthLabel(currentMonthAuditKey)} showing planned, completed, and outstanding audits.`}
           action={
-            <Link href="/audits" style={sectionLinkStyle}>
+            <Link href={buildHref("/audits", { month: currentMonthAuditKey })} style={sectionLinkStyle}>
               Open audits {"->"}
             </Link>
           }
         >
           {isLoading ? (
             <p style={emptyTextStyle}>Loading audits...</p>
-          ) : upcomingAudits.length === 0 ? (
-            <p style={emptyTextStyle}>No audits found.</p>
           ) : (
             <div style={stackCompactStyle}>
-              {upcomingAudits.map((audit) => (
-                <Link
-                  key={audit.id}
-                  href={buildHref("/audits", { search: audit.audit_number || audit.title || "" })}
-                  style={workItemStyle}
-                >
-                  <div style={workItemTopStyle}>
-                    <div style={workItemNumberStyle}>{audit.audit_number || "-"}</div>
-                    <StatusBadge value={audit.status || "Unknown"} />
-                  </div>
-                  <div style={workItemTitleStyle}>{audit.title || "-"}</div>
-                  <div style={workItemMetaStyle}>
-                    <span>{audit.audit_type || "-"}</span>
-                    <span>{formatAuditMonth(audit.audit_month)}</span>
-                    <span>{formatDate(audit.audit_date)}</span>
-                  </div>
+              <div style={auditMonthSummaryGridStyle}>
+                <Link href={buildHref("/audits", { month: currentMonthAuditKey })} style={summaryMetricCardStyle}>
+                  <span style={summaryMetricLabelStyle}>Planned This Month</span>
+                  <strong style={summaryMetricValueStyle}>{currentMonthAudits.length}</strong>
                 </Link>
-              ))}
+                <Link
+                  href={buildHref("/audits", { month: currentMonthAuditKey, status: "Completed" })}
+                  style={summaryMetricCardStyle}
+                >
+                  <span style={summaryMetricLabelStyle}>Completed</span>
+                  <strong style={summaryMetricValueStyle}>{currentMonthCompletedAudits}</strong>
+                </Link>
+                <Link href={buildHref("/audits", { month: currentMonthAuditKey })} style={summaryMetricCardStyle}>
+                  <span style={summaryMetricLabelStyle}>Outstanding</span>
+                  <strong style={summaryMetricValueStyle}>{currentMonthOutstandingAudits}</strong>
+                </Link>
+                <Link href={buildHref("/audits", { month: currentMonthAuditKey })} style={summaryMetricCardStyle}>
+                  <span style={summaryMetricLabelStyle}>Completion Rate</span>
+                  <strong style={summaryMetricValueStyle}>{currentMonthCompletionRate}%</strong>
+                </Link>
+              </div>
+
+              {currentMonthAudits.length === 0 ? (
+                <p style={emptyTextStyle}>No audits are planned for {monthLabel(currentMonthAuditKey)}.</p>
+              ) : (
+                <div style={stackCompactStyle}>
+                  {currentMonthAudits.map((audit) => (
+                    <Link
+                      key={audit.id}
+                      href={buildHref("/audits", {
+                        search: audit.audit_number || audit.title || "",
+                        month: currentMonthAuditKey,
+                      })}
+                      style={workItemStyle}
+                    >
+                      <div style={workItemTopStyle}>
+                        <div style={workItemNumberStyle}>{audit.audit_number || "-"}</div>
+                        <StatusBadge value={audit.status || "Unknown"} />
+                      </div>
+                      <div style={workItemTitleStyle}>{audit.title || "-"}</div>
+                      <div style={workItemMetaStyle}>
+                        <span>{audit.audit_type || "-"}</span>
+                        <span>{formatAuditMonth(getAuditMonthKey(audit))}</span>
+                        <span>{formatDate(audit.audit_date)}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              <div style={nextMonthPreviewStyle}>
+                <div style={nextMonthPreviewHeaderStyle}>
+                  <span style={nextMonthPreviewLabelStyle}>Next Month Planned</span>
+                  <Link href={buildHref("/audits", { month: nextMonthAuditKey })} style={sectionLinkStyle}>
+                    View {monthLabel(nextMonthAuditKey)} {"->"}
+                  </Link>
+                </div>
+                <div style={nextMonthPreviewCountStyle}>
+                  {nextMonthAudits.length} planned for {monthLabel(nextMonthAuditKey)}
+                </div>
+                {nextMonthAudits.length > 0 ? (
+                  <div style={nextMonthSnippetListStyle}>
+                    {nextMonthAudits.slice(0, 3).map((audit) => (
+                      <Link
+                        key={audit.id}
+                        href={buildHref("/audits", {
+                          search: audit.audit_number || audit.title || "",
+                          month: nextMonthAuditKey,
+                        })}
+                        style={nextMonthSnippetItemStyle}
+                      >
+                        <span style={nextMonthSnippetNumberStyle}>{audit.audit_number || "-"}</span>
+                        <span style={nextMonthSnippetTitleStyle}>{audit.title || "-"}</span>
+                        <StatusBadge value={audit.status || "Unknown"} />
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={emptyTextStyle}>No audits are planned for {monthLabel(nextMonthAuditKey)}.</p>
+                )}
+              </div>
             </div>
           )}
         </SectionCard>
@@ -983,14 +1248,23 @@ function SummaryRow({
   value,
   href,
   isLoading,
+  tone = "default",
 }: {
   label: string;
   value: number;
   href?: string;
   isLoading?: boolean;
+  tone?: "default" | "warning" | "critical";
 }) {
+  const toneStyles =
+    tone === "critical"
+      ? { background: "#fff7f7", borderColor: "#fecaca" }
+      : tone === "warning"
+      ? { background: "#fffaf0", borderColor: "#fde68a" }
+      : null;
+
   const content = (
-    <div style={summaryRowStyle}>
+    <div style={{ ...summaryRowStyle, ...(toneStyles || {}) }}>
       <span style={summaryRowLabelStyle}>{label}</span>
       <strong style={summaryRowValueStyle}>{isLoading ? "-" : value}</strong>
     </div>
@@ -1029,6 +1303,8 @@ function StatusBadge({ value }: { value: string }) {
       ? { background: "#dcfce7", color: "#166534" }
       : lower === "open"
       ? { background: "#dbeafe", color: "#1d4ed8" }
+      : lower === "in review"
+      ? { background: "#ede9fe", color: "#6d28d9" }
       : lower === "in progress"
       ? { background: "#fef3c7", color: "#92400e" }
       : lower === "planned"
@@ -1142,7 +1418,7 @@ const errorBannerStyle: CSSProperties = {
 
 const kpiGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
   gap: "12px",
   marginBottom: "18px",
 };
@@ -1178,7 +1454,7 @@ const chartGridStyle: CSSProperties = {
 
 const insightGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.2fr 0.8fr",
+  gridTemplateColumns: "1fr 1fr",
   gap: "18px",
   marginBottom: "18px",
 };
@@ -1241,21 +1517,32 @@ const stackCompactStyle: CSSProperties = {
   gap: "10px",
 };
 
+const topProblemAreasStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "8px",
+};
+
 const compactInsightLinkStyle: CSSProperties = {
   textDecoration: "none",
   display: "flex",
   alignItems: "center",
   gap: "12px",
-  padding: "12px 14px",
+  padding: "10px 12px",
   borderRadius: "14px",
   border: "1px solid #e2e8f0",
   background: "#f8fafc",
   color: "#0f172a",
 };
 
+const topProblemAreaLinkStyle: CSSProperties = {
+  ...compactInsightLinkStyle,
+  padding: "8px 10px",
+  gap: "10px",
+};
+
 const compactInsightRankStyle: CSSProperties = {
-  width: "34px",
-  height: "34px",
+  width: "30px",
+  height: "30px",
   borderRadius: "999px",
   background: "#dbeafe",
   color: "#1d4ed8",
@@ -1267,6 +1554,12 @@ const compactInsightRankStyle: CSSProperties = {
   flexShrink: 0,
 };
 
+const topProblemAreaRankStyle: CSSProperties = {
+  ...compactInsightRankStyle,
+  width: "28px",
+  height: "28px",
+};
+
 const compactInsightBodyStyle: CSSProperties = {
   minWidth: 0,
   flex: 1,
@@ -1274,18 +1567,107 @@ const compactInsightBodyStyle: CSSProperties = {
 
 const compactInsightTitleStyle: CSSProperties = {
   fontWeight: 800,
-  fontSize: "14px",
+  fontSize: "13px",
   color: "#0f172a",
-  marginBottom: "4px",
+  marginBottom: "2px",
 };
 
 const compactInsightMetaStyle: CSSProperties = {
   display: "flex",
-  gap: "10px",
+  gap: "8px",
   flexWrap: "wrap",
-  fontSize: "12px",
+  fontSize: "11px",
   color: "#64748b",
   lineHeight: 1.4,
+};
+
+const auditMonthSummaryGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: "10px",
+};
+
+const summaryMetricCardStyle: CSSProperties = {
+  textDecoration: "none",
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: "12px",
+  padding: "10px 12px",
+  display: "grid",
+  gap: "4px",
+  color: "#0f172a",
+};
+
+const summaryMetricLabelStyle: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 700,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: "0.03em",
+};
+
+const summaryMetricValueStyle: CSSProperties = {
+  fontSize: "22px",
+  lineHeight: 1.1,
+  color: "#0f172a",
+};
+
+const nextMonthPreviewStyle: CSSProperties = {
+  borderTop: "1px solid #e2e8f0",
+  paddingTop: "12px",
+  display: "grid",
+  gap: "8px",
+};
+
+const nextMonthPreviewHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
+};
+
+const nextMonthPreviewLabelStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 800,
+  color: "#0f172a",
+};
+
+const nextMonthPreviewCountStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#475569",
+};
+
+const nextMonthSnippetListStyle: CSSProperties = {
+  display: "grid",
+  gap: "8px",
+};
+
+const nextMonthSnippetItemStyle: CSSProperties = {
+  textDecoration: "none",
+  color: "#0f172a",
+  display: "grid",
+  gridTemplateColumns: "auto 1fr auto",
+  alignItems: "center",
+  gap: "10px",
+  padding: "8px 10px",
+  borderRadius: "10px",
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+};
+
+const nextMonthSnippetNumberStyle: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 800,
+  color: "#64748b",
+  whiteSpace: "nowrap",
+};
+
+const nextMonthSnippetTitleStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "#0f172a",
+  minWidth: 0,
 };
 
 const summaryRowStyle: CSSProperties = {

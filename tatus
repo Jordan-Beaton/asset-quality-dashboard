@@ -1,0 +1,304 @@
+warning: in the working copy of 'app/moc/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/page.tsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/app/moc/page.tsx b/app/moc/page.tsx[m
+[1mindex 8cb4956..e2e16ec 100644[m
+[1m--- a/app/moc/page.tsx[m
+[1m+++ b/app/moc/page.tsx[m
+[36m@@ -15,6 +15,7 @@[m [mtype ChangeType = "Permanent" | "Temporary";[m
+ type YesNoNa = "Yes" | "No" | "N/A";[m
+ type ApprovedChoice = "Yes" | "No";[m
+ type NoticeTone = "neutral" | "success" | "warning" | "error";[m
+[32m+[m[32mtype MocViewFilter = "All" | "Recent" | "Expired Temporary" | "Expiry Soon" | "Draft Ageing";[m
+ [m
+ type MocReport = {[m
+   id: string;[m
+[36m@@ -150,6 +151,7 @@[m [mtype PdfImageMeta = {[m
+ };[m
+ [m
+ const mocStatusOptions: MocStatus[] = ["Draft", "In Review", "Approved", "Closed"];[m
+[32m+[m[32mconst mocViewOptions: MocViewFilter[] = ["All", "Recent", "Expired Temporary", "Expiry Soon", "Draft Ageing"];[m
+ [m
+ const defaultReviewParties = [[m
+   "HSE",[m
+[36m@@ -580,6 +582,90 @@[m [mfunction getNoticeColours(tone: NoticeTone) {[m
+   return { bg: "#ffffff", border: "#e2e8f0", text: "#0f172a" };[m
+ }[m
+ [m
+[32m+[m[32mfunction getCreatedOrUpdatedTime(report: MocReport) {[m
+[32m+[m[32m  return new Date(report.created_at || report.updated_at || 0).getTime();[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction isRecentMoc(report: MocReport) {[m
+[32m+[m[32m  const threshold = new Date();[m
+[32m+[m[32m  threshold.setDate(threshold.getDate() - 30);[m
+[32m+[m[32m  const date = new Date(report.created_at || report.updated_at || 0);[m
+[32m+[m[32m  return !Number.isNaN(date.getTime()) && date >= threshold;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction isExpiredTemporary(report: MocReport) {[m
+[32m+[m[32m  if (report.change_type !== "Temporary" || report.status === "Closed") return false;[m
+[32m+[m[32m  const days = getDaysFromToday(report.temporary_valid_to);[m
+[32m+[m[32m  return days !== null && days < 0;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction isNearingTemporaryExpiry(report: MocReport) {[m
+[32m+[m[32m  if (report.change_type !== "Temporary" || report.status === "Closed") return false;[m
+[32m+[m[32m  const days = getDaysFromToday(report.temporary_valid_to);[m
+[32m+[m[32m  return days !== null && days >= 0 && days <= 7;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction isDraftAged(report: MocReport) {[m
+[32m+[m[32m  if (report.status !== "Draft") return false;[m
+[32m+[m[32m  const created = new Date(report.created_at || report.updated_at || 0);[m
+[32m+[m[32m  if (Number.isNaN(created.getTime())) return false;[m
+[32m+[m[32m  const today = new Date();[m
+[32m+[m[32m  created.setHours(0, 0, 0, 0);[m
+[32m+[m[32m  today.setHours(0, 0, 0, 0);[m
+[32m+[m[32m  const diffMs = today.getTime() - created.getTime();[m
+[32m+[m[32m  return diffMs / (1000 * 60 * 60 * 24) > 14;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction getTemporaryValidityLabel(report: MocReport) {[m
+[32m+[m[32m  if (report.change_type !== "Temporary") return "";[m
+[32m+[m[32m  const days = getDaysFromToday(report.temporary_valid_to);[m
+[32m+[m[32m  if (!report.temporary_valid_to) return "No validity end set";[m
+[32m+[m[32m  if (days === null) return `Valid to ${formatDate(report.temporary_valid_to)}`;[m
+[32m+[m[32m  if (days < 0) {[m
+[32m+[m[32m    return `Expired ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago`;[m
+[32m+[m[32m  }[m
+[32m+[m[32m  if (days === 0) return "Expires today";[m
+[32m+[m[32m  if (days <= 14) return `Expires in ${days} day${days === 1 ? "" : "s"}`;[m
+[32m+[m[32m  return `Valid to ${formatDate(report.temporary_valid_to)}`;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction getTemporaryValidityTone(report: MocReport) {[m
+[32m+[m[32m  if (isExpiredTemporary(report)) return { color: "#b91c1c" };[m
+[32m+[m[32m  if (isNearingTemporaryExpiry(report)) return { color: "#b45309" };[m
+[32m+[m[32m  return { color: "#475569" };[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction getNextWorkflowStatus(status: MocStatus): MocStatus | null {[m
+[32m+[m[32m  if (status === "Draft") return "In Review";[m
+[32m+[m[32m  if (status === "In Review") return "Approved";[m
+[32m+[m[32m  if (status === "Approved") return "Closed";[m
+[32m+[m[32m  return null;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction getWorkflowButtonLabel(status: MocStatus) {[m
+[32m+[m[32m  if (status === "Draft") return "Submit for Review";[m
+[32m+[m[32m  if (status === "In Review") return "Approve";[m
+[32m+[m[32m  if (status === "Approved") return "Close";[m
+[32m+[m[32m  return "";[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction buildMocHref(params?: Record<string, string | number | null | undefined>) {[m
+[32m+[m[32m  if (!params) return "/moc";[m
+[32m+[m[32m  const search = new URLSearchParams();[m
+[32m+[m[32m  Object.entries(params).forEach(([key, value]) => {[m
+[32m+[m[32m    if (value === null || value === undefined || value === "") return;[m
+[32m+[m[32m    search.set(key, String(value));[m
+[32m+[m[32m  });[m
+[32m+[m[32m  const query = search.toString();[m
+[32m+[m[32m  return query ? `/moc?${query}` : "/moc";[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mfunction parseMocStatusFilter(value: string | null | undefined): "All" | "Active" | MocStatus {[m
+[32m+[m[32m  if (value === "Active") return "Active";[m
+[32m+[m[32m  if (value === "Draft" || value === "In Review" || value === "Approved" || value === "Closed") return value;[m
+[32m+[m[32m  return "All";[m
+[32m+[m[32m}[m
+[32m+[m
+ function buildRegisterUpdatedAt(report: MocReport) {[m
+   return report.updated_at || report.created_at || "";[m
+ }[m
+[36m@@ -588,6 +674,9 @@[m [mfunction MOCPageContent() {[m
+   const searchParams = useSearchParams();[m
+   const linkedSearch = searchParams.get("search")?.trim() || "";[m
+   const linkedStatus = searchParams.get("status")?.trim() || "All";[m
+[32m+[m[32m  const linkedChangeType = searchParams.get("change_type")?.trim() || "All";[m
+[32m+[m[32m  const linkedRecent = searchParams.get("recent")?.trim() || "";[m
+[32m+[m[32m  const linkedAttention = searchParams.get("attention")?.trim() || "";[m
+ [m
+   const [reports, setReports] = useState<MocReport[]>([]);[m
+   const [actionPlanItems, setActionPlanItems] = useState<MocActionPlanItem[]>([]);[m
+[36m@@ -604,7 +693,21 @@[m [mfunction MOCPageContent() {[m
+   const [messageTone, setMessageTone] = useState<NoticeTone>("neutral");[m
+   const [refreshStamp, setRefreshStamp] = useState("");[m
+   const [search, setSearch] = useState(linkedSearch);[m
+[31m-  const [statusFilter, setStatusFilter] = useState(linkedStatus === "All" ? "All" : normaliseStatus(linkedStatus));[m
+[32m+[m[32m  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | MocStatus>(parseMocStatusFilter(linkedStatus));[m
+[32m+[m[32m  const [changeTypeFilter, setChangeTypeFilter] = useState<"All" | ChangeType>([m
+[32m+[m[32m    linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All"[m
+[32m+[m[32m  );[m
+[32m+[m[32m  const [viewFilter, setViewFilter] = useState<MocViewFilter>([m
+[32m+[m[32m    linkedAttention === "expired-temporary"[m
+[32m+[m[32m      ? "Expired Temporary"[m
+[32m+[m[32m      : linkedAttention === "expiry-soon"[m
+[32m+[m[32m      ? "Expiry Soon"[m
+[32m+[m[32m      : linkedAttention === "draft-ageing"[m
+[32m+[m[32m      ? "Draft Ageing"[m
+[32m+[m[32m      : linkedRecent === "1"[m
+[32m+[m[32m      ? "Recent"[m
+[32m+[m[32m      : "All"[m
+[32m+[m[32m  );[m
+   const [selectedReportId, setSelectedReportId] = useState("");[m
+   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());[m
+   const [detailReport, setDetailReport] = useState<MocReport>(createEmptyReport());[m
+[36m@@ -633,7 +736,8 @@[m [mfunction MOCPageContent() {[m
+ [m
+   const filteredReports = useMemo(() => {[m
+     const query = search.trim().toLowerCase();[m
+[31m-    return reports.filter((report) => {[m
+[32m+[m[32m    return [...reports][m
+[32m+[m[32m      .filter((report) => {[m
+       const matchesSearch =[m
+         !query ||[m
+         report.moc_report_no.toLowerCase().includes(query) ||[m
+[36m@@ -641,10 +745,20 @@[m [mfunction MOCPageContent() {[m
+         report.project_worksite_address.toLowerCase().includes(query) ||[m
+         report.moc_coordinator_name.toLowerCase().includes(query) ||[m
+         report.responsible_manager_name.toLowerCase().includes(query);[m
+[31m-      const matchesStatus = statusFilter === "All" || report.status === statusFilter;[m
+[31m-      return matchesSearch && matchesStatus;[m
+[31m-    });[m
+[31m-  }, [reports, search, statusFilter]);[m
+[32m+[m[32m      const matchesStatus =[m
+[32m+[m[32m        statusFilter === "All" ||[m
+[32m+[m[32m        (statusFilter === "Active" ? report.status !== "Closed" : report.status === statusFilter);[m
+[32m+[m[32m      const matchesChangeType = changeTypeFilter === "All" || report.change_type === changeTypeFilter;[m
+[32m+[m[32m      const matchesView =[m
+[32m+[m[32m        viewFilter === "All" ||[m
+[32m+[m[32m        (viewFilter === "Recent" && isRecentMoc(report)) ||[m
+[32m+[m[32m        (viewFilter === "Expired Temporary" && isExpiredTemporary(report)) ||[m
+[32m+[m[32m        (viewFilter === "Expiry Soon" && isNearingTemporaryExpiry(report)) ||[m
+[32m+[m[32m        (viewFilter === "Draft Ageing" && isDraftAged(report));[m
+[32m+[m[32m      return matchesSearch && matchesStatus && matchesChangeType && matchesView;[m
+[32m+[m[32m    })[m
+[32m+[m[32m      .sort((a, b) => getCreatedOrUpdatedTime(b) - getCreatedOrUpdatedTime(a));[m
+[32m+[m[32m  }, [reports, search, statusFilter, changeTypeFilter, viewFilter]);[m
+ [m
+   const openCount = useMemo([m
+     () => reports.filter((report) => report.status !== "Closed").length,[m
+[36m@@ -658,15 +772,46 @@[m [mfunction MOCPageContent() {[m
+     () => reports.filter((report) => report.status === "Approved").length,[m
+     [reports][m
+   );[m
+[32m+[m[32m  const inReviewCount = useMemo([m
+[32m+[m[32m    () => reports.filter((report) => report.status === "In Review").length,[m
+[32m+[m[32m    [reports][m
+[32m+[m[32m  );[m
+[32m+[m[32m  const expirySoonCount = useMemo(() => reports.filter((report) => isNearingTemporaryExpiry(report)).length, [reports]);[m
+   const recentCount = useMemo(() => {[m
+[31m-    const threshold = new Date();[m
+[31m-    threshold.setDate(threshold.getDate() - 30);[m
+[31m-    return reports.filter((report) => {[m
+[31m-      const date = new Date(report.created_at || report.updated_at || 0);[m
+[31m-      return !Number.isNaN(date.getTime()) && date >= threshold;[m
+[31m-    }).length;[m
+[32m+[m[32m    return reports.filter((report) => isRecentMoc(report)).length;[m
+   }, [reports]);[m
+   const statusBannerColours = getNoticeColours(messageTone);[m
+[32m+[m[32m  const nextWorkflowStatus = getNextWorkflowStatus(detailReport.status);[m
+[32m+[m[32m  const canEditMainFields = detailReport.status === "Draft" || detailReport.status === "In Review";[m
+[32m+[m[32m  const canEditStructural = detailReport.status === "Draft";[m
+[32m+[m[32m  const canEditCloseout = detailReport.status !== "Closed";[m
+[32m+[m[32m  const canEditCloseoutStructure = detailReport.status === "Draft" || detailReport.status === "Approved";[m
+[32m+[m[32m  const canSaveDetail = Boolean(selectedReportId) && detailReport.status !== "Closed";[m
+[32m+[m[32m  const detailWorkflowMessage =[m
+[32m+[m[32m    detailReport.status === "Draft"[m
+[32m+[m[32m      ? "Draft records are fully editable."[m
+[32m+[m[32m      : detailReport.status === "In Review"[m
+[32m+[m[32m      ? "In Review records allow content edits only. Structural row changes are locked."[m
+[32m+[m[32m      : detailReport.status === "Approved"[m
+[32m+[m[32m      ? "Approved records are read-only except for close-out completion."[m
+[32m+[m[32m      : "Closed records are fully locked.";[m
+[32m+[m
+[32m+[m[32m  useEffect(() => {[m
+[32m+[m[32m    setSearch(linkedSearch);[m
+[32m+[m[32m    setStatusFilter(parseMocStatusFilter(linkedStatus));[m
+[32m+[m[32m    setChangeTypeFilter(linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All");[m
+[32m+[m[32m    setViewFilter([m
+[32m+[m[32m      linkedAttention === "expired-temporary"[m
+[32m+[m[32m        ? "Expired Temporary"[m
+[32m+[m[32m        : linkedAttention === "expiry-soon"[m
+[32m+[m[32m        ? "Expiry Soon"[m
+[32m+[m[32m        : linkedAttention === "draft-ageing"[m
+[32m+[m[32m        ? "Draft Ageing"[m
+[32m+[m[32m        : linkedRecent === "1"[m
+[32m+[m[32m        ? "Recent"[m
+[32m+[m[32m        : "All"[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }, [linkedAttention, linkedChangeType, linkedRecent, linkedSearch, linkedStatus]);[m
+ [m
+   async function handleSignatureFile([m
+     file: File | null,[m
+[36m@@ -1060,7 +1205,7 @@[m [mfunction MOCPageContent() {[m
+         moc_coordinator_name: starterForm.moc_coordinator_name,[m
+         responsible_manager_name: starterForm.responsible_manager_name,[m
+         change_type: starterForm.change_type,[m
+[31m-        status: starterForm.status,[m
+[32m+[m[32m        status: "Draft",[m
+       };[m
+ [m
+       const insertRes = await supabase[m
+[36m@@ -1115,7 +1260,10 @@[m [mfunction MOCPageContent() {[m
+ [m
+   async function saveSelectedMoc() {[m
+     if (!selectedReportId) return;[m
+[31m-[m
+[32m+[m[32m    if (detailReport.status === "Closed") {[m
+[32m+[m[32m      showMessage("Closed MOCs are locked and cannot be edited.", "warning");[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+     setSaving(true);[m
+     const previousBundle = getBundleFromData(selectedReportId);[m
+     try {[m
+[36m@@ -1162,6 +1310,66 @@[m [mfunction MOCPageContent() {[m
+     }[m
+   }[m
+ [m
+[32m+[m[32m  async function progressSelectedMoc(nextStatus: MocStatus) {[m
+[32m+[m[32m    if (!selectedReportId) return;[m
+[32m+[m
+[32m+[m[32m    const allowedNext = getNextWorkflowStatus(detailReport.status);[m
+[32m+[m[32m    if (allowedNext !== nextStatus) {[m
+[32m+[m[32m      showMessage(`Status cannot move directly from ${detailReport.status} to ${nextStatus}.`, "warning");[m
+[32m+[m[32m      return;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    setSaving(true);[m
+[32m+[m[32m    const previousBundle = getBundleFromData(selectedReportId);[m
+[32m+[m[32m    const nextReport = { ...detailReport, status: nextStatus };[m
+[32m+[m[32m    const nextBundle = {[m
+[32m+[m[32m      ...buildCurrentDetailBundle(),[m
+[32m+[m[32m      report: nextReport,[m
+[32m+[m[32m    };[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      const updateRes = await supabase[m
+[32m+[m[32m        .from("moc_reports")[m
+[32m+[m[32m        .update(buildParentPayload(nextReport))[m
+[32m+[m[32m        .eq("id", selectedReportId);[m
+[32m+[m
+[32m+[m[32m      if (updateRes.error) {[m
+[32m+[m[32m        throw new Error(updateRes.error.message);[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      await persistChildTables(selectedReportId, nextBundle);[m
+[32m+[m
+[32m+[m[32m      const loaded = await loadData();[m
+[32m+[m[32m      openBundle(selectedReportId, loaded);[m
+[32m+[m[32m      showMessage(`${detailReport.moc_report_no} moved to ${nextStatus}.`, "success");[m
+[32m+[m[32m    } catch (error) {[m
+[32m+[m[32m      if (previousBundle) {[m
+[32m+[m[32m        try {[m
+[32m+[m[32m          await restoreBundle(previousBundle);[m
+[32m+[m[32m          await loadData();[m
+[32m+[m[32m          openBundle(selectedReportId);[m
+[32m+[m[32m          showMessage([m
+[32m+[m[32m            `Partial failure while saving ${detailReport.moc_report_no}. Previous saved data was restored. ${getErrorMessage([m
+[32m+[m[32m              error[m
+[32m+[m[32m            )}`,[m
+[32m+[m[32m            "warning"[m
+[32m+[m[32m          );[m
+[32m+[m[32m        } catch (restoreError) {[m
+[32m+[m[32m          console.error(`[MOC] F
