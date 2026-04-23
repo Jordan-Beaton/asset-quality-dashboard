@@ -592,7 +592,29 @@ function isRecentMoc(report: MocReport) {
   const date = new Date(report.created_at || report.updated_at || 0);
   return !Number.isNaN(date.getTime()) && date >= threshold;
 }
+function getDaysFromToday(value: string | null | undefined) {
+  if (!value) return null;
 
+  const due = new Date(value);
+  if (Number.isNaN(due.getTime())) return null;
+
+  const today = new Date();
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+
+  const diffMs = due.getTime() - today.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+}
+function formatDate(value: string | null | undefined) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 function isExpiredTemporary(report: MocReport) {
   if (report.change_type !== "Temporary" || report.status === "Closed") return false;
   const days = getDaysFromToday(report.temporary_valid_to);
@@ -698,16 +720,16 @@ function MOCPageContent() {
     linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All"
   );
   const [viewFilter, setViewFilter] = useState<MocViewFilter>(
-    linkedAttention === "expired-temporary"
-      ? "Expired Temporary"
-      : linkedAttention === "expiry-soon"
-      ? "Expiry Soon"
-      : linkedAttention === "draft-ageing"
-      ? "Draft Ageing"
-      : linkedRecent === "1"
-      ? "Recent"
-      : "All"
-  );
+  linkedAttention === "expired-temporary"
+    ? "Expired Temporary"
+    : linkedAttention === "expiry-soon"
+    ? "Expiry Soon"
+    : linkedAttention === "draft-ageing"
+    ? "Draft Ageing"
+    : linkedRecent === "1"
+    ? "Recent"
+    : "All"
+);
   const [selectedReportId, setSelectedReportId] = useState("");
   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());
   const [detailReport, setDetailReport] = useState<MocReport>(createEmptyReport());
@@ -2300,7 +2322,7 @@ function MOCPageContent() {
             />
 
             <div style={toolbarFiltersStyle}>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={toolbarSelectStyle}>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "All" | "Active" | MocStatus)}>
                 <option value="All">All statuses</option>
                 <option value="Active">Active</option>
                 {mocStatusOptions.map((option) => (
