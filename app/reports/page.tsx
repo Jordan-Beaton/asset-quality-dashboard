@@ -1,29 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { supabase } from "../../src/lib/supabase";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
-type Asset = {
-  id: string;
-  asset_code: string | null;
-  name: string | null;
-  description: string | null;
-  location: string | null;
-  owner: string | null;
-  status: string | null;
-};
+import { supabase } from "../../src/lib/supabase";
 
 type Ncr = {
   id: string;
@@ -33,15 +14,8 @@ type Ncr = {
   status: string | null;
   owner: string | null;
   area: string | null;
-};
-
-type Capa = {
-  id: string;
-  capa_number: string | null;
-  title: string | null;
-  status: string | null;
-  owner: string | null;
-  linked_to: string | null;
+  created_at: string | null;
+  closed_at: string | null;
 };
 
 type ActionItem = {
@@ -52,6 +26,8 @@ type ActionItem = {
   priority: string | null;
   status: string | null;
   due_date: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 type AuditRecord = {
@@ -91,24 +67,91 @@ type MonthlyReport = {
   created_at: string | null;
 };
 
-const emptyForm = {
-  month_label: "",
-  summary: "",
-  wins: "",
-  risks: "",
-  next_steps: "",
+type MocReport = {
+  id: string;
+  moc_report_no: string | null;
+  moc_report_title: string | null;
+  change_type: "Permanent" | "Temporary" | null;
+  status: string | null;
+  temporary_valid_to: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+type DocumentRow = {
+  id: string;
+  document_number: string | null;
+  title: string | null;
+  status: string | null;
+  next_review_date: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+type ReportForm = {
+  monthIndex: number;
+  year: string;
+  executiveSummary: string;
+  nextMonthFocus: string;
+};
+
+type ManagementMetrics = {
+  monthLabel: string;
+  auditSummary: {
+    auditsCompleted: number;
+    findingsBasisLabel: string;
+    findingsMajor: number;
+    findingsMinor: number;
+    findingsOfiObs: number;
+  };
+  actionsSummary: {
+    actionsRaised: number;
+    actionsClosed: number;
+    totalOpenActions: number;
+    actionsDueNext30Days: number;
+  };
+  mocSummary: {
+    mocsRaised: number;
+    mocsClosed: number;
+    totalOpenMocs: number;
+  };
+  ncrSummary: {
+    ncrsRaised: number;
+    ncrsClosedAvailable: boolean;
+    ncrsClosed: number | null;
+    totalOpenNcrs: number;
+    low: number;
+    medium: number;
+    high: number;
+  };
+  documentSummary: {
+    overdueDocuments: number;
+    documentsDueSoon: number;
+  };
+};
+
+const monthOptions = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+const currentDate = new Date();
+const defaultForm = (): ReportForm => ({
+  monthIndex: currentDate.getMonth(),
+  year: String(currentDate.getFullYear()),
+  executiveSummary: "",
+  nextMonthFocus: "",
+});
 
 function formatDateTime(value: string | null | undefined) {
   if (!value) return "-";
@@ -123,39 +166,6 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
-function formatAuditMonth(value: string | null | undefined) {
-  if (!value) return "-";
-  const [year, month] = value.split("-");
-  if (!year || !month) return value;
-
-  const date = new Date(Number(year), Number(month) - 1, 1);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleDateString("en-GB", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function isClosedStatus(value: string | null | undefined) {
-  const normal = (value || "").trim().toLowerCase();
-  return normal === "closed" || normal === "complete" || normal === "completed";
-}
-
-function getDaysFromToday(value: string | null | undefined) {
-  if (!value) return null;
-
-  const due = new Date(value);
-  if (Number.isNaN(due.getTime())) return null;
-
-  const today = new Date();
-  due.setHours(0, 0, 0, 0);
-  today.setHours(0, 0, 0, 0);
-
-  const diffMs = due.getTime() - today.getTime();
-  return Math.round(diffMs / (1000 * 60 * 60 * 24));
-}
-
 function toDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -165,276 +175,388 @@ function toDataUrl(file: File) {
   });
 }
 
-function getAuditStatusTone(status: string | null | undefined) {
-  const value = (status || "").toLowerCase();
-  if (value.includes("overdue")) return { bg: "#fee2e2", color: "#991b1b" };
-  if (value.includes("progress")) return { bg: "#fef3c7", color: "#92400e" };
-  if (value.includes("planned")) return { bg: "#dbeafe", color: "#1d4ed8" };
-  if (value.includes("completed") || value.includes("closed")) return { bg: "#dcfce7", color: "#166534" };
-  if (value.includes("cancelled")) return { bg: "#e2e8f0", color: "#334155" };
-  return { bg: "#e2e8f0", color: "#334155" };
+function parseDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isClosedStatus(value: string | null | undefined) {
+  const normal = (value || "").trim().toLowerCase();
+  return normal === "closed" || normal === "complete" || normal === "completed";
+}
+
+function isCompletedAudit(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase() === "completed";
+}
+
+function getMonthLabel(monthIndex: number, year: number) {
+  return `${monthOptions[monthIndex]} ${year}`;
+}
+
+function isDateInMonth(value: string | null | undefined, monthIndex: number, year: number) {
+  const date = parseDate(value);
+  if (!date) return false;
+  return date.getMonth() === monthIndex && date.getFullYear() === year;
+}
+
+function isAuditScheduledInMonth(audit: AuditRecord, monthIndex: number, year: number) {
+  if (isDateInMonth(audit.audit_date, monthIndex, year)) {
+    return true;
+  }
+
+  const key = (audit.audit_month || "").trim();
+  if (!key) return false;
+
+  const [rawYear, rawMonth] = key.split("-");
+  const parsedYear = Number(rawYear);
+  const parsedMonth = Number(rawMonth);
+  if (!Number.isFinite(parsedYear) || !Number.isFinite(parsedMonth)) return false;
+
+  return parsedYear === year && parsedMonth === monthIndex + 1;
+}
+
+function getDaysFromToday(value: string | null | undefined) {
+  const date = parseDate(value);
+  if (!date) return null;
+
+  const target = new Date(date);
+  const today = new Date();
+  target.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getDocumentReviewState(nextReviewDate: string | null | undefined) {
+  const days = getDaysFromToday(nextReviewDate);
+  if (days === null) return "Not set";
+  if (days < 0) return "Overdue";
+  if (days <= 30) return "Due soon";
+  return "In date";
+}
+
+function normaliseNcrSeverity(value: string | null | undefined) {
+  const normal = (value || "").trim().toLowerCase();
+  if (normal === "high" || normal === "major" || normal === "critical") return "High";
+  if (normal === "medium" || normal === "minor") return "Medium";
+  return "Low";
+}
+
+function parseReportFormFromSavedReport(report: MonthlyReport): ReportForm {
+  const snapshot = report.snapshot_json || {};
+  const snapshotMonth =
+    typeof snapshot.report_month === "number" && snapshot.report_month >= 1 && snapshot.report_month <= 12
+      ? snapshot.report_month - 1
+      : null;
+  const snapshotYear =
+    typeof snapshot.report_year === "number" && snapshot.report_year >= 2000 ? snapshot.report_year : null;
+
+  if (snapshotMonth !== null && snapshotYear !== null) {
+    return {
+      monthIndex: snapshotMonth,
+      year: String(snapshotYear),
+      executiveSummary: report.summary || "",
+      nextMonthFocus: report.next_steps || "",
+    };
+  }
+
+  const text = (report.month_label || "").trim();
+  const matchedMonthIndex = monthOptions.findIndex((month) => text.toLowerCase().startsWith(month.toLowerCase()));
+  const yearMatch = text.match(/(20\d{2})/);
+  if (matchedMonthIndex >= 0 && yearMatch) {
+    return {
+      monthIndex: matchedMonthIndex,
+      year: yearMatch[1],
+      executiveSummary: report.summary || "",
+      nextMonthFocus: report.next_steps || "",
+    };
+  }
+
+  return {
+    ...defaultForm(),
+    executiveSummary: report.summary || "",
+    nextMonthFocus: report.next_steps || "",
+  };
+}
+
+function getSnapshotSummary(report: MonthlyReport) {
+  const snapshot = report.snapshot_json || {};
+  const auditSummary = snapshot.audit_summary as Record<string, unknown> | undefined;
+  const actionSummary = snapshot.actions_summary as Record<string, unknown> | undefined;
+  const mocSummary = snapshot.moc_summary as Record<string, unknown> | undefined;
+
+  const auditsCompleted =
+    typeof auditSummary?.audits_completed === "number" ? String(auditSummary.audits_completed) : "-";
+  const openActions =
+    typeof actionSummary?.total_open_actions === "number" ? String(actionSummary.total_open_actions) : "-";
+  const openMocs = typeof mocSummary?.total_open_mocs === "number" ? String(mocSummary.total_open_mocs) : "-";
+
+  return `Audits completed: ${auditsCompleted} | Open actions: ${openActions} | Open MOCs: ${openMocs}`;
+}
+
+function buildPdfMetricTable(
+  doc: jsPDF,
+  startY: number,
+  title: string,
+  rows: Array<[string, string | number]>
+) {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(15, 23, 42);
+  doc.text(title, 14, startY);
+
+  autoTable(doc, {
+    startY: startY + 4,
+    head: [["Metric", "Value"]],
+    body: rows.map(([label, value]) => [label, String(value)]),
+    theme: "grid",
+    margin: { left: 14, right: 14 },
+    styles: {
+      fontSize: 9.2,
+      cellPadding: 3,
+      textColor: [15, 23, 42],
+      lineColor: [226, 232, 240],
+      lineWidth: 0.2,
+    },
+    headStyles: {
+      fillColor: [15, 118, 110],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 120 },
+      1: { halign: "right", cellWidth: 52 },
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    rowPageBreak: "avoid",
+  });
+
+  return ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || startY) + 8;
 }
 
 export default function ReportsPage() {
-  const [assets, setAssets] = useState<Asset[]>([]);
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
-  const [capas, setCapas] = useState<Capa[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [auditFindings, setAuditFindings] = useState<AuditFinding[]>([]);
+  const [mocs, setMocs] = useState<MocReport[]>([]);
+  const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [reports, setReports] = useState<MonthlyReport[]>([]);
-  const [message, setMessage] = useState("Loading reports dashboard...");
+  const [message, setMessage] = useState("Loading monthly management report workspace...");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [logoFileName, setLogoFileName] = useState("/enshore-logo.png");
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
-
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<ReportForm>(defaultForm);
 
   async function loadData() {
-    const [assetsRes, ncrsRes, capasRes, actionsRes, auditsRes, findingsRes, reportsRes] =
-      await Promise.all([
-        supabase.from("assets").select("*"),
-        supabase.from("ncrs").select("*"),
-        supabase.from("capas").select("*"),
-        supabase.from("actions").select("*"),
-        supabase.from("audits").select("*"),
-        supabase.from("audit_findings").select("*"),
-        supabase.from("monthly_reports").select("*").order("created_at", { ascending: false }),
-      ]);
+    const [ncrsRes, actionsRes, auditsRes, findingsRes, mocsRes, documentsRes, reportsRes] = await Promise.all([
+      supabase.from("ncrs").select("*"),
+      supabase.from("actions").select("*"),
+      supabase.from("audits").select("*"),
+      supabase.from("audit_findings").select("*"),
+      supabase.from("moc_reports").select("*"),
+      supabase.from("documents").select("*"),
+      supabase.from("monthly_reports").select("*").order("created_at", { ascending: false }),
+    ]);
 
     if (
-      assetsRes.error ||
       ncrsRes.error ||
-      capasRes.error ||
       actionsRes.error ||
       auditsRes.error ||
       findingsRes.error ||
+      mocsRes.error ||
+      documentsRes.error ||
       reportsRes.error
     ) {
       setMessage(
         `Error: ${
-          assetsRes.error?.message ||
           ncrsRes.error?.message ||
-          capasRes.error?.message ||
           actionsRes.error?.message ||
           auditsRes.error?.message ||
           findingsRes.error?.message ||
+          mocsRes.error?.message ||
+          documentsRes.error?.message ||
           reportsRes.error?.message
         }`
       );
       return;
     }
 
-    setAssets((assetsRes.data || []) as Asset[]);
     setNcrs((ncrsRes.data || []) as Ncr[]);
-    setCapas((capasRes.data || []) as Capa[]);
     setActions((actionsRes.data || []) as ActionItem[]);
     setAudits((auditsRes.data || []) as AuditRecord[]);
     setAuditFindings((findingsRes.data || []) as AuditFinding[]);
+    setMocs((mocsRes.data || []) as MocReport[]);
+    setDocuments((documentsRes.data || []) as DocumentRow[]);
     setReports((reportsRes.data || []) as MonthlyReport[]);
     setLastRefreshed(new Date().toLocaleString("en-GB"));
-    setMessage("Reports dashboard loaded successfully.");
+    setMessage("Monthly management reporting workspace loaded.");
   }
 
   useEffect(() => {
     void loadData();
   }, []);
 
-  const totalAssets = assets.length;
-  const openNcrs = ncrs.filter((n) => !isClosedStatus(n.status)).length;
-  const openCapas = capas.filter((c) => !isClosedStatus(c.status)).length;
-  const openActions = actions.filter((a) => !isClosedStatus(a.status)).length;
-  const totalAudits = audits.length;
-  const openAuditFindings = auditFindings.filter((finding) => !isClosedStatus(finding.status)).length;
+  const selectedYear = useMemo(() => {
+    const parsed = Number(form.year);
+    return Number.isFinite(parsed) && parsed >= 2000 ? parsed : currentDate.getFullYear();
+  }, [form.year]);
 
-  const overdueActions = actions.filter((action) => {
-    if (!action.due_date) return false;
-    if (isClosedStatus(action.status)) return false;
+  const buildMetricsForPeriod = useCallback(
+    (monthIndex: number, year: number): ManagementMetrics => {
+      const completedAuditsInMonth = audits.filter(
+        (audit) => isCompletedAudit(audit.status) && isAuditScheduledInMonth(audit, monthIndex, year)
+      );
+      const completedAuditIds = new Set(completedAuditsInMonth.map((audit) => audit.id));
+      const findingsLinkedToCompletedAudits = auditFindings.filter((finding) => completedAuditIds.has(finding.audit_id));
 
-    const due = new Date(action.due_date);
-    const today = new Date();
-    due.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
+      const actionRowsRaisedInMonth = actions.filter((action) => isDateInMonth(action.created_at, monthIndex, year));
+      const actionRowsClosedInMonth = actions.filter(
+        (action) => isClosedStatus(action.status) && isDateInMonth(action.updated_at, monthIndex, year)
+      );
+      const openActionRows = actions.filter((action) => !isClosedStatus(action.status));
+      const actionsDueNext30Days = actions.filter((action) => {
+        if (isClosedStatus(action.status)) return false;
+        const days = getDaysFromToday(action.due_date);
+        return days !== null && days >= 0 && days <= 30;
+      }).length;
 
-    return due < today;
-  }).length;
+      const mocRowsRaisedInMonth = mocs.filter((moc) => isDateInMonth(moc.created_at, monthIndex, year));
+      const mocRowsClosedInMonth = mocs.filter(
+        (moc) => (moc.status || "").trim().toLowerCase() === "closed" && isDateInMonth(moc.updated_at, monthIndex, year)
+      );
+      const openMocRows = mocs.filter((moc) => (moc.status || "").trim().toLowerCase() !== "closed");
 
-  const majorOpenNcrs = ncrs.filter(
-    (n) => (n.severity || "").toLowerCase() === "major" && !isClosedStatus(n.status)
-  ).length;
+      const ncrRowsRaisedInMonth = ncrs.filter((ncr) => isDateInMonth(ncr.created_at, monthIndex, year));
+      const ncrRowsClosedInMonth = ncrs.filter(
+        (ncr) => isClosedStatus(ncr.status) && isDateInMonth(ncr.closed_at, monthIndex, year)
+      );
+      const openNcrRows = ncrs.filter((ncr) => !isClosedStatus(ncr.status));
 
-  const overdueAudits = audits.filter((audit) => (audit.status || "").toLowerCase() === "overdue").length;
+      const lowOpenNcrs = openNcrRows.filter((ncr) => normaliseNcrSeverity(ncr.severity) === "Low").length;
+      const mediumOpenNcrs = openNcrRows.filter((ncr) => normaliseNcrSeverity(ncr.severity) === "Medium").length;
+      const highOpenNcrs = openNcrRows.filter((ncr) => normaliseNcrSeverity(ncr.severity) === "High").length;
 
-  const majorOpenAuditFindings = auditFindings.filter(
-    (finding) =>
-      (finding.category || "").toLowerCase() === "major" && !isClosedStatus(finding.status)
-  ).length;
+      const overdueDocuments = documents.filter(
+        (doc) => getDocumentReviewState(doc.next_review_date) === "Overdue"
+      ).length;
+      const dueSoonDocuments = documents.filter(
+        (doc) => getDocumentReviewState(doc.next_review_date) === "Due soon"
+      ).length;
 
-  const ncrStatusChart = useMemo(() => {
-    const groups = ncrs.reduce<Record<string, number>>((acc, ncr) => {
-      const key = ncr.status || "Unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [ncrs]);
-
-  const capaStatusChart = useMemo(() => {
-    const groups = capas.reduce<Record<string, number>>((acc, capa) => {
-      const key = capa.status || "Unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [capas]);
-
-  const actionStatusChart = useMemo(() => {
-    const groups = actions.reduce<Record<string, number>>((acc, action) => {
-      const key = action.status || "Unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [actions]);
-
-  const assetLocationChart = useMemo(() => {
-    const groups = assets.reduce<Record<string, number>>((acc, asset) => {
-      const key = asset.location || "Unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [assets]);
-
-  const auditStatusChart = useMemo(() => {
-    const groups = audits.reduce<Record<string, number>>((acc, audit) => {
-      const key = audit.status || "Unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [audits]);
-
-  const auditTypeChart = useMemo(() => {
-    const groups = audits.reduce<Record<string, number>>((acc, audit) => {
-      const key = audit.audit_type || "Unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [audits]);
-
-  const openNcrRows = useMemo(
-    () =>
-      ncrs
-        .filter((n) => !isClosedStatus(n.status))
-        .map((n) => [
-          n.ncr_number || "-",
-          n.title || "-",
-          n.severity || "-",
-          n.status || "-",
-          n.owner || "-",
-          n.area || "-",
-        ]),
-    [ncrs]
+      return {
+        monthLabel: getMonthLabel(monthIndex, year),
+        auditSummary: {
+          auditsCompleted: completedAuditsInMonth.length,
+          findingsBasisLabel: "Current findings linked to audits completed in the selected month",
+          findingsMajor: findingsLinkedToCompletedAudits.filter(
+            (finding) => (finding.category || "").trim().toLowerCase() === "major"
+          ).length,
+          findingsMinor: findingsLinkedToCompletedAudits.filter(
+            (finding) => (finding.category || "").trim().toLowerCase() === "minor"
+          ).length,
+          findingsOfiObs: findingsLinkedToCompletedAudits.filter((finding) => {
+            const category = (finding.category || "").trim().toLowerCase();
+            return category === "ofi" || category === "observation" || category === "obs";
+          }).length,
+        },
+        actionsSummary: {
+          actionsRaised: actionRowsRaisedInMonth.length,
+          actionsClosed: actionRowsClosedInMonth.length,
+          totalOpenActions: openActionRows.length,
+          actionsDueNext30Days,
+        },
+        mocSummary: {
+          mocsRaised: mocRowsRaisedInMonth.length,
+          mocsClosed: mocRowsClosedInMonth.length,
+          totalOpenMocs: openMocRows.length,
+        },
+        ncrSummary: {
+          ncrsRaised: ncrRowsRaisedInMonth.length,
+          ncrsClosedAvailable: true,
+          ncrsClosed: ncrRowsClosedInMonth.length,
+          totalOpenNcrs: openNcrRows.length,
+          low: lowOpenNcrs,
+          medium: mediumOpenNcrs,
+          high: highOpenNcrs,
+        },
+        documentSummary: {
+          overdueDocuments,
+          documentsDueSoon: dueSoonDocuments,
+        },
+      };
+    },
+    [actions, auditFindings, audits, documents, mocs, ncrs]
   );
 
-  const openCapaRows = useMemo(
-    () =>
-      capas
-        .filter((c) => !isClosedStatus(c.status))
-        .map((c) => [
-          c.capa_number || "-",
-          c.title || "-",
-          c.status || "-",
-          c.owner || "-",
-          c.linked_to || "-",
-        ]),
-    [capas]
+  const metrics = useMemo(
+    () => buildMetricsForPeriod(form.monthIndex, selectedYear),
+    [buildMetricsForPeriod, form.monthIndex, selectedYear]
   );
 
-  const openActionRows = useMemo(
-    () =>
-      actions
-        .filter((a) => !isClosedStatus(a.status))
-        .map((a) => [
-          a.action_number || "-",
-          a.title || "-",
-          a.priority || "-",
-          a.status || "-",
-          a.owner || "-",
-          formatDate(a.due_date),
-        ]),
-    [actions]
+  const reportCards = useMemo(
+    () => [
+      {
+        title: "A. Audit Summary",
+        rows: [
+          ["Audits completed in month", metrics.auditSummary.auditsCompleted],
+          ["Major findings", metrics.auditSummary.findingsMajor],
+          ["Minor findings", metrics.auditSummary.findingsMinor],
+          ["OFI / Observation", metrics.auditSummary.findingsOfiObs],
+        ] as Array<[string, string | number]>,
+        note: metrics.auditSummary.findingsBasisLabel,
+      },
+      {
+        title: "B. Actions",
+        rows: [
+          ["Actions raised in month", metrics.actionsSummary.actionsRaised],
+          ["Actions closed in month", metrics.actionsSummary.actionsClosed],
+          ["Total open actions", metrics.actionsSummary.totalOpenActions],
+          ["Due in next 30 days", metrics.actionsSummary.actionsDueNext30Days],
+        ] as Array<[string, string | number]>,
+      },
+      {
+        title: "C. MOC",
+        rows: [
+          ["MOCs raised in month", metrics.mocSummary.mocsRaised],
+          ["MOCs closed in month", metrics.mocSummary.mocsClosed],
+          ["Total open MOCs", metrics.mocSummary.totalOpenMocs],
+        ] as Array<[string, string | number]>,
+      },
+      {
+        title: "D. NCR",
+        rows: [
+          ["NCRs raised in month", metrics.ncrSummary.ncrsRaised],
+          [
+            "NCRs closed in month",
+            metrics.ncrSummary.ncrsClosed ?? 0,
+          ],
+          ["Total open NCRs", metrics.ncrSummary.totalOpenNcrs],
+          ["Open NCR severity - Low", metrics.ncrSummary.low],
+          ["Open NCR severity - Medium", metrics.ncrSummary.medium],
+          ["Open NCR severity - High", metrics.ncrSummary.high],
+        ] as Array<[string, string | number]>,
+      },
+      {
+        title: "E. Documents",
+        rows: [
+          ["Overdue documents", metrics.documentSummary.overdueDocuments],
+          ["Documents due soon", metrics.documentSummary.documentsDueSoon],
+        ] as Array<[string, string | number]>,
+      },
+    ],
+    [metrics]
   );
-
-  const auditRows = useMemo(
-    () =>
-      audits.map((audit) => [
-        audit.audit_number || "-",
-        audit.title || "-",
-        audit.audit_type || "-",
-        audit.status || "-",
-        formatAuditMonth(audit.audit_month),
-        formatDate(audit.audit_date),
-      ]),
-    [audits]
-  );
-
-  const auditFindingRows = useMemo(
-    () =>
-      auditFindings
-        .filter((finding) => !isClosedStatus(finding.status))
-        .map((finding) => {
-          const parentAudit = audits.find((audit) => audit.id === finding.audit_id);
-          return [
-            parentAudit?.audit_number || "-",
-            finding.reference || "-",
-            finding.category || "-",
-            finding.status || "-",
-            finding.owner || "-",
-            formatDate(finding.due_date),
-          ];
-        }),
-    [auditFindings, audits]
-  );
-
-  const auditAttentionList = useMemo(() => {
-    return [...audits]
-      .filter((audit) => {
-        const status = (audit.status || "").toLowerCase();
-        return status === "overdue" || status === "planned" || status === "in progress";
-      })
-      .sort((a, b) => {
-        const aStatus = (a.status || "").toLowerCase();
-        const bStatus = (b.status || "").toLowerCase();
-        const aRank = aStatus === "overdue" ? 0 : aStatus === "in progress" ? 1 : 2;
-        const bRank = bStatus === "overdue" ? 0 : bStatus === "in progress" ? 1 : 2;
-
-        if (aRank !== bRank) return aRank - bRank;
-
-        const aDate = a.audit_date ? new Date(a.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
-        const bDate = b.audit_date ? new Date(b.audit_date).getTime() : Number.MAX_SAFE_INTEGER;
-        return aDate - bDate;
-      })
-      .slice(0, 6);
-  }, [audits]);
 
   function resetForm() {
-    setForm(emptyForm);
+    setForm(defaultForm());
     setEditingId(null);
   }
 
   function handleEdit(report: MonthlyReport) {
     setEditingId(report.id);
-    setForm({
-      month_label: report.month_label || "",
-      summary: report.summary || "",
-      wins: report.wins || "",
-      risks: report.risks || "",
-      next_steps: report.next_steps || "",
-    });
+    setForm(parseReportFormFromSavedReport(report));
     setMessage(`Editing report: ${report.month_label}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -461,33 +583,57 @@ export default function ReportsPage() {
   async function saveMonthlyReport(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!form.month_label.trim()) {
-      setMessage("Month label is required.");
+    if (!Number.isFinite(selectedYear) || selectedYear < 2000) {
+      setMessage("Enter a valid report year.");
       return;
     }
 
+    const monthLabel = getMonthLabel(form.monthIndex, selectedYear);
     const snapshot = {
-      total_assets: totalAssets,
-      open_ncrs: openNcrs,
-      open_capas: openCapas,
-      open_actions: openActions,
-      overdue_actions: overdueActions,
-      major_open_ncrs: majorOpenNcrs,
-      total_audits: totalAudits,
-      overdue_audits: overdueAudits,
-      open_audit_findings: openAuditFindings,
-      major_open_audit_findings: majorOpenAuditFindings,
+      report_month: form.monthIndex + 1,
+      report_year: selectedYear,
+      audit_summary: {
+        audits_completed: metrics.auditSummary.auditsCompleted,
+        findings_basis_label: metrics.auditSummary.findingsBasisLabel,
+        findings_major: metrics.auditSummary.findingsMajor,
+        findings_minor: metrics.auditSummary.findingsMinor,
+        findings_ofi_observation: metrics.auditSummary.findingsOfiObs,
+      },
+      actions_summary: {
+        actions_raised: metrics.actionsSummary.actionsRaised,
+        actions_closed: metrics.actionsSummary.actionsClosed,
+        total_open_actions: metrics.actionsSummary.totalOpenActions,
+        due_next_30_days: metrics.actionsSummary.actionsDueNext30Days,
+      },
+      moc_summary: {
+        mocs_raised: metrics.mocSummary.mocsRaised,
+        mocs_closed: metrics.mocSummary.mocsClosed,
+        total_open_mocs: metrics.mocSummary.totalOpenMocs,
+      },
+      ncr_summary: {
+        ncrs_raised: metrics.ncrSummary.ncrsRaised,
+        ncrs_closed_available: metrics.ncrSummary.ncrsClosedAvailable,
+        ncrs_closed: metrics.ncrSummary.ncrsClosed,
+        total_open_ncrs: metrics.ncrSummary.totalOpenNcrs,
+        low: metrics.ncrSummary.low,
+        medium: metrics.ncrSummary.medium,
+        high: metrics.ncrSummary.high,
+      },
+      documents_summary: {
+        overdue_documents: metrics.documentSummary.overdueDocuments,
+        documents_due_soon: metrics.documentSummary.documentsDueSoon,
+      },
     };
 
     if (editingId) {
       const { error } = await supabase
         .from("monthly_reports")
         .update({
-          month_label: form.month_label,
-          summary: form.summary || null,
-          wins: form.wins || null,
-          risks: form.risks || null,
-          next_steps: form.next_steps || null,
+          month_label: monthLabel,
+          summary: form.executiveSummary.trim() || null,
+          wins: null,
+          risks: null,
+          next_steps: form.nextMonthFocus.trim() || null,
           snapshot_json: snapshot,
         })
         .eq("id", editingId);
@@ -497,15 +643,15 @@ export default function ReportsPage() {
         return;
       }
 
-      setMessage("Monthly report updated successfully.");
+      setMessage("Monthly management report updated successfully.");
     } else {
       const { error } = await supabase.from("monthly_reports").insert([
         {
-          month_label: form.month_label,
-          summary: form.summary || null,
-          wins: form.wins || null,
-          risks: form.risks || null,
-          next_steps: form.next_steps || null,
+          month_label: monthLabel,
+          summary: form.executiveSummary.trim() || null,
+          wins: null,
+          risks: null,
+          next_steps: form.nextMonthFocus.trim() || null,
           snapshot_json: snapshot,
         },
       ]);
@@ -515,7 +661,7 @@ export default function ReportsPage() {
         return;
       }
 
-      setMessage("Monthly report saved successfully.");
+      setMessage("Monthly management report saved successfully.");
     }
 
     resetForm();
@@ -526,15 +672,18 @@ export default function ReportsPage() {
     try {
       setIsGeneratingPdf(true);
 
+      const selectedPeriod = sourceReport ? parseReportFormFromSavedReport(sourceReport) : form;
+      const pdfYear = Number(selectedPeriod.year);
+      const safeYear = Number.isFinite(pdfYear) && pdfYear >= 2000 ? pdfYear : currentDate.getFullYear();
+      const pdfMetrics = buildMetricsForPeriod(selectedPeriod.monthIndex, safeYear);
+      const executiveSummary = (selectedPeriod.executiveSummary || "").trim();
+      const nextMonthFocus = (selectedPeriod.nextMonthFocus || "").trim();
+
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 14;
-      const reportSource = sourceReport || null;
-      const reportTitle =
-        reportSource?.month_label?.trim() ||
-        form.month_label?.trim() ||
-        `Management Report - ${new Date().toLocaleDateString("en-GB")}`;
+      const reportTitle = `Monthly Management Report - ${pdfMetrics.monthLabel}`;
       const generatedAt = new Date().toLocaleString("en-GB");
 
       try {
@@ -548,18 +697,18 @@ export default function ReportsPage() {
           doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 22);
         }
       } catch {
-        // Ignore logo fetch errors so the PDF still generates.
+        // Keep PDF generation resilient if the logo cannot be loaded.
       }
 
       doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
       doc.setFontSize(20);
-      doc.text("Quality Management Report", pageWidth - margin, 18, { align: "right" });
+      doc.text("Monthly Management Report", pageWidth - margin, 18, { align: "right" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(11);
       doc.setTextColor(71, 85, 105);
-      doc.text(reportTitle, pageWidth - margin, 25, { align: "right" });
+      doc.text(pdfMetrics.monthLabel, pageWidth - margin, 25, { align: "right" });
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 31, { align: "right" });
 
       doc.setDrawColor(15, 118, 110);
@@ -567,179 +716,86 @@ export default function ReportsPage() {
       doc.line(margin, 37, pageWidth - margin, 37);
 
       let y = 45;
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(13);
-      doc.text("Executive Summary", margin, y);
-      y += 6;
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10.5);
-      doc.setTextColor(51, 65, 85);
-
-      const summaryText = reportSource?.summary?.trim()
-        ? reportSource.summary.trim()
-        : form.summary?.trim()
-        ? form.summary.trim()
-        : "This report provides a live snapshot of assets, NCRs, CAPAs, audits and actions across the quality dashboard.";
-      const summaryLines = doc.splitTextToSize(summaryText, pageWidth - margin * 2);
-      doc.text(summaryLines, margin, y);
-      y += summaryLines.length * 4.7 + 5;
-
-      const kpiRows = [
-        ["Total Assets", String(totalAssets), "Open NCRs", String(openNcrs)],
-        ["Open CAPAs", String(openCapas), "Open Actions", String(openActions)],
-        ["Overdue Actions", String(overdueActions), "Major Open NCRs", String(majorOpenNcrs)],
-        ["Total Audits", String(totalAudits), "Overdue Audits", String(overdueAudits)],
-        ["Open Audit Findings", String(openAuditFindings), "Major Open Findings", String(majorOpenAuditFindings)],
-      ];
-
-      autoTable(doc, {
-        startY: y,
-        theme: "grid",
-        body: kpiRows,
-        styles: {
-          fontSize: 10,
-          cellPadding: 3.5,
-          textColor: [15, 23, 42],
-          lineColor: [203, 213, 225],
-          lineWidth: 0.2,
-        },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        columnStyles: {
-          0: { fontStyle: "bold", fillColor: [240, 249, 255] },
-          1: { halign: "center", fontStyle: "bold" },
-          2: { fontStyle: "bold", fillColor: [240, 249, 255] },
-          3: { halign: "center", fontStyle: "bold" },
-        },
-        margin: { left: margin, right: margin },
-      });
-
-      y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y;
-      y += 8;
-
-      const sectionText = (label: string, text: string | null, fallback: string) => {
+      if (executiveSummary) {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
         doc.setTextColor(15, 23, 42);
-        doc.text(label, margin, y);
+        doc.setFontSize(12);
+        doc.text("Executive Summary", margin, y);
         y += 5;
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(10.3);
         doc.setTextColor(71, 85, 105);
-        const lines = doc.splitTextToSize(text?.trim() || fallback, pageWidth - margin * 2);
-        doc.text(lines, margin, y);
-        y += lines.length * 4.5 + 6;
-      };
+        doc.setFontSize(10.2);
+        const summaryLines = doc.splitTextToSize(executiveSummary, pageWidth - margin * 2);
+        doc.text(summaryLines, margin, y);
+        y += summaryLines.length * 4.5 + 7;
+      }
 
-      sectionText("Wins", reportSource?.wins || form.wins, "No wins recorded for this report.");
-      sectionText("Risks", reportSource?.risks || form.risks, "No risks recorded for this report.");
-      sectionText("Next Steps", reportSource?.next_steps || form.next_steps, "No next steps recorded for this report.");
+      y = buildPdfMetricTable(doc, y, "A. Audit Summary", [
+        ["Audits completed in month", pdfMetrics.auditSummary.auditsCompleted],
+        ["Major findings", pdfMetrics.auditSummary.findingsMajor],
+        ["Minor findings", pdfMetrics.auditSummary.findingsMinor],
+        ["OFI / Observation", pdfMetrics.auditSummary.findingsOfiObs],
+      ]);
 
-      const ensurePageSpace = (neededHeight: number) => {
-        if (y + neededHeight > pageHeight - 18) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8.8);
+      doc.setTextColor(100, 116, 139);
+      const findingsBasis = doc.splitTextToSize(
+        pdfMetrics.auditSummary.findingsBasisLabel,
+        pageWidth - margin * 2
+      );
+      doc.text(findingsBasis, margin, y - 2);
+      y += findingsBasis.length * 4 + 1;
+
+      y = buildPdfMetricTable(doc, y, "B. Actions", [
+        ["Actions raised in month", pdfMetrics.actionsSummary.actionsRaised],
+        ["Actions closed in month", pdfMetrics.actionsSummary.actionsClosed],
+        ["Total open actions", pdfMetrics.actionsSummary.totalOpenActions],
+        ["Actions due in next 30 days", pdfMetrics.actionsSummary.actionsDueNext30Days],
+      ]);
+
+      y = buildPdfMetricTable(doc, y, "C. MOC", [
+        ["MOCs raised in month", pdfMetrics.mocSummary.mocsRaised],
+        ["MOCs closed in month", pdfMetrics.mocSummary.mocsClosed],
+        ["Total open MOCs", pdfMetrics.mocSummary.totalOpenMocs],
+      ]);
+
+      y = buildPdfMetricTable(doc, y, "D. NCR", [
+        ["NCRs raised in month", pdfMetrics.ncrSummary.ncrsRaised],
+        [
+          "NCRs closed in month",
+          pdfMetrics.ncrSummary.ncrsClosed ?? 0,
+        ],
+        ["Total open NCRs", pdfMetrics.ncrSummary.totalOpenNcrs],
+        ["Open NCR severity - Low", pdfMetrics.ncrSummary.low],
+        ["Open NCR severity - Medium", pdfMetrics.ncrSummary.medium],
+        ["Open NCR severity - High", pdfMetrics.ncrSummary.high],
+      ]);
+
+      y = buildPdfMetricTable(doc, y, "E. Documents", [
+        ["Overdue documents", pdfMetrics.documentSummary.overdueDocuments],
+        ["Documents due soon", pdfMetrics.documentSummary.documentsDueSoon],
+      ]);
+
+      if (nextMonthFocus) {
+        if (y + 28 > pageHeight - 18) {
           doc.addPage();
           y = 18;
         }
-      };
 
-      ensurePageSpace(18);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.setTextColor(15, 23, 42);
-      doc.text("Open NCR Register", margin, y);
-      y += 4;
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(12);
+        doc.text("Next Month Focus / Planned Activity", margin, y);
+        y += 5;
 
-      autoTable(doc, {
-        startY: y + 2,
-        head: [["NCR No.", "Title", "Severity", "Status", "Owner", "Area"]],
-        body: openNcrRows.length ? openNcrRows : [["-", "No open NCRs", "-", "-", "-", "-"]],
-        theme: "grid",
-        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
-        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: margin, right: margin },
-      });
-
-      y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 10;
-      ensurePageSpace(18);
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.text("Open CAPA Register", margin, y);
-      y += 4;
-
-      autoTable(doc, {
-        startY: y + 2,
-        head: [["CAPA No.", "Title", "Status", "Owner", "Linked NCR"]],
-        body: openCapaRows.length ? openCapaRows : [["-", "No open CAPAs", "-", "-", "-"]],
-        theme: "grid",
-        headStyles: { fillColor: [124, 58, 237], textColor: [255, 255, 255], fontStyle: "bold" },
-        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: margin, right: margin },
-      });
-
-      y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 10;
-      ensurePageSpace(18);
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.text("Open Actions Register", margin, y);
-      y += 4;
-
-      autoTable(doc, {
-        startY: y + 2,
-        head: [["Action No.", "Title", "Priority", "Status", "Owner", "Due Date"]],
-        body: openActionRows.length ? openActionRows : [["-", "No open actions", "-", "-", "-", "-"]],
-        theme: "grid",
-        headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: "bold" },
-        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: margin, right: margin },
-      });
-
-      y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 10;
-      ensurePageSpace(18);
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.text("Audit Programme Register", margin, y);
-      y += 4;
-
-      autoTable(doc, {
-        startY: y + 2,
-        head: [["Audit No.", "Title", "Type", "Status", "Month", "Audit Date"]],
-        body: auditRows.length ? auditRows : [["-", "No audits", "-", "-", "-", "-"]],
-        theme: "grid",
-        headStyles: { fillColor: [8, 145, 178], textColor: [255, 255, 255], fontStyle: "bold" },
-        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: margin, right: margin },
-      });
-
-      y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 10;
-      ensurePageSpace(18);
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.text("Open Audit Findings", margin, y);
-      y += 4;
-
-      autoTable(doc, {
-        startY: y + 2,
-        head: [["Audit No.", "Ref", "Category", "Status", "Owner", "Due Date"]],
-        body: auditFindingRows.length
-          ? auditFindingRows
-          : [["-", "-", "No open audit findings", "-", "-", "-"]],
-        theme: "grid",
-        headStyles: { fillColor: [124, 58, 237], textColor: [255, 255, 255], fontStyle: "bold" },
-        styles: { fontSize: 9, cellPadding: 2.8, lineColor: [226, 232, 240], lineWidth: 0.2 },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: margin, right: margin },
-      });
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(71, 85, 105);
+        doc.setFontSize(10.2);
+        const nextMonthLines = doc.splitTextToSize(nextMonthFocus, pageWidth - margin * 2);
+        doc.text(nextMonthLines, margin, y);
+      }
 
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i += 1) {
@@ -747,7 +803,7 @@ export default function ReportsPage() {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(100, 116, 139);
-        doc.text(`Enshore Subsea · ${reportTitle}`, margin, pageHeight - 8);
+        doc.text(`Enshore Subsea | ${pdfMetrics.monthLabel}`, margin, pageHeight - 8);
         doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, {
           align: "right",
         });
@@ -757,7 +813,7 @@ export default function ReportsPage() {
       const pdfUrl = URL.createObjectURL(pdfBlob);
       window.open(pdfUrl, "_blank", "noopener,noreferrer");
       doc.save(`${reportTitle.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-")}.pdf`);
-      setMessage("PDF generated successfully.");
+      setMessage("Monthly management report PDF generated successfully.");
     } catch (error) {
       console.error(error);
       setMessage("PDF generation failed.");
@@ -773,23 +829,22 @@ export default function ReportsPage() {
           <div style={eyebrowStyle}>Management Reporting</div>
           <h1 style={heroTitleStyle}>Reports</h1>
           <p style={heroSubtitleStyle}>
-            Build monthly management summaries using the current live system data,
-            now including audits and audit findings as part of the reporting pack.
+            Generate concise monthly management summaries from the live quality system without dumping raw registers.
           </p>
         </div>
 
         <div style={heroMetaWrapStyle}>
           <div style={heroMetaCardStyle}>
+            <div style={heroMetaLabelStyle}>Selected Period</div>
+            <div style={heroMetaValueStyle}>{metrics.monthLabel}</div>
+          </div>
+          <div style={heroMetaCardStyle}>
             <div style={heroMetaLabelStyle}>Saved Reports</div>
             <div style={heroMetaValueStyle}>{reports.length}</div>
           </div>
           <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Open Items</div>
-            <div style={heroMetaValueStyle}>{openNcrs + openCapas + openActions + openAuditFindings}</div>
-          </div>
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Audit Programme</div>
-            <div style={heroMetaValueStyle}>{totalAudits}</div>
+            <div style={heroMetaLabelStyle}>Open Actions</div>
+            <div style={heroMetaValueStyle}>{metrics.actionsSummary.totalOpenActions}</div>
           </div>
           <div style={heroMetaCardStyle}>
             <div style={heroMetaLabelStyle}>Last Refreshed</div>
@@ -825,19 +880,10 @@ export default function ReportsPage() {
             onClick={() => void generatePdfReport()}
             disabled={isGeneratingPdf}
           >
-            {isGeneratingPdf ? "Generating PDF..." : "Generate PDF Report"}
+            {isGeneratingPdf ? "Generating PDF..." : "Generate Monthly PDF"}
           </button>
         </div>
       </div>
-
-      <section style={statsGridStyle}>
-        <StatCard title="Total Assets" value={totalAssets} accent="#0f766e" />
-        <StatCard title="Open NCRs" value={openNcrs} accent="#dc2626" />
-        <StatCard title="Open CAPAs" value={openCapas} accent="#f59e0b" />
-        <StatCard title="Open Actions" value={openActions} accent="#2563eb" />
-        <StatCard title="Overdue Actions" value={overdueActions} accent="#b91c1c" />
-        <StatCard title="Overdue Audits" value={overdueAudits} accent="#7c3aed" />
-      </section>
 
       <section style={statusBannerStyle}>
         <strong>Status:</strong> {message}
@@ -848,62 +894,81 @@ export default function ReportsPage() {
           <div style={sectionHeaderRowStyle}>
             <div>
               <h2 style={sectionTitleStyle}>
-                {editingId ? "Edit Monthly Report" : "Create Monthly Report"}
+                {editingId ? "Edit Monthly Management Report" : "Create Monthly Management Report"}
               </h2>
               <p style={sectionSubtitleStyle}>
-                Build an executive summary using live asset, NCR, CAPA, audit and action data.
+                Choose the reporting month and generate a concise management pack from verified live data fields.
               </p>
             </div>
           </div>
 
           <form onSubmit={saveMonthlyReport}>
-            <div style={{ display: "grid", gap: "12px" }}>
-              <input
-                placeholder="Month Label (e.g. April 2026)"
-                value={form.month_label}
-                onChange={(e) => setForm({ ...form, month_label: e.target.value })}
-                style={inputStyle}
-              />
-              <textarea
-                placeholder="Summary"
-                value={form.summary}
-                onChange={(e) => setForm({ ...form, summary: e.target.value })}
-                rows={4}
-                style={textareaStyle}
-              />
-              <textarea
-                placeholder="Wins"
-                value={form.wins}
-                onChange={(e) => setForm({ ...form, wins: e.target.value })}
-                rows={4}
-                style={textareaStyle}
-              />
-              <textarea
-                placeholder="Risks"
-                value={form.risks}
-                onChange={(e) => setForm({ ...form, risks: e.target.value })}
-                rows={4}
-                style={textareaStyle}
-              />
-              <textarea
-                placeholder="Next Steps"
-                value={form.next_steps}
-                onChange={(e) => setForm({ ...form, next_steps: e.target.value })}
-                rows={4}
-                style={textareaStyle}
-              />
+            <div style={formGridStyle}>
+              <label style={fieldLabelStyle}>
+                <span>Month</span>
+                <select
+                  value={form.monthIndex}
+                  onChange={(e) => setForm((prev) => ({ ...prev, monthIndex: Number(e.target.value) }))}
+                  style={inputStyle}
+                >
+                  {monthOptions.map((month, index) => (
+                    <option key={month} value={index}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={fieldLabelStyle}>
+                <span>Year</span>
+                <input
+                  value={form.year}
+                  onChange={(e) => setForm((prev) => ({ ...prev, year: e.target.value }))}
+                  style={inputStyle}
+                  inputMode="numeric"
+                  placeholder={String(currentDate.getFullYear())}
+                />
+              </label>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
+            <div style={narrativeStackStyle}>
+              <label style={fieldLabelStyle}>
+                <span>Executive Summary</span>
+                <textarea
+                  value={form.executiveSummary}
+                  onChange={(e) => setForm((prev) => ({ ...prev, executiveSummary: e.target.value }))}
+                  style={textareaStyle}
+                  rows={4}
+                  placeholder="Optional short management summary for this month."
+                />
+              </label>
+
+              <label style={fieldLabelStyle}>
+                <span>Next Month Focus / Planned Activity</span>
+                <textarea
+                  value={form.nextMonthFocus}
+                  onChange={(e) => setForm((prev) => ({ ...prev, nextMonthFocus: e.target.value }))}
+                  style={textareaStyle}
+                  rows={4}
+                  placeholder="Optional forward-look for next month."
+                />
+              </label>
+            </div>
+
+            <div style={periodPreviewStyle}>
+              <strong>Report Period:</strong> {metrics.monthLabel}
+            </div>
+
+            <div style={buttonRowStyle}>
               <button type="submit" style={primaryButtonStyle}>
                 {editingId ? "Update Monthly Report" : "Save Monthly Report"}
               </button>
 
-              {editingId && (
+              {editingId ? (
                 <button type="button" style={secondaryButtonStyle} onClick={resetForm}>
                   Cancel Edit
                 </button>
-              )}
+              ) : null}
             </div>
           </form>
         </div>
@@ -911,221 +976,28 @@ export default function ReportsPage() {
         <div style={panelStyle}>
           <div style={sectionHeaderRowStyle}>
             <div>
-              <h2 style={sectionTitleStyle}>Executive Snapshot</h2>
+              <h2 style={sectionTitleStyle}>Management Snapshot</h2>
               <p style={sectionSubtitleStyle}>
-                Current live headline metrics for the management summary.
+                Live monthly summary blocks used to build the management PDF.
               </p>
             </div>
           </div>
 
-          <div style={{ display: "grid", gap: "12px" }}>
-            <SnapshotRow label="Total Assets" value={totalAssets} />
-            <SnapshotRow label="Open NCRs" value={openNcrs} />
-            <SnapshotRow label="Major Open NCRs" value={majorOpenNcrs} />
-            <SnapshotRow label="Open CAPAs" value={openCapas} />
-            <SnapshotRow label="Open Actions" value={openActions} />
-            <SnapshotRow label="Overdue Actions" value={overdueActions} />
-            <SnapshotRow label="Total Audits" value={totalAudits} />
-            <SnapshotRow label="Overdue Audits" value={overdueAudits} />
-            <SnapshotRow label="Open Audit Findings" value={openAuditFindings} />
-            <SnapshotRow label="Major Open Findings" value={majorOpenAuditFindings} />
-          </div>
-        </div>
-      </section>
-
-      <section style={twoColumnGridStyle}>
-        <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>Audit Attention</h2>
-              <p style={sectionSubtitleStyle}>
-                Current audits that are overdue, in progress, or still planned.
-              </p>
-            </div>
-          </div>
-
-          {auditAttentionList.length === 0 ? (
-            <p style={emptyTextStyle}>No audits currently flagged for attention.</p>
-          ) : (
-            <div style={{ display: "grid", gap: "12px" }}>
-              {auditAttentionList.map((audit) => {
-                const tone = getAuditStatusTone(audit.status);
-                return (
-                  <div key={audit.id} style={auditAttentionCardStyle}>
-                    <div style={auditAttentionTopStyle}>
-                      <div>
-                        <div style={auditAttentionNumberStyle}>{audit.audit_number || "-"}</div>
-                        <div style={auditAttentionTitleStyle}>{audit.title || "-"}</div>
-                      </div>
-                      <span
-                        style={{
-                          ...statusBadgeStyle,
-                          background: tone.bg,
-                          color: tone.color,
-                        }}
-                      >
-                        {audit.status || "Unknown"}
-                      </span>
+          <div style={snapshotCardsWrapStyle}>
+            {reportCards.map((card) => (
+              <div key={card.title} style={snapshotCardStyle}>
+                <div style={snapshotCardTitleStyle}>{card.title}</div>
+                <div style={snapshotRowsWrapStyle}>
+                  {card.rows.map(([label, value]) => (
+                    <div key={`${card.title}-${label}`} style={snapshotRowStyle}>
+                      <span style={snapshotLabelStyle}>{label}</span>
+                      <strong style={snapshotValueStyle}>{value}</strong>
                     </div>
-
-                    <div style={auditAttentionMetaGridStyle}>
-                      <span><strong>Type:</strong> {audit.audit_type || "-"}</span>
-                      <span><strong>Month:</strong> {formatAuditMonth(audit.audit_month)}</span>
-                      <span><strong>Date:</strong> {formatDate(audit.audit_date)}</span>
-                      <span><strong>Auditee:</strong> {audit.auditee || "-"}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>Open Registers Snapshot</h2>
-              <p style={sectionSubtitleStyle}>
-                Quick live position across the main modules.
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gap: "12px" }}>
-            <SnapshotRow label="Open NCRs" value={openNcrs} />
-            <SnapshotRow label="Open CAPAs" value={openCapas} />
-            <SnapshotRow label="Open Actions" value={openActions} />
-            <SnapshotRow label="Open Audit Findings" value={openAuditFindings} />
-            <SnapshotRow label="Overdue Actions" value={overdueActions} />
-            <SnapshotRow label="Overdue Audits" value={overdueAudits} />
-          </div>
-        </div>
-      </section>
-
-      <section style={chartGridStyle}>
-        <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>NCR Status</h2>
-              <p style={sectionSubtitleStyle}>Current status split across NCR records.</p>
-            </div>
-          </div>
-
-          <div style={{ width: "100%", height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={ncrStatusChart}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#dc2626" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>CAPA Status</h2>
-              <p style={sectionSubtitleStyle}>Current status split across CAPA records.</p>
-            </div>
-          </div>
-
-          <div style={{ width: "100%", height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={capaStatusChart}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#f97316" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>Actions Status</h2>
-              <p style={sectionSubtitleStyle}>Current status split across action records.</p>
-            </div>
-          </div>
-
-          <div style={{ width: "100%", height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={actionStatusChart}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#2563eb" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>Assets by Location</h2>
-              <p style={sectionSubtitleStyle}>Distribution of assets across locations.</p>
-            </div>
-          </div>
-
-          <div style={{ width: "100%", height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={assetLocationChart}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#0f766e" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>Audit Status</h2>
-              <p style={sectionSubtitleStyle}>Current audit programme status split.</p>
-            </div>
-          </div>
-
-          <div style={{ width: "100%", height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={auditStatusChart}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#7c3aed" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>Audit Type Split</h2>
-              <p style={sectionSubtitleStyle}>Internal, external and supplier audit view.</p>
-            </div>
-          </div>
-
-          <div style={{ width: "100%", height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={auditTypeChart}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#0891b2" />
-              </BarChart>
-            </ResponsiveContainer>
+                  ))}
+                </div>
+                {"note" in card && card.note ? <div style={snapshotNoteStyle}>{card.note}</div> : null}
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -1135,7 +1007,7 @@ export default function ReportsPage() {
           <div>
             <h2 style={sectionTitleStyle}>Saved Monthly Reports</h2>
             <p style={sectionSubtitleStyle}>
-              Review previously saved management reports and update them where needed.
+              Reopen saved monthly management periods and generate the concise PDF directly from each row.
             </p>
           </div>
           <div style={registerCountStyle}>{reports.length} reports</div>
@@ -1149,10 +1021,7 @@ export default function ReportsPage() {
               <thead>
                 <tr>
                   <th style={tableHeadStyle}>Month</th>
-                  <th style={tableHeadStyle}>Summary</th>
-                  <th style={tableHeadStyle}>Wins</th>
-                  <th style={tableHeadStyle}>Risks</th>
-                  <th style={tableHeadStyle}>Next Steps</th>
+                  <th style={tableHeadStyle}>Snapshot</th>
                   <th style={tableHeadStyle}>Created</th>
                   <th style={tableHeadStyle}>Actions</th>
                 </tr>
@@ -1161,10 +1030,7 @@ export default function ReportsPage() {
                 {reports.map((report) => (
                   <tr key={report.id}>
                     <td style={tableCellStyle}>{report.month_label}</td>
-                    <td style={tableCellStyle}>{report.summary || "-"}</td>
-                    <td style={tableCellStyle}>{report.wins || "-"}</td>
-                    <td style={tableCellStyle}>{report.risks || "-"}</td>
-                    <td style={tableCellStyle}>{report.next_steps || "-"}</td>
+                    <td style={tableCellStyle}>{getSnapshotSummary(report)}</td>
                     <td style={tableCellStyle}>{formatDateTime(report.created_at)}</td>
                     <td style={tableCellStyle}>
                       <div style={actionButtonsWrapStyle}>
@@ -1187,44 +1053,6 @@ export default function ReportsPage() {
         )}
       </section>
     </main>
-  );
-}
-
-function StatCard({ title, value, accent }: { title: string; value: number; accent: string }) {
-  return (
-    <div
-      style={{
-        background: "white",
-        borderRadius: "16px",
-        padding: "18px 20px",
-        borderLeft: `5px solid ${accent}`,
-        boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-      }}
-    >
-      <div style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>{title}</div>
-      <div style={{ fontSize: "34px", fontWeight: 700, color: "#0f172a", marginTop: "8px" }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function SnapshotRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div
-      style={{
-        background: "#f8fafc",
-        border: "1px solid #e2e8f0",
-        borderRadius: "10px",
-        padding: "12px 14px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-    >
-      <span style={{ color: "#334155", fontWeight: 600 }}>{label}</span>
-      <strong style={{ color: "#0f172a" }}>{value}</strong>
-    </div>
   );
 }
 
@@ -1298,13 +1126,6 @@ const backLinkStyle: React.CSSProperties = {
   textDecoration: "none",
 };
 
-const statsGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-  gap: "16px",
-  marginBottom: "20px",
-};
-
 const statusBannerStyle: React.CSSProperties = {
   background: "white",
   borderRadius: "14px",
@@ -1315,14 +1136,7 @@ const statusBannerStyle: React.CSSProperties = {
 
 const twoColumnGridStyle: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.1fr 0.9fr",
-  gap: "20px",
-  marginBottom: "20px",
-};
-
-const chartGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
+  gridTemplateColumns: "0.9fr 1.1fr",
   gap: "20px",
   marginBottom: "20px",
 };
@@ -1355,6 +1169,26 @@ const sectionSubtitleStyle: React.CSSProperties = {
   fontSize: "14px",
 };
 
+const formGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "12px",
+};
+
+const fieldLabelStyle: React.CSSProperties = {
+  display: "grid",
+  gap: "6px",
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
+};
+
+const narrativeStackStyle: React.CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  marginTop: "12px",
+};
+
 const inputStyle: React.CSSProperties = {
   padding: "10px 12px",
   borderRadius: "10px",
@@ -1365,13 +1199,10 @@ const inputStyle: React.CSSProperties = {
 };
 
 const textareaStyle: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  ...inputStyle,
   resize: "vertical",
-  fontFamily: "Arial, sans-serif",
-  background: "white",
-  color: "#0f172a",
+  minHeight: "96px",
+  fontFamily: "inherit",
 };
 
 const primaryButtonStyle: React.CSSProperties = {
@@ -1404,24 +1235,68 @@ const pdfButtonStyle: React.CSSProperties = {
   fontWeight: 700,
 };
 
-const miniButtonStyle: React.CSSProperties = {
-  background: "#2563eb",
-  color: "white",
-  border: "none",
-  padding: "8px 12px",
-  borderRadius: "8px",
-  cursor: "pointer",
-  fontWeight: 700,
+const buttonRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  marginTop: "14px",
+  flexWrap: "wrap",
 };
 
-const miniButtonDeleteStyle: React.CSSProperties = {
-  background: "#dc2626",
-  color: "white",
-  border: "none",
-  padding: "8px 12px",
-  borderRadius: "8px",
-  cursor: "pointer",
-  fontWeight: 700,
+const periodPreviewStyle: React.CSSProperties = {
+  marginTop: "14px",
+  padding: "12px 14px",
+  borderRadius: "12px",
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  color: "#334155",
+};
+
+const snapshotCardsWrapStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "14px",
+};
+
+const snapshotCardStyle: React.CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  padding: "14px",
+  background: "#f8fafc",
+};
+
+const snapshotCardTitleStyle: React.CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 800,
+  color: "#0f172a",
+  marginBottom: "10px",
+};
+
+const snapshotRowsWrapStyle: React.CSSProperties = {
+  display: "grid",
+  gap: "8px",
+};
+
+const snapshotRowStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "flex-start",
+};
+
+const snapshotLabelStyle: React.CSSProperties = {
+  color: "#475569",
+  fontSize: "13px",
+};
+
+const snapshotValueStyle: React.CSSProperties = {
+  color: "#0f172a",
+  fontSize: "14px",
+};
+
+const snapshotNoteStyle: React.CSSProperties = {
+  marginTop: "10px",
+  fontSize: "12px",
+  color: "#64748b",
 };
 
 const registerCountStyle: React.CSSProperties = {
@@ -1461,49 +1336,22 @@ const actionButtonsWrapStyle: React.CSSProperties = {
   flexWrap: "wrap",
 };
 
-const auditAttentionCardStyle: React.CSSProperties = {
-  border: "1px solid #e2e8f0",
-  borderRadius: "14px",
-  padding: "14px",
-  background: "#f8fafc",
-};
-
-const auditAttentionTopStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "12px",
-  alignItems: "flex-start",
-  flexWrap: "wrap",
-  marginBottom: "10px",
-};
-
-const auditAttentionNumberStyle: React.CSSProperties = {
-  fontSize: "12px",
-  color: "#64748b",
-  fontWeight: 800,
-  marginBottom: "4px",
-};
-
-const auditAttentionTitleStyle: React.CSSProperties = {
-  fontSize: "16px",
-  color: "#0f172a",
+const miniButtonStyle: React.CSSProperties = {
+  background: "#2563eb",
+  color: "white",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  cursor: "pointer",
   fontWeight: 700,
 };
 
-const auditAttentionMetaGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "8px 12px",
-  fontSize: "13px",
-  color: "#475569",
-};
-
-const statusBadgeStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  padding: "6px 10px",
-  borderRadius: "999px",
-  fontSize: "12px",
-  fontWeight: 800,
-  whiteSpace: "nowrap",
+const miniButtonDeleteStyle: React.CSSProperties = {
+  background: "#dc2626",
+  color: "white",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontWeight: 700,
 };

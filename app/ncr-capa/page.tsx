@@ -1,5 +1,7 @@
 "use client";
 
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -13,14 +15,18 @@ type Ncr = {
   ncr_number: string | null;
   title: string | null;
   description: string | null;
+  containment_action: string | null;
   severity: string | null;
   status: string | null;
   owner: string | null;
   area: string | null;
   due_date: string | null;
   created_at: string | null;
+  closed_at: string | null;
   project: string | null;
   source_type: string | null;
+  root_cause_category: string | null;
+  root_cause_description: string | null;
 };
 
 type Capa = {
@@ -34,6 +40,13 @@ type Capa = {
   created_at: string | null;
   linked_to: string | null;
   project: string | null;
+  correction_description: string | null;
+  corrective_action_description: string | null;
+  effectiveness_status: string | null;
+  effectiveness_review_date: string | null;
+  effectiveness_reviewer: string | null;
+  effectiveness_comments: string | null;
+  effectiveness_due_date: string | null;
 };
 
 type EvidenceFile = {
@@ -48,6 +61,18 @@ type EvidenceFile = {
   uploaded_at: string;
 };
 
+type NcrCapaPdf = {
+  id: string;
+  ncr_id: string;
+  file_name: string;
+  file_path: string;
+  generated_at: string;
+  generated_by: string | null;
+  include_linked_capa: boolean;
+  include_evidence_list: boolean;
+  external_facing: boolean;
+};
+
 type LinkedOption = {
   id: string;
   label: string;
@@ -59,15 +84,26 @@ type CombinedRow = {
   number: string;
   title: string;
   description: string;
+  containment_action: string;
   severity: string;
   status: string;
   owner: string;
   area: string;
   due_date: string;
   created_at: string;
+  closed_at: string;
   project: string;
   source_type: string;
   linked_to: string;
+  root_cause_category: string;
+  root_cause_description: string;
+  correction_description: string;
+  corrective_action_description: string;
+  effectiveness_status: string;
+  effectiveness_review_date: string;
+  effectiveness_reviewer: string;
+  effectiveness_comments: string;
+  effectiveness_due_date: string;
 };
 
 function formatDate(value: string | null | undefined) {
@@ -177,6 +213,35 @@ function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
+function normaliseEffectivenessStatus(value: string | null | undefined) {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return "Pending";
+  if (trimmed.toLowerCase() === "effective") return "Effective";
+  if (trimmed.toLowerCase() === "not effective") return "Not Effective";
+  return "Pending";
+}
+
+function getPdfText(value: string | null | undefined) {
+  const trimmed = (value || "").trim();
+  return trimmed || "";
+}
+
+function parseLinkedReferences(value: string | null | undefined) {
+  return (value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function toDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function unknownArrayToOptions(
   data: unknown,
   primaryKeys: string[],
@@ -244,6 +309,7 @@ function NcrCapaPageContent() {
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
+  const [savedPdfFiles, setSavedPdfFiles] = useState<NcrCapaPdf[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
@@ -268,6 +334,7 @@ function NcrCapaPageContent() {
   const [newNcr, setNewNcr] = useState({
     title: "",
     description: "",
+    containment_action: "",
     severity: "Medium",
     status: "Open",
     owner: "",
@@ -275,6 +342,8 @@ function NcrCapaPageContent() {
     due_date: "",
     project: "",
     source_type: "Internal",
+    root_cause_category: "",
+    root_cause_description: "",
   });
 
   const [newCapa, setNewCapa] = useState({
@@ -285,6 +354,13 @@ function NcrCapaPageContent() {
     due_date: "",
     linked_to: "",
     project: "",
+    correction_description: "",
+    corrective_action_description: "",
+    effectiveness_status: "Pending",
+    effectiveness_review_date: "",
+    effectiveness_reviewer: "",
+    effectiveness_comments: "",
+    effectiveness_due_date: "",
   });
 
   const [createNcrFiles, setCreateNcrFiles] = useState<File[]>([]);
@@ -295,6 +371,10 @@ function NcrCapaPageContent() {
   const [editRow, setEditRow] = useState<CombinedRow | null>(null);
   const [selectedEvidenceFiles, setSelectedEvidenceFiles] = useState<File[]>([]);
   const [selectedEvidenceNotes, setSelectedEvidenceNotes] = useState("");
+  const [includeLinkedCapaInPdf, setIncludeLinkedCapaInPdf] = useState(true);
+  const [includeEvidenceListInPdf, setIncludeEvidenceListInPdf] = useState(true);
+  const [externalFacingPdf, setExternalFacingPdf] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -303,6 +383,7 @@ function NcrCapaPageContent() {
       { data: ncrData, error: ncrError },
       { data: capaData, error: capaError },
       { data: evidenceData, error: evidenceError },
+      { data: pdfData, error: pdfError },
     ] = await Promise.all([
       supabase.from("ncrs").select("*").order("created_at", { ascending: false }),
       supabase.from("capas").select("*").order("created_at", { ascending: false }),
@@ -311,15 +392,18 @@ function NcrCapaPageContent() {
         .select("*")
         .in("record_type", ["NCR", "CAPA"])
         .order("uploaded_at", { ascending: false }),
+      supabase.from("ncr_capa_pdfs").select("*").order("generated_at", { ascending: false }),
     ]);
 
     if (ncrError) console.error("Error loading NCRs:", ncrError.message);
     if (capaError) console.error("Error loading CAPAs:", capaError.message);
     if (evidenceError) console.error("Error loading evidence:", evidenceError.message);
+    if (pdfError) console.error("Error loading saved PDFs:", pdfError.message);
 
     setNcrs((ncrData as Ncr[]) || []);
     setCapas((capaData as Capa[]) || []);
     setEvidenceFiles((evidenceData as EvidenceFile[]) || []);
+    setSavedPdfFiles((pdfData as NcrCapaPdf[]) || []);
     setRefreshStamp(new Date().toLocaleString("en-GB"));
     setLoading(false);
   }
@@ -339,6 +423,9 @@ function NcrCapaPageContent() {
     setSelectedEvidenceFiles([]);
     setSelectedEvidenceNotes("");
     setEditLinkedNcrToAdd("");
+    setIncludeLinkedCapaInPdf(true);
+    setIncludeEvidenceListInPdf(true);
+    setExternalFacingPdf(false);
   }, [selectedRow]);
 
   const combinedRows = useMemo<CombinedRow[]>(() => {
@@ -348,15 +435,26 @@ function NcrCapaPageContent() {
       number: n.ncr_number || "NCR-???",
       title: n.title || "",
       description: n.description || "",
+      containment_action: n.containment_action || "",
       severity: n.severity || "-",
       status: n.status || "Open",
       owner: n.owner || "",
       area: n.area || "",
       due_date: n.due_date || "",
       created_at: n.created_at || "",
+      closed_at: n.closed_at || "",
       project: n.project || "",
       source_type: n.source_type || "Internal",
       linked_to: "",
+      root_cause_category: n.root_cause_category || "",
+      root_cause_description: n.root_cause_description || "",
+      correction_description: "",
+      corrective_action_description: "",
+      effectiveness_status: "Pending",
+      effectiveness_review_date: "",
+      effectiveness_reviewer: "",
+      effectiveness_comments: "",
+      effectiveness_due_date: "",
     }));
 
     const mappedCapas: CombinedRow[] = capas.map((c) => ({
@@ -365,15 +463,26 @@ function NcrCapaPageContent() {
       number: c.capa_number || "CAPA-???",
       title: c.title || "",
       description: c.description || "",
+      containment_action: "",
       severity: "-",
       status: c.status || "Open",
       owner: c.owner || "",
       area: "",
       due_date: c.due_date || "",
       created_at: c.created_at || "",
+      closed_at: "",
       project: c.project || "",
       source_type: "",
       linked_to: c.linked_to || "",
+      root_cause_category: "",
+      root_cause_description: "",
+      correction_description: c.correction_description || "",
+      corrective_action_description: c.corrective_action_description || "",
+      effectiveness_status: normaliseEffectivenessStatus(c.effectiveness_status),
+      effectiveness_review_date: c.effectiveness_review_date || "",
+      effectiveness_reviewer: c.effectiveness_reviewer || "",
+      effectiveness_comments: c.effectiveness_comments || "",
+      effectiveness_due_date: c.effectiveness_due_date || "",
     }));
 
     return [...mappedNcrs, ...mappedCapas].sort((a, b) => {
@@ -416,6 +525,34 @@ function NcrCapaPageContent() {
     );
   }, [evidenceFiles, selectedRow]);
 
+  const selectedLinkedCapas = useMemo(() => {
+    if (!selectedRow || selectedRow.type !== "NCR") return [];
+    return capas.filter((capa) =>
+      parseLinkedReferences(capa.linked_to).includes(selectedRow.number)
+    );
+  }, [capas, selectedRow]);
+
+  const selectedNcrPdfEvidence = useMemo(() => {
+    if (!selectedRow || selectedRow.type !== "NCR") return [];
+
+    const linkedCapaIds = new Set(selectedLinkedCapas.map((capa) => capa.id));
+
+    return evidenceFiles.filter((file) => {
+      if (file.record_type === "NCR" && file.record_id === selectedRow.id) return true;
+      if (file.record_type === "CAPA" && linkedCapaIds.has(file.record_id)) return true;
+      return false;
+    });
+  }, [evidenceFiles, selectedLinkedCapas, selectedRow]);
+
+  const selectedSavedPdfHistory = useMemo(() => {
+    if (!selectedRow || selectedRow.type !== "NCR") return [];
+    return savedPdfFiles.filter((file) => file.ncr_id === selectedRow.id);
+  }, [savedPdfFiles, selectedRow]);
+
+  const latestSavedPdf = useMemo(() => {
+    return selectedSavedPdfHistory[0] || null;
+  }, [selectedSavedPdfHistory]);
+
   const projectOptions = useMemo(() => {
     const values = new Set<string>();
     combinedRows.forEach((row) => {
@@ -425,7 +562,7 @@ function NcrCapaPageContent() {
   }, [combinedRows]);
 
   const filteredRows = useMemo(() => {
-    return combinedRows.filter((row) => {
+    const filtered = combinedRows.filter((row) => {
       const q = search.trim().toLowerCase();
 
       const matchesSearch =
@@ -460,6 +597,29 @@ function NcrCapaPageContent() {
         matchesAttention
       );
     });
+
+    return [...filtered].sort((a, b) => {
+      const aCreated = new Date(a.created_at || 0).getTime();
+      const bCreated = new Date(b.created_at || 0).getTime();
+
+      if (activeLogTab === "NCR") {
+        const severityRank = getSeverityRank(a.severity) - getSeverityRank(b.severity);
+        if (severityRank !== 0) return severityRank;
+        return bCreated - aCreated;
+      }
+
+      const aDueState = dueState(a.due_date);
+      const bDueState = dueState(b.due_date);
+      const aDueRank = aDueState === "overdue" ? 0 : aDueState === "soon" ? 1 : 2;
+      const bDueRank = bDueState === "overdue" ? 0 : bDueState === "soon" ? 1 : 2;
+      if (aDueRank !== bDueRank) return aDueRank - bDueRank;
+
+      const aDueTime = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+      const bDueTime = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+      if (aDueTime !== bDueTime) return aDueTime - bDueTime;
+
+      return bCreated - aCreated;
+    });
   }, [
     combinedRows,
     search,
@@ -471,6 +631,15 @@ function NcrCapaPageContent() {
     showAttentionOnly,
     activeLogTab,
   ]);
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("All");
+    setSeverityFilter("All");
+    setSourceFilter("All");
+    setProjectFilter("All");
+    setShowAttentionOnly(false);
+  }
 
   const kpis = useMemo(() => {
     const totalNcrs = ncrs.length;
@@ -681,18 +850,22 @@ function NcrCapaPageContent() {
     const { data, error } = await supabase
       .from("ncrs")
       .insert([
-        {
-          ncr_number: nextNumber,
-          title: newNcr.title.trim(),
-          description: newNcr.description.trim() || null,
-          severity: newNcr.severity,
-          status: newNcr.status,
-          owner: newNcr.owner.trim() || null,
-          area: newNcr.area.trim() || null,
-          due_date: newNcr.due_date || null,
-          project: newNcr.project.trim() || null,
-          source_type: newNcr.source_type,
-        },
+          {
+            ncr_number: nextNumber,
+            title: newNcr.title.trim(),
+            description: newNcr.description.trim() || null,
+            containment_action: newNcr.containment_action.trim() || null,
+            severity: newNcr.severity,
+            status: newNcr.status,
+            owner: newNcr.owner.trim() || null,
+            area: newNcr.area.trim() || null,
+            due_date: newNcr.due_date || null,
+            closed_at: newNcr.status === "Closed" ? new Date().toISOString() : null,
+            project: newNcr.project.trim() || null,
+            source_type: newNcr.source_type,
+            root_cause_category: newNcr.root_cause_category || null,
+            root_cause_description: newNcr.root_cause_description.trim() || null,
+          },
       ])
       .select("*")
       .single();
@@ -722,6 +895,7 @@ function NcrCapaPageContent() {
     setNewNcr({
       title: "",
       description: "",
+      containment_action: "",
       severity: "Medium",
       status: "Open",
       owner: "",
@@ -729,6 +903,8 @@ function NcrCapaPageContent() {
       due_date: "",
       project: "",
       source_type: "Internal",
+      root_cause_category: "",
+      root_cause_description: "",
     });
     setCreateNcrFiles([]);
     setCreateNcrEvidenceNotes("");
@@ -745,6 +921,15 @@ function NcrCapaPageContent() {
     }
 
     setSaving(true);
+
+    if (
+      newCapa.status === "Closed" &&
+      normaliseEffectivenessStatus(newCapa.effectiveness_status) !== "Effective"
+    ) {
+      setSaving(false);
+      setMessage("CAPA cannot be closed until effectiveness is reviewed and marked Effective.");
+      return;
+    }
 
     const nextNumber = buildNextNumber("CAPA", capas.map((c) => c.capa_number));
     const cleanedLinkedTo = newCapa.linked_to
@@ -765,6 +950,13 @@ function NcrCapaPageContent() {
           due_date: newCapa.due_date || null,
           linked_to: cleanedLinkedTo || null,
           project: newCapa.project.trim() || null,
+          correction_description: newCapa.correction_description.trim() || null,
+          corrective_action_description: newCapa.corrective_action_description.trim() || null,
+          effectiveness_status: normaliseEffectivenessStatus(newCapa.effectiveness_status),
+          effectiveness_review_date: newCapa.effectiveness_review_date || null,
+          effectiveness_reviewer: newCapa.effectiveness_reviewer.trim() || null,
+          effectiveness_comments: newCapa.effectiveness_comments.trim() || null,
+          effectiveness_due_date: newCapa.effectiveness_due_date || null,
         },
       ])
       .select("*")
@@ -800,6 +992,13 @@ function NcrCapaPageContent() {
       due_date: "",
       linked_to: "",
       project: "",
+      correction_description: "",
+      corrective_action_description: "",
+      effectiveness_status: "Pending",
+      effectiveness_review_date: "",
+      effectiveness_reviewer: "",
+      effectiveness_comments: "",
+      effectiveness_due_date: "",
     });
     setCreateCapaFiles([]);
     setCreateCapaEvidenceNotes("");
@@ -815,18 +1014,26 @@ function NcrCapaPageContent() {
     setSaving(true);
 
     if (editRow.type === "NCR") {
+      const wasClosed = (selectedRow?.status || "").trim().toLowerCase() === "closed";
+      const isClosed = (editRow.status || "").trim().toLowerCase() === "closed";
+      const nextClosedAt = !wasClosed && isClosed ? new Date().toISOString() : wasClosed && !isClosed ? null : selectedRow?.closed_at || null;
+
       const { error } = await supabase
         .from("ncrs")
         .update({
           title: editRow.title || null,
           description: editRow.description || null,
+          containment_action: editRow.containment_action || null,
           severity: editRow.severity || null,
           status: editRow.status || null,
           owner: editRow.owner || null,
           area: editRow.area || null,
           due_date: editRow.due_date || null,
+          closed_at: nextClosedAt,
           project: editRow.project || null,
           source_type: editRow.source_type || "Internal",
+          root_cause_category: editRow.root_cause_category || null,
+          root_cause_description: editRow.root_cause_description || null,
         })
         .eq("id", editRow.id);
 
@@ -836,6 +1043,15 @@ function NcrCapaPageContent() {
         return;
       }
     } else {
+      if (
+        editRow.status === "Closed" &&
+        normaliseEffectivenessStatus(editRow.effectiveness_status) !== "Effective"
+      ) {
+        setSaving(false);
+        setMessage("CAPA cannot be closed until effectiveness is reviewed and marked Effective.");
+        return;
+      }
+
       const cleanedLinkedTo = editRow.linked_to
         .split(",")
         .map((item) => item.trim())
@@ -852,6 +1068,13 @@ function NcrCapaPageContent() {
           due_date: editRow.due_date || null,
           linked_to: cleanedLinkedTo || null,
           project: editRow.project || null,
+          correction_description: editRow.correction_description || null,
+          corrective_action_description: editRow.corrective_action_description || null,
+          effectiveness_status: normaliseEffectivenessStatus(editRow.effectiveness_status),
+          effectiveness_review_date: editRow.effectiveness_review_date || null,
+          effectiveness_reviewer: editRow.effectiveness_reviewer || null,
+          effectiveness_comments: editRow.effectiveness_comments || null,
+          effectiveness_due_date: editRow.effectiveness_due_date || null,
         })
         .eq("id", editRow.id);
 
@@ -968,9 +1191,337 @@ function NcrCapaPageContent() {
     await loadData();
   }
 
+  async function openSavedPdf(file: NcrCapaPdf) {
+    const { data, error } = await supabase.storage
+      .from("quality-evidence")
+      .createSignedUrl(file.file_path, 300);
+
+    if (error || !data?.signedUrl) {
+      setMessage(`Could not open saved PDF: ${error?.message || "Unknown error"}`);
+      return;
+    }
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function generateNcrPdf() {
+    if (!selectedRow || selectedRow.type !== "NCR") {
+      setMessage("Select an NCR first.");
+      return;
+    }
+
+    try {
+      setGeneratingPdf(true);
+
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      const title = externalFacingPdf
+        ? "Supplier / Client NCR Response Form"
+        : "Non-Conformance Report";
+
+      try {
+        const logoResponse = await fetch("/enshore-logo.png");
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const logoFile = new File([logoBlob], "enshore-logo.png", {
+            type: logoBlob.type || "image/png",
+          });
+          const logoDataUrl = await toDataUrl(logoFile);
+          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 22);
+        }
+      } catch {
+        // Keep PDF generation resilient if the logo cannot be loaded.
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(18);
+      doc.text(title, pageWidth - margin, 17, { align: "right" });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Reference: ${selectedRow.number}`, pageWidth - margin, 24, { align: "right" });
+      doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`, pageWidth - margin, 30, {
+        align: "right",
+      });
+
+      doc.setDrawColor(15, 118, 110);
+      doc.setLineWidth(0.7);
+      doc.line(margin, 37, pageWidth - margin, 37);
+
+      autoTable(doc, {
+        startY: 44,
+        theme: "grid",
+        margin: { left: margin, right: margin },
+        head: [["Field", "Value", "Field", "Value"]],
+        body: [
+          ["NCR Number", selectedRow.number, "Status", selectedRow.status || ""],
+          ["Title", selectedRow.title || "", "Severity", getSeverityDisplay(selectedRow.severity)],
+          ["Source Type", selectedRow.source_type || "", "Project", selectedRow.project || ""],
+          ["Owner", selectedRow.owner || "", "Due Date", formatDate(selectedRow.due_date)],
+        ],
+        styles: {
+          font: "helvetica",
+          fontSize: 9,
+          cellPadding: 2.4,
+          lineColor: [203, 213, 225],
+          lineWidth: 0.2,
+          textColor: [15, 23, 42],
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: [15, 118, 110],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          0: { cellWidth: 28, fontStyle: "bold" },
+          1: { cellWidth: 60 },
+          2: { cellWidth: 28, fontStyle: "bold" },
+          3: { cellWidth: 60 },
+        },
+      });
+
+      let y = ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 44) + 8;
+
+      const drawHeading = (heading: string) => {
+        if (y > pageHeight - 40) {
+          doc.addPage();
+          y = 18;
+        }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(15, 23, 42);
+        doc.text(heading, margin, y);
+        y += 5;
+      };
+
+      const drawParagraphBox = (label: string, value: string, minHeight = 22) => {
+        if (y > pageHeight - 55) {
+          doc.addPage();
+          y = 18;
+        }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9.5);
+        doc.setTextColor(30, 41, 59);
+        doc.text(label, margin, y);
+        const text = getPdfText(value);
+        const lines = text ? doc.splitTextToSize(text, pageWidth - margin * 2 - 4) : [];
+        const bodyHeight = Math.max(minHeight, lines.length * 4.5 + 6);
+        doc.setDrawColor(203, 213, 225);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(margin, y + 2, pageWidth - margin * 2, bodyHeight, 1.8, 1.8, "FD");
+        if (lines.length > 0) {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9.2);
+          doc.setTextColor(51, 65, 85);
+          doc.text(lines, margin + 2, y + 7);
+        }
+        y += bodyHeight + 8;
+      };
+
+      const drawKeyValueTable = (rows: Array<[string, string]>) => {
+        if (y > pageHeight - 60) {
+          doc.addPage();
+          y = 18;
+        }
+        autoTable(doc, {
+          startY: y,
+          theme: "grid",
+          margin: { left: margin, right: margin },
+          body: rows,
+          styles: {
+            font: "helvetica",
+            fontSize: 8.8,
+            cellPadding: 2.2,
+            lineColor: [203, 213, 225],
+            lineWidth: 0.2,
+            textColor: [15, 23, 42],
+            overflow: "linebreak",
+            valign: "top",
+          },
+          columnStyles: {
+            0: { cellWidth: 46, fontStyle: "bold", fillColor: [248, 250, 252] },
+            1: { cellWidth: 136 },
+          },
+        });
+        y = ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y) + 8;
+      };
+
+      drawHeading("NCR DETAILS");
+      drawParagraphBox("Issue / Description", selectedRow.description, 28);
+      drawParagraphBox("Containment Action", selectedRow.containment_action, 20);
+      drawParagraphBox("Root Cause Category", selectedRow.root_cause_category, 12);
+      drawParagraphBox("Root Cause Description", selectedRow.root_cause_description, 22);
+
+      const includedCapas =
+        includeLinkedCapaInPdf && selectedLinkedCapas.length > 0 ? selectedLinkedCapas : [];
+
+      if (externalFacingPdf) {
+        drawHeading("SUPPLIER / CLIENT RESPONSE");
+        drawParagraphBox("Response / Proposed Action", "", 28);
+        drawParagraphBox("Acknowledgement / Responsible Contact", "", 18);
+      }
+
+      if (includedCapas.length > 0) {
+        drawHeading("LINKED CAPA");
+
+        includedCapas.forEach((capa) => {
+          if (y > pageHeight - 88) {
+            doc.addPage();
+            y = 18;
+          }
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.setTextColor(30, 41, 59);
+          const capaHeading = `${capa.capa_number || "CAPA"}${capa.title ? ` - ${capa.title}` : ""}`;
+          const capaHeadingLines = doc.splitTextToSize(capaHeading, pageWidth - margin * 2);
+          doc.text(capaHeadingLines, margin, y);
+          y += capaHeadingLines.length * 4.2 + 2;
+
+          drawKeyValueTable([
+            ["Linked NCR", selectedRow.number],
+            ["Owner", getPdfText(capa.owner)],
+            ["Due Date", formatDate(capa.due_date)],
+            ["Status", getPdfText(capa.status)],
+            ["Effectiveness Status", normaliseEffectivenessStatus(capa.effectiveness_status)],
+            ["Effectiveness Due Date", formatDate(capa.effectiveness_due_date)],
+            ["Effectiveness Review Date", formatDate(capa.effectiveness_review_date)],
+            ["Effectiveness Reviewer", getPdfText(capa.effectiveness_reviewer)],
+          ]);
+
+          drawParagraphBox("Correction Description", getPdfText(capa.correction_description), 18);
+          drawParagraphBox(
+            "Corrective Action Description",
+            getPdfText(capa.corrective_action_description),
+            20
+          );
+          drawParagraphBox("Effectiveness Comments", getPdfText(capa.effectiveness_comments), 18);
+        });
+      }
+
+      if (includeEvidenceListInPdf) {
+        drawHeading("EVIDENCE LIST");
+
+        if (selectedNcrPdfEvidence.length === 0) {
+          drawParagraphBox("Attached Evidence", "No evidence files listed for this export.", 14);
+        } else {
+          autoTable(doc, {
+            startY: y,
+            theme: "grid",
+            margin: { left: margin, right: margin },
+            head: [["Record", "File Name", "Uploaded", "Reference"]],
+            body: selectedNcrPdfEvidence.map((file) => [
+              file.record_type === "NCR" ? selectedRow.number : capas.find((capa) => capa.id === file.record_id)?.capa_number || "CAPA",
+              file.file_name,
+              formatDateTime(file.uploaded_at),
+              file.notes || "",
+            ]),
+            styles: {
+              font: "helvetica",
+              fontSize: 8.6,
+              cellPadding: 2.1,
+              lineColor: [203, 213, 225],
+              lineWidth: 0.2,
+              textColor: [15, 23, 42],
+              overflow: "linebreak",
+            },
+            headStyles: {
+              fillColor: [15, 23, 42],
+              textColor: [255, 255, 255],
+              fontStyle: "bold",
+            },
+            columnStyles: {
+              0: { cellWidth: 24 },
+              1: { cellWidth: 70 },
+              2: { cellWidth: 32 },
+              3: { cellWidth: 60 },
+            },
+          });
+
+          y = ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y) + 8;
+        }
+      }
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.8);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Enshore | ${selectedRow.number}`, margin, pageHeight - 8);
+        doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8, {
+          align: "right",
+        });
+      }
+
+      const fileName = `${selectedRow.number}-${externalFacingPdf ? "external" : "internal"}-ncr-report.pdf`
+        .replace(/[^a-zA-Z0-9._-]/g, "-");
+      const pdfBlob = doc.output("blob");
+      const safeFileName = sanitizeFileName(fileName);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const filePath = `NCR-PDF/${selectedRow.id}/${timestamp}-${safeFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("quality-evidence")
+        .upload(filePath, pdfBlob, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: "application/pdf",
+        });
+
+      if (uploadError) {
+        setMessage(`PDF upload failed: ${uploadError.message}`);
+        return;
+      }
+
+      const { data: authData } = await supabase.auth.getUser();
+      const generatedBy = authData.user?.email || authData.user?.id || null;
+
+      const { error: metadataError } = await supabase.from("ncr_capa_pdfs").insert([
+        {
+          ncr_id: selectedRow.id,
+          file_name: fileName,
+          file_path: filePath,
+          generated_by: generatedBy,
+          include_linked_capa: includeLinkedCapaInPdf && selectedLinkedCapas.length > 0,
+          include_evidence_list: includeEvidenceListInPdf,
+          external_facing: externalFacingPdf,
+        },
+      ]);
+
+      if (metadataError) {
+        setMessage(`PDF metadata save failed: ${metadataError.message}`);
+        return;
+      }
+
+      setMessage("NCR/CAPA PDF generated and saved successfully.");
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      setMessage("NCR/CAPA PDF generation failed.");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }
+
   const statusOptions = ["Open", "In Progress", "On Hold", "Closed"];
   const severityOptions = ["Low", "Medium", "High"];
   const sourceOptions = ["Internal", "Supplier", "External"];
+  const rootCauseOptions = [
+    "Human Error",
+    "Procedure Gap",
+    "Training / Competence",
+    "Supplier Issue",
+    "Design Issue",
+    "Equipment Failure",
+    "Other",
+  ];
+  const effectivenessStatusOptions = ["Pending", "Effective", "Not Effective"];
 
   return (
     <main>
@@ -1077,6 +1628,16 @@ function NcrCapaPageContent() {
                     />
                   </div>
 
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Containment Action</label>
+                    <textarea
+                      style={textareaStyle}
+                      value={newNcr.containment_action}
+                      onChange={(e) => setNewNcr({ ...newNcr, containment_action: e.target.value })}
+                      placeholder="Describe the immediate action taken to contain the nonconformance"
+                    />
+                  </div>
+
                   <div>
                     <label style={labelStyle}>Project</label>
                     <input
@@ -1157,6 +1718,32 @@ function NcrCapaPageContent() {
                   </div>
 
                   <div>
+                    <label style={labelStyle}>Root Cause Category</label>
+                    <select
+                      style={inputStyle}
+                      value={newNcr.root_cause_category}
+                      onChange={(e) => setNewNcr({ ...newNcr, root_cause_category: e.target.value })}
+                    >
+                      <option value="">Select category</option>
+                      {rootCauseOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Root Cause Description</label>
+                    <textarea
+                      style={textareaStyle}
+                      value={newNcr.root_cause_description}
+                      onChange={(e) => setNewNcr({ ...newNcr, root_cause_description: e.target.value })}
+                      placeholder="Describe the underlying cause of the NCR"
+                    />
+                  </div>
+
+                  <div>
                     <label style={labelStyle}>Evidence Files (optional)</label>
                     <input type="file" multiple style={inputStyle} onChange={handleCreateNcrFileChange} />
                   </div>
@@ -1185,6 +1772,7 @@ function NcrCapaPageContent() {
                       setNewNcr({
                         title: "",
                         description: "",
+                        containment_action: "",
                         severity: "Medium",
                         status: "Open",
                         owner: "",
@@ -1192,6 +1780,8 @@ function NcrCapaPageContent() {
                         due_date: "",
                         project: "",
                         source_type: "Internal",
+                        root_cause_category: "",
+                        root_cause_description: "",
                       });
                       setCreateNcrFiles([]);
                       setCreateNcrEvidenceNotes("");
@@ -1264,6 +1854,103 @@ function NcrCapaPageContent() {
                       style={inputStyle}
                       value={newCapa.due_date}
                       onChange={(e) => setNewCapa({ ...newCapa, due_date: e.target.value })}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                    CAPA Action Structure
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Correction (Immediate Fix)</label>
+                    <textarea
+                      style={textareaStyle}
+                      value={newCapa.correction_description}
+                      onChange={(e) =>
+                        setNewCapa({ ...newCapa, correction_description: e.target.value })
+                      }
+                      placeholder="Describe the immediate correction taken"
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Corrective Action (Prevent Recurrence)</label>
+                    <textarea
+                      style={textareaStyle}
+                      value={newCapa.corrective_action_description}
+                      onChange={(e) =>
+                        setNewCapa({ ...newCapa, corrective_action_description: e.target.value })
+                      }
+                      placeholder="Describe the action preventing recurrence"
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                    Effectiveness Review
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Effectiveness Status</label>
+                    <select
+                      style={inputStyle}
+                      value={newCapa.effectiveness_status}
+                      onChange={(e) =>
+                        setNewCapa({ ...newCapa, effectiveness_status: e.target.value })
+                      }
+                    >
+                      {effectivenessStatusOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Effectiveness Due Date (optional)</label>
+                    <input
+                      type="date"
+                      style={inputStyle}
+                      value={newCapa.effectiveness_due_date}
+                      onChange={(e) =>
+                        setNewCapa({ ...newCapa, effectiveness_due_date: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Effectiveness Review Date</label>
+                    <input
+                      type="date"
+                      style={inputStyle}
+                      value={newCapa.effectiveness_review_date}
+                      onChange={(e) =>
+                        setNewCapa({ ...newCapa, effectiveness_review_date: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Effectiveness Reviewer</label>
+                    <input
+                      style={inputStyle}
+                      value={newCapa.effectiveness_reviewer}
+                      onChange={(e) =>
+                        setNewCapa({ ...newCapa, effectiveness_reviewer: e.target.value })
+                      }
+                      placeholder="Reviewer name"
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Effectiveness Comments</label>
+                    <textarea
+                      style={textareaStyle}
+                      value={newCapa.effectiveness_comments}
+                      onChange={(e) =>
+                        setNewCapa({ ...newCapa, effectiveness_comments: e.target.value })
+                      }
+                      placeholder="Record how effectiveness was reviewed"
                     />
                   </div>
 
@@ -1351,6 +2038,13 @@ function NcrCapaPageContent() {
                         due_date: "",
                         linked_to: "",
                         project: "",
+                        correction_description: "",
+                        corrective_action_description: "",
+                        effectiveness_status: "Pending",
+                        effectiveness_review_date: "",
+                        effectiveness_reviewer: "",
+                        effectiveness_comments: "",
+                        effectiveness_due_date: "",
                       });
                       setCreateCapaFiles([]);
                       setCreateCapaEvidenceNotes("");
@@ -1524,40 +2218,56 @@ function NcrCapaPageContent() {
             />
 
             <div style={toolbarFiltersStyle}>
-              <select style={toolbarSelectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option>All</option>
-                {statusOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
+              <div style={toolbarLabeledControlStyle}>
+                <label style={toolbarLabelStyle}>Status</label>
+                <select style={toolbarSelectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option>All</option>
+                  {statusOptions.map((option) => (
+                    <option key={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
 
               {activeLogTab === "NCR" ? (
                 <>
-                  <select
-                    style={toolbarSelectStyle}
-                    value={severityFilter}
-                    onChange={(e) => setSeverityFilter(e.target.value)}
-                  >
-                    <option>All</option>
-                    {severityOptions.map((option) => (
-                      <option key={option}>{option}</option>
-                    ))}
-                  </select>
+                  <div style={toolbarLabeledControlStyle}>
+                    <label style={toolbarLabelStyle}>Severity</label>
+                    <select
+                      style={toolbarSelectStyle}
+                      value={severityFilter}
+                      onChange={(e) => setSeverityFilter(e.target.value)}
+                    >
+                      <option>All</option>
+                      {severityOptions.map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                  <select style={toolbarSelectStyle} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
-                    <option>All</option>
-                    {sourceOptions.map((option) => (
-                      <option key={option}>{option}</option>
-                    ))}
-                  </select>
+                  <div style={toolbarLabeledControlStyle}>
+                    <label style={toolbarLabelStyle}>Source Type</label>
+                    <select
+                      style={toolbarSelectStyle}
+                      value={sourceFilter}
+                      onChange={(e) => setSourceFilter(e.target.value)}
+                    >
+                      <option>All</option>
+                      {sourceOptions.map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
                 </>
               ) : null}
 
-              <select style={toolbarSelectStyle} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
-                {projectOptions.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
+              <div style={toolbarLabeledControlStyle}>
+                <label style={toolbarLabelStyle}>Project</label>
+                <select style={toolbarSelectStyle} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+                  {projectOptions.map((option) => (
+                    <option key={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
 
               <button
                 type="button"
@@ -1569,6 +2279,10 @@ function NcrCapaPageContent() {
                 onClick={() => setShowAttentionOnly((prev) => !prev)}
               >
                 {showAttentionOnly ? "Attention only" : "Focus attention"}
+              </button>
+
+              <button type="button" style={secondaryButton} onClick={clearFilters}>
+                Clear Filters
               </button>
             </div>
           </div>
@@ -1805,6 +2519,17 @@ function NcrCapaPageContent() {
 
                   {editRow.type === "NCR" && (
                     <>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Containment Action</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.containment_action}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, containment_action: e.target.value })
+                          }
+                        />
+                      </div>
+
                       <div>
                         <label style={labelStyle}>Severity</label>
                         <select
@@ -1839,11 +2564,147 @@ function NcrCapaPageContent() {
                           onChange={(e) => setEditRow({ ...editRow, area: e.target.value })}
                         />
                       </div>
+
+                      <div>
+                        <label style={labelStyle}>Root Cause Category</label>
+                        <select
+                          style={inputStyle}
+                          value={editRow.root_cause_category}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, root_cause_category: e.target.value })
+                          }
+                        >
+                          <option value="">Select category</option>
+                          {rootCauseOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Root Cause Description</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.root_cause_description}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, root_cause_description: e.target.value })
+                          }
+                        />
+                      </div>
                     </>
                   )}
 
                   {editRow.type === "CAPA" && (
                     <>
+                      <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                        CAPA Action Structure
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Correction (Immediate Fix)</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.correction_description}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, correction_description: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Corrective Action (Prevent Recurrence)</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.corrective_action_description}
+                          onChange={(e) =>
+                            setEditRow({
+                              ...editRow,
+                              corrective_action_description: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                        Effectiveness Review
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Effectiveness Status</label>
+                        <select
+                          style={inputStyle}
+                          value={editRow.effectiveness_status}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, effectiveness_status: e.target.value })
+                          }
+                        >
+                          {effectivenessStatusOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Effectiveness Due Date (optional)</label>
+                        <input
+                          type="date"
+                          style={inputStyle}
+                          value={
+                            editRow.effectiveness_due_date
+                              ? editRow.effectiveness_due_date.slice(0, 10)
+                              : ""
+                          }
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, effectiveness_due_date: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Effectiveness Review Date</label>
+                        <input
+                          type="date"
+                          style={inputStyle}
+                          value={
+                            editRow.effectiveness_review_date
+                              ? editRow.effectiveness_review_date.slice(0, 10)
+                              : ""
+                          }
+                          onChange={(e) =>
+                            setEditRow({
+                              ...editRow,
+                              effectiveness_review_date: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Effectiveness Reviewer</label>
+                        <input
+                          style={inputStyle}
+                          value={editRow.effectiveness_reviewer}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, effectiveness_reviewer: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Effectiveness Comments</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.effectiveness_comments}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, effectiveness_comments: e.target.value })
+                          }
+                        />
+                      </div>
+
                       <div style={{ gridColumn: "1 / -1" }}>
                         <label style={labelStyle}>Add Linked NCR</label>
                         <div style={pickerRowStyle}>
@@ -1891,6 +2752,106 @@ function NcrCapaPageContent() {
                     </>
                   )}
                 </div>
+
+                {editRow.type === "NCR" ? (
+                  <div style={pdfExportPanelStyle}>
+                    <div style={pdfExportHeaderStyle}>
+                      <div>
+                        <div style={pdfExportTitleStyle}>PDF Export</div>
+                        <div style={pdfExportSubtitleStyle}>
+                          Generate an NCR form for internal use or external supplier / client response.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={pdfOptionsGridStyle}>
+                      <label style={checkboxCardStyle}>
+                        <input
+                          type="checkbox"
+                          checked={includeLinkedCapaInPdf}
+                          disabled={selectedLinkedCapas.length === 0}
+                          onChange={(e) => setIncludeLinkedCapaInPdf(e.target.checked)}
+                        />
+                        <span>
+                          Include linked CAPA
+                          <small style={checkboxHintStyle}>
+                            {selectedLinkedCapas.length === 0
+                              ? "No linked CAPA found for this NCR"
+                              : `${selectedLinkedCapas.length} linked CAPA${selectedLinkedCapas.length === 1 ? "" : "s"} available`}
+                          </small>
+                        </span>
+                      </label>
+
+                      <label style={checkboxCardStyle}>
+                        <input
+                          type="checkbox"
+                          checked={includeEvidenceListInPdf}
+                          onChange={(e) => setIncludeEvidenceListInPdf(e.target.checked)}
+                        />
+                        <span>
+                          Include evidence list
+                          <small style={checkboxHintStyle}>
+                            List uploaded NCR / linked CAPA evidence without embedding files
+                          </small>
+                        </span>
+                      </label>
+
+                      <label style={checkboxCardStyle}>
+                        <input
+                          type="checkbox"
+                          checked={externalFacingPdf}
+                          onChange={(e) => setExternalFacingPdf(e.target.checked)}
+                        />
+                        <span>
+                          Supplier / Client facing issue
+                          <small style={checkboxHintStyle}>
+                            Adjust wording for external response and acknowledgement sections
+                          </small>
+                        </span>
+                      </label>
+                    </div>
+
+                    <div style={pdfSavedMetaStyle}>
+                      {latestSavedPdf ? (
+                        <>
+                          <span>
+                            Latest saved PDF: <strong>{formatDateTime(latestSavedPdf.generated_at)}</strong>
+                          </span>
+                          <span>
+                            History: <strong>{selectedSavedPdfHistory.length}</strong> saved version{selectedSavedPdfHistory.length === 1 ? "" : "s"}
+                          </span>
+                        </>
+                      ) : (
+                        <span>No saved PDF yet for this NCR.</span>
+                      )}
+                    </div>
+
+                    <div style={buttonRowStyle}>
+                      <button
+                        type="button"
+                        style={{ ...secondaryButton, border: "1px solid #99f6e4", color: "#0f766e" }}
+                        onClick={() => void generateNcrPdf()}
+                        disabled={generatingPdf}
+                      >
+                        {generatingPdf
+                          ? "Generating PDF..."
+                          : latestSavedPdf
+                          ? "Regenerate PDF"
+                          : "Generate / Save PDF"}
+                      </button>
+
+                      {latestSavedPdf ? (
+                        <button
+                          type="button"
+                          style={secondaryButton}
+                          onClick={() => void openSavedPdf(latestSavedPdf)}
+                        >
+                          Open Saved PDF
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div style={buttonRowStyle}>
                   <button type="button" style={primaryButton} onClick={() => void saveEdit()} disabled={saving}>
@@ -2344,6 +3305,20 @@ const toolbarSelectStyle: CSSProperties = {
   minWidth: "150px",
 };
 
+const toolbarLabeledControlStyle: CSSProperties = {
+  display: "grid",
+  gap: "4px",
+  minWidth: "150px",
+};
+
+const toolbarLabelStyle: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "#475569",
+};
+
 const textareaStyle: CSSProperties = {
   ...inputStyle,
   minHeight: 100,
@@ -2518,6 +3493,71 @@ const toolbarFiltersStyle: CSSProperties = {
   display: "flex",
   gap: "10px",
   flexWrap: "wrap",
+};
+
+const pdfExportPanelStyle: CSSProperties = {
+  marginTop: "18px",
+  padding: "16px",
+  borderRadius: "18px",
+  border: "1px solid #dbeafe",
+  background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+  display: "grid",
+  gap: "14px",
+};
+
+const pdfExportHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: "12px",
+};
+
+const pdfExportTitleStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 800,
+  color: "#0f172a",
+};
+
+const pdfExportSubtitleStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "12.5px",
+  color: "#475569",
+  lineHeight: 1.5,
+};
+
+const pdfOptionsGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const checkboxCardStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "10px",
+  padding: "10px 12px",
+  borderRadius: "14px",
+  border: "1px solid #e2e8f0",
+  background: "#ffffff",
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "#0f172a",
+  lineHeight: 1.4,
+};
+
+const checkboxHintStyle: CSSProperties = {
+  display: "block",
+  marginTop: "3px",
+  fontSize: "11.5px",
+  fontWeight: 500,
+  color: "#64748b",
+};
+
+const pdfSavedMetaStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "10px 18px",
+  fontSize: "12.5px",
+  color: "#475569",
 };
 
 const compactInsightListStyle: CSSProperties = {
