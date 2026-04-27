@@ -9,9 +9,9 @@ type AppShellProps = {
   children: React.ReactNode;
 };
 
-const navItems = [
+const qualityNavItems = [
+  { href: "/home", label: "Home" },
   { href: "/", label: "Dashboard" },
-  { href: "/assets", label: "Assets" },
   { href: "/documents", label: "Documents" },
   { href: "/moc", label: "MOC" },
   { href: "/ncr-capa", label: "NCR / CAPA" },
@@ -20,9 +20,33 @@ const navItems = [
   { href: "/reports", label: "Reports" },
 ];
 
+const assetNavItems = [
+  { href: "/home", label: "Home" },
+  { href: "/assets/dashboard", label: "Dashboard" },
+  { href: "/assets", label: "Assets" },
+];
+
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
+  const isHomePage = pathname === "/home";
+  const isAssetModule = pathname.startsWith("/assets");
+  const showLogo = !isHomePage;
+  const moduleTitle = isHomePage
+    ? "Enshore Management System"
+    : isAssetModule
+    ? "Asset Management"
+    : pathname.startsWith("/hse")
+    ? "HSE Management"
+    : "Quality Management";
+  const moduleSubtitle = isHomePage
+    ? ""
+    : isAssetModule
+    ? "Asset register and control system"
+    : pathname.startsWith("/hse")
+    ? "Health, safety and environment system"
+    : "Quality management system";
+  const navItems = isAssetModule ? assetNavItems : qualityNavItems;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -54,14 +78,16 @@ export default function AppShell({ children }: AppShellProps) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
-            <Image
-              src="/enshore-logo.png"
-              alt="Enshore"
-              width={128}
-              height={32}
-              priority
-              style={{ width: "128px", height: "auto", objectFit: "contain" }}
-            />
+            {showLogo ? (
+              <Image
+                src="/enshore-logo.png"
+                alt="Enshore"
+                width={128}
+                height={32}
+                priority
+                style={{ width: "128px", height: "auto", objectFit: "contain" }}
+              />
+            ) : null}
 
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
               <div
@@ -72,17 +98,19 @@ export default function AppShell({ children }: AppShellProps) {
                   letterSpacing: "-0.01em",
                 }}
               >
-                Quality Dashboard
+                {moduleTitle}
               </div>
-              <div
-                style={{
-                  color: "rgba(255,255,255,0.75)",
-                  fontSize: "12px",
-                  fontWeight: 500,
-                }}
-              >
-                Quality management system
-              </div>
+              {moduleSubtitle ? (
+                <div
+                  style={{
+                    color: "rgba(255,255,255,0.75)",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                  }}
+                >
+                  {moduleSubtitle}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -95,44 +123,46 @@ export default function AppShell({ children }: AppShellProps) {
                 flexWrap: "wrap",
               }}
             >
-              <nav
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
-                {navItems.map((item) => {
-                  const isActive =
-                    item.href === "/"
-                      ? pathname === "/"
-                      : pathname.startsWith(item.href);
+              {!isHomePage ? (
+                <nav
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  {navItems.map((item) => {
+                    const isActive =
+                      item.href === "/"
+                        ? pathname === "/"
+                        : pathname.startsWith(item.href);
 
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      style={{
-                        color: "white",
-                        textDecoration: "none",
-                        fontWeight: 600,
-                        fontSize: "13.5px",
-                        padding: "8px 12px",
-                        borderRadius: "8px",
-                        background: isActive
-                          ? "rgba(255,255,255,0.20)"
-                          : "rgba(255,255,255,0.08)",
-                        border: isActive
-                          ? "1px solid rgba(255,255,255,0.18)"
-                          : "1px solid transparent",
-                      }}
-                    >
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        style={{
+                          color: "white",
+                          textDecoration: "none",
+                          fontWeight: 600,
+                          fontSize: "13.5px",
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          background: isActive
+                            ? "rgba(255,255,255,0.20)"
+                            : "rgba(255,255,255,0.08)",
+                          border: isActive
+                            ? "1px solid rgba(255,255,255,0.18)"
+                            : "1px solid transparent",
+                        }}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              ) : null}
 
               <button
                 onClick={handleLogout}

@@ -662,7 +662,7 @@ export default function Home() {
       label: "Open MOCs",
       value: openMocs,
       accent: "#0f766e",
-      href: buildHref("/moc", { status: "Active" }),
+      href: buildHref("/moc", { attention: "open" }),
     },
     {
       label: "Temporary MOCs",
@@ -1001,7 +1001,7 @@ export default function Home() {
             <SummaryRow
               label="Overdue Documents"
               value={overdueDocuments}
-              href={buildHref("/documents", { status: "Overdue" })}
+              href={buildHref("/documents", { review: "Overdue" })}
               isLoading={isLoading}
             />
             <SummaryRow

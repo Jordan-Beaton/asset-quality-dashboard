@@ -783,21 +783,23 @@ function MOCPageContent() {
   const [messageTone, setMessageTone] = useState<NoticeTone>("neutral");
   const [refreshStamp, setRefreshStamp] = useState("");
   const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | MocStatus>(parseMocStatusFilter(linkedStatus));
+  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | MocStatus>(
+    linkedAttention === "open" ? "Active" : parseMocStatusFilter(linkedStatus)
+  );
   const [changeTypeFilter, setChangeTypeFilter] = useState<"All" | ChangeType>(
     linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All"
   );
   const [viewFilter, setViewFilter] = useState<MocViewFilter>(
-  linkedAttention === "expired-temporary"
-    ? "Expired Temporary"
-    : linkedAttention === "expiry-soon"
-    ? "Expiry Soon"
-    : linkedAttention === "draft-ageing"
-    ? "Draft Ageing"
-    : linkedRecent === "1"
-    ? "Recent"
-    : "All"
-);
+    linkedAttention === "expired-temporary"
+      ? "Expired Temporary"
+      : linkedAttention === "expiry-soon"
+      ? "Expiry Soon"
+      : linkedAttention === "draft-ageing"
+      ? "Draft Ageing"
+      : linkedRecent === "1"
+      ? "Recent"
+      : "All"
+  );
   const [selectedReportId, setSelectedReportId] = useState("");
   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());
   const [detailReport, setDetailReport] = useState<MocReport>(createEmptyReport());
@@ -900,7 +902,7 @@ function MOCPageContent() {
 
   useEffect(() => {
     setSearch(linkedSearch);
-    setStatusFilter(parseMocStatusFilter(linkedStatus));
+    setStatusFilter(linkedAttention === "open" ? "Active" : parseMocStatusFilter(linkedStatus));
     setChangeTypeFilter(linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All");
     setViewFilter(
       linkedAttention === "expired-temporary"

@@ -528,6 +528,7 @@ function AuditsPageContent() {
   const linkedFindingCategory = searchParams.get("findingCategory")?.trim() || "All";
 
   const [audits, setAudits] = useState<AuditRecord[]>([]);
+  const [auditFiles, setAuditFiles] = useState<AuditFileRow[]>([]);
   const [findings, setFindings] = useState<FindingRecord[]>([]);
   const [selectedAuditId, setSelectedAuditId] = useState<string>("");
   const [search, setSearch] = useState(linkedSearch);
@@ -584,7 +585,13 @@ function AuditsPageContent() {
       return;
     }
 
-    const fileRows = ((fileRes.data || []) as AuditFileRow[]).reduce<Record<string, AuditFileRow>>((acc, row) => {
+    const loadedFileRows = ((fileRes.data || []) as AuditFileRow[]).sort((a, b) => {
+      const aTime = new Date(a.uploaded_at || 0).getTime();
+      const bTime = new Date(b.uploaded_at || 0).getTime();
+      return bTime - aTime;
+    });
+
+    const fileRows = loadedFileRows.reduce<Record<string, AuditFileRow>>((acc, row) => {
       if (!row.audit_id) return acc;
 
       const current = acc[row.audit_id];
@@ -665,6 +672,7 @@ function AuditsPageContent() {
     }));
 
     setFindings(findingRows);
+    setAuditFiles(loadedFileRows);
     setAudits(hydratedAudits);
     setSelectedAuditId((current) => current || hydratedAudits[0]?.id || "");
     if (showLoadedMessage) {
@@ -779,6 +787,11 @@ function AuditsPageContent() {
   const selectedFindings = useMemo(
     () => findings.filter((finding) => finding.audit_id === selectedAuditId),
     [findings, selectedAuditId]
+  );
+
+  const selectedAuditFiles = useMemo(
+    () => auditFiles.filter((file) => file.audit_id === selectedAuditId),
+    [auditFiles, selectedAuditId]
   );
 
   const filteredAudits = useMemo(() => {
@@ -1249,8 +1262,9 @@ function AuditsPageContent() {
     const confirmDelete = window.confirm(`Delete ${selectedAudit.audit_number}?`);
     if (!confirmDelete) return;
 
-    if (selectedAudit.report_storage_path) {
-      await supabase.storage.from(STORAGE_BUCKET).remove([selectedAudit.report_storage_path]);
+    const storedPaths = selectedAuditFiles.map((file) => file.file_path).filter((value): value is string => Boolean(value));
+    if (storedPaths.length > 0) {
+      await supabase.storage.from(STORAGE_BUCKET).remove(storedPaths);
     }
 
     const { error } = await supabase.from("audits").delete().eq("id", selectedAudit.id);
@@ -1393,13 +1407,7 @@ function AuditsPageContent() {
     setIsUploadingReport(true);
 
     try {
-      if (selectedAudit.report_storage_path) {
-        await supabase.storage.from(STORAGE_BUCKET).remove([selectedAudit.report_storage_path]);
-      }
-
       const path = await uploadFileToStorage(selectedAudit.id, file);
-
-      await supabase.from("audit_files").delete().eq("audit_id", selectedAudit.id);
 
       const { error } = await supabase.from("audit_files").insert([
         {
@@ -1416,47 +1424,47 @@ function AuditsPageContent() {
       }
 
       await loadAudits(false);
-      setMessage(`Audit report uploaded to ${selectedAudit.audit_number}.`);
+      setMessage(`Audit document uploaded to ${selectedAudit.audit_number}.`);
     } catch (error) {
       const err = error as Error;
-      setMessage(`Audit report upload failed: ${err.message}`);
+      setMessage(`Audit document upload failed: ${err.message}`);
     } finally {
       setIsUploadingReport(false);
       event.target.value = "";
     }
   }
 
-  async function removeReport() {
+  async function removeAuditFile(file: AuditFileRow) {
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
     }
 
-    if (selectedAudit.report_storage_path) {
-      await supabase.storage.from(STORAGE_BUCKET).remove([selectedAudit.report_storage_path]);
+    if (file.file_path) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([file.file_path]);
     }
 
-    const { error } = await supabase.from("audit_files").delete().eq("audit_id", selectedAudit.id);
+    const { error } = await supabase.from("audit_files").delete().eq("id", file.id);
 
     if (error) {
-      setMessage(`Remove report failed: ${error.message}`);
+      setMessage(`Remove document failed: ${error.message}`);
       return;
     }
 
     await loadAudits(false);
-    setMessage(`Audit report removed from ${selectedAudit.audit_number}.`);
+    setMessage(`Audit document removed from ${selectedAudit.audit_number}.`);
   }
 
-  async function openSelectedAuditReport() {
-    if (!selectedAudit?.report_storage_path) {
-      setMessage("No report uploaded for this audit.");
+  async function openAuditFile(file: AuditFileRow) {
+    if (!file.file_path) {
+      setMessage("This audit document does not have a stored file path.");
       return;
     }
 
-    const signedUrl = await createSignedFileUrl(selectedAudit.report_storage_path);
+    const signedUrl = await createSignedFileUrl(file.file_path);
 
     if (!signedUrl) {
-      setMessage(`Could not open report for ${selectedAudit.audit_number}.`);
+      setMessage(`Could not open ${file.file_name || "audit document"}.`);
       return;
     }
 
@@ -2022,12 +2030,14 @@ function AuditsPageContent() {
 
               <div style={topUploadStripStyle}>
                 <div style={topUploadMetaStyle}>
-                  <div style={topUploadTitleStyle}>Audit report</div>
+                  <div style={topUploadTitleStyle}>Audit Documents</div>
                   <div style={topUploadFileStyle}>
-                    {selectedAudit.report_file_name || "No report uploaded"}
+                    {selectedAuditFiles.length === 0
+                      ? "No audit documents uploaded"
+                      : `${selectedAuditFiles.length} audit document${selectedAuditFiles.length === 1 ? "" : "s"} linked`}
                   </div>
                   <div style={topUploadSubStyle}>
-                    {selectedAudit.report_file_name
+                    {selectedAuditFiles.length > 0
                       ? `${formatFileSize(selectedAudit.report_file_size)} • Uploaded ${formatDateTime(
                           selectedAudit.report_uploaded_at
                         )}`
@@ -2037,7 +2047,7 @@ function AuditsPageContent() {
 
                 <div style={topUploadButtonsStyle}>
                   <label style={uploadButtonStyle}>
-                    {isUploadingReport ? "Uploading..." : "Upload report"}
+                    {isUploadingReport ? "Uploading..." : "Upload document"}
                     <input
                       type="file"
                       accept=".pdf,.doc,.docx,.xlsx,.xls,.png,.jpg,.jpeg"
@@ -2046,22 +2056,44 @@ function AuditsPageContent() {
                     />
                   </label>
 
-                  {selectedAudit.report_storage_path ? (
-                    <button
-                      type="button"
-                      onClick={() => void openSelectedAuditReport()}
-                      style={reportLinkButtonStyle}
-                    >
-                      Open report
-                    </button>
-                  ) : null}
-
-                  {selectedAudit.report_file_name ? (
-                    <button type="button" style={secondaryButtonStyle} onClick={removeReport}>
-                      Remove report
-                    </button>
-                  ) : null}
                 </div>
+              </div>
+
+              <div style={auditDocumentListStyle}>
+                {selectedAuditFiles.length > 0 ? (
+                  selectedAuditFiles.map((file) => (
+                    <div key={file.id} style={auditDocumentRowStyle}>
+                      <div style={auditDocumentMetaStyle}>
+                        <div style={auditDocumentNameStyle}>{file.file_name || "Unnamed file"}</div>
+                        <div style={auditDocumentSubStyle}>
+                          {[formatFileSize(file.file_size), `Uploaded ${formatDateTime(file.uploaded_at || "")}`]
+                            .filter((value) => value && value !== "-")
+                            .join(" • ") || "Uploaded file"}
+                        </div>
+                      </div>
+                      <div style={auditDocumentActionsStyle}>
+                        <button
+                          type="button"
+                          onClick={() => void openAuditFile(file)}
+                          style={reportLinkButtonStyle}
+                        >
+                          Open / View
+                        </button>
+                        <button
+                          type="button"
+                          style={secondaryButtonStyle}
+                          onClick={() => void removeAuditFile(file)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={auditDocumentEmptyStyle}>
+                    No audit documents linked yet. Upload the PDF and Word versions here as separate files.
+                  </div>
+                )}
               </div>
 
               <div style={miniKpiGridStyle}>
@@ -3393,6 +3425,59 @@ const topUploadButtonsStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   justifyContent: "flex-end",
+};
+
+const auditDocumentListStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+  marginTop: "12px",
+};
+
+const auditDocumentRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  padding: "12px 14px",
+  borderRadius: "14px",
+  border: "1px solid #dbe4f0",
+  background: "#f8fafc",
+};
+
+const auditDocumentMetaStyle: CSSProperties = {
+  display: "grid",
+  gap: "4px",
+  minWidth: 0,
+};
+
+const auditDocumentNameStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 700,
+  color: "#0f172a",
+  overflowWrap: "anywhere",
+};
+
+const auditDocumentSubStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#64748b",
+  overflowWrap: "anywhere",
+};
+
+const auditDocumentActionsStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+  gap: "8px",
+  flexShrink: 0,
+};
+
+const auditDocumentEmptyStyle: CSSProperties = {
+  padding: "12px 14px",
+  borderRadius: "14px",
+  border: "1px dashed #cbd5e1",
+  background: "#f8fafc",
+  color: "#64748b",
+  fontSize: "13px",
 };
 
 const miniKpiGridStyle: CSSProperties = {
