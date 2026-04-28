@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 type AuditType = "Internal" | "External" | "Supplier";
@@ -115,6 +116,7 @@ type AuditLinkOption = {
   id: string;
   label: string;
 };
+
 
 const STORAGE_BUCKET = "audit-evidence";
 
@@ -346,6 +348,7 @@ function sanitizeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
+
 function normaliseAuditStatus(value: string | null | undefined): AuditStatus {
   const input = (value || "").trim().toLowerCase();
 
@@ -531,6 +534,7 @@ function AuditsPageContent() {
   const [auditFiles, setAuditFiles] = useState<AuditFileRow[]>([]);
   const [findings, setFindings] = useState<FindingRecord[]>([]);
   const [selectedAuditId, setSelectedAuditId] = useState<string>("");
+  const [lastRefreshed, setLastRefreshed] = useState("");
   const [search, setSearch] = useState(linkedSearch);
   const [statusFilter, setStatusFilter] = useState<AuditStatus | "All">(linkedStatus as AuditStatus | "All");
   const [typeFilter, setTypeFilter] = useState<AuditType | "All">(linkedType as AuditType | "All");
@@ -675,6 +679,7 @@ function AuditsPageContent() {
     setAuditFiles(loadedFileRows);
     setAudits(hydratedAudits);
     setSelectedAuditId((current) => current || hydratedAudits[0]?.id || "");
+    setLastRefreshed(new Date().toLocaleString("en-GB"));
     if (showLoadedMessage) {
       if (linkedSearch) {
         const searchLower = linkedSearch.toLowerCase();
@@ -716,6 +721,11 @@ function AuditsPageContent() {
     () => audits.find((audit) => audit.id === selectedAuditId) || null,
     [audits, selectedAuditId]
   );
+
+  const latestAuditLabel = useMemo(() => {
+    const latest = audits[0];
+    return latest ? `${latest.audit_number} - ${latest.title}` : "No audits loaded";
+  }, [audits]);
 
   useEffect(() => {
     if (!selectedAudit) return;
@@ -1380,6 +1390,7 @@ function AuditsPageContent() {
     setMessage("Finding updated.");
   }
 
+
   async function uploadFileToStorage(auditId: string, file: File) {
     const safeName = sanitizeFileName(file.name);
     const path = `audits/${auditId}/${Date.now()}-${safeName}`;
@@ -1647,29 +1658,15 @@ function AuditsPageContent() {
 
   return (
     <main>
-      <section style={heroStyle}>
-        <div style={{ flex: "1 1 700px" }}>
-          <div style={eyebrowStyle}>Audit Management</div>
-          <h1 style={heroTitleStyle}>Audits</h1>
-          <p style={heroSubtitleStyle}>
-            Dense programme view, cleaner schedule columns, sticky detail workspace, full finding management, and audit report upload pinned at the top.
-          </p>
-
-          <div style={heroPillGridStyle}>
-            <HeroPill label="Planned" value={kpis.planned} tone="blue" />
-            <HeroPill label="In Progress" value={kpis.inProgress} tone="amber" />
-            <HeroPill label="Overdue" value={kpis.overdue} tone="red" />
-            <HeroPill label="Open Findings" value={kpis.openFindings} tone="neutral" />
-          </div>
-        </div>
-
-        <div style={heroMetaGridStyle}>
-          <HeroMetaCard label="Completed Audits" value={kpis.completed} />
-          <HeroMetaCard label="Major Findings" value={kpis.totalMajor} />
-          <HeroMetaCard label="Current Audit" value={selectedAudit?.audit_number || "None"} compact />
-          <HeroMetaCard label="Programme Mode" value="Month Schedule" compact />
-        </div>
-      </section>
+      <QualityPageHero
+        label="AUDIT MANAGEMENT"
+        title="Audits"
+        description="Plan audits, manage findings, upload reports, and monitor follow-up from one audit programme workspace."
+        contextCards={[
+          { label: "Last Refreshed", value: lastRefreshed || "-" },
+          { label: "Latest Audit", value: latestAuditLabel },
+        ]}
+      />
 
       <div style={topMetaRowStyle}>
         <Link href="/" style={backLinkStyle}>

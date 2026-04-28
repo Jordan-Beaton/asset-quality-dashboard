@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 type Ncr = {
@@ -16,6 +17,17 @@ type Ncr = {
   area: string | null;
   created_at: string | null;
   closed_at: string | null;
+  root_cause_category?: string | null;
+};
+
+type Capa = {
+  id: string;
+  capa_number: string | null;
+  title: string | null;
+  status: string | null;
+  owner: string | null;
+  created_at: string | null;
+  effectiveness_status: string | null;
 };
 
 type ActionItem = {
@@ -123,10 +135,34 @@ type ManagementMetrics = {
     low: number;
     medium: number;
     high: number;
+    rootCauseBreakdown: Array<[string, number]>;
+  };
+  capaSummary: {
+    capasRaised: number;
+    capasClosedAvailable: boolean;
+    capasClosed: number | null;
+    totalOpenCapas: number;
+    awaitingEffectivenessReview: number;
+    pending: number;
+    effective: number;
+    notEffective: number;
   };
   documentSummary: {
     overdueDocuments: number;
     documentsDueSoon: number;
+  };
+};
+
+type SummaryDraftPayload = {
+  monthLabel: string;
+  year: number;
+  metrics: {
+    auditSummary: ManagementMetrics["auditSummary"];
+    actionsSummary: ManagementMetrics["actionsSummary"];
+    mocSummary: ManagementMetrics["mocSummary"];
+    ncrSummary: ManagementMetrics["ncrSummary"];
+    capaSummary: ManagementMetrics["capaSummary"];
+    documentSummary: ManagementMetrics["documentSummary"];
   };
 };
 
@@ -242,6 +278,18 @@ function normaliseNcrSeverity(value: string | null | undefined) {
   return "Low";
 }
 
+function normaliseRootCauseCategory(value: string | null | undefined) {
+  const trimmed = (value || "").trim();
+  return trimmed || "Not recorded";
+}
+
+function normaliseEffectivenessStatus(value: string | null | undefined) {
+  const normal = (value || "").trim().toLowerCase();
+  if (normal === "effective") return "Effective";
+  if (normal === "not effective") return "Not Effective";
+  return "Pending";
+}
+
 function parseReportFormFromSavedReport(report: MonthlyReport): ReportForm {
   const snapshot = report.snapshot_json || {};
   const snapshotMonth =
@@ -336,6 +384,7 @@ function buildPdfMetricTable(
 
 export default function ReportsPage() {
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
+  const [capas, setCapas] = useState<Capa[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [auditFindings, setAuditFindings] = useState<AuditFinding[]>([]);
@@ -345,13 +394,15 @@ export default function ReportsPage() {
   const [message, setMessage] = useState("Loading monthly management report workspace...");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isDraftingSummary, setIsDraftingSummary] = useState(false);
   const [logoFileName, setLogoFileName] = useState("/enshore-logo.png");
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
   const [form, setForm] = useState<ReportForm>(defaultForm);
 
   async function loadData() {
-    const [ncrsRes, actionsRes, auditsRes, findingsRes, mocsRes, documentsRes, reportsRes] = await Promise.all([
+    const [ncrsRes, capasRes, actionsRes, auditsRes, findingsRes, mocsRes, documentsRes, reportsRes] = await Promise.all([
       supabase.from("ncrs").select("*"),
+      supabase.from("capas").select("id,capa_number,title,status,owner,created_at,effectiveness_status"),
       supabase.from("actions").select("*"),
       supabase.from("audits").select("*"),
       supabase.from("audit_findings").select("*"),
@@ -362,6 +413,7 @@ export default function ReportsPage() {
 
     if (
       ncrsRes.error ||
+      capasRes.error ||
       actionsRes.error ||
       auditsRes.error ||
       findingsRes.error ||
@@ -372,6 +424,7 @@ export default function ReportsPage() {
       setMessage(
         `Error: ${
           ncrsRes.error?.message ||
+          capasRes.error?.message ||
           actionsRes.error?.message ||
           auditsRes.error?.message ||
           findingsRes.error?.message ||
@@ -384,6 +437,7 @@ export default function ReportsPage() {
     }
 
     setNcrs((ncrsRes.data || []) as Ncr[]);
+    setCapas((capasRes.data || []) as Capa[]);
     setActions((actionsRes.data || []) as ActionItem[]);
     setAudits((auditsRes.data || []) as AuditRecord[]);
     setAuditFindings((findingsRes.data || []) as AuditFinding[]);
@@ -433,10 +487,26 @@ export default function ReportsPage() {
         (ncr) => isClosedStatus(ncr.status) && isDateInMonth(ncr.closed_at, monthIndex, year)
       );
       const openNcrRows = ncrs.filter((ncr) => !isClosedStatus(ncr.status));
+      const capaRowsRaisedInMonth = capas.filter((capa) => isDateInMonth(capa.created_at, monthIndex, year));
+      const openCapaRows = capas.filter((capa) => !isClosedStatus(capa.status));
 
       const lowOpenNcrs = openNcrRows.filter((ncr) => normaliseNcrSeverity(ncr.severity) === "Low").length;
       const mediumOpenNcrs = openNcrRows.filter((ncr) => normaliseNcrSeverity(ncr.severity) === "Medium").length;
       const highOpenNcrs = openNcrRows.filter((ncr) => normaliseNcrSeverity(ncr.severity) === "High").length;
+      const rootCauseCounts = new Map<string, number>();
+      ncrRowsRaisedInMonth.forEach((ncr) => {
+        const key = normaliseRootCauseCategory(ncr.root_cause_category);
+        rootCauseCounts.set(key, (rootCauseCounts.get(key) || 0) + 1);
+      });
+      const rootCauseBreakdown = [...rootCauseCounts.entries()].sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1];
+        return a[0].localeCompare(b[0]);
+      });
+      const pendingCapas = capas.filter((capa) => normaliseEffectivenessStatus(capa.effectiveness_status) === "Pending");
+      const effectiveCapas = capas.filter((capa) => normaliseEffectivenessStatus(capa.effectiveness_status) === "Effective");
+      const notEffectiveCapas = capas.filter(
+        (capa) => normaliseEffectivenessStatus(capa.effectiveness_status) === "Not Effective"
+      );
 
       const overdueDocuments = documents.filter(
         (doc) => getDocumentReviewState(doc.next_review_date) === "Overdue"
@@ -480,6 +550,19 @@ export default function ReportsPage() {
           low: lowOpenNcrs,
           medium: mediumOpenNcrs,
           high: highOpenNcrs,
+          rootCauseBreakdown,
+        },
+        capaSummary: {
+          capasRaised: capaRowsRaisedInMonth.length,
+          capasClosedAvailable: false,
+          capasClosed: null,
+          totalOpenCapas: openCapaRows.length,
+          awaitingEffectivenessReview: openCapaRows.filter(
+            (capa) => normaliseEffectivenessStatus(capa.effectiveness_status) === "Pending"
+          ).length,
+          pending: pendingCapas.length,
+          effective: effectiveCapas.length,
+          notEffective: notEffectiveCapas.length,
         },
         documentSummary: {
           overdueDocuments,
@@ -487,12 +570,33 @@ export default function ReportsPage() {
         },
       };
     },
-    [actions, auditFindings, audits, documents, mocs, ncrs]
+    [actions, auditFindings, audits, capas, documents, mocs, ncrs]
   );
 
   const metrics = useMemo(
     () => buildMetricsForPeriod(form.monthIndex, selectedYear),
     [buildMetricsForPeriod, form.monthIndex, selectedYear]
+  );
+
+  const latestReportLabel = useMemo(() => {
+    const latest = reports[0];
+    return latest ? latest.month_label : "No saved reports";
+  }, [reports]);
+
+  const summaryDraftPayload = useMemo<SummaryDraftPayload>(
+    () => ({
+      monthLabel: metrics.monthLabel,
+      year: selectedYear,
+      metrics: {
+        auditSummary: metrics.auditSummary,
+        actionsSummary: metrics.actionsSummary,
+        mocSummary: metrics.mocSummary,
+        ncrSummary: metrics.ncrSummary,
+        capaSummary: metrics.capaSummary,
+        documentSummary: metrics.documentSummary,
+      },
+    }),
+    [metrics, selectedYear]
   );
 
   const reportCards = useMemo(
@@ -536,10 +640,24 @@ export default function ReportsPage() {
           ["Open NCR severity - Low", metrics.ncrSummary.low],
           ["Open NCR severity - Medium", metrics.ncrSummary.medium],
           ["Open NCR severity - High", metrics.ncrSummary.high],
+          ...metrics.ncrSummary.rootCauseBreakdown.map(
+            ([category, count]) => [`Root cause - ${category}`, count] as [string, number]
+          ),
         ] as Array<[string, string | number]>,
       },
       {
-        title: "E. Documents",
+        title: "E. CAPA",
+        rows: [
+          ["CAPAs raised in month", metrics.capaSummary.capasRaised],
+          ["Total open CAPAs", metrics.capaSummary.totalOpenCapas],
+          ["CAPAs awaiting effectiveness review", metrics.capaSummary.awaitingEffectivenessReview],
+          ["Effectiveness status - Pending", metrics.capaSummary.pending],
+          ["Effectiveness status - Effective", metrics.capaSummary.effective],
+          ["Effectiveness status - Not Effective", metrics.capaSummary.notEffective],
+        ] as Array<[string, string | number]>,
+      },
+      {
+        title: "F. Documents",
         rows: [
           ["Overdue documents", metrics.documentSummary.overdueDocuments],
           ["Documents due soon", metrics.documentSummary.documentsDueSoon],
@@ -618,6 +736,17 @@ export default function ReportsPage() {
         low: metrics.ncrSummary.low,
         medium: metrics.ncrSummary.medium,
         high: metrics.ncrSummary.high,
+        root_cause_breakdown: metrics.ncrSummary.rootCauseBreakdown,
+      },
+      capa_summary: {
+        capas_raised: metrics.capaSummary.capasRaised,
+        capas_closed_available: metrics.capaSummary.capasClosedAvailable,
+        capas_closed: metrics.capaSummary.capasClosed,
+        total_open_capas: metrics.capaSummary.totalOpenCapas,
+        awaiting_effectiveness_review: metrics.capaSummary.awaitingEffectivenessReview,
+        pending: metrics.capaSummary.pending,
+        effective: metrics.capaSummary.effective,
+        not_effective: metrics.capaSummary.notEffective,
       },
       documents_summary: {
         overdue_documents: metrics.documentSummary.overdueDocuments,
@@ -666,6 +795,45 @@ export default function ReportsPage() {
 
     resetForm();
     await loadData();
+  }
+
+  async function draftExecutiveSummaryWithAi() {
+    if (form.executiveSummary.trim()) {
+      const confirmed = window.confirm(
+        "Executive Summary already contains text. Replace it with a new AI draft?"
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      setIsDraftingSummary(true);
+      setMessage("Drafting executive summary with AI...");
+
+      const response = await fetch("/api/report-summary", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(summaryDraftPayload),
+      });
+
+      const data = (await response.json()) as { summary?: string; error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "AI draft request failed.");
+      }
+
+      if (!data.summary?.trim()) {
+        throw new Error("AI draft returned no summary text.");
+      }
+
+      setForm((prev) => ({ ...prev, executiveSummary: data.summary!.trim() }));
+      setMessage(`Executive Summary draft generated for ${metrics.monthLabel}.`);
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : "AI draft failed.";
+      setMessage(messageText);
+    } finally {
+      setIsDraftingSummary(false);
+    }
   }
 
   async function generatePdfReport(sourceReport?: MonthlyReport) {
@@ -771,9 +939,21 @@ export default function ReportsPage() {
         ["Open NCR severity - Low", pdfMetrics.ncrSummary.low],
         ["Open NCR severity - Medium", pdfMetrics.ncrSummary.medium],
         ["Open NCR severity - High", pdfMetrics.ncrSummary.high],
+        ...pdfMetrics.ncrSummary.rootCauseBreakdown.map(
+          ([category, count]) => [`Root cause - ${category}`, count] as [string, number]
+        ),
       ]);
 
-      y = buildPdfMetricTable(doc, y, "E. Documents", [
+      y = buildPdfMetricTable(doc, y, "E. CAPA", [
+        ["CAPAs raised in month", pdfMetrics.capaSummary.capasRaised],
+        ["Total open CAPAs", pdfMetrics.capaSummary.totalOpenCapas],
+        ["CAPAs awaiting effectiveness review", pdfMetrics.capaSummary.awaitingEffectivenessReview],
+        ["Effectiveness status - Pending", pdfMetrics.capaSummary.pending],
+        ["Effectiveness status - Effective", pdfMetrics.capaSummary.effective],
+        ["Effectiveness status - Not Effective", pdfMetrics.capaSummary.notEffective],
+      ]);
+
+      y = buildPdfMetricTable(doc, y, "F. Documents", [
         ["Overdue documents", pdfMetrics.documentSummary.overdueDocuments],
         ["Documents due soon", pdfMetrics.documentSummary.documentsDueSoon],
       ]);
@@ -824,34 +1004,15 @@ export default function ReportsPage() {
 
   return (
     <main>
-      <section style={heroStyle}>
-        <div>
-          <div style={eyebrowStyle}>Management Reporting</div>
-          <h1 style={heroTitleStyle}>Reports</h1>
-          <p style={heroSubtitleStyle}>
-            Generate concise monthly management summaries from the live quality system without dumping raw registers.
-          </p>
-        </div>
-
-        <div style={heroMetaWrapStyle}>
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Selected Period</div>
-            <div style={heroMetaValueStyle}>{metrics.monthLabel}</div>
-          </div>
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Saved Reports</div>
-            <div style={heroMetaValueStyle}>{reports.length}</div>
-          </div>
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Open Actions</div>
-            <div style={heroMetaValueStyle}>{metrics.actionsSummary.totalOpenActions}</div>
-          </div>
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Last Refreshed</div>
-            <div style={heroMetaValueStyle}>{lastRefreshed || "-"}</div>
-          </div>
-        </div>
-      </section>
+      <QualityPageHero
+        label="MANAGEMENT REPORTING"
+        title="Reports"
+        description="Generate concise monthly management summaries from live quality data without dumping raw operational registers."
+        contextCards={[
+          { label: "Last Refreshed", value: lastRefreshed || "-" },
+          { label: "Latest Report", value: latestReportLabel },
+        ]}
+      />
 
       <div
         style={{
@@ -933,7 +1094,17 @@ export default function ReportsPage() {
 
             <div style={narrativeStackStyle}>
               <label style={fieldLabelStyle}>
-                <span>Executive Summary</span>
+                <span style={narrativeHeaderRowStyle}>
+                  <span>Executive Summary</span>
+                  <button
+                    type="button"
+                    style={secondaryButtonStyle}
+                    onClick={() => void draftExecutiveSummaryWithAi()}
+                    disabled={isDraftingSummary}
+                  >
+                    {isDraftingSummary ? "Drafting..." : "Draft Executive Summary with AI"}
+                  </button>
+                </span>
                 <textarea
                   value={form.executiveSummary}
                   onChange={(e) => setForm((prev) => ({ ...prev, executiveSummary: e.target.value }))}
@@ -1065,9 +1236,12 @@ const heroStyle: React.CSSProperties = {
   boxShadow: "0 10px 30px rgba(15, 118, 110, 0.14)",
   display: "flex",
   justifyContent: "space-between",
-  gap: "20px",
+  gap: "24px",
   alignItems: "flex-start",
   flexWrap: "wrap",
+  minHeight: "244px",
+  width: "100%",
+  boxSizing: "border-box",
 };
 
 const eyebrowStyle: React.CSSProperties = {
@@ -1075,21 +1249,21 @@ const eyebrowStyle: React.CSSProperties = {
   fontWeight: 700,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  opacity: 0.78,
+  opacity: 0.82,
   marginBottom: "10px",
 };
 
 const heroTitleStyle: React.CSSProperties = {
   margin: 0,
   fontSize: "34px",
-  lineHeight: 1.1,
+  lineHeight: 1.08,
 };
 
 const heroSubtitleStyle: React.CSSProperties = {
   marginTop: "10px",
   marginBottom: 0,
   fontSize: "16px",
-  maxWidth: "720px",
+  maxWidth: "760px",
   color: "rgba(255,255,255,0.92)",
 };
 
@@ -1097,8 +1271,8 @@ const heroMetaWrapStyle: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(180px, 1fr))",
   gap: "12px",
-  minWidth: "320px",
-  flex: "1 1 320px",
+  minWidth: "340px",
+  flex: "1 1 340px",
 };
 
 const heroMetaCardStyle: React.CSSProperties = {
@@ -1187,6 +1361,14 @@ const narrativeStackStyle: React.CSSProperties = {
   display: "grid",
   gap: "12px",
   marginTop: "12px",
+};
+
+const narrativeHeaderRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "12px",
+  flexWrap: "wrap",
 };
 
 const inputStyle: React.CSSProperties = {

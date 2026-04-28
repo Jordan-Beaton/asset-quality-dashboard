@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 type DocumentStatus =
@@ -411,6 +412,7 @@ function DocumentsPageContent() {
   const [revisionsByDocumentId, setRevisionsByDocumentId] = useState<Record<string, DocumentRevisionRow[]>>({});
   const [contacts, setContacts] = useState<NotificationContactRow[]>([]);
   const [message, setMessage] = useState("Loading documents...");
+  const [lastRefreshed, setLastRefreshed] = useState("");
   const [search, setSearch] = useState(linkedSearch);
   const [statusFilter, setStatusFilter] = useState(linkedStatus);
   const [typeFilter, setTypeFilter] = useState(linkedType);
@@ -475,6 +477,7 @@ function DocumentsPageContent() {
     setRevisionsByDocumentId(grouped);
     setContacts(contactsError ? fallbackContacts : ((contactsData as NotificationContactRow[]) || fallbackContacts));
     setSelectedDocumentId((current) => current || rows[0]?.id || "");
+    setLastRefreshed(new Date().toLocaleString("en-GB"));
     setMessage(`Loaded ${rows.length} document${rows.length === 1 ? "" : "s"} successfully.`);
   }
 
@@ -559,6 +562,16 @@ function DocumentsPageContent() {
     () => documents.find((doc) => doc.id === selectedDocumentId) || null,
     [documents, selectedDocumentId]
   );
+
+  const latestDocumentLabel = useMemo(() => {
+    const latest = [...documents].sort((a, b) => {
+      const aTime = new Date(a.updated_at || a.created_at || 0).getTime();
+      const bTime = new Date(b.updated_at || b.created_at || 0).getTime();
+      return bTime - aTime;
+    })[0];
+
+    return latest ? `${latest.document_number} - ${latest.title}` : "No documents loaded";
+  }, [documents]);
 
   const selectedRevisions = useMemo(() => {
     if (!selectedDocumentId) return [];
@@ -1418,6 +1431,16 @@ const payload = {
 
   return (
     <main>
+      <QualityPageHero
+        label="DOCUMENT CONTROL"
+        title="Documents"
+        description="Manage controlled documents, review status, approvals, and upcoming review activity from one operational register."
+        contextCards={[
+          { label: "Last Refreshed", value: lastRefreshed || "-" },
+          { label: "Latest Document", value: latestDocumentLabel },
+        ]}
+      />
+
       <div style={topMetaRowStyle}>
         <Link href="/" style={backLinkStyle}>
           ← Back to Dashboard

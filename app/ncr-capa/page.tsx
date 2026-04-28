@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -658,6 +659,11 @@ function NcrCapaPageContent() {
       evidenceCount: evidenceFiles.length,
     };
   }, [ncrs, capas, combinedRows, evidenceFiles]);
+
+  const latestRecordLabel = useMemo(() => {
+    const latest = combinedRows[0];
+    return latest ? `${latest.number} - ${latest.title}` : "No NCR or CAPA records";
+  }, [combinedRows]);
 
   const topRaisedNcrs = useMemo(() => {
     return [...ncrs]
@@ -1525,30 +1531,15 @@ function NcrCapaPageContent() {
 
   return (
     <main>
-      <section style={heroStyle}>
-        <div style={{ flex: "1 1 680px" }}>
-          <div style={eyebrowStyle}>Quality Command Centre</div>
-          <h1 style={heroTitleStyle}>NCR / CAPA Register</h1>
-          <p style={heroSubtitleStyle}>
-            Joined-up working register for non-conformances and corrective actions, with evidence
-            attached directly to each NCR or CAPA.
-          </p>
-
-          <div style={heroPillGridStyle}>
-            <HeroPill label="Open Items" value={kpis.openItems} tone="amber" />
-            <HeroPill label="Overdue" value={kpis.overdue} tone="red" />
-            <HeroPill label="Due in 7 Days" value={kpis.dueSoon} tone="green" />
-            <HeroPill label="Evidence Files" value={kpis.evidenceCount} tone="blue" />
-          </div>
-        </div>
-
-        <div style={heroMetaWrapStyle}>
-          <HeroMetaCard label="NCRs" value={kpis.totalNcrs} />
-          <HeroMetaCard label="CAPAs" value={kpis.totalCapas} />
-          <HeroMetaCard label="Selected Record" value={selectedRow?.number || "None"} compact />
-          <HeroMetaCard label="Last Refreshed" value={refreshStamp || "-"} compact />
-        </div>
-      </section>
+      <QualityPageHero
+        label="NCR / CAPA"
+        title="NCR / CAPA"
+        description="Track nonconformances, corrective actions, effectiveness reviews, evidence, and saved PDF exports from one working register."
+        contextCards={[
+          { label: "Last Refreshed", value: refreshStamp || "-" },
+          { label: "Latest Record", value: latestRecordLabel },
+        ]}
+      />
 
       <div style={topMetaRowStyle}>
         <Link href="/" style={backLinkStyle}>

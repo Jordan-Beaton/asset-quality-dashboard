@@ -16,6 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { QualityPageHero } from "../src/components/QualityPageHero";
 import { supabase } from "../src/lib/supabase";
 
 type Ncr = {
@@ -128,6 +129,11 @@ function formatDateTime(value: Date | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function getLatestTimestamp(value: string | null | undefined) {
+  const time = new Date(value || 0).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
 function formatAuditMonth(value: string | null | undefined) {
@@ -628,6 +634,35 @@ export default function Home() {
     return currentMonthAudits.filter((audit) => normaliseStatus(audit.status) === "completed").length;
   }, [currentMonthAudits]);
 
+  const latestRecordSummary = useMemo(() => {
+    const candidates = [
+      ...ncrs.map((item) => ({
+        label: item.ncr_number || item.title || "NCR",
+        time: getLatestTimestamp(item.created_at),
+      })),
+      ...capas.map((item) => ({
+        label: item.capa_number || item.title || "CAPA",
+        time: getLatestTimestamp(item.updated_at || item.created_at),
+      })),
+      ...actions.map((item) => ({
+        label: item.action_number || item.title || "Action",
+        time: getLatestTimestamp(item.updated_at || item.created_at),
+      })),
+      ...audits.map((item) => ({
+        label: item.audit_number || item.title || "Audit",
+        time: getLatestTimestamp(item.created_at || item.audit_date),
+      })),
+      ...mocs.map((item) => ({
+        label: item.moc_report_no || item.moc_report_title || "MOC",
+        time: getLatestTimestamp(item.updated_at || item.created_at),
+      })),
+    ]
+      .filter((item) => item.time > 0)
+      .sort((a, b) => b.time - a.time);
+
+    return candidates[0]?.label || "No live records";
+  }, [actions, audits, capas, documents, mocs, ncrs]);
+
   const currentMonthOutstandingAudits = currentMonthAudits.length - currentMonthCompletedAudits;
   const currentMonthCompletionRate = currentMonthAudits.length
     ? Math.round((currentMonthCompletedAudits / currentMonthAudits.length) * 100)
@@ -712,20 +747,21 @@ export default function Home() {
 
   return (
     <main>
-      <section style={heroStyle}>
-        <div style={heroCopyStyle}>
-          <div style={eyebrowStyle}>Quality Dashboard</div>
-          <h1 style={heroTitleStyle}>Operational quality view across MOCs, NCRs, CAPAs, audits, actions, and documents</h1>
-          <p style={heroSubtitleStyle}>
-            Compact management view for launch monitoring, built around live workloads, trends, and the next items that need follow-up.
-          </p>
-        </div>
-
-        <div style={heroMetaRowStyle}>
-          <MetaChip label="System" value={error ? "Issue" : isLoading ? "Loading" : "Connected"} />
-          <MetaChip label="Last Refreshed" value={isLoading ? "Loading..." : formatDateTime(lastRefreshed)} />
-        </div>
-      </section>
+      <QualityPageHero
+        label="QUALITY MANAGEMENT"
+        title="Dashboard"
+        description="Live operational view across MOCs, NCRs, CAPAs, audits, actions, and documents, built for fast drill-down into the next items that need follow-up."
+        contextCards={[
+          {
+            label: "Last Refreshed",
+            value: isLoading ? "Loading..." : formatDateTime(lastRefreshed),
+          },
+          {
+            label: "Latest Record",
+            value: latestRecordSummary,
+          },
+        ]}
+      />
 
       {error ? (
         <section style={errorBannerStyle}>

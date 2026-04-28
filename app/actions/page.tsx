@@ -6,19 +6,58 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
+import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 type ActionItem = {
   id: string;
   action_number: string | null;
   title: string | null;
+  description: string | null;
   project: string | null;
   owner: string | null;
   priority: string | null;
   status: string | null;
   due_date: string | null;
+  source: string | null;
+  linked_audit_id: string | null;
+  linked_audit_number: string | null;
+  linked_finding_id: string | null;
+  linked_finding_reference: string | null;
+  linked_ncr_id: string | null;
+  linked_ncr_number: string | null;
+  linked_capa_id: string | null;
+  linked_capa_number: string | null;
+  linked_moc_id: string | null;
+  linked_moc_number: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+type AuditOption = {
+  id: string;
+  audit_number: string;
+  title: string;
+};
+
+type FindingOption = {
+  id: string;
+  audit_id: string;
+  reference: string;
+  description: string;
+};
+
+type NcrCapaOption = {
+  type: "NCR" | "CAPA";
+  id: string;
+  number: string;
+  title: string;
+};
+
+type MocOption = {
+  id: string;
+  number: string;
+  title: string;
 };
 
 type EvidenceFile = {
@@ -35,21 +74,47 @@ type EvidenceFile = {
 
 type ActionForm = {
   title: string;
+  description: string;
   project: string;
   owner: string;
   priority: string;
   status: string;
   due_date: string;
+  source: string;
+  linked_audit_id: string;
+  linked_audit_number: string;
+  linked_finding_id: string;
+  linked_finding_reference: string;
+  linked_ncr_id: string;
+  linked_ncr_number: string;
+  linked_capa_id: string;
+  linked_capa_number: string;
+  linked_moc_id: string;
+  linked_moc_number: string;
 };
 
 const emptyForm: ActionForm = {
   title: "",
+  description: "",
   project: "",
   owner: "",
   priority: "Medium",
   status: "Open",
   due_date: "",
+  source: "Manual",
+  linked_audit_id: "",
+  linked_audit_number: "",
+  linked_finding_id: "",
+  linked_finding_reference: "",
+  linked_ncr_id: "",
+  linked_ncr_number: "",
+  linked_capa_id: "",
+  linked_capa_number: "",
+  linked_moc_id: "",
+  linked_moc_number: "",
 };
+
+const actionSourceOptions = ["Manual", "Audit Finding", "NCR/CAPA", "MOC", "Other"] as const;
 
 function normaliseStatus(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
@@ -184,8 +249,60 @@ function matchesSearchTerm(action: ActionItem, query: string) {
     (action.project || "").toLowerCase().includes(lower) ||
     (action.owner || "").toLowerCase().includes(lower) ||
     (action.priority || "").toLowerCase().includes(lower) ||
-    (action.status || "").toLowerCase().includes(lower)
+    (action.status || "").toLowerCase().includes(lower) ||
+    (action.source || "").toLowerCase().includes(lower) ||
+    (action.linked_audit_number || "").toLowerCase().includes(lower) ||
+    (action.linked_finding_reference || "").toLowerCase().includes(lower)
   );
+}
+
+function getActionSourceValue(action: ActionItem) {
+  const source = (action.source || "").trim();
+  if (!source) return "Manual";
+  if (source === "Audit") {
+    return action.linked_finding_id || action.linked_finding_reference ? "Audit Finding" : "Other";
+  }
+  return source;
+}
+
+function isAuditLinkedSource(source: string | null | undefined) {
+  return source === "Audit Finding";
+}
+
+function buildActionSourceLabel(action: ActionItem) {
+  const source = getActionSourceValue(action);
+  if (!source || source === "Manual" || source === "Other") return "";
+
+  const parts = [`Source: ${source}`];
+  if (source === "Audit Finding" && action.linked_audit_number) parts.push(`Audit ${action.linked_audit_number}`);
+  if (source === "Audit Finding" && action.linked_finding_reference) parts.push(`Finding ${action.linked_finding_reference}`);
+  if (source === "NCR/CAPA" && action.linked_ncr_number) parts.push(`NCR ${action.linked_ncr_number}`);
+  if (source === "NCR/CAPA" && action.linked_capa_number) parts.push(`CAPA ${action.linked_capa_number}`);
+  if (source === "MOC" && action.linked_moc_number) parts.push(`MOC ${action.linked_moc_number}`);
+  return parts.join(" • ");
+}
+
+function buildActionFormFromItem(action: ActionItem): ActionForm {
+  return {
+    title: action.title || "",
+    description: action.description || "",
+    project: action.project || "",
+    owner: action.owner || "",
+    priority: action.priority || "Medium",
+    status: action.status || "Open",
+    due_date: action.due_date || "",
+    source: getActionSourceValue(action),
+    linked_audit_id: action.linked_audit_id || "",
+    linked_audit_number: action.linked_audit_number || "",
+    linked_finding_id: action.linked_finding_id || "",
+    linked_finding_reference: action.linked_finding_reference || "",
+    linked_ncr_id: action.linked_ncr_id || "",
+    linked_ncr_number: action.linked_ncr_number || "",
+    linked_capa_id: action.linked_capa_id || "",
+    linked_capa_number: action.linked_capa_number || "",
+    linked_moc_id: action.linked_moc_id || "",
+    linked_moc_number: action.linked_moc_number || "",
+  };
 }
 
 function ActionsPageContent() {
@@ -195,12 +312,17 @@ function ActionsPageContent() {
   const linkedPriority = searchParams.get("priority")?.trim() || "";
   const linkedOwner = searchParams.get("owner")?.trim() || "";
   const linkedProject = searchParams.get("project")?.trim() || "";
+  const linkedSource = searchParams.get("source")?.trim() || "";
   const showOverdueOnly = searchParams.get("overdue") === "1";
   const dueWindow = Number(searchParams.get("dueWindow") || "0");
   const linkedCreatedMonth = searchParams.get("createdMonth")?.trim() || "";
   const linkedClosedMonth = searchParams.get("closedMonth")?.trim() || "";
 
   const [actions, setActions] = useState<ActionItem[]>([]);
+  const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
+  const [findingOptions, setFindingOptions] = useState<FindingOption[]>([]);
+  const [ncrCapaOptions, setNcrCapaOptions] = useState<NcrCapaOption[]>([]);
+  const [mocOptions, setMocOptions] = useState<MocOption[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
   const [message, setMessage] = useState("Loading actions...");
   const [isLoading, setIsLoading] = useState(true);
@@ -217,8 +339,8 @@ function ActionsPageContent() {
   const [priorityFilter, setPriorityFilter] = useState(linkedPriority);
   const [ownerFilter, setOwnerFilter] = useState(linkedOwner);
   const [projectFilter, setProjectFilter] = useState(linkedProject);
+  const [sourceFilter, setSourceFilter] = useState(linkedSource);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ActionForm>(emptyForm);
 
   const [selectedEvidenceAction, setSelectedEvidenceAction] = useState<ActionItem | null>(null);
@@ -271,26 +393,128 @@ function ActionsPageContent() {
     }
   }
 
+  async function loadAuditOptions() {
+    const { data, error } = await supabase
+      .from("audits")
+      .select("id,audit_number,title")
+      .order("audit_number", { ascending: true });
+
+    if (error) return;
+
+    const options = ((data || []) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        id: String(row.id || ""),
+        audit_number: String(row.audit_number || ""),
+        title: String(row.title || ""),
+      }))
+      .filter((row) => row.id && row.audit_number);
+
+    setAuditOptions(options);
+  }
+
+  async function loadFindingOptions() {
+    const { data, error } = await supabase
+      .from("audit_findings")
+      .select("id,audit_id,reference,description")
+      .order("reference", { ascending: true });
+
+    if (error) return;
+
+    const options = ((data || []) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        id: String(row.id || ""),
+        audit_id: String(row.audit_id || ""),
+        reference: String(row.reference || ""),
+        description: String(row.description || ""),
+      }))
+      .filter((row) => row.id && row.audit_id && row.reference);
+
+    setFindingOptions(options);
+  }
+
+  async function loadNcrCapaOptions() {
+    const [ncrRes, capaRes] = await Promise.all([
+      supabase.from("ncrs").select("id,ncr_number,title").order("ncr_number", { ascending: true }),
+      supabase.from("capas").select("id,capa_number,title").order("capa_number", { ascending: true }),
+    ]);
+
+    const options: NcrCapaOption[] = [];
+
+    if (!ncrRes.error) {
+      options.push(
+        ...((ncrRes.data || []) as Array<Record<string, unknown>>)
+          .map((row) => ({
+            type: "NCR" as const,
+            id: String(row.id || ""),
+            number: String(row.ncr_number || ""),
+            title: String(row.title || ""),
+          }))
+          .filter((row) => row.id && row.number)
+      );
+    }
+
+    if (!capaRes.error) {
+      options.push(
+        ...((capaRes.data || []) as Array<Record<string, unknown>>)
+          .map((row) => ({
+            type: "CAPA" as const,
+            id: String(row.id || ""),
+            number: String(row.capa_number || ""),
+            title: String(row.title || ""),
+          }))
+          .filter((row) => row.id && row.number)
+      );
+    }
+
+    setNcrCapaOptions(options);
+  }
+
+  async function loadMocOptions() {
+    const { data, error } = await supabase
+      .from("moc_reports")
+      .select("id,moc_report_no,moc_report_title")
+      .order("moc_report_no", { ascending: true });
+
+    if (error) return;
+
+    const options = ((data || []) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        id: String(row.id || ""),
+        number: String(row.moc_report_no || ""),
+        title: String(row.moc_report_title || ""),
+      }))
+      .filter((row) => row.id && row.number);
+
+    setMocOptions(options);
+  }
+
   useEffect(() => {
-    void loadActions();
+    void (async () => {
+      await Promise.all([loadActions(), loadAuditOptions(), loadFindingOptions(), loadNcrCapaOptions(), loadMocOptions()]);
+    })();
   }, []);
 
   const nextActionNumber = useMemo(() => {
     return getNextAvailableActionNumber(actions);
   }, [actions]);
 
+  const linkedEvidenceFiles = useMemo(() => {
+    const actionIds = new Set(actions.map((action) => action.id).filter(Boolean));
+    return evidenceFiles.filter((file) => actionIds.has(file.record_id));
+  }, [actions, evidenceFiles]);
+
   const evidenceCountMap = useMemo(() => {
     const map = new Map<string, number>();
-    evidenceFiles.forEach((file) => {
+    linkedEvidenceFiles.forEach((file) => {
       map.set(file.record_id, (map.get(file.record_id) || 0) + 1);
     });
     return map;
-  }, [evidenceFiles]);
+  }, [linkedEvidenceFiles]);
 
   const selectedActionEvidence = useMemo(() => {
     if (!selectedEvidenceAction) return [];
-    return evidenceFiles.filter((file) => file.record_id === selectedEvidenceAction.id);
-  }, [evidenceFiles, selectedEvidenceAction]);
+    return linkedEvidenceFiles.filter((file) => file.record_id === selectedEvidenceAction.id);
+  }, [linkedEvidenceFiles, selectedEvidenceAction]);
 
   const openActions = actions.filter((a) => !isClosedLikeStatus(a.status)).length;
   const closedActions = actions.filter((a) => isClosedLikeStatus(a.status)).length;
@@ -314,6 +538,7 @@ function ActionsPageContent() {
       const matchesPriority = !priorityFilter || (action.priority || "") === priorityFilter;
       const matchesOwner = !ownerFilter || (action.owner || "") === ownerFilter;
       const matchesProject = !projectFilter || (action.project || "") === projectFilter;
+      const matchesSource = !sourceFilter || getActionSourceValue(action) === sourceFilter;
       const matchesOverdue = !showOverdueOnly || isOverdue(action);
       const matchesCreatedMonth =
         !linkedCreatedMonth || getMonthKey(action.created_at) === linkedCreatedMonth;
@@ -335,6 +560,7 @@ function ActionsPageContent() {
         matchesPriority &&
         matchesOwner &&
         matchesProject &&
+        matchesSource &&
         matchesOverdue &&
         matchesCreatedMonth &&
         matchesClosedMonth &&
@@ -348,6 +574,7 @@ function ActionsPageContent() {
     priorityFilter,
     ownerFilter,
     projectFilter,
+    sourceFilter,
     showOverdueOnly,
     linkedCreatedMonth,
     linkedClosedMonth,
@@ -393,10 +620,96 @@ function ActionsPageContent() {
     );
   }, [filteredActions, search]);
 
+  const latestActionLabel = useMemo(() => {
+    const latest = [...actions].sort((a, b) => {
+      const aTime = new Date(a.updated_at || a.created_at || 0).getTime();
+      const bTime = new Date(b.updated_at || b.created_at || 0).getTime();
+      return bTime - aTime;
+    })[0];
+
+    return latest ? `${latest.action_number || "Action"} - ${latest.title || "Untitled action"}` : "No actions loaded";
+  }, [actions]);
+
   useEffect(() => {
     if (!linkedAction) return;
     setSelectedEvidenceAction((current) => current?.id === linkedAction.id ? current : linkedAction);
   }, [linkedAction]);
+
+  useEffect(() => {
+    if (!selectedEvidenceAction) return;
+    setEditForm(buildActionFormFromItem(selectedEvidenceAction));
+  }, [selectedEvidenceAction]);
+
+  useEffect(() => {
+    if (!isAuditLinkedSource(editForm.source)) return;
+    if (editForm.linked_audit_id || !editForm.linked_audit_number) return;
+
+    const matched = auditOptions.find((option) => option.audit_number === editForm.linked_audit_number);
+    if (!matched) return;
+
+    setEditForm((current) => ({ ...current, linked_audit_id: matched.id }));
+  }, [auditOptions, editForm.linked_audit_id, editForm.linked_audit_number, editForm.source]);
+
+  useEffect(() => {
+    if (editForm.source !== "NCR/CAPA") return;
+    if (editForm.linked_ncr_id || editForm.linked_capa_id) return;
+
+    const matchedNcr =
+      editForm.linked_ncr_number &&
+      ncrCapaOptions.find(
+        (option) => option.type === "NCR" && option.number === editForm.linked_ncr_number
+      );
+    if (matchedNcr) {
+      setEditForm((current) => ({
+        ...current,
+        linked_ncr_id: matchedNcr.id,
+        linked_ncr_number: matchedNcr.number,
+      }));
+      return;
+    }
+
+    const matchedCapa =
+      editForm.linked_capa_number &&
+      ncrCapaOptions.find(
+        (option) => option.type === "CAPA" && option.number === editForm.linked_capa_number
+      );
+    if (matchedCapa) {
+      setEditForm((current) => ({
+        ...current,
+        linked_capa_id: matchedCapa.id,
+        linked_capa_number: matchedCapa.number,
+      }));
+    }
+  }, [
+    editForm.linked_capa_id,
+    editForm.linked_capa_number,
+    editForm.linked_ncr_id,
+    editForm.linked_ncr_number,
+    editForm.source,
+    ncrCapaOptions,
+  ]);
+
+  useEffect(() => {
+    if (editForm.source !== "MOC") return;
+    if (editForm.linked_moc_id || !editForm.linked_moc_number) return;
+
+    const matched = mocOptions.find((option) => option.number === editForm.linked_moc_number);
+    if (!matched) return;
+
+    setEditForm((current) => ({
+      ...current,
+      linked_moc_id: matched.id,
+      linked_moc_number: matched.number,
+    }));
+  }, [editForm.linked_moc_id, editForm.linked_moc_number, editForm.source, mocOptions]);
+
+  useEffect(() => {
+    if (!selectedEvidenceAction) return;
+    const refreshed = actions.find((action) => action.id === selectedEvidenceAction.id);
+    if (refreshed && refreshed !== selectedEvidenceAction) {
+      setSelectedEvidenceAction(refreshed);
+    }
+  }, [actions, selectedEvidenceAction]);
 
   const uniqueOwners = useMemo(() => {
     return [...new Set(actions.map((a) => a.owner).filter(Boolean))].sort();
@@ -406,6 +719,16 @@ function ActionsPageContent() {
     return [...new Set(actions.map((a) => a.project).filter(Boolean))].sort();
   }, [actions]);
 
+  const createFindingOptions = useMemo(
+    () => findingOptions.filter((finding) => finding.audit_id === form.linked_audit_id),
+    [findingOptions, form.linked_audit_id]
+  );
+
+  const editFindingOptions = useMemo(
+    () => findingOptions.filter((finding) => finding.audit_id === editForm.linked_audit_id),
+    [findingOptions, editForm.linked_audit_id]
+  );
+
   function handleCreateFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
     setCreateFiles(files);
@@ -414,6 +737,107 @@ function ActionsPageContent() {
   function handleSelectedEvidenceFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
     setSelectedEvidenceFiles(files);
+  }
+
+  function applySourceChange(
+    current: ActionForm,
+    source: string
+  ): ActionForm {
+    if (isAuditLinkedSource(source)) {
+      return {
+        ...current,
+        source,
+        linked_ncr_id: "",
+        linked_ncr_number: "",
+        linked_capa_id: "",
+        linked_capa_number: "",
+        linked_moc_id: "",
+        linked_moc_number: "",
+      };
+    }
+
+    if (source === "NCR/CAPA") {
+      return {
+        ...current,
+        source,
+        linked_audit_id: "",
+        linked_audit_number: "",
+        linked_finding_id: "",
+        linked_finding_reference: "",
+        linked_moc_id: "",
+        linked_moc_number: "",
+      };
+    }
+
+    if (source === "MOC") {
+      return {
+        ...current,
+        source,
+        linked_audit_id: "",
+        linked_audit_number: "",
+        linked_finding_id: "",
+        linked_finding_reference: "",
+        linked_ncr_id: "",
+        linked_ncr_number: "",
+        linked_capa_id: "",
+        linked_capa_number: "",
+      };
+    }
+
+    return {
+      ...current,
+      source,
+      linked_audit_id: "",
+      linked_audit_number: "",
+      linked_finding_id: "",
+      linked_finding_reference: "",
+      linked_ncr_id: "",
+      linked_ncr_number: "",
+      linked_capa_id: "",
+      linked_capa_number: "",
+      linked_moc_id: "",
+      linked_moc_number: "",
+    };
+  }
+
+  function applyAuditSelection(current: ActionForm, auditId: string): ActionForm {
+    const selectedAudit = auditOptions.find((option) => option.id === auditId);
+    return {
+      ...current,
+      linked_audit_id: selectedAudit?.id || "",
+      linked_audit_number: selectedAudit?.audit_number || "",
+      linked_finding_id: "",
+      linked_finding_reference: "",
+    };
+  }
+
+  function applyFindingSelection(current: ActionForm, findingId: string): ActionForm {
+    const selectedFinding = findingOptions.find((option) => option.id === findingId);
+    return {
+      ...current,
+      linked_finding_id: selectedFinding?.id || "",
+      linked_finding_reference: selectedFinding?.reference || "",
+    };
+  }
+
+  function applyNcrCapaSelection(current: ActionForm, value: string): ActionForm {
+    const selected = ncrCapaOptions.find((option) => `${option.type}:${option.id}` === value);
+    return {
+      ...current,
+      linked_ncr_id: selected?.type === "NCR" ? selected.id : "",
+      linked_ncr_number: selected?.type === "NCR" ? selected.number : "",
+      linked_capa_id: selected?.type === "CAPA" ? selected.id : "",
+      linked_capa_number: selected?.type === "CAPA" ? selected.number : "",
+    };
+  }
+
+  function applyMocSelection(current: ActionForm, mocId: string): ActionForm {
+    const selected = mocOptions.find((option) => option.id === mocId);
+    return {
+      ...current,
+      linked_moc_id: selected?.id || "",
+      linked_moc_number: selected?.number || "",
+    };
   }
 
   async function uploadEvidenceForRecord(recordId: string, files: File[], notes: string) {
@@ -484,11 +908,23 @@ function ActionsPageContent() {
         {
           action_number: actionNumberToUse,
           title: form.title.trim(),
+          description: form.description.trim() || null,
           project: form.project.trim() || null,
           owner: form.owner.trim() || null,
           priority: form.priority,
           status: form.status,
           due_date: form.due_date || null,
+          source: form.source || "Manual",
+          linked_audit_id: form.linked_audit_id || null,
+          linked_audit_number: form.linked_audit_number.trim() || null,
+          linked_finding_id: form.linked_finding_id.trim() || null,
+          linked_finding_reference: form.linked_finding_reference.trim() || null,
+          linked_ncr_id: form.linked_ncr_id || null,
+          linked_ncr_number: form.linked_ncr_number.trim() || null,
+          linked_capa_id: form.linked_capa_id || null,
+          linked_capa_number: form.linked_capa_number.trim() || null,
+          linked_moc_id: form.linked_moc_id || null,
+          linked_moc_number: form.linked_moc_number.trim() || null,
         },
       ])
       .select("*")
@@ -519,18 +955,6 @@ function ActionsPageContent() {
     await loadActions(false);
   }
 
-  function startEdit(action: ActionItem) {
-    setEditingId(action.id);
-    setEditForm({
-      title: action.title || "",
-      project: action.project || "",
-      owner: action.owner || "",
-      priority: action.priority || "Medium",
-      status: action.status || "Open",
-      due_date: action.due_date || "",
-    });
-  }
-
   async function saveEdit(id: string) {
     if (!editForm.title.trim()) {
       setMessage("Title is required.");
@@ -543,11 +967,23 @@ function ActionsPageContent() {
       .from("actions")
       .update({
         title: editForm.title.trim(),
+        description: editForm.description.trim() || null,
         project: editForm.project.trim() || null,
         owner: editForm.owner.trim() || null,
         priority: editForm.priority,
         status: editForm.status,
         due_date: editForm.due_date || null,
+        source: editForm.source || "Manual",
+        linked_audit_id: editForm.linked_audit_id || null,
+        linked_audit_number: editForm.linked_audit_number.trim() || null,
+        linked_finding_id: editForm.linked_finding_id.trim() || null,
+        linked_finding_reference: editForm.linked_finding_reference.trim() || null,
+        linked_ncr_id: editForm.linked_ncr_id || null,
+        linked_ncr_number: editForm.linked_ncr_number.trim() || null,
+        linked_capa_id: editForm.linked_capa_id || null,
+        linked_capa_number: editForm.linked_capa_number.trim() || null,
+        linked_moc_id: editForm.linked_moc_id || null,
+        linked_moc_number: editForm.linked_moc_number.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
@@ -559,7 +995,6 @@ function ActionsPageContent() {
       return;
     }
 
-    setEditingId(null);
     setMessage("Action updated successfully.");
     await loadActions(false);
   }
@@ -664,58 +1099,27 @@ function ActionsPageContent() {
     setPriorityFilter("");
     setOwnerFilter("");
     setProjectFilter("");
+    setSourceFilter("");
     setSelectedEvidenceAction(null);
   }
 
   return (
     <main>
-      <section style={heroStyle}>
-        <div style={{ flex: "1 1 620px" }}>
-          <div style={eyebrowStyle}>Action Register</div>
-          <h1 style={heroTitleStyle}>Actions</h1>
-          <p style={heroSubtitleStyle}>
-            Track ownership, due dates, priorities, progress and supporting evidence in one place.
-            Linked actions can be opened directly from other modules using the action number.
-          </p>
-
-          <div style={priorityStripStyle}>
-            <HeroPill label="Open" value={openActions} tone={openActions > 0 ? "blue" : "neutral"} />
-            <HeroPill label="Overdue" value={overdueActions} tone={overdueActions > 0 ? "red" : "green"} />
-            <HeroPill label="Due This Week" value={dueThisWeek} tone={dueThisWeek > 0 ? "amber" : "green"} />
-            <HeroPill
-              label="High Priority Open"
-              value={highPriorityOpen}
-              tone={highPriorityOpen > 0 ? "red" : "green"}
-            />
-          </div>
-        </div>
-
-        <div style={heroMetaWrapStyle}>
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Next Action Number</div>
-            <div style={heroMetaValueStyle}>{nextActionNumber}</div>
-          </div>
-
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Last Refreshed</div>
-            <div style={heroMetaValueStyleSmall}>
-              {isLoading ? "Loading..." : formatDateTime(lastRefreshed?.toISOString())}
-            </div>
-          </div>
-
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Current View</div>
-            <div style={heroMetaValueStyleSmall}>
-              {filteredActions.length} shown / {actions.length} total
-            </div>
-          </div>
-
-          <div style={heroMetaCardStyle}>
-            <div style={heroMetaLabelStyle}>Evidence Files</div>
-            <div style={heroMetaValueStyleSmall}>{evidenceFiles.length}</div>
-          </div>
-        </div>
-      </section>
+      <QualityPageHero
+        label="ACTION TRACKING"
+        title="Actions"
+        description="Central follow-up hub for quality actions, ownership, due dates, linked source records, and supporting evidence."
+        contextCards={[
+          {
+            label: "Last Refreshed",
+            value: isLoading ? "Loading..." : formatDateTime(lastRefreshed?.toISOString()),
+          },
+          {
+            label: "Latest Action",
+            value: latestActionLabel,
+          },
+        ]}
+      />
 
       <div
         style={{
@@ -739,7 +1143,7 @@ function ActionsPageContent() {
         <StatCard title="Open Actions" value={openActions} accent="#2563eb" />
         <StatCard title="Closed / Complete" value={closedActions} accent="#16a34a" />
         <StatCard title="Overdue Actions" value={overdueActions} accent="#dc2626" />
-        <StatCard title="Evidence Files" value={evidenceFiles.length} accent="#7c3aed" />
+        <StatCard title="Evidence Files" value={linkedEvidenceFiles.length} accent="#7c3aed" />
       </section>
 
       <section style={twoColumnGridStyle}>
@@ -770,6 +1174,17 @@ function ActionsPageContent() {
                   style={inputStyle}
                 />
               </Field>
+
+              <div style={{ gridColumn: "1 / -1" }}>
+                <Field label="Description">
+                  <textarea
+                    placeholder="Enter fuller action detail or instructions"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    style={textAreaStyle}
+                  />
+                </Field>
+              </div>
 
               <Field label="Owner">
                 <input
@@ -805,6 +1220,20 @@ function ActionsPageContent() {
                 </select>
               </Field>
 
+              <Field label="Source">
+                <select
+                  value={form.source}
+                  onChange={(e) => setForm((current) => applySourceChange(current, e.target.value))}
+                  style={inputStyle}
+                >
+                  {actionSourceOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
               <Field label="Due Date">
                 <input
                   type="date"
@@ -813,6 +1242,81 @@ function ActionsPageContent() {
                   style={inputStyle}
                 />
               </Field>
+
+              {isAuditLinkedSource(form.source) ? (
+                <Field label="Audit Number">
+                  <select
+                    value={form.linked_audit_id}
+                    onChange={(e) => setForm((current) => applyAuditSelection(current, e.target.value))}
+                    style={inputStyle}
+                  >
+                    <option value="">Select audit</option>
+                    {auditOptions.map((audit) => (
+                      <option key={audit.id} value={audit.id}>
+                        {audit.audit_number}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
+              {form.source === "Audit Finding" ? (
+                <Field label="Finding Reference">
+                  <select
+                    value={form.linked_finding_id}
+                    onChange={(e) => setForm((current) => applyFindingSelection(current, e.target.value))}
+                    style={inputStyle}
+                    disabled={!form.linked_audit_id}
+                  >
+                    <option value="">{form.linked_audit_id ? "Select finding" : "Select audit first"}</option>
+                    {createFindingOptions.map((finding) => (
+                      <option key={finding.id} value={finding.id}>
+                        {finding.reference}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
+              {form.source === "NCR/CAPA" ? (
+                <Field label="NCR / CAPA Record">
+                  <select
+                    value={
+                      form.linked_ncr_id
+                        ? `NCR:${form.linked_ncr_id}`
+                        : form.linked_capa_id
+                        ? `CAPA:${form.linked_capa_id}`
+                        : ""
+                    }
+                    onChange={(e) => setForm((current) => applyNcrCapaSelection(current, e.target.value))}
+                    style={inputStyle}
+                  >
+                    <option value="">Select NCR or CAPA</option>
+                    {ncrCapaOptions.map((option) => (
+                      <option key={`${option.type}:${option.id}`} value={`${option.type}:${option.id}`}>
+                        {option.type} {option.number} - {option.title || "Untitled"}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
+              {form.source === "MOC" ? (
+                <Field label="MOC Record">
+                  <select
+                    value={form.linked_moc_id}
+                    onChange={(e) => setForm((current) => applyMocSelection(current, e.target.value))}
+                    style={inputStyle}
+                  >
+                    <option value="">Select MOC</option>
+                    {mocOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.number} - {option.title || "Untitled"}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
 
               <Field label="Evidence Files (optional)">
                 <input type="file" multiple onChange={handleCreateFileChange} style={inputStyle} />
@@ -874,7 +1378,7 @@ function ActionsPageContent() {
 
       <SectionCard
         title="Search and Filter"
-        subtitle="Narrow the register by text, status, priority, owner or project."
+        subtitle="Narrow the register by text, status, priority, owner, project or source."
         action={
           <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
             Clear Filters
@@ -929,6 +1433,15 @@ function ActionsPageContent() {
               </option>
             ))}
           </select>
+
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={inputStyle}>
+            <option value="">All Sources</option>
+            <option value="Manual">Manual</option>
+            <option value="Audit Finding">Audit Finding</option>
+            <option value="NCR/CAPA">NCR/CAPA</option>
+            <option value="MOC">MOC</option>
+            <option value="Other">Other</option>
+          </select>
         </div>
 
         <div style={tableInfoRowStyle}>
@@ -948,28 +1461,24 @@ function ActionsPageContent() {
               <tr>
                 <th style={tableHeadStyle}>Action No.</th>
                 <th style={tableHeadStyle}>Title</th>
-                <th style={tableHeadStyle}>Project</th>
+                <th style={tableHeadStyle}>Source</th>
                 <th style={tableHeadStyle}>Owner</th>
-                <th style={tableHeadStyle}>Priority</th>
-                <th style={tableHeadStyle}>Status</th>
                 <th style={tableHeadStyle}>Due Date</th>
-                <th style={tableHeadStyle}>Evidence</th>
-                <th style={tableHeadStyle}>Updated</th>
+                <th style={tableHeadStyle}>Status</th>
                 <th style={tableHeadStyle}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredActions.length === 0 ? (
                 <tr>
-                  <td colSpan={10} style={emptyTableCellStyle}>
+                  <td colSpan={7} style={emptyTableCellStyle}>
                     No actions match the current filters.
                   </td>
                 </tr>
               ) : (
                 filteredActions.map((action) => {
                   const overdue = isOverdue(action);
-                  const evidenceCount = evidenceCountMap.get(action.id) || 0;
-                  const evidenceActive = selectedEvidenceAction?.id === action.id;
+                  const selected = selectedEvidenceAction?.id === action.id;
                   const linkedMatch =
                     search.trim() &&
                     (action.action_number || "").trim().toLowerCase() === search.trim().toLowerCase();
@@ -977,160 +1486,71 @@ function ActionsPageContent() {
                   return (
                     <tr
                       key={action.id}
+                      onClick={() => setSelectedEvidenceAction(action)}
                       style={{
                         ...tableRowStyle,
+                        cursor: "pointer",
                         background: overdue
                           ? "#fff7f7"
-                          : evidenceActive
+                          : selected
                           ? "#f5f3ff"
                           : linkedMatch
                           ? "#eff6ff"
                           : "white",
                       }}
                     >
-                      {editingId === action.id ? (
-                        <>
-                          <td style={tableCellStyle}>
-                            <div style={readOnlyTableCellStyle}>{action.action_number || "-"}</div>
-                          </td>
-                          <td style={tableCellStyle}>
-                            <input
-                              value={editForm.title}
-                              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                              style={smallInputStyle}
-                            />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <input
-                              value={editForm.project}
-                              onChange={(e) => setEditForm({ ...editForm, project: e.target.value })}
-                              style={smallInputStyle}
-                            />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <input
-                              value={editForm.owner}
-                              onChange={(e) => setEditForm({ ...editForm, owner: e.target.value })}
-                              style={smallInputStyle}
-                            />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <select
-                              value={editForm.priority}
-                              onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
-                              style={smallInputStyle}
-                            >
-                              <option value="Low">Low</option>
-                              <option value="Medium">Medium</option>
-                              <option value="High">High</option>
-                            </select>
-                          </td>
-                          <td style={tableCellStyle}>
-                            <select
-                              value={editForm.status}
-                              onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                              style={smallInputStyle}
-                            >
-                              <option value="Open">Open</option>
-                              <option value="In Progress">In Progress</option>
-                              <option value="Closed">Closed</option>
-                              <option value="Complete">Complete</option>
-                            </select>
-                          </td>
-                          <td style={tableCellStyle}>
-                            <input
-                              type="date"
-                              value={editForm.due_date}
-                              onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
-                              style={smallInputStyle}
-                            />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <span style={evidenceCountBadgeStyle}>{evidenceCount}</span>
-                          </td>
-                          <td style={tableCellStyle}>
-                            {formatDateTime(action.updated_at || action.created_at)}
-                          </td>
-                          <td style={tableCellStyle}>
-                            <div style={actionButtonsWrapStyle}>
-                              <button
-                                type="button"
-                                onClick={() => saveEdit(action.id)}
-                                style={miniButtonStyle}
-                                disabled={isSaving}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingId(null)}
-                                style={miniButtonGreyStyle}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td style={tableCellStyle}>
-                            <div style={actionNumberCellStyle}>{action.action_number || "-"}</div>
-                          </td>
-                          <td style={tableCellStyle}>
-                            <div style={primaryCellTextStyle}>{action.title || "-"}</div>
-                            <div style={secondaryCellTextStyle}>
-                              {overdue ? getDueLabel(action.due_date) : " "}
-                            </div>
-                          </td>
-                          <td style={tableCellStyle}>{action.project || "-"}</td>
-                          <td style={tableCellStyle}>{action.owner || "-"}</td>
-                          <td style={tableCellStyle}>
-                            <PriorityBadge value={action.priority || "Unknown"} />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <StatusBadge value={action.status || "Unknown"} />
-                          </td>
-                          <td style={tableCellStyle}>
-                            <div style={primaryCellTextStyle}>{formatDate(action.due_date)}</div>
-                            <div
-                              style={{
-                                ...secondaryCellTextStyle,
-                                color: overdue ? "#b91c1c" : "#64748b",
-                                fontWeight: overdue ? 700 : 500,
-                              }}
-                            >
-                              {getDueLabel(action.due_date)}
-                            </div>
-                          </td>
-                          <td style={tableCellStyle}>
-                            <span style={evidenceCountBadgeStyle}>{evidenceCount}</span>
-                          </td>
-                          <td style={tableCellStyle}>
-                            {formatDateTime(action.updated_at || action.created_at)}
-                          </td>
-                          <td style={tableCellStyle}>
-                            <div style={actionButtonsWrapStyle}>
-                              <button type="button" onClick={() => startEdit(action)} style={miniButtonStyle}>
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedEvidenceAction(action)}
-                                style={miniButtonPurpleStyle}
-                              >
-                                Evidence
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteAction(action.id)}
-                                style={miniButtonDeleteStyle}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      )}
+                      <td style={tableCellStyle}>
+                        <div style={actionNumberCellStyle}>{action.action_number || "-"}</div>
+                      </td>
+                      <td style={tableCellStyle}>
+                        <div style={primaryCellTextStyle}>{action.title || "-"}</div>
+                        <div style={secondaryCellTextStyle}>
+                          {buildActionSourceLabel(action) || " "}
+                        </div>
+                      </td>
+                      <td style={tableCellStyle}>
+                        <span style={badgeStyle}>{getActionSourceValue(action)}</span>
+                      </td>
+                      <td style={tableCellStyle}>{action.owner || "-"}</td>
+                      <td style={tableCellStyle}>
+                        <div style={primaryCellTextStyle}>{formatDate(action.due_date)}</div>
+                        <div
+                          style={{
+                            ...secondaryCellTextStyle,
+                            color: overdue ? "#b91c1c" : "#64748b",
+                            fontWeight: overdue ? 700 : 500,
+                          }}
+                        >
+                          {getDueLabel(action.due_date)}
+                        </div>
+                      </td>
+                      <td style={tableCellStyle}>
+                        <StatusBadge value={action.status || "Unknown"} />
+                      </td>
+                      <td style={tableCellStyle}>
+                        <div style={actionButtonsWrapStyle}>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedEvidenceAction(action);
+                            }}
+                            style={miniButtonStyle}
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              deleteAction(action.id);
+                            }}
+                            style={miniButtonDeleteStyle}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -1143,13 +1563,13 @@ function ActionsPageContent() {
       <SectionCard
         title={
           selectedEvidenceAction
-            ? `Evidence Manager — ${selectedEvidenceAction.action_number || "Action"}`
-            : "Evidence Manager"
+            ? `Action Detail — ${selectedEvidenceAction.action_number || "Action"}`
+            : "Action Detail"
         }
         subtitle={
           selectedEvidenceAction
-            ? "Upload follow-up evidence, preview files and remove anything no longer needed."
-            : "Select the Evidence button on any action to manage files."
+            ? "Edit the full action record, manage linked source information, and upload supporting evidence."
+            : "Click an action row to open the full detail and edit panel."
         }
         action={
           selectedEvidenceAction ? (
@@ -1162,20 +1582,258 @@ function ActionsPageContent() {
               }}
               style={secondaryButtonStyle}
             >
-              Close Evidence Panel
+              Hide Panel
             </button>
           ) : null
         }
       >
         {!selectedEvidenceAction ? (
-          <div style={emptyEvidencePanelStyle}>No action selected for evidence management.</div>
+          <div style={emptyEvidencePanelStyle}>No action selected. Click a row in the register to open the action detail panel.</div>
         ) : (
-          <div style={evidencePanelGridStyle}>
-            <div style={evidenceUploadCardStyle}>
-              <div style={evidencePanelHeadingStyle}>Upload Evidence</div>
+          <div style={detailPanelGridStyle}>
+            <div style={detailSectionCardStyle}>
+              <div style={detailPanelHeaderStyle}>
+                <div>
+                  <div style={detailActionNumberStyle}>{selectedEvidenceAction.action_number || "-"}</div>
+                  <div style={detailActionTitleStyle}>{selectedEvidenceAction.title || "Untitled Action"}</div>
+                </div>
+                <div style={detailBadgeWrapStyle}>
+                  <PriorityBadge value={selectedEvidenceAction.priority || "Unknown"} />
+                  <StatusBadge value={selectedEvidenceAction.status || "Unknown"} />
+                </div>
+              </div>
+
+              <div style={detailFormGridStyle}>
+                <Field label="Action Number">
+                  <input value={selectedEvidenceAction.action_number || ""} readOnly style={readOnlyInputStyle} />
+                </Field>
+
+                <Field label="Source">
+                  <select
+                    value={editForm.source}
+                    onChange={(e) => setEditForm((current) => applySourceChange(current, e.target.value))}
+                    style={inputStyle}
+                  >
+                    {actionSourceOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Title">
+                  <input
+                    value={editForm.title}
+                    onChange={(e) => setEditForm((current) => ({ ...current, title: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </Field>
+
+                <Field label="Owner">
+                  <input
+                    value={editForm.owner}
+                    onChange={(e) => setEditForm((current) => ({ ...current, owner: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </Field>
+
+                <Field label="Project">
+                  <input
+                    value={editForm.project}
+                    onChange={(e) => setEditForm((current) => ({ ...current, project: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </Field>
+
+                <Field label="Priority">
+                  <select
+                    value={editForm.priority}
+                    onChange={(e) => setEditForm((current) => ({ ...current, priority: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </Field>
+
+                <Field label="Status">
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm((current) => ({ ...current, status: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    <option value="Open">Open</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Closed">Closed</option>
+                    <option value="Complete">Complete</option>
+                  </select>
+                </Field>
+
+                <Field label="Due Date">
+                  <input
+                    type="date"
+                    value={editForm.due_date}
+                    onChange={(e) => setEditForm((current) => ({ ...current, due_date: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </Field>
+
+                {isAuditLinkedSource(editForm.source) ? (
+                  <Field label="Audit Number">
+                    <select
+                      value={editForm.linked_audit_id}
+                      onChange={(e) => setEditForm((current) => applyAuditSelection(current, e.target.value))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select audit</option>
+                      {auditOptions.map((audit) => (
+                        <option key={audit.id} value={audit.id}>
+                          {audit.audit_number}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : null}
+
+                {editForm.source === "Audit Finding" ? (
+                  <Field label="Finding Reference">
+                    <select
+                      value={editForm.linked_finding_id}
+                      onChange={(e) => setEditForm((current) => applyFindingSelection(current, e.target.value))}
+                      style={inputStyle}
+                      disabled={!editForm.linked_audit_id}
+                    >
+                      <option value="">{editForm.linked_audit_id ? "Select finding" : "Select audit first"}</option>
+                      {editFindingOptions.map((finding) => (
+                        <option key={finding.id} value={finding.id}>
+                          {finding.reference}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : null}
+
+                {editForm.source === "NCR/CAPA" ? (
+                  <Field label="NCR / CAPA Record">
+                    <select
+                      value={
+                        editForm.linked_ncr_id
+                          ? `NCR:${editForm.linked_ncr_id}`
+                          : editForm.linked_capa_id
+                          ? `CAPA:${editForm.linked_capa_id}`
+                          : ""
+                      }
+                      onChange={(e) => setEditForm((current) => applyNcrCapaSelection(current, e.target.value))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select NCR or CAPA</option>
+                      {ncrCapaOptions.map((option) => (
+                        <option key={`${option.type}:${option.id}`} value={`${option.type}:${option.id}`}>
+                          {option.type} {option.number} - {option.title || "Untitled"}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : null}
+
+                {editForm.source === "MOC" ? (
+                  <Field label="MOC Record">
+                    <select
+                      value={editForm.linked_moc_id}
+                      onChange={(e) => setEditForm((current) => applyMocSelection(current, e.target.value))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select MOC</option>
+                      {mocOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.number} - {option.title || "Untitled"}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : null}
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="Description">
+                    <textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm((current) => ({ ...current, description: e.target.value }))}
+                      style={textAreaStyle}
+                    />
+                  </Field>
+                </div>
+              </div>
+
+              {(isAuditLinkedSource(editForm.source) ||
+                editForm.source === "NCR/CAPA" ||
+                editForm.source === "MOC") &&
+              (
+                editForm.linked_audit_number ||
+                editForm.linked_finding_reference ||
+                editForm.linked_ncr_number ||
+                editForm.linked_capa_number ||
+                editForm.linked_moc_number
+              ) ? (
+                <div style={linkedSourceCardStyle}>
+                  <div style={linkedSourceTitleStyle}>Linked Source</div>
+                  <div style={linkedSourceMetaStyle}>Source: {editForm.source}</div>
+                  {editForm.linked_audit_number ? (
+                    <div style={linkedSourceMetaStyle}>
+                      Audit Number: <strong>{editForm.linked_audit_number}</strong>
+                    </div>
+                  ) : null}
+                  {editForm.linked_finding_reference ? (
+                    <div style={linkedSourceMetaStyle}>
+                      Finding Reference: <strong>{editForm.linked_finding_reference}</strong>
+                    </div>
+                  ) : null}
+                  {editForm.linked_audit_number ? (
+                    <Link
+                      href={`/audits?search=${encodeURIComponent(editForm.linked_audit_number)}`}
+                      style={backLinkStyle}
+                    >
+                      Open Linked Audit
+                    </Link>
+                  ) : null}
+                  {editForm.source === "NCR/CAPA" && editForm.linked_ncr_number ? (
+                    <div style={linkedSourceMetaStyle}>
+                      NCR: <strong>{editForm.linked_ncr_number}</strong>
+                    </div>
+                  ) : null}
+                  {editForm.source === "NCR/CAPA" && editForm.linked_capa_number ? (
+                    <div style={linkedSourceMetaStyle}>
+                      CAPA: <strong>{editForm.linked_capa_number}</strong>
+                    </div>
+                  ) : null}
+                  {editForm.source === "MOC" && editForm.linked_moc_number ? (
+                    <div style={linkedSourceMetaStyle}>
+                      MOC: <strong>{editForm.linked_moc_number}</strong>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div style={formFooterStyle}>
+                <button
+                  type="button"
+                  onClick={() => saveEdit(selectedEvidenceAction.id)}
+                  style={primaryButtonStyle}
+                  disabled={isSaving}
+                >
+                  {isSaving ? "Saving..." : "Save Action"}
+                </button>
+                <span style={helperTextStyle}>
+                  Title stays short for the register; description holds the fuller action detail.
+                </span>
+              </div>
+            </div>
+
+            <div style={detailSectionCardStyle}>
+              <div style={evidencePanelHeadingStyle}>Evidence</div>
               <div style={evidenceMetaTextStyle}>
-                Add one or more files against{" "}
-                <strong>{selectedEvidenceAction.action_number || "this action"}</strong>.
+                Upload follow-up files against <strong>{selectedEvidenceAction.action_number || "this action"}</strong>.
               </div>
 
               <div style={evidenceFieldWrapStyle}>
@@ -1205,9 +1863,7 @@ function ActionsPageContent() {
                   {isUploadingEvidence ? "Uploading..." : "Upload Evidence"}
                 </button>
               </div>
-            </div>
 
-            <div style={evidenceListCardStyle}>
               <div style={evidencePanelHeadingStyle}>Attached Files</div>
 
               {selectedActionEvidence.length === 0 ? (
@@ -1945,6 +2601,76 @@ const evidenceFieldWrapStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
   marginTop: "14px",
+};
+
+const linkedSourceCardStyle: CSSProperties = {
+  border: "1px solid #dbe4f0",
+  borderRadius: "14px",
+  background: "#f8fafc",
+  padding: "12px 14px",
+  display: "grid",
+  gap: "6px",
+  marginTop: "12px",
+};
+
+const linkedSourceTitleStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 800,
+  color: "#0f172a",
+};
+
+const linkedSourceMetaStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#475569",
+};
+
+const detailPanelGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, 0.8fr)",
+  gap: "16px",
+};
+
+const detailSectionCardStyle: CSSProperties = {
+  border: "1px solid #dbe4f0",
+  borderRadius: "16px",
+  background: "#ffffff",
+  padding: "16px",
+  display: "grid",
+  gap: "14px",
+};
+
+const detailPanelHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "flex-start",
+  flexWrap: "wrap",
+};
+
+const detailActionNumberStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "#0f766e",
+};
+
+const detailActionTitleStyle: CSSProperties = {
+  fontSize: "22px",
+  fontWeight: 800,
+  color: "#0f172a",
+};
+
+const detailBadgeWrapStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+};
+
+const detailFormGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "14px",
 };
 
 const evidenceListWrapStyle: CSSProperties = {

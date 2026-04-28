@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -878,6 +879,12 @@ function MOCPageContent() {
   const expirySoonCount = useMemo(() => reports.filter((report) => isNearingTemporaryExpiry(report)).length, [reports]);
   const recentCount = useMemo(() => {
     return reports.filter((report) => isRecentMoc(report)).length;
+  }, [reports]);
+  const latestMocLabel = useMemo(() => {
+    const latest = [...reports].sort(
+      (a, b) => new Date(getCreatedOrUpdatedTime(b) || 0).getTime() - new Date(getCreatedOrUpdatedTime(a) || 0).getTime()
+    )[0];
+    return latest ? `${latest.moc_report_no} - ${latest.moc_report_title}` : "No MOCs loaded";
   }, [reports]);
   const statusBannerColours = getNoticeColours(messageTone);
   const nextWorkflowStatus = getNextWorkflowStatus(detailReport.status);
@@ -1900,6 +1907,7 @@ function MOCPageContent() {
       head: string[][];
       body: Array<Array<string>>;
       fontSize?: number;
+      headFontSize?: number;
       cellPadding?: number;
       minCellHeight?: number;
       columnStyles?: Record<string | number, Record<string, unknown>>;
@@ -1927,10 +1935,12 @@ function MOCPageContent() {
         fillColor: [15, 118, 110],
         textColor: [255, 255, 255],
         fontStyle: "bold",
+        fontSize: config.headFontSize ?? config.fontSize ?? 8,
       },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       bodyStyles: { fillColor: [255, 255, 255] },
       columnStyles: config.columnStyles,
+      tableWidth: 186,
       rowPageBreak: "avoid",
       didParseCell: (hook) => {
         if (
@@ -2027,14 +2037,15 @@ function MOCPageContent() {
         getPdfText(row.status),
       ]),
       fontSize: 7.8,
+      headFontSize: 7.2,
       cellPadding: 2.4,
       minCellHeight: 9,
       columnStyles: {
-        0: { cellWidth: 14 },
-        1: { cellWidth: 86 },
+        0: { cellWidth: 16 },
+        1: { cellWidth: 85 },
         2: { cellWidth: 42 },
-        3: { cellWidth: 22 },
-        4: { cellWidth: 20 },
+        3: { cellWidth: 24 },
+        4: { cellWidth: 19 },
       },
     });
     return y + 9;
@@ -2227,19 +2238,20 @@ function MOCPageContent() {
         getPdfDate(row.review_date),
       ]),
       fontSize: 7,
+      headFontSize: 6.2,
       cellPadding: 1.8,
       minCellHeight: 9.5,
       signatureColumns: [6],
       signatureImages,
       columnStyles: {
-        0: { cellWidth: 11 },
-        1: { cellWidth: 11 },
-        2: { cellWidth: 26 },
-        3: { cellWidth: 23 },
-        4: { cellWidth: 23 },
-        5: { cellWidth: 18 },
-        6: { cellWidth: 40 },
-        7: { cellWidth: 20 },
+        0: { cellWidth: 12 },
+        1: { cellWidth: 12 },
+        2: { cellWidth: 28 },
+        3: { cellWidth: 26 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 20 },
+        6: { cellWidth: 41 },
+        7: { cellWidth: 22 },
       },
     });
     return y + 9;
@@ -2256,25 +2268,26 @@ function MOCPageContent() {
     y += 10;
     y = drawFormTable(doc, {
       startY: y,
-      head: [["Role", "Position", "Name", "Signature", "Date"]],
+      head: [["Role", "Name", "Position", "Signature", "Date"]],
       body: bundle.acceptanceRows.map((row) => [
         getPdfText(row.role_label),
-        getPdfText(row.position),
         getPdfText(row.name),
+        getPdfText(row.position),
         getPdfSignatureCellValue(row.signature),
         getPdfDate(row.signoff_date),
       ]),
       fontSize: 7.8,
+      headFontSize: 7.2,
       cellPadding: 2.6,
       minCellHeight: 10,
       signatureColumns: [3],
       signatureImages,
       columnStyles: {
         0: { cellWidth: 60 },
-        1: { cellWidth: 36 },
+        1: { cellWidth: 34 },
         2: { cellWidth: 34 },
-        3: { cellWidth: 32 },
-        4: { cellWidth: 18 },
+        3: { cellWidth: 34 },
+        4: { cellWidth: 24 },
       },
     });
     return y + 9;
@@ -2291,25 +2304,26 @@ function MOCPageContent() {
     y += 10;
     return drawFormTable(doc, {
       startY: y,
-      head: [["Role", "Position", "Name", "Signature", "Date"]],
+      head: [["Role", "Name", "Position", "Signature", "Date"]],
       body: bundle.closeoutRows.map((row) => [
         getPdfText(row.role_label),
-        getPdfText(row.position),
         getPdfText(row.name),
+        getPdfText(row.position),
         getPdfSignatureCellValue(row.signature),
         getPdfDate(row.signoff_date),
       ]),
       fontSize: 7.8,
+      headFontSize: 7.2,
       cellPadding: 2.6,
       minCellHeight: 10,
       signatureColumns: [3],
       signatureImages,
       columnStyles: {
         0: { cellWidth: 60 },
-        1: { cellWidth: 36 },
+        1: { cellWidth: 34 },
         2: { cellWidth: 34 },
-        3: { cellWidth: 32 },
-        4: { cellWidth: 18 },
+        3: { cellWidth: 34 },
+        4: { cellWidth: 24 },
       },
     });
   }
@@ -2387,23 +2401,15 @@ function MOCPageContent() {
 
   return (
     <main>
-      <section style={heroStyle}>
-        <div style={{ flex: "1 1 680px" }}>
-          <div style={eyebrowStyle}>Quality Command Centre</div>
-          <h1 style={heroTitleStyle}>Management of Change</h1>
-          <p style={heroSubtitleStyle}>
-            Operational MOC register aligned to the controlled Enshore form structure, with full record editing and PDF generation from saved values.
-          </p>
-
-        </div>
-
-        <div style={heroMetaWrapStyle}>
-          <HeroMetaCard label="Total MOCs" value={reports.length} />
-          <HeroMetaCard label="Selected Record" value={detailReport.moc_report_no || "None"} compact />
-          <HeroMetaCard label="Form" value="ENS-HSEQ-FRM-008 Rev D" compact />
-          <HeroMetaCard label="Last Refreshed" value={refreshStamp || "-"} compact />
-        </div>
-      </section>
+      <QualityPageHero
+        label="MANAGEMENT OF CHANGE"
+        title="Management of Change"
+        description="Controlled MOC register aligned to the Enshore form structure, with workflow, supporting documents, and PDF output from saved record data."
+        contextCards={[
+          { label: "Last Refreshed", value: refreshStamp || "-" },
+          { label: "Latest MOC", value: latestMocLabel },
+        ]}
+      />
 
       <div style={topMetaRowStyle}>
         <Link href="/" style={backLinkStyle}>
@@ -3638,8 +3644,8 @@ function SimpleSignoffTable({
     <div style={tableEditorWrapStyle}>
       <div style={simpleSignoffHeadStyle}>
         <div>Role</div>
-        <div>Position</div>
         <div>Name</div>
+        <div>Position</div>
         <div>Signature</div>
         <div>Date</div>
         <div>Actions</div>
@@ -3647,8 +3653,8 @@ function SimpleSignoffTable({
       {rows.map((row, index) => (
         <div key={`${row.id || "new"}-${index}`} style={simpleSignoffRowStyle}>
           <input value={row.role_label} onChange={(e) => onChange(index, "role_label", e.target.value)} style={inputStyle} />
-          <input value={row.position} onChange={(e) => onChange(index, "position", e.target.value)} style={inputStyle} />
           <input value={row.name} onChange={(e) => onChange(index, "name", e.target.value)} style={inputStyle} />
+          <input value={row.position} onChange={(e) => onChange(index, "position", e.target.value)} style={inputStyle} />
           <SignatureFieldInput
             value={row.signature}
             onTextChange={(value) => onChange(index, "signature", value)}
@@ -3685,6 +3691,9 @@ const heroStyle: CSSProperties = {
   gap: "24px",
   alignItems: "flex-start",
   flexWrap: "wrap",
+  minHeight: "244px",
+  width: "100%",
+  boxSizing: "border-box",
 };
 
 const eyebrowStyle: CSSProperties = {
@@ -3706,7 +3715,7 @@ const heroSubtitleStyle: CSSProperties = {
   marginTop: "10px",
   marginBottom: 0,
   fontSize: "16px",
-  maxWidth: "820px",
+  maxWidth: "760px",
   color: "rgba(255,255,255,0.92)",
 };
 
