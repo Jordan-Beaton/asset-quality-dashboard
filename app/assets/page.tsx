@@ -2208,7 +2208,11 @@ function AssetsPageContent() {
                                 <strong>Next Due:</strong> {formatDate(record.next_inspection_due)}
                               </span>
                               <span>
-                                <strong>Logged:</strong> {formatDateTime(record.created_at || record.uploaded_at)}
+                                <strong>Logged:</strong>{" "}
+                                {(() => {
+                                  const loggedAt = record.created_at || record.uploaded_at;
+                                  return loggedAt ? formatDateTime(loggedAt) : "-";
+                                })()}
                               </span>
                             </div>
 
@@ -2273,7 +2277,7 @@ function AssetsPageContent() {
                                 <strong>Next Due:</strong> {formatDate(record.next_maintenance_due)}
                               </span>
                               <span>
-                                <strong>Logged:</strong> {formatDateTime(record.created_at)}
+                                <strong>Logged:</strong> {record.created_at ? formatDateTime(record.created_at) : "-"}
                               </span>
                             </div>
 

@@ -926,25 +926,24 @@ function InspectionPageContent() {
               ? "Edit the selected inspection record, keep the history intact, and trigger action generation only when required."
               : "Click an inspection record to open the full detail and edit panel."
           }
-          action={
-            selectedRecord ? (
-              <button
-                type="button"
-                style={secondaryButtonStyle}
-                onClick={() => {
-                  setSelectedRecordId("");
-                  setDetailForm(emptyForm);
-                }}
-              >
-                Hide Panel
-              </button>
-            ) : null
-          }
         >
           {!selectedRecord ? (
             <div style={emptyStateStyle}>No inspection record selected.</div>
           ) : (
             <div style={detailPanelStyle}>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  style={secondaryButtonStyle}
+                  onClick={() => {
+                    setSelectedRecordId("");
+                    setDetailForm(emptyForm);
+                  }}
+                >
+                  Hide Panel
+                </button>
+              </div>
+
               <div style={detailSummaryRowStyle}>
                 <SummaryTile label="Inspection Number" value={selectedRecord.inspection_number || selectedRecord.reference || "-"} />
                 <SummaryTile label="Asset" value={assetMap.get(selectedRecord.asset_id)?.asset_code || "-"} />
