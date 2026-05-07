@@ -14,6 +14,7 @@ type ActionItem = {
   action_number: string | null;
   title: string | null;
   description: string | null;
+  department: string | null;
   project: string | null;
   owner: string | null;
   priority: string | null;
@@ -24,6 +25,13 @@ type ActionItem = {
   linked_audit_number: string | null;
   linked_finding_id: string | null;
   linked_finding_reference: string | null;
+  linked_asset_id: string | null;
+  linked_asset_code: string | null;
+  linked_inspection_id: string | null;
+  linked_inspection_number: string | null;
+  linked_maintenance_id: string | null;
+  linked_maintenance_number: string | null;
+  linked_calibration_id: string | null;
   linked_ncr_id: string | null;
   linked_ncr_number: string | null;
   linked_capa_id: string | null;
@@ -75,6 +83,7 @@ type EvidenceFile = {
 type ActionForm = {
   title: string;
   description: string;
+  department: string;
   project: string;
   owner: string;
   priority: string;
@@ -85,6 +94,13 @@ type ActionForm = {
   linked_audit_number: string;
   linked_finding_id: string;
   linked_finding_reference: string;
+  linked_asset_id: string;
+  linked_asset_code: string;
+  linked_inspection_id: string;
+  linked_inspection_number: string;
+  linked_maintenance_id: string;
+  linked_maintenance_number: string;
+  linked_calibration_id: string;
   linked_ncr_id: string;
   linked_ncr_number: string;
   linked_capa_id: string;
@@ -96,6 +112,7 @@ type ActionForm = {
 const emptyForm: ActionForm = {
   title: "",
   description: "",
+  department: "",
   project: "",
   owner: "",
   priority: "Medium",
@@ -106,6 +123,13 @@ const emptyForm: ActionForm = {
   linked_audit_number: "",
   linked_finding_id: "",
   linked_finding_reference: "",
+  linked_asset_id: "",
+  linked_asset_code: "",
+  linked_inspection_id: "",
+  linked_inspection_number: "",
+  linked_maintenance_id: "",
+  linked_maintenance_number: "",
+  linked_calibration_id: "",
   linked_ncr_id: "",
   linked_ncr_number: "",
   linked_capa_id: "",
@@ -114,7 +138,31 @@ const emptyForm: ActionForm = {
   linked_moc_number: "",
 };
 
-const actionSourceOptions = ["Manual", "Audit Finding", "NCR/CAPA", "MOC", "Other"] as const;
+const actionSourceOptions = [
+  "Manual",
+  "Audit Finding",
+  "Asset Inspection",
+  "Asset Maintenance",
+  "Asset Calibration",
+  "NCR/CAPA",
+  "MOC",
+  "Other",
+] as const;
+const departmentOptions = [
+  "Assets",
+  "Commercial",
+  "Crewing",
+  "Engineering",
+  "Finance",
+  "Human Resources",
+  "Logistics",
+  "Marketing",
+  "Operations",
+  "Procurement",
+  "Project",
+  "Survey",
+  "HSEQ",
+] as const;
 
 function normaliseStatus(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
@@ -251,6 +299,9 @@ function matchesSearchTerm(action: ActionItem, query: string) {
     (action.priority || "").toLowerCase().includes(lower) ||
     (action.status || "").toLowerCase().includes(lower) ||
     (action.source || "").toLowerCase().includes(lower) ||
+    (action.linked_asset_code || "").toLowerCase().includes(lower) ||
+    (action.linked_inspection_number || "").toLowerCase().includes(lower) ||
+    (action.linked_maintenance_number || "").toLowerCase().includes(lower) ||
     (action.linked_audit_number || "").toLowerCase().includes(lower) ||
     (action.linked_finding_reference || "").toLowerCase().includes(lower)
   );
@@ -269,6 +320,10 @@ function isAuditLinkedSource(source: string | null | undefined) {
   return source === "Audit Finding";
 }
 
+function isAssetLinkedSource(source: string | null | undefined) {
+  return source === "Asset Inspection" || source === "Asset Maintenance" || source === "Asset Calibration";
+}
+
 function buildActionSourceLabel(action: ActionItem) {
   const source = getActionSourceValue(action);
   if (!source || source === "Manual" || source === "Other") return "";
@@ -276,6 +331,13 @@ function buildActionSourceLabel(action: ActionItem) {
   const parts = [`Source: ${source}`];
   if (source === "Audit Finding" && action.linked_audit_number) parts.push(`Audit ${action.linked_audit_number}`);
   if (source === "Audit Finding" && action.linked_finding_reference) parts.push(`Finding ${action.linked_finding_reference}`);
+  if (isAssetLinkedSource(source) && action.linked_asset_code) parts.push(`Asset ${action.linked_asset_code}`);
+  if (source === "Asset Inspection" && action.linked_inspection_number) {
+    parts.push(`Inspection ${action.linked_inspection_number}`);
+  }
+  if (source === "Asset Maintenance" && action.linked_maintenance_number) {
+    parts.push(`Maintenance ${action.linked_maintenance_number}`);
+  }
   if (source === "NCR/CAPA" && action.linked_ncr_number) parts.push(`NCR ${action.linked_ncr_number}`);
   if (source === "NCR/CAPA" && action.linked_capa_number) parts.push(`CAPA ${action.linked_capa_number}`);
   if (source === "MOC" && action.linked_moc_number) parts.push(`MOC ${action.linked_moc_number}`);
@@ -286,6 +348,7 @@ function buildActionFormFromItem(action: ActionItem): ActionForm {
   return {
     title: action.title || "",
     description: action.description || "",
+    department: action.department || "",
     project: action.project || "",
     owner: action.owner || "",
     priority: action.priority || "Medium",
@@ -296,6 +359,13 @@ function buildActionFormFromItem(action: ActionItem): ActionForm {
     linked_audit_number: action.linked_audit_number || "",
     linked_finding_id: action.linked_finding_id || "",
     linked_finding_reference: action.linked_finding_reference || "",
+    linked_asset_id: action.linked_asset_id || "",
+    linked_asset_code: action.linked_asset_code || "",
+    linked_inspection_id: action.linked_inspection_id || "",
+    linked_inspection_number: action.linked_inspection_number || "",
+    linked_maintenance_id: action.linked_maintenance_id || "",
+    linked_maintenance_number: action.linked_maintenance_number || "",
+    linked_calibration_id: action.linked_calibration_id || "",
     linked_ncr_id: action.linked_ncr_id || "",
     linked_ncr_number: action.linked_ncr_number || "",
     linked_capa_id: action.linked_capa_id || "",
@@ -317,6 +387,16 @@ function ActionsPageContent() {
   const dueWindow = Number(searchParams.get("dueWindow") || "0");
   const linkedCreatedMonth = searchParams.get("createdMonth")?.trim() || "";
   const linkedClosedMonth = searchParams.get("closedMonth")?.trim() || "";
+  const prefillSource = searchParams.get("prefill_source")?.trim() || "";
+  const prefillDepartment = searchParams.get("prefill_department")?.trim() || "";
+  const prefillTitle = searchParams.get("prefill_title")?.trim() || "";
+  const prefillDescription = searchParams.get("prefill_description")?.trim() || "";
+  const prefillLinkedAssetId = searchParams.get("linked_asset_id")?.trim() || "";
+  const prefillLinkedAssetCode = searchParams.get("linked_asset_code")?.trim() || "";
+  const prefillLinkedInspectionId = searchParams.get("linked_inspection_id")?.trim() || "";
+  const prefillLinkedInspectionNumber = searchParams.get("linked_inspection_number")?.trim() || "";
+  const prefillLinkedMaintenanceId = searchParams.get("linked_maintenance_id")?.trim() || "";
+  const prefillLinkedMaintenanceNumber = searchParams.get("linked_maintenance_number")?.trim() || "";
 
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
@@ -340,12 +420,14 @@ function ActionsPageContent() {
   const [ownerFilter, setOwnerFilter] = useState(linkedOwner);
   const [projectFilter, setProjectFilter] = useState(linkedProject);
   const [sourceFilter, setSourceFilter] = useState(linkedSource);
+  const [departmentFilter, setDepartmentFilter] = useState("");
 
   const [editForm, setEditForm] = useState<ActionForm>(emptyForm);
 
   const [selectedEvidenceAction, setSelectedEvidenceAction] = useState<ActionItem | null>(null);
   const [selectedEvidenceFiles, setSelectedEvidenceFiles] = useState<File[]>([]);
   const [selectedEvidenceNotes, setSelectedEvidenceNotes] = useState("");
+  const [hasAppliedPrefill, setHasAppliedPrefill] = useState(false);
 
   async function loadActions(showLoadedMessage = true) {
     setIsLoading(true);
@@ -494,6 +576,51 @@ function ActionsPageContent() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (hasAppliedPrefill) return;
+    if (!prefillSource && !prefillTitle && !prefillDescription && !prefillLinkedAssetId && !prefillLinkedInspectionId && !prefillLinkedMaintenanceId) {
+      return;
+    }
+
+    setForm((current) => {
+      const nextSource = actionSourceOptions.includes(prefillSource as (typeof actionSourceOptions)[number])
+        ? prefillSource
+        : current.source || "Manual";
+      const nextDepartment =
+        prefillDepartment ||
+        (isAssetLinkedSource(nextSource) ? "Assets" : current.department);
+
+      return {
+        ...current,
+        source: nextSource,
+        department: nextDepartment,
+        title: prefillTitle || current.title,
+        description: prefillDescription || current.description,
+        linked_asset_id: prefillLinkedAssetId || current.linked_asset_id,
+        linked_asset_code: prefillLinkedAssetCode || current.linked_asset_code,
+        linked_inspection_id: prefillLinkedInspectionId || current.linked_inspection_id,
+        linked_inspection_number: prefillLinkedInspectionNumber || current.linked_inspection_number,
+        linked_maintenance_id: prefillLinkedMaintenanceId || current.linked_maintenance_id,
+        linked_maintenance_number: prefillLinkedMaintenanceNumber || current.linked_maintenance_number,
+      };
+    });
+
+    setHasAppliedPrefill(true);
+    setMessage("Action form prefilled from linked asset record. Review and save when ready.");
+  }, [
+    hasAppliedPrefill,
+    prefillDepartment,
+    prefillDescription,
+    prefillLinkedAssetCode,
+    prefillLinkedAssetId,
+    prefillLinkedInspectionId,
+    prefillLinkedInspectionNumber,
+    prefillLinkedMaintenanceId,
+    prefillLinkedMaintenanceNumber,
+    prefillSource,
+    prefillTitle,
+  ]);
+
   const nextActionNumber = useMemo(() => {
     return getNextAvailableActionNumber(actions);
   }, [actions]);
@@ -539,6 +666,7 @@ function ActionsPageContent() {
       const matchesOwner = !ownerFilter || (action.owner || "") === ownerFilter;
       const matchesProject = !projectFilter || (action.project || "") === projectFilter;
       const matchesSource = !sourceFilter || getActionSourceValue(action) === sourceFilter;
+      const matchesDepartment = !departmentFilter || (action.department || "") === departmentFilter;
       const matchesOverdue = !showOverdueOnly || isOverdue(action);
       const matchesCreatedMonth =
         !linkedCreatedMonth || getMonthKey(action.created_at) === linkedCreatedMonth;
@@ -561,6 +689,7 @@ function ActionsPageContent() {
         matchesOwner &&
         matchesProject &&
         matchesSource &&
+        matchesDepartment &&
         matchesOverdue &&
         matchesCreatedMonth &&
         matchesClosedMonth &&
@@ -575,6 +704,7 @@ function ActionsPageContent() {
     ownerFilter,
     projectFilter,
     sourceFilter,
+    departmentFilter,
     showOverdueOnly,
     linkedCreatedMonth,
     linkedClosedMonth,
@@ -747,6 +877,32 @@ function ActionsPageContent() {
       return {
         ...current,
         source,
+        department: current.department || "",
+        linked_asset_id: "",
+        linked_asset_code: "",
+        linked_inspection_id: "",
+        linked_inspection_number: "",
+        linked_maintenance_id: "",
+        linked_maintenance_number: "",
+        linked_calibration_id: "",
+        linked_ncr_id: "",
+        linked_ncr_number: "",
+        linked_capa_id: "",
+        linked_capa_number: "",
+        linked_moc_id: "",
+        linked_moc_number: "",
+      };
+    }
+
+    if (isAssetLinkedSource(source)) {
+      return {
+        ...current,
+        source,
+        department: "Assets",
+        linked_audit_id: "",
+        linked_audit_number: "",
+        linked_finding_id: "",
+        linked_finding_reference: "",
         linked_ncr_id: "",
         linked_ncr_number: "",
         linked_capa_id: "",
@@ -764,6 +920,13 @@ function ActionsPageContent() {
         linked_audit_number: "",
         linked_finding_id: "",
         linked_finding_reference: "",
+        linked_asset_id: "",
+        linked_asset_code: "",
+        linked_inspection_id: "",
+        linked_inspection_number: "",
+        linked_maintenance_id: "",
+        linked_maintenance_number: "",
+        linked_calibration_id: "",
         linked_moc_id: "",
         linked_moc_number: "",
       };
@@ -777,6 +940,13 @@ function ActionsPageContent() {
         linked_audit_number: "",
         linked_finding_id: "",
         linked_finding_reference: "",
+        linked_asset_id: "",
+        linked_asset_code: "",
+        linked_inspection_id: "",
+        linked_inspection_number: "",
+        linked_maintenance_id: "",
+        linked_maintenance_number: "",
+        linked_calibration_id: "",
         linked_ncr_id: "",
         linked_ncr_number: "",
         linked_capa_id: "",
@@ -791,6 +961,13 @@ function ActionsPageContent() {
       linked_audit_number: "",
       linked_finding_id: "",
       linked_finding_reference: "",
+      linked_asset_id: "",
+      linked_asset_code: "",
+      linked_inspection_id: "",
+      linked_inspection_number: "",
+      linked_maintenance_id: "",
+      linked_maintenance_number: "",
+      linked_calibration_id: "",
       linked_ncr_id: "",
       linked_ncr_number: "",
       linked_capa_id: "",
@@ -909,6 +1086,7 @@ function ActionsPageContent() {
           action_number: actionNumberToUse,
           title: form.title.trim(),
           description: form.description.trim() || null,
+          department: form.department || null,
           project: form.project.trim() || null,
           owner: form.owner.trim() || null,
           priority: form.priority,
@@ -919,6 +1097,13 @@ function ActionsPageContent() {
           linked_audit_number: form.linked_audit_number.trim() || null,
           linked_finding_id: form.linked_finding_id.trim() || null,
           linked_finding_reference: form.linked_finding_reference.trim() || null,
+          linked_asset_id: form.linked_asset_id || null,
+          linked_asset_code: form.linked_asset_code.trim() || null,
+          linked_inspection_id: form.linked_inspection_id.trim() || null,
+          linked_inspection_number: form.linked_inspection_number.trim() || null,
+          linked_maintenance_id: form.linked_maintenance_id.trim() || null,
+          linked_maintenance_number: form.linked_maintenance_number.trim() || null,
+          linked_calibration_id: form.linked_calibration_id.trim() || null,
           linked_ncr_id: form.linked_ncr_id || null,
           linked_ncr_number: form.linked_ncr_number.trim() || null,
           linked_capa_id: form.linked_capa_id || null,
@@ -968,6 +1153,7 @@ function ActionsPageContent() {
       .update({
         title: editForm.title.trim(),
         description: editForm.description.trim() || null,
+        department: editForm.department || null,
         project: editForm.project.trim() || null,
         owner: editForm.owner.trim() || null,
         priority: editForm.priority,
@@ -978,6 +1164,13 @@ function ActionsPageContent() {
         linked_audit_number: editForm.linked_audit_number.trim() || null,
         linked_finding_id: editForm.linked_finding_id.trim() || null,
         linked_finding_reference: editForm.linked_finding_reference.trim() || null,
+        linked_asset_id: editForm.linked_asset_id || null,
+        linked_asset_code: editForm.linked_asset_code.trim() || null,
+        linked_inspection_id: editForm.linked_inspection_id.trim() || null,
+        linked_inspection_number: editForm.linked_inspection_number.trim() || null,
+        linked_maintenance_id: editForm.linked_maintenance_id.trim() || null,
+        linked_maintenance_number: editForm.linked_maintenance_number.trim() || null,
+        linked_calibration_id: editForm.linked_calibration_id.trim() || null,
         linked_ncr_id: editForm.linked_ncr_id || null,
         linked_ncr_number: editForm.linked_ncr_number.trim() || null,
         linked_capa_id: editForm.linked_capa_id || null,
@@ -1100,6 +1293,7 @@ function ActionsPageContent() {
     setOwnerFilter("");
     setProjectFilter("");
     setSourceFilter("");
+    setDepartmentFilter("");
     setSelectedEvidenceAction(null);
   }
 
@@ -1164,6 +1358,21 @@ function ActionsPageContent() {
                   onChange={(e) => setForm({ ...form, project: e.target.value })}
                   style={inputStyle}
                 />
+              </Field>
+
+              <Field label="Department">
+                <select
+                  value={form.department}
+                  onChange={(e) => setForm({ ...form, department: e.target.value })}
+                  style={inputStyle}
+                >
+                  <option value="">Select department</option>
+                  {departmentOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </Field>
 
               <Field label="Title">
@@ -1318,6 +1527,26 @@ function ActionsPageContent() {
                 </Field>
               ) : null}
 
+              {isAssetLinkedSource(form.source) ? (
+                <>
+                  <Field label="Linked Asset Code">
+                    <input value={form.linked_asset_code} readOnly style={readOnlyInputStyle} />
+                  </Field>
+
+                  {form.source === "Asset Inspection" ? (
+                    <Field label="Inspection Number">
+                      <input value={form.linked_inspection_number} readOnly style={readOnlyInputStyle} />
+                    </Field>
+                  ) : null}
+
+                  {form.source === "Asset Maintenance" ? (
+                    <Field label="Maintenance Number">
+                      <input value={form.linked_maintenance_number} readOnly style={readOnlyInputStyle} />
+                    </Field>
+                  ) : null}
+                </>
+              ) : null}
+
               <Field label="Evidence Files (optional)">
                 <input type="file" multiple onChange={handleCreateFileChange} style={inputStyle} />
               </Field>
@@ -1438,9 +1667,25 @@ function ActionsPageContent() {
             <option value="">All Sources</option>
             <option value="Manual">Manual</option>
             <option value="Audit Finding">Audit Finding</option>
+            <option value="Asset Inspection">Asset Inspection</option>
+            <option value="Asset Maintenance">Asset Maintenance</option>
+            <option value="Asset Calibration">Asset Calibration</option>
             <option value="NCR/CAPA">NCR/CAPA</option>
             <option value="MOC">MOC</option>
             <option value="Other">Other</option>
+          </select>
+
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="">All Departments</option>
+            {departmentOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -1461,6 +1706,7 @@ function ActionsPageContent() {
               <tr>
                 <th style={tableHeadStyle}>Action No.</th>
                 <th style={tableHeadStyle}>Title</th>
+                <th style={tableHeadStyle}>Department</th>
                 <th style={tableHeadStyle}>Source</th>
                 <th style={tableHeadStyle}>Owner</th>
                 <th style={tableHeadStyle}>Due Date</th>
@@ -1471,7 +1717,7 @@ function ActionsPageContent() {
             <tbody>
               {filteredActions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={emptyTableCellStyle}>
+                  <td colSpan={8} style={emptyTableCellStyle}>
                     No actions match the current filters.
                   </td>
                 </tr>
@@ -1507,6 +1753,9 @@ function ActionsPageContent() {
                         <div style={secondaryCellTextStyle}>
                           {buildActionSourceLabel(action) || " "}
                         </div>
+                      </td>
+                      <td style={tableCellStyle}>
+                        <span style={badgeStyle}>{action.department || "-"}</span>
                       </td>
                       <td style={tableCellStyle}>
                         <span style={badgeStyle}>{getActionSourceValue(action)}</span>
@@ -1615,6 +1864,21 @@ function ActionsPageContent() {
                     style={inputStyle}
                   >
                     {actionSourceOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Department">
+                  <select
+                    value={editForm.department}
+                    onChange={(e) => setEditForm((current) => ({ ...current, department: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    <option value="">Select department</option>
+                    {departmentOptions.map((option) => (
                       <option key={option} value={option}>
                         {option}
                       </option>
@@ -1755,6 +2019,26 @@ function ActionsPageContent() {
                   </Field>
                 ) : null}
 
+                {isAssetLinkedSource(editForm.source) ? (
+                  <>
+                    <Field label="Linked Asset Code">
+                      <input value={editForm.linked_asset_code} readOnly style={readOnlyInputStyle} />
+                    </Field>
+
+                    {editForm.source === "Asset Inspection" ? (
+                      <Field label="Inspection Number">
+                        <input value={editForm.linked_inspection_number} readOnly style={readOnlyInputStyle} />
+                      </Field>
+                    ) : null}
+
+                    {editForm.source === "Asset Maintenance" ? (
+                      <Field label="Maintenance Number">
+                        <input value={editForm.linked_maintenance_number} readOnly style={readOnlyInputStyle} />
+                      </Field>
+                    ) : null}
+                  </>
+                ) : null}
+
                 <div style={{ gridColumn: "1 / -1" }}>
                   <Field label="Description">
                     <textarea
@@ -1767,11 +2051,15 @@ function ActionsPageContent() {
               </div>
 
               {(isAuditLinkedSource(editForm.source) ||
+                isAssetLinkedSource(editForm.source) ||
                 editForm.source === "NCR/CAPA" ||
                 editForm.source === "MOC") &&
               (
                 editForm.linked_audit_number ||
                 editForm.linked_finding_reference ||
+                editForm.linked_asset_code ||
+                editForm.linked_inspection_number ||
+                editForm.linked_maintenance_number ||
                 editForm.linked_ncr_number ||
                 editForm.linked_capa_number ||
                 editForm.linked_moc_number
@@ -1795,6 +2083,45 @@ function ActionsPageContent() {
                       style={backLinkStyle}
                     >
                       Open Linked Audit
+                    </Link>
+                  ) : null}
+                  {isAssetLinkedSource(editForm.source) && editForm.linked_asset_code ? (
+                    <div style={linkedSourceMetaStyle}>
+                      Asset: <strong>{editForm.linked_asset_code}</strong>
+                    </div>
+                  ) : null}
+                  {editForm.source === "Asset Inspection" && editForm.linked_inspection_number ? (
+                    <>
+                      <div style={linkedSourceMetaStyle}>
+                        Inspection: <strong>{editForm.linked_inspection_number}</strong>
+                      </div>
+                      <Link
+                        href={`/assets/inspection?asset=${encodeURIComponent(editForm.linked_asset_code || editForm.linked_asset_id)}`}
+                        style={backLinkStyle}
+                      >
+                        Open Linked Inspection Log
+                      </Link>
+                    </>
+                  ) : null}
+                  {editForm.source === "Asset Maintenance" && editForm.linked_maintenance_number ? (
+                    <>
+                      <div style={linkedSourceMetaStyle}>
+                        Maintenance: <strong>{editForm.linked_maintenance_number}</strong>
+                      </div>
+                      <Link
+                        href={`/assets/maintenance?asset=${encodeURIComponent(editForm.linked_asset_code || editForm.linked_asset_id)}`}
+                        style={backLinkStyle}
+                      >
+                        Open Linked Maintenance Log
+                      </Link>
+                    </>
+                  ) : null}
+                  {editForm.source === "Asset Calibration" && editForm.linked_asset_code ? (
+                    <Link
+                      href={`/assets/calibration?asset=${encodeURIComponent(editForm.linked_asset_code || editForm.linked_asset_id)}`}
+                      style={backLinkStyle}
+                    >
+                      Open Linked Calibration Log
                     </Link>
                   ) : null}
                   {editForm.source === "NCR/CAPA" && editForm.linked_ncr_number ? (
@@ -2418,7 +2745,7 @@ const miniListLine2Style: CSSProperties = {
 
 const filterBarStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
+  gridTemplateColumns: "2fr repeat(6, minmax(0, 1fr))",
   gap: "12px",
   marginBottom: "16px",
 };

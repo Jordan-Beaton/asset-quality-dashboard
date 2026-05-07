@@ -4,19 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -27,16 +15,34 @@ type Asset = {
   asset_code: string | null;
   name: string | null;
   description: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  serial_number: string | null;
+  category: string | null;
+  subcategory: string | null;
+  condition: string | null;
   location: string | null;
   owner: string | null;
+  purchase_date: string | null;
+  maintenance_due_date: string | null;
+  inspection_due_date: string | null;
   status: string | null;
 };
 
 type AssetForm = {
   name: string;
   description: string;
+  manufacturer: string;
+  model: string;
+  serial_number: string;
+  category: string;
+  subcategory: string;
+  condition: string;
   location: string;
   owner: string;
+  purchase_date: string;
+  maintenance_due_date: string;
+  inspection_due_date: string;
   status: AssetStatus;
 };
 
@@ -111,11 +117,31 @@ type AssetCalibrationRow = {
 type AssetInspectionRow = {
   id: string;
   asset_id: string;
-  reference: string;
+  reference: string | null;
   file_name: string | null;
   file_path: string | null;
   notes: string | null;
   uploaded_at: string | null;
+  inspection_date: string | null;
+  inspector: string | null;
+  result: string | null;
+  findings: string | null;
+  actions_required: string | null;
+  next_inspection_due: string | null;
+  created_at: string | null;
+};
+
+type AssetMaintenanceRow = {
+  id: string;
+  asset_id: string;
+  maintenance_date: string | null;
+  maintenance_type: string | null;
+  carried_out_by: string | null;
+  description: string | null;
+  next_maintenance_due: string | null;
+  file_name: string | null;
+  file_path: string | null;
+  created_at: string | null;
 };
 
 type AssetFileRow = {
@@ -129,14 +155,22 @@ type AssetFileRow = {
   uploaded_at: string;
 };
 
-const chartColors = ["#0f766e", "#16a34a", "#dc2626", "#ea580c", "#2563eb", "#7c3aed"];
 const STORAGE_BUCKET = "asset-files";
 
 const emptyForm: AssetForm = {
   name: "",
   description: "",
+  manufacturer: "",
+  model: "",
+  serial_number: "",
+  category: "",
+  subcategory: "",
+  condition: "",
   location: "",
   owner: "",
+  purchase_date: "",
+  maintenance_due_date: "",
+  inspection_due_date: "",
   status: "Active",
 };
 
@@ -199,6 +233,12 @@ function formatFileSize(value: number | null) {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getTimestampValue(value: string | null | undefined) {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
 }
 
 function getStatusTone(status: string) {
@@ -356,6 +396,7 @@ function AssetsPageContent() {
   const [locationFilter, setLocationFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
+  const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(true);
   const [qualityLinkedAssetIds, setQualityLinkedAssetIds] = useState<string[]>([]);
 
   const [form, setForm] = useState<AssetForm>(emptyForm);
@@ -368,6 +409,12 @@ function AssetsPageContent() {
   const [actionOptions, setActionOptions] = useState<LinkedOption[]>([]);
 
   const [qualityByAssetId, setQualityByAssetId] = useState<Record<string, AssetQualityRecord>>({});
+  const [inspectionHistoryByAssetId, setInspectionHistoryByAssetId] = useState<
+    Record<string, AssetInspectionRow[]>
+  >({});
+  const [maintenanceHistoryByAssetId, setMaintenanceHistoryByAssetId] = useState<
+    Record<string, AssetMaintenanceRow[]>
+  >({});
   const [isSavingQuality, setIsSavingQuality] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
@@ -401,10 +448,13 @@ function AssetsPageContent() {
   async function loadQualityData(assetIds: string[]) {
     if (assetIds.length === 0) {
       setQualityByAssetId({});
+      setInspectionHistoryByAssetId({});
+      setMaintenanceHistoryByAssetId({});
       return;
     }
 
-    const [qualityRes, ncrRes, actionRes, calibrationRes, inspectionRes, filesRes] = await Promise.all([
+    const [qualityRes, ncrRes, actionRes, calibrationRes, inspectionRes, maintenanceRes, filesRes] =
+      await Promise.all([
       supabase
         .from("asset_quality")
         .select("id,asset_id,quality_notes,last_quality_review")
@@ -423,7 +473,15 @@ function AssetsPageContent() {
         .in("asset_id", assetIds),
       supabase
         .from("asset_inspection_records")
-        .select("id,asset_id,reference,file_name,file_path,notes,uploaded_at")
+        .select(
+          "id,asset_id,reference,file_name,file_path,notes,uploaded_at,inspection_date,inspector,result,findings,actions_required,next_inspection_due,created_at"
+        )
+        .in("asset_id", assetIds),
+      supabase
+        .from("asset_maintenance_records")
+        .select(
+          "id,asset_id,maintenance_date,maintenance_type,carried_out_by,description,next_maintenance_due,file_name,file_path,created_at"
+        )
         .in("asset_id", assetIds),
       supabase
         .from("asset_files")
@@ -432,9 +490,13 @@ function AssetsPageContent() {
     ]);
 
     const next: Record<string, AssetQualityRecord> = {};
+    const nextInspectionHistory: Record<string, AssetInspectionRow[]> = {};
+    const nextMaintenanceHistory: Record<string, AssetMaintenanceRow[]> = {};
 
     assetIds.forEach((assetId) => {
       next[assetId] = createDefaultQualityRecord();
+      nextInspectionHistory[assetId] = [];
+      nextMaintenanceHistory[assetId] = [];
     });
 
     if (!qualityRes.error) {
@@ -481,16 +543,37 @@ function AssetsPageContent() {
 
     if (!inspectionRes.error) {
       (inspectionRes.data as AssetInspectionRow[] | null)?.forEach((row) => {
-        next[row.asset_id] = next[row.asset_id] || createDefaultQualityRecord();
-        next[row.asset_id].inspection_records.push({
-          id: row.id,
-          reference: row.reference,
-          file_name: row.file_name || "",
-          file_size: null,
-          uploaded_at: row.uploaded_at || "",
-          file_path: row.file_path || "",
-          notes: row.notes || "",
-        });
+        nextInspectionHistory[row.asset_id] = nextInspectionHistory[row.asset_id] || [];
+        nextInspectionHistory[row.asset_id].push(row);
+
+        const isDetailedInspectionRecord = Boolean(
+          row.inspection_date ||
+            row.inspector ||
+            row.result ||
+            row.findings ||
+            row.actions_required ||
+            row.next_inspection_due
+        );
+
+        if (!isDetailedInspectionRecord) {
+          next[row.asset_id] = next[row.asset_id] || createDefaultQualityRecord();
+          next[row.asset_id].inspection_records.push({
+            id: row.id,
+            reference: row.reference || "",
+            file_name: row.file_name || "",
+            file_size: null,
+            uploaded_at: row.uploaded_at || "",
+            file_path: row.file_path || "",
+            notes: row.notes || "",
+          });
+        }
+      });
+    }
+
+    if (!maintenanceRes.error) {
+      (maintenanceRes.data as AssetMaintenanceRow[] | null)?.forEach((row) => {
+        nextMaintenanceHistory[row.asset_id] = nextMaintenanceHistory[row.asset_id] || [];
+        nextMaintenanceHistory[row.asset_id].push(row);
       });
     }
 
@@ -509,6 +592,8 @@ function AssetsPageContent() {
     }
 
     setQualityByAssetId(next);
+    setInspectionHistoryByAssetId(nextInspectionHistory);
+    setMaintenanceHistoryByAssetId(nextMaintenanceHistory);
   }
 
   useEffect(() => {
@@ -550,8 +635,15 @@ function AssetsPageContent() {
       const lower = search.toLowerCase();
       result = result.filter(
         (a) =>
+          a.asset_code?.toLowerCase().includes(lower) ||
           a.name?.toLowerCase().includes(lower) ||
           a.description?.toLowerCase().includes(lower) ||
+          a.manufacturer?.toLowerCase().includes(lower) ||
+          a.model?.toLowerCase().includes(lower) ||
+          a.serial_number?.toLowerCase().includes(lower) ||
+          a.category?.toLowerCase().includes(lower) ||
+          a.subcategory?.toLowerCase().includes(lower) ||
+          a.condition?.toLowerCase().includes(lower) ||
           a.location?.toLowerCase().includes(lower) ||
           a.owner?.toLowerCase().includes(lower)
       );
@@ -580,11 +672,13 @@ function AssetsPageContent() {
   useEffect(() => {
     if (filteredAssets.length === 0) {
       setSelectedAssetId("");
+      setIsDetailPanelOpen(false);
       return;
     }
 
     if (!filteredAssets.some((asset) => asset.id === selectedAssetId)) {
       setSelectedAssetId(filteredAssets[0].id);
+      setIsDetailPanelOpen(true);
     }
   }, [filteredAssets, selectedAssetId]);
 
@@ -598,14 +692,41 @@ function AssetsPageContent() {
     return qualityByAssetId[selectedAssetId] || createDefaultQualityRecord();
   }, [qualityByAssetId, selectedAssetId]);
 
+  const selectedInspectionHistory = useMemo(() => {
+    const rows = selectedAssetId ? inspectionHistoryByAssetId[selectedAssetId] || [] : [];
+    return [...rows].sort((a, b) => {
+      const aTime = getTimestampValue(a.inspection_date || a.created_at || a.uploaded_at);
+      const bTime = getTimestampValue(b.inspection_date || b.created_at || b.uploaded_at);
+      return bTime - aTime;
+    });
+  }, [inspectionHistoryByAssetId, selectedAssetId]);
+
+  const selectedMaintenanceHistory = useMemo(() => {
+    const rows = selectedAssetId ? maintenanceHistoryByAssetId[selectedAssetId] || [] : [];
+    return [...rows].sort((a, b) => {
+      const aTime = getTimestampValue(a.maintenance_date || a.created_at);
+      const bTime = getTimestampValue(b.maintenance_date || b.created_at);
+      return bTime - aTime;
+    });
+  }, [maintenanceHistoryByAssetId, selectedAssetId]);
+
   useEffect(() => {
     if (!selectedAsset) return;
 
     setDetailForm({
       name: selectedAsset.name || "",
       description: selectedAsset.description || "",
+      manufacturer: selectedAsset.manufacturer || "",
+      model: selectedAsset.model || "",
+      serial_number: selectedAsset.serial_number || "",
+      category: selectedAsset.category || "",
+      subcategory: selectedAsset.subcategory || "",
+      condition: selectedAsset.condition || "",
       location: selectedAsset.location || "",
       owner: selectedAsset.owner || "",
+      purchase_date: selectedAsset.purchase_date || "",
+      maintenance_due_date: selectedAsset.maintenance_due_date || "",
+      inspection_due_date: selectedAsset.inspection_due_date || "",
       status: (selectedAsset.status as AssetStatus) || "Active",
     });
 
@@ -616,43 +737,30 @@ function AssetsPageContent() {
   const totalAssets = assets.length;
   const activeAssets = assets.filter((a) => (a.status || "").toLowerCase() === "active").length;
   const inactiveAssets = assets.filter((a) => (a.status || "").toLowerCase() === "inactive").length;
+  const underMaintenanceAssets = assets.filter((a) =>
+    (a.status || "").toLowerCase().includes("maintenance")
+  ).length;
   const qualityLinkedAssets = assets.filter((asset) => {
     const record = qualityByAssetId[asset.id];
     return record ? countQualityLinks(record) > 0 : false;
   }).length;
-
-  const statusChartData = useMemo(() => {
-    const groups = assets.reduce<Record<string, number>>((acc, asset) => {
-      const key = asset.status || "Unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [assets]);
-
-  const locationChartData = useMemo(() => {
-    const groups = assets.reduce<Record<string, number>>((acc, asset) => {
-      const key = asset.location || "Unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
-  }, [assets]);
-
-  const descriptionChartData = useMemo(() => {
-    const groups = assets.reduce<Record<string, number>>((acc, asset) => {
-      const key = asset.description || asset.name || "Unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
-    return Object.entries(groups)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8);
-  }, [assets]);
+  const dueSoonInspectionAssets = assets.filter((asset) => {
+    const days = getDaysUntil(asset.inspection_due_date);
+    return days !== null && days >= 0 && days <= 30;
+  }).length;
+  const overdueInspectionAssets = assets.filter((asset) => {
+    const days = getDaysUntil(asset.inspection_due_date);
+    return days !== null && days < 0;
+  }).length;
+  const dueSoonMaintenanceAssets = assets.filter((asset) => {
+    const days = getDaysUntil(asset.maintenance_due_date);
+    return days !== null && days >= 0 && days <= 30;
+  }).length;
+  const overdueMaintenanceAssets = assets.filter((asset) => {
+    const days = getDaysUntil(asset.maintenance_due_date);
+    return days !== null && days < 0;
+  }).length;
+  const assetsWithImages = assets.filter((asset) => qualityByAssetId[asset.id]?.image_name).length;
 
   const qualitySnapshotData = useMemo(() => {
     const counts = {
@@ -692,8 +800,17 @@ function AssetsPageContent() {
           asset_code: generatedAssetCode,
           name: form.name.trim(),
           description: form.description || null,
+          manufacturer: form.manufacturer || null,
+          model: form.model || null,
+          serial_number: form.serial_number || null,
+          category: form.category || null,
+          subcategory: form.subcategory || null,
+          condition: form.condition || null,
           location: form.location || null,
           owner: form.owner || null,
+          purchase_date: form.purchase_date || null,
+          maintenance_due_date: form.maintenance_due_date || null,
+          inspection_due_date: form.inspection_due_date || null,
           status: form.status || "Active",
         },
       ])
@@ -749,8 +866,17 @@ function AssetsPageContent() {
         asset_code: assetCodeToUse,
         name: detailForm.name.trim(),
         description: detailForm.description || null,
+        manufacturer: detailForm.manufacturer || null,
+        model: detailForm.model || null,
+        serial_number: detailForm.serial_number || null,
+        category: detailForm.category || null,
+        subcategory: detailForm.subcategory || null,
+        condition: detailForm.condition || null,
         location: detailForm.location || null,
         owner: detailForm.owner || null,
+        purchase_date: detailForm.purchase_date || null,
+        maintenance_due_date: detailForm.maintenance_due_date || null,
+        inspection_due_date: detailForm.inspection_due_date || null,
         status: detailForm.status || "Active",
       })
       .eq("id", selectedAsset.id);
@@ -769,8 +895,17 @@ function AssetsPageContent() {
                 asset_code: assetCodeToUse,
                 name: detailForm.name.trim(),
                 description: detailForm.description || null,
+                manufacturer: detailForm.manufacturer || null,
+                model: detailForm.model || null,
+                serial_number: detailForm.serial_number || null,
+                category: detailForm.category || null,
+                subcategory: detailForm.subcategory || null,
+                condition: detailForm.condition || null,
                 location: detailForm.location || null,
                 owner: detailForm.owner || null,
+                purchase_date: detailForm.purchase_date || null,
+                maintenance_due_date: detailForm.maintenance_due_date || null,
+                inspection_due_date: detailForm.inspection_due_date || null,
                 status: detailForm.status,
               }
             : asset
@@ -1362,33 +1497,17 @@ function AssetsPageContent() {
 
   return (
     <main>
-      <section style={heroStyle}>
-        <div style={{ flex: "1 1 680px" }}>
-          <div style={eyebrowStyle}>Asset Register</div>
-          <h1 style={heroTitleStyle}>Assets</h1>
-          <p style={heroSubtitleStyle}>
-            Live asset register with a dedicated quality workspace, image upload, and direct linking
-            to NCRs, actions, calibrations and inspections.
-          </p>
-
-          <div style={heroPillGridStyle}>
-            <HeroPill label="Total Assets" value={totalAssets} tone="neutral" />
-            <HeroPill label="Active" value={activeAssets} tone="green" />
-            <HeroPill label="Inactive" value={inactiveAssets} tone="red" />
-            <HeroPill label="Quality Linked" value={qualityLinkedAssets} tone="blue" />
-          </div>
-        </div>
-
-        <div style={heroMetaWrapStyle}>
-          <HeroMetaCard label="Filtered Results" value={filteredAssets.length} />
-          <HeroMetaCard label="Current Selection" value={selectedAsset?.name || "None"} compact />
-          <HeroMetaCard
-            label="Quality Links"
-            value={selectedAsset ? countQualityLinks(selectedQuality) : 0}
-          />
-          <HeroMetaCard label="Image" value={selectedQuality.image_name ? "Uploaded" : "Not set"} compact />
-        </div>
-      </section>
+      <QualityPageHero
+        label="ASSET MANAGEMENT"
+        title="Assets"
+        description="Operational asset register with a dedicated master-data and quality workspace, image upload, and direct linking to NCRs, actions, calibrations and inspections."
+        contextCards={[
+          { label: "Filtered Results", value: filteredAssets.length },
+          { label: "Current Selection", value: selectedAsset?.name || "None" },
+          { label: "Quality Links", value: selectedAsset ? countQualityLinks(selectedQuality) : 0 },
+          { label: "Images Uploaded", value: assetsWithImages },
+        ]}
+      />
 
       <div style={topMetaRowStyle}>
         <Link href="/" style={backLinkStyle}>
@@ -1403,17 +1522,61 @@ function AssetsPageContent() {
       <section style={statsGridStyle}>
         <StatCard title="Total Assets" value={totalAssets} accent="#0f766e" />
         <StatCard title="Active Assets" value={activeAssets} accent="#16a34a" />
-        <StatCard title="Inactive Assets" value={inactiveAssets} accent="#dc2626" />
+        <StatCard title="Under Maintenance" value={underMaintenanceAssets} accent="#d97706" />
         <StatCard title="Quality Linked" value={qualityLinkedAssets} accent="#2563eb" />
+        <StatCard
+          title="Action Needed"
+          value={overdueInspectionAssets + overdueMaintenanceAssets}
+          accent="#dc2626"
+        />
+      </section>
+
+      <section style={assetAttentionGridStyle}>
+        <AttentionCard
+          title="Inspection Watch"
+          summary={`${overdueInspectionAssets} overdue`}
+          detail={`${dueSoonInspectionAssets} due in the next 30 days`}
+          tone="red"
+        />
+        <AttentionCard
+          title="Maintenance Watch"
+          summary={`${overdueMaintenanceAssets} overdue`}
+          detail={`${dueSoonMaintenanceAssets} due in the next 30 days`}
+          tone="amber"
+        />
+        <AttentionCard
+          title="Module Coverage"
+          summary={`${assetsWithImages} assets with image references`}
+          detail={`${inactiveAssets} inactive or parked assets`}
+          tone="blue"
+        />
       </section>
 
       <section style={topGridStyle}>
         <SectionCard
           title="Add Asset"
-          subtitle="Create one asset record directly into the live register."
+          subtitle="Create one asset record directly into the live register without leaving the module workspace."
         >
           <form onSubmit={addAsset}>
             <div style={formGridStyle}>
+              <Field label="Category">
+                <input
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  style={inputStyle}
+                  placeholder="Asset category"
+                />
+              </Field>
+
+              <Field label="Subcategory">
+                <input
+                  value={form.subcategory}
+                  onChange={(e) => setForm({ ...form, subcategory: e.target.value })}
+                  style={inputStyle}
+                  placeholder="Asset subcategory"
+                />
+              </Field>
+
               <Field label="Name">
                 <input
                   value={form.name}
@@ -1445,6 +1608,51 @@ function AssetsPageContent() {
                 />
               </Field>
 
+              <Field label="Manufacturer">
+                <input
+                  value={form.manufacturer}
+                  onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
+                  style={inputStyle}
+                  placeholder="Manufacturer"
+                />
+              </Field>
+
+              <Field label="Model">
+                <input
+                  value={form.model}
+                  onChange={(e) => setForm({ ...form, model: e.target.value })}
+                  style={inputStyle}
+                  placeholder="Model"
+                />
+              </Field>
+
+              <Field label="Serial Number">
+                <input
+                  value={form.serial_number}
+                  onChange={(e) => setForm({ ...form, serial_number: e.target.value })}
+                  style={inputStyle}
+                  placeholder="Serial number"
+                />
+              </Field>
+
+              <Field label="Condition">
+                <input
+                  value={form.condition}
+                  onChange={(e) => setForm({ ...form, condition: e.target.value })}
+                  style={inputStyle}
+                  placeholder="Condition"
+                />
+              </Field>
+
+              <Field label="Responsible Person">
+                <input
+                  value={form.owner}
+                  onChange={(e) => setForm({ ...form, owner: e.target.value })}
+                  style={inputStyle}
+                  placeholder="Responsible person"
+                />
+              </Field>
+
               <Field label="Location">
                 <input
                   value={form.location}
@@ -1454,12 +1662,30 @@ function AssetsPageContent() {
                 />
               </Field>
 
-              <Field label="Owner">
+              <Field label="Purchase Date">
                 <input
-                  value={form.owner}
-                  onChange={(e) => setForm({ ...form, owner: e.target.value })}
+                  type="date"
+                  value={form.purchase_date}
+                  onChange={(e) => setForm({ ...form, purchase_date: e.target.value })}
                   style={inputStyle}
-                  placeholder="Owner / department"
+                />
+              </Field>
+
+              <Field label="Maintenance Due Date">
+                <input
+                  type="date"
+                  value={form.maintenance_due_date}
+                  onChange={(e) => setForm({ ...form, maintenance_due_date: e.target.value })}
+                  style={inputStyle}
+                />
+              </Field>
+
+              <Field label="Inspection Due Date">
+                <input
+                  type="date"
+                  value={form.inspection_due_date}
+                  onChange={(e) => setForm({ ...form, inspection_due_date: e.target.value })}
+                  style={inputStyle}
                 />
               </Field>
             </div>
@@ -1473,8 +1699,8 @@ function AssetsPageContent() {
         </SectionCard>
 
         <SectionCard
-          title="Quality Overview"
-          subtitle="Top-level view of how asset quality records are currently linked."
+          title="Operational Snapshot"
+          subtitle="Quick cue for linked quality coverage and how the workspace should be used."
         >
           <div style={qualityOverviewGridStyle}>
             <MiniMetricCard
@@ -1504,67 +1730,21 @@ function AssetsPageContent() {
           </div>
 
           <div style={qualityIntroBoxStyle}>
-            Use the <strong>Quality</strong> section in the asset detail panel to connect each
-            asset to NCRs, actions, calibration records and inspections without oversimplifying
-            complex assemblies.
+            Use the asset detail workspace below to keep <strong>master data</strong>,{" "}
+            <strong>image/files</strong>, and <strong>quality links</strong> clearly separated while
+            still editing everything from one controlled page.
           </div>
         </SectionCard>
       </section>
 
-      <section style={chartGridStyle}>
-        <SectionCard title="Assets by Status" subtitle="Current status split across the register.">
-          <div style={chartWrapStyle}>
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={statusChartData} dataKey="value" nameKey="name" outerRadius={90} label>
-                  {statusChartData.map((_, index) => (
-                    <Cell key={index} fill={chartColors[index % chartColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Assets by Location" subtitle="Location distribution across the asset register.">
-          <div style={chartWrapStyle}>
-            <ResponsiveContainer>
-              <BarChart data={locationChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#0f766e" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Assets by Description" subtitle="Top description groupings in the register.">
-          <div style={chartWrapStyle}>
-            <ResponsiveContainer>
-              <BarChart data={descriptionChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" hide />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#2563eb" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </SectionCard>
-      </section>
-
-      <section style={workspaceGridStyle}>
+      <section style={fullWidthSectionStyle}>
         <SectionCard
           title="Asset Register"
-          subtitle="Click any asset to open its detail and quality workspace on the right."
+          subtitle="Click any row to open the selected asset workspace underneath, with full-width space for editing, files, links, and history."
         >
           <div style={toolbarStyle}>
             <input
-              placeholder="Search name, description, location or owner"
+              placeholder="Search asset code, name, category, serial, location, or responsible person"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={toolbarSearchStyle}
@@ -1601,7 +1781,7 @@ function AssetsPageContent() {
                 onChange={(e) => setOwnerFilter(e.target.value)}
                 style={toolbarSelectStyle}
               >
-                <option value="">All Owners</option>
+                <option value="">All Responsible Persons</option>
                 {uniqueOwners.map((owner) => (
                   <option key={String(owner)} value={String(owner)}>
                     {String(owner)}
@@ -1616,16 +1796,29 @@ function AssetsPageContent() {
           </div>
 
           <div style={tableInfoRowStyle}>
-            Showing <strong>{filteredAssets.length}</strong> of <strong>{assets.length}</strong> assets
+            <span>
+              Showing <strong>{filteredAssets.length}</strong> of <strong>{assets.length}</strong> assets
+            </span>
+            {selectedAsset ? (
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => setIsDetailPanelOpen((current) => !current)}
+              >
+                {isDetailPanelOpen ? "Hide Panel" : "Open Panel"}
+              </button>
+            ) : null}
           </div>
 
           <div style={registerTableWrapStyle}>
             <div style={registerHeadStyle}>
-              <div>Name</div>
-              <div>Description</div>
+              <div>Asset No. / Code</div>
+              <div>Name / Title</div>
+              <div>Category</div>
+              <div>Condition</div>
+              <div>Responsible Person</div>
               <div>Location</div>
-              <div>Owner</div>
-              <div>Status</div>
+              <div>Next Due</div>
             </div>
 
             <div style={registerBodyStyle}>
@@ -1636,7 +1829,10 @@ function AssetsPageContent() {
                   <button
                     key={asset.id}
                     type="button"
-                    onClick={() => setSelectedAssetId(asset.id)}
+                    onClick={() => {
+                      setSelectedAssetId(asset.id);
+                      setIsDetailPanelOpen(true);
+                    }}
                     style={{
                       ...registerRowStyle,
                       background: selectedAssetId === asset.id ? "#eff6ff" : "#ffffff",
@@ -1644,12 +1840,34 @@ function AssetsPageContent() {
                         selectedAssetId === asset.id ? "4px solid #0f766e" : "4px solid transparent",
                     }}
                   >
-                    <div style={registerPrimaryStyle}>{asset.name || "-"}</div>
-                    <div style={registerCellTextStyle}>{asset.description || "-"}</div>
-                    <div style={registerCellTextStyle}>{asset.location || "-"}</div>
-                    <div style={registerCellTextStyle}>{asset.owner || "-"}</div>
+                    <div style={registerPrimaryStyle}>{asset.asset_code || "-"}</div>
                     <div>
-                      <StatusBadge value={asset.status || "Unknown"} />
+                      <div style={registerPrimaryStyle}>{asset.name || "-"}</div>
+                      <div style={registerSubtextStyle}>{asset.description || "No description recorded"}</div>
+                    </div>
+                    <div style={registerCellTextStyle}>{asset.category || "-"}</div>
+                    <div>
+                      {asset.condition ? (
+                        <span
+                          style={{
+                            ...badgeStyle,
+                            background: getConditionTone(asset.condition).bg,
+                            color: getConditionTone(asset.condition).color,
+                          }}
+                        >
+                          {asset.condition}
+                        </span>
+                      ) : (
+                        <span style={registerCellTextStyle}>-</span>
+                      )}
+                    </div>
+                    <div style={registerCellTextStyle}>{asset.owner || "-"}</div>
+                    <div style={registerCellTextStyle}>{asset.location || "-"}</div>
+                    <div>
+                      <div style={dueDateStackStyle}>
+                        <span style={registerDueLabelStyle}>Inspection: {formatDate(asset.inspection_due_date)}</span>
+                        <span style={registerDueLabelStyle}>Maintenance: {formatDate(asset.maintenance_due_date)}</span>
+                      </div>
                     </div>
                   </button>
                 ))
@@ -1657,33 +1875,73 @@ function AssetsPageContent() {
             </div>
           </div>
         </SectionCard>
+      </section>
 
-        <SectionCard
-          title="Asset Detail"
-          subtitle="Single workspace for core details, image and quality links."
-        >
-          {!selectedAsset ? (
-            <div style={emptyDetailStyle}>Select an asset from the register to open it here.</div>
-          ) : (
-            <div style={detailWorkspaceStyle}>
-              <div style={detailTopBarStyle}>
-                <div>
-                  <div style={detailEyebrowStyle}>Asset Detail</div>
-                  <h3 style={detailTitleStyle}>{selectedAsset.name || "Unnamed asset"}</h3>
+      {isDetailPanelOpen ? (
+        <section style={detailPanelSectionStyle}>
+          <SectionCard
+            title="Asset Detail"
+            subtitle="Selected asset workspace with grouped master data, files, quality links, and live inspection or maintenance history."
+          >
+            {!selectedAsset ? (
+              <div style={emptyDetailStyle}>Select an asset from the register to open it here.</div>
+            ) : (
+              <div style={detailWorkspaceStyle}>
+              <div style={detailSectionStyle}>
+                <div style={detailSectionTitleStyle}>Asset Identity / Status</div>
+
+                <div style={detailTopBarStyle}>
+                  <div>
+                    <div style={detailEyebrowStyle}>Asset Detail</div>
+                    <h3 style={detailTitleStyle}>{selectedAsset.name || "Unnamed asset"}</h3>
+                  </div>
+
+                  <div style={detailBadgeRowStyle}>
+                    <span
+                      style={{
+                        ...badgeStyle,
+                        background: getStatusTone(selectedAsset.status || "Unknown").bg,
+                        color: getStatusTone(selectedAsset.status || "Unknown").color,
+                      }}
+                    >
+                      {selectedAsset.status || "Unknown"}
+                    </span>
+                    {detailForm.condition ? (
+                      <span
+                        style={{
+                          ...badgeStyle,
+                          background: getConditionTone(detailForm.condition).bg,
+                          color: getConditionTone(detailForm.condition).color,
+                        }}
+                      >
+                        {detailForm.condition}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
-                <span
-                  style={{
-                    ...badgeStyle,
-                    background: getStatusTone(selectedAsset.status || "Unknown").bg,
-                    color: getStatusTone(selectedAsset.status || "Unknown").color,
-                  }}
-                >
-                  {selectedAsset.status || "Unknown"}
-                </span>
+                <div style={assetSummaryStripStyle}>
+                  <SummaryPill label="Asset Code" value={selectedAsset.asset_code || "-"} />
+                  <SummaryPill label="Category" value={detailForm.category || "-"} />
+                  <SummaryPill label="Responsible" value={detailForm.owner || "-"} />
+                  <SummaryPill label="Location" value={detailForm.location || "-"} />
+                  <SummaryPill
+                    label="Inspection Due"
+                    value={formatDate(detailForm.inspection_due_date)}
+                    tone={getDueWindowTone(getDaysUntil(detailForm.inspection_due_date))}
+                  />
+                  <SummaryPill
+                    label="Maintenance Due"
+                    value={formatDate(detailForm.maintenance_due_date)}
+                    tone={getDueWindowTone(getDaysUntil(detailForm.maintenance_due_date))}
+                  />
+                </div>
               </div>
 
-              <div style={imageStripStyle}>
+              <div style={detailSectionStyle}>
+                <div style={detailSectionTitleStyle}>Files / Image</div>
+
+                <div style={imageStripStyle}>
                 <div style={imagePreviewWrapStyle}>
                   {selectedImageUrl ? (
                     <img
@@ -1736,12 +1994,17 @@ function AssetsPageContent() {
                     ) : null}
                   </div>
                 </div>
+                </div>
               </div>
 
               <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Core Asset Record</div>
+                <div style={detailSectionTitleStyle}>Master Data</div>
 
                 <div style={detailFormGridStyle}>
+                  <Field label="Asset Code">
+                    <input value={selectedAsset.asset_code || "-"} style={readonlyInputStyle} readOnly />
+                  </Field>
+
                   <Field label="Name">
                     <input
                       value={detailForm.name}
@@ -1763,10 +2026,69 @@ function AssetsPageContent() {
                     </select>
                   </Field>
 
-                  <Field label="Description">
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <Field label="Description">
+                      <textarea
+                        value={detailForm.description}
+                        onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })}
+                        style={textareaStyle}
+                        rows={4}
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Category">
                     <input
-                      value={detailForm.description}
-                      onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })}
+                      value={detailForm.category}
+                      onChange={(e) => setDetailForm({ ...detailForm, category: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <Field label="Subcategory">
+                    <input
+                      value={detailForm.subcategory}
+                      onChange={(e) => setDetailForm({ ...detailForm, subcategory: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <Field label="Manufacturer">
+                    <input
+                      value={detailForm.manufacturer}
+                      onChange={(e) => setDetailForm({ ...detailForm, manufacturer: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <Field label="Model">
+                    <input
+                      value={detailForm.model}
+                      onChange={(e) => setDetailForm({ ...detailForm, model: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <Field label="Serial Number">
+                    <input
+                      value={detailForm.serial_number}
+                      onChange={(e) => setDetailForm({ ...detailForm, serial_number: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <Field label="Condition">
+                    <input
+                      value={detailForm.condition}
+                      onChange={(e) => setDetailForm({ ...detailForm, condition: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <Field label="Responsible Person">
+                    <input
+                      value={detailForm.owner}
+                      onChange={(e) => setDetailForm({ ...detailForm, owner: e.target.value })}
                       style={inputStyle}
                     />
                   </Field>
@@ -1779,10 +2101,33 @@ function AssetsPageContent() {
                     />
                   </Field>
 
-                  <Field label="Owner">
+                  <Field label="Purchase Date">
                     <input
-                      value={detailForm.owner}
-                      onChange={(e) => setDetailForm({ ...detailForm, owner: e.target.value })}
+                      type="date"
+                      value={detailForm.purchase_date}
+                      onChange={(e) => setDetailForm({ ...detailForm, purchase_date: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <Field label="Maintenance Due Date">
+                    <input
+                      type="date"
+                      value={detailForm.maintenance_due_date}
+                      onChange={(e) =>
+                        setDetailForm({ ...detailForm, maintenance_due_date: e.target.value })
+                      }
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <Field label="Inspection Due Date">
+                    <input
+                      type="date"
+                      value={detailForm.inspection_due_date}
+                      onChange={(e) =>
+                        setDetailForm({ ...detailForm, inspection_due_date: e.target.value })
+                      }
                       style={inputStyle}
                     />
                   </Field>
@@ -1799,7 +2144,164 @@ function AssetsPageContent() {
               </div>
 
               <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Quality</div>
+                <div style={detailSectionTitleStyle}>Inspection / Maintenance History</div>
+
+                <div style={detailSectionIntroStyle}>
+                  Use the dedicated mobile logs to add live field records, then review the saved history here against
+                  the selected asset.
+                </div>
+
+                <div style={buttonRowStyle}>
+                  <Link
+                    href={`/assets/inspection?asset=${encodeURIComponent(
+                      selectedAsset.asset_code || selectedAsset.id
+                    )}`}
+                    style={reportLinkButtonStyle}
+                  >
+                    Open Inspection Log
+                  </Link>
+                  <Link
+                    href={`/assets/maintenance?asset=${encodeURIComponent(
+                      selectedAsset.asset_code || selectedAsset.id
+                    )}`}
+                    style={reportLinkButtonStyle}
+                  >
+                    Open Maintenance Log
+                  </Link>
+                </div>
+
+                <div style={historyWorkspaceGridStyle}>
+                  <div style={historyPanelStyle}>
+                    <div style={recordsHeaderStyle}>
+                      <div style={recordsTitleStyle}>Inspection History</div>
+                      <span style={historyCountStyle}>{selectedInspectionHistory.length} records</span>
+                    </div>
+
+                    {selectedInspectionHistory.length === 0 ? (
+                      <div style={emptyRecordStyle}>No inspection history logged for this asset yet.</div>
+                    ) : (
+                      <div style={recordsListStyle}>
+                        {selectedInspectionHistory.slice(0, 6).map((record) => (
+                          <div key={record.id} style={historyRecordCardStyle}>
+                            <div style={historyRecordHeaderStyle}>
+                              <div>
+                                <div style={historyRecordTitleStyle}>
+                                  {record.result || record.reference || "Inspection record"}
+                                </div>
+                                <div style={historyRecordMetaStyle}>
+                                  {formatDate(record.inspection_date)} • {record.inspector || "Inspector not set"}
+                                </div>
+                              </div>
+                              <span
+                                style={{
+                                  ...badgeStyle,
+                                  background: getInspectionResultTone(record.result || "").bg,
+                                  color: getInspectionResultTone(record.result || "").color,
+                                }}
+                              >
+                                {record.result || "Not set"}
+                              </span>
+                            </div>
+
+                            <div style={historyInfoGridStyle}>
+                              <span>
+                                <strong>Next Due:</strong> {formatDate(record.next_inspection_due)}
+                              </span>
+                              <span>
+                                <strong>Logged:</strong> {formatDateTime(record.created_at || record.uploaded_at)}
+                              </span>
+                            </div>
+
+                            <div style={historyBodyTextStyle}>
+                              <strong>Findings:</strong> {record.findings || record.notes || "-"}
+                            </div>
+                            <div style={historyBodyTextStyle}>
+                              <strong>Actions Required:</strong> {record.actions_required || "-"}
+                            </div>
+
+                            <div style={buttonRowStyle}>
+                              {record.file_path ? (
+                                <button
+                                  type="button"
+                                  style={reportLinkButtonStyle}
+                                  onClick={() => void openStoredFile(record.file_path || "")}
+                                >
+                                  Open file
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={historyPanelStyle}>
+                    <div style={recordsHeaderStyle}>
+                      <div style={recordsTitleStyle}>Maintenance History</div>
+                      <span style={historyCountStyle}>{selectedMaintenanceHistory.length} records</span>
+                    </div>
+
+                    {selectedMaintenanceHistory.length === 0 ? (
+                      <div style={emptyRecordStyle}>No maintenance history logged for this asset yet.</div>
+                    ) : (
+                      <div style={recordsListStyle}>
+                        {selectedMaintenanceHistory.slice(0, 6).map((record) => (
+                          <div key={record.id} style={historyRecordCardStyle}>
+                            <div style={historyRecordHeaderStyle}>
+                              <div>
+                                <div style={historyRecordTitleStyle}>
+                                  {record.maintenance_type || "Maintenance record"}
+                                </div>
+                                <div style={historyRecordMetaStyle}>
+                                  {formatDate(record.maintenance_date)} • {record.carried_out_by || "Responsible person not set"}
+                                </div>
+                              </div>
+                              <span
+                                style={{
+                                  ...badgeStyle,
+                                  background: getMaintenanceTypeTone(record.maintenance_type || "").bg,
+                                  color: getMaintenanceTypeTone(record.maintenance_type || "").color,
+                                }}
+                              >
+                                {record.maintenance_type || "Not set"}
+                              </span>
+                            </div>
+
+                            <div style={historyInfoGridStyle}>
+                              <span>
+                                <strong>Next Due:</strong> {formatDate(record.next_maintenance_due)}
+                              </span>
+                              <span>
+                                <strong>Logged:</strong> {formatDateTime(record.created_at)}
+                              </span>
+                            </div>
+
+                            <div style={historyBodyTextStyle}>
+                              <strong>Description:</strong> {record.description || "-"}
+                            </div>
+
+                            <div style={buttonRowStyle}>
+                              {record.file_path ? (
+                                <button
+                                  type="button"
+                                  style={reportLinkButtonStyle}
+                                  onClick={() => void openStoredFile(record.file_path || "")}
+                                >
+                                  Open file
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div style={detailSectionStyle}>
+                <div style={detailSectionTitleStyle}>Quality Links</div>
 
                 <div style={qualityMiniGridStyle}>
                   <MiniMetricCard label="NCRs" value={qualityDraft.linked_ncrs.length} tone="#991b1b" bg="#fee2e2" />
@@ -1875,6 +2377,8 @@ function AssetsPageContent() {
                   />
                 </div>
 
+                <div style={detailSubsectionTitleStyle}>Calibration / Inspection References</div>
+
                 <div style={recordsSectionStyle}>
                   <div style={recordsHeaderStyle}>
                     <div style={recordsTitleStyle}>Calibration Records</div>
@@ -1915,7 +2419,7 @@ function AssetsPageContent() {
                                   <button
                                     type="button"
                                     style={reportLinkButtonStyle as CSSProperties}
-                                    onClick={() => void openStoredFile(record.file_path)}
+                                    onClick={() => void openStoredFile(record.file_path || "")}
                                   >
                                     Open file
                                   </button>
@@ -2002,7 +2506,7 @@ function AssetsPageContent() {
                                   <button
                                     type="button"
                                     style={reportLinkButtonStyle as CSSProperties}
-                                    onClick={() => void openStoredFile(record.file_path)}
+                                    onClick={() => void openStoredFile(record.file_path || "")}
                                   >
                                     Open file
                                   </button>
@@ -2049,6 +2553,8 @@ function AssetsPageContent() {
                   )}
                 </div>
 
+                <div style={detailSubsectionTitleStyle}>Quality Review Notes</div>
+
                 <div style={detailFormGridStyle}>
                   <Field label="Last Quality Review">
                     <input
@@ -2087,7 +2593,8 @@ function AssetsPageContent() {
             </div>
           )}
         </SectionCard>
-      </section>
+        </section>
+      ) : null}
     </main>
   );
 }
@@ -2144,6 +2651,63 @@ function StatCard({
       <div style={{ fontSize: "34px", fontWeight: 700, color: "#0f172a", marginTop: "8px" }}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function AttentionCard({
+  title,
+  summary,
+  detail,
+  tone,
+}: {
+  title: string;
+  summary: string;
+  detail: string;
+  tone: "red" | "amber" | "blue";
+}) {
+  const tones = {
+    red: { bg: "#fff1f2", border: "#fecdd3", title: "#991b1b", summary: "#7f1d1d" },
+    amber: { bg: "#fffbeb", border: "#fde68a", title: "#92400e", summary: "#78350f" },
+    blue: { bg: "#eff6ff", border: "#bfdbfe", title: "#1d4ed8", summary: "#1e3a8a" },
+  };
+  const colours = tones[tone];
+
+  return (
+    <div
+      style={{
+        ...attentionCardStyle,
+        background: colours.bg,
+        border: `1px solid ${colours.border}`,
+      }}
+    >
+      <div style={{ ...attentionCardTitleStyle, color: colours.title }}>{title}</div>
+      <div style={{ ...attentionCardSummaryStyle, color: colours.summary }}>{summary}</div>
+      <div style={attentionCardDetailStyle}>{detail}</div>
+    </div>
+  );
+}
+
+function SummaryPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: { bg: string; color: string };
+}) {
+  return (
+    <div
+      style={{
+        ...summaryPillStyle,
+        background: tone?.bg || "#f8fafc",
+        color: tone?.color || "#0f172a",
+        border: `1px solid ${tone ? "transparent" : "#e2e8f0"}`,
+      }}
+    >
+      <div style={summaryPillLabelStyle}>{label}</div>
+      <div style={summaryPillValueStyle}>{value}</div>
     </div>
   );
 }
@@ -2384,37 +2948,66 @@ const statusBannerStyle: CSSProperties = {
 
 const statsGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+  gap: "16px",
+  marginBottom: "20px",
+};
+
+const assetAttentionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
 };
 
 const topGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.05fr 0.95fr",
+  gridTemplateColumns: "1.1fr 0.9fr",
   gap: "20px",
   marginBottom: "20px",
 };
 
-const chartGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: "20px",
+const fullWidthSectionStyle: CSSProperties = {
   marginBottom: "20px",
 };
 
-const workspaceGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1.2fr 0.95fr",
-  gap: "20px",
-  alignItems: "start",
+const detailPanelSectionStyle: CSSProperties = {
+  marginBottom: "20px",
 };
 
 const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
-  padding: "20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  padding: "22px",
+  border: "1px solid #dbe7f3",
+  boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
+};
+
+const attentionCardStyle: CSSProperties = {
+  borderRadius: "18px",
+  padding: "18px 20px",
+  display: "grid",
+  gap: "8px",
+  boxShadow: "0 10px 22px rgba(15, 23, 42, 0.04)",
+};
+
+const attentionCardTitleStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const attentionCardSummaryStyle: CSSProperties = {
+  fontSize: "24px",
+  fontWeight: 800,
+  lineHeight: 1.1,
+};
+
+const attentionCardDetailStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#475569",
+  lineHeight: 1.5,
 };
 
 const sectionHeaderStyle: CSSProperties = {
@@ -2441,13 +3034,14 @@ const formGridStyle: CSSProperties = {
 
 const detailFormGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "12px",
+  gridTemplateColumns: "repeat(2, minmax(240px, 1fr))",
+  gap: "14px",
 };
 
 const fieldWrapStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
+  minWidth: 0,
 };
 
 const fieldLabelStyle: CSSProperties = {
@@ -2464,6 +3058,13 @@ const inputStyle: CSSProperties = {
   color: "#0f172a",
   width: "100%",
   boxSizing: "border-box",
+  minWidth: 0,
+};
+
+const readonlyInputStyle: CSSProperties = {
+  ...inputStyle,
+  background: "#f8fafc",
+  color: "#475569",
 };
 
 const toolbarSearchStyle: CSSProperties = {
@@ -2488,6 +3089,8 @@ const textareaStyle: CSSProperties = {
   resize: "vertical",
   fontFamily: "Arial, Helvetica, sans-serif",
   boxSizing: "border-box",
+  lineHeight: 1.5,
+  minWidth: 0,
 };
 
 const buttonRowStyle: CSSProperties = {
@@ -2597,11 +3200,6 @@ const miniMetricValueStyle: CSSProperties = {
   fontWeight: 800,
 };
 
-const chartWrapStyle: CSSProperties = {
-  width: "100%",
-  height: 300,
-};
-
 const toolbarStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
@@ -2619,6 +3217,11 @@ const toolbarFiltersStyle: CSSProperties = {
 
 const tableInfoRowStyle: CSSProperties = {
   marginBottom: "12px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
   color: "#475569",
   fontSize: "14px",
 };
@@ -2631,7 +3234,7 @@ const registerTableWrapStyle: CSSProperties = {
 
 const registerHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.4fr 1.6fr 1fr 1fr 0.8fr",
+  gridTemplateColumns: "1.1fr 1.6fr 1fr 0.9fr 1fr 1fr 1.2fr",
   gap: "12px",
   padding: "14px 16px",
   background: "#f8fafc",
@@ -2653,7 +3256,7 @@ const registerRowStyle: CSSProperties = {
   width: "100%",
   textAlign: "left",
   display: "grid",
-  gridTemplateColumns: "1.4fr 1.6fr 1fr 1fr 0.8fr",
+  gridTemplateColumns: "1.1fr 1.6fr 1fr 0.9fr 1fr 1fr 1.2fr",
   gap: "12px",
   padding: "14px 16px",
   border: "none",
@@ -2678,6 +3281,31 @@ const registerCellTextStyle: CSSProperties = {
   wordBreak: "break-word",
 };
 
+const registerSubtextStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "12px",
+  color: "#64748b",
+  lineHeight: 1.45,
+  wordBreak: "break-word",
+};
+
+const dueDateStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "4px",
+};
+
+const assetSummaryStripStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(220px, 1fr))",
+  gap: "12px",
+};
+
+const registerDueLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#475569",
+  lineHeight: 1.4,
+};
+
 const emptyRegisterStyle: CSSProperties = {
   padding: "24px 16px",
   color: "#64748b",
@@ -2694,10 +3322,8 @@ const emptyDetailStyle: CSSProperties = {
 
 const detailWorkspaceStyle: CSSProperties = {
   display: "grid",
-  gap: "16px",
-  maxHeight: "1320px",
-  overflowY: "auto",
-  paddingRight: "4px",
+  gap: "18px",
+  minWidth: 0,
 };
 
 const detailTopBarStyle: CSSProperties = {
@@ -2706,6 +3332,13 @@ const detailTopBarStyle: CSSProperties = {
   gap: "10px",
   alignItems: "flex-start",
   flexWrap: "wrap",
+};
+
+const detailBadgeRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+  alignItems: "center",
 };
 
 const detailEyebrowStyle: CSSProperties = {
@@ -2720,12 +3353,14 @@ const detailTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "22px",
   color: "#0f172a",
+  lineHeight: 1.25,
+  overflowWrap: "anywhere",
 };
 
 const imageStripStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "160px 1fr",
-  gap: "16px",
+  gridTemplateColumns: "180px minmax(0, 1fr)",
+  gap: "18px",
   border: "1px solid #cfe8e5",
   background: "linear-gradient(180deg, #f7fffd 0%, #eefbf8 100%)",
   borderRadius: "16px",
@@ -2787,13 +3422,47 @@ const imageMetaSubStyle: CSSProperties = {
   fontSize: "13px",
   color: "#475569",
   lineHeight: 1.45,
+  overflowWrap: "anywhere",
 };
 
 const detailSectionStyle: CSSProperties = {
   border: "1px solid #e2e8f0",
   borderRadius: "16px",
   padding: "16px",
-  background: "#ffffff",
+  background: "linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)",
+  minWidth: 0,
+};
+
+const detailSectionIntroStyle: CSSProperties = {
+  marginBottom: "14px",
+  color: "#475569",
+  fontSize: "14px",
+  lineHeight: 1.6,
+};
+
+const summaryPillStyle: CSSProperties = {
+  borderRadius: "14px",
+  padding: "12px 14px",
+  minHeight: "76px",
+  display: "grid",
+  gap: "6px",
+  alignContent: "start",
+};
+
+const summaryPillLabelStyle: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 800,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const summaryPillValueStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 700,
+  lineHeight: 1.35,
+  wordBreak: "break-word",
+  overflowWrap: "anywhere",
 };
 
 const detailSectionTitleStyle: CSSProperties = {
@@ -2801,6 +3470,16 @@ const detailSectionTitleStyle: CSSProperties = {
   fontWeight: 800,
   color: "#0f172a",
   marginBottom: "12px",
+};
+
+const detailSubsectionTitleStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 800,
+  color: "#475569",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  marginTop: "18px",
+  marginBottom: "10px",
 };
 
 const qualityMiniGridStyle: CSSProperties = {
@@ -2904,11 +3583,82 @@ const recordsListStyle: CSSProperties = {
   gap: "12px",
 };
 
+const historyWorkspaceGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "16px",
+  marginTop: "16px",
+};
+
+const historyPanelStyle: CSSProperties = {
+  border: "1px solid #dbe7f3",
+  borderRadius: "16px",
+  padding: "16px",
+  background: "#f8fafc",
+  minWidth: 0,
+};
+
+const historyCountStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 700,
+  color: "#64748b",
+};
+
 const recordCardStyle: CSSProperties = {
   border: "1px solid #e2e8f0",
   borderRadius: "14px",
   padding: "14px",
   background: "#f8fafc",
+};
+
+const historyRecordCardStyle: CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  padding: "14px",
+  background: "#ffffff",
+  display: "grid",
+  gap: "10px",
+  minWidth: 0,
+};
+
+const historyRecordHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "flex-start",
+  flexWrap: "wrap",
+};
+
+const historyRecordTitleStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 800,
+  color: "#0f172a",
+  lineHeight: 1.4,
+  overflowWrap: "anywhere",
+};
+
+const historyRecordMetaStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "12px",
+  color: "#64748b",
+  lineHeight: 1.5,
+  overflowWrap: "anywhere",
+};
+
+const historyInfoGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "8px 12px",
+  color: "#475569",
+  fontSize: "13px",
+  lineHeight: 1.5,
+};
+
+const historyBodyTextStyle: CSSProperties = {
+  color: "#334155",
+  fontSize: "13px",
+  lineHeight: 1.6,
+  overflowWrap: "anywhere",
 };
 
 const recordGridStyle: CSSProperties = {
@@ -2953,4 +3703,69 @@ export default function AssetsPage() {
       <AssetsPageContent />
     </Suspense>
   );
+}
+
+function getConditionTone(condition: string | null) {
+  const value = (condition || "").toLowerCase();
+
+  if (!value) return { bg: "#e2e8f0", color: "#334155" };
+  if (value.includes("excellent") || value.includes("good")) {
+    return { bg: "#dcfce7", color: "#166534" };
+  }
+  if (value.includes("fair") || value.includes("service")) {
+    return { bg: "#fef3c7", color: "#92400e" };
+  }
+  if (value.includes("poor") || value.includes("damage") || value.includes("fail")) {
+    return { bg: "#fee2e2", color: "#991b1b" };
+  }
+
+  return { bg: "#dbeafe", color: "#1d4ed8" };
+}
+
+function getInspectionResultTone(result: string) {
+  const value = result.toLowerCase();
+
+  if (value === "pass") return { bg: "#dcfce7", color: "#166534" };
+  if (value === "fail") return { bg: "#fee2e2", color: "#991b1b" };
+  if (value.includes("observation")) return { bg: "#fef3c7", color: "#92400e" };
+
+  return { bg: "#e2e8f0", color: "#334155" };
+}
+
+function getMaintenanceTypeTone(type: string) {
+  const value = type.toLowerCase();
+
+  if (value === "corrective") return { bg: "#fee2e2", color: "#991b1b" };
+  if (value === "preventative") return { bg: "#dbeafe", color: "#1d4ed8" };
+
+  return { bg: "#e2e8f0", color: "#334155" };
+}
+
+function getDueWindowTone(days: number | null) {
+  if (days === null) return { bg: "#e2e8f0", color: "#334155" };
+  if (days < 0) return { bg: "#fee2e2", color: "#991b1b" };
+  if (days <= 30) return { bg: "#fef3c7", color: "#92400e" };
+  return { bg: "#dcfce7", color: "#166534" };
+}
+
+function getDaysUntil(value: string | null) {
+  if (!value) return null;
+  const due = new Date(value);
+  if (Number.isNaN(due.getTime())) return null;
+  const today = new Date();
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }

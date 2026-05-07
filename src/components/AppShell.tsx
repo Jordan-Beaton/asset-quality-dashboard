@@ -24,6 +24,9 @@ const assetNavItems = [
   { href: "/home", label: "Home" },
   { href: "/assets/dashboard", label: "Dashboard" },
   { href: "/assets", label: "Assets" },
+  { href: "/assets/calibration", label: "Calibration" },
+  { href: "/assets/inspection", label: "Inspection" },
+  { href: "/assets/maintenance", label: "Maintenance" },
 ];
 
 export default function AppShell({ children }: AppShellProps) {
@@ -134,8 +137,8 @@ export default function AppShell({ children }: AppShellProps) {
                 >
                   {navItems.map((item) => {
                     const isActive =
-                      item.href === "/"
-                        ? pathname === "/"
+                      item.href === "/" || item.href === "/home" || item.href === "/assets"
+                        ? pathname === item.href
                         : pathname.startsWith(item.href);
 
                     return (
