@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import QRCode from "qrcode";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
@@ -189,6 +189,8 @@ type AssetTimelineEntry = {
 };
 
 const STORAGE_BUCKET = "asset-files";
+const PUBLIC_APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://asset-quality-dashboard.vercel.app";
 
 const emptyForm: AssetForm = {
   name: "",
@@ -460,6 +462,8 @@ function AssetsPageContent() {
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
   const [showQrCard, setShowQrCard] = useState(false);
   const [selectedAssetQrDataUrl, setSelectedAssetQrDataUrl] = useState("");
+  const [hasHandledDeepLinkScroll, setHasHandledDeepLinkScroll] = useState(false);
+  const detailPanelRef = useRef<HTMLElement | null>(null);
 
   async function loadAssets() {
     const { data, error } = await supabase.from("assets").select("*").order("name", {
@@ -724,6 +728,10 @@ function AssetsPageContent() {
   }, [assets, linkedAssetCode, linkedAssetId]);
 
   useEffect(() => {
+    setHasHandledDeepLinkScroll(false);
+  }, [linkedAssetCode, linkedAssetId]);
+
+  useEffect(() => {
     const imagePath = selectedAssetId ? qualityByAssetId[selectedAssetId]?.image_path || "" : "";
 
     if (!imagePath) {
@@ -778,6 +786,23 @@ function AssetsPageContent() {
     return result;
   }, [assets, search, statusFilter, locationFilter, ownerFilter, qualityLinkedOnly, qualityLinkedAssetIds]);
 
+  const deepLinkedAssetId = useMemo(() => {
+    if (!assets.length) return "";
+    if (linkedAssetCode) {
+      const matchedByCode = assets.find(
+        (asset) => (asset.asset_code || "").trim().toLowerCase() === linkedAssetCode.toLowerCase()
+      );
+      if (matchedByCode) return matchedByCode.id;
+    }
+
+    if (linkedAssetId) {
+      const matchedById = assets.find((asset) => asset.id === linkedAssetId);
+      if (matchedById) return matchedById.id;
+    }
+
+    return "";
+  }, [assets, linkedAssetCode, linkedAssetId]);
+
   useEffect(() => {
     if (filteredAssets.length === 0) {
       setSelectedAssetId("");
@@ -785,26 +810,72 @@ function AssetsPageContent() {
       return;
     }
 
+    if (deepLinkedAssetId && filteredAssets.some((asset) => asset.id === deepLinkedAssetId)) {
+      if (selectedAssetId !== deepLinkedAssetId || !isDetailPanelOpen) {
+        setSelectedAssetId(deepLinkedAssetId);
+        setIsDetailPanelOpen(true);
+      }
+      return;
+    }
+
     if (!filteredAssets.some((asset) => asset.id === selectedAssetId)) {
       setSelectedAssetId(filteredAssets[0].id);
       setIsDetailPanelOpen(true);
     }
-  }, [filteredAssets, selectedAssetId]);
+  }, [deepLinkedAssetId, filteredAssets, isDetailPanelOpen, selectedAssetId]);
 
   const selectedAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) || null,
     [assets, selectedAssetId]
   );
 
+  useEffect(() => {
+    if (!deepLinkedAssetId || !selectedAsset || selectedAsset.id !== deepLinkedAssetId) return;
+    if (!isDetailPanelOpen || hasHandledDeepLinkScroll) return;
+
+    const timer = window.setTimeout(() => {
+      detailPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      setHasHandledDeepLinkScroll(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [deepLinkedAssetId, hasHandledDeepLinkScroll, isDetailPanelOpen, selectedAsset]);
+
   const selectedAssetQrUrl = useMemo(() => {
     if (!selectedAsset) return "";
 
     const relativeUrl = selectedAsset.asset_code?.trim()
-      ? `/assets?asset=${encodeURIComponent(selectedAsset.asset_code.trim())}`
-      : `/assets?assetId=${encodeURIComponent(selectedAsset.id)}`;
+      ? `/assets/field?asset=${encodeURIComponent(selectedAsset.asset_code.trim())}`
+      : `/assets/field?assetId=${encodeURIComponent(selectedAsset.id)}`;
 
-    if (typeof window === "undefined") return relativeUrl;
-    return `${window.location.origin}${relativeUrl}`;
+    return `${PUBLIC_APP_URL}${relativeUrl}`;
+  }, [selectedAsset]);
+
+  const selectedAssetRouteValue = useMemo(() => {
+    if (!selectedAsset) return "";
+    return selectedAsset.asset_code?.trim() || selectedAsset.id;
+  }, [selectedAsset]);
+
+  const selectedAssetActionUrl = useMemo(() => {
+    if (!selectedAsset) return "/actions";
+
+    const params = new URLSearchParams({
+      source: "Asset",
+      prefill_department: "Assets",
+      linked_asset_id: selectedAsset.id,
+      linked_asset_code: selectedAsset.asset_code?.trim() || "",
+      prefill_title: selectedAsset.asset_code?.trim()
+        ? `Asset action - ${selectedAsset.asset_code.trim()}`
+        : `Asset action - ${selectedAsset.name || selectedAsset.id}`,
+      prefill_description: selectedAsset.name
+        ? `Raised from asset record ${selectedAsset.name}.`
+        : "Raised from asset record.",
+    });
+
+    return `/actions?${params.toString()}`;
   }, [selectedAsset]);
 
   const selectedQuality = useMemo(() => {
@@ -1532,6 +1603,22 @@ function AssetsPageContent() {
     printWindow.print();
   }
 
+  async function copySelectedAssetQrLink() {
+    if (!selectedAssetQrUrl) return;
+
+    if (!navigator.clipboard?.writeText) {
+      setMessage("Clipboard access is not available in this browser.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(selectedAssetQrUrl);
+      setMessage("Asset field access link copied.");
+    } catch {
+      setMessage("Could not copy asset link.");
+    }
+  }
+
   function removeCalibrationRecord(id: string) {
     setQualityDraft((prev) => ({
       ...prev,
@@ -2169,7 +2256,7 @@ function AssetsPageContent() {
       </section>
 
       {isDetailPanelOpen ? (
-        <section style={detailPanelSectionStyle}>
+        <section ref={detailPanelRef} style={detailPanelSectionStyle}>
           <SectionCard
             title="Asset Detail"
             subtitle="Selected asset workspace with grouped master data, files, quality links, and live inspection or maintenance history."
@@ -2283,64 +2370,99 @@ function AssetsPageContent() {
                         Remove image
                       </button>
                     ) : null}
-
-                    <button
-                      type="button"
-                      style={secondaryButtonStyle}
-                      onClick={() => setShowQrCard((current) => !current)}
-                    >
-                      {showQrCard ? "Hide QR Code" : "Generate / View QR Code"}
-                    </button>
                   </div>
+                </div>
+                </div>
+              </div>
 
-                  {showQrCard ? (
-                    <div style={qrCardStyle}>
-                      <div style={qrPreviewWrapStyle}>
-                        {selectedAssetQrDataUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={selectedAssetQrDataUrl}
-                            alt={`${selectedAsset.asset_code || selectedAsset.name || "Asset"} QR code`}
-                            style={qrImageStyle}
-                          />
-                        ) : (
-                          <div style={qrLoadingStyle}>Generating QR code...</div>
-                        )}
+              <div style={detailSectionStyle}>
+                <ModuleSectionHeader title="Asset QR / Field Access" />
+
+                <div style={detailSectionIntroStyle}>
+                  Scan this QR code to open the mobile field page for this asset.
+                </div>
+
+                <div style={quickActionRowStyle}>
+                  <button
+                    type="button"
+                    style={secondaryButtonStyle}
+                    onClick={() => setShowQrCard((current) => !current)}
+                  >
+                    {showQrCard ? "Hide QR Code" : "Generate / View QR Code"}
+                  </button>
+                  <Link
+                    href={`/assets/inspection?asset=${encodeURIComponent(selectedAssetRouteValue)}`}
+                    style={reportLinkButtonStyle}
+                  >
+                    Start Inspection
+                  </Link>
+                  <Link
+                    href={`/assets/maintenance?asset=${encodeURIComponent(selectedAssetRouteValue)}`}
+                    style={reportLinkButtonStyle}
+                  >
+                    Start Maintenance
+                  </Link>
+                  <Link
+                    href={`/assets/calibration?asset=${encodeURIComponent(selectedAssetRouteValue)}`}
+                    style={reportLinkButtonStyle}
+                  >
+                    View Calibration
+                  </Link>
+                  <Link href={selectedAssetActionUrl} style={reportLinkButtonStyle}>
+                    Raise Action
+                  </Link>
+                </div>
+
+                {showQrCard ? (
+                  <div style={qrCardStyle}>
+                    <div style={qrPreviewWrapStyle}>
+                      {selectedAssetQrDataUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={selectedAssetQrDataUrl}
+                          alt={`${selectedAsset.asset_code || selectedAsset.name || "Asset"} QR code`}
+                          style={qrImageStyle}
+                        />
+                      ) : (
+                        <div style={qrLoadingStyle}>Generating QR code...</div>
+                      )}
+                    </div>
+
+                    <div style={qrDetailsStyle}>
+                      <div style={qrCardTitleStyle}>Asset QR Code</div>
+                      <div style={qrCardMetaStyle}>
+                        Scanning opens the live asset field page so field users can continue straight into
+                        inspection, maintenance, calibration, or linked action workflows.
                       </div>
+                      <div style={qrTargetLabelStyle}>Encoded URL</div>
+                      <div style={qrTargetValueStyle}>{selectedAssetQrUrl}</div>
 
-                      <div style={qrDetailsStyle}>
-                        <div style={qrCardTitleStyle}>Asset QR Code</div>
-                        <div style={qrCardMetaStyle}>
-                          Scan on a phone or tablet to open this asset record directly.
-                        </div>
-                        <div style={qrTargetLabelStyle}>Encoded URL</div>
-                        <div style={qrTargetValueStyle}>{selectedAssetQrUrl}</div>
-
-                        <div style={buttonRowStyle}>
-                          {selectedAssetQrDataUrl ? (
-                            <a
-                              href={selectedAssetQrDataUrl}
-                              download={`${selectedAsset.asset_code || selectedAsset.id}-qr.png`}
-                              style={reportLinkButtonStyle}
-                            >
-                              Download QR
-                            </a>
-                          ) : null}
-                          {selectedAssetQrDataUrl ? (
-                            <button
-                              type="button"
-                              style={secondaryButtonStyle}
-                              onClick={printSelectedAssetQrCode}
-                            >
-                              Print QR
-                            </button>
-                          ) : null}
-                        </div>
+                      <div style={buttonRowStyle}>
+                        {selectedAssetQrDataUrl ? (
+                          <a
+                            href={selectedAssetQrDataUrl}
+                            download={`${selectedAsset.asset_code || selectedAsset.id}-qr.png`}
+                            style={reportLinkButtonStyle}
+                          >
+                            Download QR
+                          </a>
+                        ) : null}
+                        {selectedAssetQrDataUrl ? (
+                          <button
+                            type="button"
+                            style={secondaryButtonStyle}
+                            onClick={printSelectedAssetQrCode}
+                          >
+                            Print QR
+                          </button>
+                        ) : null}
+                        <button type="button" style={secondaryButtonStyle} onClick={() => void copySelectedAssetQrLink()}>
+                          Copy Link
+                        </button>
                       </div>
                     </div>
-                  ) : null}
-                </div>
-                </div>
+                  </div>
+                ) : null}
               </div>
 
               <div style={detailSectionStyle}>
@@ -2495,25 +2617,6 @@ function AssetsPageContent() {
                 <div style={detailSectionIntroStyle}>
                   Use the dedicated mobile logs to add live field records, then review the saved history here against
                   the selected asset.
-                </div>
-
-                <div style={buttonRowStyle}>
-                  <Link
-                    href={`/assets/inspection?asset=${encodeURIComponent(
-                      selectedAsset.asset_code || selectedAsset.id
-                    )}`}
-                    style={reportLinkButtonStyle}
-                  >
-                    Open Inspection Log
-                  </Link>
-                  <Link
-                    href={`/assets/maintenance?asset=${encodeURIComponent(
-                      selectedAsset.asset_code || selectedAsset.id
-                    )}`}
-                    style={reportLinkButtonStyle}
-                  >
-                    Open Maintenance Log
-                  </Link>
                 </div>
 
                 <div style={historyWorkspaceGridStyle}>
@@ -3498,6 +3601,13 @@ const buttonRowStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   marginTop: "14px",
+};
+
+const quickActionRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "14px",
 };
 
 const primaryButtonStyle: CSSProperties = {
