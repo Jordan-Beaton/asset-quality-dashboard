@@ -83,6 +83,7 @@ function PeoplePageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     void loadPeople();
@@ -211,6 +212,32 @@ function PeoplePageContent() {
       setMessage(`Status update failed: ${err.message}`);
     } finally {
       setIsToggling(false);
+    }
+  }
+
+  async function deleteSelectedPerson() {
+    if (!selectedPerson) return;
+
+    const confirmed = window.confirm(
+      `Delete ${selectedPerson.name} from the shared people directory? This removes the record from future selector lists.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsDeleting(true);
+      const { error } = await supabase.from("people").delete().eq("id", selectedPerson.id);
+      if (error) throw new Error(error.message);
+
+      setSelectedPersonId("");
+      setDetailForm(emptyPersonForm);
+      setMessage(`${selectedPerson.name} deleted.`);
+      await loadPeople();
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Delete failed: ${err.message}`);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -516,6 +543,14 @@ function PeoplePageContent() {
                   </button>
                   <button
                     type="button"
+                    style={deleteButtonStyle}
+                    onClick={() => void deleteSelectedPerson()}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? "Deleting..." : "Delete Person"}
+                  </button>
+                  <button
+                    type="button"
                     style={primaryButtonStyle}
                     onClick={() => void saveDetail()}
                     disabled={isSavingDetail}
@@ -734,6 +769,17 @@ const dangerButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
+const deleteButtonStyle: CSSProperties = {
+  background: "#dc2626",
+  color: "#ffffff",
+  border: "1px solid #b91c1c",
+  borderRadius: "10px",
+  padding: "9px 12px",
+  fontWeight: 700,
+  fontSize: "12px",
+  cursor: "pointer",
+};
+
 const registerListStyle: CSSProperties = {
   display: "grid",
   gap: "14px",
@@ -805,6 +851,10 @@ const summaryTileStyle: CSSProperties = {
   border: "1px solid #dbe7f3",
   background: "#f8fafc",
   padding: "14px 16px",
+  minHeight: "96px",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "space-between",
 };
 
 const summaryTileLabelStyle: CSSProperties = {

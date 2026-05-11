@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -115,6 +116,11 @@ type AuditFindingRow = {
 type AuditLinkOption = {
   id: string;
   label: string;
+};
+
+type OpenFindingRow = FindingRecord & {
+  audit_number: string;
+  audit_title: string;
 };
 
 
@@ -522,6 +528,8 @@ function MultiSelectStandards({
 }
 
 function AuditsPageContent() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "All";
@@ -529,6 +537,8 @@ function AuditsPageContent() {
   const linkedMonth = searchParams.get("month")?.trim() || "All";
   const linkedFindingStatus = searchParams.get("findingStatus")?.trim() || "All";
   const linkedFindingCategory = searchParams.get("findingCategory")?.trim() || "All";
+  const linkedView = searchParams.get("view")?.trim() || "";
+  const isOpenFindingsView = linkedView === "open-findings";
 
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [auditFiles, setAuditFiles] = useState<AuditFileRow[]>([]);
@@ -545,16 +555,22 @@ function AuditsPageContent() {
   const [showFindingForm, setShowFindingForm] = useState(false);
   const [isUploadingReport, setIsUploadingReport] = useState(false);
   const [isSavingLinks, setIsSavingLinks] = useState(false);
+  const [selectedOpenFindingId, setSelectedOpenFindingId] = useState("");
+  const [openFindingCategoryFilter, setOpenFindingCategoryFilter] = useState<
+    FindingSeverity | "All"
+  >("All");
 
   const [form, setForm] = useState<AuditForm>(createEmptyAudit());
   const [detailForm, setDetailForm] = useState<AuditForm>(createEmptyAudit());
   const [findingForm, setFindingForm] = useState<FindingForm>(createEmptyFinding());
+  const [openFindingForm, setOpenFindingForm] = useState<FindingRecord | null>(null);
 
   const [ncrOptions, setNcrOptions] = useState<AuditLinkOption[]>([]);
   const [actionOptions, setActionOptions] = useState<AuditLinkOption[]>([]);
   const [selectedNcrToAdd, setSelectedNcrToAdd] = useState("");
   const [selectedActionToAdd, setSelectedActionToAdd] = useState("");
   const programmeSectionRef = useRef<HTMLDivElement | null>(null);
+  const openFindingEditPanelRef = useRef<HTMLDivElement | null>(null);
 
   const computedAuditNumber = useMemo(
     () => buildNextAuditNumber(form.audit_type, form.audit_date, audits),
@@ -798,6 +814,51 @@ function AuditsPageContent() {
     () => findings.filter((finding) => finding.audit_id === selectedAuditId),
     [findings, selectedAuditId]
   );
+
+  const openFindings = useMemo<OpenFindingRow[]>(() => {
+    return findings
+      .filter((finding) => finding.status !== "Closed")
+      .map((finding) => {
+        const audit = audits.find((item) => item.id === finding.audit_id);
+        return {
+          ...finding,
+          audit_number: audit?.audit_number || "-",
+          audit_title: audit?.title || "Untitled Audit",
+        };
+      })
+      .sort((a, b) => {
+        const aDue = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDue = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        if (aDue !== bDue) return aDue - bDue;
+        return compareText(a.reference, b.reference);
+      });
+  }, [audits, findings]);
+
+  const selectedOpenFinding = useMemo(
+    () => openFindings.find((finding) => finding.id === selectedOpenFindingId) || null,
+    [openFindings, selectedOpenFindingId]
+  );
+
+  const filteredOpenFindings = useMemo(() => {
+    if (openFindingCategoryFilter === "All") return openFindings;
+    return openFindings.filter((finding) => finding.category === openFindingCategoryFilter);
+  }, [openFindings, openFindingCategoryFilter]);
+
+  useEffect(() => {
+    if (!selectedOpenFindingId) {
+      setOpenFindingForm(null);
+      return;
+    }
+
+    const match = openFindings.find((finding) => finding.id === selectedOpenFindingId);
+    if (!match) {
+      setSelectedOpenFindingId("");
+      setOpenFindingForm(null);
+      return;
+    }
+
+    setOpenFindingForm(match);
+  }, [openFindings, selectedOpenFindingId]);
 
   const selectedAuditFiles = useMemo(
     () => auditFiles.filter((file) => file.audit_id === selectedAuditId),
@@ -1049,6 +1110,31 @@ function AuditsPageContent() {
     window.requestAnimationFrame(() => {
       programmeSectionRef.current?.focus();
     });
+  }
+
+  function setAuditView(view: "open-findings" | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (view) {
+      params.set("view", view);
+    } else {
+      params.delete("view");
+    }
+    router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+  }
+
+  function openOpenFindingDetail(findingId: string) {
+    setSelectedOpenFindingId(findingId);
+    window.setTimeout(() => {
+      openFindingEditPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+  }
+
+  function hideOpenFindingPanel() {
+    setSelectedOpenFindingId("");
+    setOpenFindingForm(null);
   }
 
   function toggleStandard(value: string) {
@@ -1390,6 +1476,36 @@ function AuditsPageContent() {
     setMessage("Finding updated.");
   }
 
+  async function saveOpenFindingDetail() {
+    if (!openFindingForm) return;
+
+    const payload: Record<string, unknown> = {
+      category: openFindingForm.category,
+      status: openFindingForm.status,
+      clause: openFindingForm.clause.trim() || null,
+      owner: openFindingForm.owner.trim() || null,
+      due_date: openFindingForm.due_date || null,
+      closure_date:
+        openFindingForm.status === "Closed"
+          ? openFindingForm.closure_date || new Date().toISOString().slice(0, 10)
+          : null,
+      description: openFindingForm.description.trim() || null,
+      root_cause: openFindingForm.root_cause.trim() || null,
+      containment_action: openFindingForm.containment_action.trim() || null,
+      corrective_action: openFindingForm.corrective_action.trim() || null,
+    };
+
+    const { error } = await supabase.from("audit_findings").update(payload).eq("id", openFindingForm.id);
+
+    if (error) {
+      setMessage(`Finding update failed: ${error.message}`);
+      return;
+    }
+
+    await loadAudits(false);
+    setMessage(`Finding ${openFindingForm.reference} updated.`);
+  }
+
 
   async function uploadFileToStorage(auditId: string, file: File) {
     const safeName = sanitizeFileName(file.name);
@@ -1684,16 +1800,279 @@ function AuditsPageContent() {
         </section>
       ) : null}
 
-      <section style={statsGridStyle}>
-        <StatCard title="Planned Audits" value={kpis.planned} accent="#2563eb" />
-        <StatCard title="In Progress" value={kpis.inProgress} accent="#f59e0b" />
-        <StatCard title="Overdue" value={kpis.overdue} accent="#dc2626" />
-        <StatCard title="Completed" value={kpis.completed} accent="#16a34a" />
-        <StatCard title="Open Findings" value={kpis.openFindings} accent="#7c3aed" />
-        <StatCard title="Major Findings" value={kpis.totalMajor} accent="#b91c1c" />
-      </section>
+        <section style={statsGridStyle}>
+          <StatCard title="Planned Audits" value={kpis.planned} accent="#2563eb" />
+          <StatCard title="In Progress" value={kpis.inProgress} accent="#f59e0b" />
+          <StatCard title="Overdue" value={kpis.overdue} accent="#dc2626" />
+          <StatCard title="Completed" value={kpis.completed} accent="#16a34a" />
+          <StatCard
+            title="Open Findings"
+            value={kpis.openFindings}
+            accent="#7c3aed"
+            onClick={() => setAuditView("open-findings")}
+            active={isOpenFindingsView}
+          />
+          <StatCard title="Major Findings" value={kpis.totalMajor} accent="#b91c1c" />
+        </section>
 
-      <section style={topGridStyle}>
+        {isOpenFindingsView ? (
+          <section style={openFindingsSectionStyle}>
+            <SectionCard
+              title="Open Findings"
+              subtitle="All audit findings with a status other than Closed, shown in one working register."
+            >
+              <div style={openFindingsHeaderStyle}>
+                <div style={openFindingsHeaderMetaStyle}>
+                  <div style={openFindingsSummaryStyle}>
+                    Showing <strong>{filteredOpenFindings.length}</strong> open audit finding
+                    {filteredOpenFindings.length === 1 ? "" : "s"} across <strong>{audits.length}</strong>{" "}
+                    audit{audits.length === 1 ? "" : "s"}.
+                  </div>
+                  <select
+                    value={openFindingCategoryFilter}
+                    onChange={(e) =>
+                      setOpenFindingCategoryFilter(e.target.value as FindingSeverity | "All")
+                    }
+                    style={{ ...toolbarSelectStyle, minWidth: "150px" }}
+                  >
+                    <option value="All">All Categories</option>
+                    <option value="Major">Major</option>
+                    <option value="Minor">Minor</option>
+                    <option value="OFI">OFI</option>
+                    <option value="OBS">OBS</option>
+                  </select>
+                </div>
+                <button type="button" style={secondaryButtonStyle} onClick={() => setAuditView(null)}>
+                  Back to Audit Register
+                </button>
+              </div>
+
+              <div style={openFindingsTableWrapStyle}>
+                <div style={openFindingsHeadStyle}>
+                  <div>Finding Ref</div>
+                  <div>Audit Number</div>
+                  <div>Audit Title</div>
+                  <div>Category</div>
+                  <div>Description</div>
+                  <div>Owner</div>
+                  <div>Due Date</div>
+                  <div>Status</div>
+                  <div>Root Cause</div>
+                  <div>Actions / Edit</div>
+                </div>
+
+                <div style={openFindingsBodyStyle}>
+                  {filteredOpenFindings.length === 0 ? (
+                    <div style={openFindingsEmptyStyle}>No open findings match this category filter.</div>
+                  ) : (
+                    filteredOpenFindings.map((finding) => {
+                      const tone = getFindingTone(finding.category);
+                      const active = selectedOpenFindingId === finding.id;
+
+                      return (
+                        <button
+                          key={finding.id}
+                          type="button"
+                          onClick={() => openOpenFindingDetail(finding.id)}
+                          style={{
+                            ...openFindingsRowStyle,
+                            background: active ? "#eff6ff" : "#ffffff",
+                            borderLeft: active ? "4px solid #0f766e" : "4px solid transparent",
+                          }}
+                        >
+                          <div style={openFindingsPrimaryCellStyle}>{finding.reference}</div>
+                          <div style={openFindingsCellMutedStyle}>{finding.audit_number}</div>
+                          <div style={openFindingsTitleCellStyle}>{finding.audit_title}</div>
+                          <div>
+                            <span style={{ ...badgeStyle, background: tone.bg, color: tone.color }}>
+                              {finding.category}
+                            </span>
+                          </div>
+                          <div style={openFindingsBodyTextStyle}>{finding.description || "-"}</div>
+                          <div style={openFindingsBodyTextStyle}>{finding.owner || "-"}</div>
+                          <div style={openFindingsCellMutedStyle}>{formatDate(finding.due_date)}</div>
+                          <div>
+                            <span
+                              style={{
+                                ...badgeStyle,
+                                background: getStatusTone(finding.status).bg,
+                                color: getStatusTone(finding.status).color,
+                              }}
+                            >
+                              {finding.status}
+                            </span>
+                          </div>
+                          <div style={openFindingsBodyTextStyle}>{finding.root_cause || "-"}</div>
+                          <div style={openFindingsActionCellStyle}>
+                            <span style={openFindingsActionPillStyle}>Edit finding</span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {openFindingForm && selectedOpenFinding ? (
+                <div ref={openFindingEditPanelRef} style={openFindingDetailWrapStyle}>
+                  <div style={openFindingDetailHeadStyle}>
+                    <div>
+                      <div style={findingRefStyle}>{selectedOpenFinding.reference}</div>
+                      <div style={findingClauseStyle}>
+                        {selectedOpenFinding.audit_number} - {selectedOpenFinding.audit_title}
+                      </div>
+                    </div>
+                    <button type="button" style={secondaryButtonStyle} onClick={hideOpenFindingPanel}>
+                      Hide Panel
+                    </button>
+                  </div>
+
+                  <div style={detailFormGridStyle}>
+                    <Field label="Category">
+                      <select
+                        value={openFindingForm.category}
+                        onChange={(e) =>
+                          setOpenFindingForm((prev) =>
+                            prev ? { ...prev, category: e.target.value as FindingSeverity } : prev
+                          )
+                        }
+                        style={inputStyle}
+                      >
+                        <option value="Major">Major</option>
+                        <option value="Minor">Minor</option>
+                        <option value="OFI">OFI</option>
+                        <option value="OBS">OBS</option>
+                      </select>
+                    </Field>
+
+                    <Field label="Status">
+                      <select
+                        value={openFindingForm.status}
+                        onChange={(e) =>
+                          setOpenFindingForm((prev) =>
+                            prev ? { ...prev, status: e.target.value as FindingStatus } : prev
+                          )
+                        }
+                        style={inputStyle}
+                      >
+                        <option value="Open">Open</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Closed">Closed</option>
+                      </select>
+                    </Field>
+
+                    <Field label="Clause / Reference">
+                      <input
+                        value={openFindingForm.clause}
+                        onChange={(e) =>
+                          setOpenFindingForm((prev) => (prev ? { ...prev, clause: e.target.value } : prev))
+                        }
+                        style={inputStyle}
+                      />
+                    </Field>
+
+                    <Field label="Owner">
+                      <input
+                        value={openFindingForm.owner}
+                        onChange={(e) =>
+                          setOpenFindingForm((prev) => (prev ? { ...prev, owner: e.target.value } : prev))
+                        }
+                        style={inputStyle}
+                      />
+                    </Field>
+
+                    <Field label="Due Date">
+                      <input
+                        type="date"
+                        value={openFindingForm.due_date}
+                        onChange={(e) =>
+                          setOpenFindingForm((prev) => (prev ? { ...prev, due_date: e.target.value } : prev))
+                        }
+                        style={inputStyle}
+                      />
+                    </Field>
+
+                    <Field label="Closure Date">
+                      <input
+                        type="date"
+                        value={openFindingForm.closure_date}
+                        onChange={(e) =>
+                          setOpenFindingForm((prev) => (prev ? { ...prev, closure_date: e.target.value } : prev))
+                        }
+                        style={inputStyle}
+                      />
+                    </Field>
+
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <Field label="Description">
+                        <textarea
+                          value={openFindingForm.description}
+                          onChange={(e) =>
+                            setOpenFindingForm((prev) =>
+                              prev ? { ...prev, description: e.target.value } : prev
+                            )
+                          }
+                          style={textareaStyle}
+                        />
+                      </Field>
+                    </div>
+
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <Field label="Root Cause">
+                        <textarea
+                          value={openFindingForm.root_cause}
+                          onChange={(e) =>
+                            setOpenFindingForm((prev) => (prev ? { ...prev, root_cause: e.target.value } : prev))
+                          }
+                          style={textareaStyle}
+                        />
+                      </Field>
+                    </div>
+
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <Field label="Containment Action">
+                        <textarea
+                          value={openFindingForm.containment_action}
+                          onChange={(e) =>
+                            setOpenFindingForm((prev) =>
+                              prev ? { ...prev, containment_action: e.target.value } : prev
+                            )
+                          }
+                          style={textareaStyle}
+                        />
+                      </Field>
+                    </div>
+
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <Field label="Corrective Action">
+                        <textarea
+                          value={openFindingForm.corrective_action}
+                          onChange={(e) =>
+                            setOpenFindingForm((prev) =>
+                              prev ? { ...prev, corrective_action: e.target.value } : prev
+                            )
+                          }
+                          style={textareaStyle}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+
+                  <div style={detailButtonRowStyle}>
+                    <button type="button" style={primaryButtonStyle} onClick={() => void saveOpenFindingDetail()}>
+                      Save Finding
+                    </button>
+                    <button type="button" style={secondaryButtonStyle} onClick={hideOpenFindingPanel}>
+                      Hide Panel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </SectionCard>
+          </section>
+        ) : null}
+
+        <section style={topGridStyle}>
         <div style={summaryPanelGridStyle}>
           <SectionCard
             title="Create Audit"
@@ -2100,8 +2479,8 @@ function AuditsPageContent() {
                 <MiniStat label="OBS" value={selectedAudit.findings.obs} tone="#1d4ed8" bg="#dbeafe" />
               </div>
 
-              <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Audit Record</div>
+                <div style={detailSectionStyle}>
+                  <ModuleSectionHeader title="Audit Record" />
 
                 <div style={detailFormGridStyle}>
                   <Field label="Audit Type">
@@ -2245,8 +2624,8 @@ function AuditsPageContent() {
                 </div>
               </div>
 
-              <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Linked Items</div>
+                <div style={detailSectionStyle}>
+                  <ModuleSectionHeader title="Linked Items" />
 
                 <div style={linkPickerGridStyle}>
                   <Field label="Add Linked NCR">
@@ -2317,8 +2696,8 @@ function AuditsPageContent() {
               </div>
 
               {showFindingForm && (
-                <div style={detailSectionStyle}>
-                  <div style={detailSectionTitleStyle}>Raise Finding</div>
+                  <div style={detailSectionStyle}>
+                    <ModuleSectionHeader title="Raise Finding" />
 
                   <form onSubmit={createFinding}>
                     <div style={detailFormGridStyle}>
@@ -2454,8 +2833,8 @@ function AuditsPageContent() {
                 </div>
               )}
 
-              <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Findings Register</div>
+                <div style={detailSectionStyle}>
+                  <ModuleSectionHeader title="Findings Register" />
 
                 {selectedFindings.length === 0 ? (
                   <p style={emptyTextStyle}>No findings logged for this audit yet.</p>
@@ -2617,10 +2996,7 @@ function SectionCard({
 }) {
   return (
     <section style={panelStyle}>
-      <div style={sectionHeaderStyle}>
-        <h2 style={sectionTitleStyle}>{title}</h2>
-        {subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}
-      </div>
+      <ModuleSectionHeader title={title} subtitle={subtitle} />
       {children}
     </section>
   );
@@ -2635,12 +3011,32 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function StatCard({ title, value, accent }: { title: string; value: number; accent: string }) {
+function StatCard({
+  title,
+  value,
+  accent,
+  onClick,
+  active,
+}: {
+  title: string;
+  value: number;
+  accent: string;
+  onClick?: () => void;
+  active?: boolean;
+}) {
+  const style = {
+    ...statCardStyle,
+    borderTop: `4px solid ${accent}`,
+    borderColor: active ? "#0f766e" : statCardStyle.borderColor,
+    boxShadow: active ? "0 0 0 2px rgba(15, 118, 110, 0.16)" : statCardStyle.boxShadow,
+    cursor: onClick ? "pointer" : "default",
+  } satisfies CSSProperties;
+
   return (
-    <div style={{ ...statCardStyle, borderTop: `4px solid ${accent}` }}>
+    <button type="button" onClick={onClick} style={style}>
       <div style={statLabelStyle}>{title}</div>
       <div style={statValueStyle}>{value}</div>
-    </div>
+    </button>
   );
 }
 
@@ -2949,7 +3345,9 @@ const statCardStyle: CSSProperties = {
   background: "white",
   borderRadius: "16px",
   padding: "18px 20px",
+  border: "1px solid #e2e8f0",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  textAlign: "left",
 };
 
 const statLabelStyle: CSSProperties = {
@@ -2963,6 +3361,132 @@ const statValueStyle: CSSProperties = {
   fontWeight: 700,
   color: "#0f172a",
   marginTop: "8px",
+};
+
+const openFindingsSectionStyle: CSSProperties = {
+  marginBottom: "20px",
+};
+
+const openFindingsHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  flexWrap: "wrap",
+  alignItems: "center",
+  marginBottom: "14px",
+};
+
+const openFindingsHeaderMetaStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  alignItems: "center",
+};
+
+const openFindingsSummaryStyle: CSSProperties = {
+  color: "#475569",
+  fontSize: "14px",
+};
+
+const openFindingsTableWrapStyle: CSSProperties = {
+  border: "1px solid #d7dee7",
+  borderRadius: "16px",
+  overflow: "hidden",
+  background: "#ffffff",
+};
+
+const openFindingsHeadStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1.15fr 1.8fr 0.85fr 2.2fr 1fr 0.9fr 0.95fr 1.4fr 0.95fr",
+  gap: "12px",
+  padding: "14px 16px",
+  background: "#f8fafc",
+  borderBottom: "1px solid #e5e7eb",
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: 0.25,
+  alignItems: "center",
+};
+
+const openFindingsBodyStyle: CSSProperties = {
+  display: "grid",
+};
+
+const openFindingsRowStyle: CSSProperties = {
+  width: "100%",
+  textAlign: "left",
+  display: "grid",
+  gridTemplateColumns: "1fr 1.15fr 1.8fr 0.85fr 2.2fr 1fr 0.9fr 0.95fr 1.4fr 0.95fr",
+  gap: "12px",
+  padding: "14px 16px",
+  borderTop: "none",
+  borderRight: "none",
+  borderBottom: "1px solid #eef2f7",
+  borderLeft: "4px solid transparent",
+  cursor: "pointer",
+  alignItems: "center",
+};
+
+const openFindingsPrimaryCellStyle: CSSProperties = {
+  fontWeight: 800,
+  color: "#0f172a",
+  overflowWrap: "anywhere",
+};
+
+const openFindingsCellMutedStyle: CSSProperties = {
+  color: "#475569",
+  fontSize: "13px",
+  overflowWrap: "anywhere",
+};
+
+const openFindingsTitleCellStyle: CSSProperties = {
+  fontWeight: 700,
+  color: "#0f172a",
+  overflowWrap: "anywhere",
+};
+
+const openFindingsBodyTextStyle: CSSProperties = {
+  color: "#334155",
+  fontSize: "13px",
+  overflowWrap: "anywhere",
+};
+
+const openFindingsActionCellStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-start",
+};
+
+const openFindingsActionPillStyle: CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: "999px",
+  background: "#ede9fe",
+  color: "#6d28d9",
+  fontWeight: 800,
+  fontSize: "12px",
+};
+
+const openFindingsEmptyStyle: CSSProperties = {
+  padding: "18px",
+  color: "#64748b",
+};
+
+const openFindingDetailWrapStyle: CSSProperties = {
+  marginTop: "16px",
+  border: "1px solid #d7dee7",
+  borderRadius: "16px",
+  padding: "16px",
+  background: "#f8fafc",
+};
+
+const openFindingDetailHeadStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  flexWrap: "wrap",
+  alignItems: "center",
+  marginBottom: "14px",
 };
 
 const topGridStyle: CSSProperties = {
@@ -2989,22 +3513,6 @@ const panelStyle: CSSProperties = {
   padding: "20px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
   marginBottom: "20px",
-};
-
-const sectionHeaderStyle: CSSProperties = {
-  marginBottom: "16px",
-};
-
-const sectionTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "20px",
-  color: "#0f172a",
-};
-
-const sectionSubtitleStyle: CSSProperties = {
-  margin: "6px 0 0",
-  color: "#64748b",
-  fontSize: "14px",
 };
 
 const createAuditGridStyle: CSSProperties = {
@@ -3504,13 +4012,6 @@ const detailSectionStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "16px",
   background: "#ffffff",
-};
-
-const detailSectionTitleStyle: CSSProperties = {
-  fontSize: "16px",
-  fontWeight: 800,
-  color: "#0f172a",
-  marginBottom: "12px",
 };
 
 const detailButtonRowStyle: CSSProperties = {

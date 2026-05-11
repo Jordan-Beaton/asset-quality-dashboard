@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -815,6 +816,14 @@ function MOCPageContent() {
       .filter((item) => item.moc_report_id === selectedReportId)
       .sort((a, b) => new Date(b.uploaded_at || 0).getTime() - new Date(a.uploaded_at || 0).getTime());
   }, [attachments, selectedReportId]);
+
+  const latestMocSummary = useMemo(() => {
+    const latest = reports[0];
+    if (!latest) return "No MOCs loaded";
+    return latest.moc_report_title
+      ? `${latest.moc_report_no} - ${latest.moc_report_title}`
+      : latest.moc_report_no || "No MOCs loaded";
+  }, [reports]);
 
   const filteredReports = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -2377,23 +2386,15 @@ function MOCPageContent() {
 
   return (
     <main>
-      <section style={heroStyle}>
-        <div style={{ flex: "1 1 680px" }}>
-          <div style={eyebrowStyle}>Quality Command Centre</div>
-          <h1 style={heroTitleStyle}>Management of Change</h1>
-          <p style={heroSubtitleStyle}>
-            Operational MOC register aligned to the controlled Enshore form structure, with full record editing and PDF generation from saved values.
-          </p>
-
-        </div>
-
-        <div style={heroMetaWrapStyle}>
-          <HeroMetaCard label="Total MOCs" value={reports.length} />
-          <HeroMetaCard label="Selected Record" value={detailReport.moc_report_no || "None"} compact />
-          <HeroMetaCard label="Form" value="ENS-HSEQ-FRM-008 Rev D" compact />
-          <HeroMetaCard label="Last Refreshed" value={refreshStamp || "-"} compact />
-        </div>
-      </section>
+      <QualityPageHero
+        label="QUALITY COMMAND CENTRE"
+        title="Management of Change"
+        description="Operational MOC register aligned to the controlled Enshore form structure, with full record editing and PDF generation from saved values."
+        contextCards={[
+          { label: "Last Refreshed", value: refreshStamp || "-" },
+          { label: "Latest MOC", value: latestMocSummary },
+        ]}
+      />
 
       <div style={topMetaRowStyle}>
         <Link href="/" style={backLinkStyle}>
@@ -2401,12 +2402,6 @@ function MOCPageContent() {
         </Link>
 
         <div style={topMetaActionsStyle}>
-          <button type="button" style={secondaryButtonStyle} onClick={() => setShowCreatePanel((prev) => !prev)}>
-            {showCreatePanel ? "Hide create panel" : "Show create panel"}
-          </button>
-          <button type="button" style={secondaryButtonStyle} onClick={() => void loadData()}>
-            Refresh
-          </button>
           <div
             style={{
               ...statusBannerStyle,
@@ -2417,6 +2412,12 @@ function MOCPageContent() {
           >
             <strong>Status:</strong> {message}
           </div>
+          <button type="button" style={secondaryButtonStyle} onClick={() => setShowCreatePanel((prev) => !prev)}>
+            {showCreatePanel ? "Hide create panel" : "Show create panel"}
+          </button>
+          <button type="button" style={secondaryButtonStyle} onClick={() => void loadData()}>
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -3447,23 +3448,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function HeroMetaCard({
-  label,
-  value,
-  compact,
-}: {
-  label: string;
-  value: string | number;
-  compact?: boolean;
-}) {
-  return (
-    <div style={heroMetaCardStyle}>
-      <div style={heroMetaLabelStyle}>{label}</div>
-      <div style={compact ? heroMetaCompactValueStyle : heroMetaValueStyle}>{value}</div>
-    </div>
-  );
-}
-
 function CompactMetricCard({ title, value, accent }: { title: string; value: number; accent: string }) {
   return (
     <div style={{ ...compactMetricCardStyle, borderTop: `4px solid ${accent}` }}>
@@ -3708,76 +3692,6 @@ function SimpleSignoffTable({
     </div>
   );
 }
-
-const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
-  color: "white",
-  borderRadius: "20px",
-  padding: "28px 30px",
-  marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(15, 118, 110, 0.14)",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "24px",
-  alignItems: "flex-start",
-  flexWrap: "wrap",
-};
-
-const eyebrowStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 700,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  opacity: 0.82,
-  marginBottom: "10px",
-};
-
-const heroTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "34px",
-  lineHeight: 1.08,
-};
-
-const heroSubtitleStyle: CSSProperties = {
-  marginTop: "10px",
-  marginBottom: 0,
-  fontSize: "16px",
-  maxWidth: "820px",
-  color: "rgba(255,255,255,0.92)",
-};
-
-const heroMetaWrapStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(180px, 1fr))",
-  gap: "12px",
-  minWidth: "340px",
-  flex: "1 1 340px",
-};
-
-const heroMetaCardStyle: CSSProperties = {
-  background: "rgba(255,255,255,0.10)",
-  border: "1px solid rgba(255,255,255,0.14)",
-  borderRadius: "14px",
-  padding: "14px 16px",
-};
-
-const heroMetaLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 700,
-  opacity: 0.82,
-  marginBottom: "6px",
-};
-
-const heroMetaValueStyle: CSSProperties = {
-  fontSize: "18px",
-  fontWeight: 700,
-};
-
-const heroMetaCompactValueStyle: CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 700,
-  lineHeight: 1.35,
-};
 
 const topMetaRowStyle: CSSProperties = {
   marginBottom: 20,

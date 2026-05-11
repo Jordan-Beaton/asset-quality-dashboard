@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
+import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -2246,25 +2247,19 @@ function SectionCard({
   subtitle,
   action,
   children,
-}: {
-  title: string;
-  subtitle?: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section style={panelStyle}>
-      <div style={sectionHeaderRowStyle}>
-        <div>
-          <h2 style={sectionTitleStyle}>{title}</h2>
-          {subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}
-        </div>
-        {action || null}
-      </div>
-      {children}
-    </section>
-  );
-}
+  }: {
+    title: string;
+    subtitle?: string;
+    action?: ReactNode;
+    children: ReactNode;
+  }) {
+    return (
+      <section style={panelStyle}>
+        <ModuleSectionHeader title={title} subtitle={subtitle} actions={action} />
+        {children}
+      </section>
+    );
+  }
 
 function StatCard({ title, value, accent }: { title: string; value: number; accent: string }) {
   return (

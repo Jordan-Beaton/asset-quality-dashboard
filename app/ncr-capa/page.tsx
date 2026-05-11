@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -241,6 +242,62 @@ function toDataUrl(file: File) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+const evidenceImageExtensions = new Set(["jpg", "jpeg", "png", "webp"]);
+
+function getFileExtension(fileName: string | null | undefined) {
+  const name = (fileName || "").trim();
+  const match = name.match(/\.([a-z0-9]+)$/i);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function isImageEvidence(file: EvidenceFile) {
+  if ((file.content_type || "").toLowerCase().startsWith("image/")) return true;
+  return evidenceImageExtensions.has(getFileExtension(file.file_name));
+}
+
+function getEvidenceTypeLabel(file: EvidenceFile) {
+  if (file.content_type) return file.content_type;
+  const extension = getFileExtension(file.file_name);
+  return extension ? extension.toUpperCase() : "Unknown";
+}
+
+async function fetchImagePreviewData(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Image fetch failed with status ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Image decode failed"));
+      img.src = objectUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Canvas context not available");
+    }
+
+    canvas.width = image.naturalWidth || image.width;
+    canvas.height = image.naturalHeight || image.height;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    return {
+      dataUrl: canvas.toDataURL("image/png"),
+      width: canvas.width,
+      height: canvas.height,
+    };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 function unknownArrayToOptions(
@@ -1157,17 +1214,28 @@ function NcrCapaPageContent() {
     await loadData();
   }
 
-  async function openEvidence(file: EvidenceFile) {
+  async function createEvidenceSignedUrl(filePath: string, expiresIn = 900) {
     const { data, error } = await supabase.storage
       .from("quality-evidence")
-      .createSignedUrl(file.file_path, 300);
+      .createSignedUrl(filePath, expiresIn);
 
     if (error || !data?.signedUrl) {
-      setMessage(`Could not open file: ${error?.message || "Unknown error"}`);
-      return;
+      throw new Error(error?.message || "Could not create a signed evidence URL.");
     }
 
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    return data.signedUrl;
+  }
+
+  async function openEvidence(file: EvidenceFile) {
+    try {
+      const signedUrl = await createEvidenceSignedUrl(file.file_path, 300);
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setMessage(
+        `Could not open file: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+      return;
+    }
   }
 
   async function deleteEvidence(file: EvidenceFile) {
@@ -1363,13 +1431,14 @@ function NcrCapaPageContent() {
       drawParagraphBox("Root Cause Category", selectedRow.root_cause_category, 12);
       drawParagraphBox("Root Cause Description", selectedRow.root_cause_description, 22);
 
-      const includedCapas =
-        includeLinkedCapaInPdf && selectedLinkedCapas.length > 0 ? selectedLinkedCapas : [];
+        const includedCapas =
+          includeLinkedCapaInPdf && selectedLinkedCapas.length > 0 ? selectedLinkedCapas : [];
+        const evidenceUrlMap = new Map<string, string>();
 
-      if (externalFacingPdf) {
-        drawHeading("SUPPLIER / CLIENT RESPONSE");
-        drawParagraphBox("Response / Proposed Action", "", 28);
-        drawParagraphBox("Acknowledgement / Responsible Contact", "", 18);
+        if (externalFacingPdf) {
+          drawHeading("SUPPLIER / CLIENT RESPONSE");
+          drawParagraphBox("Response / Proposed Action", "", 28);
+          drawParagraphBox("Acknowledgement / Responsible Contact", "", 18);
       }
 
       if (includedCapas.length > 0) {
@@ -1410,48 +1479,151 @@ function NcrCapaPageContent() {
         });
       }
 
-      if (includeEvidenceListInPdf) {
-        drawHeading("EVIDENCE LIST");
+        if (includeEvidenceListInPdf) {
+          drawHeading("EVIDENCE LIST");
 
-        if (selectedNcrPdfEvidence.length === 0) {
-          drawParagraphBox("Attached Evidence", "No evidence files listed for this export.", 14);
-        } else {
-          autoTable(doc, {
-            startY: y,
-            theme: "grid",
-            margin: { left: margin, right: margin },
-            head: [["Record", "File Name", "Uploaded", "Reference"]],
-            body: selectedNcrPdfEvidence.map((file) => [
-              file.record_type === "NCR" ? selectedRow.number : capas.find((capa) => capa.id === file.record_id)?.capa_number || "CAPA",
-              file.file_name,
-              formatDateTime(file.uploaded_at),
-              file.notes || "",
-            ]),
-            styles: {
-              font: "helvetica",
-              fontSize: 8.6,
-              cellPadding: 2.1,
-              lineColor: [203, 213, 225],
+          if (selectedNcrPdfEvidence.length === 0) {
+            drawParagraphBox("Attached Evidence", "No evidence files listed for this export.", 14);
+          } else {
+            await Promise.all(
+              selectedNcrPdfEvidence.map(async (file) => {
+                try {
+                  const signedUrl = await createEvidenceSignedUrl(file.file_path);
+                  evidenceUrlMap.set(file.id, signedUrl);
+                } catch (error) {
+                  console.warn(`Evidence link unavailable for ${file.file_name}`, error);
+                }
+              })
+            );
+
+              const evidenceRows = selectedNcrPdfEvidence.map((file) => ({
+                record:
+                  file.record_type === "NCR"
+                    ? selectedRow.number
+                    : capas.find((capa) => capa.id === file.record_id)?.capa_number || "CAPA",
+                file_name: file.file_name,
+                uploaded: formatDateTime(file.uploaded_at),
+                file_type: getEvidenceTypeLabel(file),
+                reference: file.notes || "",
+                link: "",
+                url: evidenceUrlMap.get(file.id) || "",
+              }));
+
+            autoTable(doc, {
+              startY: y,
+              theme: "grid",
+              margin: { left: margin, right: margin },
+              columns: [
+                { header: "Record", dataKey: "record" },
+                { header: "File Name", dataKey: "file_name" },
+                { header: "Type", dataKey: "file_type" },
+                { header: "Uploaded", dataKey: "uploaded" },
+                { header: "Reference", dataKey: "reference" },
+                { header: "Link", dataKey: "link" },
+              ],
+              body: evidenceRows,
+              styles: {
+                font: "helvetica",
+                fontSize: 8.6,
+                cellPadding: 2.1,
+                lineColor: [203, 213, 225],
               lineWidth: 0.2,
               textColor: [15, 23, 42],
               overflow: "linebreak",
             },
-            headStyles: {
-              fillColor: [15, 23, 42],
-              textColor: [255, 255, 255],
-              fontStyle: "bold",
-            },
-            columnStyles: {
-              0: { cellWidth: 24 },
-              1: { cellWidth: 70 },
-              2: { cellWidth: 32 },
-              3: { cellWidth: 60 },
-            },
-          });
+              headStyles: {
+                fillColor: [15, 23, 42],
+                textColor: [255, 255, 255],
+                fontStyle: "bold",
+              },
+              columnStyles: {
+                record: { cellWidth: 24 },
+                file_name: { cellWidth: 52 },
+                file_type: { cellWidth: 24 },
+                uploaded: { cellWidth: 28 },
+                reference: { cellWidth: 38 },
+                link: { cellWidth: 24 },
+              },
+              didDrawCell: (data) => {
+                if (data.section !== "body" || data.column.dataKey !== "link") return;
 
-          y = ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y) + 8;
+                const row = data.row.raw as (typeof evidenceRows)[number];
+                if (!row.url) return;
+
+                const linkText = "Open evidence";
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(8.6);
+                doc.setTextColor(29, 78, 216);
+                doc.textWithLink(
+                  linkText,
+                  data.cell.x + 1.8,
+                  data.cell.y + data.cell.height / 2 + 1.4,
+                  { url: row.url }
+                );
+                doc.setTextColor(15, 23, 42);
+              },
+            });
+
+            y = ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y) + 8;
+
+            const imageEvidence = selectedNcrPdfEvidence.filter((file) => isImageEvidence(file));
+
+            if (imageEvidence.length > 0) {
+              drawHeading("EVIDENCE IMAGES");
+
+              for (const file of imageEvidence) {
+                const signedUrl = evidenceUrlMap.get(file.id);
+                if (!signedUrl) continue;
+
+                try {
+                  const preview = await fetchImagePreviewData(signedUrl);
+                  const maxImageWidth = pageWidth - margin * 2;
+                  const maxImageHeight = pageHeight - margin - 34;
+                  const widthRatio = maxImageWidth / preview.width;
+                  const heightRatio = maxImageHeight / preview.height;
+                  const scale = Math.min(widthRatio, heightRatio, 1);
+                  const drawWidth = preview.width * scale;
+                  const drawHeight = preview.height * scale;
+                  const captionLines = doc.splitTextToSize(
+                    file.notes ? `${file.file_name} - ${file.notes}` : file.file_name,
+                    maxImageWidth
+                  );
+                  const captionHeight = Math.max(6, captionLines.length * 4.2);
+                  const metaLine = `${
+                    file.record_type === "NCR"
+                      ? selectedRow.number
+                      : capas.find((capa) => capa.id === file.record_id)?.capa_number || "CAPA"
+                  } | ${formatDateTime(file.uploaded_at)}`;
+                  const blockHeight = captionHeight + 5 + drawHeight + 10;
+
+                  if (y + blockHeight > pageHeight - margin) {
+                    doc.addPage();
+                    y = 18;
+                  }
+
+                  doc.setFont("helvetica", "bold");
+                  doc.setFontSize(9.4);
+                  doc.setTextColor(30, 41, 59);
+                  doc.text(captionLines, margin, y);
+                  y += captionHeight;
+
+                  doc.setFont("helvetica", "normal");
+                  doc.setFontSize(8.2);
+                  doc.setTextColor(100, 116, 139);
+                  doc.text(metaLine, margin, y);
+                  y += 4;
+
+                  doc.setDrawColor(203, 213, 225);
+                  doc.roundedRect(margin, y, drawWidth, drawHeight, 1.2, 1.2);
+                  doc.addImage(preview.dataUrl, "PNG", margin, y, drawWidth, drawHeight, undefined, "FAST");
+                  y += drawHeight + 8;
+                } catch (error) {
+                  console.warn(`Image preview skipped for ${file.file_name}`, error);
+                }
+              }
+            }
+          }
         }
-      }
 
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
@@ -2973,21 +3145,18 @@ function SectionCard({
   title,
   subtitle,
   children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section style={panelStyle}>
-      <div style={sectionHeaderStyle}>
-        <h2 style={sectionTitleStyle}>{title}</h2>
-        {subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
+  }: {
+    title: string;
+    subtitle?: string;
+    children: ReactNode;
+  }) {
+    return (
+      <section style={panelStyle}>
+        <ModuleSectionHeader title={title} subtitle={subtitle} />
+        {children}
+      </section>
+    );
+  }
 
 function HeroPill({
   label,

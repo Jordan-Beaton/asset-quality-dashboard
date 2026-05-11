@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -2385,7 +2386,7 @@ function DocumentsPageContent() {
               </div>
 
               <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Document Control Record</div>
+                <ModuleSectionHeader title="Document Control Record" />
                 <div style={detailContentGridStyle}>
                   <div style={formLayoutStyle}>
                     <FormSection title="A. Document Details">
@@ -2742,7 +2743,7 @@ function DocumentsPageContent() {
               </div>
 
               <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Revision History</div>
+                <ModuleSectionHeader title="Revision History" />
 
                 {selectedRevisions.length === 0 ? (
                   <div style={emptyRevisionStyle}>No revision history files uploaded yet.</div>
@@ -2843,21 +2844,18 @@ function SectionCard({
   title,
   subtitle,
   children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section style={panelStyle}>
-      <div style={sectionHeaderStyle}>
-        <h2 style={sectionTitleStyle}>{title}</h2>
-        {subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
+  }: {
+    title: string;
+    subtitle?: string;
+    children: ReactNode;
+  }) {
+    return (
+      <section style={panelStyle}>
+        <ModuleSectionHeader title={title} subtitle={subtitle} />
+        {children}
+      </section>
+    );
+  }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (

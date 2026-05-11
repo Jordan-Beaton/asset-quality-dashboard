@@ -12,7 +12,6 @@ type AppShellProps = {
 const qualityNavItems = [
   { href: "/home", label: "Home" },
   { href: "/", label: "Dashboard" },
-  { href: "/people", label: "People" },
   { href: "/documents", label: "Documents" },
   { href: "/moc", label: "MOC" },
   { href: "/ncr-capa", label: "NCR / CAPA" },
@@ -28,7 +27,11 @@ const assetNavItems = [
   { href: "/assets/calibration", label: "Calibration" },
   { href: "/assets/inspection", label: "Inspection" },
   { href: "/assets/maintenance", label: "Maintenance" },
-  { href: "/assets/people", label: "People" },
+];
+
+const peopleNavItems = [
+  { href: "/home", label: "Home" },
+  { href: "/people", label: "People" },
 ];
 
 export default function AppShell({ children }: AppShellProps) {
@@ -56,7 +59,7 @@ export default function AppShell({ children }: AppShellProps) {
     : pathname.startsWith("/hse")
     ? "Health, safety and environment system"
     : "Quality management system";
-  const navItems = isAssetModule ? assetNavItems : qualityNavItems;
+  const navItems = isAssetModule ? assetNavItems : isPeopleModule ? peopleNavItems : qualityNavItems;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

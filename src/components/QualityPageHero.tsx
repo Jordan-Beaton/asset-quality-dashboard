@@ -11,7 +11,8 @@ type QualityPageHeroProps = {
   label: string;
   title: string;
   description: string;
-  contextCards: HeroContextCard[];
+  contextCards?: HeroContextCard[];
+  actions?: ReactNode;
 };
 
 const heroStyle: CSSProperties = {
@@ -71,6 +72,22 @@ const metaGridStyle: CSSProperties = {
   alignContent: "center",
 };
 
+const rightColumnStyle: CSSProperties = {
+  flex: "0 1 476px",
+  minWidth: "260px",
+  display: "grid",
+  gap: "12px",
+  alignContent: "start",
+};
+
+const actionsWrapStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  alignItems: "center",
+  gap: "10px",
+  flexWrap: "wrap",
+};
+
 const metaCardStyle: CSSProperties = {
   minHeight: "88px",
   padding: "16px 18px",
@@ -98,7 +115,13 @@ const metaValueStyle: CSSProperties = {
   wordBreak: "break-word",
 };
 
-export function QualityPageHero({ label, title, description, contextCards }: QualityPageHeroProps) {
+export function QualityPageHero({
+  label,
+  title,
+  description,
+  contextCards = [],
+  actions,
+}: QualityPageHeroProps) {
   return (
     <section style={heroStyle}>
       <div style={copyStyle}>
@@ -107,13 +130,18 @@ export function QualityPageHero({ label, title, description, contextCards }: Qua
         <p style={descriptionStyle}>{description}</p>
       </div>
 
-      <div style={metaGridStyle}>
-        {contextCards.slice(0, 4).map((card) => (
-          <div key={card.label} style={metaCardStyle}>
-            <div style={metaLabelStyle}>{card.label}</div>
-            <div style={metaValueStyle}>{card.value}</div>
+      <div style={rightColumnStyle}>
+        {actions ? <div style={actionsWrapStyle}>{actions}</div> : null}
+        {contextCards.length > 0 ? (
+          <div style={metaGridStyle}>
+            {contextCards.slice(0, 4).map((card) => (
+              <div key={card.label} style={metaCardStyle}>
+                <div style={metaLabelStyle}>{card.label}</div>
+                <div style={metaValueStyle}>{card.value}</div>
+              </div>
+            ))}
           </div>
-        ))}
+        ) : null}
       </div>
     </section>
   );

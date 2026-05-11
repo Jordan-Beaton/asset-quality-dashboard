@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import QRCode from "qrcode";
+import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -112,11 +114,17 @@ type AssetCalibrationRow = {
   file_path: string | null;
   notes: string | null;
   uploaded_at: string | null;
+  calibration_date: string | null;
+  calibration_due_date: string | null;
+  calibration_type: string | null;
+  calibrated_by: string | null;
+  certificate_number: string | null;
 };
 
 type AssetInspectionRow = {
   id: string;
   asset_id: string;
+  inspection_number: string | null;
   reference: string | null;
   file_name: string | null;
   file_path: string | null;
@@ -134,6 +142,7 @@ type AssetInspectionRow = {
 type AssetMaintenanceRow = {
   id: string;
   asset_id: string;
+  maintenance_number: string | null;
   maintenance_date: string | null;
   maintenance_type: string | null;
   carried_out_by: string | null;
@@ -153,6 +162,30 @@ type AssetFileRow = {
   file_path: string;
   file_size: number | null;
   uploaded_at: string;
+};
+
+type AssetActionRow = {
+  id: string;
+  action_number: string | null;
+  title: string | null;
+  description: string | null;
+  status: string | null;
+  linked_asset_id: string | null;
+  linked_asset_code: string | null;
+  created_at: string | null;
+  due_date: string | null;
+};
+
+type AssetTimelineEntry = {
+  id: string;
+  type: "File" | "Calibration" | "Inspection" | "Maintenance" | "Action";
+  date: string | null;
+  title: string;
+  description: string;
+  status: string;
+  file_path: string | null;
+  file_label: string;
+  sortTime: number;
 };
 
 const STORAGE_BUCKET = "asset-files";
@@ -388,6 +421,8 @@ function AssetsPageContent() {
   const linkedLocation = searchParams.get("location")?.trim() || "";
   const linkedOwner = searchParams.get("owner")?.trim() || "";
   const qualityLinkedOnly = searchParams.get("qualityLinked") === "1";
+  const linkedAssetCode = searchParams.get("asset")?.trim() || "";
+  const linkedAssetId = searchParams.get("assetId")?.trim() || "";
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [message, setMessage] = useState("Loading assets...");
@@ -409,15 +444,22 @@ function AssetsPageContent() {
   const [actionOptions, setActionOptions] = useState<LinkedOption[]>([]);
 
   const [qualityByAssetId, setQualityByAssetId] = useState<Record<string, AssetQualityRecord>>({});
+  const [calibrationHistoryByAssetId, setCalibrationHistoryByAssetId] = useState<
+    Record<string, AssetCalibrationRow[]>
+  >({});
   const [inspectionHistoryByAssetId, setInspectionHistoryByAssetId] = useState<
     Record<string, AssetInspectionRow[]>
   >({});
   const [maintenanceHistoryByAssetId, setMaintenanceHistoryByAssetId] = useState<
     Record<string, AssetMaintenanceRow[]>
   >({});
+  const [fileHistoryByAssetId, setFileHistoryByAssetId] = useState<Record<string, AssetFileRow[]>>({});
+  const [actionHistoryByAssetId, setActionHistoryByAssetId] = useState<Record<string, AssetActionRow[]>>({});
   const [isSavingQuality, setIsSavingQuality] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState("");
+  const [showQrCard, setShowQrCard] = useState(false);
+  const [selectedAssetQrDataUrl, setSelectedAssetQrDataUrl] = useState("");
 
   async function loadAssets() {
     const { data, error } = await supabase.from("assets").select("*").order("name", {
@@ -448,12 +490,19 @@ function AssetsPageContent() {
   async function loadQualityData(assetIds: string[]) {
     if (assetIds.length === 0) {
       setQualityByAssetId({});
+      setCalibrationHistoryByAssetId({});
       setInspectionHistoryByAssetId({});
       setMaintenanceHistoryByAssetId({});
+      setFileHistoryByAssetId({});
+      setActionHistoryByAssetId({});
       return;
     }
 
-    const [qualityRes, ncrRes, actionRes, calibrationRes, inspectionRes, maintenanceRes, filesRes] =
+    const assetCodeById = new Map(
+      assets.map((asset) => [asset.id, asset.asset_code?.trim() || ""] as const)
+    );
+
+    const [qualityRes, ncrRes, actionRes, calibrationRes, inspectionRes, maintenanceRes, filesRes, actionTimelineRes] =
       await Promise.all([
       supabase
         .from("asset_quality")
@@ -469,34 +518,48 @@ function AssetsPageContent() {
         .in("asset_id", assetIds),
       supabase
         .from("asset_calibration_records")
-        .select("id,asset_id,reference,file_name,file_path,notes,uploaded_at")
+        .select(
+          "id,asset_id,reference,file_name,file_path,notes,uploaded_at,calibration_date,calibration_due_date,calibration_type,calibrated_by,certificate_number"
+        )
         .in("asset_id", assetIds),
       supabase
         .from("asset_inspection_records")
         .select(
-          "id,asset_id,reference,file_name,file_path,notes,uploaded_at,inspection_date,inspector,result,findings,actions_required,next_inspection_due,created_at"
+          "id,asset_id,inspection_number,reference,file_name,file_path,notes,uploaded_at,inspection_date,inspector,result,findings,actions_required,next_inspection_due,created_at"
         )
         .in("asset_id", assetIds),
       supabase
         .from("asset_maintenance_records")
         .select(
-          "id,asset_id,maintenance_date,maintenance_type,carried_out_by,description,next_maintenance_due,file_name,file_path,created_at"
+          "id,asset_id,maintenance_number,maintenance_date,maintenance_type,carried_out_by,description,next_maintenance_due,file_name,file_path,created_at"
         )
         .in("asset_id", assetIds),
       supabase
         .from("asset_files")
         .select("id,asset_id,file_type,reference,file_name,file_path,file_size,uploaded_at")
         .in("asset_id", assetIds),
+      supabase
+        .from("actions")
+        .select(
+          "id,action_number,title,description,status,linked_asset_id,linked_asset_code,created_at,due_date"
+        )
+        .limit(1000),
     ]);
 
     const next: Record<string, AssetQualityRecord> = {};
+    const nextCalibrationHistory: Record<string, AssetCalibrationRow[]> = {};
     const nextInspectionHistory: Record<string, AssetInspectionRow[]> = {};
     const nextMaintenanceHistory: Record<string, AssetMaintenanceRow[]> = {};
+    const nextFileHistory: Record<string, AssetFileRow[]> = {};
+    const nextActionHistory: Record<string, AssetActionRow[]> = {};
 
     assetIds.forEach((assetId) => {
       next[assetId] = createDefaultQualityRecord();
+      nextCalibrationHistory[assetId] = [];
       nextInspectionHistory[assetId] = [];
       nextMaintenanceHistory[assetId] = [];
+      nextFileHistory[assetId] = [];
+      nextActionHistory[assetId] = [];
     });
 
     if (!qualityRes.error) {
@@ -528,6 +591,8 @@ function AssetsPageContent() {
 
     if (!calibrationRes.error) {
       (calibrationRes.data as AssetCalibrationRow[] | null)?.forEach((row) => {
+        nextCalibrationHistory[row.asset_id] = nextCalibrationHistory[row.asset_id] || [];
+        nextCalibrationHistory[row.asset_id].push(row);
         next[row.asset_id] = next[row.asset_id] || createDefaultQualityRecord();
         next[row.asset_id].calibration_records.push({
           id: row.id,
@@ -581,6 +646,10 @@ function AssetsPageContent() {
       const files = (filesRes.data as AssetFileRow[] | null) || [];
       files.forEach((fileRow) => {
         next[fileRow.asset_id] = next[fileRow.asset_id] || createDefaultQualityRecord();
+        if (fileRow.file_type === "image" || fileRow.file_type === "other") {
+          nextFileHistory[fileRow.asset_id] = nextFileHistory[fileRow.asset_id] || [];
+          nextFileHistory[fileRow.asset_id].push(fileRow);
+        }
 
         if (fileRow.file_type === "image") {
           next[fileRow.asset_id].image_name = fileRow.file_name;
@@ -591,9 +660,31 @@ function AssetsPageContent() {
       });
     }
 
+    if (!actionTimelineRes.error) {
+      ((actionTimelineRes.data as AssetActionRow[] | null) || []).forEach((row) => {
+        const linkedAssetId = row.linked_asset_id?.trim() || "";
+        if (linkedAssetId && nextActionHistory[linkedAssetId]) {
+          nextActionHistory[linkedAssetId].push(row);
+          return;
+        }
+
+        const linkedAssetCode = row.linked_asset_code?.trim() || "";
+        if (!linkedAssetCode) return;
+
+        const matchedAssetId = assetIds.find((assetId) => assetCodeById.get(assetId) === linkedAssetCode);
+        if (matchedAssetId) {
+          nextActionHistory[matchedAssetId] = nextActionHistory[matchedAssetId] || [];
+          nextActionHistory[matchedAssetId].push(row);
+        }
+      });
+    }
+
     setQualityByAssetId(next);
+    setCalibrationHistoryByAssetId(nextCalibrationHistory);
     setInspectionHistoryByAssetId(nextInspectionHistory);
     setMaintenanceHistoryByAssetId(nextMaintenanceHistory);
+    setFileHistoryByAssetId(nextFileHistory);
+    setActionHistoryByAssetId(nextActionHistory);
   }
 
   useEffect(() => {
@@ -613,6 +704,24 @@ function AssetsPageContent() {
     setLocationFilter(linkedLocation);
     setOwnerFilter(linkedOwner);
   }, [linkedSearch, linkedStatus, linkedLocation, linkedOwner]);
+
+  useEffect(() => {
+    if (assets.length === 0) return;
+    if (!linkedAssetCode && !linkedAssetId) return;
+
+    const matchedAsset =
+      assets.find(
+        (asset) =>
+          Boolean(linkedAssetCode) &&
+          (asset.asset_code || "").trim().toLowerCase() === linkedAssetCode.toLowerCase()
+      ) ||
+      assets.find((asset) => Boolean(linkedAssetId) && asset.id === linkedAssetId);
+
+    if (matchedAsset) {
+      setSelectedAssetId(matchedAsset.id);
+      setIsDetailPanelOpen(true);
+    }
+  }, [assets, linkedAssetCode, linkedAssetId]);
 
   useEffect(() => {
     const imagePath = selectedAssetId ? qualityByAssetId[selectedAssetId]?.image_path || "" : "";
@@ -687,6 +796,17 @@ function AssetsPageContent() {
     [assets, selectedAssetId]
   );
 
+  const selectedAssetQrUrl = useMemo(() => {
+    if (!selectedAsset) return "";
+
+    const relativeUrl = selectedAsset.asset_code?.trim()
+      ? `/assets?asset=${encodeURIComponent(selectedAsset.asset_code.trim())}`
+      : `/assets?assetId=${encodeURIComponent(selectedAsset.id)}`;
+
+    if (typeof window === "undefined") return relativeUrl;
+    return `${window.location.origin}${relativeUrl}`;
+  }, [selectedAsset]);
+
   const selectedQuality = useMemo(() => {
     if (!selectedAssetId) return createDefaultQualityRecord();
     return qualityByAssetId[selectedAssetId] || createDefaultQualityRecord();
@@ -710,8 +830,89 @@ function AssetsPageContent() {
     });
   }, [maintenanceHistoryByAssetId, selectedAssetId]);
 
+  const selectedTimelineEntries = useMemo(() => {
+    const calibrationRows = selectedAssetId ? calibrationHistoryByAssetId[selectedAssetId] || [] : [];
+    const inspectionRows = selectedAssetId ? inspectionHistoryByAssetId[selectedAssetId] || [] : [];
+    const maintenanceRows = selectedAssetId ? maintenanceHistoryByAssetId[selectedAssetId] || [] : [];
+    const fileRows = selectedAssetId ? fileHistoryByAssetId[selectedAssetId] || [] : [];
+    const actionRows = selectedAssetId ? actionHistoryByAssetId[selectedAssetId] || [] : [];
+
+    const entries: AssetTimelineEntry[] = [
+      ...fileRows.map((row) => ({
+        id: `file-${row.id}`,
+        type: "File" as const,
+        date: row.uploaded_at || null,
+        title: row.file_name || row.reference || "Asset file",
+        description: row.reference || `${row.file_type === "image" ? "Asset image" : "Asset file"} uploaded`,
+        status: row.file_type === "image" ? "Image" : "File",
+        file_path: row.file_path || null,
+        file_label: "Open file",
+        sortTime: getTimestampValue(row.uploaded_at),
+      })),
+      ...calibrationRows.map((row) => ({
+        id: `cal-${row.id}`,
+        type: "Calibration" as const,
+        date: row.calibration_date || row.uploaded_at || null,
+        title: row.certificate_number || row.reference || "Calibration record",
+        description:
+          row.notes ||
+          [row.calibration_type, row.calibrated_by].filter(Boolean).join(" • ") ||
+          "Calibration event recorded",
+        status: row.calibration_due_date ? `Due ${formatDate(row.calibration_due_date)}` : "Recorded",
+        file_path: row.file_path || null,
+        file_label: row.file_path ? "Open certificate" : "",
+        sortTime: getTimestampValue(row.calibration_date || row.uploaded_at),
+      })),
+      ...inspectionRows.map((row) => ({
+        id: `insp-${row.id}`,
+        type: "Inspection" as const,
+        date: row.inspection_date || row.created_at || row.uploaded_at || null,
+        title: row.inspection_number || row.reference || "Inspection record",
+        description: row.findings || row.actions_required || row.notes || row.inspector || "Inspection recorded",
+        status: row.result || "Recorded",
+        file_path: row.file_path || null,
+        file_label: row.file_path ? "Open file" : "",
+        sortTime: getTimestampValue(row.inspection_date || row.created_at || row.uploaded_at),
+      })),
+      ...maintenanceRows.map((row) => ({
+        id: `mnt-${row.id}`,
+        type: "Maintenance" as const,
+        date: row.maintenance_date || row.created_at || null,
+        title: row.maintenance_number || row.maintenance_type || "Maintenance record",
+        description: row.description || row.carried_out_by || "Maintenance recorded",
+        status: row.maintenance_type || "Recorded",
+        file_path: row.file_path || null,
+        file_label: row.file_path ? "Open file" : "",
+        sortTime: getTimestampValue(row.maintenance_date || row.created_at),
+      })),
+      ...actionRows.map((row) => ({
+        id: `action-${row.id}`,
+        type: "Action" as const,
+        date: row.created_at || row.due_date || null,
+        title: row.action_number || row.title || "Linked action",
+        description: row.description || row.title || "Action linked to asset",
+        status: row.status || "Open",
+        file_path: null,
+        file_label: "",
+        sortTime: getTimestampValue(row.created_at || row.due_date),
+      })),
+    ];
+
+    return entries.sort((a, b) => b.sortTime - a.sortTime);
+  }, [
+    actionHistoryByAssetId,
+    calibrationHistoryByAssetId,
+    fileHistoryByAssetId,
+    inspectionHistoryByAssetId,
+    maintenanceHistoryByAssetId,
+    selectedAssetId,
+  ]);
+
   useEffect(() => {
     if (!selectedAsset) return;
+
+    setShowQrCard(false);
+    setSelectedAssetQrDataUrl("");
 
     setDetailForm({
       name: selectedAsset.name || "",
@@ -733,6 +934,38 @@ function AssetsPageContent() {
     const record = qualityByAssetId[selectedAsset.id] || createDefaultQualityRecord();
     setQualityDraft(createQualityDraft(record));
   }, [selectedAsset, qualityByAssetId]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!showQrCard || !selectedAssetQrUrl) {
+      setSelectedAssetQrDataUrl("");
+      return () => {
+        isActive = false;
+      };
+    }
+
+    void QRCode.toDataURL(selectedAssetQrUrl, {
+      width: 280,
+      margin: 1,
+      color: {
+        dark: "#0f172a",
+        light: "#ffffff",
+      },
+    })
+      .then((url) => {
+        if (isActive) setSelectedAssetQrDataUrl(url);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setSelectedAssetQrDataUrl("");
+        setMessage("Could not generate QR code.");
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [showQrCard, selectedAssetQrUrl]);
 
   const totalAssets = assets.length;
   const activeAssets = assets.filter((a) => (a.status || "").toLowerCase() === "active").length;
@@ -1239,6 +1472,64 @@ function AssetsPageContent() {
     }
 
     window.open(signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  function printSelectedAssetQrCode() {
+    if (!selectedAssetQrDataUrl || !selectedAsset) return;
+
+    const printWindow = window.open("", "_blank", "width=520,height=680");
+    if (!printWindow) {
+      setMessage("Pop-up blocked. Allow pop-ups to print the QR code.");
+      return;
+    }
+
+    const assetLabel = selectedAsset.asset_code || selectedAsset.name || "Asset";
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${assetLabel} QR Code</title>
+          <style>
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              display: grid;
+              place-items: center;
+              padding: 32px;
+              color: #0f172a;
+            }
+            .wrap {
+              text-align: center;
+            }
+            img {
+              width: 280px;
+              height: 280px;
+              display: block;
+              margin: 0 auto 18px;
+            }
+            .title {
+              font-size: 22px;
+              font-weight: 800;
+              margin-bottom: 8px;
+            }
+            .meta {
+              font-size: 14px;
+              color: #475569;
+              word-break: break-word;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="wrap">
+            <img src="${selectedAssetQrDataUrl}" alt="Asset QR Code" />
+            <div class="title">${assetLabel}</div>
+            <div class="meta">${selectedAssetQrUrl}</div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   }
 
   function removeCalibrationRecord(id: string) {
@@ -1888,7 +2179,7 @@ function AssetsPageContent() {
             ) : (
               <div style={detailWorkspaceStyle}>
               <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Asset Identity / Status</div>
+                <ModuleSectionHeader title="Asset Identity / Status" />
 
                 <div style={detailTopBarStyle}>
                   <div>
@@ -1939,7 +2230,7 @@ function AssetsPageContent() {
               </div>
 
               <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Files / Image</div>
+                <ModuleSectionHeader title="Files / Image" />
 
                 <div style={imageStripStyle}>
                 <div style={imagePreviewWrapStyle}>
@@ -1992,13 +2283,68 @@ function AssetsPageContent() {
                         Remove image
                       </button>
                     ) : null}
+
+                    <button
+                      type="button"
+                      style={secondaryButtonStyle}
+                      onClick={() => setShowQrCard((current) => !current)}
+                    >
+                      {showQrCard ? "Hide QR Code" : "Generate / View QR Code"}
+                    </button>
                   </div>
+
+                  {showQrCard ? (
+                    <div style={qrCardStyle}>
+                      <div style={qrPreviewWrapStyle}>
+                        {selectedAssetQrDataUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={selectedAssetQrDataUrl}
+                            alt={`${selectedAsset.asset_code || selectedAsset.name || "Asset"} QR code`}
+                            style={qrImageStyle}
+                          />
+                        ) : (
+                          <div style={qrLoadingStyle}>Generating QR code...</div>
+                        )}
+                      </div>
+
+                      <div style={qrDetailsStyle}>
+                        <div style={qrCardTitleStyle}>Asset QR Code</div>
+                        <div style={qrCardMetaStyle}>
+                          Scan on a phone or tablet to open this asset record directly.
+                        </div>
+                        <div style={qrTargetLabelStyle}>Encoded URL</div>
+                        <div style={qrTargetValueStyle}>{selectedAssetQrUrl}</div>
+
+                        <div style={buttonRowStyle}>
+                          {selectedAssetQrDataUrl ? (
+                            <a
+                              href={selectedAssetQrDataUrl}
+                              download={`${selectedAsset.asset_code || selectedAsset.id}-qr.png`}
+                              style={reportLinkButtonStyle}
+                            >
+                              Download QR
+                            </a>
+                          ) : null}
+                          {selectedAssetQrDataUrl ? (
+                            <button
+                              type="button"
+                              style={secondaryButtonStyle}
+                              onClick={printSelectedAssetQrCode}
+                            >
+                              Print QR
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
                 </div>
               </div>
 
               <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Master Data</div>
+                <ModuleSectionHeader title="Master Data" />
 
                 <div style={detailFormGridStyle}>
                   <Field label="Asset Code">
@@ -2144,7 +2490,7 @@ function AssetsPageContent() {
               </div>
 
               <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Inspection / Maintenance History</div>
+                <ModuleSectionHeader title="Inspection / Maintenance History" />
 
                 <div style={detailSectionIntroStyle}>
                   Use the dedicated mobile logs to add live field records, then review the saved history here against
@@ -2305,7 +2651,60 @@ function AssetsPageContent() {
               </div>
 
               <div style={detailSectionStyle}>
-                <div style={detailSectionTitleStyle}>Quality Links</div>
+                <ModuleSectionHeader title="Asset History Timeline" />
+
+                <div style={detailSectionIntroStyle}>
+                  Combined operational history for this asset across files, calibration, inspection, maintenance,
+                  and linked actions.
+                </div>
+
+                {selectedTimelineEntries.length === 0 ? (
+                  <div style={emptyRecordStyle}>No asset history records available yet.</div>
+                ) : (
+                  <div style={timelineListStyle}>
+                    {selectedTimelineEntries.map((entry) => (
+                      <div key={entry.id} style={timelineCardStyle}>
+                        <div style={timelineHeaderStyle}>
+                          <div style={timelineTitleWrapStyle}>
+                            <span
+                              style={{
+                                ...badgeStyle,
+                                background: getTimelineTypeTone(entry.type).bg,
+                                color: getTimelineTypeTone(entry.type).color,
+                              }}
+                            >
+                              {entry.type}
+                            </span>
+                            <div>
+                              <div style={timelineTitleStyle}>{entry.title || "-"}</div>
+                              <div style={timelineMetaStyle}>{entry.date ? formatDateTime(entry.date) : "-"}</div>
+                            </div>
+                          </div>
+
+                          {entry.status ? <span style={timelineStatusStyle}>{entry.status}</span> : null}
+                        </div>
+
+                        <div style={timelineDescriptionStyle}>{entry.description || "-"}</div>
+
+                        {entry.file_path ? (
+                          <div style={buttonRowStyle}>
+                            <button
+                              type="button"
+                              style={reportLinkButtonStyle}
+                              onClick={() => void openStoredFile(entry.file_path || "")}
+                            >
+                              {entry.file_label || "Open file"}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div style={detailSectionStyle}>
+                <ModuleSectionHeader title="Quality Links" />
 
                 <div style={qualityMiniGridStyle}>
                   <MiniMetricCard label="NCRs" value={qualityDraft.linked_ncrs.length} tone="#991b1b" bg="#fee2e2" />
@@ -2607,21 +3006,18 @@ function SectionCard({
   title,
   subtitle,
   children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section style={panelStyle}>
-      <div style={sectionHeaderStyle}>
-        <h2 style={sectionTitleStyle}>{title}</h2>
-        {subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
+  }: {
+    title: string;
+    subtitle?: string;
+    children: ReactNode;
+  }) {
+    return (
+      <section style={panelStyle}>
+        <ModuleSectionHeader title={title} subtitle={subtitle} />
+        {children}
+      </section>
+    );
+  }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -3407,6 +3803,78 @@ const imageMetaWrapStyle: CSSProperties = {
   minWidth: 0,
 };
 
+const qrCardStyle: CSSProperties = {
+  marginTop: "16px",
+  border: "1px solid #dbe7f3",
+  borderRadius: "16px",
+  padding: "16px",
+  background: "#f8fafc",
+  display: "grid",
+  gridTemplateColumns: "minmax(160px, 200px) minmax(0, 1fr)",
+  gap: "16px",
+  alignItems: "center",
+};
+
+const qrPreviewWrapStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: "200px",
+  aspectRatio: "1 / 1",
+  borderRadius: "14px",
+  border: "1px solid #cbd5e1",
+  background: "#ffffff",
+  display: "grid",
+  placeItems: "center",
+  overflow: "hidden",
+};
+
+const qrImageStyle: CSSProperties = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
+};
+
+const qrLoadingStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#64748b",
+  textAlign: "center",
+  padding: "16px",
+};
+
+const qrDetailsStyle: CSSProperties = {
+  display: "grid",
+  gap: "8px",
+  minWidth: 0,
+};
+
+const qrCardTitleStyle: CSSProperties = {
+  fontSize: "16px",
+  fontWeight: 800,
+  color: "#0f172a",
+};
+
+const qrCardMetaStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#475569",
+  lineHeight: 1.45,
+};
+
+const qrTargetLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  marginTop: "4px",
+};
+
+const qrTargetValueStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#0f172a",
+  lineHeight: 1.45,
+  overflowWrap: "anywhere",
+};
+
 const imageMetaTitleStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
@@ -3602,6 +4070,66 @@ const historyPanelStyle: CSSProperties = {
   minWidth: 0,
 };
 
+const timelineListStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  marginTop: "14px",
+};
+
+const timelineCardStyle: CSSProperties = {
+  border: "1px solid #dbe7f3",
+  borderRadius: "14px",
+  padding: "14px 16px",
+  background: "#f8fafc",
+  display: "grid",
+  gap: "10px",
+};
+
+const timelineHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "flex-start",
+  flexWrap: "wrap",
+};
+
+const timelineTitleWrapStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  alignItems: "flex-start",
+  flexWrap: "wrap",
+};
+
+const timelineTitleStyle: CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 800,
+  color: "#0f172a",
+  lineHeight: 1.35,
+};
+
+const timelineMetaStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#64748b",
+  marginTop: "4px",
+};
+
+const timelineStatusStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 700,
+  color: "#334155",
+  background: "#e2e8f0",
+  borderRadius: "999px",
+  padding: "5px 10px",
+  whiteSpace: "nowrap",
+};
+
+const timelineDescriptionStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#475569",
+  lineHeight: 1.5,
+  overflowWrap: "anywhere",
+};
+
 const historyCountStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
@@ -3734,6 +4262,14 @@ function getInspectionResultTone(result: string) {
   if (value.includes("observation")) return { bg: "#fef3c7", color: "#92400e" };
 
   return { bg: "#e2e8f0", color: "#334155" };
+}
+
+function getTimelineTypeTone(type: AssetTimelineEntry["type"]) {
+  if (type === "File") return { bg: "#dbeafe", color: "#1d4ed8" };
+  if (type === "Calibration") return { bg: "#fef3c7", color: "#92400e" };
+  if (type === "Inspection") return { bg: "#dcfce7", color: "#166534" };
+  if (type === "Maintenance") return { bg: "#ede9fe", color: "#6d28d9" };
+  return { bg: "#fee2e2", color: "#991b1b" };
 }
 
 function getMaintenanceTypeTone(type: string) {

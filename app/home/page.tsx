@@ -27,6 +27,15 @@ const moduleCards = [
     accent: "#2563eb",
     cta: "Open Assets",
   },
+  {
+    title: "People Management",
+    description:
+      "Shared personnel directory for originators, reviewers, approvers, owners, and asset-assigned people.",
+    href: "/people",
+    status: "Available",
+    accent: "#0f766e",
+    cta: "Open People",
+  },
 ] as const;
 
 export default function HomePage() {
@@ -75,10 +84,16 @@ export default function HomePage() {
                 </span>
               </div>
 
-              <div style={cardTitleStyle}>{card.title}</div>
-              <p style={cardDescriptionStyle}>{card.description}</p>
+              <div style={cardContentStackStyle}>
+                <div style={cardTitleWrapStyle}>
+                  <div style={cardTitleStyle}>{card.title}</div>
+                </div>
+                <div style={cardDescriptionWrapStyle}>
+                  <p style={cardDescriptionStyle}>{card.description}</p>
+                </div>
+              </div>
 
-              <div style={{ marginTop: "auto" }}>
+              <div style={cardActionRowStyle}>
                 <span
                   style={{
                     ...ctaStyle,
@@ -94,11 +109,13 @@ export default function HomePage() {
           );
 
           return card.href ? (
-            <Link key={card.title} href={card.href} style={cardLinkStyle}>
+            <Link key={card.title} href={card.href} style={cardShellStyle}>
               {content}
             </Link>
           ) : (
-            <div key={card.title}>{content}</div>
+            <div key={card.title} style={cardShellStyle}>
+              {content}
+            </div>
           );
         })}
       </section>
@@ -161,12 +178,16 @@ const gridStyle: CSSProperties = {
   gap: "18px",
 };
 
-const cardLinkStyle: CSSProperties = {
+const cardShellStyle: CSSProperties = {
+  display: "flex",
+  height: "100%",
   textDecoration: "none",
 };
 
 const cardStyle: CSSProperties = {
   minHeight: "240px",
+  width: "100%",
+  height: "100%",
   display: "flex",
   flexDirection: "column",
   gap: "14px",
@@ -177,10 +198,26 @@ const cardStyle: CSSProperties = {
   boxShadow: "0 16px 28px rgba(15, 23, 42, 0.08)",
 };
 
+const cardContentStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  flex: 1,
+};
+
 const cardTopStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
+};
+
+const cardTitleWrapStyle: CSSProperties = {
+  minHeight: "58px",
+  display: "flex",
+  alignItems: "flex-start",
+};
+
+const cardDescriptionWrapStyle: CSSProperties = {
+  minHeight: "72px",
 };
 
 const statusPillStyle: CSSProperties = {
@@ -206,6 +243,11 @@ const cardDescriptionStyle: CSSProperties = {
   fontSize: "14px",
   lineHeight: 1.65,
   color: "#475569",
+};
+
+const cardActionRowStyle: CSSProperties = {
+  marginTop: "auto",
+  paddingTop: "4px",
 };
 
 const ctaStyle: CSSProperties = {
