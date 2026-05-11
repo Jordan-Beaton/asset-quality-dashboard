@@ -2017,7 +2017,7 @@ function DocumentsPageContent() {
                   />
                 </Field>
 
-                <Field label="Approved By">
+                <Field label="Approver">
                   <PeopleSelector
                     inputId="document-approved-by"
                     value={formPeopleSearch.approved_by}
@@ -2031,9 +2031,9 @@ function DocumentsPageContent() {
                     disabled={Boolean(form.rejected_by.trim())}
                     warning={
                       formPeopleSearch.approved_by.trim() && !formApproverPerson
-                        ? "Approved By must be selected from People."
+                        ? "Approver must be selected from People."
                         : formApproverPerson && !form.approver_email.trim()
-                        ? "Approved By has no email in People."
+                        ? "Approver has no email in People."
                         : ""
                     }
                   />
@@ -2593,7 +2593,7 @@ function DocumentsPageContent() {
                       />
                       </Field>
 
-                      <Field label="Approved By">
+                      <Field label="Approver">
                       <PeopleSelector
                         inputId="document-detail-approved-by"
                         value={detailPeopleSearch.approved_by}
@@ -2607,9 +2607,9 @@ function DocumentsPageContent() {
                         disabled={Boolean(detailForm.rejected_by.trim())}
                         warning={
                           detailPeopleSearch.approved_by.trim() && !detailApproverPerson
-                            ? "Approved By must be selected from People."
+                            ? "Approver must be selected from People."
                             : detailApproverPerson && !detailForm.approver_email.trim()
-                            ? "Approved By has no email in People."
+                            ? "Approver has no email in People."
                             : ""
                         }
                       />

@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import NextImage from "next/image";
+import Image from "next/image";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +14,7 @@ export const dynamic = "force-dynamic";
 type MocStatus = "Draft" | "In Review" | "Approved" | "Closed";
 type ChangeType = "Permanent" | "Temporary";
 type YesNoNa = "Yes" | "No" | "N/A";
-type ApprovedChoice = "" | "Yes" | "No";
+type ApprovedChoice = "Yes" | "No";
 type NoticeTone = "neutral" | "success" | "warning" | "error";
 type MocViewFilter = "All" | "Recent" | "Expired Temporary" | "Expiry Soon" | "Draft Ageing";
 
@@ -242,10 +241,7 @@ function normaliseYesNoNa(value: string | null | undefined): YesNoNa {
 }
 
 function normaliseApprovedChoice(value: string | null | undefined): ApprovedChoice {
-  const text = (value || "").trim().toLowerCase();
-  if (text === "yes") return "Yes";
-  if (text === "no") return "No";
-  return "";
+  return (value || "").trim().toLowerCase() === "no" ? "No" : "Yes";
 }
 
 function normaliseActionPlanStatus(value: string | null | undefined) {
@@ -366,7 +362,7 @@ function createReviewRows(): MocReviewRow[] {
     inform_flag: false,
     name: "",
     position: "",
-    approved_value: "",
+    approved_value: "Yes",
     signature: "",
     review_date: "",
     comments: "",
@@ -409,15 +405,6 @@ function toDataUrl(blob: Blob) {
   });
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 async function getLogoDataUrl() {
   try {
     const response = await fetch("/enshore-logo.png");
@@ -431,18 +418,6 @@ async function getLogoDataUrl() {
 function isDataImageUrl(value: string | null | undefined) {
   const text = (value || "").trim().toLowerCase();
   return text.startsWith("data:image/");
-}
-
-function isPdfSignatureImageCell(value: string | null | undefined) {
-  return isDataImageUrl(value);
-}
-
-function getPdfSignatureCellValue(value: string | null | undefined) {
-  const text = value || "";
-  if (isDataImageUrl(text)) {
-    return text;
-  }
-  return getPdfText(text);
 }
 
 function getPdfCheckbox(checked: boolean) {
@@ -621,6 +596,15 @@ function syncSimpleOrders<T extends { sort_order: number }>(rows: T[]) {
   return rows.map((row, index) => ({ ...row, sort_order: index }));
 }
 
+function moveArrayItem<T>(rows: T[], index: number, direction: -1 | 1) {
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= rows.length) return rows;
+  const nextRows = [...rows];
+  const [item] = nextRows.splice(index, 1);
+  nextRows.splice(nextIndex, 0, item);
+  return nextRows;
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
 }
@@ -784,23 +768,21 @@ function MOCPageContent() {
   const [messageTone, setMessageTone] = useState<NoticeTone>("neutral");
   const [refreshStamp, setRefreshStamp] = useState("");
   const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | MocStatus>(
-    linkedAttention === "open" ? "Active" : parseMocStatusFilter(linkedStatus)
-  );
+  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | MocStatus>(parseMocStatusFilter(linkedStatus));
   const [changeTypeFilter, setChangeTypeFilter] = useState<"All" | ChangeType>(
     linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All"
   );
   const [viewFilter, setViewFilter] = useState<MocViewFilter>(
-    linkedAttention === "expired-temporary"
-      ? "Expired Temporary"
-      : linkedAttention === "expiry-soon"
-      ? "Expiry Soon"
-      : linkedAttention === "draft-ageing"
-      ? "Draft Ageing"
-      : linkedRecent === "1"
-      ? "Recent"
-      : "All"
-  );
+  linkedAttention === "expired-temporary"
+    ? "Expired Temporary"
+    : linkedAttention === "expiry-soon"
+    ? "Expiry Soon"
+    : linkedAttention === "draft-ageing"
+    ? "Draft Ageing"
+    : linkedRecent === "1"
+    ? "Recent"
+    : "All"
+);
   const [selectedReportId, setSelectedReportId] = useState("");
   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());
   const [detailReport, setDetailReport] = useState<MocReport>(createEmptyReport());
@@ -880,12 +862,6 @@ function MOCPageContent() {
   const recentCount = useMemo(() => {
     return reports.filter((report) => isRecentMoc(report)).length;
   }, [reports]);
-  const latestMocLabel = useMemo(() => {
-    const latest = [...reports].sort(
-      (a, b) => new Date(getCreatedOrUpdatedTime(b) || 0).getTime() - new Date(getCreatedOrUpdatedTime(a) || 0).getTime()
-    )[0];
-    return latest ? `${latest.moc_report_no} - ${latest.moc_report_title}` : "No MOCs loaded";
-  }, [reports]);
   const statusBannerColours = getNoticeColours(messageTone);
   const nextWorkflowStatus = getNextWorkflowStatus(detailReport.status);
   const canEditCoreFields = detailReport.status === "Draft" || detailReport.status === "In Review";
@@ -909,7 +885,7 @@ function MOCPageContent() {
 
   useEffect(() => {
     setSearch(linkedSearch);
-    setStatusFilter(linkedAttention === "open" ? "Active" : parseMocStatusFilter(linkedStatus));
+    setStatusFilter(parseMocStatusFilter(linkedStatus));
     setChangeTypeFilter(linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All");
     setViewFilter(
       linkedAttention === "expired-temporary"
@@ -930,7 +906,7 @@ function MOCPageContent() {
   ) {
     if (!file) return;
     try {
-      const dataUrl = await readFileAsDataUrl(file);
+      const dataUrl = await toDataUrl(file);
       apply(dataUrl);
       showMessage("Signature image attached for PDF output.", "success");
     } catch {
@@ -1563,6 +1539,10 @@ function MOCPageContent() {
     setDetailActionItems((prev) => syncActionOrders(prev.filter((_, rowIndex) => rowIndex !== index)));
   }
 
+  function moveActionRow(index: number, direction: -1 | 1) {
+    setDetailActionItems((prev) => syncActionOrders(moveArrayItem(prev, index, direction)));
+  }
+
   function addAffectedDocumentRow() {
     setDetailAffectedDocuments((prev) => [...syncSimpleOrders(prev), createDocumentRow(prev.length)]);
   }
@@ -1575,6 +1555,10 @@ function MOCPageContent() {
 
   function removeAffectedDocumentRow(index: number) {
     setDetailAffectedDocuments((prev) => syncSimpleOrders(prev.filter((_, rowIndex) => rowIndex !== index)));
+  }
+
+  function moveAffectedDocumentRow(index: number, direction: -1 | 1) {
+    setDetailAffectedDocuments((prev) => syncSimpleOrders(moveArrayItem(prev, index, direction)));
   }
 
   function addRiskDocumentRow() {
@@ -1591,6 +1575,10 @@ function MOCPageContent() {
     setDetailRiskDocuments((prev) => syncSimpleOrders(prev.filter((_, rowIndex) => rowIndex !== index)));
   }
 
+  function moveRiskDocumentRow(index: number, direction: -1 | 1) {
+    setDetailRiskDocuments((prev) => syncSimpleOrders(moveArrayItem(prev, index, direction)));
+  }
+
   function addReviewRow() {
     setDetailReviewRows((prev) => [
       ...syncSimpleOrders(prev),
@@ -1603,7 +1591,7 @@ function MOCPageContent() {
         inform_flag: false,
         name: "",
         position: "",
-        approved_value: "",
+        approved_value: "Yes",
         signature: "",
         review_date: "",
         comments: "",
@@ -1629,6 +1617,10 @@ function MOCPageContent() {
     setDetailReviewRows((prev) => syncSimpleOrders(prev.filter((_, rowIndex) => rowIndex !== index)));
   }
 
+  function moveReviewRow(index: number, direction: -1 | 1) {
+    setDetailReviewRows((prev) => syncSimpleOrders(moveArrayItem(prev, index, direction)));
+  }
+
   function addAcceptanceRow() {
     setDetailAcceptanceRows((prev) => [
       ...syncSimpleOrders(prev),
@@ -1650,6 +1642,10 @@ function MOCPageContent() {
     setDetailAcceptanceRows((prev) => syncSimpleOrders(prev.filter((_, rowIndex) => rowIndex !== index)));
   }
 
+  function moveAcceptanceRow(index: number, direction: -1 | 1) {
+    setDetailAcceptanceRows((prev) => syncSimpleOrders(moveArrayItem(prev, index, direction)));
+  }
+
   function addCloseoutRow() {
     setDetailCloseoutRows((prev) => [
       ...syncSimpleOrders(prev),
@@ -1669,6 +1665,10 @@ function MOCPageContent() {
 
   function removeCloseoutRow(index: number) {
     setDetailCloseoutRows((prev) => syncSimpleOrders(prev.filter((_, rowIndex) => rowIndex !== index)));
+  }
+
+  function moveCloseoutRow(index: number, direction: -1 | 1) {
+    setDetailCloseoutRows((prev) => syncSimpleOrders(moveArrayItem(prev, index, direction)));
   }
 
   async function handleAttachmentUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -1907,7 +1907,6 @@ function MOCPageContent() {
       head: string[][];
       body: Array<Array<string>>;
       fontSize?: number;
-      headFontSize?: number;
       cellPadding?: number;
       minCellHeight?: number;
       columnStyles?: Record<string | number, Record<string, unknown>>;
@@ -1935,23 +1934,20 @@ function MOCPageContent() {
         fillColor: [15, 118, 110],
         textColor: [255, 255, 255],
         fontStyle: "bold",
-        fontSize: config.headFontSize ?? config.fontSize ?? 8,
       },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       bodyStyles: { fillColor: [255, 255, 255] },
       columnStyles: config.columnStyles,
-      tableWidth: 186,
       rowPageBreak: "avoid",
       didParseCell: (hook) => {
         if (
           hook.section === "body" &&
           config.signatureColumns?.includes(hook.column.index) &&
           typeof hook.cell.raw === "string" &&
-          isPdfSignatureImageCell(hook.cell.raw)
+          isDataImageUrl(hook.cell.raw)
         ) {
           hook.cell.text = [""];
-          hook.cell.styles.minCellHeight = Math.max(Number(config.minCellHeight || 8), 15);
-          hook.cell.styles.cellPadding = 1.4;
+          hook.cell.styles.minCellHeight = Math.max(Number(config.minCellHeight || 8), 12);
         }
       },
       didDrawCell: (hook) => {
@@ -1959,19 +1955,11 @@ function MOCPageContent() {
           hook.section === "body" &&
           config.signatureColumns?.includes(hook.column.index) &&
           typeof hook.cell.raw === "string" &&
-          isPdfSignatureImageCell(hook.cell.raw)
+          isDataImageUrl(hook.cell.raw)
         ) {
-          const rawValue = String(hook.cell.raw || "");
-          const signatureImage = config.signatureImages?.get(rawValue);
+          const signatureImage = config.signatureImages?.get(hook.cell.raw);
           if (signatureImage) {
-            drawImageFit(
-              doc,
-              signatureImage,
-              hook.cell.x + 1.4,
-              hook.cell.y + 1.4,
-              Math.max(hook.cell.width - 2.8, 1),
-              Math.max(hook.cell.height - 2.8, 1)
-            );
+            drawImageFit(doc, signatureImage, hook.cell.x + 1, hook.cell.y + 1, hook.cell.width - 2, hook.cell.height - 2);
           }
         }
       },
@@ -2037,15 +2025,14 @@ function MOCPageContent() {
         getPdfText(row.status),
       ]),
       fontSize: 7.8,
-      headFontSize: 7.2,
       cellPadding: 2.4,
       minCellHeight: 9,
       columnStyles: {
-        0: { cellWidth: 16 },
-        1: { cellWidth: 85 },
+        0: { cellWidth: 14 },
+        1: { cellWidth: 86 },
         2: { cellWidth: 42 },
-        3: { cellWidth: 24 },
-        4: { cellWidth: 19 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 20 },
       },
     });
     return y + 9;
@@ -2226,7 +2213,7 @@ function MOCPageContent() {
     y += 10;
     y = drawFormTable(doc, {
       startY: y,
-      head: [["Approve", "Inform", "Involved Party", "Name", "Position", "Approved", "Signature", "Date"]],
+      head: [["Approve", "Inform", "Involved Party", "Name", "Position", "Approved", "Signature", "Date", "Comments"]],
       body: bundle.reviewRows.map((row) => [
         getPdfCheckbox(row.approve_flag),
         getPdfCheckbox(row.inform_flag),
@@ -2234,96 +2221,85 @@ function MOCPageContent() {
         getPdfText(row.name),
         getPdfText(row.position),
         getPdfText(row.approved_value),
-        getPdfSignatureCellValue(row.signature),
+        row.signature || "",
         getPdfDate(row.review_date),
+        getPdfText(row.comments),
       ]),
-      fontSize: 7,
-      headFontSize: 6.2,
-      cellPadding: 1.8,
-      minCellHeight: 9.5,
+      fontSize: 6.7,
+      cellPadding: 1.6,
+      minCellHeight: 8.5,
       signatureColumns: [6],
       signatureImages,
       columnStyles: {
-        0: { cellWidth: 12 },
-        1: { cellWidth: 12 },
-        2: { cellWidth: 28 },
-        3: { cellWidth: 26 },
-        4: { cellWidth: 25 },
-        5: { cellWidth: 20 },
-        6: { cellWidth: 41 },
-        7: { cellWidth: 22 },
+        0: { cellWidth: 13 },
+        1: { cellWidth: 13 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 24 },
+        5: { cellWidth: 16 },
+        6: { cellWidth: 22 },
+        7: { cellWidth: 18 },
+        8: { cellWidth: 24 },
       },
     });
     return y + 9;
   }
 
-  function drawAcceptance(
-    doc: jsPDF,
-    y: number,
-    bundle: MocBundle,
-    signatureImages: Map<string, PdfImageMeta>
-  ) {
+  function drawAcceptance(doc: jsPDF, y: number, bundle: MocBundle, signatureImages: Map<string, PdfImageMeta>) {
     y = ensurePageSpace(doc, y, 40);
     drawSectionHeading(doc, y, "L. MOC CHANGE ACCEPTANCE");
     y += 10;
     y = drawFormTable(doc, {
       startY: y,
-      head: [["Role", "Name", "Position", "Signature", "Date"]],
+      head: [["Role", "Position", "Name", "Signature", "Date"]],
       body: bundle.acceptanceRows.map((row) => [
         getPdfText(row.role_label),
-        getPdfText(row.name),
         getPdfText(row.position),
-        getPdfSignatureCellValue(row.signature),
+        getPdfText(row.name),
+        row.signature || "",
         getPdfDate(row.signoff_date),
       ]),
       fontSize: 7.8,
-      headFontSize: 7.2,
       cellPadding: 2.6,
       minCellHeight: 10,
       signatureColumns: [3],
       signatureImages,
       columnStyles: {
-        0: { cellWidth: 60 },
-        1: { cellWidth: 34 },
+        0: { cellWidth: 62 },
+        1: { cellWidth: 38 },
         2: { cellWidth: 34 },
         3: { cellWidth: 34 },
-        4: { cellWidth: 24 },
+        4: { cellWidth: 18 },
       },
     });
     return y + 9;
   }
 
-  function drawCloseout(
-    doc: jsPDF,
-    y: number,
-    bundle: MocBundle,
-    signatureImages: Map<string, PdfImageMeta>
-  ) {
+  function drawCloseout(doc: jsPDF, y: number, bundle: MocBundle, signatureImages: Map<string, PdfImageMeta>) {
     y = ensurePageSpace(doc, y, 40);
     drawSectionHeading(doc, y, "M. MOC CLOSE-OUT VERIFICATION");
     y += 10;
     return drawFormTable(doc, {
       startY: y,
-      head: [["Role", "Name", "Position", "Signature", "Date"]],
+      head: [["Role", "Position", "Name", "Signature", "Date"]],
       body: bundle.closeoutRows.map((row) => [
         getPdfText(row.role_label),
-        getPdfText(row.name),
         getPdfText(row.position),
-        getPdfSignatureCellValue(row.signature),
+        getPdfText(row.name),
+        row.signature || "",
         getPdfDate(row.signoff_date),
       ]),
       fontSize: 7.8,
-      headFontSize: 7.2,
       cellPadding: 2.6,
       minCellHeight: 10,
       signatureColumns: [3],
       signatureImages,
       columnStyles: {
-        0: { cellWidth: 60 },
-        1: { cellWidth: 34 },
+        0: { cellWidth: 62 },
+        1: { cellWidth: 38 },
         2: { cellWidth: 34 },
         3: { cellWidth: 34 },
-        4: { cellWidth: 24 },
+        4: { cellWidth: 18 },
       },
     });
   }
@@ -2401,15 +2377,23 @@ function MOCPageContent() {
 
   return (
     <main>
-      <QualityPageHero
-        label="MANAGEMENT OF CHANGE"
-        title="Management of Change"
-        description="Controlled MOC register aligned to the Enshore form structure, with workflow, supporting documents, and PDF output from saved record data."
-        contextCards={[
-          { label: "Last Refreshed", value: refreshStamp || "-" },
-          { label: "Latest MOC", value: latestMocLabel },
-        ]}
-      />
+      <section style={heroStyle}>
+        <div style={{ flex: "1 1 680px" }}>
+          <div style={eyebrowStyle}>Quality Command Centre</div>
+          <h1 style={heroTitleStyle}>Management of Change</h1>
+          <p style={heroSubtitleStyle}>
+            Operational MOC register aligned to the controlled Enshore form structure, with full record editing and PDF generation from saved values.
+          </p>
+
+        </div>
+
+        <div style={heroMetaWrapStyle}>
+          <HeroMetaCard label="Total MOCs" value={reports.length} />
+          <HeroMetaCard label="Selected Record" value={detailReport.moc_report_no || "None"} compact />
+          <HeroMetaCard label="Form" value="ENS-HSEQ-FRM-008 Rev D" compact />
+          <HeroMetaCard label="Last Refreshed" value={refreshStamp || "-"} compact />
+        </div>
+      </section>
 
       <div style={topMetaRowStyle}>
         <Link href="/" style={backLinkStyle}>
@@ -2626,23 +2610,16 @@ function MOCPageContent() {
                   const typeTone = getChangeTypeTone(report.change_type);
 
                   return (
-                      <div
-                        key={report.id}
-                        role="button"
-                        tabIndex={0}
-                        style={{
-                          ...mocRegisterRowStyle,
-                          background: active ? "#eff6ff" : "#ffffff",
-                          borderLeft: active ? "4px solid #0f766e" : "4px solid transparent",
-                        }}
-                        onClick={() => openBundle(report.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            openBundle(report.id);
-                          }
-                        }}
-                      >
+                    <button
+                      key={report.id}
+                      type="button"
+                      style={{
+                        ...mocRegisterRowStyle,
+                        background: active ? "#eff6ff" : "#ffffff",
+                        borderLeft: active ? "4px solid #0f766e" : "4px solid transparent",
+                      }}
+                      onClick={() => openBundle(report.id)}
+                    >
                       <div style={registerSimpleTextStyle}>{report.moc_report_no}</div>
                       <div>
                         <div style={registerTitleStyle}>{report.moc_report_title || "Untitled MOC"}</div>
@@ -2682,7 +2659,7 @@ function MOCPageContent() {
                           PDF
                         </button>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -2891,7 +2868,7 @@ function MOCPageContent() {
                     <div>Responsible Person</div>
                     <div>Target Date</div>
                     <div>Status</div>
-                    <div>Actions</div>
+                    <div>Order / Remove</div>
                   </div>
                   {detailActionItems.map((row, index) => (
                     <div key={`${row.id || "new"}-${index}`} style={actionPlanRowStyle}>
@@ -2928,6 +2905,12 @@ function MOCPageContent() {
                         ))}
                       </select>
                       <div style={rowActionsWrapStyle}>
+                        <RowOrderControls
+                          index={index}
+                          total={detailActionItems.length}
+                          onMove={(direction) => moveActionRow(index, direction)}
+                          disabled={!canEditImplementationStructure}
+                        />
                         <button
                           type="button"
                           style={removeRowButtonStyle}
@@ -3040,6 +3023,7 @@ function MOCPageContent() {
                   rows={detailAffectedDocuments}
                   onChange={updateAffectedDocumentRow}
                   onRemove={removeAffectedDocumentRow}
+                  onMove={moveAffectedDocumentRow}
                   disabled={!canEditStructural}
                 />
                 </fieldset>
@@ -3052,6 +3036,7 @@ function MOCPageContent() {
                   rows={detailRiskDocuments}
                   onChange={updateRiskDocumentRow}
                   onRemove={removeRiskDocumentRow}
+                  onMove={moveRiskDocumentRow}
                   disabled={!canEditStructural}
                 />
 
@@ -3288,7 +3273,8 @@ function MOCPageContent() {
                     <div>Approved</div>
                     <div>Signature</div>
                     <div>Date</div>
-                    <div>Actions</div>
+                    <div>Comments</div>
+                    <div>Order / Remove</div>
                   </div>
                   {detailReviewRows.map((row, index) => (
                     <div key={`${row.id || "new"}-${index}`} style={reviewRowStyle}>
@@ -3326,7 +3312,6 @@ function MOCPageContent() {
                         onChange={(e) => updateReviewRow(index, "approved_value", e.target.value as ApprovedChoice)}
                         style={inputStyle}
                       >
-                        <option value="">Select</option>
                         <option value="Yes">Yes</option>
                         <option value="No">No</option>
                       </select>
@@ -3343,7 +3328,18 @@ function MOCPageContent() {
                         onChange={(e) => updateReviewRow(index, "review_date", e.target.value)}
                         style={inputStyle}
                       />
+                      <input
+                        value={row.comments}
+                        onChange={(e) => updateReviewRow(index, "comments", e.target.value)}
+                        style={inputStyle}
+                      />
                       <div style={rowActionsWrapStyle}>
+                        <RowOrderControls
+                          index={index}
+                          total={detailReviewRows.length}
+                          onMove={(direction) => moveReviewRow(index, direction)}
+                          disabled={!canEditStructural}
+                        />
                         <button
                           type="button"
                           style={removeRowButtonStyle}
@@ -3366,6 +3362,7 @@ function MOCPageContent() {
                   rows={detailAcceptanceRows}
                   onChange={updateAcceptanceRow}
                   onRemove={removeAcceptanceRow}
+                  onMove={moveAcceptanceRow}
                   onSignatureUpload={uploadAcceptanceSignature}
                   disabled={!canEditReviewSections}
                   inputIdPrefix="moc-acceptance-signature"
@@ -3384,6 +3381,7 @@ function MOCPageContent() {
                   rows={detailCloseoutRows}
                   onChange={updateCloseoutRow}
                   onRemove={removeCloseoutRow}
+                  onMove={moveCloseoutRow}
                   onSignatureUpload={uploadCloseoutSignature}
                   disabled={!canEditCloseoutStructure}
                   inputIdPrefix="moc-closeout-signature"
@@ -3494,6 +3492,29 @@ function RepeatTableToolbar({ onAdd, label, disabled }: { onAdd: () => void; lab
   );
 }
 
+function RowOrderControls({
+  index,
+  total,
+  onMove,
+  disabled,
+}: {
+  index: number;
+  total: number;
+  onMove: (direction: -1 | 1) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div style={rowActionsStyle}>
+      <button type="button" style={rowMoveButtonStyle} onClick={() => onMove(-1)} disabled={disabled || index === 0}>
+        Up
+      </button>
+      <button type="button" style={rowMoveButtonStyle} onClick={() => onMove(1)} disabled={disabled || index === total - 1}>
+        Down
+      </button>
+    </div>
+  );
+}
+
 function ImpactToggle({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
   return (
     <button
@@ -3527,15 +3548,20 @@ function SignatureFieldInput({
   disabled?: boolean;
 }) {
   const usingImage = isDataImageUrl(value);
-  const typedSignature = usingImage ? "" : value.trim();
 
   return (
     <div style={signatureFieldStackStyle}>
+      <input
+        value={usingImage ? "" : value}
+        onChange={(e) => onTextChange(e.target.value)}
+        style={inputStyle}
+        placeholder={usingImage ? "Signature image stored" : "Typed signature"}
+      />
       {usingImage ? (
         <div style={signaturePreviewStyle}>
-            <NextImage
-              src={value}
-              alt="Stored signature preview"
+          <Image
+            src={value}
+            alt="Stored signature preview"
             width={64}
             height={28}
             unoptimized
@@ -3543,21 +3569,9 @@ function SignatureFieldInput({
           />
           <span style={signaturePreviewTextStyle}>Signature image attached</span>
         </div>
-      ) : typedSignature ? (
-        <div style={signaturePreviewStyle}>
-          <span style={signatureTypedPreviewStyle}>{typedSignature}</span>
-        </div>
       ) : (
-        <div style={signaturePreviewStyle}>
-          <span style={signatureHintStyle}>No signature added yet.</span>
-        </div>
+        <div style={signatureHintStyle}>Type a signature or upload a stored signature image.</div>
       )}
-      <input
-        value={usingImage ? "" : value}
-        onChange={(e) => onTextChange(e.target.value)}
-        style={inputStyle}
-        placeholder={usingImage ? "Signature image stored" : "Type signature text"}
-      />
       <div style={signatureFieldActionsStyle}>
         <input
           id={inputId}
@@ -3594,11 +3608,13 @@ function SimpleDocumentTable({
   rows,
   onChange,
   onRemove,
+  onMove,
   disabled,
 }: {
   rows: MocDocumentRow[];
   onChange: (index: number, key: keyof MocDocumentRow, value: string) => void;
   onRemove: (index: number) => void;
+  onMove: (index: number, direction: -1 | 1) => void;
   disabled?: boolean;
 }) {
   return (
@@ -3607,7 +3623,7 @@ function SimpleDocumentTable({
         <div>Number</div>
         <div>Title</div>
         <div>Rev.</div>
-        <div>Actions</div>
+        <div>Order / Remove</div>
       </div>
       {rows.map((row, index) => (
         <div key={`${row.id || "new"}-${index}`} style={simpleDocRowStyle}>
@@ -3615,6 +3631,12 @@ function SimpleDocumentTable({
           <input value={row.title} onChange={(e) => onChange(index, "title", e.target.value)} style={inputStyle} />
           <input value={row.rev} onChange={(e) => onChange(index, "rev", e.target.value)} style={inputStyle} />
           <div style={rowActionsWrapStyle}>
+            <RowOrderControls
+              index={index}
+              total={rows.length}
+              onMove={(direction) => onMove(index, direction)}
+              disabled={disabled}
+            />
             <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
               Remove
             </button>
@@ -3629,6 +3651,7 @@ function SimpleSignoffTable({
   rows,
   onChange,
   onRemove,
+  onMove,
   onSignatureUpload,
   disabled,
   inputIdPrefix,
@@ -3636,6 +3659,7 @@ function SimpleSignoffTable({
   rows: MocSignoffRow[];
   onChange: (index: number, key: keyof MocSignoffRow, value: string | number) => void;
   onRemove: (index: number) => void;
+  onMove: (index: number, direction: -1 | 1) => void;
   onSignatureUpload: (index: number, file: File | null) => void;
   disabled?: boolean;
   inputIdPrefix: string;
@@ -3644,17 +3668,17 @@ function SimpleSignoffTable({
     <div style={tableEditorWrapStyle}>
       <div style={simpleSignoffHeadStyle}>
         <div>Role</div>
-        <div>Name</div>
         <div>Position</div>
+        <div>Name</div>
         <div>Signature</div>
         <div>Date</div>
-        <div>Actions</div>
+        <div>Order / Remove</div>
       </div>
       {rows.map((row, index) => (
         <div key={`${row.id || "new"}-${index}`} style={simpleSignoffRowStyle}>
           <input value={row.role_label} onChange={(e) => onChange(index, "role_label", e.target.value)} style={inputStyle} />
-          <input value={row.name} onChange={(e) => onChange(index, "name", e.target.value)} style={inputStyle} />
           <input value={row.position} onChange={(e) => onChange(index, "position", e.target.value)} style={inputStyle} />
+          <input value={row.name} onChange={(e) => onChange(index, "name", e.target.value)} style={inputStyle} />
           <SignatureFieldInput
             value={row.signature}
             onTextChange={(value) => onChange(index, "signature", value)}
@@ -3669,6 +3693,12 @@ function SimpleSignoffTable({
             style={inputStyle}
           />
           <div style={rowActionsWrapStyle}>
+            <RowOrderControls
+              index={index}
+              total={rows.length}
+              onMove={(direction) => onMove(index, direction)}
+              disabled={disabled}
+            />
             <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
               Remove
             </button>
@@ -3691,9 +3721,6 @@ const heroStyle: CSSProperties = {
   gap: "24px",
   alignItems: "flex-start",
   flexWrap: "wrap",
-  minHeight: "244px",
-  width: "100%",
-  boxSizing: "border-box",
 };
 
 const eyebrowStyle: CSSProperties = {
@@ -3715,7 +3742,7 @@ const heroSubtitleStyle: CSSProperties = {
   marginTop: "10px",
   marginBottom: 0,
   fontSize: "16px",
-  maxWidth: "760px",
+  maxWidth: "820px",
   color: "rgba(255,255,255,0.92)",
 };
 
@@ -4186,31 +4213,30 @@ const reviewTableWrapStyle: CSSProperties = {
   gap: "12px",
 };
 
-const reviewGridTemplate = "0.7fr 0.7fr 1.25fr 1fr 1fr 0.95fr 1.55fr 1fr 1.1fr";
-
 const reviewHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: reviewGridTemplate,
-  gap: "12px",
-  padding: "0 2px",
+  gridTemplateColumns: "0.65fr 0.65fr 1.15fr 1fr 1fr 0.85fr 1.35fr 0.95fr 1.05fr 1.1fr",
+  gap: "10px",
+  padding: "10px 12px",
+  borderRadius: "14px",
+  border: "1px solid #d7dee7",
+  background: "#f8fafc",
   fontSize: "12px",
   fontWeight: 800,
   color: "#64748b",
   textTransform: "uppercase",
   letterSpacing: 0.3,
-  textAlign: "left",
 };
 
 const reviewRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: reviewGridTemplate,
-  gap: "12px",
-  alignItems: "start",
+  gridTemplateColumns: "0.65fr 0.65fr 1.15fr 1fr 1fr 0.85fr 1.35fr 0.95fr 1.05fr 1.1fr",
+  gap: "10px",
+  alignItems: "center",
   padding: "12px",
   borderRadius: "14px",
   border: "1px solid #d7dee7",
   background: "#ffffff",
-  minHeight: "128px",
 };
 
 const checkboxCellStyle: CSSProperties = {
@@ -4225,8 +4251,8 @@ const checkboxCellStyle: CSSProperties = {
 
 const simpleSignoffHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.25fr 1fr 1fr 1.5fr 0.95fr 1.05fr",
-  gap: "12px",
+  gridTemplateColumns: "1.25fr 1fr 1fr 1.3fr 0.95fr 1.1fr",
+  gap: "10px",
   padding: "10px 12px",
   borderRadius: "14px",
   border: "1px solid #d7dee7",
@@ -4240,37 +4266,29 @@ const simpleSignoffHeadStyle: CSSProperties = {
 
 const simpleSignoffRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.25fr 1fr 1fr 1.5fr 0.95fr 1.05fr",
-  gap: "12px",
-  alignItems: "start",
+  gridTemplateColumns: "1.25fr 1fr 1fr 1.3fr 0.95fr 1.1fr",
+  gap: "10px",
+  alignItems: "center",
   padding: "12px",
   borderRadius: "14px",
   border: "1px solid #d7dee7",
   background: "#ffffff",
-  minHeight: "128px",
 };
 
 const rowActionsWrapStyle: CSSProperties = {
-  display: "grid",
+  display: "flex",
+  alignItems: "center",
   gap: "8px",
-  alignContent: "start",
-  padding: "8px",
-  borderRadius: "10px",
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
-  minHeight: "100%",
+};
+
+const rowActionsStyle: CSSProperties = {
+  display: "inline-flex",
+  gap: "6px",
 };
 
 const signatureFieldStackStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
-  padding: "8px",
-  borderRadius: "12px",
-  border: "1px solid #d7dee7",
-  background: "#f8fafc",
-  minHeight: "104px",
-  alignContent: "start",
-  boxSizing: "border-box",
 };
 
 const hiddenFileInputStyle: CSSProperties = {
@@ -4290,7 +4308,6 @@ const signatureFieldActionsStyle: CSSProperties = {
   gap: "6px",
   alignItems: "center",
   flexWrap: "wrap",
-  justifyContent: "flex-start",
 };
 
 const signatureButtonStyle: CSSProperties = {
@@ -4309,13 +4326,11 @@ const signaturePreviewStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "8px",
-  minHeight: "36px",
-  maxHeight: "36px",
+  minHeight: "38px",
   padding: "8px 10px",
   borderRadius: "10px",
   border: "1px solid #d7dee7",
-  background: "#ffffff",
-  overflow: "hidden",
+  background: "#f8fafc",
 };
 
 const signatureImageThumbStyle: CSSProperties = {
@@ -4332,26 +4347,11 @@ const signaturePreviewTextStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
   color: "#475569",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  minWidth: 0,
-  display: "block",
 };
 
 const signatureHintStyle: CSSProperties = {
   fontSize: "12px",
   color: "#64748b",
-  padding: "0 2px",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
-const signatureTypedPreviewStyle: CSSProperties = {
-  ...signaturePreviewTextStyle,
-  color: "#0f172a",
-  fontStyle: "italic",
 };
 
 const rowMoveButtonStyle: CSSProperties = {
