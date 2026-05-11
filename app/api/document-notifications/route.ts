@@ -1,7 +1,130 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
+type NotificationRequest = {
+  eventType?: string;
+  documentNumber?: string;
+  documentTitle?: string;
+  currentRevision?: string;
+  originatorName?: string;
+  originatorEmail?: string;
+  reviewedBy?: string;
+  approvedBy?: string;
+  rejectedBy?: string;
+  reviewApprovalStatus?: string;
+  recipientEmails?: string[];
+  message?: string;
+};
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatMessage(value: string) {
+  return escapeHtml(value).replace(/\n/g, "<br/>");
+}
+
+function buildSubject(eventType: string, documentNumber: string) {
+  const subjectMap: Record<string, string> = {
+    submitted_for_review: `${documentNumber} submitted for review`,
+    reviewed: `${documentNumber} reviewed and ready for approval`,
+    approved: `${documentNumber} approved and now live`,
+    rejected: `${documentNumber} rejected`,
+    superseded: `${documentNumber} superseded`,
+  };
+
+  return subjectMap[eventType] || `${documentNumber} update`;
+}
+
+function buildHtml(payload: Required<Pick<NotificationRequest, "eventType" | "documentNumber" | "documentTitle">> &
+  Omit<NotificationRequest, "eventType" | "documentNumber" | "documentTitle">) {
+  const subject = buildSubject(payload.eventType, payload.documentNumber);
+
+  return `
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #0f172a; line-height: 1.5;">
+      <h2 style="margin-bottom: 12px;">${escapeHtml(subject)}</h2>
+      <p><strong>Document:</strong> ${escapeHtml(payload.documentNumber || "-")}</p>
+      <p><strong>Title:</strong> ${escapeHtml(payload.documentTitle || "-")}</p>
+      <p><strong>Revision:</strong> ${escapeHtml(payload.currentRevision || "-")}</p>
+      <p><strong>Workflow Status:</strong> ${escapeHtml(payload.reviewApprovalStatus || "-")}</p>
+      <p><strong>Originator:</strong> ${escapeHtml(payload.originatorName || "-")} (${escapeHtml(
+        payload.originatorEmail || "-"
+      )})</p>
+      ${
+        payload.reviewedBy
+          ? `<p><strong>Reviewed By:</strong> ${escapeHtml(payload.reviewedBy)}</p>`
+          : ""
+      }
+      ${
+        payload.approvedBy
+          ? `<p><strong>Approved By:</strong> ${escapeHtml(payload.approvedBy)}</p>`
+          : ""
+      }
+      ${
+        payload.rejectedBy
+          ? `<p><strong>Rejected By:</strong> ${escapeHtml(payload.rejectedBy)}</p>`
+          : ""
+      }
+      ${
+        payload.message
+          ? `<p><strong>Message:</strong><br/>${formatMessage(String(payload.message))}</p>`
+          : ""
+      }
+      <br/>
+      <p>This is an automated notification from the Document Control System.</p>
+    </div>
+  `;
+}
+
+async function logEmailAttempt(
+  body: NotificationRequest,
+  recipientEmails: string[],
+  success: boolean,
+  providerMessageId: string | null,
+  errorMessage: string | null
+) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) return;
+
+  try {
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    const logPayload = {
+      event_type: body.eventType || "",
+      document_number: body.documentNumber || "",
+      document_title: body.documentTitle || "",
+      current_revision: body.currentRevision || null,
+      recipient_emails: recipientEmails,
+      review_approval_status: body.reviewApprovalStatus || null,
+      originator_name: body.originatorName || null,
+      originator_email: body.originatorEmail || null,
+      reviewed_by: body.reviewedBy || null,
+      approved_by: body.approvedBy || null,
+      rejected_by: body.rejectedBy || null,
+      provider: "resend",
+      provider_message_id: providerMessageId,
+      success,
+      error_message: errorMessage,
+      created_at: new Date().toISOString(),
+    };
+
+    await supabase.from("document_email_logs").insert(logPayload);
+  } catch (error) {
+    console.warn("DOCUMENT EMAIL LOGGING SKIPPED", error);
+  }
+}
+
 export async function POST(request: Request) {
+  let body: NotificationRequest | null = null;
+
   try {
     const resendApiKey = process.env.RESEND_API_KEY;
     const fromEmail = process.env.DOCUMENT_NOTIFICATIONS_FROM_EMAIL;
@@ -21,67 +144,47 @@ export async function POST(request: Request) {
     }
 
     const resend = new Resend(resendApiKey);
+    body = (await request.json()) as NotificationRequest;
 
-    const body = await request.json();
-
-    const {
-      eventType,
-      documentNumber,
-      documentTitle,
-      originatorName,
-      originatorEmail,
-      recipientEmails,
-      message,
-    } = body;
+    const recipientEmails = Array.isArray(body.recipientEmails)
+      ? Array.from(
+          new Set(
+            body.recipientEmails
+              .map((email) => String(email || "").trim())
+              .filter(Boolean)
+          )
+        )
+      : [];
 
     console.log("EMAIL TRIGGERED", {
-      eventType,
-      documentNumber,
+      eventType: body.eventType,
+      documentNumber: body.documentNumber,
       recipientEmails,
     });
 
-    if (!recipientEmails || !Array.isArray(recipientEmails) || recipientEmails.length === 0) {
-      return NextResponse.json(
-        { error: "No recipients provided." },
-        { status: 400 }
-      );
+    if (!recipientEmails.length) {
+      return NextResponse.json({ error: "No recipients provided." }, { status: 400 });
     }
 
-    const subjectMap: Record<string, string> = {
-      submitted_for_review: `${documentNumber} submitted for review`,
-      reviewed: `${documentNumber} reviewed`,
-      approved: `${documentNumber} approved`,
-      rejected: `${documentNumber} rejected`,
-      superseded: `${documentNumber} superseded`,
-    };
-
-    const subject = subjectMap[eventType] || `${documentNumber} update`;
-
-    const html = `
-      <div style="font-family: Arial, Helvetica, sans-serif; color: #0f172a;">
-        <h2 style="margin-bottom: 12px;">${subject}</h2>
-        <p><strong>Document:</strong> ${documentNumber || "-"}</p>
-        <p><strong>Title:</strong> ${documentTitle || "-"}</p>
-        <p><strong>Event:</strong> ${eventType || "-"}</p>
-        <p><strong>Originator:</strong> ${originatorName || "-"} (${originatorEmail || "-"})</p>
-        ${
-          message
-            ? `<p><strong>Message:</strong><br/>${String(message).replace(/\n/g, "<br/>")}</p>`
-            : ""
-        }
-        <br/>
-        <p>This is an automated notification from the Document Control System.</p>
-      </div>
-    `;
+    const documentNumber = body.documentNumber || "Document";
+    const documentTitle = body.documentTitle || "-";
+    const eventType = body.eventType || "update";
 
     const sendResult = await resend.emails.send({
       from: fromEmail,
       to: recipientEmails,
-      subject,
-      html,
+      subject: buildSubject(eventType, documentNumber),
+      html: buildHtml({
+        ...body,
+        eventType,
+        documentNumber,
+        documentTitle,
+      }),
     });
 
     console.log("EMAIL RESULT", sendResult);
+
+    await logEmailAttempt(body, recipientEmails, true, sendResult.data?.id || null, null);
 
     return NextResponse.json({
       ok: true,
@@ -90,12 +193,21 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("EMAIL ERROR", error);
 
+    await logEmailAttempt(
+      body || {},
+      Array.isArray(body?.recipientEmails)
+        ? body!.recipientEmails
+            .map((email) => String(email || "").trim())
+            .filter(Boolean)
+        : [],
+      false,
+      null,
+      error instanceof Error ? error.message : "Unknown notification error."
+    );
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unknown notification error.",
+        error: error instanceof Error ? error.message : "Unknown notification error.",
       },
       { status: 500 }
     );

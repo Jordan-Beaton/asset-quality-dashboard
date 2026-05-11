@@ -245,7 +245,12 @@ function CalibrationPageContent() {
         .from("asset_calibration_records")
         .select("*")
         .order("calibration_due_date", { ascending: true, nullsFirst: false }),
-      supabase.from("asset_people").select("id,name,role,active").eq("active", true).order("name", { ascending: true }),
+      supabase
+        .from("people")
+        .select("id,name,role,active")
+        .eq("active", true)
+        .eq("department", "Assets")
+        .order("name", { ascending: true }),
     ]);
 
     if (assetsRes.error || calibrationsRes.error || peopleRes.error) {

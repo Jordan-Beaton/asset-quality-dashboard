@@ -234,7 +234,12 @@ function InspectionPageContent() {
     const [assetsRes, inspectionsRes, peopleRes] = await Promise.all([
       supabase.from("assets").select("*").order("name", { ascending: true }),
       supabase.from("asset_inspection_records").select("*").order("inspection_date", { ascending: false }),
-      supabase.from("asset_people").select("id,name,role,active").eq("active", true).order("name", { ascending: true }),
+      supabase
+        .from("people")
+        .select("id,name,role,active")
+        .eq("active", true)
+        .eq("department", "Assets")
+        .order("name", { ascending: true }),
     ]);
 
     if (assetsRes.error || inspectionsRes.error || peopleRes.error) {
@@ -298,10 +303,11 @@ function InspectionPageContent() {
 
     try {
       setIsAddingPerson(true);
-      const { error } = await supabase.from("asset_people").insert([
+      const { error } = await supabase.from("people").insert([
         {
           name: personDraft.name.trim(),
           role: personDraft.role.trim() || null,
+          department: "Assets",
           active: true,
         },
       ]);
@@ -322,9 +328,10 @@ function InspectionPageContent() {
       setPersonDraft(emptyPersonDraft);
       setMessage(`Added ${newName} to asset people.`);
       const { data, error: reloadError } = await supabase
-        .from("asset_people")
+        .from("people")
         .select("id,name,role,active")
         .eq("active", true)
+        .eq("department", "Assets")
         .order("name", { ascending: true });
       if (!reloadError) {
         setPeople((data || []) as AssetPerson[]);

@@ -65,8 +65,10 @@ type DocumentRow = {
   originator_name: string | null;
   originator_email: string | null;
   reviewed_by: string | null;
+  reviewer_email?: string | null;
   reviewed_at: string | null;
   approved_by: string | null;
+  approver_email?: string | null;
   approved_at: string | null;
   rejected_by: string | null;
   rejected_at: string | null;
@@ -107,6 +109,16 @@ type NotificationContactRow = {
   active: boolean | null;
 };
 
+type PersonRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
+  department: string | null;
+  active: boolean | null;
+  created_at: string | null;
+};
+
 type DocumentForm = {
   document_type: DocumentTypeOption | "";
   document_number: string;
@@ -121,8 +133,10 @@ type DocumentForm = {
   originator_name: string;
   originator_email: string;
   reviewed_by: string;
+  reviewer_email: string;
   reviewed_at: string;
   approved_by: string;
+  approver_email: string;
   approved_at: string;
   rejected_by: string;
   rejected_at: string;
@@ -130,6 +144,10 @@ type DocumentForm = {
   notification_emails: string[];
   comments: string;
 };
+
+type PeopleFieldKey = "originator_name" | "reviewed_by" | "approved_by" | "rejected_by";
+
+type PeopleSearchState = Record<PeopleFieldKey, string>;
 
 type NotificationEventType =
   | "submitted_for_review"
@@ -141,7 +159,6 @@ type NotificationEventType =
 const STORAGE_BUCKET = "document-files";
 const DEFAULT_USER_NAME = "Jordan Beaton";
 const DEFAULT_USER_EMAIL = "jbeaton@enshoresubsea.com";
-
 const DOCUMENT_TYPE_OPTIONS: DocumentTypeOption[] = [
   "Procedure",
   "Form",
@@ -209,16 +226,18 @@ const emptyForm: DocumentForm = {
   current_revision: "A",
   issue_date: "",
   review_cycle_years: 1,
-  originator_name: DEFAULT_USER_NAME,
-  originator_email: DEFAULT_USER_EMAIL,
+  originator_name: "",
+  originator_email: "",
   reviewed_by: "",
+  reviewer_email: "",
   reviewed_at: "",
   approved_by: "",
+  approver_email: "",
   approved_at: "",
   rejected_by: "",
   rejected_at: "",
   rejection_reason: "",
-  notification_emails: [DEFAULT_USER_EMAIL],
+  notification_emails: [],
   comments: "",
 };
 
@@ -399,6 +418,30 @@ function uniqueEmails(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+function normalizePersonName(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase();
+}
+
+function findPersonByName(people: PersonRow[], value: string | null | undefined) {
+  const target = normalizePersonName(value);
+  if (!target) return null;
+  return people.find((person) => normalizePersonName(person.name) === target) || null;
+}
+
+function deriveStoredNotificationEmails(
+  source: Pick<DocumentForm, "notification_emails" | "reviewer_email" | "approver_email">
+) {
+  return uniqueEmails([...source.notification_emails, source.reviewer_email, source.approver_email]);
+}
+
+function extractAdditionalNotificationEmails(
+  storedEmails: string[] | null | undefined,
+  autoEmails: string[]
+) {
+  const autoSet = new Set(uniqueEmails(autoEmails).map((email) => email.toLowerCase()));
+  return uniqueEmails((storedEmails || []).filter((email) => !autoSet.has(email.trim().toLowerCase())));
+}
+
 function DocumentsPageContent() {
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
@@ -410,7 +453,8 @@ function DocumentsPageContent() {
 
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [revisionsByDocumentId, setRevisionsByDocumentId] = useState<Record<string, DocumentRevisionRow[]>>({});
-  const [contacts, setContacts] = useState<NotificationContactRow[]>([]);
+  const [people, setPeople] = useState<PersonRow[]>([]);
+  const [, setContacts] = useState<NotificationContactRow[]>([]);
   const [message, setMessage] = useState("Loading documents...");
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [search, setSearch] = useState(linkedSearch);
@@ -421,9 +465,22 @@ function DocumentsPageContent() {
   const [approvalFilter, setApprovalFilter] = useState(linkedApproval);
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [showDetailPanel, setShowDetailPanel] = useState(false);
+  const [showCreatePanel, setShowCreatePanel] = useState(false);
 
   const [form, setForm] = useState<DocumentForm>(emptyForm);
   const [detailForm, setDetailForm] = useState<DocumentForm>(emptyForm);
+  const [formPeopleSearch, setFormPeopleSearch] = useState<PeopleSearchState>({
+    originator_name: emptyForm.originator_name,
+    reviewed_by: emptyForm.reviewed_by,
+    approved_by: emptyForm.approved_by,
+    rejected_by: emptyForm.rejected_by,
+  });
+  const [detailPeopleSearch, setDetailPeopleSearch] = useState<PeopleSearchState>({
+    originator_name: emptyForm.originator_name,
+    reviewed_by: emptyForm.reviewed_by,
+    approved_by: emptyForm.approved_by,
+    rejected_by: emptyForm.rejected_by,
+  });
 
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -433,10 +490,12 @@ function DocumentsPageContent() {
     const [
       { data: documentsData, error: documentsError },
       { data: revisionsData, error: revisionsError },
+      { data: peopleData, error: peopleError },
       { data: contactsData, error: contactsError },
     ] = await Promise.all([
       supabase.from("documents").select("*").order("document_number", { ascending: true }),
       supabase.from("document_revisions").select("*").order("uploaded_at", { ascending: false }),
+      supabase.from("people").select("id, name, email, role, department, active, created_at").eq("active", true).order("name", { ascending: true }),
       supabase
         .from("document_notification_contacts")
         .select("*")
@@ -463,18 +522,11 @@ function DocumentsPageContent() {
       grouped[revision.document_id].push(revision);
     });
 
-    const fallbackContacts: NotificationContactRow[] = [
-      {
-        id: "default-jordan",
-        first_name: "Jordan",
-        last_name: "Beaton",
-        email: DEFAULT_USER_EMAIL,
-        active: true,
-      },
-    ];
+    const fallbackContacts: NotificationContactRow[] = [];
 
     setDocuments(rows);
     setRevisionsByDocumentId(grouped);
+    setPeople(peopleError ? [] : ((peopleData as PersonRow[]) || []));
     setContacts(contactsError ? fallbackContacts : ((contactsData as NotificationContactRow[]) || fallbackContacts));
     setSelectedDocumentId((current) => current || rows[0]?.id || "");
     setLastRefreshed(new Date().toLocaleString("en-GB"));
@@ -578,35 +630,177 @@ function DocumentsPageContent() {
     return revisionsByDocumentId[selectedDocumentId] || [];
   }, [revisionsByDocumentId, selectedDocumentId]);
 
+  const supportsReviewerEmail = useMemo(
+    () => documents.some((doc) => Object.prototype.hasOwnProperty.call(doc, "reviewer_email")),
+    [documents]
+  );
+  const supportsApproverEmail = useMemo(
+    () => documents.some((doc) => Object.prototype.hasOwnProperty.call(doc, "approver_email")),
+    [documents]
+  );
+
+  function resolveDocumentPersonEmail(name: string) {
+    const matchedPerson = findPersonByName(people, name);
+    if (!matchedPerson) return "";
+    return matchedPerson.email?.trim() || "";
+  }
+
+  function buildDocumentFormFromRow(row: DocumentRow): DocumentForm {
+    const approverName = row.approved_by || "";
+    const rejectorName = row.rejected_by || "";
+    const outcomeName = approverName || rejectorName;
+    const reviewerEmail =
+      (typeof row.reviewer_email === "string" ? row.reviewer_email : null) ||
+      resolveDocumentPersonEmail(row.reviewed_by || "");
+    const approverEmail =
+      (typeof row.approver_email === "string" ? row.approver_email : null) ||
+      resolveDocumentPersonEmail(outcomeName);
+    const originatorEmail = row.originator_email || "";
+    const extras = extractAdditionalNotificationEmails(row.notification_emails, [
+      originatorEmail,
+      reviewerEmail || "",
+      approverEmail || "",
+    ]);
+
+    return {
+      document_type: (row.document_type as DocumentTypeOption) || "",
+      document_number: row.document_number || "",
+      title: row.title || "",
+      description: row.description || "",
+      department_owner: (row.department_owner as DepartmentOwnerOption) || "",
+      status: (row.status as DocumentStatus) || "Draft",
+      review_approval_status: normalizeApprovalStatus(row.review_approval_status),
+      current_revision: row.current_revision || "A",
+      issue_date: row.issue_date || "",
+      review_cycle_years: (row.review_cycle_years as 1 | 2 | 3) || 1,
+      originator_name: row.originator_name || "",
+      originator_email: originatorEmail,
+      reviewed_by: row.reviewed_by || "",
+      reviewer_email: reviewerEmail || "",
+      reviewed_at: row.reviewed_at ? row.reviewed_at.slice(0, 10) : "",
+      approved_by: approverName,
+      approver_email: approverEmail || "",
+      approved_at: row.approved_at ? row.approved_at.slice(0, 10) : "",
+      rejected_by: rejectorName,
+      rejected_at: row.rejected_at ? row.rejected_at.slice(0, 10) : "",
+      rejection_reason: row.rejection_reason || "",
+      notification_emails: extras,
+      comments: row.comments || "",
+    };
+  }
+
+  function setCreatePersonField(field: PeopleFieldKey, person: PersonRow | null) {
+    setForm((prev) => {
+      if (field === "originator_name") {
+        return {
+          ...prev,
+          originator_name: person?.name || "",
+          originator_email: person?.email?.trim() || "",
+        };
+      }
+      if (field === "reviewed_by") {
+        return {
+          ...prev,
+          reviewed_by: person?.name || "",
+          reviewer_email: person?.email?.trim() || "",
+        };
+      }
+      if (field === "approved_by") {
+        return {
+          ...prev,
+          approved_by: person?.name || "",
+          rejected_by: "",
+          approver_email: person?.email?.trim() || "",
+        };
+      }
+      return {
+        ...prev,
+        approved_by: "",
+        rejected_by: person?.name || "",
+        approver_email: person?.email?.trim() || "",
+      };
+    });
+    setFormPeopleSearch((prev) => {
+      if (field === "approved_by") {
+        return {
+          ...prev,
+          approved_by: person?.name || "",
+          rejected_by: "",
+        };
+      }
+      if (field === "rejected_by") {
+        return {
+          ...prev,
+          approved_by: "",
+          rejected_by: person?.name || "",
+        };
+      }
+      return { ...prev, [field]: person?.name || "" };
+    });
+  }
+
+  function setDetailPersonField(field: PeopleFieldKey, person: PersonRow | null) {
+    setDetailForm((prev) => {
+      if (field === "originator_name") {
+        return {
+          ...prev,
+          originator_name: person?.name || "",
+          originator_email: person?.email?.trim() || "",
+        };
+      }
+      if (field === "reviewed_by") {
+        return {
+          ...prev,
+          reviewed_by: person?.name || "",
+          reviewer_email: person?.email?.trim() || "",
+        };
+      }
+      if (field === "approved_by") {
+        return {
+          ...prev,
+          approved_by: person?.name || "",
+          rejected_by: "",
+          approver_email: person?.email?.trim() || "",
+        };
+      }
+      return {
+        ...prev,
+        approved_by: "",
+        rejected_by: person?.name || "",
+        approver_email: person?.email?.trim() || "",
+      };
+    });
+    setDetailPeopleSearch((prev) => {
+      if (field === "approved_by") {
+        return {
+          ...prev,
+          approved_by: person?.name || "",
+          rejected_by: "",
+        };
+      }
+      if (field === "rejected_by") {
+        return {
+          ...prev,
+          approved_by: "",
+          rejected_by: person?.name || "",
+        };
+      }
+      return { ...prev, [field]: person?.name || "" };
+    });
+  }
+
   useEffect(() => {
     if (!selectedDocument) return;
 
-    setDetailForm({
-      document_type: (selectedDocument.document_type as DocumentTypeOption) || "",
-      document_number: selectedDocument.document_number || "",
-      title: selectedDocument.title || "",
-      description: selectedDocument.description || "",
-      department_owner: (selectedDocument.department_owner as DepartmentOwnerOption) || "",
-      status: (selectedDocument.status as DocumentStatus) || "Draft",
-      review_approval_status: normalizeApprovalStatus(selectedDocument.review_approval_status),
-      current_revision: selectedDocument.current_revision || "A",
-      issue_date: selectedDocument.issue_date || "",
-      review_cycle_years: (selectedDocument.review_cycle_years as 1 | 2 | 3) || 1,
-      originator_name: selectedDocument.originator_name || DEFAULT_USER_NAME,
-      originator_email: selectedDocument.originator_email || DEFAULT_USER_EMAIL,
-      reviewed_by: selectedDocument.reviewed_by || "",
-      reviewed_at: selectedDocument.reviewed_at ? selectedDocument.reviewed_at.slice(0, 10) : "",
-      approved_by: selectedDocument.approved_by || "",
-      approved_at: selectedDocument.approved_at ? selectedDocument.approved_at.slice(0, 10) : "",
-      rejected_by: selectedDocument.rejected_by || "",
-      rejected_at: selectedDocument.rejected_at ? selectedDocument.rejected_at.slice(0, 10) : "",
-      rejection_reason: selectedDocument.rejection_reason || "",
-      notification_emails: selectedDocument.notification_emails?.length
-        ? selectedDocument.notification_emails
-        : [DEFAULT_USER_EMAIL],
-      comments: selectedDocument.comments || "",
+    const nextDetailForm = buildDocumentFormFromRow(selectedDocument);
+    setDetailForm(nextDetailForm);
+    setDetailPeopleSearch({
+      originator_name: nextDetailForm.originator_name,
+      reviewed_by: nextDetailForm.reviewed_by,
+      approved_by: nextDetailForm.approved_by,
+      rejected_by: nextDetailForm.rejected_by,
     });
-  }, [selectedDocument]);
+  }, [people, selectedDocument]);
 
   const totalDocuments = documents.length;
   const liveDocuments = documents.filter((doc) => (doc.status || "").trim().toLowerCase() === "live").length;
@@ -631,6 +825,54 @@ function DocumentsPageContent() {
 
   const nextReviewDatePreview = buildNextReviewDate(form.issue_date, form.review_cycle_years);
   const detailReviewDatePreview = buildNextReviewDate(detailForm.issue_date, detailForm.review_cycle_years);
+  const formOriginatorPerson = findPersonByName(people, form.originator_name);
+  const formReviewerPerson = findPersonByName(people, form.reviewed_by);
+  const formApproverPerson = findPersonByName(people, form.approved_by);
+  const formRejectorPerson = findPersonByName(people, form.rejected_by);
+  const detailOriginatorPerson = findPersonByName(people, detailForm.originator_name);
+  const detailReviewerPerson = findPersonByName(people, detailForm.reviewed_by);
+  const detailApproverPerson = findPersonByName(people, detailForm.approved_by);
+  const detailRejectorPerson = findPersonByName(people, detailForm.rejected_by);
+  function createPersonSearchHandler(
+    mode: "create" | "detail",
+    field: PeopleFieldKey,
+    value: string
+  ) {
+    const setter = mode === "create" ? setFormPeopleSearch : setDetailPeopleSearch;
+    setter((prev) => ({ ...prev, [field]: value }));
+
+    if (!value.trim()) {
+      if (mode === "create") {
+        setCreatePersonField(field, null);
+      } else {
+        setDetailPersonField(field, null);
+      }
+    }
+  }
+
+  function handlePersonSearchBlur(mode: "create" | "detail", field: PeopleFieldKey) {
+    window.setTimeout(() => {
+      const currentValue =
+        mode === "create"
+          ? field === "originator_name"
+            ? form.originator_name
+            : field === "reviewed_by"
+            ? form.reviewed_by
+            : field === "approved_by"
+            ? form.approved_by
+            : form.rejected_by
+          : field === "originator_name"
+          ? detailForm.originator_name
+          : field === "reviewed_by"
+          ? detailForm.reviewed_by
+          : field === "approved_by"
+          ? detailForm.approved_by
+          : detailForm.rejected_by;
+
+      const setter = mode === "create" ? setFormPeopleSearch : setDetailPeopleSearch;
+      setter((prev) => ({ ...prev, [field]: currentValue }));
+    }, 120);
+  }
 
   async function notifyDocumentEvent(
     eventType: NotificationEventType,
@@ -639,11 +881,14 @@ function DocumentsPageContent() {
     documentTitle: string,
     extraMessage?: string
   ) {
-    const recipientEmails = uniqueEmails([
-      source.originator_email,
-      ...source.notification_emails,
-      DEFAULT_USER_EMAIL,
-    ]);
+    const recipientEmails =
+      eventType === "submitted_for_review"
+        ? uniqueEmails([source.reviewer_email])
+        : eventType === "reviewed"
+        ? uniqueEmails([source.approver_email])
+        : eventType === "approved"
+        ? uniqueEmails([source.originator_email, source.reviewer_email, source.approver_email])
+        : uniqueEmails([source.originator_email, source.reviewer_email, source.approver_email]);
 
     try {
       const response = await fetch("/api/document-notifications", {
@@ -655,8 +900,13 @@ function DocumentsPageContent() {
           eventType,
           documentNumber,
           documentTitle,
+          currentRevision: source.current_revision,
           originatorName: source.originator_name,
           originatorEmail: source.originator_email,
+          reviewedBy: source.reviewed_by,
+          approvedBy: source.approved_by,
+          rejectedBy: source.rejected_by,
+          reviewApprovalStatus: source.review_approval_status,
           recipientEmails,
           message: extraMessage || "",
         }),
@@ -666,9 +916,11 @@ function DocumentsPageContent() {
         const payload = await response.json().catch(() => null);
         throw new Error(payload?.error || "Notification send failed");
       }
+
+      return null;
     } catch (error) {
       const text = error instanceof Error ? error.message : "Notification send failed";
-      setMessage(`Document updated, but email notification failed: ${text}`);
+      return text;
     }
   }
 
@@ -831,28 +1083,38 @@ function DocumentsPageContent() {
 
     setIsSaving(true);
 
+    const insertPayload: Record<string, unknown> = {
+      document_type: form.document_type,
+      document_number: form.document_number.trim(),
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      department_owner: form.department_owner,
+      status: form.status,
+      review_approval_status: form.review_approval_status,
+      current_revision: (form.current_revision || "A").trim().toUpperCase(),
+      issue_date: form.issue_date || null,
+      review_cycle_years: form.review_cycle_years,
+      originator_name: form.originator_name.trim(),
+      originator_email: form.originator_email.trim(),
+      reviewed_by: form.reviewed_by.trim() || null,
+      reviewed_at: form.reviewed_at || null,
+      approved_by: form.approved_by.trim() || null,
+      rejected_by: form.rejected_by.trim() || null,
+      approved_at: form.approved_at || null,
+      notification_emails: deriveStoredNotificationEmails(form),
+      comments: form.comments.trim() || null,
+    };
+
+    if (supportsReviewerEmail) {
+      insertPayload.reviewer_email = form.reviewer_email.trim() || null;
+    }
+    if (supportsApproverEmail) {
+      insertPayload.approver_email = form.approver_email.trim() || null;
+    }
+
     const { data, error } = await supabase
       .from("documents")
-      .insert({
-        document_type: form.document_type,
-        document_number: form.document_number.trim(),
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        department_owner: form.department_owner,
-        status: form.status,
-        review_approval_status: form.review_approval_status,
-        current_revision: (form.current_revision || "A").trim().toUpperCase(),
-        issue_date: form.issue_date || null,
-        review_cycle_years: form.review_cycle_years,
-        originator_name: form.originator_name.trim(),
-        originator_email: form.originator_email.trim(),
-        reviewed_by: form.reviewed_by.trim() || null,
-        reviewed_at: form.reviewed_at || null,
-        approved_by: form.approved_by.trim() || null,
-        approved_at: form.approved_at || null,
-        notification_emails: uniqueEmails(form.notification_emails),
-        comments: form.comments.trim() || null,
-      })
+      .insert(insertPayload)
       .select("*")
       .single();
 
@@ -864,8 +1126,15 @@ function DocumentsPageContent() {
     }
 
     setForm(emptyForm);
+    setFormPeopleSearch({
+      originator_name: emptyForm.originator_name,
+      reviewed_by: emptyForm.reviewed_by,
+      approved_by: emptyForm.approved_by,
+      rejected_by: emptyForm.rejected_by,
+    });
     setSelectedDocumentId((data as DocumentRow).id);
     setShowDetailPanel(true);
+    setShowCreatePanel(false);
     setMessage("Document added successfully.");
     await loadDocuments();
   }
@@ -898,27 +1167,37 @@ function DocumentsPageContent() {
 
     setIsSaving(true);
 
+    const updatePayload: Record<string, unknown> = {
+      document_type: detailForm.document_type,
+      title: detailForm.title.trim(),
+      description: detailForm.description.trim() || null,
+      department_owner: detailForm.department_owner,
+      status: detailForm.status,
+      review_approval_status: detailForm.review_approval_status,
+      current_revision: (detailForm.current_revision || "A").trim().toUpperCase(),
+      issue_date: detailForm.issue_date || null,
+      review_cycle_years: detailForm.review_cycle_years,
+      originator_name: detailForm.originator_name.trim(),
+      originator_email: detailForm.originator_email.trim(),
+      reviewed_by: detailForm.reviewed_by.trim() || null,
+      reviewed_at: detailForm.reviewed_at || null,
+      approved_by: detailForm.approved_by.trim() || null,
+      rejected_by: detailForm.rejected_by.trim() || null,
+      approved_at: detailForm.approved_at || null,
+      notification_emails: deriveStoredNotificationEmails(detailForm),
+      comments: detailForm.comments.trim() || null,
+    };
+
+    if (supportsReviewerEmail) {
+      updatePayload.reviewer_email = detailForm.reviewer_email.trim() || null;
+    }
+    if (supportsApproverEmail) {
+      updatePayload.approver_email = detailForm.approver_email.trim() || null;
+    }
+
     const { error } = await supabase
       .from("documents")
-      .update({
-        document_type: detailForm.document_type,
-        title: detailForm.title.trim(),
-        description: detailForm.description.trim() || null,
-        department_owner: detailForm.department_owner,
-        status: detailForm.status,
-        review_approval_status: detailForm.review_approval_status,
-        current_revision: (detailForm.current_revision || "A").trim().toUpperCase(),
-        issue_date: detailForm.issue_date || null,
-        review_cycle_years: detailForm.review_cycle_years,
-        originator_name: detailForm.originator_name.trim(),
-        originator_email: detailForm.originator_email.trim(),
-        reviewed_by: detailForm.reviewed_by.trim() || null,
-        reviewed_at: detailForm.reviewed_at || null,
-        approved_by: detailForm.approved_by.trim() || null,
-        approved_at: detailForm.approved_at || null,
-        notification_emails: uniqueEmails(detailForm.notification_emails),
-        comments: detailForm.comments.trim() || null,
-      })
+      .update(updatePayload)
       .eq("id", selectedDocument.id);
 
     setIsSaving(false);
@@ -943,14 +1222,14 @@ function DocumentsPageContent() {
       return;
     }
 
-  const payload = {
-  status: "Under Review" as DocumentStatus,
-  review_approval_status: "Pending Review" as ReviewApprovalStatus,
-  originator_name: detailForm.originator_name.trim(),
-  originator_email: detailForm.originator_email.trim(),
-  notification_emails: uniqueEmails(detailForm.notification_emails),
-  comments: detailForm.comments.trim(),
-};
+    const payload: Record<string, unknown> = {
+      status: "Under Review" as DocumentStatus,
+      review_approval_status: "Pending Review" as ReviewApprovalStatus,
+      originator_name: detailForm.originator_name.trim(),
+      originator_email: detailForm.originator_email.trim(),
+      notification_emails: deriveStoredNotificationEmails(detailForm),
+      comments: detailForm.comments.trim(),
+    };
 
     const { error } = await supabase.from("documents").update(payload).eq("id", selectedDocument.id);
 
@@ -959,16 +1238,30 @@ function DocumentsPageContent() {
       return;
     }
 
-    await notifyDocumentEvent(
-      "submitted_for_review",
-      { ...detailForm, ...payload },
-      selectedDocument.document_number,
-      detailForm.title.trim(),
-      detailForm.comments.trim()
-    );
+    const reviewSubmissionSource: DocumentForm = {
+      ...detailForm,
+      status: "Under Review",
+      review_approval_status: "Pending Review",
+      originator_name: detailForm.originator_name.trim(),
+      originator_email: detailForm.originator_email.trim(),
+      notification_emails: deriveStoredNotificationEmails(detailForm),
+      comments: detailForm.comments.trim(),
+    };
 
-    setMessage("Document submitted for review.");
-    await loadDocuments();
+      const notificationError = await notifyDocumentEvent(
+        "submitted_for_review",
+        reviewSubmissionSource,
+        selectedDocument.document_number,
+        detailForm.title.trim(),
+        detailForm.comments.trim()
+      );
+
+      setMessage(
+        notificationError
+          ? `Document updated, but notification failed: ${notificationError}`
+          : "Document submitted for review."
+      );
+      await loadDocuments();
   }
 
   async function markReviewed() {
@@ -982,18 +1275,22 @@ function DocumentsPageContent() {
       return;
     }
 
-    const reviewDate = todayIsoDate();
+    const reviewDate =
+      detailForm.reviewed_at && detailForm.reviewed_at.trim() ? detailForm.reviewed_at : todayIsoDate();
 
-const payload = {
-  status: "Under Review" as DocumentStatus,
-  review_approval_status: "Reviewed" as ReviewApprovalStatus,
-  reviewed_by: detailForm.reviewed_by.trim() || DEFAULT_USER_NAME,
-  reviewed_at: detailForm.reviewed_at || reviewDate,
-  rejected_by: "",
-  rejected_at: "",
-  rejection_reason: "",
-  notification_emails: uniqueEmails(detailForm.notification_emails),
-};
+    const payload: Record<string, unknown> = {
+      status: "Under Review" as DocumentStatus,
+      review_approval_status: "Reviewed" as ReviewApprovalStatus,
+      reviewed_by: detailForm.reviewed_by.trim() || DEFAULT_USER_NAME,
+      reviewed_at: reviewDate,
+      rejected_by: "",
+      rejected_at: null,
+      rejection_reason: "",
+      notification_emails: deriveStoredNotificationEmails(detailForm),
+    };
+    if (supportsReviewerEmail) {
+      payload.reviewer_email = detailForm.reviewer_email.trim() || null;
+    }
 
     const { error } = await supabase.from("documents").update(payload).eq("id", selectedDocument.id);
 
@@ -1002,22 +1299,33 @@ const payload = {
       return;
     }
 
-    await notifyDocumentEvent(
-      "reviewed",
-      {
-        ...detailForm,
-        ...payload,
-        reviewed_by: payload.reviewed_by,
-        reviewed_at: payload.reviewed_at,
-        rejection_reason: "",
-      },
-      selectedDocument.document_number,
-      detailForm.title.trim(),
-      `Reviewed by ${payload.reviewed_by} on ${formatDate(payload.reviewed_at)}.`
-    );
+    const reviewedSource: DocumentForm = {
+      ...detailForm,
+      status: "Under Review",
+      review_approval_status: "Reviewed",
+      reviewed_by: String(payload.reviewed_by || ""),
+      reviewer_email: detailForm.reviewer_email,
+      reviewed_at: String(payload.reviewed_at || ""),
+      rejected_by: "",
+      rejected_at: "",
+      rejection_reason: "",
+      notification_emails: deriveStoredNotificationEmails(detailForm),
+    };
 
-    setMessage("Document marked as reviewed.");
-    await loadDocuments();
+      const notificationError = await notifyDocumentEvent(
+        "reviewed",
+        reviewedSource,
+        selectedDocument.document_number,
+        detailForm.title.trim(),
+        `Reviewed by ${String(payload.reviewed_by || "")} on ${formatDate(String(payload.reviewed_at || ""))}.`
+      );
+
+      setMessage(
+        notificationError
+          ? `Document updated, but notification failed: ${notificationError}`
+          : "Document marked as reviewed."
+      );
+      await loadDocuments();
   }
 
   async function approveDocument() {
@@ -1033,16 +1341,20 @@ const payload = {
 
     const approvedDate = todayIsoDate();
 
-const payload = {
-  status: "Live" as DocumentStatus,
-  review_approval_status: "Approved" as ReviewApprovalStatus,
-  approved_by: detailForm.approved_by.trim() || DEFAULT_USER_NAME,
-  approved_at: detailForm.approved_at || approvedDate,
-  rejected_by: "",
-  rejected_at: "",
-  rejection_reason: "",
-  notification_emails: uniqueEmails(detailForm.notification_emails),
-};
+    const payload: Record<string, unknown> = {
+      status: "Live" as DocumentStatus,
+      review_approval_status: "Approved" as ReviewApprovalStatus,
+      approved_by: detailForm.approved_by.trim() || DEFAULT_USER_NAME,
+      approved_at:
+        detailForm.approved_at && detailForm.approved_at.trim() ? detailForm.approved_at : approvedDate,
+      rejected_by: "",
+      rejected_at: null,
+      rejection_reason: "",
+      notification_emails: deriveStoredNotificationEmails(detailForm),
+    };
+    if (supportsApproverEmail) {
+      payload.approver_email = detailForm.approver_email.trim() || null;
+    }
 
     const { error } = await supabase.from("documents").update(payload).eq("id", selectedDocument.id);
 
@@ -1051,22 +1363,33 @@ const payload = {
       return;
     }
 
-    await notifyDocumentEvent(
-      "approved",
-      {
-        ...detailForm,
-        ...payload,
-        approved_by: payload.approved_by,
-        approved_at: payload.approved_at,
-        rejection_reason: "",
-      },
-      selectedDocument.document_number,
-      detailForm.title.trim(),
-      `Approved by ${payload.approved_by} on ${formatDate(payload.approved_at)}.`
-    );
+    const approvedSource: DocumentForm = {
+      ...detailForm,
+      status: "Live",
+      review_approval_status: "Approved",
+      approved_by: String(payload.approved_by || ""),
+      approver_email: detailForm.approver_email,
+      approved_at: String(payload.approved_at || ""),
+      rejected_by: "",
+      rejected_at: "",
+      rejection_reason: "",
+      notification_emails: deriveStoredNotificationEmails(detailForm),
+    };
 
-    setMessage("Document approved and moved live.");
-    await loadDocuments();
+      const notificationError = await notifyDocumentEvent(
+        "approved",
+        approvedSource,
+        selectedDocument.document_number,
+        detailForm.title.trim(),
+        `Approved by ${String(payload.approved_by || "")} on ${formatDate(String(payload.approved_at || ""))}.`
+      );
+
+      setMessage(
+        notificationError
+          ? `Document updated, but notification failed: ${notificationError}`
+          : "Document approved and moved live."
+      );
+      await loadDocuments();
   }
 
   async function rejectDocument() {
@@ -1082,14 +1405,18 @@ const payload = {
 
     const rejectedDate = todayIsoDate();
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       status: "Draft" as DocumentStatus,
       review_approval_status: "Rejected" as ReviewApprovalStatus,
+      approved_by: "",
       rejected_by: detailForm.rejected_by.trim() || DEFAULT_USER_NAME,
       rejected_at: detailForm.rejected_at || rejectedDate,
       rejection_reason: detailForm.rejection_reason.trim(),
-      notification_emails: uniqueEmails(detailForm.notification_emails),
+      notification_emails: deriveStoredNotificationEmails(detailForm),
     };
+    if (supportsApproverEmail) {
+      payload.approver_email = detailForm.approver_email.trim() || null;
+    }
 
     const { error } = await supabase.from("documents").update(payload).eq("id", selectedDocument.id);
 
@@ -1098,15 +1425,22 @@ const payload = {
       return;
     }
 
+    const rejectedSource: DocumentForm = {
+      ...detailForm,
+      status: "Draft",
+      review_approval_status: "Rejected",
+      rejected_by: String(payload.rejected_by || ""),
+      rejected_at: String(payload.rejected_at || ""),
+      rejection_reason: String(payload.rejection_reason || ""),
+      notification_emails: deriveStoredNotificationEmails(detailForm),
+    };
+
     await notifyDocumentEvent(
       "rejected",
-      {
-        ...detailForm,
-        ...payload,
-      },
+      rejectedSource,
       selectedDocument.document_number,
       detailForm.title.trim(),
-      `Rejected by ${payload.rejected_by} on ${formatDate(payload.rejected_at)}.\nReason: ${payload.rejection_reason}`
+      `Rejected by ${String(payload.rejected_by || "")} on ${formatDate(String(payload.rejected_at || ""))}.\nReason: ${String(payload.rejection_reason || "")}`
     );
 
     setMessage("Document rejected and originator notified.");
@@ -1193,31 +1527,41 @@ const payload = {
         .update({ is_current: false })
         .eq("document_id", selectedDocument.id);
 
+      const fileUpdatePayload: Record<string, unknown> = {
+        document_type: detailForm.document_type || null,
+        title: detailForm.title.trim(),
+        description: detailForm.description.trim() || null,
+        department_owner: detailForm.department_owner || null,
+        status: detailForm.status,
+        review_approval_status: detailForm.review_approval_status,
+        current_revision: currentRevision,
+        issue_date: detailForm.issue_date || null,
+        review_cycle_years: detailForm.review_cycle_years,
+        originator_name: detailForm.originator_name.trim() || null,
+        originator_email: detailForm.originator_email.trim() || null,
+        reviewed_by: detailForm.reviewed_by.trim() || null,
+        reviewed_at: detailForm.reviewed_at || null,
+        approved_by: detailForm.approved_by.trim() || null,
+        rejected_by: detailForm.rejected_by.trim() || null,
+        approved_at: detailForm.approved_at || null,
+        notification_emails: deriveStoredNotificationEmails(detailForm),
+        comments: detailForm.comments.trim() || null,
+        file_name: file.name,
+        file_path: path,
+        file_size: file.size,
+        uploaded_at: uploadTimestamp,
+      };
+
+      if (supportsReviewerEmail) {
+        fileUpdatePayload.reviewer_email = detailForm.reviewer_email.trim() || null;
+      }
+      if (supportsApproverEmail) {
+        fileUpdatePayload.approver_email = detailForm.approver_email.trim() || null;
+      }
+
       const { error: updateError } = await supabase
         .from("documents")
-        .update({
-          document_type: detailForm.document_type || null,
-          title: detailForm.title.trim(),
-          description: detailForm.description.trim() || null,
-          department_owner: detailForm.department_owner || null,
-          status: detailForm.status,
-          review_approval_status: detailForm.review_approval_status,
-          current_revision: currentRevision,
-          issue_date: detailForm.issue_date || null,
-          review_cycle_years: detailForm.review_cycle_years,
-          originator_name: detailForm.originator_name.trim() || null,
-          originator_email: detailForm.originator_email.trim() || null,
-          reviewed_by: detailForm.reviewed_by.trim() || null,
-          reviewed_at: detailForm.reviewed_at || null,
-          approved_by: detailForm.approved_by.trim() || null,
-          approved_at: detailForm.approved_at || null,
-          notification_emails: uniqueEmails(detailForm.notification_emails),
-          comments: detailForm.comments.trim() || null,
-          file_name: file.name,
-          file_path: path,
-          file_size: file.size,
-          uploaded_at: uploadTimestamp,
-        })
+        .update(fileUpdatePayload)
         .eq("id", selectedDocument.id);
 
       if (updateError) {
@@ -1381,32 +1725,37 @@ const payload = {
       supersedeComment
     );
 
-    setForm({
-      document_type: (selectedDocument.document_type as DocumentTypeOption) || "",
-      document_number: "",
-      title: selectedDocument.title || "",
-      description: selectedDocument.description || "",
-      department_owner: "",
-      status: "Draft",
-      review_approval_status: "Draft",
-      current_revision: "A",
-      issue_date: "",
-      review_cycle_years: (selectedDocument.review_cycle_years as 1 | 2 | 3) || 1,
-      originator_name: selectedDocument.originator_name || DEFAULT_USER_NAME,
-      originator_email: selectedDocument.originator_email || DEFAULT_USER_EMAIL,
-      reviewed_by: "",
+      const replacementForm: DocumentForm = {
+        ...buildDocumentFormFromRow(selectedDocument),
+        document_number: "",
+        department_owner: "",
+        status: "Draft",
+        review_approval_status: "Draft",
+        current_revision: "A",
+        issue_date: "",
+        originator_name: "",
+        originator_email: "",
+        reviewed_by: "",
+        reviewer_email: "",
       reviewed_at: "",
       approved_by: "",
+      approver_email: "",
       approved_at: "",
       rejected_by: "",
       rejected_at: "",
       rejection_reason: "",
-      notification_emails: selectedDocument.notification_emails?.length
-        ? selectedDocument.notification_emails
-        : [DEFAULT_USER_EMAIL],
       comments: `Supersedes ${selectedDocument.document_number}`,
+    };
+
+    setForm(replacementForm);
+    setFormPeopleSearch({
+      originator_name: replacementForm.originator_name,
+      reviewed_by: replacementForm.reviewed_by,
+      approved_by: replacementForm.approved_by,
+      rejected_by: replacementForm.rejected_by,
     });
 
+    setShowCreatePanel(true);
     setShowDetailPanel(false);
     setMessage(
       `Old document superseded. Complete the Add Document form to create the replacement for ${selectedDocument.document_number}.`
@@ -1458,256 +1807,301 @@ const payload = {
         <StatCard title="Review Overdue" value={overdueReviews} accent="#dc2626" />
       </section>
 
-      <section style={compactTopGridStyle}>
-        <SectionCard
-          title="Add Document"
-          subtitle="Department owner + document type will build the next document number automatically."
-        >
-          <form onSubmit={addDocument}>
-            <div style={compactFormGridStyle}>
-              <Field label="Department Owner">
-                <select
-                  value={form.department_owner}
-                  onChange={(e) =>
-                    setForm({ ...form, department_owner: e.target.value as DepartmentOwnerOption | "" })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Select department</option>
-                  {DEPARTMENT_OWNER_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+      <section style={createPanelSectionStyle}>
+        <div style={createPanelToggleRowStyle}>
+          <button
+            type="button"
+            style={showCreatePanel ? secondaryButtonStyle : primaryButtonStyle}
+            onClick={() => setShowCreatePanel((prev) => !prev)}
+          >
+            {showCreatePanel ? "Hide Create Form" : "Create Document"}
+          </button>
+        </div>
 
-              <Field label="Document Type">
-                <select
-                  value={form.document_type}
-                  onChange={(e) =>
-                    setForm({ ...form, document_type: e.target.value as DocumentTypeOption | "" })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="">Select type</option>
-                  {DOCUMENT_TYPE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+        {showCreatePanel ? (
+          <SectionCard
+            title="Add Document"
+            subtitle="Department owner + document type will build the next document number automatically."
+          >
+            <form onSubmit={addDocument}>
+            <div style={formLayoutStyle}>
+              <FormSection title="A. Document Details">
+                <Field label="Document Number">
+                  <input value={form.document_number} readOnly style={readOnlyInputStyle} />
+                </Field>
 
-              <Field label="Document Number">
-                <input value={form.document_number} readOnly style={readOnlyInputStyle} />
-              </Field>
+                <Field label="Title">
+                  <input
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    style={inputStyle}
+                    placeholder="Document title"
+                  />
+                </Field>
 
-              <Field label="Title">
-                <input
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  style={inputStyle}
-                  placeholder="Document title"
-                />
-              </Field>
-
-              <Field label="Status">
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value as DocumentStatus })}
-                  style={inputStyle}
-                >
-                  <option value="Draft">Draft</option>
-                  <option value="Under Review">Under Review</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Live">Live</option>
-                  <option value="Superseded">Superseded</option>
-                  <option value="Obsolete">Obsolete</option>
-                  <option value="Archived">Archived</option>
-                </select>
-              </Field>
-
-              <Field label="Review / Approval Status">
-                <select
-                  value={form.review_approval_status}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      review_approval_status: e.target.value as ReviewApprovalStatus,
-                    })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="Draft">Draft</option>
-                  <option value="Pending Review">Pending Review</option>
-                  <option value="Reviewed">Reviewed</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
-              </Field>
-
-              <Field label="Current Revision">
-                <input
-                  value={form.current_revision}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      current_revision: e.target.value.toUpperCase().slice(0, 1),
-                    })
-                  }
-                  style={inputStyle}
-                  placeholder="A"
-                />
-              </Field>
-
-              <Field label="Originator Name">
-                <input
-                  value={form.originator_name}
-                  onChange={(e) => setForm({ ...form, originator_name: e.target.value })}
-                  style={inputStyle}
-                  placeholder="Originator full name"
-                />
-              </Field>
-
-              <Field label="Originator Email">
-                <input
-                  value={form.originator_email}
-                  onChange={(e) => setForm({ ...form, originator_email: e.target.value })}
-                  style={inputStyle}
-                  placeholder="Originator email"
-                />
-              </Field>
-
-              <Field label="Issue Date">
-                <input
-                  type="date"
-                  value={form.issue_date}
-                  onChange={(e) => setForm({ ...form, issue_date: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Review Cycle">
-                <select
-                  value={form.review_cycle_years}
-                  onChange={(e) =>
-                    setForm({ ...form, review_cycle_years: Number(e.target.value) as 1 | 2 | 3 })
-                  }
-                  style={inputStyle}
-                >
-                  <option value={1}>1 year</option>
-                  <option value={2}>2 years</option>
-                  <option value={3}>3 years</option>
-                </select>
-              </Field>
-
-              <Field label="Next Review Date">
-                <input
-                  value={nextReviewDatePreview ? formatDate(nextReviewDatePreview) : "-"}
-                  readOnly
-                  style={readOnlyInputStyle}
-                />
-              </Field>
-
-              <Field label="Notification List">
-                <select
-                  multiple
-                  value={form.notification_emails}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      notification_emails: Array.from(e.target.selectedOptions).map((option) => option.value),
-                    })
-                  }
-                  style={multiSelectStyle}
-                >
-                  {contacts.map((contact) => {
-                    const label = `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
-                    return (
-                      <option key={contact.id} value={contact.email}>
-                        {label ? `${label} - ${contact.email}` : contact.email}
+                <Field label="Document Type">
+                  <select
+                    value={form.document_type}
+                    onChange={(e) =>
+                      setForm({ ...form, document_type: e.target.value as DocumentTypeOption | "" })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="">Select type</option>
+                    {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
                       </option>
-                    );
-                  })}
-                </select>
-              </Field>
+                    ))}
+                  </select>
+                </Field>
 
-              <Field label="Reviewed By">
-                <input
-                  value={form.reviewed_by}
-                  onChange={(e) => setForm({ ...form, reviewed_by: e.target.value })}
-                  style={inputStyle}
-                  placeholder="Reviewer"
-                />
-              </Field>
+                <Field label="Department">
+                  <select
+                    value={form.department_owner}
+                    onChange={(e) =>
+                      setForm({ ...form, department_owner: e.target.value as DepartmentOwnerOption | "" })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="">Select department</option>
+                    {DEPARTMENT_OWNER_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
 
-              <Field label="Reviewed Date">
-                <input
-                  type="date"
-                  value={form.reviewed_at}
-                  onChange={(e) => setForm({ ...form, reviewed_at: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
+                <Field label="Status">
+                  <select
+                    value={form.status}
+                    onChange={(e) => setForm({ ...form, status: e.target.value as DocumentStatus })}
+                    style={inputStyle}
+                  >
+                    <option value="Draft">Draft</option>
+                    <option value="Under Review">Under Review</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Live">Live</option>
+                    <option value="Superseded">Superseded</option>
+                    <option value="Obsolete">Obsolete</option>
+                    <option value="Archived">Archived</option>
+                  </select>
+                </Field>
 
-              <Field label="Approved By">
-                <input
-                  value={form.approved_by}
-                  onChange={(e) => setForm({ ...form, approved_by: e.target.value })}
-                  style={inputStyle}
-                  placeholder="Approver"
-                />
-              </Field>
-
-              <Field label="Approved Date">
-                <input
-                  type="date"
-                  value={form.approved_at}
-                  onChange={(e) => setForm({ ...form, approved_at: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field label="Rejected By">
-                <input
-                  value={form.rejected_by}
-                  onChange={(e) => setForm({ ...form, rejected_by: e.target.value })}
-                  style={inputStyle}
-                  placeholder="Rejector"
-                />
-              </Field>
-
-              <Field label="Rejected Date">
-                <input
-                  type="date"
-                  value={form.rejected_at}
-                  onChange={(e) => setForm({ ...form, rejected_at: e.target.value })}
-                  style={inputStyle}
-                />
-              </Field>
-
-              <div style={{ gridColumn: "1 / -1" }}>
-                <Field label="Rejection Reason">
-                  <textarea
-                    value={form.rejection_reason}
-                    onChange={(e) => setForm({ ...form, rejection_reason: e.target.value })}
-                    style={compactTextareaStyle}
-                    placeholder="Required when rejecting"
+                <Field label="Current Revision">
+                  <input
+                    value={form.current_revision}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        current_revision: e.target.value.toUpperCase().slice(0, 1),
+                      })
+                    }
+                    style={inputStyle}
+                    placeholder="A"
                   />
                 </Field>
-              </div>
+              </FormSection>
 
-              <div style={{ gridColumn: "1 / -1" }}>
-                <Field label="Description">
-                  <textarea
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    style={compactTextareaStyle}
-                    placeholder="Short scope / description"
+              <FormSection title="B. Review Control">
+                <Field label="Review Cycle">
+                  <select
+                    value={form.review_cycle_years}
+                    onChange={(e) =>
+                      setForm({ ...form, review_cycle_years: Number(e.target.value) as 1 | 2 | 3 })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value={1}>1 year</option>
+                    <option value={2}>2 years</option>
+                    <option value={3}>3 years</option>
+                  </select>
+                </Field>
+
+                <Field label="Issue Date">
+                  <input
+                    type="date"
+                    value={form.issue_date}
+                    onChange={(e) => setForm({ ...form, issue_date: e.target.value })}
+                    style={inputStyle}
                   />
                 </Field>
-              </div>
+
+                <Field label="Next Review Date">
+                  <input
+                    value={nextReviewDatePreview ? formatDate(nextReviewDatePreview) : "-"}
+                    readOnly
+                    style={readOnlyInputStyle}
+                  />
+                </Field>
+
+                <Field label="Review / Approval Status">
+                  <select
+                    value={form.review_approval_status}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        review_approval_status: e.target.value as ReviewApprovalStatus,
+                      })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="Draft">Draft</option>
+                    <option value="Pending Review">Pending Review</option>
+                    <option value="Reviewed">Reviewed</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </Field>
+
+                <Field label="Reviewed Date">
+                  <input
+                    type="date"
+                    value={form.reviewed_at}
+                    onChange={(e) => setForm({ ...form, reviewed_at: e.target.value })}
+                    style={inputStyle}
+                  />
+                </Field>
+
+                <Field label="Approved Date">
+                  <input
+                    type="date"
+                    value={form.approved_at}
+                    onChange={(e) => setForm({ ...form, approved_at: e.target.value })}
+                    style={inputStyle}
+                  />
+                </Field>
+              </FormSection>
+
+              <FormSection title="C. People">
+                <Field label="Originator">
+                  <PeopleSelector
+                    inputId="document-originator"
+                    value={formPeopleSearch.originator_name}
+                    selectedName={form.originator_name}
+                    people={people}
+                    placeholder="Start typing a name"
+                    onChange={(value) => createPersonSearchHandler("create", "originator_name", value)}
+                    onSelect={(person) => setCreatePersonField("originator_name", person)}
+                    onBlur={() => handlePersonSearchBlur("create", "originator_name")}
+                    resolvedEmail={form.originator_email}
+                    warning={
+                      formPeopleSearch.originator_name.trim() && !formOriginatorPerson
+                        ? "Originator must be selected from People."
+                        : formOriginatorPerson && !form.originator_email.trim()
+                        ? "Originator has no email in People."
+                        : ""
+                    }
+                  />
+                </Field>
+
+                <Field label="Reviewer">
+                  <PeopleSelector
+                    inputId="document-reviewed-by"
+                    value={formPeopleSearch.reviewed_by}
+                    selectedName={form.reviewed_by}
+                    people={people}
+                    placeholder="Start typing a name"
+                    onChange={(value) => createPersonSearchHandler("create", "reviewed_by", value)}
+                    onSelect={(person) => setCreatePersonField("reviewed_by", person)}
+                    onBlur={() => handlePersonSearchBlur("create", "reviewed_by")}
+                    resolvedEmail={form.reviewer_email}
+                    warning={
+                      formPeopleSearch.reviewed_by.trim() && !formReviewerPerson
+                        ? "Reviewer must be selected from People."
+                        : formReviewerPerson && !form.reviewer_email.trim()
+                        ? "Reviewer has no email in People."
+                        : ""
+                    }
+                  />
+                </Field>
+
+                <Field label="Approved By">
+                  <PeopleSelector
+                    inputId="document-approved-by"
+                    value={formPeopleSearch.approved_by}
+                    selectedName={form.approved_by}
+                    people={people}
+                    placeholder="Start typing a name"
+                    onChange={(value) => createPersonSearchHandler("create", "approved_by", value)}
+                    onSelect={(person) => setCreatePersonField("approved_by", person)}
+                    onBlur={() => handlePersonSearchBlur("create", "approved_by")}
+                    resolvedEmail={form.approver_email}
+                    disabled={Boolean(form.rejected_by.trim())}
+                    warning={
+                      formPeopleSearch.approved_by.trim() && !formApproverPerson
+                        ? "Approved By must be selected from People."
+                        : formApproverPerson && !form.approver_email.trim()
+                        ? "Approved By has no email in People."
+                        : ""
+                    }
+                  />
+                </Field>
+
+                <Field label="Rejected By">
+                  <PeopleSelector
+                    inputId="document-rejected-by"
+                    value={formPeopleSearch.rejected_by}
+                    selectedName={form.rejected_by}
+                    people={people}
+                    placeholder="Start typing a name"
+                    onChange={(value) => createPersonSearchHandler("create", "rejected_by", value)}
+                    onSelect={(person) => setCreatePersonField("rejected_by", person)}
+                    onBlur={() => handlePersonSearchBlur("create", "rejected_by")}
+                    resolvedEmail={form.rejected_by.trim() ? form.approver_email : ""}
+                    disabled={Boolean(form.approved_by.trim())}
+                    warning={
+                      formPeopleSearch.rejected_by.trim() && !formRejectorPerson
+                        ? "Rejected By must be selected from People."
+                        : formRejectorPerson && !form.approver_email.trim()
+                        ? "Rejected By has no email in People."
+                        : ""
+                    }
+                  />
+                </Field>
+              </FormSection>
+
+              <FormSection title="D. File / Revision Notes">
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={formSectionHintStyle}>
+                    Upload the controlled document after the record is created.
+                  </div>
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="Description">
+                    <textarea
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      style={compactTextareaStyle}
+                      placeholder="Short scope / description"
+                    />
+                  </Field>
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="Comments / Revision Notes">
+                    <textarea
+                      value={form.comments}
+                      onChange={(e) => setForm({ ...form, comments: e.target.value })}
+                      style={compactTextareaStyle}
+                      placeholder="Optional notes for review or revision context"
+                    />
+                  </Field>
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="Rejection Reason">
+                    <textarea
+                      value={form.rejection_reason}
+                      onChange={(e) => setForm({ ...form, rejection_reason: e.target.value })}
+                      style={compactTextareaStyle}
+                      placeholder="Only needed if this draft is being set up in a rejected state"
+                    />
+                  </Field>
+                </div>
+              </FormSection>
             </div>
 
             <div style={buttonRowStyle}>
@@ -1718,65 +2112,9 @@ const payload = {
                 Next sequence: {String(nextSequence).padStart(3, "0")}
               </span>
             </div>
-          </form>
-        </SectionCard>
-
-        <SectionCard title="Control Snapshot" subtitle="Click a box to filter the register below.">
-          <div style={snapshotHeaderRowStyle}>
-            <button
-              type="button"
-              style={reportButtonStyle}
-              onClick={() => exportDocumentsReport("Documents Due Soon Report", dueSoonDocuments)}
-            >
-              Export Due Soon Report
-            </button>
-          </div>
-
-          <div style={miniSnapshotGridStyle}>
-            <SnapshotCard
-              label="Live"
-              value={liveDocuments}
-              tone="#166534"
-              bg="#dcfce7"
-              onClick={() => applySnapshotFilter({ status: "Live" })}
-            />
-            <SnapshotCard
-              label="Draft"
-              value={draftDocuments}
-              tone="#1d4ed8"
-              bg="#dbeafe"
-              onClick={() => applySnapshotFilter({ status: "Draft" })}
-            />
-            <SnapshotCard
-              label="Archived"
-              value={archivedDocuments}
-              tone="#6d28d9"
-              bg="#ede9fe"
-              onClick={() => applySnapshotFilter({ status: "Archived" })}
-            />
-            <SnapshotCard
-              label="Approved"
-              value={approvedDocuments}
-              tone="#1d4ed8"
-              bg="#dbeafe"
-              onClick={() => applySnapshotFilter({ approval: "Approved" })}
-            />
-            <SnapshotCard
-              label="Overdue"
-              value={overdueReviews}
-              tone="#991b1b"
-              bg="#fee2e2"
-              onClick={() => applySnapshotFilter({ review: "Overdue" })}
-            />
-            <SnapshotCard
-              label="Due Soon"
-              value={dueSoonReviews}
-              tone="#92400e"
-              bg="#fef3c7"
-              onClick={() => applySnapshotFilter({ review: "Due soon" })}
-            />
-          </div>
-        </SectionCard>
+            </form>
+          </SectionCard>
+        ) : null}
       </section>
 
       <section>
@@ -1996,7 +2334,7 @@ const payload = {
                 </button>
               </div>
 
-              <div style={fileStripStyle}>
+              <div style={{ ...fileStripStyle, display: "none" }}>
                 <div style={fileMetaWrapStyle}>
                   <div style={fileMetaTitleStyle}>Current controlled file</div>
                   <div style={fileMetaFileStyle}>
@@ -2048,267 +2386,342 @@ const payload = {
 
               <div style={detailSectionStyle}>
                 <div style={detailSectionTitleStyle}>Document Control Record</div>
+                <div style={detailContentGridStyle}>
+                  <div style={formLayoutStyle}>
+                    <FormSection title="A. Document Details">
+                    <Field label="Document Number">
+                      <input value={detailForm.document_number} readOnly style={readOnlyInputStyle} />
+                    </Field>
 
-                <div style={detailFormGridStyle}>
-                  <Field label="Department Owner">
-                    <select
-                      value={detailForm.department_owner}
-                      onChange={(e) =>
-                        setDetailForm({
-                          ...detailForm,
-                          department_owner: e.target.value as DepartmentOwnerOption | "",
-                        })
-                      }
-                      style={inputStyle}
-                    >
-                      <option value="">Select department</option>
-                      {DEPARTMENT_OWNER_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                    <Field label="Title">
+                      <input
+                        value={detailForm.title}
+                        onChange={(e) => setDetailForm({ ...detailForm, title: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </Field>
 
-                  <Field label="Document Type">
-                    <select
-                      value={detailForm.document_type}
-                      onChange={(e) =>
-                        setDetailForm({
-                          ...detailForm,
-                          document_type: e.target.value as DocumentTypeOption | "",
-                        })
-                      }
-                      style={inputStyle}
-                    >
-                      <option value="">Select type</option>
-                      {DOCUMENT_TYPE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field label="Document Number">
-                    <input value={detailForm.document_number} readOnly style={readOnlyInputStyle} />
-                  </Field>
-
-                  <Field label="Title">
-                    <input
-                      value={detailForm.title}
-                      onChange={(e) => setDetailForm({ ...detailForm, title: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Status">
-                    <select
-                      value={detailForm.status}
-                      onChange={(e) => setDetailForm({ ...detailForm, status: e.target.value as DocumentStatus })}
-                      style={inputStyle}
-                    >
-                      <option value="Draft">Draft</option>
-                      <option value="Under Review">Under Review</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Live">Live</option>
-                      <option value="Superseded">Superseded</option>
-                      <option value="Obsolete">Obsolete</option>
-                      <option value="Archived">Archived</option>
-                    </select>
-                  </Field>
-
-                  <Field label="Review / Approval Status">
-                    <select
-                      value={detailForm.review_approval_status}
-                      onChange={(e) =>
-                        setDetailForm({
-                          ...detailForm,
-                          review_approval_status: e.target.value as ReviewApprovalStatus,
-                        })
-                      }
-                      style={inputStyle}
-                    >
-                      <option value="Draft">Draft</option>
-                      <option value="Pending Review">Pending Review</option>
-                      <option value="Reviewed">Reviewed</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Rejected">Rejected</option>
-                    </select>
-                  </Field>
-
-                  <Field label="Current Revision">
-                    <input
-                      value={detailForm.current_revision}
-                      onChange={(e) =>
-                        setDetailForm({
-                          ...detailForm,
-                          current_revision: e.target.value.toUpperCase().slice(0, 1),
-                        })
-                      }
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Originator Name">
-                    <input
-                      value={detailForm.originator_name}
-                      onChange={(e) => setDetailForm({ ...detailForm, originator_name: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Originator Email">
-                    <input
-                      value={detailForm.originator_email}
-                      onChange={(e) => setDetailForm({ ...detailForm, originator_email: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Issue Date">
-                    <input
-                      type="date"
-                      value={detailForm.issue_date}
-                      onChange={(e) => setDetailForm({ ...detailForm, issue_date: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Review Cycle">
-                    <select
-                      value={detailForm.review_cycle_years}
-                      onChange={(e) =>
-                        setDetailForm({
-                          ...detailForm,
-                          review_cycle_years: Number(e.target.value) as 1 | 2 | 3,
-                        })
-                      }
-                      style={inputStyle}
-                    >
-                      <option value={1}>1 year</option>
-                      <option value={2}>2 years</option>
-                      <option value={3}>3 years</option>
-                    </select>
-                  </Field>
-
-                  <Field label="Next Review Date">
-                    <input
-                      value={
-                        detailReviewDatePreview
-                          ? formatDate(detailReviewDatePreview)
-                          : selectedDocument.next_review_date
-                          ? formatDate(selectedDocument.next_review_date)
-                          : "-"
-                      }
-                      readOnly
-                      style={readOnlyInputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Notification List">
-                    <select
-                      multiple
-                      value={detailForm.notification_emails}
-                      onChange={(e) =>
-                        setDetailForm({
-                          ...detailForm,
-                          notification_emails: Array.from(e.target.selectedOptions).map((option) => option.value),
-                        })
-                      }
-                      style={multiSelectStyle}
-                    >
-                      {contacts.map((contact) => {
-                        const label = `${contact.first_name || ""} ${contact.last_name || ""}`.trim();
-                        return (
-                          <option key={contact.id} value={contact.email}>
-                            {label ? `${label} - ${contact.email}` : contact.email}
+                    <Field label="Document Type">
+                      <select
+                        value={detailForm.document_type}
+                        onChange={(e) =>
+                          setDetailForm({
+                            ...detailForm,
+                            document_type: e.target.value as DocumentTypeOption | "",
+                          })
+                        }
+                        style={inputStyle}
+                      >
+                        <option value="">Select type</option>
+                        {DOCUMENT_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
                           </option>
-                        );
-                      })}
-                    </select>
-                  </Field>
+                        ))}
+                      </select>
+                    </Field>
 
-                  <Field label="Reviewed By">
-                    <input
-                      value={detailForm.reviewed_by}
-                      onChange={(e) => setDetailForm({ ...detailForm, reviewed_by: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
+                    <Field label="Department">
+                      <select
+                        value={detailForm.department_owner}
+                        onChange={(e) =>
+                          setDetailForm({
+                            ...detailForm,
+                            department_owner: e.target.value as DepartmentOwnerOption | "",
+                          })
+                        }
+                        style={inputStyle}
+                      >
+                        <option value="">Select department</option>
+                        {DEPARTMENT_OWNER_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
 
-                  <Field label="Reviewed Date">
-                    <input
-                      type="date"
-                      value={detailForm.reviewed_at}
-                      onChange={(e) => setDetailForm({ ...detailForm, reviewed_at: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
+                    <Field label="Status">
+                      <select
+                        value={detailForm.status}
+                        onChange={(e) => setDetailForm({ ...detailForm, status: e.target.value as DocumentStatus })}
+                        style={inputStyle}
+                      >
+                        <option value="Draft">Draft</option>
+                        <option value="Under Review">Under Review</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Live">Live</option>
+                        <option value="Superseded">Superseded</option>
+                        <option value="Obsolete">Obsolete</option>
+                        <option value="Archived">Archived</option>
+                      </select>
+                    </Field>
 
-                  <Field label="Approved By">
-                    <input
-                      value={detailForm.approved_by}
-                      onChange={(e) => setDetailForm({ ...detailForm, approved_by: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Approved Date">
-                    <input
-                      type="date"
-                      value={detailForm.approved_at}
-                      onChange={(e) => setDetailForm({ ...detailForm, approved_at: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Rejected By">
-                    <input
-                      value={detailForm.rejected_by}
-                      onChange={(e) => setDetailForm({ ...detailForm, rejected_by: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <Field label="Rejected Date">
-                    <input
-                      type="date"
-                      value={detailForm.rejected_at}
-                      onChange={(e) => setDetailForm({ ...detailForm, rejected_at: e.target.value })}
-                      style={inputStyle}
-                    />
-                  </Field>
-
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <Field label="Rejection Reason">
-                      <textarea
-                        value={detailForm.rejection_reason}
-                        onChange={(e) => setDetailForm({ ...detailForm, rejection_reason: e.target.value })}
-                        style={textareaStyle}
-                        placeholder="Required when rejecting"
+                    <Field label="Current Revision">
+                      <input
+                        value={detailForm.current_revision}
+                        onChange={(e) =>
+                          setDetailForm({
+                            ...detailForm,
+                            current_revision: e.target.value.toUpperCase().slice(0, 1),
+                          })
+                        }
+                        style={inputStyle}
                       />
                     </Field>
+                    </FormSection>
+
+                    <FormSection title="B. Review Control">
+                    <Field label="Review Cycle">
+                      <select
+                        value={detailForm.review_cycle_years}
+                        onChange={(e) =>
+                          setDetailForm({
+                            ...detailForm,
+                            review_cycle_years: Number(e.target.value) as 1 | 2 | 3,
+                          })
+                        }
+                        style={inputStyle}
+                      >
+                        <option value={1}>1 year</option>
+                        <option value={2}>2 years</option>
+                        <option value={3}>3 years</option>
+                      </select>
+                    </Field>
+
+                    <Field label="Issue Date">
+                      <input
+                        type="date"
+                        value={detailForm.issue_date}
+                        onChange={(e) => setDetailForm({ ...detailForm, issue_date: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </Field>
+
+                    <Field label="Next Review Date">
+                      <input
+                        value={
+                          detailReviewDatePreview
+                            ? formatDate(detailReviewDatePreview)
+                            : selectedDocument.next_review_date
+                            ? formatDate(selectedDocument.next_review_date)
+                            : "-"
+                        }
+                        readOnly
+                        style={readOnlyInputStyle}
+                      />
+                    </Field>
+
+                    <Field label="Review / Approval Status">
+                      <select
+                        value={detailForm.review_approval_status}
+                        onChange={(e) =>
+                          setDetailForm({
+                            ...detailForm,
+                            review_approval_status: e.target.value as ReviewApprovalStatus,
+                          })
+                        }
+                        style={inputStyle}
+                      >
+                        <option value="Draft">Draft</option>
+                        <option value="Pending Review">Pending Review</option>
+                        <option value="Reviewed">Reviewed</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </Field>
+
+                    <Field label="Reviewed Date">
+                      <input
+                        type="date"
+                        value={detailForm.reviewed_at}
+                        onChange={(e) => setDetailForm({ ...detailForm, reviewed_at: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </Field>
+
+                    <Field label="Approved Date">
+                      <input
+                        type="date"
+                        value={detailForm.approved_at}
+                        onChange={(e) => setDetailForm({ ...detailForm, approved_at: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </Field>
+                    </FormSection>
+
+                    <FormSection title="C. People">
+                      <Field label="Originator">
+                      <PeopleSelector
+                        inputId="document-detail-originator"
+                        value={detailPeopleSearch.originator_name}
+                        selectedName={detailForm.originator_name}
+                        people={people}
+                        placeholder="Start typing a name"
+                        onChange={(value) => createPersonSearchHandler("detail", "originator_name", value)}
+                        onSelect={(person) => setDetailPersonField("originator_name", person)}
+                        onBlur={() => handlePersonSearchBlur("detail", "originator_name")}
+                        resolvedEmail={detailForm.originator_email}
+                        warning={
+                          detailPeopleSearch.originator_name.trim() && !detailOriginatorPerson
+                            ? "Originator must be selected from People."
+                            : detailOriginatorPerson && !detailForm.originator_email.trim()
+                            ? "Originator has no email in People."
+                            : ""
+                        }
+                      />
+                      </Field>
+
+                      <Field label="Reviewer">
+                      <PeopleSelector
+                        inputId="document-detail-reviewed-by"
+                        value={detailPeopleSearch.reviewed_by}
+                        selectedName={detailForm.reviewed_by}
+                        people={people}
+                        placeholder="Start typing a name"
+                        onChange={(value) => createPersonSearchHandler("detail", "reviewed_by", value)}
+                        onSelect={(person) => setDetailPersonField("reviewed_by", person)}
+                        onBlur={() => handlePersonSearchBlur("detail", "reviewed_by")}
+                        resolvedEmail={detailForm.reviewer_email}
+                        warning={
+                          detailPeopleSearch.reviewed_by.trim() && !detailReviewerPerson
+                            ? "Reviewer must be selected from People."
+                            : detailReviewerPerson && !detailForm.reviewer_email.trim()
+                            ? "Reviewer has no email in People."
+                            : ""
+                        }
+                      />
+                      </Field>
+
+                      <Field label="Approved By">
+                      <PeopleSelector
+                        inputId="document-detail-approved-by"
+                        value={detailPeopleSearch.approved_by}
+                        selectedName={detailForm.approved_by}
+                        people={people}
+                        placeholder="Start typing a name"
+                        onChange={(value) => createPersonSearchHandler("detail", "approved_by", value)}
+                        onSelect={(person) => setDetailPersonField("approved_by", person)}
+                        onBlur={() => handlePersonSearchBlur("detail", "approved_by")}
+                        resolvedEmail={detailForm.approver_email}
+                        disabled={Boolean(detailForm.rejected_by.trim())}
+                        warning={
+                          detailPeopleSearch.approved_by.trim() && !detailApproverPerson
+                            ? "Approved By must be selected from People."
+                            : detailApproverPerson && !detailForm.approver_email.trim()
+                            ? "Approved By has no email in People."
+                            : ""
+                        }
+                      />
+                      </Field>
+
+                      <Field label="Rejected By">
+                        <PeopleSelector
+                          inputId="document-detail-rejected-by"
+                          value={detailPeopleSearch.rejected_by}
+                          selectedName={detailForm.rejected_by}
+                          people={people}
+                          placeholder="Start typing a name"
+                        onChange={(value) => createPersonSearchHandler("detail", "rejected_by", value)}
+                        onSelect={(person) => setDetailPersonField("rejected_by", person)}
+                        onBlur={() => handlePersonSearchBlur("detail", "rejected_by")}
+                        resolvedEmail={detailForm.rejected_by.trim() ? detailForm.approver_email : ""}
+                        disabled={Boolean(detailForm.approved_by.trim())}
+                        warning={
+                            detailPeopleSearch.rejected_by.trim() && !detailRejectorPerson
+                              ? "Rejected By must be selected from People."
+                              : detailRejectorPerson && !detailForm.approver_email.trim()
+                              ? "Rejected By has no email in People."
+                              : ""
+                          }
+                        />
+                      </Field>
+                    </FormSection>
+
+                    <FormSection title="D. File / Revision Notes">
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <Field label="Description">
+                          <textarea
+                            value={detailForm.description}
+                            onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })}
+                            style={textareaStyle}
+                          />
+                        </Field>
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <Field label="Comments / Revision Notes">
+                          <textarea
+                            value={detailForm.comments}
+                            onChange={(e) => setDetailForm({ ...detailForm, comments: e.target.value })}
+                            style={textareaStyle}
+                          />
+                        </Field>
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <Field label="Rejection Reason">
+                          <textarea
+                            value={detailForm.rejection_reason}
+                            onChange={(e) => setDetailForm({ ...detailForm, rejection_reason: e.target.value })}
+                            style={textareaStyle}
+                            placeholder="Required when rejecting"
+                          />
+                        </Field>
+                      </div>
+                    </FormSection>
                   </div>
 
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <Field label="Description">
-                      <textarea
-                        value={detailForm.description}
-                        onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })}
-                        style={textareaStyle}
-                      />
-                    </Field>
-                  </div>
+                  <div style={detailSidebarStyle}>
+                    <div style={fileStripStyle}>
+                      <div style={fileMetaWrapStyle}>
+                        <div style={fileMetaTitleStyle}>Current controlled file</div>
+                        <div style={fileMetaFileStyle}>
+                          {selectedDocument.file_name || "No file uploaded for current revision"}
+                        </div>
+                        <div style={fileMetaSubStyle}>
+                          Revision {selectedDocument.current_revision || "-"} •{" "}
+                          {selectedDocument.file_name
+                            ? `${formatFileSize(selectedDocument.file_size)} • Uploaded ${formatDateTime(
+                                selectedDocument.uploaded_at
+                              )} • View / download only`
+                            : "Upload the current controlled copy here. Files are view / download only in the system."}
+                        </div>
+                      </div>
 
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <Field label="Comments / Revision Notes">
-                      <textarea
-                        value={detailForm.comments}
-                        onChange={(e) => setDetailForm({ ...detailForm, comments: e.target.value })}
-                        style={textareaStyle}
-                      />
-                    </Field>
+                      <div style={fileButtonsWrapStyle}>
+                        <label style={uploadButtonStyle}>
+                          {isUploadingFile ? "Uploading..." : "Upload controlled copy"}
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                            onChange={handleControlledFileUpload}
+                            style={{ display: "none" }}
+                            disabled={isUploadingFile}
+                          />
+                        </label>
+
+                        {selectedDocument.file_path ? (
+                          <button
+                            type="button"
+                            style={reportLinkButtonStyle}
+                            onClick={() => void openDocumentFile(selectedDocument.file_path || "")}
+                          >
+                            Open / Download
+                          </button>
+                        ) : null}
+
+                        <button type="button" style={secondaryButtonStyle} onClick={issueNextRevision}>
+                          Up-rev to {getNextRevision(selectedDocument.current_revision || "A")}
+                        </button>
+
+                        {selectedDocument.file_name ? (
+                          <button type="button" style={secondaryButtonStyle} onClick={removeControlledFile}>
+                            Remove file
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2455,6 +2868,164 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+function FormSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div style={formSectionStyle}>
+      <div style={formSectionTitleStyle}>{title}</div>
+      <div style={formSectionGridStyle}>{children}</div>
+    </div>
+  );
+}
+
+function PeopleSelector({
+  inputId,
+  value,
+  selectedName,
+  people,
+  placeholder,
+  onChange,
+  onSelect,
+  onBlur,
+  resolvedEmail,
+  warning,
+  disabled,
+}: {
+  inputId: string;
+  value: string;
+  selectedName: string;
+  people: PersonRow[];
+  placeholder: string;
+  onChange: (value: string) => void;
+  onSelect: (person: PersonRow) => void;
+  onBlur: () => void;
+  resolvedEmail: string;
+  warning?: string;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const suggestions = useMemo(() => {
+    const query = value.trim().toLowerCase();
+    if (!query) return [];
+    return people
+      .filter((person) => person.name.toLowerCase().includes(query))
+      .slice(0, 6);
+  }, [people, value]);
+  const showSuggestions =
+    !disabled &&
+    isOpen &&
+    value.trim().length > 0 &&
+    normalizePersonName(value) !== normalizePersonName(selectedName) &&
+    suggestions.length > 0;
+
+  return (
+    <div style={peopleSelectorWrapStyle}>
+      <input
+        id={inputId}
+        value={value}
+        onChange={(event) => {
+          if (disabled) return;
+          setIsOpen(true);
+          onChange(event.target.value);
+        }}
+        onFocus={() => {
+          if (disabled) return;
+          setIsOpen(true);
+        }}
+        onBlur={() => {
+          setIsOpen(false);
+          onBlur();
+        }}
+        style={disabled ? disabledInputStyle : inputStyle}
+        placeholder={placeholder}
+        autoComplete="off"
+        disabled={disabled}
+      />
+      {showSuggestions ? (
+        <div style={peopleSuggestionListStyle}>
+          {suggestions.map((person) => (
+            <button
+              key={person.id}
+              type="button"
+              style={{
+                ...peopleSuggestionButtonStyle,
+                background:
+                  normalizePersonName(person.name) === normalizePersonName(selectedName)
+                    ? "#f0fdfa"
+                    : "#ffffff",
+              }}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                setIsOpen(false);
+                onSelect(person);
+              }}
+            >
+              <span>{person.name}</span>
+              <span style={peopleSuggestionMetaStyle}>
+                {person.role ? `${person.role}${person.email ? " • " : ""}` : ""}
+                {person.email || "No email"}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div style={peopleSelectorHintStyle}>
+        {resolvedEmail ? `Email: ${resolvedEmail}` : "Select a person from People to populate email."}
+      </div>
+      {warning ? <div style={peopleSelectorWarningStyle}>{warning}</div> : null}
+    </div>
+  );
+}
+
+function NotificationEmailList({
+  items,
+}: {
+  items: Array<{ label: string; email: string; missing: boolean }>;
+}) {
+  const populatedItems = items.filter((item) => item.email || item.missing);
+  return (
+    <div style={notificationListStyle}>
+      <div style={notificationListHeaderStyle}>Resolved recipients</div>
+      {populatedItems.length ? (
+        <div style={notificationListGridStyle}>
+          {populatedItems.map((item) => (
+            <div key={item.label} style={notificationListRowStyle}>
+              <span style={notificationListRowLabelStyle}>{item.label}</span>
+              <span style={item.missing ? notificationMissingTextStyle : notificationListRowValueStyle}>
+                {item.email || "Email missing in People record"}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={notificationListEmptyStyle}>No notification emails resolved yet.</div>
+      )}
+    </div>
+  );
+}
+
+function ControlSnapshotCard({
+  items,
+}: {
+  items: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <div style={snapshotMetaGridStyle}>
+      {items.map((item) => (
+        <div key={item.label} style={snapshotMetaItemStyle}>
+          <div style={snapshotMetaLabelStyle}>{item.label}</div>
+          <div style={snapshotMetaValueStyle}>{item.value || "-"}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function StatCard({
   title,
   value,
@@ -2552,17 +3123,30 @@ const statsGridStyle: CSSProperties = {
   marginBottom: "20px",
 };
 
+const createPanelSectionStyle: CSSProperties = {
+  marginBottom: "20px",
+  display: "grid",
+  gap: "12px",
+};
+
+const createPanelToggleRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-start",
+  alignItems: "center",
+};
+
 const compactTopGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.2fr 0.8fr",
-  gap: "20px",
-  marginBottom: "20px",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: "12px",
+  marginBottom: "14px",
+  alignItems: "start",
 };
 
 const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
-  padding: "20px",
+  padding: "18px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
@@ -2622,9 +3206,144 @@ const readOnlyInputStyle: CSSProperties = {
   fontWeight: 700,
 };
 
-const multiSelectStyle: CSSProperties = {
+const disabledInputStyle: CSSProperties = {
   ...inputStyle,
-  minHeight: "108px",
+  background: "#f8fafc",
+  color: "#94a3b8",
+  cursor: "not-allowed",
+};
+
+const peopleSelectorWrapStyle: CSSProperties = {
+  position: "relative",
+  display: "grid",
+  gap: "6px",
+};
+
+const peopleSuggestionListStyle: CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 4px)",
+  left: 0,
+  right: 0,
+  zIndex: 20,
+  background: "#ffffff",
+  border: "1px solid #cbd5e1",
+  borderRadius: "12px",
+  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.12)",
+  overflow: "hidden",
+};
+
+const peopleSuggestionButtonStyle: CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  border: "none",
+  background: "#ffffff",
+  color: "#0f172a",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "12px",
+  cursor: "pointer",
+  textAlign: "left",
+  fontSize: "14px",
+};
+
+const peopleSuggestionMetaStyle: CSSProperties = {
+  color: "#64748b",
+  fontSize: "12px",
+  whiteSpace: "nowrap",
+};
+
+const peopleSelectorHintStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#64748b",
+};
+
+const peopleSelectorWarningStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#b45309",
+  fontWeight: 600,
+};
+
+const notificationListStyle: CSSProperties = {
+  border: "1px solid #dbeafe",
+  background: "#f8fbff",
+  borderRadius: "12px",
+  padding: "10px 12px",
+  display: "grid",
+  gap: "8px",
+};
+
+const notificationListHeaderStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 700,
+  color: "#334155",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const snapshotMetaGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+  gap: "10px",
+};
+
+const snapshotMetaItemStyle: CSSProperties = {
+  border: "1px solid #dbe4ef",
+  background: "#f8fafc",
+  borderRadius: "12px",
+  padding: "10px 12px",
+  display: "grid",
+  gap: "4px",
+};
+
+const snapshotMetaLabelStyle: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 800,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const snapshotMetaValueStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 700,
+  color: "#0f172a",
+};
+
+const notificationListGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "6px",
+};
+
+const notificationListRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "baseline",
+};
+
+const notificationListRowLabelStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 700,
+  color: "#334155",
+};
+
+const notificationListRowValueStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#0f172a",
+  textAlign: "right",
+  overflowWrap: "anywhere",
+};
+
+const notificationMissingTextStyle: CSSProperties = {
+  ...notificationListRowValueStyle,
+  color: "#b45309",
+  fontWeight: 600,
+};
+
+const notificationListEmptyStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#64748b",
 };
 
 const toolbarSearchStyle: CSSProperties = {
@@ -2640,7 +3359,7 @@ const toolbarSelectStyle: CSSProperties = {
 
 const compactTextareaStyle: CSSProperties = {
   width: "100%",
-  minHeight: "76px",
+  minHeight: "72px",
   padding: "10px 12px",
   borderRadius: "10px",
   border: "1px solid #cbd5e1",
@@ -2653,7 +3372,7 @@ const compactTextareaStyle: CSSProperties = {
 
 const textareaStyle: CSSProperties = {
   width: "100%",
-  minHeight: "96px",
+  minHeight: "92px",
   padding: "10px 12px",
   borderRadius: "10px",
   border: "1px solid #cbd5e1",
@@ -2677,6 +3396,43 @@ const workflowButtonRowStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   alignItems: "center",
+};
+
+const formLayoutStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+};
+
+const formSectionStyle: CSSProperties = {
+  border: "1px solid #dbe4ef",
+  borderRadius: "14px",
+  padding: "14px",
+  background: "#f8fafc",
+  display: "grid",
+  gap: "10px",
+};
+
+const formSectionTitleStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#0f766e",
+  letterSpacing: "0.05em",
+  textTransform: "uppercase",
+};
+
+const formSectionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+  gap: "10px",
+};
+
+const formSectionHintStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#64748b",
+  background: "#ffffff",
+  border: "1px dashed #cbd5e1",
+  borderRadius: "10px",
+  padding: "10px 12px",
 };
 
 const helperTextStyle: CSSProperties = {
@@ -2793,6 +3549,12 @@ const miniSnapshotGridStyle: CSSProperties = {
   gap: "10px",
 };
 
+const snapshotSupportStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+  marginBottom: "12px",
+};
+
 const snapshotCardButtonStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "12px",
@@ -2896,7 +3658,20 @@ const emptyRegisterStyle: CSSProperties = {
 
 const detailWorkspaceStyle: CSSProperties = {
   display: "grid",
-  gap: "16px",
+  gap: "14px",
+};
+
+const detailContentGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 2.3fr) minmax(260px, 1fr)",
+  gap: "14px",
+  alignItems: "start",
+};
+
+const detailSidebarStyle: CSSProperties = {
+  display: "grid",
+  gap: "14px",
+  alignContent: "start",
 };
 
 const detailTopBarStyle: CSSProperties = {

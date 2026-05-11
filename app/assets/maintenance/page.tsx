@@ -228,7 +228,12 @@ function MaintenancePageContent() {
     const [assetsRes, maintenanceRes, peopleRes] = await Promise.all([
       supabase.from("assets").select("*").order("name", { ascending: true }),
       supabase.from("asset_maintenance_records").select("*").order("maintenance_date", { ascending: false }),
-      supabase.from("asset_people").select("id,name,role,active").eq("active", true).order("name", { ascending: true }),
+      supabase
+        .from("people")
+        .select("id,name,role,active")
+        .eq("active", true)
+        .eq("department", "Assets")
+        .order("name", { ascending: true }),
     ]);
 
     if (assetsRes.error || maintenanceRes.error || peopleRes.error) {
@@ -293,10 +298,11 @@ function MaintenancePageContent() {
       const newName = personDraft.name.trim();
       const newRole = personDraft.role.trim() || null;
 
-      const { error } = await supabase.from("asset_people").insert([
+      const { error } = await supabase.from("people").insert([
         {
           name: newName,
           role: newRole,
+          department: "Assets",
           active: true,
         },
       ]);
@@ -319,9 +325,10 @@ function MaintenancePageContent() {
       setMessage(`Added ${newName} to asset people.`);
 
       const { data, error: reloadError } = await supabase
-        .from("asset_people")
+        .from("people")
         .select("id,name,role,active")
         .eq("active", true)
+        .eq("department", "Assets")
         .order("name", { ascending: true });
 
       if (!reloadError) {

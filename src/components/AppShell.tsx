@@ -12,6 +12,7 @@ type AppShellProps = {
 const qualityNavItems = [
   { href: "/home", label: "Home" },
   { href: "/", label: "Dashboard" },
+  { href: "/people", label: "People" },
   { href: "/documents", label: "Documents" },
   { href: "/moc", label: "MOC" },
   { href: "/ncr-capa", label: "NCR / CAPA" },
@@ -27,6 +28,7 @@ const assetNavItems = [
   { href: "/assets/calibration", label: "Calibration" },
   { href: "/assets/inspection", label: "Inspection" },
   { href: "/assets/maintenance", label: "Maintenance" },
+  { href: "/assets/people", label: "People" },
 ];
 
 export default function AppShell({ children }: AppShellProps) {
@@ -34,11 +36,14 @@ export default function AppShell({ children }: AppShellProps) {
   const isLoginPage = pathname === "/login";
   const isHomePage = pathname === "/home";
   const isAssetModule = pathname.startsWith("/assets");
+  const isPeopleModule = pathname.startsWith("/people");
   const showLogo = !isHomePage;
   const moduleTitle = isHomePage
     ? "Enshore Management System"
     : isAssetModule
     ? "Asset Management"
+    : isPeopleModule
+    ? "People Management"
     : pathname.startsWith("/hse")
     ? "HSE Management"
     : "Quality Management";
@@ -46,6 +51,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? ""
     : isAssetModule
     ? "Asset register and control system"
+    : isPeopleModule
+    ? "Shared people directory and status management"
     : pathname.startsWith("/hse")
     ? "Health, safety and environment system"
     : "Quality management system";
