@@ -182,6 +182,7 @@ async function uploadInspectionFile(assetId: string, file: File) {
 function InspectionPageContent() {
   const searchParams = useSearchParams();
   const linkedAssetParam = searchParams.get("asset")?.trim() || "";
+  const isFieldMode = Boolean(linkedAssetParam);
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [people, setPeople] = useState<AssetPerson[]>([]);
@@ -268,6 +269,7 @@ function InspectionPageContent() {
     () => records.find((record) => record.id === selectedRecordId) || null,
     [records, selectedRecordId]
   );
+  const fieldAsset = useMemo(() => (form.assetId ? assetMap.get(form.assetId) || null : null), [assetMap, form.assetId]);
 
   async function getNextInspectionNumber() {
     const { data, error } = await supabase.from("asset_inspection_records").select("inspection_number");
@@ -483,7 +485,25 @@ function InspectionPageContent() {
   }
 
   return (
-    <main>
+    <main style={isFieldMode ? fieldModeMainStyle : undefined}>
+      {isFieldMode ? (
+        <section style={fieldModeHeaderStyle}>
+          <div style={fieldModeHeaderTopStyle}>
+            <Link href={`/assets/field?asset=${encodeURIComponent(linkedAssetParam)}`} style={backLinkStyle}>
+              Back to Field Access
+            </Link>
+            <div style={fieldModeEyebrowStyle}>Asset Inspection</div>
+          </div>
+          <div style={fieldModeTitleStyle}>
+            {fieldAsset?.asset_code || linkedAssetParam}
+            {fieldAsset?.name ? ` - ${fieldAsset.name}` : ""}
+          </div>
+          <div style={statusBannerStyle}>
+            <strong>Status:</strong> {message}
+          </div>
+        </section>
+      ) : (
+        <>
       <QualityPageHero
         label="ASSET MANAGEMENT"
         title="Inspection Log"
@@ -525,11 +545,17 @@ function InspectionPageContent() {
           tone="blue"
         />
       </section>
+        </>
+      )}
 
-      <section style={stackedGridStyle}>
+      <section style={isFieldMode ? fieldModeStackedGridStyle : stackedGridStyle}>
         <SectionCard
           title="Add Inspection Record"
-          subtitle="Compact inspection entry with clear field alignment, direct people management, and one saved history row per inspection event."
+          subtitle={
+            isFieldMode
+              ? "Focused field inspection entry for the selected asset."
+              : "Compact inspection entry with clear field alignment, direct people management, and one saved history row per inspection event."
+          }
         >
           <form onSubmit={handleSubmit}>
             <div style={mobileFormGridStyle}>
@@ -670,6 +696,8 @@ function InspectionPageContent() {
           </form>
         </SectionCard>
 
+        {!isFieldMode ? (
+          <>
         <SectionCard
           title="Filters & History"
           subtitle="Filter by asset or result to review one asset's full inspection history over time."
@@ -1021,6 +1049,8 @@ function InspectionPageContent() {
             </div>
           )}
         </SectionCard>
+          </>
+        ) : null}
       </section>
     </main>
   );
@@ -1106,6 +1136,48 @@ export default function AssetInspectionPage() {
     </Suspense>
   );
 }
+
+const fieldModeMainStyle: CSSProperties = {
+  maxWidth: "760px",
+  margin: "0 auto",
+  display: "grid",
+  gap: "14px",
+};
+
+const fieldModeStackedGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "14px",
+};
+
+const fieldModeHeaderStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+  marginBottom: "6px",
+};
+
+const fieldModeHeaderTopStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+const fieldModeEyebrowStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "#0f766e",
+};
+
+const fieldModeTitleStyle: CSSProperties = {
+  fontSize: "20px",
+  fontWeight: 800,
+  color: "#0f172a",
+  lineHeight: 1.3,
+  overflowWrap: "anywhere",
+};
 
 const topMetaRowStyle: CSSProperties = {
   marginBottom: "20px",
