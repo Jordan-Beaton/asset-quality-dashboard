@@ -34,6 +34,8 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname === "/login";
+  const requestedPath =
+    request.nextUrl.pathname + (request.nextUrl.search || "");
   const isPublicAsset =
     request.nextUrl.pathname.startsWith("/_next") ||
     request.nextUrl.pathname === "/favicon.ico" ||
@@ -46,12 +48,26 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isLoginPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.search = "";
+    url.searchParams.set("redirect", requestedPath);
     return NextResponse.redirect(url);
   }
 
   if (user && isLoginPage) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    const redirectTarget = request.nextUrl.searchParams.get("redirect") || "/";
+    const safeRedirectTarget =
+      redirectTarget.startsWith("/") && !redirectTarget.startsWith("//")
+        ? redirectTarget
+        : "/";
+    url.pathname = safeRedirectTarget.split("?")[0] || "/";
+    url.search = "";
+    const redirectQuery = safeRedirectTarget.includes("?")
+      ? safeRedirectTarget.slice(safeRedirectTarget.indexOf("?") + 1)
+      : "";
+    if (redirectQuery) {
+      url.search = `?${redirectQuery}`;
+    }
     return NextResponse.redirect(url);
   }
 

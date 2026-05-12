@@ -1,14 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "../../src/lib/supabase";
 
-export default function LoginPage() {
+const REDIRECT_STORAGE_KEY = "asset-quality-login-redirect";
+
+function LoginPageContent() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const redirectTarget = searchParams.get("redirect") || "/";
+  const safeRedirectTarget =
+    redirectTarget.startsWith("/") && !redirectTarget.startsWith("//")
+      ? redirectTarget
+      : "/";
+
+  useEffect(() => {
+    if (safeRedirectTarget && safeRedirectTarget !== "/") {
+      window.sessionStorage.setItem(REDIRECT_STORAGE_KEY, safeRedirectTarget);
+    }
+  }, [safeRedirectTarget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +42,16 @@ export default function LoginPage() {
         return;
       }
 
-      window.location.href = "/";
+      const storedRedirect = window.sessionStorage.getItem(REDIRECT_STORAGE_KEY) || "";
+      const finalRedirectTarget =
+        safeRedirectTarget !== "/" ? safeRedirectTarget : storedRedirect || "/";
+
+      await supabase.auth.getSession();
+      window.sessionStorage.removeItem(REDIRECT_STORAGE_KEY);
+      window.location.href =
+        finalRedirectTarget.startsWith("/") && !finalRedirectTarget.startsWith("//")
+          ? finalRedirectTarget
+          : "/";
       return;
     }
 
@@ -213,5 +237,13 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ maxWidth: "440px", margin: "48px auto", padding: "28px" }}>Loading sign in...</div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

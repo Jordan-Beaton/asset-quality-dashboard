@@ -45,11 +45,6 @@ type AssetPerson = {
   active: boolean;
 };
 
-type PersonDraft = {
-  name: string;
-  role: string;
-};
-
 type InspectionForm = {
   assetId: string;
   inspectionDate: string;
@@ -74,11 +69,6 @@ const emptyForm: InspectionForm = {
   actionsRequired: "",
   nextInspectionDue: "",
   actionRequired: false,
-};
-
-const emptyPersonDraft: PersonDraft = {
-  name: "",
-  role: "",
 };
 
 function formatDate(value: string | null | undefined) {
@@ -204,12 +194,10 @@ function InspectionPageContent() {
   const [resultFilter, setResultFilter] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
-  const [isAddingPerson, setIsAddingPerson] = useState(false);
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [openingId, setOpeningId] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState("");
-  const [personDraft, setPersonDraft] = useState<PersonDraft>(emptyPersonDraft);
 
   useEffect(() => {
     void loadData();
@@ -293,55 +281,6 @@ function InspectionPageContent() {
     }, 0);
 
     return formatInspectionNumber(maxUsed + 1);
-  }
-
-  async function addPersonAndSelect(target: "create" | "detail") {
-    if (!personDraft.name.trim()) {
-      setMessage("Person name is required.");
-      return;
-    }
-
-    try {
-      setIsAddingPerson(true);
-      const { error } = await supabase.from("people").insert([
-        {
-          name: personDraft.name.trim(),
-          role: personDraft.role.trim() || null,
-          department: "Assets",
-          active: true,
-        },
-      ]);
-
-      if (error) throw new Error(error.message);
-
-      const newName = personDraft.name.trim();
-      setPeople((current) =>
-        [...current, { id: `temp-${Date.now()}`, name: newName, role: personDraft.role.trim() || null, active: true }].sort((a, b) =>
-          a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-        )
-      );
-      if (target === "create") {
-        setForm((prev) => ({ ...prev, inspector: newName }));
-      } else {
-        setDetailForm((prev) => ({ ...prev, inspector: newName }));
-      }
-      setPersonDraft(emptyPersonDraft);
-      setMessage(`Added ${newName} to asset people.`);
-      const { data, error: reloadError } = await supabase
-        .from("people")
-        .select("id,name,role,active")
-        .eq("active", true)
-        .eq("department", "Assets")
-        .order("name", { ascending: true });
-      if (!reloadError) {
-        setPeople((data || []) as AssetPerson[]);
-      }
-    } catch (error) {
-      const err = error as Error;
-      setMessage(`Add person failed: ${err.message}`);
-    } finally {
-      setIsAddingPerson(false);
-    }
   }
 
   const filteredRecords = useMemo(() => {
@@ -633,31 +572,6 @@ function InspectionPageContent() {
                 </select>
               </Field>
 
-              <Field label="Add Person">
-                <div style={inlineAddPersonRowStyle}>
-                  <input
-                    value={personDraft.name}
-                    onChange={(e) => setPersonDraft((prev) => ({ ...prev, name: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="Person name"
-                  />
-                  <input
-                    value={personDraft.role}
-                    onChange={(e) => setPersonDraft((prev) => ({ ...prev, role: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="Role (optional)"
-                  />
-                  <button
-                    type="button"
-                    style={secondaryButtonStyle}
-                    onClick={() => void addPersonAndSelect("create")}
-                    disabled={isAddingPerson}
-                  >
-                    {isAddingPerson ? "Saving Person..." : "Add Person"}
-                  </button>
-                </div>
-              </Field>
-
               <Field label="Inspection Date">
                 <input
                   type="date"
@@ -723,6 +637,7 @@ function InspectionPageContent() {
                 </div>
               </Field>
 
+              <div style={fullSpanStyle}>
               <Field label="Findings">
                 <textarea
                   rows={4}
@@ -732,7 +647,9 @@ function InspectionPageContent() {
                   placeholder="Inspection findings or observations"
                 />
               </Field>
+              </div>
 
+              <div style={fullSpanStyle}>
               <Field label="Actions Required">
                 <textarea
                   rows={4}
@@ -742,6 +659,7 @@ function InspectionPageContent() {
                   placeholder="Follow-up actions required"
                 />
               </Field>
+              </div>
             </div>
 
             <div style={buttonRowStyle}>
@@ -977,45 +895,20 @@ function InspectionPageContent() {
                   </select>
                 </Field>
 
-                <Field label="Inspector">
-                  <select
-                    value={detailForm.inspector}
-                    onChange={(e) => setDetailForm((prev) => ({ ...prev, inspector: e.target.value }))}
-                    style={inputStyle}
+              <Field label="Inspector">
+                <select
+                  value={detailForm.inspector}
+                  onChange={(e) => setDetailForm((prev) => ({ ...prev, inspector: e.target.value }))}
+                  style={inputStyle}
                   >
                     <option value="">Select inspector</option>
                     {detailPeopleOptions.map((person) => (
                       <option key={person} value={person}>
                         {person}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Add Person">
-                  <div style={inlineAddPersonRowStyle}>
-                    <input
-                      value={personDraft.name}
-                      onChange={(e) => setPersonDraft((prev) => ({ ...prev, name: e.target.value }))}
-                      style={inputStyle}
-                      placeholder="Person name"
-                    />
-                    <input
-                      value={personDraft.role}
-                      onChange={(e) => setPersonDraft((prev) => ({ ...prev, role: e.target.value }))}
-                      style={inputStyle}
-                      placeholder="Role (optional)"
-                    />
-                    <button
-                      type="button"
-                      style={secondaryButtonStyle}
-                      onClick={() => void addPersonAndSelect("detail")}
-                      disabled={isAddingPerson}
-                    >
-                      {isAddingPerson ? "Saving Person..." : "Add Person"}
-                    </button>
-                  </div>
-                </Field>
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
                 <Field label="Inspection Date">
                   <input
@@ -1065,7 +958,7 @@ function InspectionPageContent() {
                   </select>
                 </Field>
 
-                <div style={{ gridColumn: "1 / -1" }}>
+                <div style={fullSpanStyle}>
                   <Field label="Findings">
                     <textarea
                       rows={4}
@@ -1076,7 +969,7 @@ function InspectionPageContent() {
                   </Field>
                 </div>
 
-                <div style={{ gridColumn: "1 / -1" }}>
+                <div style={fullSpanStyle}>
                   <Field label="Actions Required / Notes">
                     <textarea
                       rows={4}
@@ -1240,7 +1133,7 @@ const statusBannerStyle: CSSProperties = {
 
 const attentionGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   gap: "16px",
   marginBottom: "20px",
 };
@@ -1282,8 +1175,9 @@ const sectionSubtitleStyle: CSSProperties = {
 
 const mobileFormGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   gap: "12px",
+  alignItems: "start",
 };
 
 const fieldWrapStyle: CSSProperties = {
@@ -1316,6 +1210,10 @@ const textareaStyle: CSSProperties = {
   resize: "vertical",
 };
 
+const fullSpanStyle: CSSProperties = {
+  gridColumn: "1 / -1",
+};
+
 const helperTextStyle: CSSProperties = {
   fontSize: "13px",
   color: "#64748b",
@@ -1329,13 +1227,6 @@ const readOnlyInputStyle: CSSProperties = {
   fontWeight: 700,
 };
 
-const inlineAddPersonRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) auto",
-  gap: "8px",
-  alignItems: "center",
-};
-
 const uploadControlWrapStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
@@ -1343,17 +1234,17 @@ const uploadControlWrapStyle: CSSProperties = {
 
 const buttonRowStyle: CSSProperties = {
   marginTop: "14px",
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "12px",
-  flexWrap: "wrap",
-  alignItems: "center",
+  alignItems: "stretch",
 };
 
 const buttonRowStyleTight: CSSProperties = {
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
   gap: "10px",
-  flexWrap: "wrap",
-  alignItems: "center",
+  alignItems: "stretch",
 };
 
 const primaryButtonStyle: CSSProperties = {
@@ -1460,7 +1351,7 @@ const detailPanelStyle: CSSProperties = {
 
 const detailSummaryRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "12px",
 };
 

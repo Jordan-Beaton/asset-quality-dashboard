@@ -41,11 +41,6 @@ type AssetPerson = {
   active: boolean;
 };
 
-type PersonDraft = {
-  name: string;
-  role: string;
-};
-
 type NewMaintenanceForm = {
   asset_id: string;
   maintenance_date: string;
@@ -70,11 +65,6 @@ const emptyNewMaintenance: NewMaintenanceForm = {
   next_maintenance_due: "",
   action_required: false,
   file: null,
-};
-
-const emptyPersonDraft: PersonDraft = {
-  name: "",
-  role: "",
 };
 
 function formatDate(value: string | null | undefined) {
@@ -199,11 +189,9 @@ function MaintenancePageContent() {
   const [typeFilter, setTypeFilter] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
-  const [isAddingPerson, setIsAddingPerson] = useState(false);
   const [openingId, setOpeningId] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState("");
-  const [personDraft, setPersonDraft] = useState<PersonDraft>(emptyPersonDraft);
 
   useEffect(() => {
     void loadData();
@@ -285,61 +273,6 @@ function MaintenancePageContent() {
     }, 0);
 
     return formatMaintenanceNumber(maxUsed + 1);
-  }
-
-  async function addPersonAndSelect(target: "create" | "detail") {
-    if (!personDraft.name.trim()) {
-      setMessage("Person name is required.");
-      return;
-    }
-
-    try {
-      setIsAddingPerson(true);
-      const newName = personDraft.name.trim();
-      const newRole = personDraft.role.trim() || null;
-
-      const { error } = await supabase.from("people").insert([
-        {
-          name: newName,
-          role: newRole,
-          department: "Assets",
-          active: true,
-        },
-      ]);
-
-      if (error) throw new Error(error.message);
-
-      if (target === "create") {
-        setNewMaintenance((prev) => ({
-          ...prev,
-          carried_out_by: newName,
-        }));
-      } else {
-        setDetailForm((prev) => ({
-          ...prev,
-          carried_out_by: newName,
-        }));
-      }
-
-      setPersonDraft(emptyPersonDraft);
-      setMessage(`Added ${newName} to asset people.`);
-
-      const { data, error: reloadError } = await supabase
-        .from("people")
-        .select("id,name,role,active")
-        .eq("active", true)
-        .eq("department", "Assets")
-        .order("name", { ascending: true });
-
-      if (!reloadError) {
-        setPeople((data || []) as AssetPerson[]);
-      }
-    } catch (error) {
-      const err = error as Error;
-      setMessage(`Add person failed: ${err.message}`);
-    } finally {
-      setIsAddingPerson(false);
-    }
   }
 
   const filteredRecords = useMemo(() => {
@@ -635,33 +568,6 @@ function MaintenancePageContent() {
                   ))}
                 </select>
               </Field>
-
-              <div style={{ gridColumn: "1 / -1" }}>
-                <Field label="Add Person">
-                  <div style={inlineAddPersonRowStyle}>
-                    <input
-                      value={personDraft.name}
-                      onChange={(e) => setPersonDraft((prev) => ({ ...prev, name: e.target.value }))}
-                      style={inputStyle}
-                      placeholder="Person name"
-                    />
-                    <input
-                      value={personDraft.role}
-                      onChange={(e) => setPersonDraft((prev) => ({ ...prev, role: e.target.value }))}
-                      style={inputStyle}
-                      placeholder="Role (optional)"
-                    />
-                    <button
-                      type="button"
-                      style={secondaryButtonStyle}
-                      onClick={() => void addPersonAndSelect("create")}
-                      disabled={isAddingPerson}
-                    >
-                      {isAddingPerson ? "Saving Person..." : "Add Person"}
-                    </button>
-                  </div>
-                </Field>
-              </div>
 
               <Field label="Maintenance Date">
                 <input
@@ -1009,36 +915,9 @@ function MaintenancePageContent() {
                       <option key={person} value={person}>
                         {person}
                       </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <Field label="Add Person">
-                    <div style={inlineAddPersonRowStyle}>
-                      <input
-                        value={personDraft.name}
-                        onChange={(e) => setPersonDraft((prev) => ({ ...prev, name: e.target.value }))}
-                        style={inputStyle}
-                        placeholder="Person name"
-                      />
-                      <input
-                        value={personDraft.role}
-                        onChange={(e) => setPersonDraft((prev) => ({ ...prev, role: e.target.value }))}
-                        style={inputStyle}
-                        placeholder="Role (optional)"
-                      />
-                      <button
-                        type="button"
-                        style={secondaryButtonStyle}
-                        onClick={() => void addPersonAndSelect("detail")}
-                        disabled={isAddingPerson}
-                      >
-                        {isAddingPerson ? "Saving Person..." : "Add Person"}
-                      </button>
-                    </div>
+                      ))}
+                    </select>
                   </Field>
-                </div>
 
                 <Field label="Maintenance Date">
                   <input
@@ -1352,13 +1231,6 @@ const readOnlyInputStyle: CSSProperties = {
 const fileInputStyle: CSSProperties = {
   ...inputStyle,
   padding: "9px 12px",
-};
-
-const inlineAddPersonRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) auto",
-  gap: "8px",
-  alignItems: "center",
 };
 
 const uploadControlWrapStyle: CSSProperties = {
