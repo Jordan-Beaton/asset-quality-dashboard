@@ -7,6 +7,7 @@ import type { CSSProperties, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
+import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -121,6 +122,7 @@ type AuditLinkOption = {
 type OpenFindingRow = FindingRecord & {
   audit_number: string;
   audit_title: string;
+  audit_type: AuditType;
 };
 
 
@@ -251,6 +253,17 @@ function formatDateTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function getOverdueDays(value: string) {
+  if (!value) return null;
+  const due = new Date(value);
+  if (Number.isNaN(due.getTime())) return null;
+  const today = new Date();
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
 }
 
 function formatMonth(value: string) {
@@ -559,6 +572,8 @@ function AuditsPageContent() {
   const [openFindingCategoryFilter, setOpenFindingCategoryFilter] = useState<
     FindingSeverity | "All"
   >("All");
+  const [openFindingTypeFilter, setOpenFindingTypeFilter] = useState<AuditType | "All">("All");
+  const [generatingOpenFindingsReport, setGeneratingOpenFindingsReport] = useState(false);
 
   const [form, setForm] = useState<AuditForm>(createEmptyAudit());
   const [detailForm, setDetailForm] = useState<AuditForm>(createEmptyAudit());
@@ -824,6 +839,7 @@ function AuditsPageContent() {
           ...finding,
           audit_number: audit?.audit_number || "-",
           audit_title: audit?.title || "Untitled Audit",
+          audit_type: audit?.audit_type || "Internal",
         };
       })
       .sort((a, b) => {
@@ -834,15 +850,19 @@ function AuditsPageContent() {
       });
   }, [audits, findings]);
 
-  const selectedOpenFinding = useMemo(
-    () => openFindings.find((finding) => finding.id === selectedOpenFindingId) || null,
-    [openFindings, selectedOpenFindingId]
-  );
-
   const filteredOpenFindings = useMemo(() => {
-    if (openFindingCategoryFilter === "All") return openFindings;
-    return openFindings.filter((finding) => finding.category === openFindingCategoryFilter);
-  }, [openFindings, openFindingCategoryFilter]);
+    return openFindings.filter((finding) => {
+      const matchesCategory =
+        openFindingCategoryFilter === "All" || finding.category === openFindingCategoryFilter;
+      const matchesType = openFindingTypeFilter === "All" || finding.audit_type === openFindingTypeFilter;
+      return matchesCategory && matchesType;
+    });
+  }, [openFindings, openFindingCategoryFilter, openFindingTypeFilter]);
+
+  const selectedOpenFinding = useMemo(
+    () => filteredOpenFindings.find((finding) => finding.id === selectedOpenFindingId) || null,
+    [filteredOpenFindings, selectedOpenFindingId]
+  );
 
   useEffect(() => {
     if (!selectedOpenFindingId) {
@@ -850,7 +870,7 @@ function AuditsPageContent() {
       return;
     }
 
-    const match = openFindings.find((finding) => finding.id === selectedOpenFindingId);
+    const match = filteredOpenFindings.find((finding) => finding.id === selectedOpenFindingId);
     if (!match) {
       setSelectedOpenFindingId("");
       setOpenFindingForm(null);
@@ -858,7 +878,7 @@ function AuditsPageContent() {
     }
 
     setOpenFindingForm(match);
-  }, [openFindings, selectedOpenFindingId]);
+  }, [filteredOpenFindings, selectedOpenFindingId]);
 
   const selectedAuditFiles = useMemo(
     () => auditFiles.filter((file) => file.audit_id === selectedAuditId),
@@ -1772,6 +1792,170 @@ function AuditsPageContent() {
     setMessage(`${selectedAudit.audit_number} PDF generated.`);
   }
 
+  function generateOpenAuditNcrReport() {
+    if (filteredOpenFindings.length === 0) {
+      setMessage("No open audit findings match the current filters.");
+      return;
+    }
+
+    try {
+      setGeneratingOpenFindingsReport(true);
+
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const generatedAt = new Date().toISOString();
+      const typeSummary = openFindingTypeFilter === "All" ? "All audit types" : openFindingTypeFilter;
+      const categorySummary =
+        openFindingCategoryFilter === "All" ? "All finding categories" : openFindingCategoryFilter;
+
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, pageWidth, 24, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text("ENSHORE SUBSEA", margin, 11.5);
+      doc.setFontSize(10);
+      doc.text("Open Audit NCR Report", margin, 18);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Open Audit NCR Report", margin, 34);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 34, { align: "right" });
+      doc.text(`Filters: ${typeSummary} | ${categorySummary}`, margin, 41);
+      doc.text(`Open findings: ${filteredOpenFindings.length}`, pageWidth - margin, 41, { align: "right" });
+
+      autoTable(doc, {
+        startY: 47,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 16 },
+        head: [[
+          "Finding Ref",
+          "Audit Number",
+          "Audit Title",
+          "Audit Type",
+          "Category",
+          "Description",
+          "Owner",
+          "Due Date",
+          "Status",
+          "Root Cause",
+          "Containment Action",
+          "Corrective Action",
+        ]],
+        body: filteredOpenFindings.map((finding) => [
+          finding.reference,
+          finding.audit_number,
+          finding.audit_title,
+          finding.audit_type,
+          finding.category,
+          finding.description || "-",
+          finding.owner || "-",
+          formatDate(finding.due_date),
+          finding.status,
+          finding.root_cause || "-",
+          finding.containment_action || "-",
+          finding.corrective_action || "-",
+        ]),
+        headStyles: {
+          fillColor: [15, 118, 110],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        styles: {
+          fontSize: 7.6,
+          cellPadding: 2,
+          textColor: [15, 23, 42],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.2,
+          overflow: "linebreak",
+          valign: "top",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 16 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 17 },
+          4: { cellWidth: 16 },
+          5: { cellWidth: 42 },
+          6: { cellWidth: 18 },
+          7: { cellWidth: 18 },
+          8: { cellWidth: 18 },
+          9: { cellWidth: 30 },
+          10: { cellWidth: 30 },
+          11: { cellWidth: 30 },
+        },
+        didParseCell: (data) => {
+          if (data.section !== "body") return;
+          const finding = filteredOpenFindings[data.row.index];
+          if (!finding) return;
+
+          if (data.column.index === 4) {
+            const tone = getFindingTone(finding.category);
+            const fillColor: [number, number, number] =
+              tone.bg === "#fee2e2"
+                ? [254, 226, 226]
+                : tone.bg === "#fef3c7"
+                  ? [254, 243, 199]
+                  : tone.bg === "#dbeafe"
+                    ? [219, 234, 254]
+                    : [220, 252, 231];
+            const textColor: [number, number, number] =
+              tone.color === "#991b1b"
+                ? [153, 27, 27]
+                : tone.color === "#92400e"
+                  ? [146, 64, 14]
+                  : tone.color === "#1d4ed8"
+                    ? [29, 78, 216]
+                    : [22, 101, 52];
+            data.cell.styles.fillColor = fillColor;
+            data.cell.styles.textColor = textColor;
+          }
+
+          if (data.column.index === 7) {
+            const overdueDays = getOverdueDays(finding.due_date);
+            if (overdueDays && finding.status !== "Closed") {
+              data.cell.styles.fillColor = [254, 226, 226];
+              data.cell.styles.textColor = [153, 27, 27];
+              data.cell.styles.fontStyle = "bold";
+            }
+          }
+        },
+      });
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Enshore Subsea | Audit Open Findings", margin, pageHeight - 6.5);
+        doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6.5, { align: "right" });
+      }
+
+      doc.save(`open-audit-ncr-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setMessage("Open Audit NCR Report generated.");
+    } catch (error) {
+      console.error(error);
+      setMessage("Open Audit NCR Report generation failed.");
+    } finally {
+      setGeneratingOpenFindingsReport(false);
+    }
+  }
+
   return (
     <main>
       <QualityPageHero
@@ -1801,18 +1985,18 @@ function AuditsPageContent() {
       ) : null}
 
         <section style={statsGridStyle}>
-          <StatCard title="Planned Audits" value={kpis.planned} accent="#2563eb" />
-          <StatCard title="In Progress" value={kpis.inProgress} accent="#f59e0b" />
-          <StatCard title="Overdue" value={kpis.overdue} accent="#dc2626" />
-          <StatCard title="Completed" value={kpis.completed} accent="#16a34a" />
-          <StatCard
+          <QualityKpiCard title="Planned Audits" value={kpis.planned} accent="#2563eb" />
+          <QualityKpiCard title="In Progress" value={kpis.inProgress} accent="#7c3aed" />
+          <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#dc2626" />
+          <QualityKpiCard title="Completed" value={kpis.completed} accent="#16a34a" />
+          <QualityKpiCard
             title="Open Findings"
             value={kpis.openFindings}
-            accent="#7c3aed"
+            accent="#f59e0b"
             onClick={() => setAuditView("open-findings")}
             active={isOpenFindingsView}
           />
-          <StatCard title="Major Findings" value={kpis.totalMajor} accent="#b91c1c" />
+          <QualityKpiCard title="Major Findings" value={kpis.totalMajor} accent="#b91c1c" />
         </section>
 
         {isOpenFindingsView ? (
@@ -1829,6 +2013,16 @@ function AuditsPageContent() {
                     audit{audits.length === 1 ? "" : "s"}.
                   </div>
                   <select
+                    value={openFindingTypeFilter}
+                    onChange={(e) => setOpenFindingTypeFilter(e.target.value as AuditType | "All")}
+                    style={{ ...toolbarSelectStyle, minWidth: "150px" }}
+                  >
+                    <option value="All">All Audit Types</option>
+                    <option value="Internal">Internal</option>
+                    <option value="External">External</option>
+                    <option value="Supplier">Supplier</option>
+                  </select>
+                  <select
                     value={openFindingCategoryFilter}
                     onChange={(e) =>
                       setOpenFindingCategoryFilter(e.target.value as FindingSeverity | "All")
@@ -1842,9 +2036,21 @@ function AuditsPageContent() {
                     <option value="OBS">OBS</option>
                   </select>
                 </div>
-                <button type="button" style={secondaryButtonStyle} onClick={() => setAuditView(null)}>
-                  Back to Audit Register
-                </button>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                  <button
+                    type="button"
+                    style={{ ...secondaryButtonStyle, border: "1px solid #bfdbfe", color: "#1d4ed8" }}
+                    onClick={generateOpenAuditNcrReport}
+                    disabled={generatingOpenFindingsReport}
+                  >
+                    {generatingOpenFindingsReport
+                      ? "Generating Report..."
+                      : "Generate Open Audit NCR Report"}
+                  </button>
+                  <button type="button" style={secondaryButtonStyle} onClick={() => setAuditView(null)}>
+                    Back to Audit Register
+                  </button>
+                </div>
               </div>
 
               <div style={openFindingsTableWrapStyle}>
@@ -1863,7 +2069,9 @@ function AuditsPageContent() {
 
                 <div style={openFindingsBodyStyle}>
                   {filteredOpenFindings.length === 0 ? (
-                    <div style={openFindingsEmptyStyle}>No open findings match this category filter.</div>
+                    <div style={openFindingsEmptyStyle}>
+                      No open findings match the selected audit type and category filters.
+                    </div>
                   ) : (
                     filteredOpenFindings.map((finding) => {
                       const tone = getFindingTone(finding.category);
@@ -3011,35 +3219,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function StatCard({
-  title,
-  value,
-  accent,
-  onClick,
-  active,
-}: {
-  title: string;
-  value: number;
-  accent: string;
-  onClick?: () => void;
-  active?: boolean;
-}) {
-  const style = {
-    ...statCardStyle,
-    borderTop: `4px solid ${accent}`,
-    borderColor: active ? "#0f766e" : statCardStyle.borderColor,
-    boxShadow: active ? "0 0 0 2px rgba(15, 118, 110, 0.16)" : statCardStyle.boxShadow,
-    cursor: onClick ? "pointer" : "default",
-  } satisfies CSSProperties;
-
-  return (
-    <button type="button" onClick={onClick} style={style}>
-      <div style={statLabelStyle}>{title}</div>
-      <div style={statValueStyle}>{value}</div>
-    </button>
-  );
-}
-
 function HeroPill({
   label,
   value,
@@ -3339,28 +3518,6 @@ const statsGridStyle: CSSProperties = {
   gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
-};
-
-const statCardStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "16px",
-  padding: "18px 20px",
-  border: "1px solid #e2e8f0",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  textAlign: "left",
-};
-
-const statLabelStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#64748b",
-  fontWeight: 600,
-};
-
-const statValueStyle: CSSProperties = {
-  fontSize: "34px",
-  fontWeight: 700,
-  color: "#0f172a",
-  marginTop: "8px",
 };
 
 const openFindingsSectionStyle: CSSProperties = {
