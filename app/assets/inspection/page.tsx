@@ -227,7 +227,6 @@ function InspectionPageContent() {
         .from("people")
         .select("id,name,role,active")
         .eq("active", true)
-        .eq("department", "Assets")
         .order("name", { ascending: true }),
     ]);
 
@@ -325,7 +324,7 @@ function InspectionPageContent() {
     e.preventDefault();
 
     if (!form.assetId || !form.inspectionDate || !form.inspector.trim()) {
-      setMessage("Please complete: Asset, Inspection Date, and Inspector.");
+      setMessage("Please complete: Asset, Inspection Date, and Carried Out By.");
       return;
     }
 
@@ -447,7 +446,7 @@ function InspectionPageContent() {
   async function saveRecordDetail() {
     if (!selectedRecord) return;
     if (!detailForm.assetId || !detailForm.inspectionDate || !detailForm.inspector.trim()) {
-      setMessage("Please complete: Asset, Inspection Date, and Inspector.");
+      setMessage("Please complete: Asset, Inspection Date, and Carried Out By.");
       return;
     }
 
@@ -583,13 +582,13 @@ function InspectionPageContent() {
                 </select>
               </Field>
 
-              <Field label="Inspector">
+              <Field label="Carried Out By">
                 <select
                   value={form.inspector}
                   onChange={(e) => setForm((prev) => ({ ...prev, inspector: e.target.value }))}
                   style={inputStyle}
                 >
-                  <option value="">Select inspector</option>
+                  <option value="">Select person</option>
                   {createPeopleOptions.map((person) => (
                     <option key={person} value={person}>
                       {person}
@@ -923,13 +922,13 @@ function InspectionPageContent() {
                   </select>
                 </Field>
 
-              <Field label="Inspector">
-                <select
-                  value={detailForm.inspector}
-                  onChange={(e) => setDetailForm((prev) => ({ ...prev, inspector: e.target.value }))}
-                  style={inputStyle}
+                <Field label="Carried Out By">
+                  <select
+                    value={detailForm.inspector}
+                    onChange={(e) => setDetailForm((prev) => ({ ...prev, inspector: e.target.value }))}
+                    style={inputStyle}
                   >
-                    <option value="">Select inspector</option>
+                    <option value="">Select person</option>
                     {detailPeopleOptions.map((person) => (
                       <option key={person} value={person}>
                         {person}

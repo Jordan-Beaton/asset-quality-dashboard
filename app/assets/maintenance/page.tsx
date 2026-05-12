@@ -221,7 +221,6 @@ function MaintenancePageContent() {
         .from("people")
         .select("id,name,role,active")
         .eq("active", true)
-        .eq("department", "Assets")
         .order("name", { ascending: true }),
     ]);
 
@@ -553,7 +552,7 @@ function MaintenancePageContent() {
           }
         >
           <form onSubmit={handleSubmit}>
-            <div style={formGridStyle}>
+            <div style={mobileFormGridStyle}>
               <Field label="Maintenance Number">
                 <input value="Assigned on save" readOnly style={readOnlyInputStyle} />
               </Field>
@@ -675,31 +674,21 @@ function MaintenancePageContent() {
                 </div>
               </Field>
 
-              <div style={{ gridColumn: "1 / -1" }}>
+              <div style={fullSpanStyle}>
                 <Field label="Work Completed / Description">
-                  <>
-                    <textarea
-                      id="maintenance-create-description"
-                      value={newMaintenance.description}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        setNewMaintenance((prev) => ({
-                          ...prev,
-                          description: value,
-                        }));
-                      }}
-                      placeholder="Describe the maintenance carried out"
-                      style={{
-                        width: "100%",
-                        minHeight: "120px",
-                        border: "1px solid #cbd5e1",
-                        borderRadius: "12px",
-                        padding: "12px",
-                        fontSize: "14px",
-                        resize: "vertical",
-                      }}
-                    />
-                  </>
+                  <textarea
+                    id="maintenance-create-description"
+                    value={newMaintenance.description}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setNewMaintenance((prev) => ({
+                        ...prev,
+                        description: value,
+                      }));
+                    }}
+                    placeholder="Describe the maintenance carried out"
+                    style={textareaStyle}
+                  />
                 </Field>
               </div>
             </div>
@@ -915,7 +904,7 @@ function MaintenancePageContent() {
                 <SummaryTile label="Created" value={formatDateTime(selectedRecord.created_at)} />
               </div>
 
-              <div style={formGridStyle}>
+              <div style={mobileFormGridStyle}>
                 <Field label="Maintenance Number">
                   <input value={selectedRecord.maintenance_number || ""} readOnly style={readOnlyInputStyle} />
                 </Field>
@@ -1248,16 +1237,15 @@ const sectionSubtitleStyle: CSSProperties = {
   lineHeight: 1.55,
 };
 
-const formGridStyle: CSSProperties = {
+const mobileFormGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
   gap: "12px",
+  alignItems: "start",
 };
 
 const filterGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "12px",
+  ...mobileFormGridStyle,
 };
 
 const fieldWrapStyle: CSSProperties = {
@@ -1290,6 +1278,10 @@ const textareaStyle: CSSProperties = {
   resize: "vertical",
 };
 
+const fullSpanStyle: CSSProperties = {
+  gridColumn: "1 / -1",
+};
+
 const helperTextStyle: CSSProperties = {
   fontSize: "13px",
   color: "#64748b",
@@ -1315,17 +1307,17 @@ const uploadControlWrapStyle: CSSProperties = {
 
 const buttonRowStyle: CSSProperties = {
   marginTop: "14px",
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "12px",
-  flexWrap: "wrap",
-  alignItems: "center",
+  alignItems: "stretch",
 };
 
 const buttonRowStyleTight: CSSProperties = {
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
   gap: "10px",
-  flexWrap: "wrap",
-  alignItems: "center",
+  alignItems: "stretch",
 };
 
 const primaryButtonStyle: CSSProperties = {
