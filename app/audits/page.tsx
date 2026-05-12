@@ -552,6 +552,7 @@ function AuditsPageContent() {
   const linkedFindingCategory = searchParams.get("findingCategory")?.trim() || "All";
   const linkedView = searchParams.get("view")?.trim() || "";
   const isOpenFindingsView = linkedView === "open-findings";
+  const isClosedFindingsView = linkedView === "closed-findings";
 
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [auditFiles, setAuditFiles] = useState<AuditFileRow[]>([]);
@@ -850,6 +851,26 @@ function AuditsPageContent() {
       });
   }, [audits, findings]);
 
+  const closedFindings = useMemo<OpenFindingRow[]>(() => {
+    return findings
+      .filter((finding) => finding.status === "Closed")
+      .map((finding) => {
+        const audit = audits.find((item) => item.id === finding.audit_id);
+        return {
+          ...finding,
+          audit_number: audit?.audit_number || "-",
+          audit_title: audit?.title || "Untitled Audit",
+          audit_type: audit?.audit_type || "Internal",
+        };
+      })
+      .sort((a, b) => {
+        const aClosed = a.closure_date ? new Date(a.closure_date).getTime() : 0;
+        const bClosed = b.closure_date ? new Date(b.closure_date).getTime() : 0;
+        if (aClosed !== bClosed) return bClosed - aClosed;
+        return compareText(a.reference, b.reference);
+      });
+  }, [audits, findings]);
+
   const filteredOpenFindings = useMemo(() => {
     return openFindings.filter((finding) => {
       const matchesCategory =
@@ -859,9 +880,20 @@ function AuditsPageContent() {
     });
   }, [openFindings, openFindingCategoryFilter, openFindingTypeFilter]);
 
+  const filteredClosedFindings = useMemo(() => {
+    return closedFindings.filter((finding) => {
+      const matchesCategory =
+        openFindingCategoryFilter === "All" || finding.category === openFindingCategoryFilter;
+      const matchesType = openFindingTypeFilter === "All" || finding.audit_type === openFindingTypeFilter;
+      return matchesCategory && matchesType;
+    });
+  }, [closedFindings, openFindingCategoryFilter, openFindingTypeFilter]);
+
+  const activeFindingsWorkspaceRows = isClosedFindingsView ? filteredClosedFindings : filteredOpenFindings;
+
   const selectedOpenFinding = useMemo(
-    () => filteredOpenFindings.find((finding) => finding.id === selectedOpenFindingId) || null,
-    [filteredOpenFindings, selectedOpenFindingId]
+    () => activeFindingsWorkspaceRows.find((finding) => finding.id === selectedOpenFindingId) || null,
+    [activeFindingsWorkspaceRows, selectedOpenFindingId]
   );
 
   useEffect(() => {
@@ -870,7 +902,7 @@ function AuditsPageContent() {
       return;
     }
 
-    const match = filteredOpenFindings.find((finding) => finding.id === selectedOpenFindingId);
+    const match = activeFindingsWorkspaceRows.find((finding) => finding.id === selectedOpenFindingId);
     if (!match) {
       setSelectedOpenFindingId("");
       setOpenFindingForm(null);
@@ -878,7 +910,7 @@ function AuditsPageContent() {
     }
 
     setOpenFindingForm(match);
-  }, [filteredOpenFindings, selectedOpenFindingId]);
+  }, [activeFindingsWorkspaceRows, selectedOpenFindingId]);
 
   const selectedAuditFiles = useMemo(
     () => auditFiles.filter((file) => file.audit_id === selectedAuditId),
@@ -972,8 +1004,9 @@ function AuditsPageContent() {
     const completed = audits.filter((audit) => audit.status === "Completed").length;
     const totalMajor = findings.filter((finding) => finding.category === "Major").length;
     const openFindings = findings.filter((finding) => finding.status !== "Closed").length;
+    const closedFindings = findings.filter((finding) => finding.status === "Closed").length;
 
-    return { planned, inProgress, overdue, completed, totalMajor, openFindings };
+    return { planned, inProgress, overdue, completed, totalMajor, openFindings, closedFindings };
   }, [audits, findings]);
 
   const findingRepeatCountByKey = useMemo(() => {
@@ -1132,7 +1165,7 @@ function AuditsPageContent() {
     });
   }
 
-  function setAuditView(view: "open-findings" | null) {
+  function setAuditView(view: "open-findings" | "closed-findings" | null) {
     const params = new URLSearchParams(searchParams.toString());
     if (view) {
       params.set("view", view);
@@ -1524,6 +1557,26 @@ function AuditsPageContent() {
 
     await loadAudits(false);
     setMessage(`Finding ${openFindingForm.reference} updated.`);
+  }
+
+  async function deleteFinding(finding: FindingRecord) {
+    const confirmed = window.confirm("This will permanently delete this finding. Continue?");
+    if (!confirmed) return;
+
+    const { error } = await supabase.from("audit_findings").delete().eq("id", finding.id);
+
+    if (error) {
+      setMessage(`Finding delete failed: ${error.message}`);
+      return;
+    }
+
+    if (selectedOpenFindingId === finding.id) {
+      setSelectedOpenFindingId("");
+      setOpenFindingForm(null);
+    }
+
+    await loadAudits(false);
+    setMessage(`Finding ${finding.reference} deleted.`);
   }
 
 
@@ -1956,6 +2009,155 @@ function AuditsPageContent() {
     }
   }
 
+  function generateClosedAuditNcrReport() {
+    if (filteredClosedFindings.length === 0) {
+      setMessage("No closed audit findings match the current filters.");
+      return;
+    }
+
+    try {
+      setGeneratingOpenFindingsReport(true);
+
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const generatedAt = new Date().toISOString();
+      const typeSummary = openFindingTypeFilter === "All" ? "All audit types" : openFindingTypeFilter;
+      const categorySummary =
+        openFindingCategoryFilter === "All" ? "All finding categories" : openFindingCategoryFilter;
+
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, pageWidth, 24, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text("ENSHORE SUBSEA", margin, 11.5);
+      doc.setFontSize(10);
+      doc.text("Closed Audit NCR Report", margin, 18);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Closed Audit NCR Report", margin, 34);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 34, { align: "right" });
+      doc.text(`Filters: ${typeSummary} | ${categorySummary}`, margin, 41);
+      doc.text(`Closed findings: ${filteredClosedFindings.length}`, pageWidth - margin, 41, { align: "right" });
+
+      autoTable(doc, {
+        startY: 47,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 16 },
+        head: [[
+          "Finding Ref",
+          "Audit Number",
+          "Audit Title",
+          "Audit Type",
+          "Category",
+          "Owner",
+          "Closure Date",
+          "Due Date",
+          "Root Cause",
+          "Corrective Action",
+        ]],
+        body: filteredClosedFindings.map((finding) => [
+          finding.reference,
+          finding.audit_number,
+          finding.audit_title,
+          finding.audit_type,
+          finding.category,
+          finding.owner || "-",
+          formatDate(finding.closure_date),
+          formatDate(finding.due_date),
+          finding.root_cause || "-",
+          finding.corrective_action || "-",
+        ]),
+        headStyles: {
+          fillColor: [15, 118, 110],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        styles: {
+          fontSize: 7.8,
+          cellPadding: 2,
+          textColor: [15, 23, 42],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.2,
+          overflow: "linebreak",
+          valign: "top",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 16 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 34 },
+          3: { cellWidth: 18 },
+          4: { cellWidth: 16 },
+          5: { cellWidth: 18 },
+          6: { cellWidth: 18 },
+          7: { cellWidth: 18 },
+          8: { cellWidth: 42 },
+          9: { cellWidth: 54 },
+        },
+        didParseCell: (data) => {
+          if (data.section !== "body") return;
+          const finding = filteredClosedFindings[data.row.index];
+          if (!finding) return;
+
+          if (data.column.index === 4) {
+            const tone = getFindingTone(finding.category);
+            const fillColor: [number, number, number] =
+              tone.bg === "#fee2e2"
+                ? [254, 226, 226]
+                : tone.bg === "#fef3c7"
+                  ? [254, 243, 199]
+                  : tone.bg === "#dbeafe"
+                    ? [219, 234, 254]
+                    : [220, 252, 231];
+            const textColor: [number, number, number] =
+              tone.color === "#991b1b"
+                ? [153, 27, 27]
+                : tone.color === "#92400e"
+                  ? [146, 64, 14]
+                  : tone.color === "#1d4ed8"
+                    ? [29, 78, 216]
+                    : [22, 101, 52];
+            data.cell.styles.fillColor = fillColor;
+            data.cell.styles.textColor = textColor;
+          }
+        },
+      });
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Enshore Subsea | Audit Closed Findings", margin, pageHeight - 6.5);
+        doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6.5, { align: "right" });
+      }
+
+      doc.save(`closed-audit-ncr-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setMessage("Closed Audit NCR Report generated.");
+    } catch (error) {
+      console.error(error);
+      setMessage("Closed Audit NCR Report generation failed.");
+    } finally {
+      setGeneratingOpenFindingsReport(false);
+    }
+  }
+
   return (
     <main>
       <QualityPageHero
@@ -1996,20 +2198,32 @@ function AuditsPageContent() {
             onClick={() => setAuditView("open-findings")}
             active={isOpenFindingsView}
           />
+          <QualityKpiCard
+            title="Closed Findings"
+            value={kpis.closedFindings}
+            accent="#0f766e"
+            onClick={() => setAuditView("closed-findings")}
+            active={isClosedFindingsView}
+          />
           <QualityKpiCard title="Major Findings" value={kpis.totalMajor} accent="#b91c1c" />
         </section>
 
-        {isOpenFindingsView ? (
+        {isOpenFindingsView || isClosedFindingsView ? (
           <section style={openFindingsSectionStyle}>
             <SectionCard
-              title="Open Findings"
-              subtitle="All audit findings with a status other than Closed, shown in one working register."
+              title={isClosedFindingsView ? "Closed Findings" : "Open Findings"}
+              subtitle={
+                isClosedFindingsView
+                  ? "All audit findings with a status of Closed, shown in one working register for trend and review analysis."
+                  : "All audit findings with a status other than Closed, shown in one working register."
+              }
             >
               <div style={openFindingsHeaderStyle}>
                 <div style={openFindingsHeaderMetaStyle}>
                   <div style={openFindingsSummaryStyle}>
-                    Showing <strong>{filteredOpenFindings.length}</strong> open audit finding
-                    {filteredOpenFindings.length === 1 ? "" : "s"} across <strong>{audits.length}</strong>{" "}
+                    Showing <strong>{activeFindingsWorkspaceRows.length}</strong>{" "}
+                    {isClosedFindingsView ? "closed" : "open"} audit finding
+                    {activeFindingsWorkspaceRows.length === 1 ? "" : "s"} across <strong>{audits.length}</strong>{" "}
                     audit{audits.length === 1 ? "" : "s"}.
                   </div>
                   <select
@@ -2040,12 +2254,14 @@ function AuditsPageContent() {
                   <button
                     type="button"
                     style={{ ...secondaryButtonStyle, border: "1px solid #bfdbfe", color: "#1d4ed8" }}
-                    onClick={generateOpenAuditNcrReport}
+                    onClick={isClosedFindingsView ? generateClosedAuditNcrReport : generateOpenAuditNcrReport}
                     disabled={generatingOpenFindingsReport}
                   >
                     {generatingOpenFindingsReport
                       ? "Generating Report..."
-                      : "Generate Open Audit NCR Report"}
+                      : isClosedFindingsView
+                        ? "Generate Closed Audit NCR Report"
+                        : "Generate Open Audit NCR Report"}
                   </button>
                   <button type="button" style={secondaryButtonStyle} onClick={() => setAuditView(null)}>
                     Back to Audit Register
@@ -2062,18 +2278,20 @@ function AuditsPageContent() {
                   <div>Description</div>
                   <div>Owner</div>
                   <div>Due Date</div>
-                  <div>Status</div>
+                  <div>{isClosedFindingsView ? "Closure Date" : "Status"}</div>
                   <div>Root Cause</div>
                   <div>Actions / Edit</div>
                 </div>
 
                 <div style={openFindingsBodyStyle}>
-                  {filteredOpenFindings.length === 0 ? (
+                  {activeFindingsWorkspaceRows.length === 0 ? (
                     <div style={openFindingsEmptyStyle}>
-                      No open findings match the selected audit type and category filters.
+                      {isClosedFindingsView
+                        ? "No closed findings match the selected audit type and category filters."
+                        : "No open findings match the selected audit type and category filters."}
                     </div>
                   ) : (
-                    filteredOpenFindings.map((finding) => {
+                    activeFindingsWorkspaceRows.map((finding) => {
                       const tone = getFindingTone(finding.category);
                       const active = selectedOpenFindingId === finding.id;
 
@@ -2099,17 +2317,21 @@ function AuditsPageContent() {
                           <div style={openFindingsBodyTextStyle}>{finding.description || "-"}</div>
                           <div style={openFindingsBodyTextStyle}>{finding.owner || "-"}</div>
                           <div style={openFindingsCellMutedStyle}>{formatDate(finding.due_date)}</div>
-                          <div>
-                            <span
-                              style={{
-                                ...badgeStyle,
-                                background: getStatusTone(finding.status).bg,
-                                color: getStatusTone(finding.status).color,
-                              }}
-                            >
-                              {finding.status}
-                            </span>
-                          </div>
+                          {isClosedFindingsView ? (
+                            <div style={openFindingsCellMutedStyle}>{formatDate(finding.closure_date)}</div>
+                          ) : (
+                            <div>
+                              <span
+                                style={{
+                                  ...badgeStyle,
+                                  background: getStatusTone(finding.status).bg,
+                                  color: getStatusTone(finding.status).color,
+                                }}
+                              >
+                                {finding.status}
+                              </span>
+                            </div>
+                          )}
                           <div style={openFindingsBodyTextStyle}>{finding.root_cause || "-"}</div>
                           <div style={openFindingsActionCellStyle}>
                             <span style={openFindingsActionPillStyle}>Edit finding</span>
@@ -3179,6 +3401,16 @@ function AuditsPageContent() {
                               </Field>
                             </div>
                           </div>
+
+                          <div style={findingCardActionsStyle}>
+                            <button
+                              type="button"
+                              style={dangerButtonStyle}
+                              onClick={() => void deleteFinding(finding)}
+                            >
+                              Delete Finding
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -4240,6 +4472,14 @@ const findingHeadStyle: CSSProperties = {
 const findingBadgeWrapStyle: CSSProperties = {
   display: "flex",
   gap: "8px",
+  flexWrap: "wrap",
+};
+
+const findingCardActionsStyle: CSSProperties = {
+  marginTop: "14px",
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "10px",
   flexWrap: "wrap",
 };
 
