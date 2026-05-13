@@ -51,8 +51,15 @@ type DepartmentOwnerOption =
   | "Project"
   | "Operations";
 
+type DocumentScope = "Company/System" | "Asset";
+
 type DocumentRow = {
   id: string;
+  document_scope: string | null;
+  asset_id: string | null;
+  asset_name: string | null;
+  asset_code: string | null;
+  asset_document_id_code: string | null;
   document_type: string | null;
   document_number: string;
   title: string;
@@ -121,7 +128,20 @@ type PersonRow = {
   created_at: string | null;
 };
 
+type AssetOption = {
+  id: string;
+  asset_code: string | null;
+  name: string | null;
+  document_id_code: string | null;
+  status: string | null;
+};
+
 type DocumentForm = {
+  document_scope: DocumentScope;
+  asset_id: string;
+  asset_name: string;
+  asset_code: string;
+  asset_document_id_code: string;
   document_type: DocumentTypeOption | "";
   document_number: string;
   title: string;
@@ -218,6 +238,11 @@ const DEPARTMENT_CODE_MAP: Record<DepartmentOwnerOption, string> = {
 };
 
 const emptyForm: DocumentForm = {
+  document_scope: "Company/System",
+  asset_id: "",
+  asset_name: "",
+  asset_code: "",
+  asset_document_id_code: "",
   document_type: "",
   document_number: "",
   title: "",
@@ -360,12 +385,31 @@ function buildDocumentPrefix(
   return `ENS-${DEPARTMENT_CODE_MAP[departmentOwner]}-${TYPE_CODE_MAP[documentType]}`;
 }
 
+function buildAssetDocumentPrefix(assetDocumentIdCode: string, documentType: DocumentTypeOption | "") {
+  const cleanCode = assetDocumentIdCode.trim().toUpperCase();
+  if (!cleanCode || !documentType) return "";
+  return `${cleanCode}-AST-${TYPE_CODE_MAP[documentType]}`;
+}
+
+function buildScopedDocumentPrefix(source: Pick<DocumentForm, "document_scope" | "asset_document_id_code" | "department_owner" | "document_type">) {
+  if (source.document_scope === "Asset") {
+    return buildAssetDocumentPrefix(source.asset_document_id_code, source.document_type);
+  }
+
+  return buildDocumentPrefix(source.department_owner, source.document_type);
+}
+
 function buildDocumentNumber(
   departmentOwner: DepartmentOwnerOption | "",
   documentType: DocumentTypeOption | "",
   nextSequence: number
 ) {
   const prefix = buildDocumentPrefix(departmentOwner, documentType);
+  if (!prefix) return "";
+  return `${prefix}-${String(nextSequence).padStart(3, "0")}`;
+}
+
+function buildDocumentNumberFromPrefix(prefix: string, nextSequence: number) {
   if (!prefix) return "";
   return `${prefix}-${String(nextSequence).padStart(3, "0")}`;
 }
@@ -430,6 +474,19 @@ function findPersonByName(people: PersonRow[], value: string | null | undefined)
   return people.find((person) => normalizePersonName(person.name) === target) || null;
 }
 
+function getDocumentScopeLabel(doc: Pick<DocumentRow, "document_scope">) {
+  return doc.document_scope === "Asset" ? "Asset" : "Company/System";
+}
+
+function getDocumentAssetContext(
+  doc: Pick<DocumentRow, "asset_name" | "asset_code" | "asset_document_id_code">
+) {
+  const name = doc.asset_name || "Linked asset";
+  const code = doc.asset_code ? ` (${doc.asset_code})` : "";
+  const documentIdCode = doc.asset_document_id_code ? ` - ${doc.asset_document_id_code}` : "";
+  return `${name}${code}${documentIdCode}`;
+}
+
 function deriveStoredNotificationEmails(
   source: Pick<DocumentForm, "notification_emails" | "reviewer_email" | "approver_email">
 ) {
@@ -455,6 +512,7 @@ function DocumentsPageContent() {
 
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [revisionsByDocumentId, setRevisionsByDocumentId] = useState<Record<string, DocumentRevisionRow[]>>({});
+  const [assets, setAssets] = useState<AssetOption[]>([]);
   const [people, setPeople] = useState<PersonRow[]>([]);
   const [, setContacts] = useState<NotificationContactRow[]>([]);
   const [message, setMessage] = useState("Loading documents...");
@@ -492,11 +550,16 @@ function DocumentsPageContent() {
     const [
       { data: documentsData, error: documentsError },
       { data: revisionsData, error: revisionsError },
+      { data: assetsData, error: assetsError },
       { data: peopleData, error: peopleError },
       { data: contactsData, error: contactsError },
     ] = await Promise.all([
       supabase.from("documents").select("*").order("document_number", { ascending: true }),
       supabase.from("document_revisions").select("*").order("uploaded_at", { ascending: false }),
+      supabase
+        .from("assets")
+        .select("id, asset_code, name, document_id_code, status")
+        .order("name", { ascending: true }),
       supabase.from("people").select("id, name, email, role, department, active, created_at").eq("active", true).order("name", { ascending: true }),
       supabase
         .from("document_notification_contacts")
@@ -528,6 +591,7 @@ function DocumentsPageContent() {
 
     setDocuments(rows);
     setRevisionsByDocumentId(grouped);
+    setAssets(assetsError ? [] : ((assetsData as AssetOption[]) || []));
     setPeople(peopleError ? [] : ((peopleData as PersonRow[]) || []));
     setContacts(contactsError ? fallbackContacts : ((contactsData as NotificationContactRow[]) || fallbackContacts));
     setSelectedDocumentId((current) => current || rows[0]?.id || "");
@@ -543,7 +607,7 @@ function DocumentsPageContent() {
     let isActive = true;
 
     async function updateNextNumber() {
-      const prefix = buildDocumentPrefix(form.department_owner, form.document_type);
+      const prefix = buildScopedDocumentPrefix(form);
 
       if (!prefix) {
         if (!isActive) return;
@@ -559,7 +623,7 @@ function DocumentsPageContent() {
       setNextSequence(next);
       setForm((prev) => ({
         ...prev,
-        document_number: buildDocumentNumber(prev.department_owner, prev.document_type, next),
+        document_number: buildDocumentNumberFromPrefix(buildScopedDocumentPrefix(prev), next),
       }));
     }
 
@@ -568,7 +632,7 @@ function DocumentsPageContent() {
     return () => {
       isActive = false;
     };
-  }, [form.department_owner, form.document_type, documents]);
+  }, [form.document_scope, form.department_owner, form.document_type, form.asset_document_id_code, documents]);
 
   const filteredDocuments = useMemo(() => {
     const lower = search.trim().toLowerCase();
@@ -583,7 +647,11 @@ function DocumentsPageContent() {
         (doc.title || "").toLowerCase().includes(lower) ||
         (doc.description || "").toLowerCase().includes(lower) ||
         (doc.document_type || "").toLowerCase().includes(lower) ||
-        (doc.department_owner || "").toLowerCase().includes(lower);
+        (doc.department_owner || "").toLowerCase().includes(lower) ||
+        (doc.document_scope || "").toLowerCase().includes(lower) ||
+        (doc.asset_name || "").toLowerCase().includes(lower) ||
+        (doc.asset_code || "").toLowerCase().includes(lower) ||
+        (doc.asset_document_id_code || "").toLowerCase().includes(lower);
 
       const matchesStatus = !statusFilter || (doc.status || "") === statusFilter;
       const matchesType = !typeFilter || (doc.document_type || "") === typeFilter;
@@ -665,6 +733,11 @@ function DocumentsPageContent() {
     ]);
 
     return {
+      document_scope: row.document_scope === "Asset" ? "Asset" : "Company/System",
+      asset_id: row.asset_id || "",
+      asset_name: row.asset_name || "",
+      asset_code: row.asset_code || "",
+      asset_document_id_code: row.asset_document_id_code || "",
       document_type: (row.document_type as DocumentTypeOption) || "",
       document_number: row.document_number || "",
       title: row.title || "",
@@ -824,6 +897,19 @@ function DocumentsPageContent() {
   const uniqueOwners = [...new Set(documents.map((doc) => doc.department_owner).filter(Boolean))].sort(
     compareTextNullable
   );
+  const assetDocumentIdCodeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    assets.forEach((asset) => {
+      const code = (asset.document_id_code || "").trim().toUpperCase();
+      if (!code) return;
+      counts[code] = (counts[code] || 0) + 1;
+    });
+    return counts;
+  }, [assets]);
+  const selectedCreateAsset = assets.find((asset) => asset.id === form.asset_id) || null;
+  const selectedCreateAssetCode = (selectedCreateAsset?.document_id_code || "").trim().toUpperCase();
+  const selectedCreateAssetCodeIsDuplicate =
+    Boolean(selectedCreateAssetCode) && (assetDocumentIdCodeCounts[selectedCreateAssetCode] || 0) > 1;
 
   const nextReviewDatePreview = buildNextReviewDate(form.issue_date, form.review_cycle_years);
   const detailReviewDatePreview = buildNextReviewDate(detailForm.issue_date, detailForm.review_cycle_years);
@@ -874,6 +960,32 @@ function DocumentsPageContent() {
       const setter = mode === "create" ? setFormPeopleSearch : setDetailPeopleSearch;
       setter((prev) => ({ ...prev, [field]: currentValue }));
     }, 120);
+  }
+
+  function applyCreateDocumentScope(scope: DocumentScope) {
+    setForm((prev) => ({
+      ...prev,
+      document_scope: scope,
+      department_owner: scope === "Asset" ? "Assets" : "",
+      asset_id: "",
+      asset_name: "",
+      asset_code: "",
+      asset_document_id_code: "",
+      document_number: "",
+    }));
+  }
+
+  function applyCreateAsset(assetId: string) {
+    const asset = assets.find((item) => item.id === assetId) || null;
+
+    setForm((prev) => ({
+      ...prev,
+      asset_id: asset?.id || "",
+      asset_name: asset?.name || "",
+      asset_code: asset?.asset_code || "",
+      asset_document_id_code: (asset?.document_id_code || "").trim().toUpperCase(),
+      department_owner: "Assets",
+    }));
   }
 
   async function notifyDocumentEvent(
@@ -1073,6 +1185,18 @@ function DocumentsPageContent() {
       return;
     }
 
+    if (form.document_scope === "Asset") {
+      if (!form.asset_id) {
+        setMessage("Select an asset for asset-specific documents.");
+        return;
+      }
+
+      if (!form.asset_document_id_code.trim()) {
+        setMessage("Selected asset needs a Document ID Code before an asset-specific document can be created.");
+        return;
+      }
+    }
+
     if (!form.originator_name.trim() || !form.originator_email.trim()) {
       setMessage("Originator name and originator email are required.");
       return;
@@ -1086,6 +1210,12 @@ function DocumentsPageContent() {
     setIsSaving(true);
 
     const insertPayload: Record<string, unknown> = {
+      document_scope: form.document_scope,
+      asset_id: form.document_scope === "Asset" ? form.asset_id : null,
+      asset_name: form.document_scope === "Asset" ? form.asset_name.trim() || null : null,
+      asset_code: form.document_scope === "Asset" ? form.asset_code.trim() || null : null,
+      asset_document_id_code:
+        form.document_scope === "Asset" ? form.asset_document_id_code.trim().toUpperCase() : null,
       document_type: form.document_type,
       document_number: form.document_number.trim(),
       title: form.title.trim(),
@@ -1157,6 +1287,11 @@ function DocumentsPageContent() {
       return;
     }
 
+    if (detailForm.document_scope === "Asset" && !detailForm.asset_document_id_code.trim()) {
+      setMessage("Asset-specific documents need a stored Asset Document ID Code.");
+      return;
+    }
+
     if (!detailForm.originator_name.trim() || !detailForm.originator_email.trim()) {
       setMessage("Originator name and originator email are required.");
       return;
@@ -1170,6 +1305,12 @@ function DocumentsPageContent() {
     setIsSaving(true);
 
     const updatePayload: Record<string, unknown> = {
+      document_scope: detailForm.document_scope,
+      asset_id: detailForm.document_scope === "Asset" ? detailForm.asset_id || null : null,
+      asset_name: detailForm.document_scope === "Asset" ? detailForm.asset_name.trim() || null : null,
+      asset_code: detailForm.document_scope === "Asset" ? detailForm.asset_code.trim() || null : null,
+      asset_document_id_code:
+        detailForm.document_scope === "Asset" ? detailForm.asset_document_id_code.trim().toUpperCase() : null,
       document_type: detailForm.document_type,
       title: detailForm.title.trim(),
       description: detailForm.description.trim() || null,
@@ -1730,7 +1871,7 @@ function DocumentsPageContent() {
       const replacementForm: DocumentForm = {
         ...buildDocumentFormFromRow(selectedDocument),
         document_number: "",
-        department_owner: "",
+        department_owner: selectedDocument.document_scope === "Asset" ? "Assets" : "",
         status: "Draft",
         review_approval_status: "Draft",
         current_revision: "A",
@@ -1828,6 +1969,57 @@ function DocumentsPageContent() {
             <form onSubmit={addDocument}>
             <div style={formLayoutStyle}>
               <FormSection title="A. Document Details">
+                <Field label="Asset Specific Document?">
+                  <label style={{ display: "flex", gap: "10px", alignItems: "center", fontWeight: 700 }}>
+                    <input
+                      type="checkbox"
+                      checked={form.document_scope === "Asset"}
+                      onChange={(e) => applyCreateDocumentScope(e.target.checked ? "Asset" : "Company/System")}
+                    />
+                    <span>{form.document_scope === "Asset" ? "Yes - asset-specific" : "No - company/system"}</span>
+                  </label>
+                </Field>
+
+                {form.document_scope === "Asset" ? (
+                  <>
+                    <Field label="Asset">
+                      <select value={form.asset_id} onChange={(e) => applyCreateAsset(e.target.value)} style={inputStyle}>
+                        <option value="">Select asset</option>
+                        {assets.map((asset) => {
+                          const code = (asset.document_id_code || "").trim();
+                          const labelParts = [
+                            asset.name || "Unnamed asset",
+                            asset.asset_code ? `Code: ${asset.asset_code}` : "",
+                            code ? `Document ID Code: ${code}` : "Document ID Code missing",
+                          ].filter(Boolean);
+
+                          return (
+                            <option key={asset.id} value={asset.id}>
+                              {labelParts.join(" | ")}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </Field>
+
+                    <Field label="Asset Document ID Code">
+                      <input
+                        value={form.asset_document_id_code || ""}
+                        readOnly
+                        style={form.asset_document_id_code ? readOnlyInputStyle : disabledInputStyle}
+                        placeholder="Select an asset with a Document ID Code"
+                      />
+                    </Field>
+
+                    <div style={formSectionHintStyle}>
+                      Asset-specific numbering uses [Document ID Code]-AST-[Document Type]-[###].
+                      {selectedCreateAssetCodeIsDuplicate
+                        ? " Warning: more than one asset currently shares this Document ID Code."
+                        : ""}
+                    </div>
+                  </>
+                ) : null}
+
                 <Field label="Document Number">
                   <input value={form.document_number} readOnly style={readOnlyInputStyle} />
                 </Field>
@@ -1864,7 +2056,8 @@ function DocumentsPageContent() {
                     onChange={(e) =>
                       setForm({ ...form, department_owner: e.target.value as DepartmentOwnerOption | "" })
                     }
-                    style={inputStyle}
+                    style={form.document_scope === "Asset" ? disabledInputStyle : inputStyle}
+                    disabled={form.document_scope === "Asset"}
                   >
                     <option value="">Select department</option>
                     {DEPARTMENT_OWNER_OPTIONS.map((option) => (
@@ -2214,6 +2407,7 @@ function DocumentsPageContent() {
             <div style={registerHeadStyle}>
               <div>Document No.</div>
               <div>Title</div>
+              <div>Scope</div>
               <div>Type</div>
               <div>Owner</div>
               <div>Revision</div>
@@ -2245,6 +2439,14 @@ function DocumentsPageContent() {
                     >
                       <div style={registerPrimaryStyle}>{doc.document_number}</div>
                       <div style={registerCellTextStyle}>{doc.title || "-"}</div>
+                      <div style={registerCellTextStyle}>
+                        <div>{getDocumentScopeLabel(doc)}</div>
+                        {doc.document_scope === "Asset" ? (
+                          <div style={{ color: "#64748b", fontSize: "12px", marginTop: "4px" }}>
+                            {getDocumentAssetContext(doc)}
+                          </div>
+                        ) : null}
+                      </div>
                       <div style={registerCellTextStyle}>{doc.document_type || "-"}</div>
                       <div style={registerCellTextStyle}>{doc.department_owner || "-"}</div>
                       <div style={registerCellTextStyle}>{doc.current_revision || "-"}</div>
@@ -2391,6 +2593,30 @@ function DocumentsPageContent() {
                 <div style={detailContentGridStyle}>
                   <div style={formLayoutStyle}>
                     <FormSection title="A. Document Details">
+                    <Field label="Document Scope">
+                      <input value={detailForm.document_scope} readOnly style={readOnlyInputStyle} />
+                    </Field>
+
+                    {detailForm.document_scope === "Asset" ? (
+                      <>
+                        <Field label="Linked Asset">
+                          <input
+                            value={getDocumentAssetContext({
+                              asset_name: detailForm.asset_name,
+                              asset_code: detailForm.asset_code,
+                              asset_document_id_code: detailForm.asset_document_id_code,
+                            })}
+                            readOnly
+                            style={readOnlyInputStyle}
+                          />
+                        </Field>
+
+                        <Field label="Asset Document ID Code">
+                          <input value={detailForm.asset_document_id_code || "-"} readOnly style={readOnlyInputStyle} />
+                        </Field>
+                      </>
+                    ) : null}
+
                     <Field label="Document Number">
                       <input value={detailForm.document_number} readOnly style={readOnlyInputStyle} />
                     </Field>
@@ -2432,7 +2658,8 @@ function DocumentsPageContent() {
                             department_owner: e.target.value as DepartmentOwnerOption | "",
                           })
                         }
-                        style={inputStyle}
+                        style={detailForm.document_scope === "Asset" ? disabledInputStyle : inputStyle}
+                        disabled={detailForm.document_scope === "Asset"}
                       >
                         <option value="">Select department</option>
                         {DEPARTMENT_OWNER_OPTIONS.map((option) => (
@@ -3575,7 +3802,7 @@ const registerTableWrapStyle: CSSProperties = {
 
 const registerHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.2fr 2fr 1fr 1fr 0.8fr 1.1fr 0.9fr 1fr",
+  gridTemplateColumns: "1.2fr 1.8fr 1.2fr 0.9fr 1fr 0.7fr 1fr 0.9fr 1fr",
   gap: "12px",
   padding: "14px 16px",
   background: "#f8fafc",
@@ -3597,7 +3824,7 @@ const registerRowStyle: CSSProperties = {
   width: "100%",
   textAlign: "left",
   display: "grid",
-  gridTemplateColumns: "1.2fr 2fr 1fr 1fr 0.8fr 1.1fr 0.9fr 1fr",
+  gridTemplateColumns: "1.2fr 1.8fr 1.2fr 0.9fr 1fr 0.7fr 1fr 0.9fr 1fr",
   gap: "12px",
   padding: "14px 16px",
   border: "none",

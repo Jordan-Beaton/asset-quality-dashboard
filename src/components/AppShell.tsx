@@ -30,6 +30,17 @@ const assetNavItems = [
   { href: "/assets/reports", label: "Reports" },
 ];
 
+const riskNavItems = [
+  { href: "/home", label: "Home" },
+  { href: "/risk", label: "Dashboard" },
+  { href: "/risk/register", label: "Register" },
+  { href: "/risk/reviews", label: "Reviews" },
+  { href: "/risk/controls", label: "Controls" },
+  { href: "/risk/opportunities", label: "Opportunities" },
+  { href: "/risk/actions", label: "Actions" },
+  { href: "/risk/reports", label: "Reports" },
+];
+
 const peopleNavItems = [
   { href: "/home", label: "Home" },
   { href: "/people", label: "People" },
@@ -40,12 +51,15 @@ export default function AppShell({ children }: AppShellProps) {
   const isLoginPage = pathname === "/login";
   const isHomePage = pathname === "/home";
   const isAssetModule = pathname.startsWith("/assets");
+  const isRiskModule = pathname.startsWith("/risk");
   const isPeopleModule = pathname.startsWith("/people");
   const showLogo = !isHomePage;
   const moduleTitle = isHomePage
     ? "Enshore Management System"
     : isAssetModule
     ? "Asset Management"
+    : isRiskModule
+    ? "Risk Management"
     : isPeopleModule
     ? "People Management"
     : pathname.startsWith("/hse")
@@ -55,12 +69,20 @@ export default function AppShell({ children }: AppShellProps) {
     ? ""
     : isAssetModule
     ? "Asset register and control system"
+    : isRiskModule
+    ? "Risk register, controls, opportunities, and reporting"
     : isPeopleModule
     ? "Shared people directory and status management"
     : pathname.startsWith("/hse")
     ? "Health, safety and environment system"
     : "Quality management system";
-  const navItems = isAssetModule ? assetNavItems : isPeopleModule ? peopleNavItems : qualityNavItems;
+  const navItems = isAssetModule
+    ? assetNavItems
+    : isRiskModule
+    ? riskNavItems
+    : isPeopleModule
+    ? peopleNavItems
+    : qualityNavItems;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -148,7 +170,7 @@ export default function AppShell({ children }: AppShellProps) {
                 >
                   {navItems.map((item) => {
                     const isActive =
-                      item.href === "/" || item.href === "/home" || item.href === "/assets"
+                      item.href === "/" || item.href === "/home" || item.href === "/assets" || item.href === "/risk"
                         ? pathname === item.href
                         : pathname.startsWith(item.href);
 

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
+import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -67,6 +68,12 @@ type MocOption = {
   id: string;
   number: string;
   title: string;
+};
+
+type ActionPerson = {
+  id: string;
+  name: string;
+  active: boolean | null;
 };
 
 type EvidenceFile = {
@@ -404,6 +411,7 @@ function ActionsPageContent() {
   const [findingOptions, setFindingOptions] = useState<FindingOption[]>([]);
   const [ncrCapaOptions, setNcrCapaOptions] = useState<NcrCapaOption[]>([]);
   const [mocOptions, setMocOptions] = useState<MocOption[]>([]);
+  const [people, setPeople] = useState<ActionPerson[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
   const [message, setMessage] = useState("Loading actions...");
   const [isLoading, setIsLoading] = useState(true);
@@ -571,9 +579,36 @@ function ActionsPageContent() {
     setMocOptions(options);
   }
 
+  async function loadPeople() {
+    const { data, error } = await supabase
+      .from("people")
+      .select("id,name,active")
+      .eq("active", true)
+      .order("name", { ascending: true });
+
+    if (error) return;
+
+    const options = ((data || []) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        id: String(row.id || ""),
+        name: String(row.name || "").trim(),
+        active: typeof row.active === "boolean" ? row.active : null,
+      }))
+      .filter((row) => row.id && row.name);
+
+    setPeople(options);
+  }
+
   useEffect(() => {
     void (async () => {
-      await Promise.all([loadActions(), loadAuditOptions(), loadFindingOptions(), loadNcrCapaOptions(), loadMocOptions()]);
+      await Promise.all([
+        loadActions(),
+        loadAuditOptions(),
+        loadFindingOptions(),
+        loadNcrCapaOptions(),
+        loadMocOptions(),
+        loadPeople(),
+      ]);
     })();
   }, []);
 
@@ -845,6 +880,24 @@ function ActionsPageContent() {
   const uniqueOwners = useMemo(() => {
     return [...new Set(actions.map((a) => a.owner).filter(Boolean))].sort();
   }, [actions]);
+
+  const peopleOptions = useMemo(() => {
+    return [...new Set(people.map((person) => person.name.trim()).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [people]);
+
+  const createOwnerOptions = useMemo(() => {
+    const currentOwner = form.owner.trim();
+    if (!currentOwner || peopleOptions.includes(currentOwner)) return peopleOptions;
+    return [currentOwner, ...peopleOptions];
+  }, [form.owner, peopleOptions]);
+
+  const editOwnerOptions = useMemo(() => {
+    const currentOwner = editForm.owner.trim();
+    if (!currentOwner || peopleOptions.includes(currentOwner)) return peopleOptions;
+    return [currentOwner, ...peopleOptions];
+  }, [editForm.owner, peopleOptions]);
 
   const uniqueProjects = useMemo(() => {
     return [...new Set(actions.map((a) => a.project).filter(Boolean))].sort();
@@ -1335,10 +1388,10 @@ function ActionsPageContent() {
       </div>
 
       <section style={statsGridStyle}>
-        <StatCard title="Open Actions" value={openActions} accent="#2563eb" />
-        <StatCard title="Closed / Complete" value={closedActions} accent="#16a34a" />
-        <StatCard title="Overdue Actions" value={overdueActions} accent="#dc2626" />
-        <StatCard title="Evidence Files" value={linkedEvidenceFiles.length} accent="#7c3aed" />
+        <QualityKpiCard title="Open Actions" value={openActions} accent="#2563eb" />
+        <QualityKpiCard title="Closed / Complete" value={closedActions} accent="#16a34a" />
+        <QualityKpiCard title="Overdue Actions" value={overdueActions} accent="#dc2626" />
+        <QualityKpiCard title="Evidence Files" value={linkedEvidenceFiles.length} accent="#7c3aed" />
       </section>
 
       <section style={twoColumnGridStyle}>
@@ -1397,12 +1450,18 @@ function ActionsPageContent() {
               </div>
 
               <Field label="Owner">
-                <input
-                  placeholder="Enter owner"
+                <select
                   value={form.owner}
                   onChange={(e) => setForm({ ...form, owner: e.target.value })}
                   style={inputStyle}
-                />
+                >
+                  <option value="">Select owner</option>
+                  {createOwnerOptions.map((owner) => (
+                    <option key={owner} value={owner}>
+                      {owner}
+                    </option>
+                  ))}
+                </select>
               </Field>
 
               <Field label="Priority">
@@ -1896,11 +1955,18 @@ function ActionsPageContent() {
                 </Field>
 
                 <Field label="Owner">
-                  <input
+                  <select
                     value={editForm.owner}
                     onChange={(e) => setEditForm((current) => ({ ...current, owner: e.target.value }))}
                     style={inputStyle}
-                  />
+                  >
+                    <option value="">Select owner</option>
+                    {editOwnerOptions.map((owner) => (
+                      <option key={owner} value={owner}>
+                        {owner}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
 
                 <Field label="Project">
@@ -2261,20 +2327,6 @@ function SectionCard({
     );
   }
 
-function StatCard({ title, value, accent }: { title: string; value: number; accent: string }) {
-  return (
-    <div
-      style={{
-        ...statCardStyle,
-        borderTop: `4px solid ${accent}`,
-      }}
-    >
-      <div style={statCardLabelStyle}>{title}</div>
-      <div style={statCardValueStyle}>{value}</div>
-    </div>
-  );
-}
-
 function HeroPill({
   label,
   value,
@@ -2510,26 +2562,6 @@ const statsGridStyle: CSSProperties = {
   gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
-};
-
-const statCardStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "16px",
-  padding: "18px 20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-
-const statCardLabelStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#64748b",
-  fontWeight: 600,
-};
-
-const statCardValueStyle: CSSProperties = {
-  fontSize: "34px",
-  fontWeight: 700,
-  color: "#0f172a",
-  marginTop: "8px",
 };
 
 const twoColumnGridStyle: CSSProperties = {

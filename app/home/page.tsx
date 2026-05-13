@@ -28,6 +28,14 @@ const moduleCards = [
     cta: "Open Assets",
   },
   {
+    title: "Risk Management",
+    description: "Risk register, reviews, controls, opportunities, actions, and risk reporting.",
+    href: "/risk",
+    status: "Available",
+    accent: "#7c3aed",
+    cta: "Open Risk",
+  },
+  {
     title: "People Management",
     description:
       "Shared personnel directory for originators, reviewers, approvers, owners, and asset-assigned people.",

@@ -2399,10 +2399,16 @@ function MOCPageContent() {
 
       <div style={topMetaRowStyle}>
         <Link href="/" style={backLinkStyle}>
-          Back to Dashboard
+          ← Back to Dashboard
         </Link>
 
         <div style={topMetaActionsStyle}>
+          <button type="button" style={secondaryButtonStyle} onClick={() => setShowCreatePanel((prev) => !prev)}>
+            {showCreatePanel ? "Hide create panel" : "Show create panel"}
+          </button>
+          <button type="button" style={secondaryButtonStyle} onClick={() => void loadData()}>
+            Refresh
+          </button>
           <div
             style={{
               ...statusBannerStyle,
@@ -2413,12 +2419,6 @@ function MOCPageContent() {
           >
             <strong>Status:</strong> {message}
           </div>
-          <button type="button" style={secondaryButtonStyle} onClick={() => setShowCreatePanel((prev) => !prev)}>
-            {showCreatePanel ? "Hide create panel" : "Show create panel"}
-          </button>
-          <button type="button" style={secondaryButtonStyle} onClick={() => void loadData()}>
-            Refresh
-          </button>
         </div>
       </div>
 
