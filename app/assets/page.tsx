@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import QRCode from "qrcode";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
+import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -29,6 +30,8 @@ type Asset = {
   maintenance_due_date: string | null;
   inspection_due_date: string | null;
   status: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type AssetForm = {
@@ -428,6 +431,7 @@ function AssetsPageContent() {
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [message, setMessage] = useState("Loading assets...");
+  const [lastRefreshed, setLastRefreshed] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
@@ -478,6 +482,7 @@ function AssetsPageContent() {
     const loaded = (data || []) as Asset[];
     setAssets(loaded);
     setSelectedAssetId((current) => current || loaded[0]?.id || "");
+    setLastRefreshed(new Date().toLocaleString("en-GB"));
     setMessage(`Loaded ${loaded.length} assets successfully.`);
   }
 
@@ -1065,6 +1070,16 @@ function AssetsPageContent() {
     return days !== null && days < 0;
   }).length;
   const assetsWithImages = assets.filter((asset) => qualityByAssetId[asset.id]?.image_name).length;
+  const latestAssetLabel = useMemo(() => {
+    const latest = [...assets].sort((a, b) => {
+      const aTime = new Date(a.updated_at || a.created_at || 0).getTime();
+      const bTime = new Date(b.updated_at || b.created_at || 0).getTime();
+      return bTime - aTime;
+    })[0];
+
+    if (!latest) return "No assets loaded";
+    return latest.asset_code || latest.name || "Unnamed asset";
+  }, [assets]);
 
   const qualitySnapshotData = useMemo(() => {
     const counts = {
@@ -1880,15 +1895,13 @@ function AssetsPageContent() {
         title="Assets"
         description="Operational asset register with a dedicated master-data and quality workspace, image upload, and direct linking to NCRs, actions, calibrations and inspections."
         contextCards={[
-          { label: "Filtered Results", value: filteredAssets.length },
-          { label: "Current Selection", value: selectedAsset?.name || "None" },
-          { label: "Quality Links", value: selectedAsset ? countQualityLinks(selectedQuality) : 0 },
-          { label: "Images Uploaded", value: assetsWithImages },
+          { label: "Last Refreshed", value: lastRefreshed || "-" },
+          { label: "Latest Asset", value: latestAssetLabel },
         ]}
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/" style={backLinkStyle}>
+        <Link href="/assets/dashboard" style={backLinkStyle}>
           ← Back to Dashboard
         </Link>
 
@@ -1898,11 +1911,11 @@ function AssetsPageContent() {
       </div>
 
       <section style={statsGridStyle}>
-        <StatCard title="Total Assets" value={totalAssets} accent="#0f766e" />
-        <StatCard title="Active Assets" value={activeAssets} accent="#16a34a" />
-        <StatCard title="Under Maintenance" value={underMaintenanceAssets} accent="#d97706" />
-        <StatCard title="Quality Linked" value={qualityLinkedAssets} accent="#2563eb" />
-        <StatCard
+        <QualityKpiCard title="Total Assets" value={totalAssets} accent="#0f766e" />
+        <QualityKpiCard title="Active Assets" value={activeAssets} accent="#16a34a" />
+        <QualityKpiCard title="Under Maintenance" value={underMaintenanceAssets} accent="#d97706" />
+        <QualityKpiCard title="Quality Linked" value={qualityLinkedAssets} accent="#2563eb" />
+        <QualityKpiCard
           title="Action Needed"
           value={overdueInspectionAssets + overdueMaintenanceAssets}
           accent="#dc2626"
@@ -3451,7 +3464,7 @@ const statusBannerStyle: CSSProperties = {
 
 const statsGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
 };

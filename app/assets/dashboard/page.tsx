@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
 
@@ -65,6 +66,7 @@ type AssetMaintenanceRecord = {
   carried_out_by: string | null;
   description: string | null;
   next_maintenance_due: string | null;
+  action_required?: boolean | null;
   file_name: string | null;
   file_path: string | null;
   created_at: string | null;
@@ -114,6 +116,30 @@ type RecentActivityItem = {
   title: string;
   subtitle: string;
   timestamp: string | null;
+};
+
+type AssetLinkedAction = {
+  id: string;
+  action_number: string | null;
+  title: string | null;
+  description: string | null;
+  status: string | null;
+  linked_asset_id: string | null;
+  linked_asset_code: string | null;
+  created_at: string | null;
+  due_date: string | null;
+};
+
+type AttentionBoardItem = {
+  id: string;
+  type: "Calibration" | "Inspection" | "Maintenance" | "Action";
+  assetLabel: string;
+  reference: string;
+  dueDate: string | null;
+  description: string;
+  status: string;
+  href: string;
+  sortTime: number;
 };
 
 function formatDate(value: string | null | undefined) {
@@ -194,6 +220,13 @@ function getActivityTone(type: RecentActivityItem["type"]) {
   return { bg: "#fce7f3", text: "#be185d" };
 }
 
+function getBoardTypeTone(type: AttentionBoardItem["type"]) {
+  if (type === "Calibration") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
+  if (type === "Inspection") return { bg: "#fef3c7", text: "#92400e", border: "#fde68a" };
+  if (type === "Maintenance") return { bg: "#ede9fe", text: "#6d28d9", border: "#ddd6fe" };
+  return { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
+}
+
 function buildAssetLabel(asset: Asset | null) {
   if (!asset) return "Unknown asset";
   const code = asset.asset_code || asset.id;
@@ -207,6 +240,7 @@ function DashboardContent() {
   const [inspectionRecords, setInspectionRecords] = useState<AssetInspectionRecord[]>([]);
   const [maintenanceRecords, setMaintenanceRecords] = useState<AssetMaintenanceRecord[]>([]);
   const [assetFiles, setAssetFiles] = useState<AssetFileRow[]>([]);
+  const [linkedActions, setLinkedActions] = useState<AssetLinkedAction[]>([]);
   const [message, setMessage] = useState("Loading asset dashboard...");
   const [lastRefreshed, setLastRefreshed] = useState("");
 
@@ -215,15 +249,16 @@ function DashboardContent() {
   }, []);
 
   async function loadDashboardData() {
-    const [assetsRes, calibrationsRes, inspectionsRes, maintenanceRes, filesRes] = await Promise.all([
+    const [assetsRes, calibrationsRes, inspectionsRes, maintenanceRes, filesRes, actionsRes] = await Promise.all([
       supabase.from("assets").select("*").order("name", { ascending: true }),
       supabase.from("asset_calibration_records").select("*"),
       supabase.from("asset_inspection_records").select("*"),
       supabase.from("asset_maintenance_records").select("*"),
       supabase.from("asset_files").select("*").order("uploaded_at", { ascending: false }),
+      supabase.from("actions").select("id,action_number,title,description,status,linked_asset_id,linked_asset_code,created_at,due_date"),
     ]);
 
-    if (assetsRes.error || calibrationsRes.error || inspectionsRes.error || maintenanceRes.error || filesRes.error) {
+    if (assetsRes.error || calibrationsRes.error || inspectionsRes.error || maintenanceRes.error || filesRes.error || actionsRes.error) {
       setMessage(
         `Dashboard load failed: ${
           assetsRes.error?.message ||
@@ -231,6 +266,7 @@ function DashboardContent() {
           inspectionsRes.error?.message ||
           maintenanceRes.error?.message ||
           filesRes.error?.message ||
+          actionsRes.error?.message ||
           "Unknown error"
         }`
       );
@@ -242,6 +278,7 @@ function DashboardContent() {
     setInspectionRecords((inspectionsRes.data || []) as AssetInspectionRecord[]);
     setMaintenanceRecords((maintenanceRes.data || []) as AssetMaintenanceRecord[]);
     setAssetFiles((filesRes.data || []) as AssetFileRow[]);
+    setLinkedActions((actionsRes.data || []) as AssetLinkedAction[]);
     setLastRefreshed(new Date().toLocaleString("en-GB"));
     setMessage("Asset dashboard loaded.");
   }
@@ -422,6 +459,107 @@ function DashboardContent() {
   }, [recentAssetRecords]);
 
   const latestAssetRecord = recentAssetRecords[0] || null;
+  const assetCodeMap = useMemo(() => {
+    const nextMap = new Map<string, Asset>();
+    assets.forEach((asset) => {
+      const code = asset.asset_code?.trim();
+      if (code) nextMap.set(code, asset);
+    });
+    return nextMap;
+  }, [assets]);
+
+  const assetLinkedActions = useMemo(() => {
+    return linkedActions
+      .filter((action) => {
+        const linkedAssetId = action.linked_asset_id?.trim();
+        const linkedAssetCode = action.linked_asset_code?.trim();
+        return Boolean((linkedAssetId && assetMap.has(linkedAssetId)) || (linkedAssetCode && assetCodeMap.has(linkedAssetCode)));
+      })
+      .map((action) => {
+        const asset =
+          (action.linked_asset_id?.trim() ? assetMap.get(action.linked_asset_id.trim()) : null) ||
+          (action.linked_asset_code?.trim() ? assetCodeMap.get(action.linked_asset_code.trim()) : null) ||
+          null;
+        return { action, asset };
+      });
+  }, [assetCodeMap, assetMap, linkedActions]);
+
+  const openAssetActions = useMemo(
+    () =>
+      assetLinkedActions.filter(({ action }) => {
+        const status = (action.status || "").trim().toLowerCase();
+        return status !== "closed" && status !== "complete" && status !== "completed";
+      }),
+    [assetLinkedActions]
+  );
+  const overdueAssetActions = useMemo(
+    () =>
+      openAssetActions.filter(({ action }) => {
+        const days = getDaysRemaining(action.due_date);
+        return days !== null && days < 0;
+      }),
+    [openAssetActions]
+  );
+
+  const overdueAttentionItems = useMemo<AttentionBoardItem[]>(() => {
+    const calibrationItems = calibrationRows
+      .filter((row) => row.status === "Overdue")
+      .map((row) => ({
+        id: `calibration-${row.id}`,
+        type: "Calibration" as const,
+        assetLabel: buildAssetLabel(row.asset),
+        reference: row.record.certificate_number || row.record.reference || "Calibration record",
+        dueDate: row.record.calibration_due_date,
+        description: row.record.notes || row.record.calibration_type || "Calibration follow-up overdue",
+        status: row.status,
+        href: `/assets/calibration?asset=${encodeURIComponent(row.asset?.asset_code || row.asset?.id || "")}`,
+        sortTime: getTimestampValue(row.record.calibration_due_date),
+      }));
+
+    const inspectionItems = inspectionRows
+      .filter((row) => row.status === "Overdue")
+      .map((row) => ({
+        id: `inspection-${row.id}`,
+        type: "Inspection" as const,
+        assetLabel: buildAssetLabel(row.asset),
+        reference: row.record.reference || row.record.result || "Inspection record",
+        dueDate: row.record.next_inspection_due,
+        description: row.record.findings || row.record.actions_required || row.record.inspector || "Inspection follow-up overdue",
+        status: row.record.result || row.status,
+        href: `/assets/inspection?asset=${encodeURIComponent(row.asset?.asset_code || row.asset?.id || "")}`,
+        sortTime: getTimestampValue(row.record.next_inspection_due),
+      }));
+
+    const maintenanceItems = maintenanceRows
+      .filter((row) => row.status === "Overdue")
+      .map((row) => ({
+        id: `maintenance-${row.id}`,
+        type: "Maintenance" as const,
+        assetLabel: buildAssetLabel(row.asset),
+        reference: row.record.maintenance_type || "Maintenance record",
+        dueDate: row.record.next_maintenance_due,
+        description: row.record.description || row.record.carried_out_by || "Maintenance follow-up overdue",
+        status: row.record.maintenance_type || row.status,
+        href: `/assets/maintenance?asset=${encodeURIComponent(row.asset?.asset_code || row.asset?.id || "")}`,
+        sortTime: getTimestampValue(row.record.next_maintenance_due),
+      }));
+
+    const actionItems = overdueAssetActions.map(({ action, asset }) => ({
+      id: `action-${action.id}`,
+      type: "Action" as const,
+      assetLabel: buildAssetLabel(asset),
+      reference: action.action_number || action.title || "Linked action",
+      dueDate: action.due_date,
+      description: action.description || action.title || "Open action linked to asset",
+      status: action.status || "Open",
+      href: `/actions?search=${encodeURIComponent(action.action_number || action.title || "")}`,
+      sortTime: getTimestampValue(action.due_date),
+    }));
+
+    return [...calibrationItems, ...inspectionItems, ...maintenanceItems, ...actionItems].sort(
+      (a, b) => b.sortTime - a.sortTime
+    );
+  }, [calibrationRows, inspectionRows, maintenanceRows, overdueAssetActions]);
 
   return (
     <main>
@@ -431,29 +569,23 @@ function DashboardContent() {
         description="Live operational view of calibration, inspection, maintenance, documents, and the most recent asset-side activity without leaving the Asset module."
         contextCards={[
           { label: "Last Refreshed", value: lastRefreshed || "-" },
-          { label: "Latest Record", value: latestAssetRecord ? latestAssetRecord.title : "No recent asset activity" },
-          { label: "Inspection Overdue", value: overdueInspections.length },
-          { label: "Maintenance Watchlist", value: maintenanceWatchlist.length },
+          { label: "Latest Update", value: latestAssetRecord ? latestAssetRecord.title : "No recent asset activity" },
         ]}
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/assets" style={backLinkStyle}>
-          ← Back to Assets
-        </Link>
-
         <div style={statusBannerStyle}>
           <strong>Status:</strong> {message}
         </div>
       </div>
 
       <section style={statsGridStyle}>
-        <StatCard title="Total Assets" value={assets.length} accent="#2563eb" />
-        <StatCard title="Calibration Overdue" value={overdueCalibrations.length} accent="#dc2626" />
-        <StatCard title="Inspection Overdue" value={overdueInspections.length} accent="#d97706" />
-        <StatCard title="Maintenance Due Soon" value={maintenanceDueSoonCount} accent="#7c3aed" />
-        <StatCard title="Assets With Files" value={assetsWithFiles} accent="#0f766e" />
-        <StatCard title="Recent Asset Activity" value={recentActivityCount} accent="#be185d" />
+        <QualityKpiCard title="Total Assets" value={assets.length} accent="#2563eb" />
+        <QualityKpiCard title="Calibration Overdue" value={overdueCalibrations.length} accent="#dc2626" />
+        <QualityKpiCard title="Inspection Overdue" value={overdueInspections.length} accent="#d97706" />
+        <QualityKpiCard title="Maintenance Due Soon" value={maintenanceDueSoonCount} accent="#7c3aed" />
+        <QualityKpiCard title="Assets With Files" value={assetsWithFiles} accent="#0f766e" />
+        <QualityKpiCard title="Recent Asset Activity" value={recentActivityCount} accent="#be185d" />
       </section>
 
       <section style={attentionGridStyle}>
@@ -481,6 +613,65 @@ function DashboardContent() {
           detail="Files, inspections, maintenance, and calibration activity stay visible without leaving the dashboard."
           tone="blue"
         />
+      </section>
+
+      <section style={attentionBoardSectionStyle}>
+        <div style={sectionHeaderRowStyle}>
+          <div>
+            <h2 style={sectionTitleStyle}>Asset Overdue Attention Board</h2>
+            <p style={sectionSubtitleStyle}>
+              Combined overdue view across calibration, inspection, maintenance, and open linked asset actions.
+            </p>
+          </div>
+        </div>
+
+        {overdueAttentionItems.length === 0 ? (
+          <EmptyState message="No overdue asset-linked items are currently on the attention board." />
+        ) : (
+          <div style={attentionBoardWrapStyle}>
+            <div style={attentionBoardHeadStyle}>
+              <div>Type / Asset</div>
+              <div>Reference</div>
+              <div>Due Date</div>
+              <div>Status</div>
+              <div>Description</div>
+              <div>Open</div>
+            </div>
+
+            <div style={attentionBoardBodyStyle}>
+              {overdueAttentionItems.map((item) => {
+                const tone = getBoardTypeTone(item.type);
+                return (
+                  <div key={item.id} style={attentionBoardRowStyle}>
+                    <div style={attentionBoardPrimaryCellStyle}>
+                      <span
+                        style={{
+                          ...activityBadgeStyle,
+                          background: tone.bg,
+                          color: tone.text,
+                          border: `1px solid ${tone.border}`,
+                          width: "fit-content",
+                        }}
+                      >
+                        {item.type}
+                      </span>
+                      <div style={itemTitleStyle}>{item.assetLabel}</div>
+                    </div>
+                    <div style={attentionBoardCellStyle}>{item.reference}</div>
+                    <div style={attentionBoardCellStyle}>{formatDate(item.dueDate)}</div>
+                    <div style={attentionBoardCellStyle}>{item.status}</div>
+                    <div style={attentionBoardCellStyle}>{item.description}</div>
+                    <div style={attentionBoardCellStyle}>
+                      <Link href={item.href} style={panelLinkStyle}>
+                        Open
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       <section style={panelGridStyle}>
@@ -773,10 +964,10 @@ export default function AssetDashboardPage() {
 }
 
 const topMetaRowStyle: CSSProperties = {
-  marginBottom: "20px",
+  marginBottom: 20,
   display: "flex",
-  justifyContent: "space-between",
-  gap: "12px",
+  justifyContent: "flex-end",
+  gap: 12,
   flexWrap: "wrap",
   alignItems: "center",
 };
@@ -788,17 +979,16 @@ const backLinkStyle: CSSProperties = {
 };
 
 const statusBannerStyle: CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  background: "white",
+  borderRadius: "12px",
+  padding: "12px 16px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
   color: "#0f172a",
-  padding: "10px 14px",
-  borderRadius: "14px",
-  fontSize: "14px",
 };
 
 const statsGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
 };
@@ -808,6 +998,63 @@ const attentionGridStyle: CSSProperties = {
   gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
+};
+
+const attentionBoardSectionStyle: CSSProperties = {
+  background: "#ffffff",
+  borderRadius: "18px",
+  border: "1px solid #dbe7f3",
+  boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
+  padding: "22px",
+  marginBottom: "20px",
+};
+
+const attentionBoardWrapStyle: CSSProperties = {
+  border: "1px solid #dbe7f3",
+  borderRadius: "16px",
+  overflow: "hidden",
+  overflowX: "auto",
+  background: "#ffffff",
+};
+
+const attentionBoardHeadStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1.35fr 1fr 0.75fr 0.8fr 1.4fr 0.5fr",
+  minWidth: "860px",
+  gap: "12px",
+  padding: "12px 16px",
+  background: "#f8fafc",
+  borderBottom: "1px solid #e2e8f0",
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#475569",
+  textTransform: "uppercase",
+  letterSpacing: "0.03em",
+};
+
+const attentionBoardBodyStyle: CSSProperties = {
+  display: "grid",
+};
+
+const attentionBoardRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1.35fr 1fr 0.75fr 0.8fr 1.4fr 0.5fr",
+  minWidth: "860px",
+  gap: "12px",
+  padding: "14px 16px",
+  borderBottom: "1px solid #e2e8f0",
+  alignItems: "start",
+};
+
+const attentionBoardPrimaryCellStyle: CSSProperties = {
+  display: "grid",
+  gap: "8px",
+};
+
+const attentionBoardCellStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#334155",
+  lineHeight: 1.5,
 };
 
 const statCardStyle: CSSProperties = {

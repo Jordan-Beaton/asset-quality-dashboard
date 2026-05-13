@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
 
@@ -509,40 +510,23 @@ function InspectionPageContent() {
         description="Capture one inspection event per row with mobile-friendly fields, live evidence upload, and a clear inspection history for each asset."
         contextCards={[
           { label: "Last Refreshed", value: lastRefreshed || "-" },
-          { label: "Overdue", value: overdueCount },
-          { label: "Due Soon", value: dueSoonCount },
-          { label: "Latest Record", value: latestRecord?.asset?.asset_code || "No inspections logged" },
+          { label: "Latest Inspection", value: latestRecord?.asset?.asset_code || "No inspections logged" },
         ]}
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/assets" style={backLinkStyle}>
-          ← Back to Assets
+        <Link href="/assets/dashboard" style={backLinkStyle}>
+          ← Back to Dashboard
         </Link>
-        <div style={statusBannerStyle}>
+        <div style={desktopStatusBannerStyle}>
           <strong>Status:</strong> {message}
         </div>
       </div>
 
       <section style={attentionGridStyle}>
-        <AttentionCard
-          title="Overdue"
-          summary={`${overdueCount} assets overdue`}
-          detail="These inspection follow-ups should be prioritized first in the field."
-          tone="red"
-        />
-        <AttentionCard
-          title="Due Soon"
-          summary={`${dueSoonCount} due within 30 days`}
-          detail="Use this to plan the next inspection workload before items slip overdue."
-          tone="amber"
-        />
-        <AttentionCard
-          title="Coverage"
-          summary={`${filteredRecords.length} visible inspection records`}
-          detail="Filter by asset or result and keep the full inspection history attached to the asset."
-          tone="blue"
-        />
+        <QualityKpiCard title="Overdue" value={overdueCount} accent="#dc2626" />
+        <QualityKpiCard title="Due Soon" value={dueSoonCount} accent="#f59e0b" />
+        <QualityKpiCard title="Coverage" value={filteredRecords.length} accent="#2563eb" />
       </section>
         </>
       )}
@@ -1179,10 +1163,10 @@ const fieldModeTitleStyle: CSSProperties = {
 };
 
 const topMetaRowStyle: CSSProperties = {
-  marginBottom: "20px",
+  marginBottom: 20,
   display: "flex",
   justifyContent: "space-between",
-  gap: "12px",
+  gap: 12,
   flexWrap: "wrap",
   alignItems: "center",
 };
@@ -1202,9 +1186,17 @@ const statusBannerStyle: CSSProperties = {
   fontSize: "14px",
 };
 
+const desktopStatusBannerStyle: CSSProperties = {
+  background: "white",
+  borderRadius: "12px",
+  padding: "12px 16px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  color: "#0f172a",
+};
+
 const attentionGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
 };

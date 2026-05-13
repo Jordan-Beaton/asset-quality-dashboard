@@ -384,24 +384,28 @@ function PeoplePageContent() {
             </button>
           </div>
 
-          <div style={registerListStyle}>
+          <div style={peopleRegisterWrapStyle}>
             {filteredPeople.length === 0 ? (
               <div style={emptyStateStyle}>No people match the current filters.</div>
             ) : (
-              filteredPeople.map((person) => {
-                const tone = statusTone(person.active);
-                const selected = selectedPersonId === person.id;
+              <table style={peopleRegisterTableStyle}>
+                <thead>
+                  <tr>
+                    <th style={peopleRegisterHeaderCellStyle}>Name</th>
+                    <th style={peopleRegisterHeaderCellStyle}>Email</th>
+                    <th style={peopleRegisterHeaderCellStyle}>Role</th>
+                    <th style={peopleRegisterHeaderCellStyle}>Department</th>
+                    <th style={peopleRegisterHeaderCellStyle}>Status</th>
+                    <th style={peopleRegisterHeaderCellStyle}>Created</th>
+                    <th style={{ ...peopleRegisterHeaderCellStyle, textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPeople.map((person) => {
+                    const tone = statusTone(person.active);
+                    const selected = selectedPersonId === person.id;
 
-                return (
-                  <div
-                    key={person.id}
-                    style={{
-                      ...registerCardStyle,
-                      cursor: "pointer",
-                      borderColor: selected ? "#93c5fd" : "#dbe7f3",
-                      boxShadow: selected ? "0 0 0 2px rgba(37,99,235,0.15)" : "none",
-                    }}
-                    onClick={() => {
+                    const selectPerson = () => {
                       setSelectedPersonId(person.id);
                       setDetailForm({
                         name: person.name,
@@ -410,36 +414,51 @@ function PeoplePageContent() {
                         department: (person.department as Department) || "Assets",
                         active: person.active,
                       });
-                    }}
-                  >
-                    <div style={registerHeaderStyle}>
-                      <div>
-                        <div style={registerTitleStyle}>{person.name}</div>
-                        <div style={registerMetaStyle}>{person.email || "No email set"}</div>
-                      </div>
-                      <span
-                        style={{
-                          ...pillStyle,
-                          background: tone.bg,
-                          color: tone.text,
-                          border: `1px solid ${tone.border}`,
-                        }}
-                      >
-                        {person.active ? "Active" : "Inactive"}
-                      </span>
-                    </div>
+                    };
 
-                    <div style={registerTableStyle}>
-                      <div><strong>Role</strong></div>
-                      <div><strong>Department</strong></div>
-                      <div><strong>Created</strong></div>
-                      <div>{person.role || "-"}</div>
-                      <div>{person.department || "-"}</div>
-                      <div>{formatDateTime(person.created_at)}</div>
-                    </div>
-                  </div>
-                );
-              })
+                    return (
+                      <tr
+                        key={person.id}
+                        style={{
+                          ...peopleRegisterRowStyle,
+                          background: selected ? "#eff6ff" : "#ffffff",
+                        }}
+                        onClick={selectPerson}
+                      >
+                        <td style={peopleRegisterPrimaryCellStyle}>{person.name}</td>
+                        <td style={peopleRegisterCellStyle}>{person.email || "-"}</td>
+                        <td style={peopleRegisterCellStyle}>{person.role || "-"}</td>
+                        <td style={peopleRegisterCellStyle}>{person.department || "-"}</td>
+                        <td style={peopleRegisterCellStyle}>
+                          <span
+                            style={{
+                              ...pillStyle,
+                              background: tone.bg,
+                              color: tone.text,
+                              border: `1px solid ${tone.border}`,
+                            }}
+                          >
+                            {person.active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td style={peopleRegisterCellStyle}>{formatDateTime(person.created_at)}</td>
+                        <td style={{ ...peopleRegisterCellStyle, textAlign: "right" }}>
+                          <button
+                            type="button"
+                            style={secondaryButtonStyle}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              selectPerson();
+                            }}
+                          >
+                            {selected ? "Open" : "Edit / View"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
         </SectionCard>
@@ -780,49 +799,55 @@ const deleteButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const registerListStyle: CSSProperties = {
-  display: "grid",
-  gap: "14px",
+const peopleRegisterWrapStyle: CSSProperties = {
   marginTop: "18px",
+  overflowX: "auto",
 };
 
-const registerCardStyle: CSSProperties = {
-  borderRadius: "16px",
+const peopleRegisterTableStyle: CSSProperties = {
+  width: "100%",
+  minWidth: "860px",
+  borderCollapse: "separate",
+  borderSpacing: 0,
+  background: "#ffffff",
   border: "1px solid #dbe7f3",
+  borderRadius: "16px",
+  overflow: "hidden",
+};
+
+const peopleRegisterHeaderCellStyle: CSSProperties = {
+  padding: "12px 14px",
+  fontSize: "12px",
+  fontWeight: 800,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "#64748b",
   background: "#f8fafc",
-  padding: "16px",
-  display: "grid",
-  gap: "12px",
+  borderBottom: "1px solid #e2e8f0",
+  textAlign: "left",
+  whiteSpace: "nowrap",
 };
 
-const registerHeaderStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "12px",
-  flexWrap: "wrap",
-  alignItems: "flex-start",
+const peopleRegisterRowStyle: CSSProperties = {
+  cursor: "pointer",
 };
 
-const registerTitleStyle: CSSProperties = {
-  fontSize: "15px",
+const peopleRegisterPrimaryCellStyle: CSSProperties = {
+  padding: "14px",
+  fontSize: "14px",
   fontWeight: 800,
   color: "#0f172a",
+  borderBottom: "1px solid #eef2f7",
+  verticalAlign: "middle",
+  whiteSpace: "nowrap",
 };
 
-const registerMetaStyle: CSSProperties = {
-  marginTop: "4px",
-  fontSize: "13px",
-  color: "#64748b",
-  lineHeight: 1.5,
-};
-
-const registerTableStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: "8px 16px",
+const peopleRegisterCellStyle: CSSProperties = {
+  padding: "14px",
   color: "#334155",
-  fontSize: "14px",
-  alignItems: "start",
+  fontSize: "13px",
+  borderBottom: "1px solid #eef2f7",
+  verticalAlign: "middle",
 };
 
 const pillStyle: CSSProperties = {

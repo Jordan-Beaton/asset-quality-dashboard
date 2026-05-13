@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
 
@@ -359,6 +360,17 @@ function CalibrationPageContent() {
       total: calibrationRows.length,
     };
   }, [calibrationRows]);
+  const latestCalibrationLabel = useMemo(() => {
+    const latest = [...records].sort((a, b) => {
+      const aTime = new Date(a.calibration_date || a.created_at || 0).getTime();
+      const bTime = new Date(b.calibration_date || b.created_at || 0).getTime();
+      return bTime - aTime;
+    })[0];
+
+    if (!latest) return "No calibrations logged";
+    const asset = latest.asset_id ? assets.find((item) => item.id === latest.asset_id) : null;
+    return latest.certificate_number || latest.reference || asset?.asset_code || asset?.name || "Calibration record";
+  }, [assets, records]);
   const overdueRows = calibrationRows.filter((row) => row.status === "Overdue").slice(0, 5);
   const dueSoonRows = calibrationRows.filter((row) => row.status === "Due Soon").slice(0, 5);
 
@@ -473,15 +485,13 @@ function CalibrationPageContent() {
         description="Combined calibration log across all assets, with certificate storage, due-date visibility, and simple asset-based history filtering."
         contextCards={[
           { label: "Last Refreshed", value: lastRefreshed || "-" },
-          { label: "Overdue", value: heroCounts.overdue },
-          { label: "Due Soon", value: heroCounts.dueSoon },
-          { label: "Records", value: heroCounts.total },
+          { label: "Latest Calibration", value: latestCalibrationLabel },
         ]}
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/assets" style={backLinkStyle}>
-          ← Back to Assets
+        <Link href="/assets/dashboard" style={backLinkStyle}>
+          ← Back to Dashboard
         </Link>
 
         <div style={statusBannerStyle}>
@@ -490,24 +500,9 @@ function CalibrationPageContent() {
       </div>
 
       <section style={attentionGridStyle}>
-        <AttentionCard
-          title="Overdue"
-          summary={`${heroCounts.overdue} records need attention`}
-          detail="These certificates are already past their due date and should be prioritized."
-          tone="red"
-        />
-        <AttentionCard
-          title="Due Soon"
-          summary={`${heroCounts.dueSoon} records due within 30 days`}
-          detail="This gives the next calibration workload at a glance."
-          tone="amber"
-        />
-        <AttentionCard
-          title="Coverage"
-          summary={`${heroCounts.total} live calibration records`}
-          detail="Use filters and the combined register to review one asset or the full calibration picture."
-          tone="blue"
-        />
+        <QualityKpiCard title="Overdue" value={heroCounts.overdue} accent="#dc2626" />
+        <QualityKpiCard title="Due Soon" value={heroCounts.dueSoon} accent="#f59e0b" />
+        <QualityKpiCard title="Coverage" value={heroCounts.total} accent="#2563eb" />
       </section>
 
       <section style={twoColumnGridStyle}>
@@ -974,10 +969,10 @@ export default function AssetCalibrationPage() {
 }
 
 const topMetaRowStyle: CSSProperties = {
-  marginBottom: "20px",
+  marginBottom: 20,
   display: "flex",
   justifyContent: "space-between",
-  gap: "12px",
+  gap: 12,
   flexWrap: "wrap",
   alignItems: "center",
 };
@@ -989,17 +984,16 @@ const backLinkStyle: CSSProperties = {
 };
 
 const statusBannerStyle: CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  background: "white",
+  borderRadius: "12px",
+  padding: "12px 16px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
   color: "#0f172a",
-  padding: "10px 14px",
-  borderRadius: "14px",
-  fontSize: "14px",
 };
 
 const attentionGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
 };

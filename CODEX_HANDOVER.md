@@ -24,6 +24,26 @@ The app must stay production-minded, stable, and visually consistent.
 - Do not assume Supabase columns without checking
 - Keep document numbering logic intact
 
+## Master UI / Layout rule
+Quality Management is the master reference for styling, structure, and layout.
+
+When creating or modifying equivalent tabs in other modules:
+- copy the matching Quality Management tab layout
+- preserve the same structure, spacing, header style, KPI card style, report layout, table layout, and button placement
+- only change the data source and wording to match the relevant module
+
+Examples:
+- Asset Reports must mirror Quality Reports
+- Asset Dashboard must mirror Quality Dashboard style
+- Asset register pages should mirror the equivalent Quality register/KPI style
+- Equivalent tabs must feel like the same system, not separate designs
+
+Do not invent a new layout unless explicitly approved.
+
+Do not mix references between different Quality pages unless asked.
+
+If unsure, stop and ask which Quality Management tab should be used as the master reference before implementing.
+
 ## Existing modules
 - Dashboard
 - Assets
