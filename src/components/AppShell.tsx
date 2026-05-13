@@ -27,6 +27,7 @@ const assetNavItems = [
   { href: "/assets/calibration", label: "Calibration" },
   { href: "/assets/inspection", label: "Inspection" },
   { href: "/assets/maintenance", label: "Maintenance" },
+  { href: "/assets/reports", label: "Reports" },
 ];
 
 const peopleNavItems = [
