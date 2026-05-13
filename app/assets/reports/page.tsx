@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
@@ -68,6 +68,17 @@ type ReportForm = {
   year: string;
   executiveSummary: string;
   nextMonthFocus: string;
+};
+
+type AssetMonthlyReport = {
+  id: string;
+  month_label: string;
+  summary: string | null;
+  wins: string | null;
+  risks: string | null;
+  next_steps: string | null;
+  snapshot_json: Record<string, unknown> | null;
+  created_at: string | null;
 };
 
 type AssetManagementMetrics = {
@@ -281,27 +292,96 @@ function buildExecutiveSummary(metrics: AssetManagementMetrics) {
   return lines.join(" ");
 }
 
+function parseReportFormFromSavedReport(report: AssetMonthlyReport): ReportForm {
+  const snapshot = report.snapshot_json || {};
+  const snapshotMonth =
+    typeof snapshot.report_month === "number" && snapshot.report_month >= 1 && snapshot.report_month <= 12
+      ? snapshot.report_month - 1
+      : null;
+  const snapshotYear =
+    typeof snapshot.report_year === "number" && snapshot.report_year >= 2000 ? snapshot.report_year : null;
+
+  if (snapshotMonth !== null && snapshotYear !== null) {
+    return {
+      monthIndex: snapshotMonth,
+      year: String(snapshotYear),
+      executiveSummary: report.summary || "",
+      nextMonthFocus: report.next_steps || "",
+    };
+  }
+
+  const text = (report.month_label || "").trim();
+  const matchedMonthIndex = monthOptions.findIndex((month) => text.toLowerCase().startsWith(month.toLowerCase()));
+  const yearMatch = text.match(/(20\d{2})/);
+  if (matchedMonthIndex >= 0 && yearMatch) {
+    return {
+      monthIndex: matchedMonthIndex,
+      year: yearMatch[1],
+      executiveSummary: report.summary || "",
+      nextMonthFocus: report.next_steps || "",
+    };
+  }
+
+  return {
+    ...defaultForm(),
+    executiveSummary: report.summary || "",
+    nextMonthFocus: report.next_steps || "",
+  };
+}
+
+function getSnapshotSummary(report: AssetMonthlyReport) {
+  const snapshot = report.snapshot_json || {};
+  const assetSummary = snapshot.assets_summary as Record<string, unknown> | undefined;
+  const calibrationSummary = snapshot.calibration_summary as Record<string, unknown> | undefined;
+  const inspectionSummary = snapshot.inspection_summary as Record<string, unknown> | undefined;
+  const maintenanceSummary = snapshot.maintenance_summary as Record<string, unknown> | undefined;
+  const actionsSummary = snapshot.actions_summary as Record<string, unknown> | undefined;
+
+  const totalAssets = typeof assetSummary?.total_assets === "number" ? String(assetSummary.total_assets) : "-";
+  const overdueCalibrations =
+    typeof calibrationSummary?.overdue === "number" ? String(calibrationSummary.overdue) : "-";
+  const overdueInspections = typeof inspectionSummary?.overdue === "number" ? String(inspectionSummary.overdue) : "-";
+  const overdueMaintenance =
+    typeof maintenanceSummary?.overdue === "number" ? String(maintenanceSummary.overdue) : "-";
+  const openActions =
+    typeof actionsSummary?.open_linked_asset_actions === "number"
+      ? String(actionsSummary.open_linked_asset_actions)
+      : "-";
+
+  return `Assets: ${totalAssets} | Overdue cal: ${overdueCalibrations} | Overdue insp: ${overdueInspections} | Overdue maint: ${overdueMaintenance} | Open actions: ${openActions}`;
+}
+
 export default function AssetReportsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [calibrationRecords, setCalibrationRecords] = useState<AssetCalibrationRecord[]>([]);
   const [inspectionRecords, setInspectionRecords] = useState<AssetInspectionRecord[]>([]);
   const [maintenanceRecords, setMaintenanceRecords] = useState<AssetMaintenanceRecord[]>([]);
   const [actions, setActions] = useState<AssetLinkedAction[]>([]);
+  const [reports, setReports] = useState<AssetMonthlyReport[]>([]);
   const [message, setMessage] = useState("Loading asset reporting workspace...");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [form, setForm] = useState<ReportForm>(defaultForm);
 
   async function loadData() {
-    const [assetsRes, calibrationsRes, inspectionsRes, maintenanceRes, actionsRes] = await Promise.all([
+    const [assetsRes, calibrationsRes, inspectionsRes, maintenanceRes, actionsRes, reportsRes] = await Promise.all([
       supabase.from("assets").select("*").order("name", { ascending: true }),
       supabase.from("asset_calibration_records").select("*"),
       supabase.from("asset_inspection_records").select("*"),
       supabase.from("asset_maintenance_records").select("*"),
       supabase.from("actions").select("id,action_number,title,description,status,linked_asset_id,linked_asset_code,created_at,due_date"),
+      supabase.from("asset_monthly_reports").select("*").order("created_at", { ascending: false }),
     ]);
 
-    if (assetsRes.error || calibrationsRes.error || inspectionsRes.error || maintenanceRes.error || actionsRes.error) {
+    if (
+      assetsRes.error ||
+      calibrationsRes.error ||
+      inspectionsRes.error ||
+      maintenanceRes.error ||
+      actionsRes.error ||
+      reportsRes.error
+    ) {
       setMessage(
         `Error: ${
           assetsRes.error?.message ||
@@ -309,6 +389,7 @@ export default function AssetReportsPage() {
           inspectionsRes.error?.message ||
           maintenanceRes.error?.message ||
           actionsRes.error?.message ||
+          reportsRes.error?.message ||
           "Unknown error"
         }`
       );
@@ -320,6 +401,7 @@ export default function AssetReportsPage() {
     setInspectionRecords((inspectionsRes.data || []) as AssetInspectionRecord[]);
     setMaintenanceRecords((maintenanceRes.data || []) as AssetMaintenanceRecord[]);
     setActions((actionsRes.data || []) as AssetLinkedAction[]);
+    setReports((reportsRes.data || []) as AssetMonthlyReport[]);
     setLastRefreshed(new Date().toLocaleString("en-GB"));
     setMessage("Asset reporting workspace loaded.");
   }
@@ -483,6 +565,9 @@ export default function AssetReportsPage() {
   );
 
   const latestDataLabel = useMemo(() => {
+    const latestReport = reports[0];
+    if (latestReport) return latestReport.month_label;
+
     const latestItems = [
       ...assets.map((asset) => ({
         label: buildAssetLabel(asset),
@@ -509,21 +594,122 @@ export default function AssetReportsPage() {
       .sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
 
     return latestItems[0]?.label || "On-demand reporting";
-  }, [assets, calibrationRecords, inspectionRecords, linkedAssetActions, maintenanceRecords]);
+  }, [assets, calibrationRecords, inspectionRecords, linkedAssetActions, maintenanceRecords, reports]);
 
   function resetForm() {
     setForm(defaultForm());
+    setEditingId(null);
   }
 
-  async function generatePdfReport() {
+  function handleEdit(report: AssetMonthlyReport) {
+    setEditingId(report.id);
+    setForm(parseReportFormFromSavedReport(report));
+    setMessage(`Editing asset report: ${report.month_label}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function handleDelete(id: string) {
+    const confirmed = window.confirm("Are you sure you want to delete this asset report?");
+    if (!confirmed) return;
+
+    const { error } = await supabase.from("asset_monthly_reports").delete().eq("id", id);
+
+    if (error) {
+      setMessage(`Delete failed: ${error.message}`);
+      return;
+    }
+
+    if (editingId === id) {
+      resetForm();
+    }
+
+    setMessage("Asset monthly report deleted successfully.");
+    await loadData();
+  }
+
+  async function saveMonthlyReport(e: FormEvent) {
+    e.preventDefault();
+
+    if (!Number.isFinite(selectedYear) || selectedYear < 2000) {
+      setMessage("Enter a valid report year.");
+      return;
+    }
+
+    const monthLabel = getMonthLabel(form.monthIndex, selectedYear);
+    const snapshot = {
+      report_month: form.monthIndex + 1,
+      report_year: selectedYear,
+      assets_summary: {
+        total_assets: metrics.assetsSummary.totalAssets,
+        active_assets: metrics.assetsSummary.activeAssets,
+        inactive_assets: metrics.assetsSummary.inactiveAssets,
+      },
+      calibration_summary: {
+        due_this_month: metrics.calibrationSummary.dueThisMonth,
+        overdue: metrics.calibrationSummary.overdue,
+        completed_this_month: metrics.calibrationSummary.completedThisMonth,
+      },
+      inspection_summary: {
+        completed_this_month: metrics.inspectionSummary.completedThisMonth,
+        overdue: metrics.inspectionSummary.overdue,
+        due_soon: metrics.inspectionSummary.dueSoon,
+        attention_required: metrics.inspectionSummary.attentionRequired,
+      },
+      maintenance_summary: {
+        completed_this_month: metrics.maintenanceSummary.completedThisMonth,
+        overdue: metrics.maintenanceSummary.overdue,
+        due_soon: metrics.maintenanceSummary.dueSoon,
+        action_required: metrics.maintenanceSummary.actionRequired,
+      },
+      actions_summary: {
+        open_linked_asset_actions: metrics.actionsSummary.openLinkedAssetActions,
+        overdue_linked_asset_actions: metrics.actionsSummary.overdueLinkedAssetActions,
+      },
+    };
+
+    const payload = {
+      month_label: monthLabel,
+      summary: form.executiveSummary.trim() || null,
+      wins: null,
+      risks: null,
+      next_steps: form.nextMonthFocus.trim() || null,
+      snapshot_json: snapshot,
+    };
+
+    if (editingId) {
+      const { error } = await supabase.from("asset_monthly_reports").update(payload).eq("id", editingId);
+
+      if (error) {
+        setMessage(`Update report failed: ${error.message}`);
+        return;
+      }
+
+      setMessage("Asset monthly report updated successfully.");
+    } else {
+      const { error } = await supabase.from("asset_monthly_reports").insert([payload]);
+
+      if (error) {
+        setMessage(`Save report failed: ${error.message}`);
+        return;
+      }
+
+      setMessage("Asset monthly report saved successfully.");
+    }
+
+    resetForm();
+    await loadData();
+  }
+
+  async function generatePdfReport(sourceReport?: AssetMonthlyReport) {
     try {
       setIsGeneratingPdf(true);
 
-      const pdfYear = Number(form.year);
+      const selectedPeriod = sourceReport ? parseReportFormFromSavedReport(sourceReport) : form;
+      const pdfYear = Number(selectedPeriod.year);
       const safeYear = Number.isFinite(pdfYear) && pdfYear >= 2000 ? pdfYear : currentDate.getFullYear();
-      const pdfMetrics = buildMetricsForPeriod(form.monthIndex, safeYear);
-      const executiveSummary = form.executiveSummary.trim() || buildExecutiveSummary(pdfMetrics);
-      const nextMonthFocus = form.nextMonthFocus.trim();
+      const pdfMetrics = buildMetricsForPeriod(selectedPeriod.monthIndex, safeYear);
+      const executiveSummary = (selectedPeriod.executiveSummary || "").trim() || buildExecutiveSummary(pdfMetrics);
+      const nextMonthFocus = (selectedPeriod.nextMonthFocus || "").trim();
       const reportTitle = `Asset Monthly Report - ${pdfMetrics.monthLabel}`;
 
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -780,7 +966,7 @@ export default function AssetReportsPage() {
         description="Generate concise monthly asset management summaries from live asset, calibration, inspection, maintenance, and linked action data."
         contextCards={[
           { label: "Last Refreshed", value: lastRefreshed || "-" },
-          { label: "Latest Dataset", value: latestDataLabel },
+          { label: "Latest Report", value: latestDataLabel },
         ]}
       />
 
@@ -812,77 +998,84 @@ export default function AssetReportsPage() {
         <div style={panelStyle}>
           <div style={sectionHeaderRowStyle}>
             <div>
-              <h2 style={sectionTitleStyle}>Create Monthly Management Report</h2>
+              <h2 style={sectionTitleStyle}>
+                {editingId ? "Edit Monthly Management Report" : "Create Monthly Management Report"}
+              </h2>
               <p style={sectionSubtitleStyle}>
                 Choose the reporting month and generate a concise management pack from verified asset data fields.
               </p>
             </div>
           </div>
 
-          <div style={formGridStyle}>
-            <label style={fieldLabelStyle}>
-              <span>Month</span>
-              <select
-                value={form.monthIndex}
-                onChange={(e) => setForm((prev) => ({ ...prev, monthIndex: Number(e.target.value) }))}
-                style={inputStyle}
-              >
-                {monthOptions.map((month, index) => (
-                  <option key={month} value={index}>
-                    {month}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <form onSubmit={saveMonthlyReport}>
+            <div style={formGridStyle}>
+              <label style={fieldLabelStyle}>
+                <span>Month</span>
+                <select
+                  value={form.monthIndex}
+                  onChange={(e) => setForm((prev) => ({ ...prev, monthIndex: Number(e.target.value) }))}
+                  style={inputStyle}
+                >
+                  {monthOptions.map((month, index) => (
+                    <option key={month} value={index}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <label style={fieldLabelStyle}>
-              <span>Year</span>
-              <input
-                value={form.year}
-                onChange={(e) => setForm((prev) => ({ ...prev, year: e.target.value }))}
-                style={inputStyle}
-                inputMode="numeric"
-                placeholder={String(currentDate.getFullYear())}
-              />
-            </label>
-          </div>
+              <label style={fieldLabelStyle}>
+                <span>Year</span>
+                <input
+                  value={form.year}
+                  onChange={(e) => setForm((prev) => ({ ...prev, year: e.target.value }))}
+                  style={inputStyle}
+                  inputMode="numeric"
+                  placeholder={String(currentDate.getFullYear())}
+                />
+              </label>
+            </div>
 
-          <div style={narrativeStackStyle}>
-            <label style={fieldLabelStyle}>
-              <span>Executive Summary</span>
-              <textarea
-                value={form.executiveSummary}
-                onChange={(e) => setForm((prev) => ({ ...prev, executiveSummary: e.target.value }))}
-                style={textareaStyle}
-                rows={4}
-                placeholder="Optional short management summary for this asset reporting month."
-              />
-            </label>
+            <div style={narrativeStackStyle}>
+              <label style={fieldLabelStyle}>
+                <span>Executive Summary</span>
+                <textarea
+                  value={form.executiveSummary}
+                  onChange={(e) => setForm((prev) => ({ ...prev, executiveSummary: e.target.value }))}
+                  style={textareaStyle}
+                  rows={4}
+                  placeholder="Optional short management summary for this asset reporting month."
+                />
+              </label>
 
-            <label style={fieldLabelStyle}>
-              <span>Next Month Focus / Planned Activity</span>
-              <textarea
-                value={form.nextMonthFocus}
-                onChange={(e) => setForm((prev) => ({ ...prev, nextMonthFocus: e.target.value }))}
-                style={textareaStyle}
-                rows={4}
-                placeholder="Optional forward-look for asset management priorities."
-              />
-            </label>
-          </div>
+              <label style={fieldLabelStyle}>
+                <span>Next Month Focus / Planned Activity</span>
+                <textarea
+                  value={form.nextMonthFocus}
+                  onChange={(e) => setForm((prev) => ({ ...prev, nextMonthFocus: e.target.value }))}
+                  style={textareaStyle}
+                  rows={4}
+                  placeholder="Optional forward-look for asset management priorities."
+                />
+              </label>
+            </div>
 
-          <div style={periodPreviewStyle}>
-            <strong>Report Period:</strong> {metrics.monthLabel}
-          </div>
+            <div style={periodPreviewStyle}>
+              <strong>Report Period:</strong> {metrics.monthLabel}
+            </div>
 
-          <div style={buttonRowStyle}>
-            <button type="button" style={primaryButtonStyle} onClick={() => void generatePdfReport()} disabled={isGeneratingPdf}>
-              {isGeneratingPdf ? "Generating PDF..." : "Generate Monthly PDF"}
-            </button>
-            <button type="button" style={secondaryButtonStyle} onClick={resetForm}>
-              Reset
-            </button>
-          </div>
+            <div style={buttonRowStyle}>
+              <button type="submit" style={primaryButtonStyle}>
+                {editingId ? "Update Monthly Report" : "Save Monthly Report"}
+              </button>
+
+              {editingId ? (
+                <button type="button" style={secondaryButtonStyle} onClick={resetForm}>
+                  Cancel Edit
+                </button>
+              ) : null}
+            </div>
+          </form>
         </div>
 
         <div style={panelStyle}>
@@ -918,15 +1111,50 @@ export default function AssetReportsPage() {
           <div>
             <h2 style={sectionTitleStyle}>Saved Monthly Reports</h2>
             <p style={sectionSubtitleStyle}>
-              Asset monthly reports are generated on demand in this pass. A dedicated saved asset-report register would need separate schema support.
+              Reopen saved asset monthly periods and generate the concise PDF directly from each row.
             </p>
           </div>
-          <div style={registerCountStyle}>On-demand only</div>
+          <div style={registerCountStyle}>{reports.length} reports</div>
         </div>
 
-        <p style={emptyTextStyle}>
-          No saved asset monthly reports are shown here because this module does not currently have dedicated report persistence without schema changes.
-        </p>
+        {reports.length === 0 ? (
+          <p style={emptyTextStyle}>No asset monthly reports saved yet.</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={tableHeadStyle}>Month</th>
+                  <th style={tableHeadStyle}>Snapshot</th>
+                  <th style={tableHeadStyle}>Created</th>
+                  <th style={tableHeadStyle}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((report) => (
+                  <tr key={report.id}>
+                    <td style={tableCellStyle}>{report.month_label}</td>
+                    <td style={tableCellStyle}>{getSnapshotSummary(report)}</td>
+                    <td style={tableCellStyle}>{formatDateTime(report.created_at)}</td>
+                    <td style={tableCellStyle}>
+                      <div style={actionButtonsWrapStyle}>
+                        <button type="button" style={miniButtonStyle} onClick={() => void generatePdfReport(report)}>
+                          PDF
+                        </button>
+                        <button type="button" style={miniButtonStyle} onClick={() => handleEdit(report)}>
+                          Edit
+                        </button>
+                        <button type="button" style={miniButtonDeleteStyle} onClick={() => void handleDelete(report.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </main>
   );
@@ -1114,4 +1342,50 @@ const registerCountStyle: CSSProperties = {
 const emptyTextStyle: CSSProperties = {
   color: "#64748b",
   margin: 0,
+};
+
+const tableStyle: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+};
+
+const tableHeadStyle: CSSProperties = {
+  textAlign: "left",
+  padding: "12px 10px",
+  borderBottom: "1px solid #e2e8f0",
+  color: "#475569",
+  fontSize: "13px",
+};
+
+const tableCellStyle: CSSProperties = {
+  padding: "14px 10px",
+  borderBottom: "1px solid #f1f5f9",
+  color: "#0f172a",
+  verticalAlign: "top",
+};
+
+const actionButtonsWrapStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+};
+
+const miniButtonStyle: CSSProperties = {
+  background: "#2563eb",
+  color: "white",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const miniButtonDeleteStyle: CSSProperties = {
+  background: "#dc2626",
+  color: "white",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontWeight: 700,
 };
