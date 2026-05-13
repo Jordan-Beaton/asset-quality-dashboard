@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import * as XLSX from "xlsx";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
@@ -109,6 +110,29 @@ type CombinedRow = {
   effectiveness_due_date: string;
 };
 
+type NcrSortKey = "number" | "severity" | "status" | "due_date";
+type SortDirection = "asc" | "desc";
+
+type NcrImportRow = {
+  rowNumber: number;
+  ncr_number: string;
+  title: string;
+  description: string;
+  containment_action: string;
+  project: string;
+  owner: string;
+  severity: string;
+  status: string;
+  source_type: string;
+  area: string;
+  due_date: string;
+  root_cause_category: string;
+  root_cause_description: string;
+  evidence_files: string;
+  evidence_notes: string;
+  errors: string[];
+};
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "-";
   const d = new Date(value);
@@ -201,6 +225,30 @@ function getSeverityRank(severity: string | null | undefined) {
   return 2;
 }
 
+function getNcrSeveritySortRank(severity: string | null | undefined) {
+  const display = getSeverityDisplay(severity);
+  if (display === "Low") return 0;
+  if (display === "Medium") return 1;
+  if (display === "High") return 2;
+  return 3;
+}
+
+function getNcrStatusSortRank(status: string | null | undefined) {
+  const value = (status || "").trim().toLowerCase();
+  if (value === "open") return 0;
+  if (value === "in progress") return 1;
+  if (value === "on hold") return 2;
+  if (value === "closed") return 3;
+  return 4;
+}
+
+function getTrailingNumber(value: string | null | undefined) {
+  const match = (value || "").match(/(\d+)$/);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  const parsed = Number(match[1]);
+  return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
+}
+
 function hexToRgbTriplet(value: string) {
   const normalized = value.replace("#", "");
   const parts = normalized.match(/.{1,2}/g);
@@ -240,6 +288,72 @@ function normaliseEffectivenessStatus(value: string | null | undefined) {
   if (trimmed.toLowerCase() === "effective") return "Effective";
   if (trimmed.toLowerCase() === "not effective") return "Not Effective";
   return "Pending";
+}
+
+function normalizeImportHeader(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeImportOption(value: string, options: string[], fallback: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  const matched = options.find((option) => option.toLowerCase() === trimmed.toLowerCase());
+  return matched || trimmed;
+}
+
+function normalizeImportDate(value: unknown) {
+  if (value === null || value === undefined || value === "") return "";
+
+  if (typeof value === "number") {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (!parsed) return "";
+    const year = String(parsed.y).padStart(4, "0");
+    const month = String(parsed.m).padStart(2, "0");
+    const day = String(parsed.d).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+    return value.toISOString().slice(0, 10);
+  }
+
+  const text = String(value).trim();
+  if (!text) return "";
+
+  const isoMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2].padStart(2, "0")}-${isoMatch[3].padStart(2, "0")}`;
+  }
+
+  const gbMatch = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+  if (gbMatch) {
+    const year = gbMatch[3].length === 2 ? `20${gbMatch[3]}` : gbMatch[3];
+    return `${year}-${gbMatch[2].padStart(2, "0")}-${gbMatch[1].padStart(2, "0")}`;
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+}
+
+function buildImportedEvidenceNote(evidenceFiles: string, evidenceNotes: string) {
+  const lines = [
+    evidenceFiles.trim() ? `Evidence Files: ${evidenceFiles.trim()}` : "",
+    evidenceNotes.trim() ? `Evidence Notes: ${evidenceNotes.trim()}` : "",
+  ].filter(Boolean);
+
+  return lines.length ? `Imported Evidence Reference\n${lines.join("\n")}` : "";
+}
+
+function appendImportedEvidenceReference(rootCauseDescription: string, evidenceFiles: string, evidenceNotes: string) {
+  const evidenceReference = buildImportedEvidenceNote(evidenceFiles, evidenceNotes);
+  if (!evidenceReference) return rootCauseDescription.trim();
+  return [rootCauseDescription.trim(), evidenceReference].filter(Boolean).join("\n\n");
 }
 
 function getPdfText(value: string | null | undefined) {
@@ -403,6 +517,7 @@ function NcrCapaPageContent() {
   const [projectFilter, setProjectFilter] = useState(linkedProject);
   const [showAttentionOnly, setShowAttentionOnly] = useState(false);
   const [activeLogTab, setActiveLogTab] = useState<"NCR" | "CAPA">(linkedType === "CAPA" ? "CAPA" : "NCR");
+  const [ncrSort, setNcrSort] = useState<{ key: NcrSortKey; direction: SortDirection } | null>(null);
 
   const [ncrOptions, setNcrOptions] = useState<LinkedOption[]>([]);
   const [newLinkedNcrToAdd, setNewLinkedNcrToAdd] = useState("");
@@ -444,6 +559,9 @@ function NcrCapaPageContent() {
   const [createNcrEvidenceNotes, setCreateNcrEvidenceNotes] = useState("");
   const [createCapaFiles, setCreateCapaFiles] = useState<File[]>([]);
   const [createCapaEvidenceNotes, setCreateCapaEvidenceNotes] = useState("");
+  const [importFileName, setImportFileName] = useState("");
+  const [importRows, setImportRows] = useState<NcrImportRow[]>([]);
+  const [importingNcrs, setImportingNcrs] = useState(false);
 
   const [editRow, setEditRow] = useState<CombinedRow | null>(null);
   const [selectedEvidenceFiles, setSelectedEvidenceFiles] = useState<File[]>([]);
@@ -681,6 +799,26 @@ function NcrCapaPageContent() {
       const bCreated = new Date(b.created_at || 0).getTime();
 
       if (activeLogTab === "NCR") {
+        if (ncrSort) {
+          const directionFactor = ncrSort.direction === "asc" ? 1 : -1;
+          let result = 0;
+
+          if (ncrSort.key === "number") {
+            result = getTrailingNumber(a.number) - getTrailingNumber(b.number);
+          } else if (ncrSort.key === "severity") {
+            result = getNcrSeveritySortRank(a.severity) - getNcrSeveritySortRank(b.severity);
+          } else if (ncrSort.key === "status") {
+            result = getNcrStatusSortRank(a.status) - getNcrStatusSortRank(b.status);
+          } else if (ncrSort.key === "due_date") {
+            const aDueTime = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+            const bDueTime = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+            result = aDueTime - bDueTime;
+          }
+
+          if (result !== 0) return result * directionFactor;
+          return bCreated - aCreated;
+        }
+
         const severityRank = getSeverityRank(a.severity) - getSeverityRank(b.severity);
         if (severityRank !== 0) return severityRank;
         return bCreated - aCreated;
@@ -708,6 +846,7 @@ function NcrCapaPageContent() {
     linkedOverdueOnly,
     showAttentionOnly,
     activeLogTab,
+    ncrSort,
   ]);
 
   function clearFilters() {
@@ -717,6 +856,18 @@ function NcrCapaPageContent() {
     setSourceFilter("All");
     setProjectFilter("All");
     setShowAttentionOnly(false);
+  }
+
+  function toggleNcrSort(key: NcrSortKey) {
+    setNcrSort((current) => {
+      if (!current || current.key !== key) return { key, direction: "asc" };
+      return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+    });
+  }
+
+  function ncrSortLabel(key: NcrSortKey, label: string) {
+    if (ncrSort?.key !== key) return label;
+    return `${label} ${ncrSort.direction === "asc" ? "↑" : "↓"}`;
   }
 
   const kpis = useMemo(() => {
@@ -1888,6 +2039,169 @@ function NcrCapaPageContent() {
     "Other",
   ];
   const effectivenessStatusOptions = ["Pending", "Effective", "Not Effective"];
+  const importHasErrors = importRows.some((row) => row.errors.length > 0);
+  const importValidRows = importRows.filter((row) => row.errors.length === 0);
+
+  function getImportCell(row: Record<string, unknown>, columnName: string) {
+    const target = normalizeImportHeader(columnName);
+    const entry = Object.entries(row).find(([key]) => normalizeImportHeader(key) === target);
+    const value = entry?.[1];
+    return value === null || value === undefined ? "" : String(value).trim();
+  }
+
+  async function handleNcrImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    setImportRows([]);
+    setMessage(`Reading ${file.name}...`);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        setMessage("Import failed: workbook does not contain any sheets.");
+        return;
+      }
+
+      const sheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+        defval: "",
+        raw: true,
+      });
+
+      if (rows.length === 0) {
+        setMessage("Import failed: first sheet has no data rows.");
+        return;
+      }
+
+      const allocatedNumbers = ncrs.map((ncr) => ncr.ncr_number);
+      const parsedRows: NcrImportRow[] = rows.map((row, index) => {
+        const nextNumber = buildNextNumber("NCR", allocatedNumbers);
+        allocatedNumbers.push(nextNumber);
+
+        const title = getImportCell(row, "Title");
+        const description = getImportCell(row, "Description");
+        const containmentAction = getImportCell(row, "Containment Action");
+        const project = getImportCell(row, "Project");
+        const owner = getImportCell(row, "Owner");
+        const severity = normalizeImportOption(getImportCell(row, "Severity"), severityOptions, "");
+        const status = normalizeImportOption(getImportCell(row, "Status"), statusOptions, "");
+        const sourceType = normalizeImportOption(getImportCell(row, "Source Type"), sourceOptions, "Internal");
+        const area = getImportCell(row, "Area");
+        const dueDate = normalizeImportDate(row[Object.keys(row).find((key) => normalizeImportHeader(key) === "due date") || ""]);
+        const rootCauseCategory = normalizeImportOption(
+          getImportCell(row, "Root Cause Category"),
+          rootCauseOptions,
+          ""
+        );
+        const rootCauseDescription = getImportCell(row, "Root Cause Description");
+        const evidenceFiles = getImportCell(row, "Evidence Files");
+        const evidenceNotes = getImportCell(row, "Evidence Notes");
+        const errors: string[] = [];
+
+        if (!title) errors.push("Title is required.");
+        if (!description) errors.push("Description is required.");
+        if (!project) errors.push("Project is required.");
+        if (!owner) errors.push("Owner is required.");
+        if (!severity) errors.push("Severity is required.");
+        if (!status) errors.push("Status is required.");
+        if (!dueDate) errors.push("Due Date is required or invalid.");
+        if (severity && !severityOptions.includes(severity)) {
+          errors.push(`Severity must be one of: ${severityOptions.join(", ")}.`);
+        }
+        if (status && !statusOptions.includes(status)) {
+          errors.push(`Status must be one of: ${statusOptions.join(", ")}.`);
+        }
+        if (sourceType && !sourceOptions.includes(sourceType)) {
+          errors.push(`Source Type must be one of: ${sourceOptions.join(", ")}.`);
+        }
+        if (rootCauseCategory && !rootCauseOptions.includes(rootCauseCategory)) {
+          errors.push(`Root Cause Category must be one of: ${rootCauseOptions.join(", ")}.`);
+        }
+
+        return {
+          rowNumber: index + 2,
+          ncr_number: nextNumber,
+          title,
+          description,
+          containment_action: containmentAction,
+          project,
+          owner,
+          severity,
+          status,
+          source_type: sourceType || "Internal",
+          area,
+          due_date: dueDate,
+          root_cause_category: rootCauseCategory,
+          root_cause_description: rootCauseDescription,
+          evidence_files: evidenceFiles,
+          evidence_notes: evidenceNotes,
+          errors,
+        };
+      });
+
+      setImportRows(parsedRows);
+      setMessage(
+        `Preview ready: ${parsedRows.length} NCR row${parsedRows.length === 1 ? "" : "s"} loaded from ${file.name}.`
+      );
+    } catch (error) {
+      setMessage(`Import preview failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  async function importPreviewedNcrs() {
+    if (!importRows.length) {
+      setMessage("Select an Excel file before importing.");
+      return;
+    }
+
+    if (importHasErrors) {
+      setMessage("Fix import preview errors before importing NCRs.");
+      return;
+    }
+
+    setImportingNcrs(true);
+
+    const insertRows = importRows.map((row) => ({
+      ncr_number: row.ncr_number,
+      title: row.title,
+      description: row.description,
+      containment_action: row.containment_action || null,
+      severity: row.severity,
+      status: row.status,
+      owner: row.owner,
+      area: row.area || null,
+      due_date: row.due_date,
+      closed_at: row.status === "Closed" ? new Date().toISOString() : null,
+      project: row.project,
+      source_type: row.source_type || "Internal",
+      root_cause_category: row.root_cause_category || null,
+      root_cause_description:
+        appendImportedEvidenceReference(row.root_cause_description, row.evidence_files, row.evidence_notes) ||
+        null,
+    }));
+
+    const { error } = await supabase.from("ncrs").insert(insertRows);
+
+    setImportingNcrs(false);
+
+    if (error) {
+      setMessage(`NCR import failed: ${error.message}`);
+      return;
+    }
+
+    setMessage(`Imported ${insertRows.length} NCR${insertRows.length === 1 ? "" : "s"} from ${importFileName}.`);
+    setImportRows([]);
+    setImportFileName("");
+    await loadData();
+    await loadNcrOptions();
+  }
 
   return (
     <main>
@@ -1934,6 +2248,107 @@ function NcrCapaPageContent() {
         <QualityKpiCard title="NCRs" value={kpis.totalNcrs} accent="#60a5fa" />
         <QualityKpiCard title="CAPAs" value={kpis.totalCapas} accent="#c084fc" />
         <QualityKpiCard title="Evidence Files" value={kpis.evidenceCount} accent="#f472b6" />
+      </section>
+
+      <section style={{ marginBottom: "20px" }}>
+        <SectionCard
+          title="Bulk NCR Excel Import"
+          subtitle="Upload an .xlsx file, preview row-level validation, then import NCRs only."
+        >
+          <div style={importPanelStyle}>
+            <div>
+              <label style={labelStyle}>Excel File</label>
+              <input
+                type="file"
+                accept=".xlsx"
+                style={inputStyle}
+                onChange={(event) => void handleNcrImportFileChange(event)}
+              />
+              <div style={mutedTextStyle}>
+                First worksheet only. Evidence file references are preserved as text under Imported Evidence Reference.
+              </div>
+            </div>
+
+            <div style={importActionsStyle}>
+              <button
+                type="button"
+                style={primaryButton}
+                onClick={() => void importPreviewedNcrs()}
+                disabled={!importRows.length || importHasErrors || importingNcrs}
+              >
+                {importingNcrs ? "Importing NCRs..." : `Import ${importValidRows.length} NCRs`}
+              </button>
+              <button
+                type="button"
+                style={secondaryButton}
+                onClick={() => {
+                  setImportRows([]);
+                  setImportFileName("");
+                  setMessage("NCR import preview cleared.");
+                }}
+                disabled={!importRows.length}
+              >
+                Clear Preview
+              </button>
+            </div>
+          </div>
+
+          {importRows.length ? (
+            <div style={importPreviewWrapStyle}>
+              <div style={tableInfoRowStyle}>
+                Previewing <strong>{importRows.length}</strong> row{importRows.length === 1 ? "" : "s"}
+                {importFileName ? (
+                  <>
+                    {" "}
+                    from <strong>{importFileName}</strong>
+                  </>
+                ) : null}
+                .{" "}
+                {importHasErrors ? (
+                  <span style={{ color: "#b91c1c", fontWeight: 800 }}>Resolve row errors before import.</span>
+                ) : (
+                  <span style={{ color: "#166534", fontWeight: 800 }}>Ready to import.</span>
+                )}
+              </div>
+
+              <div style={importTableStyle}>
+                <div style={importTableHeadStyle}>
+                  <div>Row</div>
+                  <div>NCR No.</div>
+                  <div>Title</div>
+                  <div>Project</div>
+                  <div>Owner</div>
+                  <div>Severity</div>
+                  <div>Status</div>
+                  <div>Due Date</div>
+                  <div>Validation</div>
+                </div>
+
+                {importRows.map((row) => (
+                  <div
+                    key={`${row.rowNumber}-${row.ncr_number}`}
+                    style={{
+                      ...importTableRowStyle,
+                      background: row.errors.length ? "#fff7f7" : "#ffffff",
+                    }}
+                  >
+                    <div>{row.rowNumber}</div>
+                    <div>{row.ncr_number}</div>
+                    <div>{row.title || "-"}</div>
+                    <div>{row.project || "-"}</div>
+                    <div>{row.owner || "-"}</div>
+                    <div>{row.severity || "-"}</div>
+                    <div>{row.status || "-"}</div>
+                    <div>{row.due_date || "-"}</div>
+                    <div style={row.errors.length ? importErrorTextStyle : importOkTextStyle}>
+                      {row.errors.length ? row.errors.join(" ") : "OK"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </SectionCard>
       </section>
 
       <section style={topGridStyle}>
@@ -2660,12 +3075,20 @@ function NcrCapaPageContent() {
               <div style={registerHeadStyle}>
                 {activeLogTab === "NCR" ? (
                   <>
-                    <div>NCR No.</div>
+                    <button type="button" style={sortableHeaderButtonStyle} onClick={() => toggleNcrSort("number")}>
+                      {ncrSortLabel("number", "NCR No.")}
+                    </button>
                     <div>Title</div>
-                    <div>Severity</div>
+                    <button type="button" style={sortableHeaderButtonStyle} onClick={() => toggleNcrSort("severity")}>
+                      {ncrSortLabel("severity", "Severity")}
+                    </button>
                     <div>Owner</div>
-                    <div>Due Date</div>
-                    <div>Status</div>
+                    <button type="button" style={sortableHeaderButtonStyle} onClick={() => toggleNcrSort("due_date")}>
+                      {ncrSortLabel("due_date", "Due Date")}
+                    </button>
+                    <button type="button" style={sortableHeaderButtonStyle} onClick={() => toggleNcrSort("status")}>
+                      {ncrSortLabel("status", "Status")}
+                    </button>
                   </>
                 ) : (
                   <>
@@ -3814,6 +4237,66 @@ const toolbarFiltersStyle: CSSProperties = {
   flexWrap: "wrap",
 };
 
+const importPanelStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  gap: "16px",
+  alignItems: "end",
+};
+
+const importActionsStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+};
+
+const importPreviewWrapStyle: CSSProperties = {
+  marginTop: "16px",
+};
+
+const importTableStyle: CSSProperties = {
+  border: "1px solid #d7dee7",
+  borderRadius: "14px",
+  overflow: "hidden",
+};
+
+const importTableHeadStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "0.5fr 0.9fr 1.8fr 1fr 1fr 0.8fr 0.9fr 0.9fr 2fr",
+  gap: "10px",
+  padding: "12px",
+  background: "#f8fafc",
+  borderBottom: "1px solid #e5e7eb",
+  fontSize: "11px",
+  fontWeight: 800,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: 0.3,
+};
+
+const importTableRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "0.5fr 0.9fr 1.8fr 1fr 1fr 0.8fr 0.9fr 0.9fr 2fr",
+  gap: "10px",
+  padding: "12px",
+  borderBottom: "1px solid #eef2f7",
+  fontSize: "12px",
+  color: "#0f172a",
+  lineHeight: 1.4,
+  alignItems: "start",
+};
+
+const importErrorTextStyle: CSSProperties = {
+  color: "#b91c1c",
+  fontWeight: 700,
+};
+
+const importOkTextStyle: CSSProperties = {
+  color: "#166534",
+  fontWeight: 800,
+};
+
 const pdfExportPanelStyle: CSSProperties = {
   marginTop: "18px",
   padding: "16px",
@@ -3935,6 +4418,18 @@ const registerHeadStyle: CSSProperties = {
   textTransform: "uppercase",
   letterSpacing: 0.3,
   alignItems: "center",
+};
+
+const sortableHeaderButtonStyle: CSSProperties = {
+  border: "none",
+  background: "transparent",
+  padding: 0,
+  color: "inherit",
+  font: "inherit",
+  textTransform: "inherit",
+  letterSpacing: "inherit",
+  cursor: "pointer",
+  textAlign: "left",
 };
 
 const registerBodyStyle: CSSProperties = {
@@ -4070,5 +4565,3 @@ export default function NcrCapaPage() {
     </Suspense>
   );
 }
-
-
