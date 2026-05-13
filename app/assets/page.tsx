@@ -16,6 +16,7 @@ type AssetStatus = "Active" | "Inactive" | "Quarantine" | "Under Maintenance";
 type Asset = {
   id: string;
   asset_code: string | null;
+  document_id_code: string | null;
   name: string | null;
   description: string | null;
   manufacturer: string | null;
@@ -36,6 +37,7 @@ type Asset = {
 
 type AssetForm = {
   name: string;
+  document_id_code: string;
   description: string;
   manufacturer: string;
   model: string;
@@ -197,6 +199,7 @@ const PUBLIC_APP_URL =
 
 const emptyForm: AssetForm = {
   name: "",
+  document_id_code: "",
   description: "",
   manufacturer: "",
   model: "",
@@ -992,6 +995,7 @@ function AssetsPageContent() {
 
     setDetailForm({
       name: selectedAsset.name || "",
+      document_id_code: selectedAsset.document_id_code || "",
       description: selectedAsset.description || "",
       manufacturer: selectedAsset.manufacturer || "",
       model: selectedAsset.model || "",
@@ -1118,6 +1122,7 @@ function AssetsPageContent() {
         {
           asset_code: generatedAssetCode,
           name: form.name.trim(),
+          document_id_code: form.document_id_code.trim() || null,
           description: form.description || null,
           manufacturer: form.manufacturer || null,
           model: form.model || null,
@@ -1184,6 +1189,7 @@ function AssetsPageContent() {
       .update({
         asset_code: assetCodeToUse,
         name: detailForm.name.trim(),
+        document_id_code: detailForm.document_id_code.trim() || null,
         description: detailForm.description || null,
         manufacturer: detailForm.manufacturer || null,
         model: detailForm.model || null,
@@ -1213,6 +1219,7 @@ function AssetsPageContent() {
                 ...asset,
                 asset_code: assetCodeToUse,
                 name: detailForm.name.trim(),
+                document_id_code: detailForm.document_id_code.trim() || null,
                 description: detailForm.description || null,
                 manufacturer: detailForm.manufacturer || null,
                 model: detailForm.model || null,
@@ -1977,6 +1984,15 @@ function AssetsPageContent() {
                 />
               </Field>
 
+              <Field label="Document ID Code">
+                <input
+                  value={form.document_id_code}
+                  onChange={(e) => setForm({ ...form, document_id_code: e.target.value })}
+                  style={inputStyle}
+                  placeholder="e.g. 1100, C4, RG"
+                />
+              </Field>
+
               <Field label="Status">
                 <select
                   value={form.status}
@@ -2313,6 +2329,7 @@ function AssetsPageContent() {
 
                 <div style={assetSummaryStripStyle}>
                   <SummaryPill label="Asset Code" value={selectedAsset.asset_code || "-"} />
+                  <SummaryPill label="Document ID Code" value={detailForm.document_id_code || "-"} />
                   <SummaryPill label="Category" value={detailForm.category || "-"} />
                   <SummaryPill label="Responsible" value={detailForm.owner || "-"} />
                   <SummaryPill label="Location" value={detailForm.location || "-"} />
@@ -2490,6 +2507,14 @@ function AssetsPageContent() {
                     <input
                       value={detailForm.name}
                       onChange={(e) => setDetailForm({ ...detailForm, name: e.target.value })}
+                      style={inputStyle}
+                    />
+                  </Field>
+
+                  <Field label="Document ID Code">
+                    <input
+                      value={detailForm.document_id_code}
+                      onChange={(e) => setDetailForm({ ...detailForm, document_id_code: e.target.value })}
                       style={inputStyle}
                     />
                   </Field>
