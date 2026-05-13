@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
+import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -1802,10 +1803,10 @@ function DocumentsPageContent() {
       </div>
 
       <section style={statsGridStyle}>
-        <StatCard title="Total Documents" value={totalDocuments} accent="#0f766e" />
-        <StatCard title="Live Documents" value={liveDocuments} accent="#16a34a" />
-        <StatCard title="Approved (Approval Status)" value={approvedDocuments} accent="#2563eb" />
-        <StatCard title="Review Overdue" value={overdueReviews} accent="#dc2626" />
+        <QualityKpiCard title="Total Documents" value={totalDocuments} accent="#0f766e" />
+        <QualityKpiCard title="Live Documents" value={liveDocuments} accent="#16a34a" />
+        <QualityKpiCard title="Approved (Approval Status)" value={approvedDocuments} accent="#2563eb" />
+        <QualityKpiCard title="Review Overdue" value={overdueReviews} accent="#dc2626" />
       </section>
 
       <section style={createPanelSectionStyle}>
@@ -3020,33 +3021,6 @@ function ControlSnapshotCard({
           <div style={snapshotMetaValueStyle}>{item.value || "-"}</div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  accent,
-}: {
-  title: string;
-  value: number;
-  accent: string;
-}) {
-  return (
-    <div
-      style={{
-        background: "white",
-        borderRadius: "16px",
-        padding: "18px 20px",
-        borderLeft: `5px solid ${accent}`,
-        boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-      }}
-    >
-      <div style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>{title}</div>
-      <div style={{ fontSize: "34px", fontWeight: 700, color: "#0f172a", marginTop: "8px" }}>
-        {value}
-      </div>
     </div>
   );
 }

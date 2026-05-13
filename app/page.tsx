@@ -16,6 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { QualityKpiCard } from "../src/components/QualityKpiCard";
 import { QualityPageHero } from "../src/components/QualityPageHero";
 import { supabase } from "../src/lib/supabase";
 
@@ -772,12 +773,11 @@ export default function Home() {
 
       <section style={kpiGridStyle}>
         {kpis.map((item) => (
-          <StatCard
+          <QualityKpiCard
             key={item.label}
             title={item.label}
-            value={item.value}
+            value={isLoading ? "-" : item.value}
             accent={item.accent}
-            isLoading={isLoading}
             href={item.href}
           />
         ))}
@@ -1245,40 +1245,6 @@ function SectionCard({
   );
 }
 
-function StatCard({
-  title,
-  value,
-  accent,
-  isLoading,
-  href,
-}: {
-  title: string;
-  value: number;
-  accent: string;
-  isLoading?: boolean;
-  href?: string;
-}) {
-  const content = (
-    <div
-      style={{
-        ...statCardStyle,
-        borderTop: `4px solid ${accent}`,
-      }}
-    >
-      <div style={statCardLabelStyle}>{title}</div>
-      <div style={statCardValueStyle}>{isLoading ? "-" : value}</div>
-    </div>
-  );
-
-  return href ? (
-    <Link href={href} style={{ textDecoration: "none" }}>
-      {content}
-    </Link>
-  ) : (
-    content
-  );
-}
-
 function SummaryRow({
   label,
   value,
@@ -1457,28 +1423,6 @@ const kpiGridStyle: CSSProperties = {
   gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
   gap: "12px",
   marginBottom: "18px",
-};
-
-const statCardStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "16px",
-  padding: "16px 18px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  minHeight: "104px",
-};
-
-const statCardLabelStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#64748b",
-  fontWeight: 600,
-  lineHeight: 1.4,
-};
-
-const statCardValueStyle: CSSProperties = {
-  fontSize: "30px",
-  fontWeight: 700,
-  color: "#0f172a",
-  marginTop: "10px",
 };
 
 const chartGridStyle: CSSProperties = {

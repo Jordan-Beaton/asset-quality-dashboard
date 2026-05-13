@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
+import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -142,6 +143,17 @@ function formatFileSize(bytes: number | null | undefined) {
   return `${size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`;
 }
 
+function getOverdueDays(value: string | null | undefined) {
+  if (!value) return null;
+  const due = new Date(value);
+  if (Number.isNaN(due.getTime())) return null;
+  const today = new Date();
+  due.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
+}
+
 function dueState(date: string | null | undefined) {
   if (!date) return "none";
   const today = new Date();
@@ -187,6 +199,13 @@ function getSeverityRank(severity: string | null | undefined) {
   if (display === "High") return 0;
   if (display === "Medium") return 1;
   return 2;
+}
+
+function hexToRgbTriplet(value: string) {
+  const normalized = value.replace("#", "");
+  const parts = normalized.match(/.{1,2}/g);
+  if (!parts || parts.length < 3) return [226, 232, 240] as [number, number, number];
+  return parts.slice(0, 3).map((item) => Number.parseInt(item, 16)) as [number, number, number];
 }
 
 function getTypeTone(type: "NCR" | "CAPA") {
@@ -433,6 +452,7 @@ function NcrCapaPageContent() {
   const [includeEvidenceListInPdf, setIncludeEvidenceListInPdf] = useState(true);
   const [externalFacingPdf, setExternalFacingPdf] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingOpenNcrReport, setGeneratingOpenNcrReport] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -1687,6 +1707,174 @@ function NcrCapaPageContent() {
     }
   }
 
+  async function generateOpenNcrReport() {
+    const openNcrRows = ncrs
+      .filter((row) => (row.status || "").trim() !== "Closed")
+      .sort((a, b) => {
+        const aDue = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDue = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        if (aDue !== bDue) return aDue - bDue;
+        const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bCreated - aCreated;
+      });
+
+    if (openNcrRows.length === 0) {
+      setMessage("No open NCRs available for report generation.");
+      return;
+    }
+
+    try {
+      setGeneratingOpenNcrReport(true);
+
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const generatedAt = new Date().toLocaleString("en-GB");
+
+      try {
+        const logoResponse = await fetch("/logo.png");
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const logoDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(new Error("Could not convert logo to data URL."));
+            reader.readAsDataURL(logoBlob);
+          });
+          doc.addImage(logoDataUrl, "PNG", margin, 8, 44, 20);
+        }
+      } catch {
+        // Keep report generation resilient if the logo cannot be loaded.
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(17);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Open NCR Report", pageWidth / 2, 17, { align: "center" });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text("Management meeting register of all NCRs with a status other than Closed.", pageWidth / 2, 23, {
+        align: "center",
+      });
+      doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 17, { align: "right" });
+      doc.text(`Open NCRs: ${openNcrRows.length}`, pageWidth - margin, 23, { align: "right" });
+
+      doc.setDrawColor(15, 118, 110);
+      doc.setLineWidth(0.7);
+      doc.line(margin, 31, pageWidth - margin, 31);
+
+      const reportRows = openNcrRows.map((row) => {
+        const overdueDays = getOverdueDays(row.due_date);
+        const sourceLabel = [row.project, row.area].filter(Boolean).join(" / ") || "-";
+        return {
+          ncr_number: row.ncr_number || "-",
+          source: sourceLabel,
+          audit_type: row.source_type || "-",
+          category: row.root_cause_category || getSeverityDisplay(row.severity),
+          status: row.status || "-",
+          owner: row.owner || "-",
+          due_date: formatDate(row.due_date),
+          overdue_days: overdueDays ? String(overdueDays) : "-",
+          description: row.description || "-",
+          root_cause: row.root_cause_description || "-",
+          corrective_action: row.containment_action || "-",
+          is_overdue: Boolean(overdueDays),
+          severity: row.severity || "",
+        };
+      });
+
+      autoTable(doc, {
+        startY: 36,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 14 },
+        tableWidth: "auto",
+        columns: [
+          { header: "NCR Number", dataKey: "ncr_number" },
+          { header: "Source", dataKey: "source" },
+          { header: "Audit Type", dataKey: "audit_type" },
+          { header: "Category", dataKey: "category" },
+          { header: "Status", dataKey: "status" },
+          { header: "Owner", dataKey: "owner" },
+          { header: "Due Date", dataKey: "due_date" },
+          { header: "Overdue Days", dataKey: "overdue_days" },
+          { header: "Description", dataKey: "description" },
+          { header: "Root Cause", dataKey: "root_cause" },
+          { header: "Corrective Action", dataKey: "corrective_action" },
+        ],
+        body: reportRows,
+        styles: {
+          font: "helvetica",
+          fontSize: 7.4,
+          cellPadding: 1.8,
+          lineColor: [203, 213, 225],
+          lineWidth: 0.2,
+          textColor: [15, 23, 42],
+          overflow: "linebreak",
+          valign: "top",
+        },
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          ncr_number: { cellWidth: 22 },
+          source: { cellWidth: 22 },
+          audit_type: { cellWidth: 18 },
+          category: { cellWidth: 20 },
+          status: { cellWidth: 16 },
+          owner: { cellWidth: 18 },
+          due_date: { cellWidth: 18 },
+          overdue_days: { cellWidth: 14, halign: "center" },
+          description: { cellWidth: 42 },
+          root_cause: { cellWidth: 42 },
+          corrective_action: { cellWidth: 42 },
+        },
+        didParseCell: (data) => {
+          if (data.section !== "body") return;
+          const row = data.row.raw as (typeof reportRows)[number];
+
+          if (data.column.dataKey === "category") {
+            const tone = getSeverityTone(row.severity);
+            data.cell.styles.fillColor = hexToRgbTriplet(tone.bg);
+            data.cell.styles.textColor = hexToRgbTriplet(tone.color);
+          }
+
+          if ((data.column.dataKey === "due_date" || data.column.dataKey === "overdue_days") && row.is_overdue) {
+            data.cell.styles.fillColor = [254, 226, 226];
+            data.cell.styles.textColor = [153, 27, 27];
+            data.cell.styles.fontStyle = "bold";
+          }
+        },
+        didDrawPage: () => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text("Enshore Quality Management System", margin, pageHeight - 6);
+          doc.text(
+            `Page ${doc.getCurrentPageInfo().pageNumber} of ${doc.getNumberOfPages()}`,
+            pageWidth - margin,
+            pageHeight - 6,
+            { align: "right" }
+          );
+        },
+      });
+
+      const fileName = `open-ncr-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(fileName);
+      setMessage("Open NCR report generated successfully.");
+    } catch (error) {
+      console.error(error);
+      setMessage("Open NCR report generation failed.");
+    } finally {
+      setGeneratingOpenNcrReport(false);
+    }
+  }
+
   const statusOptions = ["Open", "In Progress", "On Hold", "Closed"];
   const severityOptions = ["Low", "Medium", "High"];
   const sourceOptions = ["Internal", "Supplier", "External"];
@@ -1719,6 +1907,14 @@ function NcrCapaPageContent() {
         </Link>
 
         <div style={topMetaActionsStyle}>
+          <button
+            type="button"
+            style={{ ...secondaryButton, border: "1px solid #bfdbfe", color: "#1d4ed8" }}
+            onClick={() => void generateOpenNcrReport()}
+            disabled={generatingOpenNcrReport}
+          >
+            {generatingOpenNcrReport ? "Generating Open NCR Report..." : "Generate Open NCR Report"}
+          </button>
           <button type="button" style={secondaryButton} onClick={() => setShowCreatePanel((prev) => !prev)}>
             {showCreatePanel ? "Hide create panel" : "Show create panel"}
           </button>
@@ -1732,12 +1928,12 @@ function NcrCapaPageContent() {
       </div>
 
       <section style={statsGridStyle}>
-        <StatCard title="Open Items" value={kpis.openItems} accent="#f59e0b" />
-        <StatCard title="Overdue" value={kpis.overdue} accent="#ef4444" />
-        <StatCard title="Due in 7 Days" value={kpis.dueSoon} accent="#22c55e" />
-        <StatCard title="NCRs" value={kpis.totalNcrs} accent="#60a5fa" />
-        <StatCard title="CAPAs" value={kpis.totalCapas} accent="#c084fc" />
-        <StatCard title="Evidence Files" value={kpis.evidenceCount} accent="#f472b6" />
+        <QualityKpiCard title="Open Items" value={kpis.openItems} accent="#f59e0b" />
+        <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#ef4444" />
+        <QualityKpiCard title="Due in 7 Days" value={kpis.dueSoon} accent="#22c55e" />
+        <QualityKpiCard title="NCRs" value={kpis.totalNcrs} accent="#60a5fa" />
+        <QualityKpiCard title="CAPAs" value={kpis.totalCapas} accent="#c084fc" />
+        <QualityKpiCard title="Evidence Files" value={kpis.evidenceCount} accent="#f472b6" />
       </section>
 
       <section style={topGridStyle}>
@@ -3201,23 +3397,6 @@ function HeroMetaCard({
   );
 }
 
-function StatCard({
-  title,
-  value,
-  accent,
-}: {
-  title: string;
-  value: number;
-  accent: string;
-}) {
-  return (
-    <div style={{ ...statCardStyle, borderTop: `4px solid ${accent}` }}>
-      <div style={statCardLabelStyle}>{title}</div>
-      <div style={statCardValueStyle}>{value}</div>
-    </div>
-  );
-}
-
 function SelectedFilesList({ files }: { files: File[] }) {
   if (files.length === 0) {
     return <div style={{ marginTop: 12, fontSize: 13, color: "#64748b" }}>No files selected.</div>;
@@ -3377,26 +3556,6 @@ const statsGridStyle: CSSProperties = {
   gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
-};
-
-const statCardStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "16px",
-  padding: "18px 20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-
-const statCardLabelStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#64748b",
-  fontWeight: 600,
-};
-
-const statCardValueStyle: CSSProperties = {
-  fontSize: "34px",
-  fontWeight: 700,
-  color: "#0f172a",
-  marginTop: "8px",
 };
 
 const topGridStyle: CSSProperties = {

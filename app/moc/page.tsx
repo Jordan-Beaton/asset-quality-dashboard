@@ -8,6 +8,7 @@ import type { CSSProperties, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -2422,24 +2423,27 @@ function MOCPageContent() {
       </div>
 
       <section style={kpiRowStyle}>
-        <Link href={buildMocHref({ status: "Active" })} style={metricLinkStyle}>
-          <CompactMetricCard title="Active MOCs" value={openCount} accent="#f59e0b" />
-        </Link>
-        <Link href={buildMocHref({ change_type: "Temporary" })} style={metricLinkStyle}>
-          <CompactMetricCard title="Temporary MOCs" value={temporaryCount} accent="#2563eb" />
-        </Link>
-        <Link href={buildMocHref({ status: "In Review" })} style={metricLinkStyle}>
-          <CompactMetricCard title="In Review" value={inReviewCount} accent="#7c3aed" />
-        </Link>
-        <Link href={buildMocHref({ status: "Approved" })} style={metricLinkStyle}>
-          <CompactMetricCard title="Approved MOCs" value={approvedCount} accent="#dc2626" />
-        </Link>
-        <Link href={buildMocHref({ attention: "expiry-soon" })} style={metricLinkStyle}>
-          <CompactMetricCard title="Expiry in 7 Days" value={expirySoonCount} accent="#b45309" />
-        </Link>
-        <Link href={buildMocHref({ recent: 1 })} style={metricLinkStyle}>
-          <CompactMetricCard title="Recently Created" value={recentCount} accent="#16a34a" />
-        </Link>
+        <QualityKpiCard title="Active MOCs" value={openCount} accent="#f59e0b" href={buildMocHref({ status: "Active" })} />
+        <QualityKpiCard
+          title="Temporary MOCs"
+          value={temporaryCount}
+          accent="#2563eb"
+          href={buildMocHref({ change_type: "Temporary" })}
+        />
+        <QualityKpiCard title="In Review" value={inReviewCount} accent="#7c3aed" href={buildMocHref({ status: "In Review" })} />
+        <QualityKpiCard title="Approved MOCs" value={approvedCount} accent="#dc2626" href={buildMocHref({ status: "Approved" })} />
+        <QualityKpiCard
+          title="Expiry in 7 Days"
+          value={expirySoonCount}
+          accent="#b45309"
+          href={buildMocHref({ attention: "expiry-soon" })}
+        />
+        <QualityKpiCard
+          title="Recently Created"
+          value={recentCount}
+          accent="#16a34a"
+          href={buildMocHref({ recent: 1 })}
+        />
       </section>
 
       <section style={topGridStyle}>
@@ -3448,15 +3452,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function CompactMetricCard({ title, value, accent }: { title: string; value: number; accent: string }) {
-  return (
-    <div style={{ ...compactMetricCardStyle, borderTop: `4px solid ${accent}` }}>
-      <div style={compactMetricTitleStyle}>{title}</div>
-      <div style={compactMetricValueStyle}>{value}</div>
-    </div>
-  );
-}
-
 function DetailSubsection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={detailSectionStyle}>
@@ -3737,34 +3732,11 @@ const workspaceGridStyle: CSSProperties = {
 
 const kpiRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-  gap: "14px",
+  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+  gap: "12px",
   marginBottom: "18px",
 };
 
-const metricLinkStyle: CSSProperties = {
-  textDecoration: "none",
-};
-
-const compactMetricCardStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "16px",
-  padding: "16px 18px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-
-const compactMetricTitleStyle: CSSProperties = {
-  color: "#64748b",
-  fontSize: "13px",
-  fontWeight: 700,
-};
-
-const compactMetricValueStyle: CSSProperties = {
-  color: "#0f172a",
-  fontSize: "26px",
-  fontWeight: 800,
-  marginTop: "8px",
-};
 
 const panelStyle: CSSProperties = {
   background: "white",
