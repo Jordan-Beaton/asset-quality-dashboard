@@ -521,6 +521,7 @@ export default function AssetReportsPage() {
     () => [
       {
         title: "A. Assets",
+        accent: "#2563eb",
         rows: [
           ["Total assets", metrics.assetsSummary.totalAssets],
           ["Active assets", metrics.assetsSummary.activeAssets],
@@ -529,6 +530,7 @@ export default function AssetReportsPage() {
       },
       {
         title: "B. Calibration",
+        accent: "#dc2626",
         rows: [
           ["Due this month", metrics.calibrationSummary.dueThisMonth],
           ["Overdue calibration", metrics.calibrationSummary.overdue],
@@ -537,6 +539,7 @@ export default function AssetReportsPage() {
       },
       {
         title: "C. Inspection",
+        accent: "#f59e0b",
         rows: [
           ["Completed this month", metrics.inspectionSummary.completedThisMonth],
           ["Overdue inspections", metrics.inspectionSummary.overdue],
@@ -546,6 +549,7 @@ export default function AssetReportsPage() {
       },
       {
         title: "D. Maintenance",
+        accent: "#7c3aed",
         rows: [
           ["Completed this month", metrics.maintenanceSummary.completedThisMonth],
           ["Overdue maintenance", metrics.maintenanceSummary.overdue],
@@ -555,6 +559,7 @@ export default function AssetReportsPage() {
       },
       {
         title: "E. Linked Actions",
+        accent: "#0f766e",
         rows: [
           ["Open linked asset actions", metrics.actionsSummary.openLinkedAssetActions],
           ["Overdue linked asset actions", metrics.actionsSummary.overdueLinkedAssetActions],
@@ -996,112 +1001,112 @@ export default function AssetReportsPage() {
 
       <section style={twoColumnGridStyle}>
         <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>
-                {editingId ? "Edit Monthly Management Report" : "Create Monthly Management Report"}
-              </h2>
-              <p style={sectionSubtitleStyle}>
-                Choose the reporting month and generate a concise management pack from verified asset data fields.
-              </p>
-            </div>
+        <div style={sectionHeaderRowStyle}>
+          <div>
+            <h2 style={sectionTitleStyle}>
+              {editingId ? "Edit Monthly Management Report" : "Create Monthly Management Report"}
+            </h2>
+            <p style={sectionSubtitleStyle}>
+              Choose the reporting month and generate a concise management pack from verified asset data fields.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={saveMonthlyReport}>
+          <div style={formGridStyle}>
+            <label style={fieldLabelStyle}>
+              <span>Month</span>
+              <select
+                value={form.monthIndex}
+                onChange={(e) => setForm((prev) => ({ ...prev, monthIndex: Number(e.target.value) }))}
+                style={inputStyle}
+              >
+                {monthOptions.map((month, index) => (
+                  <option key={month} value={index}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={fieldLabelStyle}>
+              <span>Year</span>
+              <input
+                value={form.year}
+                onChange={(e) => setForm((prev) => ({ ...prev, year: e.target.value }))}
+                style={inputStyle}
+                inputMode="numeric"
+                placeholder={String(currentDate.getFullYear())}
+              />
+            </label>
           </div>
 
-          <form onSubmit={saveMonthlyReport}>
-            <div style={formGridStyle}>
-              <label style={fieldLabelStyle}>
-                <span>Month</span>
-                <select
-                  value={form.monthIndex}
-                  onChange={(e) => setForm((prev) => ({ ...prev, monthIndex: Number(e.target.value) }))}
-                  style={inputStyle}
-                >
-                  {monthOptions.map((month, index) => (
-                    <option key={month} value={index}>
-                      {month}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          <div style={narrativeStackStyle}>
+            <label style={fieldLabelStyle}>
+              <span>Executive Summary</span>
+              <textarea
+                value={form.executiveSummary}
+                onChange={(e) => setForm((prev) => ({ ...prev, executiveSummary: e.target.value }))}
+                style={textareaStyle}
+                rows={4}
+                placeholder="Optional short management summary for this asset reporting month."
+              />
+            </label>
 
-              <label style={fieldLabelStyle}>
-                <span>Year</span>
-                <input
-                  value={form.year}
-                  onChange={(e) => setForm((prev) => ({ ...prev, year: e.target.value }))}
-                  style={inputStyle}
-                  inputMode="numeric"
-                  placeholder={String(currentDate.getFullYear())}
-                />
-              </label>
-            </div>
+            <label style={fieldLabelStyle}>
+              <span>Next Month Focus / Planned Activity</span>
+              <textarea
+                value={form.nextMonthFocus}
+                onChange={(e) => setForm((prev) => ({ ...prev, nextMonthFocus: e.target.value }))}
+                style={textareaStyle}
+                rows={4}
+                placeholder="Optional forward-look for asset management priorities."
+              />
+            </label>
+          </div>
 
-            <div style={narrativeStackStyle}>
-              <label style={fieldLabelStyle}>
-                <span>Executive Summary</span>
-                <textarea
-                  value={form.executiveSummary}
-                  onChange={(e) => setForm((prev) => ({ ...prev, executiveSummary: e.target.value }))}
-                  style={textareaStyle}
-                  rows={4}
-                  placeholder="Optional short management summary for this asset reporting month."
-                />
-              </label>
+          <div style={periodPreviewStyle}>
+            <strong>Report Period:</strong> {metrics.monthLabel}
+          </div>
 
-              <label style={fieldLabelStyle}>
-                <span>Next Month Focus / Planned Activity</span>
-                <textarea
-                  value={form.nextMonthFocus}
-                  onChange={(e) => setForm((prev) => ({ ...prev, nextMonthFocus: e.target.value }))}
-                  style={textareaStyle}
-                  rows={4}
-                  placeholder="Optional forward-look for asset management priorities."
-                />
-              </label>
-            </div>
+          <div style={buttonRowStyle}>
+            <button type="submit" style={primaryButtonStyle}>
+              {editingId ? "Update Monthly Report" : "Save Monthly Report"}
+            </button>
 
-            <div style={periodPreviewStyle}>
-              <strong>Report Period:</strong> {metrics.monthLabel}
-            </div>
-
-            <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle}>
-                {editingId ? "Update Monthly Report" : "Save Monthly Report"}
+            {editingId ? (
+              <button type="button" style={secondaryButtonStyle} onClick={resetForm}>
+                Cancel Edit
               </button>
-
-              {editingId ? (
-                <button type="button" style={secondaryButtonStyle} onClick={resetForm}>
-                  Cancel Edit
-                </button>
-              ) : null}
-            </div>
+            ) : null}
+          </div>
           </form>
         </div>
 
         <div style={panelStyle}>
-          <div style={sectionHeaderRowStyle}>
-            <div>
-              <h2 style={sectionTitleStyle}>Management Snapshot</h2>
-              <p style={sectionSubtitleStyle}>
-                Live monthly summary blocks used to build the asset management PDF.
-              </p>
-            </div>
+        <div style={sectionHeaderRowStyle}>
+          <div>
+            <h2 style={sectionTitleStyle}>Management Snapshot</h2>
+            <p style={sectionSubtitleStyle}>
+              Live monthly summary blocks used to build the asset management PDF.
+            </p>
           </div>
+        </div>
 
           <div style={snapshotCardsWrapStyle}>
-            {reportCards.map((card) => (
-              <div key={card.title} style={snapshotCardStyle}>
-                <div style={snapshotCardTitleStyle}>{card.title}</div>
-                <div style={snapshotRowsWrapStyle}>
-                  {card.rows.map(([label, value]) => (
-                    <div key={`${card.title}-${label}`} style={snapshotRowStyle}>
-                      <span style={snapshotLabelStyle}>{label}</span>
-                      <strong style={snapshotValueStyle}>{value}</strong>
-                    </div>
-                  ))}
-                </div>
+          {reportCards.map((card) => (
+            <div key={card.title} style={snapshotCardStyle}>
+              <div style={snapshotCardTitleStyle}>{card.title}</div>
+              <div style={snapshotRowsWrapStyle}>
+                {card.rows.map(([label, value]) => (
+                  <div key={`${card.title}-${label}`} style={snapshotRowStyle}>
+                    <span style={snapshotLabelStyle}>{label}</span>
+                    <strong style={snapshotValueStyle}>{value}</strong>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+          ))}
           </div>
         </div>
       </section>
