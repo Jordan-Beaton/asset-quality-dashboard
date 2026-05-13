@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import * as XLSX from "xlsx";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
@@ -43,6 +44,18 @@ type PersonForm = {
   active: boolean;
 };
 
+type PeopleImportRow = {
+  rowNumber: number;
+  name: string;
+  email: string;
+  role: string;
+  department: string;
+  active: boolean;
+  skipped: boolean;
+  errors: string[];
+  skipReasons: string[];
+};
+
 const emptyPersonForm: PersonForm = {
   name: "",
   email: "",
@@ -70,6 +83,41 @@ function statusTone(active: boolean) {
     : { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
 }
 
+function normalizeImportHeader(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeLookupValue(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase();
+}
+
+function getImportCell(row: Record<string, unknown>, candidates: string[]) {
+  const normalizedCandidates = candidates.map(normalizeImportHeader);
+  const entry = Object.entries(row).find(([key]) =>
+    normalizedCandidates.includes(normalizeImportHeader(key))
+  );
+  const value = entry?.[1];
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function normalizeImportedDepartment(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const matched = DEPARTMENTS.find((department) => department.toLowerCase() === trimmed.toLowerCase());
+  return matched || "";
+}
+
+function normalizeImportedActive(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return true;
+  if (["false", "no", "n", "inactive", "0"].includes(trimmed)) return false;
+  return true;
+}
+
 function PeoplePageContent() {
   const [people, setPeople] = useState<PersonRecord[]>([]);
   const [message, setMessage] = useState("Loading people...");
@@ -84,6 +132,9 @@ function PeoplePageContent() {
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [importFileName, setImportFileName] = useState("");
+  const [importRows, setImportRows] = useState<PeopleImportRow[]>([]);
+  const [isImportingPeople, setIsImportingPeople] = useState(false);
 
   useEffect(() => {
     void loadPeople();
@@ -129,6 +180,139 @@ function PeoplePageContent() {
   const activeCount = people.filter((person) => person.active).length;
   const inactiveCount = people.length - activeCount;
   const latestPerson = people[0] || null;
+  const importableRows = importRows.filter((row) => !row.skipped && row.errors.length === 0);
+  const skippedImportRows = importRows.filter((row) => row.skipped || row.errors.length > 0);
+
+  async function handlePeopleImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    setImportRows([]);
+    setMessage(`Reading ${file.name}...`);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        setMessage("Import failed: workbook does not contain any sheets.");
+        return;
+      }
+
+      const sheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+        defval: "",
+        raw: true,
+      });
+
+      if (rows.length === 0) {
+        setMessage("Import failed: first sheet has no data rows.");
+        return;
+      }
+
+      const existingNames = new Set(people.map((person) => normalizeLookupValue(person.name)).filter(Boolean));
+      const existingEmails = new Set(
+        people.map((person) => normalizeLookupValue(person.email)).filter(Boolean)
+      );
+      const uploadNames = new Set<string>();
+      const uploadEmails = new Set<string>();
+
+      const parsedRows = rows.map((row, index): PeopleImportRow => {
+        const name = getImportCell(row, ["Name", "Full Name", "Person"]);
+        const email = getImportCell(row, ["Email", "Email Address"]);
+        const role = getImportCell(row, ["Role", "Job Title", "Position"]);
+        const department = normalizeImportedDepartment(getImportCell(row, ["Department"]));
+        const active = normalizeImportedActive(getImportCell(row, ["Active", "Status"]));
+        const normalizedName = normalizeLookupValue(name);
+        const normalizedEmail = normalizeLookupValue(email);
+        const errors: string[] = [];
+        const skipReasons: string[] = [];
+
+        if (!name) errors.push("Name is required.");
+
+        if (normalizedName && existingNames.has(normalizedName)) {
+          skipReasons.push("Duplicate name already exists.");
+        }
+
+        if (normalizedEmail && existingEmails.has(normalizedEmail)) {
+          skipReasons.push("Duplicate email already exists.");
+        }
+
+        if (normalizedName && uploadNames.has(normalizedName)) {
+          skipReasons.push("Duplicate name in uploaded file.");
+        }
+
+        if (normalizedEmail && uploadEmails.has(normalizedEmail)) {
+          skipReasons.push("Duplicate email in uploaded file.");
+        }
+
+        if (normalizedName && !uploadNames.has(normalizedName)) uploadNames.add(normalizedName);
+        if (normalizedEmail && !uploadEmails.has(normalizedEmail)) uploadEmails.add(normalizedEmail);
+
+        return {
+          rowNumber: index + 2,
+          name,
+          email,
+          role,
+          department,
+          active,
+          skipped: skipReasons.length > 0,
+          errors,
+          skipReasons,
+        };
+      });
+
+      setImportRows(parsedRows);
+      setMessage(
+        `Preview ready: ${parsedRows.length} row${parsedRows.length === 1 ? "" : "s"} loaded from ${file.name}.`
+      );
+    } catch (error) {
+      setMessage(`Import preview failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  async function importPreviewedPeople() {
+    if (!importRows.length) {
+      setMessage("Select an Excel file before importing.");
+      return;
+    }
+
+    if (!importableRows.length) {
+      setMessage("No valid new people rows are available to import.");
+      return;
+    }
+
+    try {
+      setIsImportingPeople(true);
+
+      const insertRows = importableRows.map((row) => ({
+        name: row.name.trim(),
+        email: row.email.trim() || null,
+        role: row.role.trim() || null,
+        department: row.department || null,
+        active: row.active,
+      }));
+
+      const { error } = await supabase.from("people").insert(insertRows);
+      if (error) throw new Error(error.message);
+
+      setMessage(
+        `Imported ${insertRows.length} people record${insertRows.length === 1 ? "" : "s"} from ${importFileName}.`
+      );
+      setImportRows([]);
+      setImportFileName("");
+      await loadPeople();
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Import failed: ${err.message}`);
+    } finally {
+      setIsImportingPeople(false);
+    }
+  }
 
   async function createPerson(e: React.FormEvent) {
     e.preventDefault();
@@ -326,6 +510,106 @@ function PeoplePageContent() {
               </button>
             </div>
           </form>
+        </SectionCard>
+
+        <SectionCard
+          title="Import People from Excel"
+          subtitle="Bulk-create shared people records from the first worksheet while skipping duplicates and allowing blank departments."
+        >
+          <div style={importPanelStyle}>
+            <Field label="Excel File">
+              <input
+                type="file"
+                accept=".xlsx"
+                style={inputStyle}
+                onChange={(event) => void handlePeopleImportFileChange(event)}
+              />
+            </Field>
+
+            <div style={importActionsStyle}>
+              <button
+                type="button"
+                style={primaryButtonStyle}
+                onClick={() => void importPreviewedPeople()}
+                disabled={!importableRows.length || isImportingPeople}
+              >
+                {isImportingPeople ? "Importing..." : `Import ${importableRows.length} People`}
+              </button>
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => {
+                  setImportRows([]);
+                  setImportFileName("");
+                  setMessage("People import preview cleared.");
+                }}
+                disabled={!importRows.length}
+              >
+                Clear Preview
+              </button>
+            </div>
+          </div>
+
+          {importRows.length ? (
+            <div style={importPreviewWrapStyle}>
+              <div style={importSummaryStyle}>
+                Previewing <strong>{importRows.length}</strong> row{importRows.length === 1 ? "" : "s"}
+                {importFileName ? (
+                  <>
+                    {" "}
+                    from <strong>{importFileName}</strong>
+                  </>
+                ) : null}
+                . Ready to import: <strong>{importableRows.length}</strong>. Skipped/errors:{" "}
+                <strong>{skippedImportRows.length}</strong>.
+              </div>
+
+              <div style={peopleImportTableWrapStyle}>
+                <table style={peopleImportTableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={peopleRegisterHeaderCellStyle}>Row</th>
+                      <th style={peopleRegisterHeaderCellStyle}>Name</th>
+                      <th style={peopleRegisterHeaderCellStyle}>Email</th>
+                      <th style={peopleRegisterHeaderCellStyle}>Role</th>
+                      <th style={peopleRegisterHeaderCellStyle}>Department</th>
+                      <th style={peopleRegisterHeaderCellStyle}>Active</th>
+                      <th style={peopleRegisterHeaderCellStyle}>Import Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importRows.map((row) => {
+                      const messages = [...row.errors, ...row.skipReasons];
+                      return (
+                        <tr
+                          key={`${row.rowNumber}-${row.name}-${row.email}`}
+                          style={{
+                            background: row.errors.length ? "#fff7f7" : row.skipped ? "#fffbeb" : "#ffffff",
+                          }}
+                        >
+                          <td style={peopleRegisterCellStyle}>{row.rowNumber}</td>
+                          <td style={peopleRegisterPrimaryCellStyle}>{row.name || "-"}</td>
+                          <td style={peopleRegisterCellStyle}>{row.email || "-"}</td>
+                          <td style={peopleRegisterCellStyle}>{row.role || "-"}</td>
+                          <td style={peopleRegisterCellStyle}>{row.department || "-"}</td>
+                          <td style={peopleRegisterCellStyle}>{row.active ? "Yes" : "No"}</td>
+                          <td
+                            style={{
+                              ...peopleRegisterCellStyle,
+                              color: row.errors.length ? "#b91c1c" : row.skipped ? "#92400e" : "#166534",
+                              fontWeight: 800,
+                            }}
+                          >
+                            {messages.length ? messages.join(" ") : "Ready"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
         </SectionCard>
 
         <SectionCard
@@ -802,6 +1086,44 @@ const deleteButtonStyle: CSSProperties = {
 const peopleRegisterWrapStyle: CSSProperties = {
   marginTop: "18px",
   overflowX: "auto",
+};
+
+const importPanelStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  gap: "16px",
+  alignItems: "end",
+};
+
+const importActionsStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+};
+
+const importPreviewWrapStyle: CSSProperties = {
+  marginTop: "18px",
+};
+
+const importSummaryStyle: CSSProperties = {
+  marginBottom: "12px",
+  color: "#475569",
+  fontSize: "14px",
+};
+
+const peopleImportTableWrapStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #dbe7f3",
+  borderRadius: "16px",
+};
+
+const peopleImportTableStyle: CSSProperties = {
+  width: "100%",
+  minWidth: "900px",
+  borderCollapse: "separate",
+  borderSpacing: 0,
+  background: "#ffffff",
 };
 
 const peopleRegisterTableStyle: CSSProperties = {
