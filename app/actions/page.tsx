@@ -2,6 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -154,6 +156,8 @@ const actionSourceOptions = [
   "Asset Calibration",
   "NCR/CAPA",
   "MOC",
+  "Risk",
+  "HSE",
   "Other",
 ] as const;
 const departmentOptions = [
@@ -324,6 +328,12 @@ function getActionSourceValue(action: ActionItem) {
   return source;
 }
 
+function getActionSourceLabel(action: ActionItem) {
+  const source = getActionSourceValue(action);
+  if (source === "NCR/CAPA") return "NCR / CAPA";
+  return source;
+}
+
 function isAuditLinkedSource(source: string | null | undefined) {
   return source === "Audit Finding";
 }
@@ -350,6 +360,23 @@ function buildActionSourceLabel(action: ActionItem) {
   if (source === "NCR/CAPA" && action.linked_capa_number) parts.push(`CAPA ${action.linked_capa_number}`);
   if (source === "MOC" && action.linked_moc_number) parts.push(`MOC ${action.linked_moc_number}`);
   return parts.join(" • ");
+}
+
+function buildLinkedRecordDisplay(action: ActionItem) {
+  const source = getActionSourceLabel(action);
+  const values = [
+    action.linked_audit_number ? `Audit ${action.linked_audit_number}` : "",
+    action.linked_finding_reference ? `Finding ${action.linked_finding_reference}` : "",
+    action.linked_asset_code ? `Asset ${action.linked_asset_code}` : "",
+    action.linked_inspection_number ? `Inspection ${action.linked_inspection_number}` : "",
+    action.linked_maintenance_number ? `Maintenance ${action.linked_maintenance_number}` : "",
+    action.linked_ncr_number ? `NCR ${action.linked_ncr_number}` : "",
+    action.linked_capa_number ? `CAPA ${action.linked_capa_number}` : "",
+    action.linked_moc_number ? `MOC ${action.linked_moc_number}` : "",
+  ].filter(Boolean);
+
+  if (values.length) return values.join(" | ");
+  return source && source !== "Manual" ? source : "-";
 }
 
 function buildActionFormFromItem(action: ActionItem): ActionForm {
@@ -391,7 +418,7 @@ function ActionsPageContent() {
   const linkedOwner = searchParams.get("owner")?.trim() || "";
   const linkedProject = searchParams.get("project")?.trim() || "";
   const linkedSource = searchParams.get("source")?.trim() || "";
-  const showOverdueOnly = searchParams.get("overdue") === "1";
+  const linkedOverdueOnly = searchParams.get("overdue") === "1";
   const dueWindow = Number(searchParams.get("dueWindow") || "0");
   const linkedCreatedMonth = searchParams.get("createdMonth")?.trim() || "";
   const linkedClosedMonth = searchParams.get("closedMonth")?.trim() || "";
@@ -430,6 +457,7 @@ function ActionsPageContent() {
   const [projectFilter, setProjectFilter] = useState(linkedProject);
   const [sourceFilter, setSourceFilter] = useState(linkedSource);
   const [departmentFilter, setDepartmentFilter] = useState("");
+  const [showOverdueOnly, setShowOverdueOnly] = useState(linkedOverdueOnly);
 
   const [editForm, setEditForm] = useState<ActionForm>(emptyForm);
 
@@ -1340,6 +1368,170 @@ function ActionsPageContent() {
     await loadActions(false);
   }
 
+  async function generateFilteredActionRegisterPdf() {
+    if (filteredActions.length === 0) {
+      setMessage("No filtered actions available for PDF export.");
+      return;
+    }
+
+    try {
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const generatedAt = new Date().toLocaleString("en-GB");
+      const filterSummaryRows = [
+        ["Search", search.trim() || "None"],
+        ["Status", statusFilter || "All"],
+        ["Priority", priorityFilter || "All"],
+        ["Owner", ownerFilter || "All"],
+        ["Project", projectFilter || "All"],
+        ["Source", sourceFilter || "All"],
+        ["Department", departmentFilter || "All"],
+        ["Overdue Only", showOverdueOnly ? "Yes" : "No"],
+      ];
+
+      try {
+        const logoResponse = await fetch("/logo.png");
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const logoDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(new Error("Could not convert logo to data URL."));
+            reader.readAsDataURL(logoBlob);
+          });
+          doc.addImage(logoDataUrl, "PNG", margin, 8, 44, 20);
+        }
+      } catch {
+        // Keep report generation resilient if the logo cannot be loaded.
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(17);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Filtered Action Register PDF", pageWidth / 2, 17, { align: "center" });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text("Central Action Management register filtered to the current view.", pageWidth / 2, 23, {
+        align: "center",
+      });
+      doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 17, { align: "right" });
+      doc.text(`Actions: ${filteredActions.length}`, pageWidth - margin, 23, { align: "right" });
+
+      doc.setDrawColor(15, 118, 110);
+      doc.setLineWidth(0.7);
+      doc.line(margin, 31, pageWidth - margin, 31);
+
+      autoTable(doc, {
+        startY: 35,
+        theme: "grid",
+        margin: { left: margin, right: margin },
+        body: filterSummaryRows,
+        styles: {
+          font: "helvetica",
+          fontSize: 8.2,
+          cellPadding: 1.6,
+          lineColor: [203, 213, 225],
+          lineWidth: 0.2,
+          textColor: [15, 23, 42],
+        },
+        columnStyles: {
+          0: { cellWidth: 30, fontStyle: "bold", fillColor: [248, 250, 252] },
+          1: { cellWidth: 72 },
+        },
+      });
+
+      const reportRows = filteredActions.map((action) => ({
+        action_number: action.action_number || "-",
+        title: action.title || "-",
+        department: action.department || "-",
+        source: getActionSourceLabel(action),
+        linked_record: buildLinkedRecordDisplay(action),
+        owner: action.owner || "-",
+        priority: action.priority || "-",
+        due_date: formatDate(action.due_date),
+        status: action.status || "-",
+        due_label: getDueLabel(action.due_date),
+        is_overdue: isOverdue(action),
+      }));
+
+      autoTable(doc, {
+        startY: ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 35) + 5,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 14 },
+        tableWidth: "auto",
+        columns: [
+          { header: "Action No.", dataKey: "action_number" },
+          { header: "Title", dataKey: "title" },
+          { header: "Department", dataKey: "department" },
+          { header: "Source", dataKey: "source" },
+          { header: "Linked Record", dataKey: "linked_record" },
+          { header: "Owner", dataKey: "owner" },
+          { header: "Priority", dataKey: "priority" },
+          { header: "Due Date", dataKey: "due_date" },
+          { header: "Status", dataKey: "status" },
+        ],
+        body: reportRows,
+        styles: {
+          font: "helvetica",
+          fontSize: 7.4,
+          cellPadding: 1.8,
+          lineColor: [203, 213, 225],
+          lineWidth: 0.2,
+          textColor: [15, 23, 42],
+          overflow: "linebreak",
+          valign: "top",
+        },
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          action_number: { cellWidth: 22 },
+          title: { cellWidth: 48 },
+          department: { cellWidth: 24 },
+          source: { cellWidth: 26 },
+          linked_record: { cellWidth: 44 },
+          owner: { cellWidth: 26 },
+          priority: { cellWidth: 18 },
+          due_date: { cellWidth: 20 },
+          status: { cellWidth: 20 },
+        },
+        didParseCell: (data) => {
+          if (data.section !== "body") return;
+          const row = data.row.raw as (typeof reportRows)[number];
+          if (row.is_overdue && (data.column.dataKey === "due_date" || data.column.dataKey === "status")) {
+            data.cell.styles.fillColor = [254, 226, 226];
+            data.cell.styles.textColor = [153, 27, 27];
+            data.cell.styles.fontStyle = "bold";
+          }
+        },
+        didDrawPage: () => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text("Enshore Action Management", margin, pageHeight - 6);
+          doc.text(
+            `Page ${doc.getCurrentPageInfo().pageNumber} of ${doc.getNumberOfPages()}`,
+            pageWidth - margin,
+            pageHeight - 6,
+            { align: "right" }
+          );
+        },
+      });
+
+      doc.save(`filtered-action-register-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setMessage("Filtered Action Register PDF generated successfully.");
+    } catch (error) {
+      console.error(error);
+      setMessage("Filtered Action Register PDF generation failed.");
+    }
+  }
+
   function clearFilters() {
     setSearch("");
     setStatusFilter("");
@@ -1348,15 +1540,16 @@ function ActionsPageContent() {
     setProjectFilter("");
     setSourceFilter("");
     setDepartmentFilter("");
+    setShowOverdueOnly(false);
     setSelectedEvidenceAction(null);
   }
 
   return (
     <main>
       <QualityPageHero
-        label="ACTION TRACKING"
-        title="Actions"
-        description="Central follow-up hub for quality actions, ownership, due dates, linked source records, and supporting evidence."
+        label="ACTION MANAGEMENT"
+        title="Action Management"
+        description="Central action register and follow-up control for quality, asset, risk, MOC, audit, and future HSE workflows."
         contextCards={[
           {
             label: "Last Refreshed",
@@ -1378,7 +1571,7 @@ function ActionsPageContent() {
           flexWrap: "wrap",
         }}
       >
-        <Link href="/" style={backLinkStyle}>
+        <Link href="/home" style={backLinkStyle}>
           ← Back to Dashboard
         </Link>
 
@@ -1666,12 +1859,17 @@ function ActionsPageContent() {
       </section>
 
       <SectionCard
-        title="Search and Filter"
-        subtitle="Narrow the register by text, status, priority, owner, project or source."
+        title="Action Register Filters"
+        subtitle="Narrow the central register by text, status, priority, owner, project, source, department, or overdue state."
         action={
-          <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
-            Clear Filters
-          </button>
+          <div style={filterActionRowStyle}>
+            <button type="button" onClick={() => void generateFilteredActionRegisterPdf()} style={primaryButtonStyle}>
+              Filtered Action Register PDF
+            </button>
+            <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
+              Clear Filters
+            </button>
+          </div>
         }
       >
         <div style={filterBarStyle}>
@@ -1732,6 +1930,8 @@ function ActionsPageContent() {
             <option value="Asset Calibration">Asset Calibration</option>
             <option value="NCR/CAPA">NCR/CAPA</option>
             <option value="MOC">MOC</option>
+            <option value="Risk">Risk</option>
+            <option value="HSE">HSE</option>
             <option value="Other">Other</option>
           </select>
 
@@ -1747,6 +1947,18 @@ function ActionsPageContent() {
               </option>
             ))}
           </select>
+
+          <button
+            type="button"
+            onClick={() => setShowOverdueOnly((current) => !current)}
+            style={{
+              ...secondaryButtonStyle,
+              background: showOverdueOnly ? "#0f172a" : "#e2e8f0",
+              color: showOverdueOnly ? "#ffffff" : "#0f172a",
+            }}
+          >
+            {showOverdueOnly ? "Showing Overdue Only" : "Include All Due Status"}
+          </button>
         </div>
 
         <div style={tableInfoRowStyle}>
@@ -1768,6 +1980,7 @@ function ActionsPageContent() {
                 <th style={tableHeadStyle}>Title</th>
                 <th style={tableHeadStyle}>Department</th>
                 <th style={tableHeadStyle}>Source</th>
+                <th style={tableHeadStyle}>Linked Record</th>
                 <th style={tableHeadStyle}>Owner</th>
                 <th style={tableHeadStyle}>Due Date</th>
                 <th style={tableHeadStyle}>Status</th>
@@ -1777,7 +1990,7 @@ function ActionsPageContent() {
             <tbody>
               {filteredActions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={emptyTableCellStyle}>
+                  <td colSpan={9} style={emptyTableCellStyle}>
                     No actions match the current filters.
                   </td>
                 </tr>
@@ -1818,7 +2031,10 @@ function ActionsPageContent() {
                         <span style={badgeStyle}>{action.department || "-"}</span>
                       </td>
                       <td style={tableCellStyle}>
-                        <span style={badgeStyle}>{getActionSourceValue(action)}</span>
+                        <span style={badgeStyle}>{getActionSourceLabel(action)}</span>
+                      </td>
+                      <td style={tableCellStyle}>
+                        <div style={secondaryCellTextStyle}>{buildLinkedRecordDisplay(action)}</div>
                       </td>
                       <td style={tableCellStyle}>{action.owner || "-"}</td>
                       <td style={tableCellStyle}>
@@ -2663,6 +2879,13 @@ const formFooterStyle: CSSProperties = {
   marginTop: "16px",
 };
 
+const filterActionRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  flexWrap: "wrap",
+};
+
 const helperTextStyle: CSSProperties = {
   color: "#64748b",
   fontSize: "13px",
@@ -2772,7 +2995,7 @@ const miniListLine2Style: CSSProperties = {
 
 const filterBarStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "2fr repeat(6, minmax(0, 1fr))",
+  gridTemplateColumns: "2fr repeat(7, minmax(0, 1fr))",
   gap: "12px",
   marginBottom: "16px",
 };
