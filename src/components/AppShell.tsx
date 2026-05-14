@@ -46,6 +46,11 @@ const peopleNavItems = [
   { href: "/people", label: "People" },
 ];
 
+const actionNavItems = [
+  { href: "/home", label: "Home" },
+  { href: "/actions", label: "Actions" },
+];
+
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
@@ -53,9 +58,12 @@ export default function AppShell({ children }: AppShellProps) {
   const isAssetModule = pathname.startsWith("/assets");
   const isRiskModule = pathname.startsWith("/risk");
   const isPeopleModule = pathname.startsWith("/people");
+  const isActionModule = pathname === "/actions";
   const showLogo = !isHomePage;
   const moduleTitle = isHomePage
     ? "Enshore Management System"
+    : isActionModule
+    ? "Action Management"
     : isAssetModule
     ? "Asset Management"
     : isRiskModule
@@ -67,6 +75,8 @@ export default function AppShell({ children }: AppShellProps) {
     : "Quality Management";
   const moduleSubtitle = isHomePage
     ? ""
+    : isActionModule
+    ? "Central action register and follow-up control"
     : isAssetModule
     ? "Asset register and control system"
     : isRiskModule
@@ -82,6 +92,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? riskNavItems
     : isPeopleModule
     ? peopleNavItems
+    : isActionModule
+    ? actionNavItems
     : qualityNavItems;
 
   const handleLogout = async () => {

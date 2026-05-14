@@ -36,6 +36,14 @@ const moduleCards = [
     cta: "Open Risk",
   },
   {
+    title: "Action Management",
+    description: "Central action register for Quality, Assets, Risk, MOC, HSE, audits, owners, and evidence.",
+    href: "/actions",
+    status: "Available",
+    accent: "#2563eb",
+    cta: "Open Actions",
+  },
+  {
     title: "People Management",
     description:
       "Shared personnel directory for originators, reviewers, approvers, owners, and asset-assigned people.",
