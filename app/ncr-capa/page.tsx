@@ -570,7 +570,7 @@ function NcrCapaPageContent() {
   const [includeEvidenceListInPdf, setIncludeEvidenceListInPdf] = useState(true);
   const [externalFacingPdf, setExternalFacingPdf] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [generatingOpenNcrReport, setGeneratingOpenNcrReport] = useState(false);
+  const [generatingFilteredNcrReport, setGeneratingFilteredNcrReport] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -1858,31 +1858,30 @@ function NcrCapaPageContent() {
     }
   }
 
-  async function generateOpenNcrReport() {
-    const openNcrRows = ncrs
-      .filter((row) => (row.status || "").trim() !== "Closed")
-      .sort((a, b) => {
-        const aDue = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
-        const bDue = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
-        if (aDue !== bDue) return aDue - bDue;
-        const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return bCreated - aCreated;
-      });
+  async function generateFilteredNcrReport() {
+    const filteredNcrRows = filteredRows.filter((row) => row.type === "NCR");
 
-    if (openNcrRows.length === 0) {
-      setMessage("No open NCRs available for report generation.");
+    if (filteredNcrRows.length === 0) {
+      setMessage("No filtered NCRs available for report generation.");
       return;
     }
 
     try {
-      setGeneratingOpenNcrReport(true);
+      setGeneratingFilteredNcrReport(true);
 
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 12;
       const generatedAt = new Date().toLocaleString("en-GB");
+      const filterSummaryRows = [
+        ["Status", statusFilter],
+        ["Severity", severityFilter],
+        ["Source Type", sourceFilter],
+        ["Project", projectFilter],
+        ["Search", search.trim() || "None"],
+        ["Focus Attention", showAttentionOnly ? "Yes" : "No"],
+      ];
 
       try {
         const logoResponse = await fetch("/logo.png");
@@ -1903,26 +1902,46 @@ function NcrCapaPageContent() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(17);
       doc.setTextColor(15, 23, 42);
-      doc.text("Open NCR Report", pageWidth / 2, 17, { align: "center" });
+      doc.text("Filtered NCR Report", pageWidth / 2, 17, { align: "center" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
       doc.setTextColor(71, 85, 105);
-      doc.text("Management meeting register of all NCRs with a status other than Closed.", pageWidth / 2, 23, {
+      doc.text("Management meeting register of NCRs matching the current register filters.", pageWidth / 2, 23, {
         align: "center",
       });
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 17, { align: "right" });
-      doc.text(`Open NCRs: ${openNcrRows.length}`, pageWidth - margin, 23, { align: "right" });
+      doc.text(`Filtered NCRs: ${filteredNcrRows.length}`, pageWidth - margin, 23, { align: "right" });
 
       doc.setDrawColor(15, 118, 110);
       doc.setLineWidth(0.7);
       doc.line(margin, 31, pageWidth - margin, 31);
 
-      const reportRows = openNcrRows.map((row) => {
+      autoTable(doc, {
+        startY: 35,
+        theme: "grid",
+        margin: { left: margin, right: margin },
+        tableWidth: "auto",
+        body: filterSummaryRows,
+        styles: {
+          font: "helvetica",
+          fontSize: 8.2,
+          cellPadding: 1.6,
+          lineColor: [203, 213, 225],
+          lineWidth: 0.2,
+          textColor: [15, 23, 42],
+        },
+        columnStyles: {
+          0: { cellWidth: 28, fontStyle: "bold", fillColor: [248, 250, 252] },
+          1: { cellWidth: 72 },
+        },
+      });
+
+      const reportRows = filteredNcrRows.map((row) => {
         const overdueDays = getOverdueDays(row.due_date);
         const sourceLabel = [row.project, row.area].filter(Boolean).join(" / ") || "-";
         return {
-          ncr_number: row.ncr_number || "-",
+          ncr_number: row.number || "-",
           source: sourceLabel,
           audit_type: row.source_type || "-",
           category: row.root_cause_category || getSeverityDisplay(row.severity),
@@ -1939,7 +1958,7 @@ function NcrCapaPageContent() {
       });
 
       autoTable(doc, {
-        startY: 36,
+        startY: ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 35) + 5,
         theme: "grid",
         margin: { left: margin, right: margin, bottom: 14 },
         tableWidth: "auto",
@@ -2015,14 +2034,14 @@ function NcrCapaPageContent() {
         },
       });
 
-      const fileName = `open-ncr-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+      const fileName = `filtered-ncr-report-${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(fileName);
-      setMessage("Open NCR report generated successfully.");
+      setMessage("Filtered NCR report generated successfully.");
     } catch (error) {
       console.error(error);
-      setMessage("Open NCR report generation failed.");
+      setMessage("Filtered NCR report generation failed.");
     } finally {
-      setGeneratingOpenNcrReport(false);
+      setGeneratingFilteredNcrReport(false);
     }
   }
 
@@ -2221,14 +2240,6 @@ function NcrCapaPageContent() {
         </Link>
 
         <div style={topMetaActionsStyle}>
-          <button
-            type="button"
-            style={{ ...secondaryButton, border: "1px solid #bfdbfe", color: "#1d4ed8" }}
-            onClick={() => void generateOpenNcrReport()}
-            disabled={generatingOpenNcrReport}
-          >
-            {generatingOpenNcrReport ? "Generating Open NCR Report..." : "Generate Open NCR Report"}
-          </button>
           <button type="button" style={secondaryButton} onClick={() => setShowCreatePanel((prev) => !prev)}>
             {showCreatePanel ? "Hide create panel" : "Show create panel"}
           </button>
@@ -3043,21 +3054,20 @@ function NcrCapaPageContent() {
                 </select>
               </div>
 
-              <button
-                type="button"
-                style={{
-                  ...secondaryButton,
-                  background: showAttentionOnly ? "#0f172a" : "#ffffff",
-                  color: showAttentionOnly ? "#ffffff" : "#0f172a",
-                }}
-                onClick={() => setShowAttentionOnly((prev) => !prev)}
-              >
-                {showAttentionOnly ? "Attention only" : "Focus attention"}
-              </button>
-
-              <button type="button" style={secondaryButton} onClick={clearFilters}>
+              <button type="button" style={toolbarButtonStyle} onClick={clearFilters}>
                 Clear Filters
               </button>
+
+              {activeLogTab === "NCR" ? (
+                <button
+                  type="button"
+                  style={{ ...toolbarButtonStyle, border: "1px solid #bfdbfe", color: "#1d4ed8" }}
+                  onClick={() => void generateFilteredNcrReport()}
+                  disabled={generatingFilteredNcrReport || filteredRows.filter((row) => row.type === "NCR").length === 0}
+                >
+                  {generatingFilteredNcrReport ? "Generating PDF Report..." : "Generate PDF Report"}
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -4047,6 +4057,19 @@ const toolbarSelectStyle: CSSProperties = {
   minWidth: "150px",
 };
 
+const toolbarButtonStyle: CSSProperties = {
+  padding: "10px 16px",
+  borderRadius: 10,
+  border: "1px solid #cbd5e1",
+  background: "#ffffff",
+  color: "#0f172a",
+  fontWeight: 700,
+  cursor: "pointer",
+  minWidth: "150px",
+  height: "42px",
+  alignSelf: "flex-end",
+};
+
 const toolbarLabeledControlStyle: CSSProperties = {
   display: "grid",
   gap: "4px",
@@ -4235,6 +4258,7 @@ const toolbarFiltersStyle: CSSProperties = {
   display: "flex",
   gap: "10px",
   flexWrap: "wrap",
+  alignItems: "flex-end",
 };
 
 const importPanelStyle: CSSProperties = {
