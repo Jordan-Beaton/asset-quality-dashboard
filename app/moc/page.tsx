@@ -254,6 +254,29 @@ function normaliseActionPlanStatus(value: string | null | undefined) {
   return "Open";
 }
 
+function buildMocLinkedActionHref(report: MocReport) {
+  const descriptionSections = [
+    report.proposed_change_description ? `Proposed Change:\n${report.proposed_change_description}` : "",
+    report.reason_for_change ? `Reason for Change:\n${report.reason_for_change}` : "",
+    report.implementation_plan ? `Implementation Plan:\n${report.implementation_plan}` : "",
+    report.hazard_risks_description ? `Risk / Impact Summary:\n${report.hazard_risks_description}` : "",
+    report.proposed_risk_mitigations ? `Mitigation Summary:\n${report.proposed_risk_mitigations}` : "",
+  ].filter(Boolean);
+
+  const params = new URLSearchParams({
+    prefill_source: "MOC",
+    prefill_department: "HSEQ",
+    prefill_project: report.project_worksite_address || "",
+    prefill_title: `${report.moc_report_no} - ${report.moc_report_title || "Untitled MOC"}`,
+    prefill_description: descriptionSections.join("\n\n"),
+    prefill_owner: report.responsible_manager_name || report.moc_coordinator_name || "",
+    linked_moc_id: report.id,
+    linked_moc_number: report.moc_report_no,
+  });
+
+  return `/actions?${params.toString()}`;
+}
+
 function buildNextMocNumber(values: string[]) {
   const used = values
     .map((value) => {
@@ -3412,6 +3435,12 @@ function MOCPageContent() {
               >
                 {generatingPdf ? "Generating PDF..." : "Generate PDF"}
               </button>
+              <Link
+                href={buildMocLinkedActionHref(detailReport)}
+                style={{ ...secondaryButtonStyle, border: "1px solid #99f6e4", color: "#0f766e", textDecoration: "none" }}
+              >
+                Generate Linked Action
+              </Link>
               <button type="button" style={dangerButtonStyle} onClick={() => void deleteSelectedMoc()} disabled={saving}>
                 Delete
               </button>

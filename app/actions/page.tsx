@@ -554,6 +554,8 @@ function ActionsPageContent() {
   const prefillLinkedMaintenanceNumber = searchParams.get("linked_maintenance_number")?.trim() || "";
   const prefillLinkedNcrId = searchParams.get("linked_ncr_id")?.trim() || "";
   const prefillLinkedNcrNumber = searchParams.get("linked_ncr_number")?.trim() || "";
+  const prefillLinkedMocId = searchParams.get("linked_moc_id")?.trim() || "";
+  const prefillLinkedMocNumber = searchParams.get("linked_moc_number")?.trim() || "";
   const hasCreatePrefillParams = Boolean(
     prefillSource ||
       prefillDepartment ||
@@ -568,7 +570,9 @@ function ActionsPageContent() {
       prefillLinkedMaintenanceId ||
       prefillLinkedMaintenanceNumber ||
       prefillLinkedNcrId ||
-      prefillLinkedNcrNumber
+      prefillLinkedNcrNumber ||
+      prefillLinkedMocId ||
+      prefillLinkedMocNumber
   );
   const hasRegisterFilterParams = Boolean(
     linkedSearch ||
@@ -829,7 +833,9 @@ function ActionsPageContent() {
       !prefillLinkedInspectionId &&
       !prefillLinkedMaintenanceId &&
       !prefillLinkedNcrId &&
-      !prefillLinkedNcrNumber
+      !prefillLinkedNcrNumber &&
+      !prefillLinkedMocId &&
+      !prefillLinkedMocNumber
     ) {
       return;
     }
@@ -858,6 +864,8 @@ function ActionsPageContent() {
         linked_maintenance_number: prefillLinkedMaintenanceNumber || current.linked_maintenance_number,
         linked_ncr_id: prefillLinkedNcrId || current.linked_ncr_id,
         linked_ncr_number: prefillLinkedNcrNumber || current.linked_ncr_number,
+        linked_moc_id: prefillLinkedMocId || current.linked_moc_id,
+        linked_moc_number: prefillLinkedMocNumber || current.linked_moc_number,
       };
     });
 
@@ -874,6 +882,8 @@ function ActionsPageContent() {
     prefillLinkedInspectionNumber,
     prefillLinkedMaintenanceId,
     prefillLinkedMaintenanceNumber,
+    prefillLinkedMocId,
+    prefillLinkedMocNumber,
     prefillLinkedNcrId,
     prefillLinkedNcrNumber,
     prefillOwner,
