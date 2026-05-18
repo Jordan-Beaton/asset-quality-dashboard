@@ -140,6 +140,29 @@ function formatDate(value: string | null | undefined) {
   return d.toLocaleDateString("en-GB");
 }
 
+function buildNcrLinkedActionHref(row: CombinedRow) {
+  const descriptionSections = [
+    row.description ? `NCR Description:\n${row.description}` : "",
+    row.containment_action ? `Containment Action:\n${row.containment_action}` : "",
+    row.root_cause_category || row.root_cause_description
+      ? `Root Cause Summary:\n${[row.root_cause_category, row.root_cause_description].filter(Boolean).join(" - ")}`
+      : "",
+  ].filter(Boolean);
+
+  const params = new URLSearchParams({
+    prefill_source: "NCR/CAPA",
+    prefill_department: "HSEQ",
+    prefill_project: row.project || "",
+    prefill_title: `${row.number} - ${row.title || "Untitled NCR"}`,
+    prefill_description: descriptionSections.join("\n\n"),
+    prefill_owner: row.owner || "",
+    linked_ncr_id: row.id,
+    linked_ncr_number: row.number,
+  });
+
+  return `/actions?${params.toString()}`;
+}
+
 function formatDateTime(value: string | null | undefined) {
   if (!value) return "-";
   const d = new Date(value);
@@ -3649,6 +3672,14 @@ function NcrCapaPageContent() {
                   <button type="button" style={primaryButton} onClick={() => void saveEdit()} disabled={saving}>
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
+                  {editRow.type === "NCR" ? (
+                    <Link
+                      href={buildNcrLinkedActionHref(editRow)}
+                      style={{ ...secondaryButton, border: "1px solid #99f6e4", color: "#0f766e", textDecoration: "none" }}
+                    >
+                      Generate Linked Action
+                    </Link>
+                  ) : null}
                   <button
                     type="button"
                     style={secondaryButton}

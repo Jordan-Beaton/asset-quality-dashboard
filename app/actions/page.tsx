@@ -542,6 +542,8 @@ function ActionsPageContent() {
   const linkedView = searchParams.get("view")?.trim() || "";
   const prefillSource = searchParams.get("prefill_source")?.trim() || "";
   const prefillDepartment = searchParams.get("prefill_department")?.trim() || "";
+  const prefillProject = searchParams.get("prefill_project")?.trim() || "";
+  const prefillOwner = searchParams.get("prefill_owner")?.trim() || "";
   const prefillTitle = searchParams.get("prefill_title")?.trim() || "";
   const prefillDescription = searchParams.get("prefill_description")?.trim() || "";
   const prefillLinkedAssetId = searchParams.get("linked_asset_id")?.trim() || "";
@@ -550,9 +552,13 @@ function ActionsPageContent() {
   const prefillLinkedInspectionNumber = searchParams.get("linked_inspection_number")?.trim() || "";
   const prefillLinkedMaintenanceId = searchParams.get("linked_maintenance_id")?.trim() || "";
   const prefillLinkedMaintenanceNumber = searchParams.get("linked_maintenance_number")?.trim() || "";
+  const prefillLinkedNcrId = searchParams.get("linked_ncr_id")?.trim() || "";
+  const prefillLinkedNcrNumber = searchParams.get("linked_ncr_number")?.trim() || "";
   const hasCreatePrefillParams = Boolean(
     prefillSource ||
       prefillDepartment ||
+      prefillProject ||
+      prefillOwner ||
       prefillTitle ||
       prefillDescription ||
       prefillLinkedAssetId ||
@@ -560,7 +566,9 @@ function ActionsPageContent() {
       prefillLinkedInspectionId ||
       prefillLinkedInspectionNumber ||
       prefillLinkedMaintenanceId ||
-      prefillLinkedMaintenanceNumber
+      prefillLinkedMaintenanceNumber ||
+      prefillLinkedNcrId ||
+      prefillLinkedNcrNumber
   );
   const hasRegisterFilterParams = Boolean(
     linkedSearch ||
@@ -810,7 +818,19 @@ function ActionsPageContent() {
 
   useEffect(() => {
     if (hasAppliedPrefill) return;
-    if (!prefillSource && !prefillTitle && !prefillDescription && !prefillLinkedAssetId && !prefillLinkedInspectionId && !prefillLinkedMaintenanceId) {
+    if (
+      !prefillSource &&
+      !prefillDepartment &&
+      !prefillProject &&
+      !prefillOwner &&
+      !prefillTitle &&
+      !prefillDescription &&
+      !prefillLinkedAssetId &&
+      !prefillLinkedInspectionId &&
+      !prefillLinkedMaintenanceId &&
+      !prefillLinkedNcrId &&
+      !prefillLinkedNcrNumber
+    ) {
       return;
     }
 
@@ -826,6 +846,8 @@ function ActionsPageContent() {
         ...current,
         source: nextSource,
         department: nextDepartment,
+        project: prefillProject || current.project,
+        owner: prefillOwner || current.owner,
         title: prefillTitle || current.title,
         description: prefillDescription || current.description,
         linked_asset_id: prefillLinkedAssetId || current.linked_asset_id,
@@ -834,12 +856,14 @@ function ActionsPageContent() {
         linked_inspection_number: prefillLinkedInspectionNumber || current.linked_inspection_number,
         linked_maintenance_id: prefillLinkedMaintenanceId || current.linked_maintenance_id,
         linked_maintenance_number: prefillLinkedMaintenanceNumber || current.linked_maintenance_number,
+        linked_ncr_id: prefillLinkedNcrId || current.linked_ncr_id,
+        linked_ncr_number: prefillLinkedNcrNumber || current.linked_ncr_number,
       };
     });
 
     setActiveView("create");
     setHasAppliedPrefill(true);
-    setMessage("Action form prefilled from linked asset record. Review and save when ready.");
+    setMessage("Action form prefilled from linked record. Review and save when ready.");
   }, [
     hasAppliedPrefill,
     prefillDepartment,
@@ -850,6 +874,10 @@ function ActionsPageContent() {
     prefillLinkedInspectionNumber,
     prefillLinkedMaintenanceId,
     prefillLinkedMaintenanceNumber,
+    prefillLinkedNcrId,
+    prefillLinkedNcrNumber,
+    prefillOwner,
+    prefillProject,
     prefillSource,
     prefillTitle,
   ]);
