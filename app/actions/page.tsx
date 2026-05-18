@@ -7,6 +7,20 @@ import autoTable from "jspdf-autotable";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { CSSProperties, ReactNode } from "react";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
@@ -75,7 +89,28 @@ type MocOption = {
 type ActionPerson = {
   id: string;
   name: string;
+  email: string | null;
+  department: string | null;
   active: boolean | null;
+};
+
+type QuickFilter = "" | "my" | "overdue" | "dueWeek" | "highPriority";
+
+type ActionView = "dashboard" | "register" | "create" | "my" | "priority" | "reports";
+
+type ChartDatum = {
+  name: string;
+  value: number;
+};
+
+type TrendDatum = {
+  name: string;
+  closed: number;
+};
+
+type LinkedRecordChip = {
+  label: string;
+  tone: "teal" | "blue" | "purple" | "amber" | "red" | "slate";
 };
 
 type EvidenceFile = {
@@ -175,6 +210,21 @@ const departmentOptions = [
   "Survey",
   "HSEQ",
 ] as const;
+
+const chartColours = ["#0f766e", "#2563eb", "#7c3aed", "#f59e0b", "#dc2626", "#64748b", "#16a34a"];
+
+const actionViews: Array<{ id: ActionView; label: string }> = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "register", label: "Action Register" },
+  { id: "create", label: "Create Action" },
+  { id: "my", label: "My Actions" },
+  { id: "priority", label: "Overdue / Priority" },
+  { id: "reports", label: "Reports" },
+];
+
+function isActionView(value: string): value is ActionView {
+  return actionViews.some((view) => view.id === value);
+}
 
 function normaliseStatus(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
@@ -315,7 +365,10 @@ function matchesSearchTerm(action: ActionItem, query: string) {
     (action.linked_inspection_number || "").toLowerCase().includes(lower) ||
     (action.linked_maintenance_number || "").toLowerCase().includes(lower) ||
     (action.linked_audit_number || "").toLowerCase().includes(lower) ||
-    (action.linked_finding_reference || "").toLowerCase().includes(lower)
+    (action.linked_finding_reference || "").toLowerCase().includes(lower) ||
+    (action.linked_ncr_number || "").toLowerCase().includes(lower) ||
+    (action.linked_capa_number || "").toLowerCase().includes(lower) ||
+    (action.linked_moc_number || "").toLowerCase().includes(lower)
   );
 }
 
@@ -334,12 +387,76 @@ function getActionSourceLabel(action: ActionItem) {
   return source;
 }
 
+function getSourceChipTone(source: string): LinkedRecordChip["tone"] {
+  if (source === "Audit Finding") return "blue";
+  if (isAssetLinkedSource(source)) return "teal";
+  if (source === "NCR/CAPA") return "red";
+  if (source === "MOC") return "purple";
+  if (source === "Risk") return "amber";
+  if (source === "HSE") return "teal";
+  return "slate";
+}
+
 function isAuditLinkedSource(source: string | null | undefined) {
   return source === "Audit Finding";
 }
 
 function isAssetLinkedSource(source: string | null | undefined) {
   return source === "Asset Inspection" || source === "Asset Maintenance" || source === "Asset Calibration";
+}
+
+function sourceImpliesLinkedRecord(source: string | null | undefined) {
+  return (
+    source === "Audit Finding" ||
+    source === "Asset Inspection" ||
+    source === "Asset Maintenance" ||
+    source === "Asset Calibration" ||
+    source === "NCR/CAPA" ||
+    source === "MOC" ||
+    source === "Risk" ||
+    source === "HSE"
+  );
+}
+
+function buildLinkedRecordChips(action: ActionItem): LinkedRecordChip[] {
+  const chips: LinkedRecordChip[] = [];
+  const source = getActionSourceValue(action);
+
+  if (action.linked_audit_number) chips.push({ label: `Audit ${action.linked_audit_number}`, tone: "blue" });
+  if (action.linked_finding_reference) chips.push({ label: `Finding ${action.linked_finding_reference}`, tone: "blue" });
+  if (action.linked_asset_code) chips.push({ label: `Asset ${action.linked_asset_code}`, tone: "teal" });
+  if (action.linked_inspection_number) chips.push({ label: `Inspection ${action.linked_inspection_number}`, tone: "teal" });
+  if (action.linked_maintenance_number) chips.push({ label: `Maintenance ${action.linked_maintenance_number}`, tone: "teal" });
+  if (action.linked_ncr_number) chips.push({ label: `NCR ${action.linked_ncr_number}`, tone: "red" });
+  if (action.linked_capa_number) chips.push({ label: `CAPA ${action.linked_capa_number}`, tone: "red" });
+  if (action.linked_moc_number) chips.push({ label: `MOC ${action.linked_moc_number}`, tone: "purple" });
+
+  if (chips.length === 0 && sourceImpliesLinkedRecord(source)) {
+    chips.push({ label: "Missing linked record", tone: "amber" });
+  }
+
+  return chips;
+}
+
+function hasLinkedRecord(action: ActionItem) {
+  return buildLinkedRecordChips(action).some((chip) => chip.label !== "Missing linked record");
+}
+
+function matchesPersonName(value: string | null | undefined, personName: string | null) {
+  if (!value || !personName) return false;
+  return value.trim().toLowerCase() === personName.trim().toLowerCase();
+}
+
+function countBy<T>(items: T[], getKey: (item: T) => string) {
+  const counts = new Map<string, number>();
+  items.forEach((item) => {
+    const key = getKey(item).trim() || "Unspecified";
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+
+  return [...counts.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
 }
 
 function buildActionSourceLabel(action: ActionItem) {
@@ -359,7 +476,7 @@ function buildActionSourceLabel(action: ActionItem) {
   if (source === "NCR/CAPA" && action.linked_ncr_number) parts.push(`NCR ${action.linked_ncr_number}`);
   if (source === "NCR/CAPA" && action.linked_capa_number) parts.push(`CAPA ${action.linked_capa_number}`);
   if (source === "MOC" && action.linked_moc_number) parts.push(`MOC ${action.linked_moc_number}`);
-  return parts.join(" • ");
+  return parts.join(" | ");
 }
 
 function buildLinkedRecordDisplay(action: ActionItem) {
@@ -422,6 +539,7 @@ function ActionsPageContent() {
   const dueWindow = Number(searchParams.get("dueWindow") || "0");
   const linkedCreatedMonth = searchParams.get("createdMonth")?.trim() || "";
   const linkedClosedMonth = searchParams.get("closedMonth")?.trim() || "";
+  const linkedView = searchParams.get("view")?.trim() || "";
   const prefillSource = searchParams.get("prefill_source")?.trim() || "";
   const prefillDepartment = searchParams.get("prefill_department")?.trim() || "";
   const prefillTitle = searchParams.get("prefill_title")?.trim() || "";
@@ -432,6 +550,37 @@ function ActionsPageContent() {
   const prefillLinkedInspectionNumber = searchParams.get("linked_inspection_number")?.trim() || "";
   const prefillLinkedMaintenanceId = searchParams.get("linked_maintenance_id")?.trim() || "";
   const prefillLinkedMaintenanceNumber = searchParams.get("linked_maintenance_number")?.trim() || "";
+  const hasCreatePrefillParams = Boolean(
+    prefillSource ||
+      prefillDepartment ||
+      prefillTitle ||
+      prefillDescription ||
+      prefillLinkedAssetId ||
+      prefillLinkedAssetCode ||
+      prefillLinkedInspectionId ||
+      prefillLinkedInspectionNumber ||
+      prefillLinkedMaintenanceId ||
+      prefillLinkedMaintenanceNumber
+  );
+  const hasRegisterFilterParams = Boolean(
+    linkedSearch ||
+      linkedStatus ||
+      linkedPriority ||
+      linkedOwner ||
+      linkedProject ||
+      linkedSource ||
+      linkedOverdueOnly ||
+      dueWindow > 0 ||
+      linkedCreatedMonth ||
+      linkedClosedMonth
+  );
+  const initialView: ActionView = hasCreatePrefillParams
+    ? "create"
+    : hasRegisterFilterParams
+    ? "register"
+    : isActionView(linkedView)
+    ? linkedView
+    : "dashboard";
 
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
@@ -458,6 +607,11 @@ function ActionsPageContent() {
   const [sourceFilter, setSourceFilter] = useState(linkedSource);
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [showOverdueOnly, setShowOverdueOnly] = useState(linkedOverdueOnly);
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
+  const [activeView, setActiveView] = useState<ActionView>(initialView);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
+  const [currentPersonName, setCurrentPersonName] = useState("");
+  const [currentPersonNotice, setCurrentPersonNotice] = useState("");
 
   const [editForm, setEditForm] = useState<ActionForm>(emptyForm);
 
@@ -610,7 +764,7 @@ function ActionsPageContent() {
   async function loadPeople() {
     const { data, error } = await supabase
       .from("people")
-      .select("id,name,active")
+      .select("id,name,email,department,active")
       .eq("active", true)
       .order("name", { ascending: true });
 
@@ -620,11 +774,24 @@ function ActionsPageContent() {
       .map((row) => ({
         id: String(row.id || ""),
         name: String(row.name || "").trim(),
+        email: row.email ? String(row.email).trim() : null,
+        department: row.department ? String(row.department).trim() : null,
         active: typeof row.active === "boolean" ? row.active : null,
       }))
       .filter((row) => row.id && row.name);
 
     setPeople(options);
+  }
+
+  async function loadCurrentUser() {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      setCurrentPersonNotice("My Actions unavailable: signed-in user could not be confirmed.");
+      return;
+    }
+
+    const email = data.user?.email?.trim().toLowerCase() || "";
+    setCurrentUserEmail(email);
   }
 
   useEffect(() => {
@@ -636,6 +803,7 @@ function ActionsPageContent() {
         loadNcrCapaOptions(),
         loadMocOptions(),
         loadPeople(),
+        loadCurrentUser(),
       ]);
     })();
   }, []);
@@ -669,6 +837,7 @@ function ActionsPageContent() {
       };
     });
 
+    setActiveView("create");
     setHasAppliedPrefill(true);
     setMessage("Action form prefilled from linked asset record. Review and save when ready.");
   }, [
@@ -722,6 +891,71 @@ function ActionsPageContent() {
     return days !== null && days >= 0 && days <= 7;
   }).length;
 
+  const myOpenActions = actions.filter(
+    (a) => !isClosedLikeStatus(a.status) && matchesPersonName(a.owner, currentPersonName)
+  ).length;
+
+  const linkedRecordIssues = actions.filter((action) => {
+    const source = getActionSourceValue(action);
+    return sourceImpliesLinkedRecord(source) && !hasLinkedRecord(action);
+  }).length;
+
+  const statusChartData = useMemo(() => {
+    return countBy(actions, (action) => action.status || "Unspecified");
+  }, [actions]);
+
+  const sourceChartData = useMemo(() => {
+    return countBy(actions, (action) => getActionSourceLabel(action));
+  }, [actions]);
+
+  const openOwnerChartData = useMemo(() => {
+    return countBy(
+      actions.filter((action) => !isClosedLikeStatus(action.status)),
+      (action) => action.owner || "Unassigned"
+    ).slice(0, 8);
+  }, [actions]);
+
+  const duePressureData = useMemo<ChartDatum[]>(() => {
+    const open = actions.filter((action) => !isClosedLikeStatus(action.status));
+    const overdue = open.filter((action) => isOverdue(action)).length;
+    const due7 = open.filter((action) => {
+      const days = getDaysFromToday(action.due_date);
+      return days !== null && days >= 0 && days <= 7;
+    }).length;
+    const due30 = open.filter((action) => {
+      const days = getDaysFromToday(action.due_date);
+      return days !== null && days > 7 && days <= 30;
+    }).length;
+    const noDueDate = open.filter((action) => !action.due_date).length;
+
+    return [
+      { name: "Overdue", value: overdue },
+      { name: "Due 7 Days", value: due7 },
+      { name: "Due 30 Days", value: due30 },
+      { name: "No Due Date", value: noDueDate },
+    ];
+  }, [actions]);
+
+  const priorityMixData = useMemo(() => {
+    return countBy(
+      actions.filter((action) => !isClosedLikeStatus(action.status)),
+      (action) => action.priority || "Unspecified"
+    );
+  }, [actions]);
+
+  const closureTrendData = useMemo<TrendDatum[]>(() => {
+    const closedCounts = countBy(
+      actions.filter((action) => isClosedLikeStatus(action.status)),
+      (action) => getMonthKey(action.updated_at || action.created_at) || "Unknown"
+    );
+
+    return closedCounts
+      .filter((item) => item.name !== "Unknown")
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(-6)
+      .map((item) => ({ name: item.name, closed: item.value }));
+  }, [actions]);
+
   const filteredActions = useMemo(() => {
     return actions.filter((action) => {
       const matchesSearch = matchesSearchTerm(action, search);
@@ -732,6 +966,19 @@ function ActionsPageContent() {
       const matchesSource = !sourceFilter || getActionSourceValue(action) === sourceFilter;
       const matchesDepartment = !departmentFilter || (action.department || "") === departmentFilter;
       const matchesOverdue = !showOverdueOnly || isOverdue(action);
+      const matchesMyActions =
+        quickFilter !== "my" || (Boolean(currentPersonName) && matchesPersonName(action.owner, currentPersonName));
+      const matchesQuickOverdue = quickFilter !== "overdue" || isOverdue(action);
+      const matchesQuickDueWeek =
+        quickFilter !== "dueWeek" ||
+        (() => {
+          if (!action.due_date || isClosedLikeStatus(action.status)) return false;
+          const days = getDaysFromToday(action.due_date);
+          return days !== null && days >= 0 && days <= 7;
+        })();
+      const matchesQuickHighPriority =
+        quickFilter !== "highPriority" ||
+        ((action.priority || "").toLowerCase() === "high" && !isClosedLikeStatus(action.status));
       const matchesCreatedMonth =
         !linkedCreatedMonth || getMonthKey(action.created_at) === linkedCreatedMonth;
       const matchesClosedMonth =
@@ -755,6 +1002,10 @@ function ActionsPageContent() {
         matchesSource &&
         matchesDepartment &&
         matchesOverdue &&
+        matchesMyActions &&
+        matchesQuickOverdue &&
+        matchesQuickDueWeek &&
+        matchesQuickHighPriority &&
         matchesCreatedMonth &&
         matchesClosedMonth &&
         matchesDueWindow
@@ -770,6 +1021,8 @@ function ActionsPageContent() {
     sourceFilter,
     departmentFilter,
     showOverdueOnly,
+    quickFilter,
+    currentPersonName,
     linkedCreatedMonth,
     linkedClosedMonth,
     dueWindow,
@@ -802,6 +1055,38 @@ function ActionsPageContent() {
       })
       .slice(0, 5);
   }, [actions]);
+
+  const highPriorityList = useMemo(() => {
+    return [...actions]
+      .filter((action) => (action.priority || "").toLowerCase() === "high" && !isClosedLikeStatus(action.status))
+      .sort((a, b) => {
+        const aDate = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDate - bDate;
+      })
+      .slice(0, 8);
+  }, [actions]);
+
+  const myActionList = useMemo(() => {
+    if (!currentPersonName) return [];
+    return [...actions]
+      .filter((action) => matchesPersonName(action.owner, currentPersonName))
+      .sort((a, b) => {
+        const aClosed = isClosedLikeStatus(a.status);
+        const bClosed = isClosedLikeStatus(b.status);
+        if (aClosed !== bClosed) return aClosed ? 1 : -1;
+        const aDate = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const bDate = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+        return aDate - bDate;
+      });
+  }, [actions, currentPersonName]);
+
+  const myOverdueActions = myActionList.filter((action) => isOverdue(action));
+  const myDueThisWeekActions = myActionList.filter((action) => {
+    if (!action.due_date || isClosedLikeStatus(action.status)) return false;
+    const days = getDaysFromToday(action.due_date);
+    return days !== null && days >= 0 && days <= 7;
+  });
 
   const linkedAction = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -904,6 +1189,24 @@ function ActionsPageContent() {
       setSelectedEvidenceAction(refreshed);
     }
   }, [actions, selectedEvidenceAction]);
+
+  useEffect(() => {
+    if (!currentUserEmail) {
+      setCurrentPersonName("");
+      setCurrentPersonNotice("My Actions unavailable: no signed-in user email was found.");
+      return;
+    }
+
+    const matched = people.find((person) => (person.email || "").trim().toLowerCase() === currentUserEmail);
+    if (!matched) {
+      setCurrentPersonName("");
+      setCurrentPersonNotice(`My Actions unavailable: ${currentUserEmail} is not linked to an active People record.`);
+      return;
+    }
+
+    setCurrentPersonName(matched.name);
+    setCurrentPersonNotice(`My Actions matched to ${matched.name}.`);
+  }, [currentUserEmail, people]);
 
   const uniqueOwners = useMemo(() => {
     return [...new Set(actions.map((a) => a.owner).filter(Boolean))].sort();
@@ -1389,6 +1692,7 @@ function ActionsPageContent() {
         ["Source", sourceFilter || "All"],
         ["Department", departmentFilter || "All"],
         ["Overdue Only", showOverdueOnly ? "Yes" : "No"],
+        ["Quick Filter", quickFilter || "None"],
       ];
 
       try {
@@ -1541,6 +1845,7 @@ function ActionsPageContent() {
     setSourceFilter("");
     setDepartmentFilter("");
     setShowOverdueOnly(false);
+    setQuickFilter("");
     setSelectedEvidenceAction(null);
   }
 
@@ -1580,14 +1885,114 @@ function ActionsPageContent() {
         </div>
       </div>
 
-      <section style={statsGridStyle}>
-        <QualityKpiCard title="Open Actions" value={openActions} accent="#2563eb" />
-        <QualityKpiCard title="Closed / Complete" value={closedActions} accent="#16a34a" />
-        <QualityKpiCard title="Overdue Actions" value={overdueActions} accent="#dc2626" />
-        <QualityKpiCard title="Evidence Files" value={linkedEvidenceFiles.length} accent="#7c3aed" />
-      </section>
+      <ActionViewTabs activeView={activeView} onChange={setActiveView} />
 
-      <section style={twoColumnGridStyle}>
+      {activeView === "dashboard" ? (
+        <>
+          <section style={statsGridStyle}>
+            <QualityKpiCard title="Open Actions" value={openActions} accent="#2563eb" />
+            <QualityKpiCard title="Closed / Complete" value={closedActions} accent="#16a34a" />
+            <QualityKpiCard title="Overdue Actions" value={overdueActions} accent="#dc2626" />
+            <QualityKpiCard title="Evidence Files" value={linkedEvidenceFiles.length} accent="#7c3aed" />
+            <QualityKpiCard title="My Open Actions" value={myOpenActions} accent="#0f766e" />
+            <QualityKpiCard title="Linked Record Issues" value={linkedRecordIssues} accent="#f59e0b" />
+          </section>
+
+          <SectionCard
+            title="Action Intelligence Dashboard"
+            subtitle="Operational visibility across ownership, source modules, due-date pressure, and closure movement."
+          >
+            <div style={dashboardGridStyle}>
+              <ChartPanel title="Actions by Status">
+                <ResponsiveContainer width="100%" height={230}>
+                  <BarChart data={statusChartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="#0f766e" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartPanel>
+
+              <ChartPanel title="Actions by Source / Module">
+                <ResponsiveContainer width="100%" height={230}>
+                  <BarChart data={sourceChartData} layout="vertical" margin={{ left: 24 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={92} />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="#2563eb" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartPanel>
+
+              <ChartPanel title="Open Actions by Owner">
+                <ResponsiveContainer width="100%" height={230}>
+                  <BarChart data={openOwnerChartData} layout="vertical" margin={{ left: 32 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={104} />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="#7c3aed" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartPanel>
+
+              <ChartPanel title="Due Date Pressure">
+                <ResponsiveContainer width="100%" height={230}>
+                  <BarChart data={duePressureData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                      {duePressureData.map((entry, index) => (
+                        <Cell key={entry.name} fill={chartColours[index % chartColours.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartPanel>
+
+              <ChartPanel title="Priority Mix">
+                <ResponsiveContainer width="100%" height={230}>
+                  <PieChart>
+                    <Pie
+                      data={priorityMixData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={54}
+                      outerRadius={82}
+                      paddingAngle={2}
+                      label
+                    >
+                      {priorityMixData.map((entry, index) => (
+                        <Cell key={entry.name} fill={chartColours[index % chartColours.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartPanel>
+
+              <ChartPanel title="Closure Trend">
+                <ResponsiveContainer width="100%" height={230}>
+                  <LineChart data={closureTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="closed" stroke="#16a34a" strokeWidth={3} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartPanel>
+            </div>
+          </SectionCard>
+        </>
+      ) : null}
+
+      {activeView === "create" ? (
         <SectionCard
           title="Create Action"
           subtitle="Add a new action with automatic numbering, project tracking and optional evidence upload."
@@ -1826,7 +2231,9 @@ function ActionsPageContent() {
             </div>
           </form>
         </SectionCard>
+      ) : null}
 
+      {activeView === "priority" ? (
         <SectionCard title="Priority View" subtitle="What needs chasing right now.">
           <div style={listGridStyle}>
             <MiniListCard
@@ -1854,24 +2261,122 @@ function ActionsPageContent() {
                 tone: "amber" as const,
               }))}
             />
+
+            <MiniListCard
+              title="High Priority Open"
+              emptyText="No high-priority open actions."
+              items={highPriorityList.map((action) => ({
+                id: action.id,
+                line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
+                line2: `${action.project || "No project"} | ${action.owner || "No owner"} | ${getDueLabel(
+                  action.due_date
+                )}`,
+                tone: "red" as const,
+              }))}
+            />
           </div>
         </SectionCard>
-      </section>
+      ) : null}
 
-      <SectionCard
-        title="Action Register Filters"
-        subtitle="Narrow the central register by text, status, priority, owner, project, source, department, or overdue state."
-        action={
-          <div style={filterActionRowStyle}>
+      {activeView === "my" ? (
+        <SectionCard
+          title="My Actions"
+          subtitle="Personal action view matched from the signed-in user email to the active People Management record."
+        >
+          <div style={myActionsNoticeStyle}>
+            <strong>My Actions:</strong> {currentPersonNotice}
+          </div>
+
+          <section style={statsGridStyle}>
+            <QualityKpiCard title="My Total Actions" value={myActionList.length} accent="#0f766e" />
+            <QualityKpiCard title="My Open Actions" value={myOpenActions} accent="#2563eb" />
+            <QualityKpiCard title="My Overdue" value={myOverdueActions.length} accent="#dc2626" />
+            <QualityKpiCard title="My Due This Week" value={myDueThisWeekActions.length} accent="#f59e0b" />
+          </section>
+
+          {currentPersonName ? (
+            <div style={listGridStyle}>
+              <MiniListCard
+                title="My Overdue Actions"
+                emptyText="No overdue actions are assigned to you."
+                items={myOverdueActions.slice(0, 8).map((action) => ({
+                  id: action.id,
+                  line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
+                  line2: `${action.project || "No project"} | ${getActionSourceLabel(action)} | ${getDueLabel(
+                    action.due_date
+                  )}`,
+                  tone: "red" as const,
+                }))}
+              />
+              <MiniListCard
+                title="My Due This Week"
+                emptyText="No actions assigned to you are due this week."
+                items={myDueThisWeekActions.slice(0, 8).map((action) => ({
+                  id: action.id,
+                  line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
+                  line2: `${action.project || "No project"} | ${getActionSourceLabel(action)} | ${getDueLabel(
+                    action.due_date
+                  )}`,
+                  tone: "amber" as const,
+                }))}
+              />
+            </div>
+          ) : (
+            <div style={emptyEvidencePanelStyle}>No personal action list is available until your login email matches an active People record.</div>
+          )}
+        </SectionCard>
+      ) : null}
+
+      {activeView === "reports" ? (
+        <SectionCard
+          title="Action Reports"
+          subtitle="Generate operational action reports from the current register filter state."
+          action={
             <button type="button" onClick={() => void generateFilteredActionRegisterPdf()} style={primaryButtonStyle}>
               Filtered Action Register PDF
             </button>
-            <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
-              Clear Filters
-            </button>
+          }
+        >
+          <div style={reportSummaryGridStyle}>
+            <div style={reportSummaryCardStyle}>
+              <div style={reportSummaryLabelStyle}>Filtered Actions</div>
+              <div style={reportSummaryValueStyle}>{filteredActions.length}</div>
+            </div>
+            <div style={reportSummaryCardStyle}>
+              <div style={reportSummaryLabelStyle}>Status Filter</div>
+              <div style={reportSummaryTextStyle}>{statusFilter || "All"}</div>
+            </div>
+            <div style={reportSummaryCardStyle}>
+              <div style={reportSummaryLabelStyle}>Source Filter</div>
+              <div style={reportSummaryTextStyle}>{sourceFilter || "All"}</div>
+            </div>
+            <div style={reportSummaryCardStyle}>
+              <div style={reportSummaryLabelStyle}>Owner Filter</div>
+              <div style={reportSummaryTextStyle}>{ownerFilter || "All"}</div>
+            </div>
           </div>
-        }
-      >
+          <p style={helperTextStyle}>
+            The PDF export uses the same filtered action set as the Action Register. Use the Action Register view to adjust filters, then return here to export.
+          </p>
+        </SectionCard>
+      ) : null}
+
+      {activeView === "register" ? (
+        <>
+          <SectionCard
+            title="Action Register Filters"
+            subtitle="Narrow the central register by text, status, priority, owner, project, source, department, or overdue state."
+            action={
+              <div style={filterActionRowStyle}>
+                <button type="button" onClick={() => void generateFilteredActionRegisterPdf()} style={primaryButtonStyle}>
+                  Filtered Action Register PDF
+                </button>
+                <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
+                  Clear Filters
+                </button>
+              </div>
+            }
+          >
         <div style={filterBarStyle}>
           <input
             placeholder="Search action no. / title / project / owner"
@@ -1964,6 +2469,12 @@ function ActionsPageContent() {
         <div style={tableInfoRowStyle}>
           <span>
             Showing <strong>{filteredActions.length}</strong> of <strong>{actions.length}</strong> actions
+            {quickFilter ? (
+              <>
+                {" "}
+                with quick filter <strong>{quickFilter === "dueWeek" ? "Due This Week" : quickFilter === "highPriority" ? "High Priority" : quickFilter === "my" ? "My Actions" : "Overdue"}</strong>
+              </>
+            ) : null}
           </span>
           {linkedAction ? (
             <span style={linkedSearchHintStyle}>
@@ -2031,10 +2542,10 @@ function ActionsPageContent() {
                         <span style={badgeStyle}>{action.department || "-"}</span>
                       </td>
                       <td style={tableCellStyle}>
-                        <span style={badgeStyle}>{getActionSourceLabel(action)}</span>
+                        <SourceChip action={action} />
                       </td>
                       <td style={tableCellStyle}>
-                        <div style={secondaryCellTextStyle}>{buildLinkedRecordDisplay(action)}</div>
+                        <LinkedRecordChips action={action} />
                       </td>
                       <td style={tableCellStyle}>{action.owner || "-"}</td>
                       <td style={tableCellStyle}>
@@ -2333,22 +2844,18 @@ function ActionsPageContent() {
                 </div>
               </div>
 
-              {(isAuditLinkedSource(editForm.source) ||
-                isAssetLinkedSource(editForm.source) ||
-                editForm.source === "NCR/CAPA" ||
-                editForm.source === "MOC") &&
-              (
-                editForm.linked_audit_number ||
-                editForm.linked_finding_reference ||
-                editForm.linked_asset_code ||
-                editForm.linked_inspection_number ||
-                editForm.linked_maintenance_number ||
-                editForm.linked_ncr_number ||
-                editForm.linked_capa_number ||
-                editForm.linked_moc_number
-              ) ? (
+              {sourceImpliesLinkedRecord(editForm.source) ? (
                 <div style={linkedSourceCardStyle}>
-                  <div style={linkedSourceTitleStyle}>Linked Source</div>
+                  <div style={linkedSourceTitleStyle}>Linked Record Intelligence</div>
+                  <div style={linkedSourceChipRowStyle}>
+                    <SourceChip action={selectedEvidenceAction} />
+                    <LinkedRecordChips action={selectedEvidenceAction} />
+                  </div>
+                  {sourceImpliesLinkedRecord(editForm.source) && !hasLinkedRecord(selectedEvidenceAction) ? (
+                    <div style={linkedWarningStyle}>
+                      This source normally has a linked record, but no linked reference is stored on this action.
+                    </div>
+                  ) : null}
                   <div style={linkedSourceMetaStyle}>Source: {editForm.source}</div>
                   {editForm.linked_audit_number ? (
                     <div style={linkedSourceMetaStyle}>
@@ -2511,6 +3018,8 @@ function ActionsPageContent() {
           </div>
         )}
       </SectionCard>
+        </>
+      ) : null}
     </main>
   );
 }
@@ -2542,6 +3051,32 @@ function SectionCard({
       </section>
     );
   }
+
+function ActionViewTabs({
+  activeView,
+  onChange,
+}: {
+  activeView: ActionView;
+  onChange: (view: ActionView) => void;
+}) {
+  return (
+    <nav style={viewTabsStyle} aria-label="Action Management views">
+      {actionViews.map((view) => (
+        <button
+          key={view.id}
+          type="button"
+          onClick={() => onChange(view.id)}
+          style={{
+            ...viewTabButtonStyle,
+            ...(activeView === view.id ? viewTabButtonActiveStyle : null),
+          }}
+        >
+          {view.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
 
 function HeroPill({
   label,
@@ -2613,6 +3148,72 @@ function MiniListCard({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ChartPanel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div style={chartPanelStyle}>
+      <h3 style={chartPanelTitleStyle}>{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function QuickFilterButton({
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        ...quickFilterButtonStyle,
+        background: active ? "#0f766e" : "#f8fafc",
+        color: active ? "#ffffff" : "#0f172a",
+        borderColor: active ? "#0f766e" : "#cbd5e1",
+        opacity: disabled ? 0.55 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function SourceChip({ action }: { action: ActionItem }) {
+  const source = getActionSourceValue(action);
+  return (
+    <span style={{ ...linkedChipStyle, ...linkedChipToneStyles[getSourceChipTone(source)] }}>
+      {getActionSourceLabel(action)}
+    </span>
+  );
+}
+
+function LinkedRecordChips({ action }: { action: ActionItem }) {
+  const chips = buildLinkedRecordChips(action);
+
+  if (chips.length === 0) {
+    return <span style={secondaryCellTextStyle}>-</span>;
+  }
+
+  return (
+    <div style={linkedChipRowStyle}>
+      {chips.map((chip) => (
+        <span key={chip.label} style={{ ...linkedChipStyle, ...linkedChipToneStyles[chip.tone] }}>
+          {chip.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -2771,6 +3372,34 @@ const statusBannerStyleInline: CSSProperties = {
   padding: "12px 16px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
   color: "#0f172a",
+};
+
+const viewTabsStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "20px",
+  padding: "10px",
+  background: "#ffffff",
+  border: "1px solid #e2e8f0",
+  borderRadius: "16px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
+
+const viewTabButtonStyle: CSSProperties = {
+  border: "1px solid #cbd5e1",
+  borderRadius: "999px",
+  background: "#f8fafc",
+  color: "#334155",
+  padding: "10px 14px",
+  cursor: "pointer",
+  fontWeight: 800,
+};
+
+const viewTabButtonActiveStyle: CSSProperties = {
+  background: "#0f766e",
+  borderColor: "#0f766e",
+  color: "#ffffff",
 };
 
 const statsGridStyle: CSSProperties = {
@@ -2956,6 +3585,85 @@ const listGridStyle: CSSProperties = {
   gap: "16px",
 };
 
+const dashboardGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: "16px",
+};
+
+const chartPanelStyle: CSSProperties = {
+  minHeight: "280px",
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  background: "#f8fafc",
+  padding: "14px",
+};
+
+const chartPanelTitleStyle: CSSProperties = {
+  margin: "0 0 12px",
+  fontSize: "15px",
+  color: "#0f172a",
+};
+
+const quickFilterRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "12px",
+};
+
+const quickFilterButtonStyle: CSSProperties = {
+  border: "1px solid #cbd5e1",
+  padding: "10px 14px",
+  borderRadius: "999px",
+  fontWeight: 800,
+};
+
+const myActionsNoticeStyle: CSSProperties = {
+  border: "1px solid #dbe4f0",
+  background: "#f8fafc",
+  borderRadius: "12px",
+  padding: "10px 12px",
+  marginBottom: "16px",
+  color: "#475569",
+  fontSize: "13px",
+};
+
+const reportSummaryGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: "14px",
+  marginBottom: "14px",
+};
+
+const reportSummaryCardStyle: CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
+  background: "#f8fafc",
+  padding: "14px",
+};
+
+const reportSummaryLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#64748b",
+  textTransform: "uppercase",
+  marginBottom: "8px",
+};
+
+const reportSummaryValueStyle: CSSProperties = {
+  fontSize: "28px",
+  fontWeight: 800,
+  color: "#0f766e",
+};
+
+const reportSummaryTextStyle: CSSProperties = {
+  fontSize: "16px",
+  fontWeight: 800,
+  color: "#0f172a",
+};
+
 const miniListCardStyle: CSSProperties = {
   background: "#f8fafc",
   border: "1px solid #e2e8f0",
@@ -3013,6 +3721,50 @@ const tableInfoRowStyle: CSSProperties = {
 const linkedSearchHintStyle: CSSProperties = {
   color: "#1d4ed8",
   fontWeight: 600,
+};
+
+const linkedChipRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "6px",
+};
+
+const linkedSourceChipRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+  alignItems: "center",
+};
+
+const linkedChipStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  width: "fit-content",
+  padding: "5px 9px",
+  borderRadius: "999px",
+  fontSize: "12px",
+  fontWeight: 800,
+  border: "1px solid transparent",
+  whiteSpace: "nowrap",
+};
+
+const linkedChipToneStyles: Record<LinkedRecordChip["tone"], CSSProperties> = {
+  teal: { background: "#ccfbf1", color: "#115e59", borderColor: "#99f6e4" },
+  blue: { background: "#dbeafe", color: "#1d4ed8", borderColor: "#bfdbfe" },
+  purple: { background: "#ede9fe", color: "#6d28d9", borderColor: "#ddd6fe" },
+  amber: { background: "#fef3c7", color: "#92400e", borderColor: "#fde68a" },
+  red: { background: "#fee2e2", color: "#991b1b", borderColor: "#fecaca" },
+  slate: { background: "#e2e8f0", color: "#334155", borderColor: "#cbd5e1" },
+};
+
+const linkedWarningStyle: CSSProperties = {
+  border: "1px solid #fde68a",
+  background: "#fffbeb",
+  color: "#92400e",
+  borderRadius: "10px",
+  padding: "9px 10px",
+  fontSize: "13px",
+  fontWeight: 700,
 };
 
 const tableStyle: CSSProperties = {
