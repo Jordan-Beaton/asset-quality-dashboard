@@ -41,6 +41,29 @@ const riskNavItems = [
   { href: "/risk/reports", label: "Reports" },
 ];
 
+const hseNavItems = [
+  { href: "/home", label: "Home" },
+  { href: "/hse", label: "Dashboard" },
+  { href: "/hse/incidents", label: "Incidents" },
+  { href: "/hse/inspections", label: "Inspections" },
+  { href: "/hse/risk-assessments", label: "Risk Assess." },
+  { href: "/hse/environmental", label: "Enviro" },
+  { href: "/hse/actions", label: "Actions" },
+  { href: "/hse/reports", label: "Reports" },
+];
+
+const adminNavItems = [
+  { href: "/home", label: "Home" },
+  { href: "/admin", label: "Dashboard" },
+  { href: "/admin/departments", label: "Depts" },
+  { href: "/admin/people-roles", label: "People" },
+  { href: "/admin/document-control", label: "Documents" },
+  { href: "/admin/assets", label: "Assets" },
+  { href: "/admin/risk", label: "Risk" },
+  { href: "/admin/actions", label: "Actions" },
+  { href: "/admin/system", label: "System" },
+];
+
 const peopleNavItems = [
   { href: "/home", label: "Home" },
   { href: "/people", label: "People" },
@@ -57,6 +80,8 @@ export default function AppShell({ children }: AppShellProps) {
   const isHomePage = pathname === "/home";
   const isAssetModule = pathname.startsWith("/assets");
   const isRiskModule = pathname.startsWith("/risk");
+  const isHseModule = pathname.startsWith("/hse");
+  const isAdminModule = pathname.startsWith("/admin");
   const isPeopleModule = pathname.startsWith("/people");
   const isActionModule = pathname === "/actions";
   const showLogo = !isHomePage;
@@ -68,10 +93,12 @@ export default function AppShell({ children }: AppShellProps) {
     ? "Asset Management"
     : isRiskModule
     ? "Risk Management"
+    : isHseModule
+    ? "HSE Management"
+    : isAdminModule
+    ? "Admin / Settings"
     : isPeopleModule
     ? "People Management"
-    : pathname.startsWith("/hse")
-    ? "HSE Management"
     : "Quality Management";
   const moduleSubtitle = isHomePage
     ? ""
@@ -81,15 +108,21 @@ export default function AppShell({ children }: AppShellProps) {
     ? "Asset register and control system"
     : isRiskModule
     ? "Risk register, controls, opportunities, and reporting"
+    : isHseModule
+    ? "Health, safety and environment system"
+    : isAdminModule
+    ? "Master data and system configuration"
     : isPeopleModule
     ? "Shared people directory and status management"
-    : pathname.startsWith("/hse")
-    ? "Health, safety and environment system"
     : "Quality management system";
   const navItems = isAssetModule
     ? assetNavItems
     : isRiskModule
     ? riskNavItems
+    : isHseModule
+    ? hseNavItems
+    : isAdminModule
+    ? adminNavItems
     : isPeopleModule
     ? peopleNavItems
     : isActionModule

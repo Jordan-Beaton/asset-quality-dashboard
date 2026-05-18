@@ -32,6 +32,13 @@ When creating or modifying equivalent tabs in other modules:
 - preserve the same structure, spacing, header style, KPI card style, report layout, table layout, and button placement
 - only change the data source and wording to match the relevant module
 
+When creating a new module:
+- first copy the equivalent Quality Management page/header structure exactly
+- copy the existing Quality Management AppShell/header structure exactly
+- then replace only wording and data for the new module
+- do not recreate approximate header spacing
+- do not create approximate versions of the Quality header, hero, KPI, table, or report structures
+
 Examples:
 - Asset Reports must mirror Quality Reports
 - Asset Dashboard must mirror Quality Dashboard style

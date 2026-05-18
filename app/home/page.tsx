@@ -13,11 +13,11 @@ const moduleCards = [
   },
   {
     title: "HSE Management",
-    description: "Coming soon. This area will expand into wider HSE workflow and reporting.",
-    href: "",
-    status: "Coming Soon",
-    accent: "#475569",
-    cta: "Coming Soon",
+    description: "Incidents, inspections, risk assessments, environmental controls, actions, and HSE reporting.",
+    href: "/hse",
+    status: "Available",
+    accent: "#0f766e",
+    cta: "Open HSE",
   },
   {
     title: "Asset Management",
@@ -50,6 +50,14 @@ const moduleCards = [
     status: "Available",
     accent: "#0f766e",
     cta: "Open Review",
+  },
+  {
+    title: "Admin / Settings",
+    description: "Controlled area for master data, reference values, roles, numbering, and system configuration.",
+    href: "/admin",
+    status: "Available",
+    accent: "#475569",
+    cta: "Open Admin",
   },
   {
     title: "People Management",
@@ -132,14 +140,10 @@ export default function HomePage() {
             </div>
           );
 
-          return card.href ? (
+          return (
             <Link key={card.title} href={card.href} style={cardShellStyle}>
               {content}
             </Link>
-          ) : (
-            <div key={card.title} style={cardShellStyle}>
-              {content}
-            </div>
           );
         })}
       </section>
