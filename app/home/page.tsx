@@ -44,6 +44,14 @@ const moduleCards = [
     cta: "Open Actions",
   },
   {
+    title: "Management Review",
+    description: "Read-only management snapshot of quality, actions, risk, documents, assets, and HSE readiness.",
+    href: "/management-review",
+    status: "Available",
+    accent: "#0f766e",
+    cta: "Open Review",
+  },
+  {
     title: "People Management",
     description:
       "Shared personnel directory for originators, reviewers, approvers, owners, and asset-assigned people.",
