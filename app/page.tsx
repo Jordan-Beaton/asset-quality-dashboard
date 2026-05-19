@@ -353,7 +353,6 @@ export default function Home() {
   }, []);
 
   const openNcrs = ncrs.filter((item) => !isClosedLikeStatus(item.status)).length;
-  const openCapas = capas.filter((item) => !isClosedLikeStatus(item.status)).length;
   const openActions = actions.filter((item) => !isClosedLikeStatus(item.status)).length;
   const openAuditFindings = auditFindings.filter((item) => !isClosedLikeStatus(item.status)).length;
   const openMocs = mocs.filter((item) => normaliseStatus(item.status) !== "closed").length;
@@ -371,26 +370,26 @@ export default function Home() {
   const nearingTemporaryMocs = mocs.filter((item) => isNearingTemporaryMoc(item)).length;
   const agedDraftMocs = mocs.filter((item) => isDraftAgedMoc(item)).length;
 
-  const overdueNcrCapas = [...ncrs, ...capas].filter((item) => {
+  const overdueNcrs = ncrs.filter((item) => {
     if (isClosedLikeStatus(item.status)) return false;
     const days = getDaysFromToday(item.due_date || null);
     return days !== null && days < 0;
   }).length;
 
-  const ncrCapaStatusData = useMemo(
+  const ncrStatusData = useMemo(
     () => [
       {
-        name: "NCR",
-        Open: ncrs.filter((item) => !isClosedLikeStatus(item.status)).length,
-        Closed: ncrs.filter((item) => isClosedLikeStatus(item.status)).length,
+        name: "Open",
+        value: ncrs.filter((item) => !isClosedLikeStatus(item.status)).length,
+        fill: "#dc2626",
       },
       {
-        name: "CAPA",
-        Open: capas.filter((item) => !isClosedLikeStatus(item.status)).length,
-        Closed: capas.filter((item) => isClosedLikeStatus(item.status)).length,
+        name: "Closed",
+        value: ncrs.filter((item) => isClosedLikeStatus(item.status)).length,
+        fill: "#16a34a",
       },
     ],
-    [ncrs, capas]
+    [ncrs]
   );
 
   const actionsTrendData = useMemo(() => {
@@ -641,10 +640,6 @@ export default function Home() {
         label: item.ncr_number || item.title || "NCR",
         time: getLatestTimestamp(item.created_at),
       })),
-      ...capas.map((item) => ({
-        label: item.capa_number || item.title || "CAPA",
-        time: getLatestTimestamp(item.updated_at || item.created_at),
-      })),
       ...actions.map((item) => ({
         label: item.action_number || item.title || "Action",
         time: getLatestTimestamp(item.updated_at || item.created_at),
@@ -662,7 +657,7 @@ export default function Home() {
       .sort((a, b) => b.time - a.time);
 
     return candidates[0]?.label || "No live records";
-  }, [actions, audits, capas, documents, mocs, ncrs]);
+  }, [actions, audits, documents, mocs, ncrs]);
 
   const currentMonthOutstandingAudits = currentMonthAudits.length - currentMonthCompletedAudits;
   const currentMonthCompletionRate = currentMonthAudits.length
@@ -675,12 +670,6 @@ export default function Home() {
       value: openNcrs,
       accent: "#dc2626",
       href: buildHref("/ncr-capa", { type: "NCR", status: "Open" }),
-    },
-    {
-      label: "Open CAPAs",
-      value: openCapas,
-      accent: "#f59e0b",
-      href: buildHref("/ncr-capa", { type: "CAPA", status: "Open" }),
     },
     {
       label: "Open Actions",
@@ -751,7 +740,7 @@ export default function Home() {
       <QualityPageHero
         label="QUALITY MANAGEMENT"
         title="Dashboard"
-        description="Live operational view across MOCs, NCRs, CAPAs, audits, actions, and documents, built for fast drill-down into the next items that need follow-up."
+        description="Live operational view across MOCs, NCRs, audits, actions, and documents, built for fast drill-down into the next items that need follow-up."
         contextCards={[
           {
             label: "Last Refreshed",
@@ -784,38 +773,27 @@ export default function Home() {
       </section>
 
       <section style={chartGridStyle}>
-        <SectionCard title="NCR/CAPA Status" subtitle="Open versus closed by record type.">
+        <SectionCard title="NCR Status" subtitle="Open versus closed NCR records.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ncrCapaStatusData}>
+                <BarChart data={ncrStatusData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
                   <YAxis allowDecimals={false} />
                   <Tooltip />
-                  <Legend />
                   <Bar
-                    dataKey="Open"
-                    stackId="status"
-                    fill="#dc2626"
+                    dataKey="value"
                     radius={[6, 6, 0, 0]}
                     cursor="pointer"
-                    onClick={(data: { name?: string }) =>
-                      router.push(buildHref("/ncr-capa", { type: data?.name || "", status: "Open" }))
-                    }
-                  />
-                  <Bar
-                    dataKey="Closed"
-                    stackId="status"
-                    fill="#16a34a"
-                    radius={[6, 6, 0, 0]}
-                    cursor="pointer"
-                    onClick={(data: { name?: string }) =>
-                      router.push(buildHref("/ncr-capa", { type: data?.name || "", status: "Closed" }))
-                    }
-                  />
+                    onClick={(data: { name?: string }) => router.push(buildHref("/ncr-capa", { status: data?.name || "" }))}
+                  >
+                    {ncrStatusData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.fill} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1029,8 +1007,8 @@ export default function Home() {
               isLoading={isLoading}
             />
             <SummaryRow
-              label="Overdue NCR/CAPA"
-              value={overdueNcrCapas}
+              label="Overdue NCRs"
+              value={overdueNcrs}
               href={buildHref("/ncr-capa", { status: "Open" })}
               isLoading={isLoading}
             />

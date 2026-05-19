@@ -119,6 +119,13 @@ type AuditLinkOption = {
   label: string;
 };
 
+type PeopleOption = {
+  id: string;
+  name: string;
+  email: string | null;
+  department: string | null;
+};
+
 type OpenFindingRow = FindingRecord & {
   audit_number: string;
   audit_title: string;
@@ -380,6 +387,44 @@ function normaliseAuditStatus(value: string | null | undefined): AuditStatus {
   return "Planned";
 }
 
+function getAuditMonthDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!year || !month) return null;
+
+  return new Date(year, month - 1, 1);
+}
+
+function isAuditScheduleOverdue(audit: AuditRecord) {
+  if (audit.status === "Completed" || audit.status === "Cancelled" || audit.status === "Overdue") {
+    return audit.status === "Overdue";
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (audit.audit_date) {
+    const auditDate = new Date(audit.audit_date);
+    if (!Number.isNaN(auditDate.getTime())) {
+      auditDate.setHours(0, 0, 0, 0);
+      return auditDate < today;
+    }
+  }
+
+  const auditMonth = getAuditMonthDate(audit.audit_month);
+  if (!auditMonth) return false;
+
+  const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  return auditMonth < currentMonth;
+}
+
+function getEffectiveAuditStatus(audit: AuditRecord): AuditStatus {
+  return isAuditScheduleOverdue(audit) ? "Overdue" : audit.status;
+}
+
 function normaliseAuditType(value: string | null | undefined): AuditType {
   const input = (value || "").trim().toLowerCase();
 
@@ -565,6 +610,7 @@ function AuditsPageContent() {
   const [monthFilter, setMonthFilter] = useState<string>(linkedMonth);
   const [sortKey, setSortKey] = useState<SortKey>("audit_month");
   const [sortAsc, setSortAsc] = useState<boolean>(true);
+  const [auditQuickFilter, setAuditQuickFilter] = useState<"" | "Major">("");
   const [message, setMessage] = useState("Loading audits...");
   const [showFindingForm, setShowFindingForm] = useState(false);
   const [isUploadingReport, setIsUploadingReport] = useState(false);
@@ -585,6 +631,7 @@ function AuditsPageContent() {
 
   const [ncrOptions, setNcrOptions] = useState<AuditLinkOption[]>([]);
   const [actionOptions, setActionOptions] = useState<AuditLinkOption[]>([]);
+  const [peopleOptions, setPeopleOptions] = useState<PeopleOption[]>([]);
   const [selectedNcrToAdd, setSelectedNcrToAdd] = useState("");
   const [selectedActionToAdd, setSelectedActionToAdd] = useState("");
   const programmeSectionRef = useRef<HTMLDivElement | null>(null);
@@ -599,6 +646,30 @@ function AuditsPageContent() {
     const [loadedNcrs, loadedActions] = await Promise.all([tryLoadNcrOptions(), tryLoadActionOptions()]);
     setNcrOptions(loadedNcrs);
     setActionOptions(loadedActions);
+  }
+
+  async function loadPeopleOptions() {
+    const { data, error } = await supabase
+      .from("people")
+      .select("id,name,email,department,active")
+      .eq("active", true)
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.error("Load people failed:", error.message);
+      return;
+    }
+
+    const options = ((data || []) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        id: String(row.id || ""),
+        name: String(row.name || "").trim(),
+        email: row.email ? String(row.email).trim() : null,
+        department: row.department ? String(row.department).trim() : null,
+      }))
+      .filter((person) => person.id && person.name);
+
+    setPeopleOptions(options);
   }
 
   async function loadAudits(showLoadedMessage = true) {
@@ -733,7 +804,7 @@ function AuditsPageContent() {
 
   useEffect(() => {
     void (async () => {
-      await Promise.all([loadAudits(), loadLinkOptions()]);
+      await Promise.all([loadAudits(), loadLinkOptions(), loadPeopleOptions()]);
     })();
   }, []);
 
@@ -935,9 +1006,11 @@ function AuditsPageContent() {
         audit.linked_ncrs.some((item) => item.toLowerCase().includes(lower)) ||
         audit.linked_actions.some((item) => item.toLowerCase().includes(lower));
 
-      const matchesStatus = statusFilter === "All" || audit.status === statusFilter;
+      const effectiveStatus = getEffectiveAuditStatus(audit);
+      const matchesStatus = statusFilter === "All" || effectiveStatus === statusFilter;
       const matchesType = typeFilter === "All" || audit.audit_type === typeFilter;
       const matchesMonth = monthFilter === "All" || audit.audit_month === monthFilter;
+      const matchesQuickFilter = auditQuickFilter !== "Major" || audit.findings.major > 0;
       const scopedFindings = findings.filter((finding) => finding.audit_id === audit.id);
       const matchesFindingStatus =
         linkedFindingStatus === "All" ||
@@ -951,6 +1024,7 @@ function AuditsPageContent() {
         matchesStatus &&
         matchesType &&
         matchesMonth &&
+        matchesQuickFilter &&
         matchesFindingStatus &&
         matchesFindingCategory
       );
@@ -993,6 +1067,7 @@ function AuditsPageContent() {
     statusFilter,
     typeFilter,
     monthFilter,
+    auditQuickFilter,
     linkedFindingStatus,
     linkedFindingCategory,
     sortKey,
@@ -1000,10 +1075,10 @@ function AuditsPageContent() {
   ]);
 
   const kpis = useMemo(() => {
-    const planned = audits.filter((audit) => audit.status === "Planned").length;
-    const inProgress = audits.filter((audit) => audit.status === "In Progress").length;
-    const overdue = audits.filter((audit) => audit.status === "Overdue").length;
-    const completed = audits.filter((audit) => audit.status === "Completed").length;
+    const planned = audits.filter((audit) => getEffectiveAuditStatus(audit) === "Planned").length;
+    const inProgress = audits.filter((audit) => getEffectiveAuditStatus(audit) === "In Progress").length;
+    const overdue = audits.filter((audit) => getEffectiveAuditStatus(audit) === "Overdue").length;
+    const completed = audits.filter((audit) => getEffectiveAuditStatus(audit) === "Completed").length;
     const totalMajor = findings.filter((finding) => finding.category === "Major").length;
     const openFindings = findings.filter((finding) => finding.status !== "Closed").length;
     const closedFindings = findings.filter((finding) => finding.status === "Closed").length;
@@ -1175,6 +1250,18 @@ function AuditsPageContent() {
       params.delete("view");
     }
     router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+  }
+
+  function applyAuditStatusKpiFilter(status: AuditStatus) {
+    setAuditView(null);
+    setStatusFilter(status);
+    setAuditQuickFilter("");
+  }
+
+  function applyMajorFindingsFilter() {
+    setAuditView(null);
+    setStatusFilter("All");
+    setAuditQuickFilter("Major");
   }
 
   function openOpenFindingDetail(findingId: string) {
@@ -2507,10 +2594,34 @@ function AuditsPageContent() {
       ) : null}
 
         <section style={statsGridStyle}>
-          <QualityKpiCard title="Planned Audits" value={kpis.planned} accent="#2563eb" />
-          <QualityKpiCard title="In Progress" value={kpis.inProgress} accent="#7c3aed" />
-          <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#dc2626" />
-          <QualityKpiCard title="Completed" value={kpis.completed} accent="#16a34a" />
+          <QualityKpiCard
+            title="Remaining Audits"
+            value={kpis.planned}
+            accent="#2563eb"
+            onClick={() => applyAuditStatusKpiFilter("Planned")}
+            active={!isOpenFindingsView && !isClosedFindingsView && statusFilter === "Planned"}
+          />
+          <QualityKpiCard
+            title="In Progress"
+            value={kpis.inProgress}
+            accent="#7c3aed"
+            onClick={() => applyAuditStatusKpiFilter("In Progress")}
+            active={!isOpenFindingsView && !isClosedFindingsView && statusFilter === "In Progress"}
+          />
+          <QualityKpiCard
+            title="Overdue"
+            value={kpis.overdue}
+            accent="#dc2626"
+            onClick={() => applyAuditStatusKpiFilter("Overdue")}
+            active={!isOpenFindingsView && !isClosedFindingsView && statusFilter === "Overdue"}
+          />
+          <QualityKpiCard
+            title="Completed"
+            value={kpis.completed}
+            accent="#16a34a"
+            onClick={() => applyAuditStatusKpiFilter("Completed")}
+            active={!isOpenFindingsView && !isClosedFindingsView && statusFilter === "Completed"}
+          />
           <QualityKpiCard
             title="Open Findings"
             value={kpis.openFindings}
@@ -2525,7 +2636,13 @@ function AuditsPageContent() {
             onClick={() => setAuditView("closed-findings")}
             active={isClosedFindingsView}
           />
-          <QualityKpiCard title="Major Findings" value={kpis.totalMajor} accent="#b91c1c" />
+          <QualityKpiCard
+            title="Major Findings"
+            value={kpis.totalMajor}
+            accent="#b91c1c"
+            onClick={applyMajorFindingsFilter}
+            active={!isOpenFindingsView && !isClosedFindingsView && auditQuickFilter === "Major"}
+          />
         </section>
 
         {isOpenFindingsView || isClosedFindingsView ? (
@@ -2901,8 +3018,20 @@ function AuditsPageContent() {
                     value={form.lead_auditor}
                     onChange={(e) => setForm((prev) => ({ ...prev, lead_auditor: e.target.value }))}
                     style={inputStyle}
+                    list={form.audit_type === "Internal" ? "internal-lead-auditor-options" : undefined}
                     placeholder="Lead auditor"
                   />
+                  {form.audit_type === "Internal" ? (
+                    <datalist id="internal-lead-auditor-options">
+                      {peopleOptions.map((person) => (
+                        <option
+                          key={person.id}
+                          value={person.name}
+                          label={[person.department, person.email].filter(Boolean).join(" | ")}
+                        />
+                      ))}
+                    </datalist>
+                  ) : null}
                 </Field>
 
                 <Field label={form.audit_type === "External" ? "Certification Body" : "Location"}>
@@ -3035,7 +3164,10 @@ function AuditsPageContent() {
             <div style={toolbarFiltersStyle}>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as AuditStatus | "All")}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as AuditStatus | "All");
+                  setAuditQuickFilter("");
+                }}
                 style={toolbarSelectStyle}
               >
                 <option value="All">All Status</option>
@@ -3109,6 +3241,7 @@ function AuditsPageContent() {
                   (audit.audit_number.toLowerCase() === linkedSearch.toLowerCase() ||
                     audit.linked_ncrs.some((item) => item.toLowerCase() === linkedSearch.toLowerCase()) ||
                     audit.linked_actions.some((item) => item.toLowerCase() === linkedSearch.toLowerCase()));
+                const effectiveStatus = getEffectiveAuditStatus(audit);
 
                 return (
                   <button
@@ -3147,11 +3280,11 @@ function AuditsPageContent() {
                       <span
                         style={{
                           ...badgeStyle,
-                          background: getStatusTone(audit.status).bg,
-                          color: getStatusTone(audit.status).color,
+                          background: getStatusTone(effectiveStatus).bg,
+                          color: getStatusTone(effectiveStatus).color,
                         }}
                       >
-                        {audit.status}
+                        {effectiveStatus}
                       </span>
                     </div>
                   </button>
