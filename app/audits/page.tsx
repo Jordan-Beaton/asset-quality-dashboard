@@ -568,6 +568,8 @@ function AuditsPageContent() {
   const [message, setMessage] = useState("Loading audits...");
   const [showFindingForm, setShowFindingForm] = useState(false);
   const [isUploadingReport, setIsUploadingReport] = useState(false);
+  const [uploadingFindingEvidenceId, setUploadingFindingEvidenceId] = useState("");
+  const [generatingFindingPdfId, setGeneratingFindingPdfId] = useState("");
   const [isSavingLinks, setIsSavingLinks] = useState(false);
   const [selectedOpenFindingId, setSelectedOpenFindingId] = useState("");
   const [openFindingCategoryFilter, setOpenFindingCategoryFilter] = useState<
@@ -1580,9 +1582,10 @@ function AuditsPageContent() {
   }
 
 
-  async function uploadFileToStorage(auditId: string, file: File) {
+  async function uploadFileToStorage(auditId: string, file: File, folder = "") {
     const safeName = sanitizeFileName(file.name);
-    const path = `audits/${auditId}/${Date.now()}-${safeName}`;
+    const folderPath = folder ? `${folder.replace(/^\/+|\/+$/g, "")}/` : "";
+    const path = `audits/${auditId}/${folderPath}${Date.now()}-${safeName}`;
 
     const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
       upsert: true,
@@ -1593,6 +1596,49 @@ function AuditsPageContent() {
     }
 
     return path;
+  }
+
+  async function handleFindingEvidenceUpload(
+    finding: FindingRecord,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    setUploadingFindingEvidenceId(finding.id);
+
+    try {
+      const safeFindingRef = sanitizeFileName(finding.reference || "finding");
+
+      for (const file of files) {
+        const path = await uploadFileToStorage(finding.audit_id, file, `findings/${safeFindingRef}`);
+
+        const { error } = await supabase.from("audit_files").insert([
+          {
+            audit_id: finding.audit_id,
+            file_name: `${finding.reference || "Finding"} evidence - ${file.name}`,
+            file_path: path,
+            file_size: file.size,
+            uploaded_at: new Date().toISOString(),
+          },
+        ]);
+
+        if (error) {
+          throw new Error(error.message);
+        }
+      }
+
+      await loadAudits(false);
+      setMessage(
+        `${files.length} evidence file${files.length === 1 ? "" : "s"} uploaded for ${finding.reference}.`
+      );
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Finding evidence upload failed: ${err.message}`);
+    } finally {
+      setUploadingFindingEvidenceId("");
+      event.target.value = "";
+    }
   }
 
   async function handleReportUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -1669,6 +1715,280 @@ function AuditsPageContent() {
     }
 
     window.open(signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  function getFindingEvidenceFiles(finding: FindingRecord) {
+    const safeFindingRef = sanitizeFileName(finding.reference || "finding");
+    const findingFolder = `/findings/${safeFindingRef}/`;
+    const findingNamePrefix = `${finding.reference || "Finding"} evidence -`;
+
+    return auditFiles.filter((file) => {
+      if (file.audit_id !== finding.audit_id) return false;
+      return Boolean(
+        file.file_path?.includes(findingFolder) ||
+          file.file_name?.startsWith(findingNamePrefix)
+      );
+    });
+  }
+
+  function getFindingEvidenceDisplayName(file: AuditFileRow, finding: FindingRecord) {
+    const prefix = `${finding.reference || "Finding"} evidence - `;
+    if (file.file_name?.startsWith(prefix)) return file.file_name.slice(prefix.length);
+    return file.file_name || "Unnamed evidence file";
+  }
+
+  async function removeFindingEvidenceFile(file: AuditFileRow, finding: FindingRecord) {
+    const confirmed = window.confirm(
+      `Delete evidence file "${getFindingEvidenceDisplayName(file, finding)}" from ${finding.reference}?`
+    );
+    if (!confirmed) return;
+
+    if (file.file_path) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([file.file_path]);
+    }
+
+    const { error } = await supabase.from("audit_files").delete().eq("id", file.id);
+
+    if (error) {
+      setMessage(`Delete finding evidence failed: ${error.message}`);
+      return;
+    }
+
+    await loadAudits(false);
+    setMessage(`Evidence deleted from ${finding.reference}.`);
+  }
+
+  function renderFindingEvidenceActions(finding: FindingRecord) {
+    const evidenceFiles = getFindingEvidenceFiles(finding);
+
+    if (evidenceFiles.length === 0) {
+      return <span style={findingEvidenceEmptyStyle}>No evidence uploaded</span>;
+    }
+
+    return (
+      <div style={findingEvidenceActionsStyle}>
+        {evidenceFiles.map((file) => (
+          <div key={file.id} style={findingEvidenceItemStyle}>
+            <div style={findingEvidenceMetaStyle}>
+              <div style={findingEvidenceNameStyle}>{getFindingEvidenceDisplayName(file, finding)}</div>
+              <div style={findingEvidenceSubStyle}>
+                {[formatFileSize(file.file_size), `Uploaded ${formatDateTime(file.uploaded_at || "")}`]
+                  .filter((value) => value && value !== "-")
+                  .join(" • ") || "Uploaded evidence"}
+              </div>
+            </div>
+            <div style={findingEvidenceButtonRowStyle}>
+              <button
+                type="button"
+                style={reportLinkButtonStyle}
+                onClick={() => void openAuditFile(file)}
+              >
+                Open / Preview
+              </button>
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => void removeFindingEvidenceFile(file, finding)}
+              >
+                Delete Evidence
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  async function generateFindingPdf(finding: FindingRecord) {
+    const audit = audits.find((item) => item.id === finding.audit_id);
+    if (!audit) {
+      setMessage("Parent audit could not be found for this finding.");
+      return;
+    }
+
+    setGeneratingFindingPdfId(finding.id);
+
+    try {
+      const evidenceFiles = getFindingEvidenceFiles(finding);
+      const evidenceWithUrls = await Promise.all(
+        evidenceFiles.map(async (file) => ({
+          file,
+          url: file.file_path ? await createSignedFileUrl(file.file_path) : "",
+        }))
+      );
+
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      const generatedAt = new Date().toISOString();
+
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, pageWidth, 24, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text("ENSHORE SUBSEA", margin, 11.5);
+      doc.setFontSize(10);
+      doc.text("Audit Finding Report", margin, 18);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(15, 23, 42);
+      doc.text(finding.reference || "Audit Finding", margin, 34);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`${audit.audit_number} - ${audit.title}`, margin, 41);
+      doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 41, { align: "right" });
+
+      autoTable(doc, {
+        startY: 48,
+        theme: "grid",
+        margin: { left: margin, right: margin },
+        body: [
+          ["Finding Ref", finding.reference || "-", "Category", finding.category],
+          ["Status", finding.status, "Owner", finding.owner || "-"],
+          ["Due Date", formatDate(finding.due_date), "Closure Date", formatDate(finding.closure_date)],
+          ["Clause / Reference", finding.clause || "-", "Audit Type", audit.audit_type],
+          ["Auditee", audit.auditee || "-", "Lead Auditor", audit.lead_auditor || "-"],
+        ],
+        columnStyles: {
+          0: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 34 },
+          1: { cellWidth: 62 },
+          2: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 34 },
+          3: { cellWidth: 52 },
+        },
+        styles: {
+          fontSize: 9.5,
+          cellPadding: 3,
+          textColor: [15, 23, 42],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.2,
+          valign: "middle",
+        },
+      });
+
+      let y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 48;
+      y += 8;
+
+      const drawTextBox = (title: string, value: string, minHeight = 20) => {
+        if (y > pageHeight - 45) {
+          doc.addPage();
+          y = 18;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(15, 23, 42);
+        doc.text(title, margin, y);
+        y += 4;
+
+        const lines = doc.splitTextToSize(value || "-", pageWidth - margin * 2 - 6);
+        const boxHeight = Math.max(minHeight, lines.length * 4.5 + 8);
+
+        doc.setDrawColor(226, 232, 240);
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(margin, y, pageWidth - margin * 2, boxHeight, 2, 2, "FD");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(30, 41, 59);
+        doc.text(lines, margin + 3, y + 6);
+        y += boxHeight + 7;
+      };
+
+      drawTextBox("Description / Objective Evidence", finding.description, 28);
+      drawTextBox("Root Cause", finding.root_cause, 24);
+      drawTextBox("Containment Action", finding.containment_action, 22);
+      drawTextBox("Corrective Action", finding.corrective_action, 24);
+
+      if (y > pageHeight - 60) {
+        doc.addPage();
+        y = 18;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Uploaded Evidence", margin, y);
+      y += 5;
+
+      if (evidenceWithUrls.length === 0) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(71, 85, 105);
+        doc.text("No evidence files uploaded against this finding.", margin, y);
+        y += 8;
+      } else {
+        autoTable(doc, {
+          startY: y,
+          theme: "grid",
+          margin: { left: margin, right: margin },
+          head: [["File", "Size", "Uploaded", "Evidence Link"]],
+          body: evidenceWithUrls.map(({ file, url }) => [
+            getFindingEvidenceDisplayName(file, finding),
+            formatFileSize(file.file_size),
+            formatDateTime(file.uploaded_at || ""),
+            url ? "Open evidence" : "Unavailable",
+          ]),
+          headStyles: {
+            fillColor: [15, 118, 110],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+          },
+          styles: {
+            fontSize: 8.5,
+            cellPadding: 2.5,
+            textColor: [15, 23, 42],
+            lineColor: [226, 232, 240],
+            lineWidth: 0.2,
+            overflow: "linebreak",
+          },
+          columnStyles: {
+            0: { cellWidth: 70 },
+            1: { cellWidth: 22 },
+            2: { cellWidth: 42 },
+            3: { cellWidth: 48, textColor: [29, 78, 216], fontStyle: "bold" },
+          },
+          didDrawCell: (data) => {
+            if (data.section !== "body" || data.column.index !== 3) return;
+            const row = evidenceWithUrls[data.row.index];
+            if (!row?.url) return;
+            doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: row.url });
+          },
+        });
+
+        y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
+        y += 8;
+
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Evidence links are secure signed URLs and may expire after generation.", margin, y);
+      }
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(15, 118, 110);
+        doc.line(margin, pageHeight - 13, pageWidth - margin, pageHeight - 13);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Enshore Subsea | ${finding.reference}`, margin, pageHeight - 8);
+        doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+      }
+
+      doc.save(`${sanitizeFileName(finding.reference || "audit-finding")}-finding-report.pdf`);
+      setMessage(`Finding PDF report generated for ${finding.reference}.`);
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Finding PDF generation failed: ${err.message}`);
+    } finally {
+      setGeneratingFindingPdfId("");
+    }
   }
 
   function generateAuditPdf() {
@@ -2492,8 +2812,40 @@ function AuditsPageContent() {
                     <button type="button" style={primaryButtonStyle} onClick={() => void saveOpenFindingDetail()}>
                       Save Finding
                     </button>
+                    <button
+                      type="button"
+                      style={secondaryButtonStyle}
+                      onClick={() => void generateFindingPdf(openFindingForm)}
+                      disabled={Boolean(generatingFindingPdfId)}
+                    >
+                      {generatingFindingPdfId === openFindingForm.id ? "Generating PDF..." : "Generate PDF Report"}
+                    </button>
+                    {renderFindingEvidenceActions(openFindingForm)}
+                    <label
+                      style={{
+                        ...uploadButtonStyle,
+                        opacity: uploadingFindingEvidenceId === openFindingForm.id ? 0.7 : 1,
+                        cursor: uploadingFindingEvidenceId === openFindingForm.id ? "wait" : "pointer",
+                      }}
+                    >
+                      {uploadingFindingEvidenceId === openFindingForm.id ? "Uploading Evidence..." : "Evidence Upload"}
+                      <input
+                        type="file"
+                        multiple
+                        style={{ display: "none" }}
+                        disabled={Boolean(uploadingFindingEvidenceId)}
+                        onChange={(event) => void handleFindingEvidenceUpload(openFindingForm, event)}
+                      />
+                    </label>
                     <button type="button" style={secondaryButtonStyle} onClick={hideOpenFindingPanel}>
                       Hide Panel
+                    </button>
+                    <button
+                      type="button"
+                      style={dangerButtonStyle}
+                      onClick={() => void deleteFinding(openFindingForm)}
+                    >
+                      Delete Finding
                     </button>
                   </div>
                 </div>
@@ -3403,6 +3755,31 @@ function AuditsPageContent() {
                           </div>
 
                           <div style={findingCardActionsStyle}>
+                            {renderFindingEvidenceActions(finding)}
+                            <button
+                              type="button"
+                              style={secondaryButtonStyle}
+                              onClick={() => void generateFindingPdf(finding)}
+                              disabled={Boolean(generatingFindingPdfId)}
+                            >
+                              {generatingFindingPdfId === finding.id ? "Generating PDF..." : "Generate PDF Report"}
+                            </button>
+                            <label
+                              style={{
+                                ...uploadButtonStyle,
+                                opacity: uploadingFindingEvidenceId === finding.id ? 0.7 : 1,
+                                cursor: uploadingFindingEvidenceId === finding.id ? "wait" : "pointer",
+                              }}
+                            >
+                              {uploadingFindingEvidenceId === finding.id ? "Uploading Evidence..." : "Evidence Upload"}
+                              <input
+                                type="file"
+                                multiple
+                                style={{ display: "none" }}
+                                disabled={Boolean(uploadingFindingEvidenceId)}
+                                onChange={(event) => void handleFindingEvidenceUpload(finding, event)}
+                              />
+                            </label>
                             <button
                               type="button"
                               style={dangerButtonStyle}
@@ -4479,8 +4856,58 @@ const findingCardActionsStyle: CSSProperties = {
   marginTop: "14px",
   display: "flex",
   justifyContent: "flex-end",
+  alignItems: "center",
   gap: "10px",
   flexWrap: "wrap",
+};
+
+const findingEvidenceActionsStyle: CSSProperties = {
+  display: "grid",
+  gap: "8px",
+  flex: "1 1 420px",
+  minWidth: "280px",
+};
+
+const findingEvidenceItemStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "center",
+  padding: "10px 12px",
+  borderRadius: "12px",
+  background: "#ffffff",
+  border: "1px solid #dbeafe",
+};
+
+const findingEvidenceMetaStyle: CSSProperties = {
+  minWidth: 0,
+};
+
+const findingEvidenceNameStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 800,
+  color: "#0f172a",
+  overflowWrap: "anywhere",
+};
+
+const findingEvidenceSubStyle: CSSProperties = {
+  marginTop: "3px",
+  fontSize: "12px",
+  color: "#64748b",
+};
+
+const findingEvidenceButtonRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+  flexShrink: 0,
+};
+
+const findingEvidenceEmptyStyle: CSSProperties = {
+  color: "#64748b",
+  fontSize: "12px",
+  fontWeight: 700,
 };
 
 const findingRefStyle: CSSProperties = {

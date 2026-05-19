@@ -20,6 +20,7 @@ type Ncr = {
   title: string | null;
   description: string | null;
   containment_action: string | null;
+  corrective_action: string | null;
   severity: string | null;
   status: string | null;
   owner: string | null;
@@ -77,9 +78,28 @@ type NcrCapaPdf = {
   external_facing: boolean;
 };
 
+type LinkedAction = {
+  id: string;
+  action_number: string | null;
+  title: string | null;
+  status: string | null;
+  owner: string | null;
+  due_date: string | null;
+  linked_ncr_id: string | null;
+  linked_ncr_number: string | null;
+};
+
 type LinkedOption = {
   id: string;
   label: string;
+};
+
+type PersonOption = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  department: string | null;
+  active: boolean | null;
 };
 
 type CombinedRow = {
@@ -89,6 +109,7 @@ type CombinedRow = {
   title: string;
   description: string;
   containment_action: string;
+  corrective_action: string;
   severity: string;
   status: string;
   owner: string;
@@ -112,6 +133,7 @@ type CombinedRow = {
 
 type NcrSortKey = "number" | "severity" | "status" | "due_date";
 type SortDirection = "asc" | "desc";
+type NcrQuickFilter = "" | "Open" | "In Progress" | "Closed" | "Overdue" | "DueSoon" | "All";
 
 type NcrImportRow = {
   rowNumber: number;
@@ -119,6 +141,7 @@ type NcrImportRow = {
   title: string;
   description: string;
   containment_action: string;
+  corrective_action: string;
   project: string;
   owner: string;
   severity: string;
@@ -144,6 +167,7 @@ function buildNcrLinkedActionHref(row: CombinedRow) {
   const descriptionSections = [
     row.description ? `NCR Description:\n${row.description}` : "",
     row.containment_action ? `Containment Action:\n${row.containment_action}` : "",
+    row.corrective_action ? `Corrective Action:\n${row.corrective_action}` : "",
     row.root_cause_category || row.root_cause_description
       ? `Root Cause Summary:\n${[row.root_cause_category, row.root_cause_description].filter(Boolean).join(" - ")}`
       : "",
@@ -513,22 +537,25 @@ async function tryLoadNcrOptions(): Promise<LinkedOption[]> {
 function NcrCapaPageContent() {
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
-  const linkedType = searchParams.get("type")?.trim() || "All";
   const linkedStatus = searchParams.get("status")?.trim() || "All";
   const linkedSeverity = searchParams.get("severity")?.trim() || "All";
   const linkedSource = searchParams.get("source")?.trim() || "All";
   const linkedProject = searchParams.get("project")?.trim() || "All";
   const linkedOverdueOnly = searchParams.get("overdue") === "1";
+  const directNcrNumber = searchParams.get("ncr")?.trim() || "";
+  const directNcrId = searchParams.get("ncrId")?.trim() || "";
 
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
+  const [linkedActions, setLinkedActions] = useState<LinkedAction[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
   const [savedPdfFiles, setSavedPdfFiles] = useState<NcrCapaPdf[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
   const [activeCreateTab, setActiveCreateTab] = useState<"NCR" | "CAPA">("NCR");
-  const [showCreatePanel, setShowCreatePanel] = useState(true);
+  const [showCreatePanel, setShowCreatePanel] = useState(false);
+  const [showImportPanel, setShowImportPanel] = useState(false);
   const [selectedRow, setSelectedRow] = useState<CombinedRow | null>(null);
   const [refreshStamp, setRefreshStamp] = useState<string>("");
   const [message, setMessage] = useState("");
@@ -539,10 +566,13 @@ function NcrCapaPageContent() {
   const [sourceFilter, setSourceFilter] = useState(linkedSource);
   const [projectFilter, setProjectFilter] = useState(linkedProject);
   const [showAttentionOnly, setShowAttentionOnly] = useState(false);
-  const [activeLogTab, setActiveLogTab] = useState<"NCR" | "CAPA">(linkedType === "CAPA" ? "CAPA" : "NCR");
+  const [activeLogTab, setActiveLogTab] = useState<"NCR" | "CAPA">("NCR");
+  const [ncrQuickFilter, setNcrQuickFilter] = useState<NcrQuickFilter>("");
+  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [ncrSort, setNcrSort] = useState<{ key: NcrSortKey; direction: SortDirection } | null>(null);
 
   const [ncrOptions, setNcrOptions] = useState<LinkedOption[]>([]);
+  const [people, setPeople] = useState<PersonOption[]>([]);
   const [newLinkedNcrToAdd, setNewLinkedNcrToAdd] = useState("");
   const [editLinkedNcrToAdd, setEditLinkedNcrToAdd] = useState("");
 
@@ -550,6 +580,7 @@ function NcrCapaPageContent() {
     title: "",
     description: "",
     containment_action: "",
+    corrective_action: "",
     severity: "Medium",
     status: "Open",
     owner: "",
@@ -585,6 +616,8 @@ function NcrCapaPageContent() {
   const [importFileName, setImportFileName] = useState("");
   const [importRows, setImportRows] = useState<NcrImportRow[]>([]);
   const [importingNcrs, setImportingNcrs] = useState(false);
+  const [newRootCauseOther, setNewRootCauseOther] = useState("");
+  const [editRootCauseOther, setEditRootCauseOther] = useState("");
 
   const [editRow, setEditRow] = useState<CombinedRow | null>(null);
   const [selectedEvidenceFiles, setSelectedEvidenceFiles] = useState<File[]>([]);
@@ -601,11 +634,16 @@ function NcrCapaPageContent() {
     const [
       { data: ncrData, error: ncrError },
       { data: capaData, error: capaError },
+      { data: actionData, error: actionError },
       { data: evidenceData, error: evidenceError },
       { data: pdfData, error: pdfError },
     ] = await Promise.all([
       supabase.from("ncrs").select("*").order("created_at", { ascending: false }),
       supabase.from("capas").select("*").order("created_at", { ascending: false }),
+      supabase
+        .from("actions")
+        .select("id,action_number,title,status,owner,due_date,linked_ncr_id,linked_ncr_number")
+        .order("action_number", { ascending: true }),
       supabase
         .from("evidence_files")
         .select("*")
@@ -616,11 +654,13 @@ function NcrCapaPageContent() {
 
     if (ncrError) console.error("Error loading NCRs:", ncrError.message);
     if (capaError) console.error("Error loading CAPAs:", capaError.message);
+    if (actionError) console.error("Error loading linked actions:", actionError.message);
     if (evidenceError) console.error("Error loading evidence:", evidenceError.message);
     if (pdfError) console.error("Error loading saved PDFs:", pdfError.message);
 
     setNcrs((ncrData as Ncr[]) || []);
     setCapas((capaData as Capa[]) || []);
+    setLinkedActions((actionData as LinkedAction[]) || []);
     setEvidenceFiles((evidenceData as EvidenceFile[]) || []);
     setSavedPdfFiles((pdfData as NcrCapaPdf[]) || []);
     setRefreshStamp(new Date().toLocaleString("en-GB"));
@@ -632,9 +672,25 @@ function NcrCapaPageContent() {
     setNcrOptions(options);
   }
 
+  async function loadPeople() {
+    const { data, error } = await supabase
+      .from("people")
+      .select("id,name,email,department,active")
+      .eq("active", true)
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.error("Error loading people:", error.message);
+      return;
+    }
+
+    setPeople(((data as PersonOption[]) || []).filter((person) => Boolean(person.name?.trim())));
+  }
+
   useEffect(() => {
     void loadData();
     void loadNcrOptions();
+    void loadPeople();
   }, []);
 
   useEffect(() => {
@@ -645,6 +701,7 @@ function NcrCapaPageContent() {
     setIncludeLinkedCapaInPdf(true);
     setIncludeEvidenceListInPdf(true);
     setExternalFacingPdf(false);
+    setEditRootCauseOther(getOtherRootCauseCategoryText(selectedRow?.root_cause_category || ""));
   }, [selectedRow]);
 
   const combinedRows = useMemo<CombinedRow[]>(() => {
@@ -655,6 +712,7 @@ function NcrCapaPageContent() {
       title: n.title || "",
       description: n.description || "",
       containment_action: n.containment_action || "",
+      corrective_action: n.corrective_action || "",
       severity: n.severity || "-",
       status: n.status || "Open",
       owner: n.owner || "",
@@ -683,6 +741,7 @@ function NcrCapaPageContent() {
       title: c.title || "",
       description: c.description || "",
       containment_action: "",
+      corrective_action: "",
       severity: "-",
       status: c.status || "Open",
       owner: c.owner || "",
@@ -712,21 +771,26 @@ function NcrCapaPageContent() {
   }, [ncrs, capas]);
 
   useEffect(() => {
-    if (!linkedSearch || combinedRows.length === 0) return;
+    if ((!linkedSearch && !directNcrNumber && !directNcrId) || combinedRows.length === 0) return;
 
-    const value = linkedSearch.toLowerCase();
+    const value = (directNcrNumber || linkedSearch).toLowerCase();
     const match = combinedRows.find(
       (row) =>
-        row.number.toLowerCase() === value ||
-        row.title.toLowerCase().includes(value) ||
-        row.linked_to.toLowerCase().includes(value)
+        row.type === "NCR" &&
+        ((directNcrId && row.id === directNcrId) ||
+          Boolean(
+            value &&
+              (row.number.toLowerCase() === value ||
+                row.title.toLowerCase().includes(value) ||
+                row.linked_to.toLowerCase().includes(value))
+          ))
     );
 
     if (match) {
       setActiveLogTab(match.type);
       setSelectedRow((current) => (current?.id === match.id ? current : match));
     }
-  }, [linkedSearch, combinedRows]);
+  }, [directNcrId, directNcrNumber, linkedSearch, combinedRows]);
 
   const evidenceCountMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -751,17 +815,19 @@ function NcrCapaPageContent() {
     );
   }, [capas, selectedRow]);
 
+  const selectedLinkedActions = useMemo(() => {
+    if (!selectedRow || selectedRow.type !== "NCR") return [];
+    return linkedActions.filter(
+      (action) =>
+        (action.linked_ncr_id && action.linked_ncr_id === selectedRow.id) ||
+        (action.linked_ncr_number && action.linked_ncr_number === selectedRow.number)
+    );
+  }, [linkedActions, selectedRow]);
+
   const selectedNcrPdfEvidence = useMemo(() => {
     if (!selectedRow || selectedRow.type !== "NCR") return [];
-
-    const linkedCapaIds = new Set(selectedLinkedCapas.map((capa) => capa.id));
-
-    return evidenceFiles.filter((file) => {
-      if (file.record_type === "NCR" && file.record_id === selectedRow.id) return true;
-      if (file.record_type === "CAPA" && linkedCapaIds.has(file.record_id)) return true;
-      return false;
-    });
-  }, [evidenceFiles, selectedLinkedCapas, selectedRow]);
+    return evidenceFiles.filter((file) => file.record_type === "NCR" && file.record_id === selectedRow.id);
+  }, [evidenceFiles, selectedRow]);
 
   const selectedSavedPdfHistory = useMemo(() => {
     if (!selectedRow || selectedRow.type !== "NCR") return [];
@@ -774,11 +840,39 @@ function NcrCapaPageContent() {
 
   const projectOptions = useMemo(() => {
     const values = new Set<string>();
-    combinedRows.forEach((row) => {
+    combinedRows.filter((row) => row.type === "NCR").forEach((row) => {
       if (row.project?.trim()) values.add(row.project.trim());
     });
     return ["All", ...Array.from(values).sort()];
   }, [combinedRows]);
+
+  const yearOptions = useMemo(() => {
+    const values = new Set<string>();
+    ncrs.forEach((ncr) => {
+      const value = ncr.created_at ? new Date(ncr.created_at) : null;
+      if (value && !Number.isNaN(value.getTime())) values.add(String(value.getFullYear()));
+    });
+    values.add(String(new Date().getFullYear()));
+    return ["All Years", ...Array.from(values).sort((a, b) => Number(b) - Number(a))];
+  }, [ncrs]);
+
+  const peopleNameOptions = useMemo(() => {
+    return Array.from(
+      new Set(people.map((person) => person.name?.trim()).filter((name): name is string => Boolean(name)))
+    ).sort((a, b) => a.localeCompare(b));
+  }, [people]);
+
+  const createOwnerOptions = useMemo(() => {
+    const currentOwner = newNcr.owner.trim();
+    if (!currentOwner || peopleNameOptions.includes(currentOwner)) return peopleNameOptions;
+    return [currentOwner, ...peopleNameOptions];
+  }, [newNcr.owner, peopleNameOptions]);
+
+  const editOwnerOptions = useMemo(() => {
+    const currentOwner = editRow?.owner.trim() || "";
+    if (!currentOwner || peopleNameOptions.includes(currentOwner)) return peopleNameOptions;
+    return [currentOwner, ...peopleNameOptions];
+  }, [editRow?.owner, peopleNameOptions]);
 
   const filteredRows = useMemo(() => {
     const filtered = combinedRows.filter((row) => {
@@ -801,6 +895,16 @@ function NcrCapaPageContent() {
         activeLogTab === "CAPA" || sourceFilter === "All" || row.source_type === sourceFilter;
       const matchesProject = projectFilter === "All" || row.project === projectFilter;
       const matchesOverdueOnly = !linkedOverdueOnly || dueState(row.due_date) === "overdue";
+      const rowYear = row.created_at ? String(new Date(row.created_at).getFullYear()) : "";
+      const matchesYear = yearFilter === "All Years" || rowYear === yearFilter;
+      const matchesQuickFilter =
+        !ncrQuickFilter ||
+        (ncrQuickFilter === "All" && ["Open", "In Progress", "Closed"].includes(row.status)) ||
+        (ncrQuickFilter === "Open" && row.status === "Open") ||
+        (ncrQuickFilter === "In Progress" && row.status === "In Progress") ||
+        (ncrQuickFilter === "Closed" && row.status === "Closed") ||
+        (ncrQuickFilter === "Overdue" && dueState(row.due_date) === "overdue") ||
+        (ncrQuickFilter === "DueSoon" && dueState(row.due_date) === "soon");
 
       const attention = dueState(row.due_date) === "overdue" || row.status === "Open";
       const matchesAttention = !showAttentionOnly || attention;
@@ -812,7 +916,9 @@ function NcrCapaPageContent() {
         matchesSeverity &&
         matchesSource &&
         matchesProject &&
+        matchesYear &&
         matchesOverdueOnly &&
+        matchesQuickFilter &&
         matchesAttention
       );
     });
@@ -866,6 +972,8 @@ function NcrCapaPageContent() {
     severityFilter,
     sourceFilter,
     projectFilter,
+    yearFilter,
+    ncrQuickFilter,
     linkedOverdueOnly,
     showAttentionOnly,
     activeLogTab,
@@ -879,6 +987,19 @@ function NcrCapaPageContent() {
     setSourceFilter("All");
     setProjectFilter("All");
     setShowAttentionOnly(false);
+    setNcrQuickFilter("");
+    setYearFilter(String(new Date().getFullYear()));
+  }
+
+  function applyKpiFilter(filter: NcrQuickFilter) {
+    setActiveLogTab("NCR");
+    setNcrQuickFilter(filter);
+    setSearch("");
+    setSeverityFilter("All");
+    setSourceFilter("All");
+    setProjectFilter("All");
+    setShowAttentionOnly(false);
+    setStatusFilter(filter === "Open" || filter === "In Progress" || filter === "Closed" ? filter : "All");
   }
 
   function toggleNcrSort(key: NcrSortKey) {
@@ -894,26 +1015,31 @@ function NcrCapaPageContent() {
   }
 
   const kpis = useMemo(() => {
-    const totalNcrs = ncrs.length;
-    const totalCapas = capas.length;
-    const openNcrsCount = ncrs.filter((n) => (n.status || "").toLowerCase() === "open").length;
-    const openCapasCount = capas.filter((c) => (c.status || "").toLowerCase() === "open").length;
-    const overdue = combinedRows.filter((row) => dueState(row.due_date) === "overdue").length;
-    const dueSoon = combinedRows.filter((row) => dueState(row.due_date) === "soon").length;
+    const yearScopedNcrs = combinedRows.filter((row) => {
+      if (row.type !== "NCR") return false;
+      const rowYear = row.created_at ? String(new Date(row.created_at).getFullYear()) : "";
+      return yearFilter === "All Years" || rowYear === yearFilter;
+    });
+    const openNcrsCount = yearScopedNcrs.filter((n) => n.status === "Open").length;
+    const inProgressCount = yearScopedNcrs.filter((n) => n.status === "In Progress").length;
+    const closedCount = yearScopedNcrs.filter((n) => n.status === "Closed").length;
+    const totalNcrs = openNcrsCount + inProgressCount + closedCount;
+    const overdue = yearScopedNcrs.filter((row) => dueState(row.due_date) === "overdue").length;
+    const dueSoon = yearScopedNcrs.filter((row) => dueState(row.due_date) === "soon").length;
 
     return {
       totalNcrs,
-      totalCapas,
-      openItems: openNcrsCount + openCapasCount,
+      openItems: openNcrsCount,
+      inProgress: inProgressCount,
+      closed: closedCount,
       overdue,
       dueSoon,
-      evidenceCount: evidenceFiles.length,
     };
-  }, [ncrs, capas, combinedRows, evidenceFiles]);
+  }, [combinedRows, yearFilter]);
 
   const latestRecordLabel = useMemo(() => {
-    const latest = combinedRows[0];
-    return latest ? `${latest.number} - ${latest.title}` : "No NCR or CAPA records";
+    const latest = combinedRows.find((row) => row.type === "NCR");
+    return latest ? `${latest.number} - ${latest.title}` : "No NCR records";
   }, [combinedRows]);
 
   const topRaisedNcrs = useMemo(() => {
@@ -1112,6 +1238,7 @@ function NcrCapaPageContent() {
             title: newNcr.title.trim(),
             description: newNcr.description.trim() || null,
             containment_action: newNcr.containment_action.trim() || null,
+            corrective_action: newNcr.corrective_action.trim() || null,
             severity: newNcr.severity,
             status: newNcr.status,
             owner: newNcr.owner.trim() || null,
@@ -1120,7 +1247,7 @@ function NcrCapaPageContent() {
             closed_at: newNcr.status === "Closed" ? new Date().toISOString() : null,
             project: newNcr.project.trim() || null,
             source_type: newNcr.source_type,
-            root_cause_category: newNcr.root_cause_category || null,
+            root_cause_category: resolveRootCauseCategory(newNcr.root_cause_category, newRootCauseOther) || null,
             root_cause_description: newNcr.root_cause_description.trim() || null,
           },
       ])
@@ -1153,6 +1280,7 @@ function NcrCapaPageContent() {
       title: "",
       description: "",
       containment_action: "",
+      corrective_action: "",
       severity: "Medium",
       status: "Open",
       owner: "",
@@ -1165,6 +1293,7 @@ function NcrCapaPageContent() {
     });
     setCreateNcrFiles([]);
     setCreateNcrEvidenceNotes("");
+    setNewRootCauseOther("");
     setSaving(false);
     setMessage(`${nextNumber} created successfully.`);
     await loadData();
@@ -1281,6 +1410,7 @@ function NcrCapaPageContent() {
           title: editRow.title || null,
           description: editRow.description || null,
           containment_action: editRow.containment_action || null,
+          corrective_action: editRow.corrective_action || null,
           severity: editRow.severity || null,
           status: editRow.status || null,
           owner: editRow.owner || null,
@@ -1289,7 +1419,8 @@ function NcrCapaPageContent() {
           closed_at: nextClosedAt,
           project: editRow.project || null,
           source_type: editRow.source_type || "Internal",
-          root_cause_category: editRow.root_cause_category || null,
+          root_cause_category:
+            resolveRootCauseCategory(editRow.root_cause_category, editRootCauseOther) || null,
           root_cause_description: editRow.root_cause_description || null,
         })
         .eq("id", editRow.id);
@@ -1622,55 +1753,16 @@ function NcrCapaPageContent() {
       drawHeading("NCR DETAILS");
       drawParagraphBox("Issue / Description", selectedRow.description, 28);
       drawParagraphBox("Containment Action", selectedRow.containment_action, 20);
+      drawParagraphBox("Corrective Action", selectedRow.corrective_action, 20);
       drawParagraphBox("Root Cause Category", selectedRow.root_cause_category, 12);
       drawParagraphBox("Root Cause Description", selectedRow.root_cause_description, 22);
 
-        const includedCapas =
-          includeLinkedCapaInPdf && selectedLinkedCapas.length > 0 ? selectedLinkedCapas : [];
         const evidenceUrlMap = new Map<string, string>();
 
         if (externalFacingPdf) {
           drawHeading("SUPPLIER / CLIENT RESPONSE");
           drawParagraphBox("Response / Proposed Action", "", 28);
           drawParagraphBox("Acknowledgement / Responsible Contact", "", 18);
-      }
-
-      if (includedCapas.length > 0) {
-        drawHeading("LINKED CAPA");
-
-        includedCapas.forEach((capa) => {
-          if (y > pageHeight - 88) {
-            doc.addPage();
-            y = 18;
-          }
-
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10);
-          doc.setTextColor(30, 41, 59);
-          const capaHeading = `${capa.capa_number || "CAPA"}${capa.title ? ` - ${capa.title}` : ""}`;
-          const capaHeadingLines = doc.splitTextToSize(capaHeading, pageWidth - margin * 2);
-          doc.text(capaHeadingLines, margin, y);
-          y += capaHeadingLines.length * 4.2 + 2;
-
-          drawKeyValueTable([
-            ["Linked NCR", selectedRow.number],
-            ["Owner", getPdfText(capa.owner)],
-            ["Due Date", formatDate(capa.due_date)],
-            ["Status", getPdfText(capa.status)],
-            ["Effectiveness Status", normaliseEffectivenessStatus(capa.effectiveness_status)],
-            ["Effectiveness Due Date", formatDate(capa.effectiveness_due_date)],
-            ["Effectiveness Review Date", formatDate(capa.effectiveness_review_date)],
-            ["Effectiveness Reviewer", getPdfText(capa.effectiveness_reviewer)],
-          ]);
-
-          drawParagraphBox("Correction Description", getPdfText(capa.correction_description), 18);
-          drawParagraphBox(
-            "Corrective Action Description",
-            getPdfText(capa.corrective_action_description),
-            20
-          );
-          drawParagraphBox("Effectiveness Comments", getPdfText(capa.effectiveness_comments), 18);
-        });
       }
 
         if (includeEvidenceListInPdf) {
@@ -1691,10 +1783,7 @@ function NcrCapaPageContent() {
             );
 
               const evidenceRows = selectedNcrPdfEvidence.map((file) => ({
-                record:
-                  file.record_type === "NCR"
-                    ? selectedRow.number
-                    : capas.find((capa) => capa.id === file.record_id)?.capa_number || "CAPA",
+                record: selectedRow.number,
                 file_name: file.file_name,
                 uploaded: formatDateTime(file.uploaded_at),
                 file_type: getEvidenceTypeLabel(file),
@@ -1783,11 +1872,7 @@ function NcrCapaPageContent() {
                     maxImageWidth
                   );
                   const captionHeight = Math.max(6, captionLines.length * 4.2);
-                  const metaLine = `${
-                    file.record_type === "NCR"
-                      ? selectedRow.number
-                      : capas.find((capa) => capa.id === file.record_id)?.capa_number || "CAPA"
-                  } | ${formatDateTime(file.uploaded_at)}`;
+                  const metaLine = `${selectedRow.number} | ${formatDateTime(file.uploaded_at)}`;
                   const blockHeight = captionHeight + 5 + drawHeight + 10;
 
                   if (y + blockHeight > pageHeight - margin) {
@@ -1860,7 +1945,7 @@ function NcrCapaPageContent() {
           file_name: fileName,
           file_path: filePath,
           generated_by: generatedBy,
-          include_linked_capa: includeLinkedCapaInPdf && selectedLinkedCapas.length > 0,
+          include_linked_capa: false,
           include_evidence_list: includeEvidenceListInPdf,
           external_facing: externalFacingPdf,
         },
@@ -1871,11 +1956,11 @@ function NcrCapaPageContent() {
         return;
       }
 
-      setMessage("NCR/CAPA PDF generated and saved successfully.");
+      setMessage("NCR PDF generated and saved successfully.");
       await loadData();
     } catch (error) {
       console.error(error);
-      setMessage("NCR/CAPA PDF generation failed.");
+      setMessage("NCR PDF generation failed.");
     } finally {
       setGeneratingPdf(false);
     }
@@ -1902,8 +1987,9 @@ function NcrCapaPageContent() {
         ["Severity", severityFilter],
         ["Source Type", sourceFilter],
         ["Project", projectFilter],
+        ["Year", yearFilter],
         ["Search", search.trim() || "None"],
-        ["Focus Attention", showAttentionOnly ? "Yes" : "No"],
+        ["Quick Filter", ncrQuickFilter || "None"],
       ];
 
       try {
@@ -1974,7 +2060,8 @@ function NcrCapaPageContent() {
           overdue_days: overdueDays ? String(overdueDays) : "-",
           description: row.description || "-",
           root_cause: row.root_cause_description || "-",
-          corrective_action: row.containment_action || "-",
+          containment_action: row.containment_action || "-",
+          corrective_action: row.corrective_action || "-",
           is_overdue: Boolean(overdueDays),
           severity: row.severity || "",
         };
@@ -1995,6 +2082,7 @@ function NcrCapaPageContent() {
           { header: "Due Date", dataKey: "due_date" },
           { header: "Overdue Days", dataKey: "overdue_days" },
           { header: "Description", dataKey: "description" },
+          { header: "Containment", dataKey: "containment_action" },
           { header: "Root Cause", dataKey: "root_cause" },
           { header: "Corrective Action", dataKey: "corrective_action" },
         ],
@@ -2016,16 +2104,17 @@ function NcrCapaPageContent() {
         },
         columnStyles: {
           ncr_number: { cellWidth: 22 },
-          source: { cellWidth: 22 },
-          audit_type: { cellWidth: 18 },
-          category: { cellWidth: 20 },
-          status: { cellWidth: 16 },
-          owner: { cellWidth: 18 },
-          due_date: { cellWidth: 18 },
-          overdue_days: { cellWidth: 14, halign: "center" },
-          description: { cellWidth: 42 },
-          root_cause: { cellWidth: 42 },
-          corrective_action: { cellWidth: 42 },
+          source: { cellWidth: 18 },
+          audit_type: { cellWidth: 16 },
+          category: { cellWidth: 18 },
+          status: { cellWidth: 14 },
+          owner: { cellWidth: 16 },
+          due_date: { cellWidth: 14 },
+          overdue_days: { cellWidth: 12, halign: "center" },
+          description: { cellWidth: 31 },
+          containment_action: { cellWidth: 31 },
+          root_cause: { cellWidth: 31 },
+          corrective_action: { cellWidth: 31 },
         },
         didParseCell: (data) => {
           if (data.section !== "body") return;
@@ -2068,7 +2157,7 @@ function NcrCapaPageContent() {
     }
   }
 
-  const statusOptions = ["Open", "In Progress", "On Hold", "Closed"];
+  const statusOptions = ["Open", "In Progress", "Closed"];
   const severityOptions = ["Low", "Medium", "High"];
   const sourceOptions = ["Internal", "Supplier", "External"];
   const rootCauseOptions = [
@@ -2083,6 +2172,29 @@ function NcrCapaPageContent() {
   const effectivenessStatusOptions = ["Pending", "Effective", "Not Effective"];
   const importHasErrors = importRows.some((row) => row.errors.length > 0);
   const importValidRows = importRows.filter((row) => row.errors.length === 0);
+
+  function getOtherRootCauseCategoryText(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === "Other") return "";
+    if (trimmed.startsWith("Other - ")) return trimmed.replace("Other - ", "").trim();
+    if (!rootCauseOptions.includes(trimmed)) return trimmed;
+    return "";
+  }
+
+  function getRootCauseCategorySelectValue(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    if (trimmed === "Other" || trimmed.startsWith("Other - ") || !rootCauseOptions.includes(trimmed)) {
+      return "Other";
+    }
+    return trimmed;
+  }
+
+  function resolveRootCauseCategory(category: string, otherCategory: string) {
+    if (getRootCauseCategorySelectValue(category) !== "Other") return category;
+    const trimmedOther = otherCategory.trim();
+    return trimmedOther ? `Other - ${trimmedOther}` : "Other";
+  }
 
   function getImportCell(row: Record<string, unknown>, columnName: string) {
     const target = normalizeImportHeader(columnName);
@@ -2128,6 +2240,7 @@ function NcrCapaPageContent() {
         const title = getImportCell(row, "Title");
         const description = getImportCell(row, "Description");
         const containmentAction = getImportCell(row, "Containment Action");
+        const correctiveAction = getImportCell(row, "Corrective Action");
         const project = getImportCell(row, "Project");
         const owner = getImportCell(row, "Owner");
         const severity = normalizeImportOption(getImportCell(row, "Severity"), severityOptions, "");
@@ -2171,6 +2284,7 @@ function NcrCapaPageContent() {
           title,
           description,
           containment_action: containmentAction,
+          corrective_action: correctiveAction,
           project,
           owner,
           severity,
@@ -2215,6 +2329,7 @@ function NcrCapaPageContent() {
       title: row.title,
       description: row.description,
       containment_action: row.containment_action || null,
+      corrective_action: row.corrective_action || null,
       severity: row.severity,
       status: row.status,
       owner: row.owner,
@@ -2248,9 +2363,9 @@ function NcrCapaPageContent() {
   return (
     <main>
       <QualityPageHero
-        label="NCR / CAPA"
-        title="NCR / CAPA"
-        description="Track nonconformances, corrective actions, effectiveness reviews, evidence, and saved PDF exports from one working register."
+        label="NCR"
+        title="NCR"
+        description="Track nonconformances, containment, corrective actions, root cause, evidence, and saved PDF exports from one working register."
         contextCards={[
           { label: "Last Refreshed", value: refreshStamp || "-" },
           { label: "Latest Record", value: latestRecordLabel },
@@ -2264,7 +2379,10 @@ function NcrCapaPageContent() {
 
         <div style={topMetaActionsStyle}>
           <button type="button" style={secondaryButton} onClick={() => setShowCreatePanel((prev) => !prev)}>
-            {showCreatePanel ? "Hide create panel" : "Show create panel"}
+            {showCreatePanel ? "Hide Create NCR" : "Create New NCR"}
+          </button>
+          <button type="button" style={secondaryButton} onClick={() => setShowImportPanel((prev) => !prev)}>
+            {showImportPanel ? "Hide NCR Import" : "Bulk NCR Excel Import"}
           </button>
           <button type="button" style={secondaryButton} onClick={() => void loadData()}>
             Refresh
@@ -2276,14 +2394,15 @@ function NcrCapaPageContent() {
       </div>
 
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Open Items" value={kpis.openItems} accent="#f59e0b" />
-        <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#ef4444" />
-        <QualityKpiCard title="Due in 7 Days" value={kpis.dueSoon} accent="#22c55e" />
-        <QualityKpiCard title="NCRs" value={kpis.totalNcrs} accent="#60a5fa" />
-        <QualityKpiCard title="CAPAs" value={kpis.totalCapas} accent="#c084fc" />
-        <QualityKpiCard title="Evidence Files" value={kpis.evidenceCount} accent="#f472b6" />
+        <QualityKpiCard title="Open Items" value={kpis.openItems} accent="#f59e0b" onClick={() => applyKpiFilter("Open")} active={ncrQuickFilter === "Open"} />
+        <QualityKpiCard title="In Progress" value={kpis.inProgress} accent="#7c3aed" onClick={() => applyKpiFilter("In Progress")} active={ncrQuickFilter === "In Progress"} />
+        <QualityKpiCard title="Closed NCRs" value={kpis.closed} accent="#16a34a" onClick={() => applyKpiFilter("Closed")} active={ncrQuickFilter === "Closed"} />
+        <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#ef4444" onClick={() => applyKpiFilter("Overdue")} active={ncrQuickFilter === "Overdue"} />
+        <QualityKpiCard title="Due in 7 Days" value={kpis.dueSoon} accent="#22c55e" onClick={() => applyKpiFilter("DueSoon")} active={ncrQuickFilter === "DueSoon"} />
+        <QualityKpiCard title="Total NCRs" value={kpis.totalNcrs} accent="#60a5fa" onClick={() => applyKpiFilter("All")} active={ncrQuickFilter === "All"} />
       </section>
 
+      {showImportPanel ? (
       <section style={{ marginBottom: "20px" }}>
         <SectionCard
           title="Bulk NCR Excel Import"
@@ -2384,38 +2503,16 @@ function NcrCapaPageContent() {
           ) : null}
         </SectionCard>
       </section>
+      ) : null}
 
       <section style={topGridStyle}>
         {showCreatePanel ? (
-          <SectionCard title="Add Quality Record" subtitle="Create a new NCR or CAPA.">
-            <div style={createTabWrapStyle}>
-              <button
-                type="button"
-                onClick={() => setActiveCreateTab("NCR")}
-                style={{
-                  ...createTabButtonStyle,
-                  background: activeCreateTab === "NCR" ? "#2563eb" : "transparent",
-                  color: activeCreateTab === "NCR" ? "#ffffff" : "#1e3a8a",
-                }}
-              >
-                New NCR
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveCreateTab("CAPA")}
-                style={{
-                  ...createTabButtonStyle,
-                  background: activeCreateTab === "CAPA" ? "#7c3aed" : "transparent",
-                  color: activeCreateTab === "CAPA" ? "#ffffff" : "#5b21b6",
-                }}
-              >
-                New CAPA
-              </button>
-            </div>
-
+          <SectionCard title="Create a New NCR" subtitle="Capture the nonconformance, containment, corrective action, root cause, ownership, due date, and evidence.">
             {activeCreateTab === "NCR" ? (
               <div style={createPanelNcrStyle}>
                 <div style={detailFormGridStyle}>
+                  <div style={formSectionTitleStyle}>A. Core NCR Information</div>
+
                   <div style={{ gridColumn: "1 / -1" }}>
                     <label style={labelStyle}>Title</label>
                     <input
@@ -2436,16 +2533,6 @@ function NcrCapaPageContent() {
                     />
                   </div>
 
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <label style={labelStyle}>Containment Action</label>
-                    <textarea
-                      style={textareaStyle}
-                      value={newNcr.containment_action}
-                      onChange={(e) => setNewNcr({ ...newNcr, containment_action: e.target.value })}
-                      placeholder="Describe the immediate action taken to contain the nonconformance"
-                    />
-                  </div>
-
                   <div>
                     <label style={labelStyle}>Project</label>
                     <input
@@ -2458,12 +2545,18 @@ function NcrCapaPageContent() {
 
                   <div>
                     <label style={labelStyle}>Owner</label>
-                    <input
+                    <select
                       style={inputStyle}
                       value={newNcr.owner}
                       onChange={(e) => setNewNcr({ ...newNcr, owner: e.target.value })}
-                      placeholder="Owner"
-                    />
+                    >
+                      <option value="">Select owner</option>
+                      {createOwnerOptions.map((owner) => (
+                        <option key={owner} value={owner}>
+                          {owner}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -2525,12 +2618,30 @@ function NcrCapaPageContent() {
                     />
                   </div>
 
+                  <div style={formSectionTitleStyle}>B. Containment Action</div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Containment Action</label>
+                    <textarea
+                      style={textareaStyle}
+                      value={newNcr.containment_action}
+                      onChange={(e) => setNewNcr({ ...newNcr, containment_action: e.target.value })}
+                      placeholder="Describe the immediate action taken to contain the nonconformance"
+                    />
+                  </div>
+
+                  <div style={formSectionTitleStyle}>C. Root Cause</div>
+
                   <div>
                     <label style={labelStyle}>Root Cause Category</label>
                     <select
                       style={inputStyle}
-                      value={newNcr.root_cause_category}
-                      onChange={(e) => setNewNcr({ ...newNcr, root_cause_category: e.target.value })}
+                      value={getRootCauseCategorySelectValue(newNcr.root_cause_category)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setNewNcr({ ...newNcr, root_cause_category: value });
+                        if (value !== "Other") setNewRootCauseOther("");
+                      }}
                     >
                       <option value="">Select category</option>
                       {rootCauseOptions.map((option) => (
@@ -2541,6 +2652,18 @@ function NcrCapaPageContent() {
                     </select>
                   </div>
 
+                  {getRootCauseCategorySelectValue(newNcr.root_cause_category) === "Other" ? (
+                    <div>
+                      <label style={labelStyle}>Other Root Cause Category</label>
+                      <input
+                        style={inputStyle}
+                        value={newRootCauseOther}
+                        onChange={(e) => setNewRootCauseOther(e.target.value)}
+                        placeholder="Type the root cause category"
+                      />
+                    </div>
+                  ) : null}
+
                   <div style={{ gridColumn: "1 / -1" }}>
                     <label style={labelStyle}>Root Cause Description</label>
                     <textarea
@@ -2550,6 +2673,20 @@ function NcrCapaPageContent() {
                       placeholder="Describe the underlying cause of the NCR"
                     />
                   </div>
+
+                  <div style={formSectionTitleStyle}>D. Corrective Action</div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Corrective Action</label>
+                    <textarea
+                      style={textareaStyle}
+                      value={newNcr.corrective_action}
+                      onChange={(e) => setNewNcr({ ...newNcr, corrective_action: e.target.value })}
+                      placeholder="Describe the corrective action to prevent recurrence"
+                    />
+                  </div>
+
+                  <div style={formSectionTitleStyle}>E. Evidence</div>
 
                   <div>
                     <label style={labelStyle}>Evidence Files (optional)</label>
@@ -2581,6 +2718,7 @@ function NcrCapaPageContent() {
                         title: "",
                         description: "",
                         containment_action: "",
+                        corrective_action: "",
                         severity: "Medium",
                         status: "Open",
                         owner: "",
@@ -2593,6 +2731,7 @@ function NcrCapaPageContent() {
                       });
                       setCreateNcrFiles([]);
                       setCreateNcrEvidenceNotes("");
+                      setNewRootCauseOther("");
                     }}
                   >
                     Clear
@@ -2865,12 +3004,9 @@ function NcrCapaPageContent() {
               </div>
             )}
           </SectionCard>
-        ) : (
-          <SectionCard title="Add Quality Record" subtitle="Create a new NCR or CAPA.">
-            <div style={emptyBoardStyle}>Create panel hidden. Use the button above to show it again.</div>
-          </SectionCard>
-        )}
+        ) : null}
 
+        {false ? (
         <div style={sidePanelStackStyle}>
           <SectionCard
             title="Top 5 Raised NCRs by Severity"
@@ -2988,41 +3124,17 @@ function NcrCapaPageContent() {
             )}
           </SectionCard>
         </div>
+        ) : null}
       </section>
 
       <section style={workspaceGridStyle}>
-        <SectionCard title="NCR / CAPA Log" subtitle="Table-led working register for day-to-day review, update, and evidence handling.">
+        <SectionCard title="NCR Register" subtitle="Table-led working register for day-to-day review, update, evidence handling, linked actions, and PDF reporting.">
           <div style={toolbarStyle}>
-            <div style={createTabWrapStyle}>
-              <button
-                type="button"
-                onClick={() => setActiveLogTab("NCR")}
-                style={{
-                  ...createTabButtonStyle,
-                  background: activeLogTab === "NCR" ? "#2563eb" : "transparent",
-                  color: activeLogTab === "NCR" ? "#ffffff" : "#1e3a8a",
-                }}
-              >
-                NCR View
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveLogTab("CAPA")}
-                style={{
-                  ...createTabButtonStyle,
-                  background: activeLogTab === "CAPA" ? "#7c3aed" : "transparent",
-                  color: activeLogTab === "CAPA" ? "#ffffff" : "#5b21b6",
-                }}
-              >
-                CAPA View
-              </button>
-            </div>
-
             <input
               style={toolbarSearchStyle}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search ${activeLogTab === "NCR" ? "NCR" : "CAPA"} number, title, owner, project...`}
+              placeholder="Search NCR number, title, owner, project..."
             />
 
             <div style={toolbarFiltersStyle}>
@@ -3069,6 +3181,15 @@ function NcrCapaPageContent() {
               ) : null}
 
               <div style={toolbarLabeledControlStyle}>
+                <label style={toolbarLabelStyle}>Year</label>
+                <select style={toolbarSelectStyle} value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                  {yearOptions.map((option) => (
+                    <option key={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={toolbarLabeledControlStyle}>
                 <label style={toolbarLabelStyle}>Project</label>
                 <select style={toolbarSelectStyle} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
                   {projectOptions.map((option) => (
@@ -3096,11 +3217,11 @@ function NcrCapaPageContent() {
 
           <div style={tableInfoRowStyle}>
             Showing <strong>{filteredRows.length}</strong> of{" "}
-            <strong>{activeLogTab === "NCR" ? ncrs.length : capas.length}</strong> {activeLogTab} records
+            <strong>{kpis.totalNcrs}</strong> NCR records for {yearFilter}
           </div>
 
           {loading ? (
-            <div style={emptyBoardStyle}>Loading NCR / CAPA records...</div>
+            <div style={emptyBoardStyle}>Loading NCR records...</div>
           ) : filteredRows.length === 0 ? (
             <div style={emptyBoardStyle}>No matching records found.</div>
           ) : (
@@ -3273,6 +3394,8 @@ function NcrCapaPageContent() {
                 </div>
 
                 <div style={detailFormGridStyle}>
+                  <div style={formSectionTitleStyle}>A. Core NCR Information</div>
+
                   <div style={{ gridColumn: "1 / -1" }}>
                     <label style={labelStyle}>Title</label>
                     <input
@@ -3306,11 +3429,18 @@ function NcrCapaPageContent() {
 
                   <div>
                     <label style={labelStyle}>Owner</label>
-                    <input
+                    <select
                       style={inputStyle}
                       value={editRow.owner}
                       onChange={(e) => setEditRow({ ...editRow, owner: e.target.value })}
-                    />
+                    >
+                      <option value="">Select owner</option>
+                      {editOwnerOptions.map((owner) => (
+                        <option key={owner} value={owner}>
+                          {owner}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -3334,17 +3464,6 @@ function NcrCapaPageContent() {
 
                   {editRow.type === "NCR" && (
                     <>
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Containment Action</label>
-                        <textarea
-                          style={textareaStyle}
-                          value={editRow.containment_action}
-                          onChange={(e) =>
-                            setEditRow({ ...editRow, containment_action: e.target.value })
-                          }
-                        />
-                      </div>
-
                       <div>
                         <label style={labelStyle}>Severity</label>
                         <select
@@ -3380,14 +3499,31 @@ function NcrCapaPageContent() {
                         />
                       </div>
 
+                      <div style={formSectionTitleStyle}>B. Containment Action</div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Containment Action</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.containment_action}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, containment_action: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div style={formSectionTitleStyle}>C. Root Cause</div>
+
                       <div>
                         <label style={labelStyle}>Root Cause Category</label>
                         <select
                           style={inputStyle}
-                          value={editRow.root_cause_category}
-                          onChange={(e) =>
-                            setEditRow({ ...editRow, root_cause_category: e.target.value })
-                          }
+                          value={getRootCauseCategorySelectValue(editRow.root_cause_category)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setEditRow({ ...editRow, root_cause_category: value });
+                            if (value !== "Other") setEditRootCauseOther("");
+                          }}
                         >
                           <option value="">Select category</option>
                           {rootCauseOptions.map((option) => (
@@ -3398,6 +3534,18 @@ function NcrCapaPageContent() {
                         </select>
                       </div>
 
+                      {getRootCauseCategorySelectValue(editRow.root_cause_category) === "Other" ? (
+                        <div>
+                          <label style={labelStyle}>Other Root Cause Category</label>
+                          <input
+                            style={inputStyle}
+                            value={editRootCauseOther}
+                            onChange={(e) => setEditRootCauseOther(e.target.value)}
+                            placeholder="Type the root cause category"
+                          />
+                        </div>
+                      ) : null}
+
                       <div style={{ gridColumn: "1 / -1" }}>
                         <label style={labelStyle}>Root Cause Description</label>
                         <textarea
@@ -3405,6 +3553,19 @@ function NcrCapaPageContent() {
                           value={editRow.root_cause_description}
                           onChange={(e) =>
                             setEditRow({ ...editRow, root_cause_description: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div style={formSectionTitleStyle}>D. Corrective Action</div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Corrective Action</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.corrective_action}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, corrective_action: e.target.value })
                           }
                         />
                       </div>
@@ -3583,30 +3744,13 @@ function NcrCapaPageContent() {
                       <label style={checkboxCardStyle}>
                         <input
                           type="checkbox"
-                          checked={includeLinkedCapaInPdf}
-                          disabled={selectedLinkedCapas.length === 0}
-                          onChange={(e) => setIncludeLinkedCapaInPdf(e.target.checked)}
-                        />
-                        <span>
-                          Include linked CAPA
-                          <small style={checkboxHintStyle}>
-                            {selectedLinkedCapas.length === 0
-                              ? "No linked CAPA found for this NCR"
-                              : `${selectedLinkedCapas.length} linked CAPA${selectedLinkedCapas.length === 1 ? "" : "s"} available`}
-                          </small>
-                        </span>
-                      </label>
-
-                      <label style={checkboxCardStyle}>
-                        <input
-                          type="checkbox"
                           checked={includeEvidenceListInPdf}
                           onChange={(e) => setIncludeEvidenceListInPdf(e.target.checked)}
                         />
                         <span>
                           Include evidence list
                           <small style={checkboxHintStyle}>
-                            List uploaded NCR / linked CAPA evidence without embedding files
+                            List uploaded NCR evidence without embedding files
                           </small>
                         </span>
                       </label>
@@ -3665,6 +3809,50 @@ function NcrCapaPageContent() {
                         </button>
                       ) : null}
                     </div>
+                  </div>
+                ) : null}
+
+                {editRow.type === "NCR" ? (
+                  <div style={linkedActionsPanelStyle}>
+                    <div style={pdfExportHeaderStyle}>
+                      <div>
+                        <div style={pdfExportTitleStyle}>Linked Actions</div>
+                        <div style={pdfExportSubtitleStyle}>
+                          Central Action Management items linked to this NCR.
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedLinkedActions.length === 0 ? (
+                      <div style={emptyBoardStyle}>No central actions are linked to this NCR yet.</div>
+                    ) : (
+                      <div style={linkedActionListStyle}>
+                        {selectedLinkedActions.map((action) => (
+                          <div key={action.id} style={linkedActionItemStyle}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={linkedActionTitleStyle}>
+                                {action.action_number || "Action"} - {action.title || "Untitled action"}
+                              </div>
+                              <div style={linkedActionMetaStyle}>
+                                Status: <strong>{action.status || "-"}</strong> | Owner:{" "}
+                                <strong>{action.owner || "-"}</strong> | Due:{" "}
+                                <strong>{formatDate(action.due_date)}</strong>
+                              </div>
+                            </div>
+                            <Link
+                              href={
+                                action.id
+                                  ? `/actions?actionId=${encodeURIComponent(action.id)}`
+                                  : `/actions?action=${encodeURIComponent(action.action_number || "")}`
+                              }
+                              style={{ ...secondaryButtonSmall, textDecoration: "none", whiteSpace: "nowrap" }}
+                            >
+                              Open Linked Action
+                            </Link>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : null}
 
@@ -4024,7 +4212,7 @@ const statsGridStyle: CSSProperties = {
 
 const topGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.05fr 0.95fr",
+  gridTemplateColumns: "1fr",
   gap: "20px",
   marginBottom: "20px",
 };
@@ -4228,6 +4416,14 @@ const detailFormGridStyle: CSSProperties = {
   gap: "12px",
 };
 
+const formSectionTitleStyle: CSSProperties = {
+  gridColumn: "1 / -1",
+  fontSize: 13,
+  fontWeight: 800,
+  color: "#0f172a",
+  paddingTop: 4,
+};
+
 const pickerRowStyle: CSSProperties = {
   display: "flex",
   gap: "10px",
@@ -4415,6 +4611,42 @@ const pdfSavedMetaStyle: CSSProperties = {
   gap: "10px 18px",
   fontSize: "12.5px",
   color: "#475569",
+};
+
+const linkedActionsPanelStyle: CSSProperties = {
+  marginTop: "16px",
+  padding: "14px",
+  borderRadius: "16px",
+  background: "#f8fafc",
+  border: "1px solid #dbeafe",
+};
+
+const linkedActionListStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const linkedActionItemStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "center",
+  padding: "12px",
+  borderRadius: "12px",
+  background: "#ffffff",
+  border: "1px solid #e2e8f0",
+};
+
+const linkedActionTitleStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 800,
+  color: "#0f172a",
+};
+
+const linkedActionMetaStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "12px",
+  color: "#64748b",
 };
 
 const compactInsightListStyle: CSSProperties = {
@@ -4615,7 +4847,7 @@ const badgeStyle: CSSProperties = {
 };
 export default function NcrCapaPage() {
   return (
-    <Suspense fallback={<main style={{ padding: "24px" }}>Loading NCR / CAPA...</main>}>
+    <Suspense fallback={<main style={{ padding: "24px" }}>Loading NCR...</main>}>
       <NcrCapaPageContent />
     </Suspense>
   );

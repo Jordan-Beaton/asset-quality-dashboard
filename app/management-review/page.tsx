@@ -611,9 +611,19 @@ export default function ManagementReviewPage() {
 
       <section style={kpiGridStyle}>
         <QualityKpiCard title="Quality Open Items" value={displayValue(qualityOpenItems)} accent={healthTone(qualityOpenItems)} />
-        <QualityKpiCard title="Overdue Actions" value={displayValue(snapshot.actions.overdue)} accent={healthTone(snapshot.actions.overdue)} />
+        <QualityKpiCard
+          title="Overdue Actions"
+          value={displayValue(snapshot.actions.overdue)}
+          accent={healthTone(snapshot.actions.overdue)}
+          href="/actions?view=register&overdue=1"
+        />
         <QualityKpiCard title="High/Critical Risks" value={displayValue(snapshot.risk.highCritical)} accent={healthTone(snapshot.risk.highCritical)} />
-        <QualityKpiCard title="Document Reviews Due" value={displayValue(snapshot.documents.overdueReviews)} accent={healthTone(snapshot.documents.overdueReviews)} />
+        <QualityKpiCard
+          title="Document Reviews Due"
+          value={displayValue(snapshot.documents.overdueReviews)}
+          accent={healthTone(snapshot.documents.overdueReviews)}
+          href="/documents?review=Overdue"
+        />
         <QualityKpiCard title="Asset Due Pressure" value={displayValue(snapshot.assets.overdueCalibration === null || snapshot.assets.overdueInspection === null || snapshot.assets.overdueMaintenance === null ? null : (snapshot.assets.overdueCalibration || 0) + (snapshot.assets.overdueInspection || 0) + (snapshot.assets.overdueMaintenance || 0))} accent="#2563eb" />
         <QualityKpiCard title="HSE Readiness" value="Pending" accent="#64748b" />
       </section>
@@ -621,19 +631,31 @@ export default function ManagementReviewPage() {
       <section style={panelGridStyle}>
         <SnapshotPanel title="Quality" subtitle="NCR, CAPA, audit finding, and MOC control health.">
           <MetricGrid>
-            <Metric label="Open NCRs" value={snapshot.quality.openNcrs} tone={healthTone(snapshot.quality.openNcrs)} />
-            <Metric label="Overdue CAPAs" value={snapshot.quality.overdueCapas} tone={healthTone(snapshot.quality.overdueCapas)} />
-            <Metric label="Open Audit Findings" value={snapshot.quality.openAuditFindings} tone={healthTone(snapshot.quality.openAuditFindings)} />
+            <Metric label="Open NCRs" value={snapshot.quality.openNcrs} tone={healthTone(snapshot.quality.openNcrs)} href="/ncr-capa?type=NCR&status=Open" />
+            <Metric label="Overdue CAPAs" value={snapshot.quality.overdueCapas} tone={healthTone(snapshot.quality.overdueCapas)} href="/ncr-capa?type=CAPA&overdue=1" />
+            <Metric
+              label="Open Audit Findings"
+              value={snapshot.quality.openAuditFindings}
+              tone={healthTone(snapshot.quality.openAuditFindings)}
+              href="/audits?view=open-findings"
+            />
             <Metric label="Closed Findings This Month" value={snapshot.quality.closedFindingsThisMonth} tone="#16a34a" />
-            <Metric label="Open MOCs" value={snapshot.quality.openMocs} tone={healthTone(snapshot.quality.openMocs)} />
+            <Metric label="Open MOCs" value={snapshot.quality.openMocs} tone={healthTone(snapshot.quality.openMocs)} href="/moc?status=Active" />
           </MetricGrid>
         </SnapshotPanel>
 
         <SnapshotPanel title="Actions" subtitle="Central action follow-up control across active modules.">
           <ChartBlock data={actionPressure} type="bar" />
           <MetricGrid>
-            <Metric label="Open Actions" value={snapshot.actions.open} tone="#2563eb" />
-            <Metric label="Due This Week" value={snapshot.actions.dueThisWeek} tone="#f59e0b" />
+            <Metric label="Open Actions" value={snapshot.actions.open} tone="#2563eb" href="/actions?view=register&status=Open" />
+            <Metric label="Overdue Actions" value={snapshot.actions.overdue} tone={healthTone(snapshot.actions.overdue)} href="/actions?view=register&overdue=1" />
+            <Metric
+              label="High Priority"
+              value={snapshot.actions.highPriorityOpen}
+              tone={healthTone(snapshot.actions.highPriorityOpen)}
+              href="/actions?view=register&priority=High"
+            />
+            <Metric label="Due This Week" value={snapshot.actions.dueThisWeek} tone="#f59e0b" href="/actions?view=register&dueWindow=7" />
           </MetricGrid>
         </SnapshotPanel>
 
@@ -648,8 +670,13 @@ export default function ManagementReviewPage() {
         <SnapshotPanel title="Documents" subtitle="Document review and approval workflow health.">
           <ChartBlock data={documentPressure} type="bar" />
           <MetricGrid>
-            <Metric label="Overdue Reviews" value={snapshot.documents.overdueReviews} tone={healthTone(snapshot.documents.overdueReviews)} />
-            <Metric label="Due Soon" value={snapshot.documents.dueSoon} tone="#f59e0b" />
+            <Metric
+              label="Overdue Reviews"
+              value={snapshot.documents.overdueReviews}
+              tone={healthTone(snapshot.documents.overdueReviews)}
+              href="/documents?review=Overdue"
+            />
+            <Metric label="Due Soon" value={snapshot.documents.dueSoon} tone="#f59e0b" href="/documents?review=Due%20soon" />
             <Metric label="Pending Review/Approval" value={snapshot.documents.pendingReviewApproval} tone="#2563eb" />
           </MetricGrid>
         </SnapshotPanel>
@@ -704,14 +731,24 @@ function MetricGrid({ children }: { children: ReactNode }) {
   return <div style={metricGridStyle}>{children}</div>;
 }
 
-function Metric({ label, value, tone }: { label: string; value: CountValue; tone: string }) {
-  return (
+function Metric({ label, value, tone, href }: { label: string; value: CountValue; tone: string; href?: string }) {
+  const content = (
     <div style={metricCardStyle}>
       <div style={{ ...metricAccentStyle, background: tone }} />
       <div style={metricLabelStyle}>{label}</div>
       <div style={metricValueStyle}>{displayValue(value)}</div>
     </div>
   );
+
+  if (href) {
+    return (
+      <Link href={href} style={metricLinkStyle}>
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }
 
 function ChartBlock({ data, type }: { data: ChartDatum[]; type: "bar" | "pie" }) {
@@ -831,6 +868,12 @@ const metricCardStyle: CSSProperties = {
   background: "#f8fafc",
   padding: "14px",
   overflow: "hidden",
+};
+
+const metricLinkStyle: CSSProperties = {
+  display: "block",
+  color: "inherit",
+  textDecoration: "none",
 };
 
 const metricAccentStyle: CSSProperties = {

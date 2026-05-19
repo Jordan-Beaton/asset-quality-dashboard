@@ -540,6 +540,8 @@ function ActionsPageContent() {
   const linkedCreatedMonth = searchParams.get("createdMonth")?.trim() || "";
   const linkedClosedMonth = searchParams.get("closedMonth")?.trim() || "";
   const linkedView = searchParams.get("view")?.trim() || "";
+  const directActionNumber = searchParams.get("action")?.trim() || "";
+  const directActionId = searchParams.get("actionId")?.trim() || "";
   const prefillSource = searchParams.get("prefill_source")?.trim() || "";
   const prefillDepartment = searchParams.get("prefill_department")?.trim() || "";
   const prefillProject = searchParams.get("prefill_project")?.trim() || "";
@@ -576,6 +578,8 @@ function ActionsPageContent() {
   );
   const hasRegisterFilterParams = Boolean(
     linkedSearch ||
+      directActionNumber ||
+      directActionId ||
       linkedStatus ||
       linkedPriority ||
       linkedOwner ||
@@ -1151,6 +1155,25 @@ function ActionsPageContent() {
     if (!linkedAction) return;
     setSelectedEvidenceAction((current) => current?.id === linkedAction.id ? current : linkedAction);
   }, [linkedAction]);
+
+  useEffect(() => {
+    if (hasCreatePrefillParams || actions.length === 0 || (!directActionId && !directActionNumber)) return;
+
+    const directNumber = directActionNumber.trim().toLowerCase();
+    const match = actions.find((action) => {
+      if (directActionId && action.id === directActionId) return true;
+      return Boolean(
+        directNumber &&
+          (action.action_number || "").trim().toLowerCase() === directNumber
+      );
+    });
+
+    if (!match) return;
+
+    setActiveView("register");
+    setSelectedEvidenceAction((current) => (current?.id === match.id ? current : match));
+    if (match.action_number) setSearch(match.action_number);
+  }, [actions, directActionId, directActionNumber, hasCreatePrefillParams]);
 
   useEffect(() => {
     if (!selectedEvidenceAction) return;
@@ -1887,6 +1910,13 @@ function ActionsPageContent() {
     setSelectedEvidenceAction(null);
   }
 
+  function openActionInRegister(action: ActionItem) {
+    setActiveView("register");
+    setSelectedEvidenceAction(action);
+    setSearch(action.action_number || "");
+    setQuickFilter("");
+  }
+
   return (
     <main>
       <QualityPageHero
@@ -2337,6 +2367,10 @@ function ActionsPageContent() {
               <MiniListCard
                 title="My Overdue Actions"
                 emptyText="No overdue actions are assigned to you."
+                onItemClick={(id) => {
+                  const action = actions.find((item) => item.id === id);
+                  if (action) openActionInRegister(action);
+                }}
                 items={myOverdueActions.slice(0, 8).map((action) => ({
                   id: action.id,
                   line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
@@ -2349,6 +2383,10 @@ function ActionsPageContent() {
               <MiniListCard
                 title="My Due This Week"
                 emptyText="No actions assigned to you are due this week."
+                onItemClick={(id) => {
+                  const action = actions.find((item) => item.id === id);
+                  if (action) openActionInRegister(action);
+                }}
                 items={myDueThisWeekActions.slice(0, 8).map((action) => ({
                   id: action.id,
                   line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
@@ -2957,6 +2995,18 @@ function ActionsPageContent() {
                       NCR: <strong>{editForm.linked_ncr_number}</strong>
                     </div>
                   ) : null}
+                  {editForm.source === "NCR/CAPA" && (editForm.linked_ncr_id || editForm.linked_ncr_number) ? (
+                    <Link
+                      href={
+                        editForm.linked_ncr_id
+                          ? `/ncr-capa?ncrId=${encodeURIComponent(editForm.linked_ncr_id)}`
+                          : `/ncr-capa?ncr=${encodeURIComponent(editForm.linked_ncr_number)}`
+                      }
+                      style={backLinkStyle}
+                    >
+                      Open Linked NCR
+                    </Link>
+                  ) : null}
                   {editForm.source === "NCR/CAPA" && editForm.linked_capa_number ? (
                     <div style={linkedSourceMetaStyle}>
                       CAPA: <strong>{editForm.linked_capa_number}</strong>
@@ -3153,6 +3203,7 @@ function MiniListCard({
   title,
   emptyText,
   items,
+  onItemClick,
 }: {
   title: string;
   emptyText: string;
@@ -3162,6 +3213,7 @@ function MiniListCard({
     line2: string;
     tone: "red" | "amber";
   }>;
+  onItemClick?: (id: string) => void;
 }) {
   return (
     <div style={miniListCardStyle}>
@@ -3172,17 +3224,20 @@ function MiniListCard({
       ) : (
         <div style={miniListWrapStyle}>
           {items.map((item) => (
-            <div
+            <button
+              type="button"
               key={item.id}
+              onClick={onItemClick ? () => onItemClick(item.id) : undefined}
               style={{
                 ...miniListItemStyle,
                 borderLeft: item.tone === "red" ? "4px solid #dc2626" : "4px solid #f59e0b",
                 background: item.tone === "red" ? "#fef2f2" : "#fffbeb",
+                cursor: onItemClick ? "pointer" : "default",
               }}
             >
               <div style={miniListLine1Style}>{item.line1}</div>
               <div style={miniListLine2Style}>{item.line2}</div>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -3724,6 +3779,12 @@ const miniListWrapStyle: CSSProperties = {
 const miniListItemStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "12px 14px",
+  borderTop: "none",
+  borderRight: "none",
+  borderBottom: "none",
+  width: "100%",
+  textAlign: "left",
+  fontFamily: "inherit",
 };
 
 const miniListLine1Style: CSSProperties = {
