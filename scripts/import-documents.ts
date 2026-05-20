@@ -41,6 +41,10 @@ function normaliseRevision(value: unknown): string {
   const text = normaliseText(value)
   if (!text) return 'A'
 
+  if (/^(tbc|tbd|to\s+be\s+drafted|to\s+draft|to\s+be\s+confirmed|to\s+be\s+completed)$/i.test(text)) {
+    return 'A'
+  }
+
   const lettersOnly = text.replace(/[^a-z]/gi, '').toUpperCase()
   if (!lettersOnly) return 'A'
 

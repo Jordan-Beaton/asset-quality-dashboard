@@ -16,6 +16,7 @@ type AuditStatus = "Planned" | "In Progress" | "Completed" | "Overdue" | "Cancel
 type FindingSeverity = "Major" | "Minor" | "OFI" | "OBS";
 type FindingStatus = "Open" | "In Progress" | "Closed";
 type SortKey = "audit_month" | "audit_number" | "title" | "audit_type" | "lead_auditor" | "findings";
+type AuditWorkspaceView = "dashboard" | "programme" | "create" | "findings" | "reports";
 
 type AuditRecord = {
   id: string;
@@ -623,6 +624,21 @@ function AuditsPageContent() {
   >("All");
   const [openFindingTypeFilter, setOpenFindingTypeFilter] = useState<AuditType | "All">("All");
   const [generatingOpenFindingsReport, setGeneratingOpenFindingsReport] = useState(false);
+  const [activeView, setActiveView] = useState<AuditWorkspaceView>(() => {
+    if (linkedView === "open-findings" || linkedView === "closed-findings") return "findings";
+    if (
+      linkedSearch ||
+      linkedStatus !== "All" ||
+      linkedType !== "All" ||
+      linkedMonth !== "All" ||
+      linkedFindingStatus !== "All" ||
+      linkedFindingCategory !== "All"
+    ) {
+      return "programme";
+    }
+
+    return "dashboard";
+  });
 
   const [form, setForm] = useState<AuditForm>(createEmptyAudit());
   const [detailForm, setDetailForm] = useState<AuditForm>(createEmptyAudit());
@@ -808,6 +824,12 @@ function AuditsPageContent() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (isOpenFindingsView || isClosedFindingsView) {
+      setActiveView("findings");
+    }
+  }, [isOpenFindingsView, isClosedFindingsView]);
+
   const monthOptions = useMemo(() => {
     return Array.from(new Set(audits.map((audit) => audit.audit_month))).sort();
   }, [audits]);
@@ -961,6 +983,38 @@ function AuditsPageContent() {
       return matchesCategory && matchesType;
     });
   }, [closedFindings, openFindingCategoryFilter, openFindingTypeFilter]);
+
+  const findingStatusByAuditType = useMemo(() => {
+    return (["Internal", "External", "Supplier"] as AuditType[]).map((auditType) => {
+      const open = openFindings.filter((finding) => finding.audit_type === auditType).length;
+      const closed = closedFindings.filter((finding) => finding.audit_type === auditType).length;
+      return {
+        auditType,
+        open,
+        closed,
+        total: open + closed,
+      };
+    });
+  }, [closedFindings, openFindings]);
+
+  const maxFindingTypeTotal = useMemo(
+    () => Math.max(1, ...findingStatusByAuditType.map((item) => item.total)),
+    [findingStatusByAuditType]
+  );
+
+  const openFindingsReportRowsByType = useMemo(() => {
+    return (["Internal", "External", "Supplier"] as AuditType[]).reduce<Record<AuditType, OpenFindingRow[]>>(
+      (acc, auditType) => {
+        acc[auditType] = openFindings.filter((finding) => {
+          const matchesCategory =
+            openFindingCategoryFilter === "All" || finding.category === openFindingCategoryFilter;
+          return finding.audit_type === auditType && matchesCategory;
+        });
+        return acc;
+      },
+      { Internal: [], External: [], Supplier: [] }
+    );
+  }, [openFindings, openFindingCategoryFilter]);
 
   const activeFindingsWorkspaceRows = isClosedFindingsView ? filteredClosedFindings : filteredOpenFindings;
 
@@ -1246,20 +1300,49 @@ function AuditsPageContent() {
     const params = new URLSearchParams(searchParams.toString());
     if (view) {
       params.set("view", view);
+      setActiveView("findings");
     } else {
       params.delete("view");
+      setActiveView("programme");
     }
     router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
   }
 
+  function openFindingStatusByType(auditType: AuditType, status: "open" | "closed") {
+    setOpenFindingTypeFilter(auditType);
+    setOpenFindingCategoryFilter("All");
+    setAuditView(status === "closed" ? "closed-findings" : "open-findings");
+  }
+
+  function clearFindingViewParam() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("view");
+    router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+  }
+
+  function switchAuditWorkspaceView(view: AuditWorkspaceView) {
+    setActiveView(view);
+
+    if (view === "findings") {
+      setAuditView(isClosedFindingsView ? "closed-findings" : "open-findings");
+      return;
+    }
+
+    if (isOpenFindingsView || isClosedFindingsView) {
+      clearFindingViewParam();
+    }
+  }
+
   function applyAuditStatusKpiFilter(status: AuditStatus) {
     setAuditView(null);
+    setActiveView("programme");
     setStatusFilter(status);
     setAuditQuickFilter("");
   }
 
   function applyMajorFindingsFilter() {
     setAuditView(null);
+    setActiveView("programme");
     setStatusFilter("All");
     setAuditQuickFilter("Major");
   }
@@ -2252,9 +2335,12 @@ function AuditsPageContent() {
     setMessage(`${selectedAudit.audit_number} PDF generated.`);
   }
 
-  function generateOpenAuditNcrReport() {
-    if (filteredOpenFindings.length === 0) {
-      setMessage("No open audit findings match the current filters.");
+  function generateOpenAuditNcrReport(auditTypeOverride?: AuditType) {
+    const reportRows = auditTypeOverride ? openFindingsReportRowsByType[auditTypeOverride] : filteredOpenFindings;
+    const reportTitle = auditTypeOverride ? `${auditTypeOverride} Audit NCR Report` : "Open Audit NCR Report";
+
+    if (reportRows.length === 0) {
+      setMessage(`No open ${auditTypeOverride ? auditTypeOverride.toLowerCase() : "audit"} findings match the current filters.`);
       return;
     }
 
@@ -2266,7 +2352,7 @@ function AuditsPageContent() {
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 12;
       const generatedAt = new Date().toISOString();
-      const typeSummary = openFindingTypeFilter === "All" ? "All audit types" : openFindingTypeFilter;
+      const typeSummary = auditTypeOverride || (openFindingTypeFilter === "All" ? "All audit types" : openFindingTypeFilter);
       const categorySummary =
         openFindingCategoryFilter === "All" ? "All finding categories" : openFindingCategoryFilter;
 
@@ -2278,19 +2364,19 @@ function AuditsPageContent() {
       doc.setTextColor(255, 255, 255);
       doc.text("ENSHORE SUBSEA", margin, 11.5);
       doc.setFontSize(10);
-      doc.text("Open Audit NCR Report", margin, 18);
+      doc.text(reportTitle, margin, 18);
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
       doc.setTextColor(15, 23, 42);
-      doc.text("Open Audit NCR Report", margin, 34);
+      doc.text(reportTitle, margin, 34);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
       doc.setTextColor(71, 85, 105);
       doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 34, { align: "right" });
       doc.text(`Filters: ${typeSummary} | ${categorySummary}`, margin, 41);
-      doc.text(`Open findings: ${filteredOpenFindings.length}`, pageWidth - margin, 41, { align: "right" });
+      doc.text(`Open findings: ${reportRows.length}`, pageWidth - margin, 41, { align: "right" });
 
       autoTable(doc, {
         startY: 47,
@@ -2310,7 +2396,7 @@ function AuditsPageContent() {
           "Containment Action",
           "Corrective Action",
         ]],
-        body: filteredOpenFindings.map((finding) => [
+        body: reportRows.map((finding) => [
           finding.reference,
           finding.audit_number,
           finding.audit_title,
@@ -2330,8 +2416,8 @@ function AuditsPageContent() {
           fontStyle: "bold",
         },
         styles: {
-          fontSize: 7.6,
-          cellPadding: 2,
+          fontSize: 7,
+          cellPadding: 1.7,
           textColor: [15, 23, 42],
           lineColor: [226, 232, 240],
           lineWidth: 0.2,
@@ -2342,22 +2428,22 @@ function AuditsPageContent() {
           fillColor: [248, 250, 252],
         },
         columnStyles: {
-          0: { cellWidth: 16 },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 30 },
-          3: { cellWidth: 17 },
-          4: { cellWidth: 16 },
-          5: { cellWidth: 42 },
-          6: { cellWidth: 18 },
-          7: { cellWidth: 18 },
-          8: { cellWidth: 18 },
-          9: { cellWidth: 30 },
-          10: { cellWidth: 30 },
-          11: { cellWidth: 30 },
+          0: { cellWidth: 14 },
+          1: { cellWidth: 18 },
+          2: { cellWidth: 28 },
+          3: { cellWidth: 15 },
+          4: { cellWidth: 14 },
+          5: { cellWidth: 38 },
+          6: { cellWidth: 16 },
+          7: { cellWidth: 16 },
+          8: { cellWidth: 16 },
+          9: { cellWidth: 28 },
+          10: { cellWidth: 28 },
+          11: { cellWidth: 28 },
         },
         didParseCell: (data) => {
           if (data.section !== "body") return;
-          const finding = filteredOpenFindings[data.row.index];
+          const finding = reportRows[data.row.index];
           if (!finding) return;
 
           if (data.column.index === 4) {
@@ -2406,8 +2492,9 @@ function AuditsPageContent() {
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6.5, { align: "right" });
       }
 
-      doc.save(`open-audit-ncr-report-${new Date().toISOString().slice(0, 10)}.pdf`);
-      setMessage("Open Audit NCR Report generated.");
+      const filePrefix = auditTypeOverride ? `${auditTypeOverride.toLowerCase()}-audit-ncr-report` : "open-audit-ncr-report";
+      doc.save(`${filePrefix}-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setMessage(`${reportTitle} generated.`);
     } catch (error) {
       console.error(error);
       setMessage("Open Audit NCR Report generation failed.");
@@ -2490,8 +2577,8 @@ function AuditsPageContent() {
           fontStyle: "bold",
         },
         styles: {
-          fontSize: 7.8,
-          cellPadding: 2,
+          fontSize: 7.4,
+          cellPadding: 1.8,
           textColor: [15, 23, 42],
           lineColor: [226, 232, 240],
           lineWidth: 0.2,
@@ -2504,14 +2591,14 @@ function AuditsPageContent() {
         columnStyles: {
           0: { cellWidth: 16 },
           1: { cellWidth: 20 },
-          2: { cellWidth: 34 },
+          2: { cellWidth: 36 },
           3: { cellWidth: 18 },
           4: { cellWidth: 16 },
           5: { cellWidth: 18 },
           6: { cellWidth: 18 },
           7: { cellWidth: 18 },
-          8: { cellWidth: 42 },
-          9: { cellWidth: 54 },
+          8: { cellWidth: 44 },
+          9: { cellWidth: 50 },
         },
         didParseCell: (data) => {
           if (data.section !== "body") return;
@@ -2593,6 +2680,27 @@ function AuditsPageContent() {
         </section>
       ) : null}
 
+      <nav style={auditViewNavStyle} aria-label="Audit workspace views">
+        {[
+          ["dashboard", "Dashboard"],
+          ["programme", "Audit Programme"],
+          ["create", "Create Audit"],
+          ["findings", "Findings"],
+          ["reports", "Reports"],
+        ].map(([view, label]) => (
+          <button
+            key={view}
+            type="button"
+            style={activeView === view ? activeViewButtonStyle : viewButtonStyle}
+            onClick={() => switchAuditWorkspaceView(view as AuditWorkspaceView)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {activeView === "dashboard" ? (
+        <>
         <section style={statsGridStyle}>
           <QualityKpiCard
             title="Remaining Audits"
@@ -2645,7 +2753,92 @@ function AuditsPageContent() {
           />
         </section>
 
-        {isOpenFindingsView || isClosedFindingsView ? (
+        <section style={dashboardPanelGridStyle}>
+          <SectionCard
+            title="Findings by Audit Type"
+            subtitle="Open and closed finding balance across Internal, External, and Supplier audits."
+          >
+            <div style={findingTypeChartStyle}>
+              {findingStatusByAuditType.map((item) => {
+                const openWidth = item.total > 0 ? (item.open / maxFindingTypeTotal) * 100 : 0;
+                const closedWidth = item.total > 0 ? (item.closed / maxFindingTypeTotal) * 100 : 0;
+
+                return (
+                  <div key={item.auditType} style={findingTypeRowStyle}>
+                    <div style={findingTypeLabelStyle}>
+                      <strong>{item.auditType}</strong>
+                      <span>{item.total} finding{item.total === 1 ? "" : "s"}</span>
+                    </div>
+                    <div style={findingTypeBarTrackStyle} aria-label={`${item.auditType} findings`}>
+                      <button
+                        type="button"
+                        style={{
+                          ...findingTypeBarSegmentStyle,
+                          width: `${openWidth}%`,
+                          minWidth: item.open > 0 ? "36px" : 0,
+                          background: "#f97316",
+                        }}
+                        onClick={() => openFindingStatusByType(item.auditType, "open")}
+                        disabled={item.open === 0}
+                        title={`${item.open} open ${item.auditType.toLowerCase()} finding${item.open === 1 ? "" : "s"}`}
+                      >
+                        {item.open > 0 ? item.open : ""}
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          ...findingTypeBarSegmentStyle,
+                          width: `${closedWidth}%`,
+                          minWidth: item.closed > 0 ? "36px" : 0,
+                          background: "#0f766e",
+                        }}
+                        onClick={() => openFindingStatusByType(item.auditType, "closed")}
+                        disabled={item.closed === 0}
+                        title={`${item.closed} closed ${item.auditType.toLowerCase()} finding${item.closed === 1 ? "" : "s"}`}
+                      >
+                        {item.closed > 0 ? item.closed : ""}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={findingTypeLegendStyle}>
+              <span><i style={{ ...findingTypeLegendDotStyle, background: "#f97316" }} />Open</span>
+              <span><i style={{ ...findingTypeLegendDotStyle, background: "#0f766e" }} />Closed</span>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Top 5 Problem Audits / Areas"
+            subtitle="Compact management view of the highest findings and frequency outcome."
+          >
+            {topProblemAreas.length === 0 ? (
+              <p style={emptyTextStyle}>No audit findings available yet.</p>
+            ) : (
+              <div style={compactProblemListStyle}>
+                {topProblemAreas.map((item, index) => (
+                  <div key={item.name} style={compactProblemRowStyle}>
+                    <div style={compactProblemRankStyle}>#{index + 1}</div>
+                    <div style={compactProblemBodyStyle}>
+                      <div style={compactProblemTitleStyle}>{item.name}</div>
+                      <div style={compactProblemMetaStyle}>
+                        <span>{item.findings} findings</span>
+                        <span>Risk {item.riskScore}</span>
+                        <span>{item.auditNumbers.join(", ")}</span>
+                      </div>
+                    </div>
+                    <span style={getFrequencyBadgeStyle(item.frequency as "Reduce" | "Maintain" | "Increase")}>{item.frequency}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+        </section>
+        </>
+      ) : null}
+
+        {activeView === "findings" ? (
           <section style={openFindingsSectionStyle}>
             <SectionCard
               title={isClosedFindingsView ? "Closed Findings" : "Open Findings"}
@@ -2691,7 +2884,9 @@ function AuditsPageContent() {
                   <button
                     type="button"
                     style={{ ...secondaryButtonStyle, border: "1px solid #bfdbfe", color: "#1d4ed8" }}
-                    onClick={isClosedFindingsView ? generateClosedAuditNcrReport : generateOpenAuditNcrReport}
+                    onClick={() =>
+                      isClosedFindingsView ? generateClosedAuditNcrReport() : generateOpenAuditNcrReport()
+                    }
                     disabled={generatingOpenFindingsReport}
                   >
                     {generatingOpenFindingsReport
@@ -2971,8 +3166,9 @@ function AuditsPageContent() {
           </section>
         ) : null}
 
+      {activeView === "create" ? (
         <section style={topGridStyle}>
-        <div style={summaryPanelGridStyle}>
+        <div style={singlePanelGridStyle}>
           <SectionCard
             title="Create Audit"
             subtitle="Create the next audit. Numbering is automatic from type and audit date."
@@ -3122,35 +3318,11 @@ function AuditsPageContent() {
               </div>
             </form>
           </SectionCard>
-
-          <SectionCard
-            title="Top 5 Problem Audits / Areas"
-            subtitle="Compact management view of the highest findings and frequency outcome."
-          >
-            {topProblemAreas.length === 0 ? (
-              <p style={emptyTextStyle}>No audit findings available yet.</p>
-            ) : (
-              <div style={compactProblemListStyle}>
-                {topProblemAreas.map((item, index) => (
-                  <div key={item.name} style={compactProblemRowStyle}>
-                    <div style={compactProblemRankStyle}>#{index + 1}</div>
-                    <div style={compactProblemBodyStyle}>
-                      <div style={compactProblemTitleStyle}>{item.name}</div>
-                      <div style={compactProblemMetaStyle}>
-                        <span>{item.findings} findings</span>
-                        <span>Risk {item.riskScore}</span>
-                        <span>{item.auditNumbers.join(", ")}</span>
-                      </div>
-                    </div>
-                    <span style={getFrequencyBadgeStyle(item.frequency as "Reduce" | "Maintain" | "Increase")}>{item.frequency}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SectionCard>
         </div>
       </section>
+      ) : null}
 
+      {activeView === "programme" ? (
       <section style={tableLayoutStyle}>
         <SectionCard title="Audit Programme" subtitle="Main working view with schedule, findings summary, and risk-based frequency outcome.">
           <div style={toolbarStyle}>
@@ -3931,6 +4103,53 @@ function AuditsPageContent() {
           </SectionCard>
         ) : null}
       </section>
+      ) : null}
+
+      {activeView === "reports" ? (
+        <section style={reportsGridStyle}>
+          <SectionCard title="Audit Reports" subtitle="Generate focused PDF outputs from the current audit findings data.">
+            <div style={reportActionGridStyle}>
+              <button
+                type="button"
+                style={reportActionCardStyle}
+                onClick={() => generateOpenAuditNcrReport()}
+                disabled={generatingOpenFindingsReport}
+              >
+                <span style={reportActionLabelStyle}>Open Audit NCR Report</span>
+                <strong style={reportActionValueStyle}>{filteredOpenFindings.length}</strong>
+                <span style={reportActionHintStyle}>Open findings using the current audit type and category filters.</span>
+              </button>
+
+              {(["Internal", "External", "Supplier"] as AuditType[]).map((auditType) => (
+                <button
+                  key={auditType}
+                  type="button"
+                  style={reportActionCardStyle}
+                  onClick={() => generateOpenAuditNcrReport(auditType)}
+                  disabled={generatingOpenFindingsReport}
+                >
+                  <span style={reportActionLabelStyle}>{auditType} Audit NCR Report</span>
+                  <strong style={reportActionValueStyle}>{openFindingsReportRowsByType[auditType].length}</strong>
+                  <span style={reportActionHintStyle}>
+                    Open {auditType.toLowerCase()} audit findings using the current category filter.
+                  </span>
+                </button>
+              ))}
+
+              <button
+                type="button"
+                style={reportActionCardStyle}
+                onClick={generateClosedAuditNcrReport}
+                disabled={generatingOpenFindingsReport}
+              >
+                <span style={reportActionLabelStyle}>Closed Audit NCR Report</span>
+                <strong style={reportActionValueStyle}>{filteredClosedFindings.length}</strong>
+                <span style={reportActionHintStyle}>Closed findings using the current audit type and category filters.</span>
+              </button>
+            </div>
+          </SectionCard>
+        </section>
+      ) : null}
     </main>
   );
 }
@@ -4262,6 +4481,94 @@ const statsGridStyle: CSSProperties = {
   marginBottom: "20px",
 };
 
+const auditViewNavStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "20px",
+};
+
+const viewButtonStyle: CSSProperties = {
+  background: "#e2e8f0",
+  color: "#0f172a",
+  border: "none",
+  padding: "10px 14px",
+  borderRadius: "10px",
+  cursor: "pointer",
+  fontWeight: 800,
+};
+
+const activeViewButtonStyle: CSSProperties = {
+  ...viewButtonStyle,
+  background: "#0f766e",
+  color: "#ffffff",
+};
+
+const dashboardPanelGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+  gap: "16px",
+  marginBottom: "20px",
+};
+
+const findingTypeChartStyle: CSSProperties = {
+  display: "grid",
+  gap: "16px",
+};
+
+const findingTypeRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "110px minmax(0, 1fr)",
+  gap: "14px",
+  alignItems: "center",
+};
+
+const findingTypeLabelStyle: CSSProperties = {
+  display: "grid",
+  gap: "4px",
+  color: "#0f172a",
+  fontSize: "13px",
+};
+
+const findingTypeBarTrackStyle: CSSProperties = {
+  minHeight: "34px",
+  borderRadius: "999px",
+  background: "#e2e8f0",
+  overflow: "hidden",
+  display: "flex",
+  alignItems: "stretch",
+};
+
+const findingTypeBarSegmentStyle: CSSProperties = {
+  border: "none",
+  color: "#ffffff",
+  fontWeight: 800,
+  fontSize: "12px",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: "opacity 0.16s ease",
+};
+
+const findingTypeLegendStyle: CSSProperties = {
+  display: "flex",
+  gap: "14px",
+  flexWrap: "wrap",
+  marginTop: "14px",
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
+};
+
+const findingTypeLegendDotStyle: CSSProperties = {
+  width: "10px",
+  height: "10px",
+  borderRadius: "999px",
+  display: "inline-block",
+  marginRight: "6px",
+};
+
 const openFindingsSectionStyle: CSSProperties = {
   marginBottom: "20px",
 };
@@ -4401,6 +4708,12 @@ const summaryPanelGridStyle: CSSProperties = {
   gap: "20px",
 };
 
+const singlePanelGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr)",
+  gap: "20px",
+};
+
 const tableLayoutStyle: CSSProperties = {
   display: "grid",
   gap: "20px",
@@ -4412,6 +4725,50 @@ const panelStyle: CSSProperties = {
   padding: "20px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
   marginBottom: "20px",
+};
+
+const reportsGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "16px",
+  marginBottom: "20px",
+};
+
+const reportActionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "12px",
+};
+
+const reportActionCardStyle: CSSProperties = {
+  border: "1px solid #dbe4ef",
+  background: "#f8fafc",
+  borderRadius: "14px",
+  padding: "14px",
+  cursor: "pointer",
+  textAlign: "left",
+  display: "grid",
+  gap: "8px",
+  minHeight: "150px",
+};
+
+const reportActionLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#475569",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const reportActionValueStyle: CSSProperties = {
+  fontSize: "28px",
+  color: "#0f172a",
+  lineHeight: 1,
+};
+
+const reportActionHintStyle: CSSProperties = {
+  color: "#64748b",
+  fontSize: "13px",
+  lineHeight: 1.45,
 };
 
 const createAuditGridStyle: CSSProperties = {

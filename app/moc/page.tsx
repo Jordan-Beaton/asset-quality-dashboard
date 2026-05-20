@@ -19,6 +19,7 @@ type YesNoNa = "Yes" | "No" | "N/A";
 type ApprovedChoice = "Yes" | "No";
 type NoticeTone = "neutral" | "success" | "warning" | "error";
 type MocViewFilter = "All" | "Recent" | "Expired Temporary" | "Expiry Soon" | "Draft Ageing";
+type MocWorkspaceView = "dashboard" | "register" | "create" | "reports";
 
 type MocReport = {
   id: string;
@@ -788,7 +789,6 @@ function MOCPageContent() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [attachmentActionId, setAttachmentActionId] = useState("");
-  const [showCreatePanel, setShowCreatePanel] = useState(true);
   const [message, setMessage] = useState("Loading MOC register...");
   const [messageTone, setMessageTone] = useState<NoticeTone>("neutral");
   const [refreshStamp, setRefreshStamp] = useState("");
@@ -808,6 +808,11 @@ function MOCPageContent() {
     ? "Recent"
     : "All"
 );
+  const [activeView, setActiveView] = useState<MocWorkspaceView>(() =>
+    linkedSearch || linkedStatus !== "All" || linkedChangeType !== "All" || linkedRecent || linkedAttention
+      ? "register"
+      : "dashboard"
+  );
   const [selectedReportId, setSelectedReportId] = useState("");
   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());
   const [detailReport, setDetailReport] = useState<MocReport>(createEmptyReport());
@@ -931,6 +936,9 @@ function MOCPageContent() {
         ? "Recent"
         : "All"
     );
+    if (linkedSearch || linkedStatus !== "All" || linkedChangeType !== "All" || linkedRecent || linkedAttention) {
+      setActiveView("register");
+    }
   }, [linkedAttention, linkedChangeType, linkedRecent, linkedSearch, linkedStatus]);
 
   async function handleSignatureFile(
@@ -1200,6 +1208,21 @@ function MOCPageContent() {
     setDetailReviewRows(createReviewRows());
     setDetailAcceptanceRows(createSignoffRows(defaultAcceptanceRoles));
     setDetailCloseoutRows(createSignoffRows(defaultCloseoutRoles));
+  }
+
+  function switchMocWorkspaceView(view: MocWorkspaceView) {
+    setActiveView(view);
+  }
+
+  function applyMocDashboardFilter(next: {
+    status?: "All" | "Active" | MocStatus;
+    changeType?: "All" | ChangeType;
+    view?: MocViewFilter;
+  }) {
+    setStatusFilter(next.status ?? "All");
+    setChangeTypeFilter(next.changeType ?? "All");
+    setViewFilter(next.view ?? "All");
+    setActiveView("register");
   }
 
   function buildCurrentDetailBundle(): PersistableMocBundle {
@@ -2426,9 +2449,6 @@ function MOCPageContent() {
         </Link>
 
         <div style={topMetaActionsStyle}>
-          <button type="button" style={secondaryButtonStyle} onClick={() => setShowCreatePanel((prev) => !prev)}>
-            {showCreatePanel ? "Hide create panel" : "Show create panel"}
-          </button>
           <button type="button" style={secondaryButtonStyle} onClick={() => void loadData()}>
             Refresh
           </button>
@@ -2445,32 +2465,104 @@ function MOCPageContent() {
         </div>
       </div>
 
+      <nav style={mocViewNavStyle} aria-label="MOC workspace views">
+        {[
+          ["dashboard", "Dashboard"],
+          ["register", "MOC Register"],
+          ["create", "Create MOC"],
+          ["reports", "Reports"],
+        ].map(([view, label]) => (
+          <button
+            key={view}
+            type="button"
+            style={activeView === view ? activeViewButtonStyle : viewButtonStyle}
+            onClick={() => switchMocWorkspaceView(view as MocWorkspaceView)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {activeView === "dashboard" ? (
+        <>
       <section style={kpiRowStyle}>
-        <QualityKpiCard title="Active MOCs" value={openCount} accent="#f59e0b" href={buildMocHref({ status: "Active" })} />
+        <QualityKpiCard
+          title="Active MOCs"
+          value={openCount}
+          accent="#f59e0b"
+          onClick={() => applyMocDashboardFilter({ status: "Active" })}
+        />
         <QualityKpiCard
           title="Temporary MOCs"
           value={temporaryCount}
           accent="#2563eb"
-          href={buildMocHref({ change_type: "Temporary" })}
+          onClick={() => applyMocDashboardFilter({ changeType: "Temporary" })}
         />
-        <QualityKpiCard title="In Review" value={inReviewCount} accent="#7c3aed" href={buildMocHref({ status: "In Review" })} />
-        <QualityKpiCard title="Approved MOCs" value={approvedCount} accent="#dc2626" href={buildMocHref({ status: "Approved" })} />
+        <QualityKpiCard
+          title="In Review"
+          value={inReviewCount}
+          accent="#7c3aed"
+          onClick={() => applyMocDashboardFilter({ status: "In Review" })}
+        />
+        <QualityKpiCard
+          title="Approved MOCs"
+          value={approvedCount}
+          accent="#dc2626"
+          onClick={() => applyMocDashboardFilter({ status: "Approved" })}
+        />
         <QualityKpiCard
           title="Expiry in 7 Days"
           value={expirySoonCount}
           accent="#b45309"
-          href={buildMocHref({ attention: "expiry-soon" })}
+          onClick={() => applyMocDashboardFilter({ view: "Expiry Soon" })}
         />
         <QualityKpiCard
           title="Recently Created"
           value={recentCount}
           accent="#16a34a"
-          href={buildMocHref({ recent: 1 })}
+          onClick={() => applyMocDashboardFilter({ view: "Recent" })}
         />
       </section>
+      <section style={dashboardPanelGridStyle}>
+        <SectionCard title="MOC Workload" subtitle="Quick operational split across live MOC states.">
+          <div style={quickActionGridStyle}>
+            <button type="button" style={quickActionCardStyle} onClick={() => applyMocDashboardFilter({ status: "Active" })}>
+              <span style={quickActionLabelStyle}>Active</span>
+              <strong style={quickActionValueStyle}>{openCount}</strong>
+            </button>
+            <button type="button" style={quickActionCardStyle} onClick={() => applyMocDashboardFilter({ status: "In Review" })}>
+              <span style={quickActionLabelStyle}>In Review</span>
+              <strong style={quickActionValueStyle}>{inReviewCount}</strong>
+            </button>
+            <button type="button" style={quickActionCardStyle} onClick={() => applyMocDashboardFilter({ status: "Approved" })}>
+              <span style={quickActionLabelStyle}>Approved</span>
+              <strong style={quickActionValueStyle}>{approvedCount}</strong>
+            </button>
+          </div>
+        </SectionCard>
 
+        <SectionCard title="Temporary Change Watch" subtitle="Temporary MOCs that need time-bound attention.">
+          <div style={quickActionGridStyle}>
+            <button type="button" style={quickActionCardStyle} onClick={() => applyMocDashboardFilter({ changeType: "Temporary" })}>
+              <span style={quickActionLabelStyle}>Temporary</span>
+              <strong style={quickActionValueStyle}>{temporaryCount}</strong>
+            </button>
+            <button type="button" style={quickActionCardStyle} onClick={() => applyMocDashboardFilter({ view: "Expiry Soon" })}>
+              <span style={quickActionLabelStyle}>Expiry in 7 Days</span>
+              <strong style={quickActionValueStyle}>{expirySoonCount}</strong>
+            </button>
+            <button type="button" style={quickActionCardStyle} onClick={() => applyMocDashboardFilter({ view: "Draft Ageing" })}>
+              <span style={quickActionLabelStyle}>Draft Ageing</span>
+              <strong style={quickActionValueStyle}>{reports.filter((report) => isDraftAged(report)).length}</strong>
+            </button>
+          </div>
+        </SectionCard>
+      </section>
+      </>
+      ) : null}
+
+      {activeView === "create" ? (
       <section style={topGridStyle}>
-        {showCreatePanel ? (
           <SectionCard title="Create MOC" subtitle="Start a new Management of Change record and complete the full form below after creation.">
             <div style={starterFormGridStyle}>
               <Field label="MOC Report No.">
@@ -2551,11 +2643,10 @@ function MOCPageContent() {
               </button>
             </div>
           </SectionCard>
-        ) : (
-          <SectionCard title="Create MOC" subtitle="Create panel hidden. Use the button above to show it again." />
-        )}
       </section>
+      ) : null}
 
+      {activeView === "register" ? (
       <section style={workspaceGridStyle}>
         <SectionCard title="MOC Register" subtitle="Main operational register for saved MOC reports. Click a row to open the full detail and edit panel.">
           <div style={toolbarStyle}>
@@ -3448,6 +3539,35 @@ function MOCPageContent() {
           </SectionCard>
         ) : null}
       </section>
+      ) : null}
+
+      {activeView === "reports" ? (
+        <section style={reportsGridStyle}>
+          <SectionCard title="MOC Reports" subtitle="Generate controlled MOC PDF outputs from saved records.">
+            <div style={reportActionGridStyle}>
+              {reports.length === 0 ? (
+                <div style={emptyBoardStyle}>No MOC records are available for reporting.</div>
+              ) : (
+                reports.slice(0, 12).map((report) => (
+                  <button
+                    key={report.id}
+                    type="button"
+                    style={reportActionCardStyle}
+                    onClick={() => void generatePdfFor(report.id, selectedReportId === report.id)}
+                    disabled={generatingPdf}
+                  >
+                    <span style={reportActionLabelStyle}>{report.moc_report_no || "MOC"}</span>
+                    <strong style={reportActionTitleStyle}>{report.moc_report_title || "Untitled MOC"}</strong>
+                    <span style={reportActionHintStyle}>
+                      {report.status} | {report.change_type} | {formatDateTime(buildRegisterUpdatedAt(report))}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </SectionCard>
+        </section>
+      ) : null}
     </main>
   );
 }
@@ -3766,6 +3886,99 @@ const kpiRowStyle: CSSProperties = {
   marginBottom: "18px",
 };
 
+const mocViewNavStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "20px",
+};
+
+const viewButtonStyle: CSSProperties = {
+  background: "#e2e8f0",
+  color: "#0f172a",
+  border: "none",
+  padding: "10px 14px",
+  borderRadius: "10px",
+  cursor: "pointer",
+  fontWeight: 800,
+};
+
+const activeViewButtonStyle: CSSProperties = {
+  ...viewButtonStyle,
+  background: "#0f766e",
+  color: "#ffffff",
+};
+
+const dashboardPanelGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+  gap: "16px",
+  marginBottom: "20px",
+};
+
+const quickActionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+  gap: "12px",
+};
+
+const quickActionCardStyle: CSSProperties = {
+  border: "1px solid #dbe4ef",
+  background: "#f8fafc",
+  borderRadius: "14px",
+  padding: "14px",
+  cursor: "pointer",
+  textAlign: "left",
+  display: "grid",
+  gap: "6px",
+};
+
+const quickActionLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#475569",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const quickActionValueStyle: CSSProperties = {
+  fontSize: "28px",
+  color: "#0f172a",
+  lineHeight: 1,
+};
+
+const reportsGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "16px",
+  marginBottom: "20px",
+};
+
+const reportActionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "12px",
+};
+
+const reportActionCardStyle: CSSProperties = {
+  ...quickActionCardStyle,
+  minHeight: "150px",
+};
+
+const reportActionLabelStyle: CSSProperties = {
+  ...quickActionLabelStyle,
+};
+
+const reportActionTitleStyle: CSSProperties = {
+  fontSize: "18px",
+  color: "#0f172a",
+  lineHeight: 1.25,
+};
+
+const reportActionHintStyle: CSSProperties = {
+  color: "#64748b",
+  fontSize: "13px",
+  lineHeight: 1.45,
+};
 
 const panelStyle: CSSProperties = {
   background: "white",

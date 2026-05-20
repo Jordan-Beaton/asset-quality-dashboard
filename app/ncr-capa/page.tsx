@@ -134,6 +134,7 @@ type CombinedRow = {
 type NcrSortKey = "number" | "severity" | "status" | "due_date";
 type SortDirection = "asc" | "desc";
 type NcrQuickFilter = "" | "Open" | "In Progress" | "Closed" | "Overdue" | "DueSoon" | "All";
+type NcrWorkspaceView = "dashboard" | "register" | "create" | "import" | "reports";
 
 type NcrImportRow = {
   rowNumber: number;
@@ -155,6 +156,25 @@ type NcrImportRow = {
   evidence_notes: string;
   errors: string[];
 };
+
+const ncrWorkspaceViews: { id: NcrWorkspaceView; label: string }[] = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "register", label: "NCR Register" },
+  { id: "create", label: "Create NCR" },
+  { id: "import", label: "Import" },
+  { id: "reports", label: "Reports" },
+];
+
+function parseNcrWorkspaceView(value: string | null): NcrWorkspaceView | null {
+  if (!value) return null;
+  const normalised = value.trim().toLowerCase();
+  if (normalised === "dashboard") return "dashboard";
+  if (normalised === "register" || normalised === "ncr-register") return "register";
+  if (normalised === "create" || normalised === "create-ncr") return "create";
+  if (normalised === "import") return "import";
+  if (normalised === "reports") return "reports";
+  return null;
+}
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "-";
@@ -544,6 +564,16 @@ function NcrCapaPageContent() {
   const linkedOverdueOnly = searchParams.get("overdue") === "1";
   const directNcrNumber = searchParams.get("ncr")?.trim() || "";
   const directNcrId = searchParams.get("ncrId")?.trim() || "";
+  const requestedWorkspaceView = parseNcrWorkspaceView(searchParams.get("view"));
+  const hasRegisterQuery =
+    Boolean(linkedSearch) ||
+    linkedStatus !== "All" ||
+    linkedSeverity !== "All" ||
+    linkedSource !== "All" ||
+    linkedProject !== "All" ||
+    linkedOverdueOnly ||
+    Boolean(directNcrNumber) ||
+    Boolean(directNcrId);
 
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
@@ -553,9 +583,10 @@ function NcrCapaPageContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
-  const [activeCreateTab, setActiveCreateTab] = useState<"NCR" | "CAPA">("NCR");
-  const [showCreatePanel, setShowCreatePanel] = useState(false);
-  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [activeCreateTab] = useState<"NCR" | "CAPA">("NCR");
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<NcrWorkspaceView>(
+    hasRegisterQuery ? "register" : requestedWorkspaceView || "dashboard"
+  );
   const [selectedRow, setSelectedRow] = useState<CombinedRow | null>(null);
   const [refreshStamp, setRefreshStamp] = useState<string>("");
   const [message, setMessage] = useState("");
@@ -694,6 +725,17 @@ function NcrCapaPageContent() {
   }, []);
 
   useEffect(() => {
+    if (hasRegisterQuery) {
+      setActiveWorkspaceView("register");
+      return;
+    }
+
+    if (requestedWorkspaceView) {
+      setActiveWorkspaceView(requestedWorkspaceView);
+    }
+  }, [hasRegisterQuery, requestedWorkspaceView]);
+
+  useEffect(() => {
     setEditRow(selectedRow);
     setSelectedEvidenceFiles([]);
     setSelectedEvidenceNotes("");
@@ -788,6 +830,7 @@ function NcrCapaPageContent() {
 
     if (match) {
       setActiveLogTab(match.type);
+      setActiveWorkspaceView("register");
       setSelectedRow((current) => (current?.id === match.id ? current : match));
     }
   }, [directNcrId, directNcrNumber, linkedSearch, combinedRows]);
@@ -837,6 +880,20 @@ function NcrCapaPageContent() {
   const latestSavedPdf = useMemo(() => {
     return selectedSavedPdfHistory[0] || null;
   }, [selectedSavedPdfHistory]);
+
+  const statusOptions = ["Open", "In Progress", "Closed"];
+  const severityOptions = ["Low", "Medium", "High"];
+  const sourceOptions = ["Internal", "Supplier", "External"];
+  const rootCauseOptions = [
+    "Human Error",
+    "Procedure Gap",
+    "Training / Competence",
+    "Supplier Issue",
+    "Design Issue",
+    "Equipment Failure",
+    "Other",
+  ];
+  const effectivenessStatusOptions = ["Pending", "Effective", "Not Effective"];
 
   const projectOptions = useMemo(() => {
     const values = new Set<string>();
@@ -992,6 +1049,7 @@ function NcrCapaPageContent() {
   }
 
   function applyKpiFilter(filter: NcrQuickFilter) {
+    setActiveWorkspaceView("register");
     setActiveLogTab("NCR");
     setNcrQuickFilter(filter);
     setSearch("");
@@ -1036,6 +1094,75 @@ function NcrCapaPageContent() {
       dueSoon,
     };
   }, [combinedRows, yearFilter]);
+
+  const yearScopedNcrRows = useMemo(() => {
+    return combinedRows.filter((row) => {
+      if (row.type !== "NCR") return false;
+      const rowYear = row.created_at ? String(new Date(row.created_at).getFullYear()) : "";
+      return yearFilter === "All Years" || rowYear === yearFilter;
+    });
+  }, [combinedRows, yearFilter]);
+
+  const ncrStatusStory = useMemo(
+    () =>
+      statusOptions.map((status) => ({
+        label: status,
+        value: yearScopedNcrRows.filter((row) => row.status === status).length,
+        color: status === "Closed" ? "#16a34a" : status === "In Progress" ? "#7c3aed" : "#f59e0b",
+      })),
+    [statusOptions, yearScopedNcrRows]
+  );
+
+  const ncrSeverityStory = useMemo(
+    () =>
+      severityOptions.map((severity) => ({
+        label: severity,
+        value: yearScopedNcrRows.filter((row) => row.severity === severity).length,
+        color: severity === "High" ? "#dc2626" : severity === "Medium" ? "#f59e0b" : "#16a34a",
+      })),
+    [severityOptions, yearScopedNcrRows]
+  );
+
+  const ncrSourceStory = useMemo(
+    () =>
+      sourceOptions.map((source) => ({
+        label: source,
+        value: yearScopedNcrRows.filter((row) => row.source_type === source).length,
+        color: source === "Supplier" ? "#2563eb" : source === "External" ? "#7c3aed" : "#0f766e",
+      })),
+    [sourceOptions, yearScopedNcrRows]
+  );
+
+  const ncrDueStory = useMemo(
+    () => [
+      {
+        label: "Overdue",
+        value: yearScopedNcrRows.filter((row) => dueState(row.due_date) === "overdue").length,
+        color: "#dc2626",
+      },
+      {
+        label: "Due 7 Days",
+        value: yearScopedNcrRows.filter((row) => dueState(row.due_date) === "soon").length,
+        color: "#f59e0b",
+      },
+      {
+        label: "In Date",
+        value: yearScopedNcrRows.filter((row) => dueState(row.due_date) === "ok").length,
+        color: "#16a34a",
+      },
+      {
+        label: "No Due Date",
+        value: yearScopedNcrRows.filter((row) => !row.due_date).length,
+        color: "#64748b",
+      },
+    ],
+    [yearScopedNcrRows]
+  );
+
+  const ncrClosureRate = useMemo(() => {
+    if (kpis.totalNcrs === 0) return 0;
+    return Math.round((kpis.closed / kpis.totalNcrs) * 100);
+  }, [kpis.closed, kpis.totalNcrs]);
 
   const latestRecordLabel = useMemo(() => {
     const latest = combinedRows.find((row) => row.type === "NCR");
@@ -2157,19 +2284,6 @@ function NcrCapaPageContent() {
     }
   }
 
-  const statusOptions = ["Open", "In Progress", "Closed"];
-  const severityOptions = ["Low", "Medium", "High"];
-  const sourceOptions = ["Internal", "Supplier", "External"];
-  const rootCauseOptions = [
-    "Human Error",
-    "Procedure Gap",
-    "Training / Competence",
-    "Supplier Issue",
-    "Design Issue",
-    "Equipment Failure",
-    "Other",
-  ];
-  const effectivenessStatusOptions = ["Pending", "Effective", "Not Effective"];
   const importHasErrors = importRows.some((row) => row.errors.length > 0);
   const importValidRows = importRows.filter((row) => row.errors.length === 0);
 
@@ -2378,12 +2492,6 @@ function NcrCapaPageContent() {
         </Link>
 
         <div style={topMetaActionsStyle}>
-          <button type="button" style={secondaryButton} onClick={() => setShowCreatePanel((prev) => !prev)}>
-            {showCreatePanel ? "Hide Create NCR" : "Create New NCR"}
-          </button>
-          <button type="button" style={secondaryButton} onClick={() => setShowImportPanel((prev) => !prev)}>
-            {showImportPanel ? "Hide NCR Import" : "Bulk NCR Excel Import"}
-          </button>
           <button type="button" style={secondaryButton} onClick={() => void loadData()}>
             Refresh
           </button>
@@ -2393,16 +2501,65 @@ function NcrCapaPageContent() {
         </div>
       </div>
 
-      <section style={statsGridStyle}>
-        <QualityKpiCard title="Open Items" value={kpis.openItems} accent="#f59e0b" onClick={() => applyKpiFilter("Open")} active={ncrQuickFilter === "Open"} />
-        <QualityKpiCard title="In Progress" value={kpis.inProgress} accent="#7c3aed" onClick={() => applyKpiFilter("In Progress")} active={ncrQuickFilter === "In Progress"} />
-        <QualityKpiCard title="Closed NCRs" value={kpis.closed} accent="#16a34a" onClick={() => applyKpiFilter("Closed")} active={ncrQuickFilter === "Closed"} />
-        <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#ef4444" onClick={() => applyKpiFilter("Overdue")} active={ncrQuickFilter === "Overdue"} />
-        <QualityKpiCard title="Due in 7 Days" value={kpis.dueSoon} accent="#22c55e" onClick={() => applyKpiFilter("DueSoon")} active={ncrQuickFilter === "DueSoon"} />
-        <QualityKpiCard title="Total NCRs" value={kpis.totalNcrs} accent="#60a5fa" onClick={() => applyKpiFilter("All")} active={ncrQuickFilter === "All"} />
-      </section>
+      <nav style={workspaceNavStyle} aria-label="NCR workspace views">
+        {ncrWorkspaceViews.map((view) => (
+          <button
+            key={view.id}
+            type="button"
+            style={activeWorkspaceView === view.id ? activeWorkspaceNavButtonStyle : workspaceNavButtonStyle}
+            onClick={() => setActiveWorkspaceView(view.id)}
+          >
+            {view.label}
+          </button>
+        ))}
+      </nav>
 
-      {showImportPanel ? (
+      {activeWorkspaceView === "dashboard" ? (
+        <>
+          <section style={statsGridStyle}>
+            <QualityKpiCard title="Open Items" value={kpis.openItems} accent="#f59e0b" onClick={() => applyKpiFilter("Open")} active={ncrQuickFilter === "Open"} />
+            <QualityKpiCard title="In Progress" value={kpis.inProgress} accent="#7c3aed" onClick={() => applyKpiFilter("In Progress")} active={ncrQuickFilter === "In Progress"} />
+            <QualityKpiCard title="Closed NCRs" value={kpis.closed} accent="#16a34a" onClick={() => applyKpiFilter("Closed")} active={ncrQuickFilter === "Closed"} />
+            <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#ef4444" onClick={() => applyKpiFilter("Overdue")} active={ncrQuickFilter === "Overdue"} />
+            <QualityKpiCard title="Due in 7 Days" value={kpis.dueSoon} accent="#22c55e" onClick={() => applyKpiFilter("DueSoon")} active={ncrQuickFilter === "DueSoon"} />
+            <QualityKpiCard title="Total NCRs" value={kpis.totalNcrs} accent="#60a5fa" onClick={() => applyKpiFilter("All")} active={ncrQuickFilter === "All"} />
+          </section>
+
+          <section style={dashboardPanelGridStyle}>
+            <SectionCard title="NCR Story" subtitle={`Operational split for ${yearFilter}. Click a KPI above to open the matching register view.`}>
+              <div style={storyGridStyle}>
+                <StoryBars title="Status Split" items={ncrStatusStory} />
+                <StoryBars title="Severity Mix" items={ncrSeverityStory} />
+                <StoryBars title="Source Type" items={ncrSourceStory} />
+                <StoryBars title="Due Date Pressure" items={ncrDueStory} />
+              </div>
+            </SectionCard>
+
+            <SectionCard title="NCR Pressure" subtitle={`Counts shown for ${yearFilter}.`}>
+              <div style={dashboardMetricGridStyle}>
+                <div style={dashboardMetricCardStyle}>
+                  <span>Open + In Progress</span>
+                  <strong>{kpis.openItems + kpis.inProgress}</strong>
+                </div>
+                <div style={dashboardMetricCardStyle}>
+                  <span>Closed</span>
+                  <strong>{kpis.closed}</strong>
+                </div>
+                <div style={dashboardMetricCardStyle}>
+                  <span>Overdue / Due Soon</span>
+                  <strong>{kpis.overdue + kpis.dueSoon}</strong>
+                </div>
+                <div style={dashboardMetricCardStyle}>
+                  <span>Closure Rate</span>
+                  <strong>{ncrClosureRate}%</strong>
+                </div>
+              </div>
+            </SectionCard>
+          </section>
+        </>
+      ) : null}
+
+      {activeWorkspaceView === "import" ? (
       <section style={{ marginBottom: "20px" }}>
         <SectionCard
           title="Bulk NCR Excel Import"
@@ -2505,8 +2662,8 @@ function NcrCapaPageContent() {
       </section>
       ) : null}
 
+      {activeWorkspaceView === "create" ? (
       <section style={topGridStyle}>
-        {showCreatePanel ? (
           <SectionCard title="Create a New NCR" subtitle="Capture the nonconformance, containment, corrective action, root cause, ownership, due date, and evidence.">
             {activeCreateTab === "NCR" ? (
               <div style={createPanelNcrStyle}>
@@ -3004,7 +3161,6 @@ function NcrCapaPageContent() {
               </div>
             )}
           </SectionCard>
-        ) : null}
 
         {false ? (
         <div style={sidePanelStackStyle}>
@@ -3126,7 +3282,9 @@ function NcrCapaPageContent() {
         </div>
         ) : null}
       </section>
+      ) : null}
 
+      {activeWorkspaceView === "register" ? (
       <section style={workspaceGridStyle}>
         <SectionCard title="NCR Register" subtitle="Table-led working register for day-to-day review, update, evidence handling, linked actions, and PDF reporting.">
           <div style={toolbarStyle}>
@@ -3985,6 +4143,118 @@ function NcrCapaPageContent() {
           </div>
         ) : null}
       </section>
+      ) : null}
+
+      {activeWorkspaceView === "reports" ? (
+        <section style={reportsGridStyle}>
+          <SectionCard
+            title="NCR Reports"
+            subtitle="Filter the NCR register here, then generate a controlled PDF output from the visible records."
+          >
+            <div style={reportFilterPanelStyle}>
+              <input
+                style={toolbarSearchStyle}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search NCR number, title, owner, project..."
+              />
+
+              <div style={toolbarFiltersStyle}>
+                <div style={toolbarLabeledControlStyle}>
+                  <label style={toolbarLabelStyle}>Status</label>
+                  <select style={toolbarSelectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option>All</option>
+                    {statusOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={toolbarLabeledControlStyle}>
+                  <label style={toolbarLabelStyle}>Severity</label>
+                  <select style={toolbarSelectStyle} value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)}>
+                    <option>All</option>
+                    {severityOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={toolbarLabeledControlStyle}>
+                  <label style={toolbarLabelStyle}>Source Type</label>
+                  <select style={toolbarSelectStyle} value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+                    <option>All</option>
+                    {sourceOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={toolbarLabeledControlStyle}>
+                  <label style={toolbarLabelStyle}>Year</label>
+                  <select style={toolbarSelectStyle} value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                    {yearOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={toolbarLabeledControlStyle}>
+                  <label style={toolbarLabelStyle}>Project</label>
+                  <select style={toolbarSelectStyle} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+                    {projectOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button type="button" style={toolbarButtonStyle} onClick={clearFilters}>
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+
+            <div style={reportActionGridStyle}>
+              <div style={reportActionCardStyle}>
+                <div>
+                  <div style={reportActionLabelStyle}>PDF Report Output</div>
+                  <div style={reportActionHintStyle}>
+                    Exports the NCR records currently controlled by the filters above.
+                  </div>
+                </div>
+                <div style={reportActionValueStyle}>
+                  {filteredRows.filter((row) => row.type === "NCR").length} NCRs
+                </div>
+                <button
+                  type="button"
+                  style={{ ...primaryButton, justifySelf: "start" }}
+                  onClick={() => void generateFilteredNcrReport()}
+                  disabled={generatingFilteredNcrReport || filteredRows.filter((row) => row.type === "NCR").length === 0}
+                >
+                  {generatingFilteredNcrReport ? "Generating PDF Report..." : "Generate PDF Report"}
+                </button>
+              </div>
+
+              <div style={reportActionCardStyle}>
+                <div>
+                  <div style={reportActionLabelStyle}>Individual NCR Reports</div>
+                  <div style={reportActionHintStyle}>
+                    Select an NCR in the register to generate, save, and reopen its individual NCR PDF with evidence references.
+                  </div>
+                </div>
+                <div style={reportActionValueStyle}>{savedPdfFiles.length} saved PDFs</div>
+                <button
+                  type="button"
+                  style={secondaryButton}
+                  onClick={() => setActiveWorkspaceView("register")}
+                >
+                  Open NCR Register
+                </button>
+              </div>
+            </div>
+          </SectionCard>
+        </section>
+      ) : null}
     </main>
   );
 }
@@ -4005,6 +4275,33 @@ function SectionCard({
       </section>
     );
   }
+
+function StoryBars({ title, items }: { title: string; items: { label: string; value: number; color: string }[] }) {
+  const max = Math.max(1, ...items.map((item) => item.value));
+
+  return (
+    <div style={storyCardStyle}>
+      <div style={storyTitleStyle}>{title}</div>
+      <div style={storyBarsStyle}>
+        {items.map((item) => (
+          <div key={item.label} style={storyBarRowStyle}>
+            <div style={storyBarLabelStyle}>{item.label}</div>
+            <div style={storyTrackStyle}>
+              <div
+                style={{
+                  ...storyFillStyle,
+                  width: `${Math.max(4, (item.value / max) * 100)}%`,
+                  background: item.color,
+                }}
+              />
+            </div>
+            <div style={storyBarValueStyle}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function HeroPill({
   label,
@@ -4206,8 +4503,146 @@ const statusBannerStyle: CSSProperties = {
 const statsGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+  gap: "12px",
+  marginBottom: "18px",
+};
+
+const workspaceNavStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "20px",
+};
+
+const workspaceNavButtonStyle: CSSProperties = {
+  background: "#e2e8f0",
+  color: "#0f172a",
+  border: "none",
+  padding: "10px 14px",
+  borderRadius: "10px",
+  cursor: "pointer",
+  fontWeight: 800,
+};
+
+const activeWorkspaceNavButtonStyle: CSSProperties = {
+  ...workspaceNavButtonStyle,
+  background: "#0f766e",
+  color: "#ffffff",
+};
+
+const dashboardPanelGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
   gap: "16px",
   marginBottom: "20px",
+};
+
+const quickActionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+  gap: "12px",
+};
+
+const quickActionCardStyle: CSSProperties = {
+  border: "1px solid #dbe4ef",
+  background: "#f8fafc",
+  borderRadius: "14px",
+  padding: "14px",
+  cursor: "pointer",
+  textAlign: "left",
+  display: "grid",
+  gap: "6px",
+};
+
+const quickActionLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#475569",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const quickActionValueStyle: CSSProperties = {
+  fontSize: "28px",
+  color: "#0f172a",
+  lineHeight: 1,
+};
+
+const storyGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "14px",
+};
+
+const storyCardStyle: CSSProperties = {
+  border: "1px solid #dbe4ef",
+  background: "#f8fafc",
+  borderRadius: "14px",
+  padding: "14px",
+  display: "grid",
+  gap: "12px",
+};
+
+const storyTitleStyle: CSSProperties = {
+  color: "#0f172a",
+  fontSize: "14px",
+  fontWeight: 800,
+};
+
+const storyBarsStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const storyBarRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "92px minmax(0, 1fr) 28px",
+  gap: "10px",
+  alignItems: "center",
+};
+
+const storyBarLabelStyle: CSSProperties = {
+  color: "#475569",
+  fontSize: "12px",
+  fontWeight: 700,
+};
+
+const storyTrackStyle: CSSProperties = {
+  height: "12px",
+  borderRadius: "999px",
+  background: "#e2e8f0",
+  overflow: "hidden",
+};
+
+const storyFillStyle: CSSProperties = {
+  height: "100%",
+  borderRadius: "999px",
+};
+
+const storyBarValueStyle: CSSProperties = {
+  color: "#0f172a",
+  fontSize: "13px",
+  fontWeight: 900,
+  textAlign: "right",
+};
+
+const dashboardMetricGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+};
+
+const dashboardMetricCardStyle: CSSProperties = {
+  border: "1px solid #dbe3ec",
+  background: "#f8fafc",
+  borderRadius: "14px",
+  padding: "14px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
 };
 
 const topGridStyle: CSSProperties = {
@@ -4222,6 +4657,57 @@ const workspaceGridStyle: CSSProperties = {
   gridTemplateColumns: "1fr",
   gap: "20px",
   alignItems: "start",
+};
+
+const reportsGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "16px",
+  marginBottom: "20px",
+};
+
+const reportActionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "14px",
+};
+
+const reportFilterPanelStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  padding: "14px",
+  borderRadius: "16px",
+  border: "1px solid #dbe4ef",
+  background: "#f8fafc",
+  marginBottom: "14px",
+};
+
+const reportActionCardStyle: CSSProperties = {
+  borderRadius: "16px",
+  border: "1px solid #dbe3ec",
+  background: "#f8fafc",
+  padding: "16px",
+  display: "grid",
+  gap: "14px",
+  alignContent: "start",
+};
+
+const reportActionLabelStyle: CSSProperties = {
+  color: "#0f172a",
+  fontSize: "15px",
+  fontWeight: 800,
+};
+
+const reportActionHintStyle: CSSProperties = {
+  marginTop: "6px",
+  color: "#475569",
+  fontSize: "13px",
+  lineHeight: 1.5,
+};
+
+const reportActionValueStyle: CSSProperties = {
+  color: "#0f766e",
+  fontSize: "22px",
+  fontWeight: 900,
 };
 
 const sidePanelStackStyle: CSSProperties = {

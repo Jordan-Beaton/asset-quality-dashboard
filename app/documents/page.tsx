@@ -1,5 +1,7 @@
 "use client";
 
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -177,6 +179,15 @@ type NotificationEventType =
   | "approved"
   | "rejected"
   | "superseded";
+
+type DocumentWorkspaceView =
+  | "dashboard"
+  | "register"
+  | "create"
+  | "review"
+  | "approval"
+  | "archive"
+  | "reports";
 
 const STORAGE_BUCKET = "document-files";
 const DEFAULT_USER_NAME = "Jordan Beaton";
@@ -474,10 +485,6 @@ function findPersonByName(people: PersonRow[], value: string | null | undefined)
   return people.find((person) => normalizePersonName(person.name) === target) || null;
 }
 
-function getDocumentScopeLabel(doc: Pick<DocumentRow, "document_scope">) {
-  return doc.document_scope === "Asset" ? "Asset" : "Company/System";
-}
-
 function getDocumentAssetContext(
   doc: Pick<DocumentRow, "asset_name" | "asset_code" | "asset_document_id_code">
 ) {
@@ -526,6 +533,12 @@ function DocumentsPageContent() {
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
+  const [activeView, setActiveView] = useState<DocumentWorkspaceView>(
+    linkedSearch || linkedStatus || linkedType || linkedOwner || linkedReview || linkedApproval ? "register" : "dashboard"
+  );
+  const [showRegisterFilters, setShowRegisterFilters] = useState(
+    Boolean(linkedStatus || linkedType || linkedOwner || linkedReview || linkedApproval)
+  );
 
   const [form, setForm] = useState<DocumentForm>(emptyForm);
   const [detailForm, setDetailForm] = useState<DocumentForm>(emptyForm);
@@ -684,6 +697,22 @@ function DocumentsPageContent() {
 
   const dueSoonDocuments = useMemo(
     () => documents.filter((doc) => getReviewTone(doc.next_review_date).label === "Due soon"),
+    [documents]
+  );
+  const overdueReviewDocuments = useMemo(
+    () => documents.filter((doc) => getReviewTone(doc.next_review_date).label === "Overdue"),
+    [documents]
+  );
+  const approvalQueueDocuments = useMemo(
+    () => documents.filter((doc) => normalizeApprovalStatus(doc.review_approval_status) === "Pending Review"),
+    [documents]
+  );
+  const archiveDocuments = useMemo(
+    () =>
+      documents.filter((doc) => {
+        const status = (doc.status || "").trim().toLowerCase();
+        return status === "archived" || status === "superseded" || status === "obsolete";
+      }),
     [documents]
   );
 
@@ -1055,6 +1084,7 @@ function DocumentsPageContent() {
     approval?: string;
     review?: string;
   }) {
+    setActiveView("register");
     setSearch("");
     setTypeFilter("");
     setOwnerFilter("");
@@ -1067,103 +1097,157 @@ function DocumentsPageContent() {
     }, 0);
   }
 
-  function exportDocumentsReport(title: string, rows: DocumentRow[]) {
-    const printWindow = window.open("", "_blank", "width=1000,height=800");
+  function switchWorkspaceView(view: DocumentWorkspaceView) {
+    setActiveView(view);
 
-    if (!printWindow) {
-      setMessage("Pop-up blocked. Allow pop-ups to generate the report.");
+    if (view === "create") {
+      setShowCreatePanel(true);
+      setShowDetailPanel(false);
       return;
     }
 
-    const generatedAt = new Date().toLocaleString("en-GB");
+    if (view === "review") {
+      setSearch("");
+      setStatusFilter("");
+      setTypeFilter("");
+      setOwnerFilter("");
+      setApprovalFilter("");
+      setReviewFilter("Overdue");
+      setShowCreatePanel(false);
+      return;
+    }
 
-    const tableRows = rows
-      .map(
-        (doc) => `
-          <tr>
-            <td>${doc.document_number || "-"}</td>
-            <td>${doc.title || "-"}</td>
-            <td>${doc.document_type || "-"}</td>
-            <td>${doc.department_owner || "-"}</td>
-            <td>${doc.current_revision || "-"}</td>
-            <td>${doc.status || "-"}</td>
-            <td>${normalizeApprovalStatus(doc.review_approval_status)}</td>
-            <td>${formatDate(doc.next_review_date)}</td>
-          </tr>
-        `
-      )
-      .join("");
+    if (view === "approval") {
+      setSearch("");
+      setStatusFilter("");
+      setTypeFilter("");
+      setOwnerFilter("");
+      setReviewFilter("");
+      setApprovalFilter("Pending Review");
+      setShowCreatePanel(false);
+      return;
+    }
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${title}</title>
-          <style>
-            body {
-              font-family: Arial, Helvetica, sans-serif;
-              padding: 32px;
-              color: #0f172a;
-            }
-            h1 {
-              margin: 0 0 8px;
-              font-size: 28px;
-              color: #0f766e;
-            }
-            .meta {
-              margin-bottom: 24px;
-              color: #475569;
-              font-size: 14px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              font-size: 13px;
-            }
-            th, td {
-              border: 1px solid #cbd5e1;
-              padding: 10px 8px;
-              text-align: left;
-              vertical-align: top;
-            }
-            th {
-              background: #f8fafc;
-              font-weight: 700;
-            }
-            .summary {
-              margin-bottom: 18px;
-              font-size: 14px;
-              font-weight: 700;
-            }
-          </style>
-        </head>
-        <body>
-          <h1>${title}</h1>
-          <div class="meta">Generated: ${generatedAt}</div>
-          <div class="summary">Total documents in report: ${rows.length}</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Document Number</th>
-                <th>Title</th>
-                <th>Type</th>
-                <th>Owner</th>
-                <th>Revision</th>
-                <th>Status</th>
-                <th>Approval Status</th>
-                <th>Next Review</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${tableRows || `<tr><td colspan="8">No documents found.</td></tr>`}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `);
+    if (view === "archive") {
+      setSearch("");
+      setStatusFilter("__multi:Superseded|Obsolete|Archived");
+      setTypeFilter("");
+      setOwnerFilter("");
+      setReviewFilter("");
+      setApprovalFilter("");
+      setShowCreatePanel(false);
+      return;
+    }
 
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
+    setShowCreatePanel(false);
+  }
+
+  function exportDocumentsReport(title: string, rows: DocumentRow[]) {
+    try {
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 12;
+      const generatedAt = new Date().toLocaleString("en-GB");
+      const fileName = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "document-report"}.pdf`;
+
+      pdf.setFillColor(15, 118, 110);
+      pdf.rect(0, 0, pageWidth, 24, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(16);
+      pdf.text("ENSHORE", margin, 10);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Document Control Report", margin, 17);
+
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(18);
+      pdf.text(title, margin, 34);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(`Generated: ${generatedAt}`, margin, 40);
+      pdf.text(`Documents in report: ${rows.length}`, margin, 45);
+
+      autoTable(pdf, {
+        startY: 52,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 16 },
+        head: [[
+          "Document No.",
+          "Title",
+          "Type",
+          "Owner",
+          "Rev",
+          "Status",
+          "Approval",
+          "Issue Date",
+          "Next Review",
+        ]],
+        body: rows.map((doc) => [
+          doc.document_number || "-",
+          doc.title || "-",
+          doc.document_type || "-",
+          doc.department_owner || "-",
+          doc.current_revision || "-",
+          doc.status || "-",
+          normalizeApprovalStatus(doc.review_approval_status),
+          formatDate(doc.issue_date),
+          formatDate(doc.next_review_date),
+        ]),
+        styles: {
+          font: "helvetica",
+          fontSize: 7,
+          cellPadding: 2,
+          overflow: "linebreak",
+          valign: "top",
+          textColor: [15, 23, 42],
+          lineColor: [203, 213, 225],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [15, 118, 110],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          halign: "left",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 26 },
+          1: { cellWidth: 64 },
+          2: { cellWidth: 24 },
+          3: { cellWidth: 24 },
+          4: { cellWidth: 12, halign: "center" },
+          5: { cellWidth: 22 },
+          6: { cellWidth: 24 },
+          7: { cellWidth: 22 },
+          8: { cellWidth: 22 },
+        },
+        didDrawPage: () => {
+          const pageNumber = pdf.getNumberOfPages();
+          pdf.setFontSize(8);
+          pdf.setTextColor(100, 116, 139);
+          pdf.text("Read-only export from Document Control.", margin, pageHeight - 8);
+          pdf.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+        },
+      });
+
+      if (rows.length === 0) {
+        pdf.setFontSize(11);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text("No documents matched this report.", margin, 58);
+      }
+
+      pdf.save(fileName);
+      setMessage(`${title} PDF generated.`);
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "PDF generation failed.";
+      setMessage(`PDF generation failed: ${text}`);
+    }
   }
 
   async function openDocumentFile(path: string) {
@@ -1933,7 +2017,7 @@ function DocumentsPageContent() {
 
   function handleSelectDocument(id: string) {
     setSelectedDocumentId(id);
-    setShowDetailPanel(true);
+    setShowDetailPanel(false);
   }
 
   return (
@@ -1958,6 +2042,28 @@ function DocumentsPageContent() {
         </div>
       </div>
 
+      <nav style={documentViewNavStyle} aria-label="Document workspace views">
+        {[
+          ["dashboard", "Dashboard"],
+          ["register", "Document Register"],
+          ["create", "Create Document"],
+          ["review", "Review Queue"],
+          ["approval", "Approval Queue"],
+          ["archive", "Archive"],
+          ["reports", "Reports"],
+        ].map(([view, label]) => (
+          <button
+            key={view}
+            type="button"
+            style={activeView === view ? activeViewButtonStyle : viewButtonStyle}
+            onClick={() => switchWorkspaceView(view as DocumentWorkspaceView)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {activeView === "dashboard" ? (
       <section style={statsGridStyle}>
         <QualityKpiCard
           title="Total Documents"
@@ -1995,8 +2101,46 @@ function DocumentsPageContent() {
           accent="#dc2626"
           onClick={() => applySnapshotFilter({ review: "Overdue" })}
         />
+        <QualityKpiCard
+          title="Due Soon"
+          value={dueSoonReviews}
+          accent="#f97316"
+          onClick={() => applySnapshotFilter({ review: "Due soon" })}
+        />
       </section>
+      ) : null}
 
+      {activeView === "dashboard" ? (
+        <section style={dashboardPanelGridStyle}>
+          <SectionCard title="Review Control" subtitle="Documents needing review attention.">
+            <div style={quickActionGridStyle}>
+              <button type="button" style={quickActionCardStyle} onClick={() => applySnapshotFilter({ review: "Overdue" })}>
+                <span style={quickActionLabelStyle}>Overdue reviews</span>
+                <strong style={quickActionValueStyle}>{overdueReviews}</strong>
+              </button>
+              <button type="button" style={quickActionCardStyle} onClick={() => applySnapshotFilter({ review: "Due soon" })}>
+                <span style={quickActionLabelStyle}>Due soon</span>
+                <strong style={quickActionValueStyle}>{dueSoonReviews}</strong>
+              </button>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Workflow Queues" subtitle="Review and approval work in progress.">
+            <div style={quickActionGridStyle}>
+              <button type="button" style={quickActionCardStyle} onClick={() => switchWorkspaceView("approval")}>
+                <span style={quickActionLabelStyle}>Pending review</span>
+                <strong style={quickActionValueStyle}>{approvalQueueDocuments.length}</strong>
+              </button>
+              <button type="button" style={quickActionCardStyle} onClick={() => switchWorkspaceView("archive")}>
+                <span style={quickActionLabelStyle}>Archive / superseded</span>
+                <strong style={quickActionValueStyle}>{archiveDocuments.length}</strong>
+              </button>
+            </div>
+          </SectionCard>
+        </section>
+      ) : null}
+
+      {activeView === "create" ? (
       <section style={createPanelSectionStyle}>
         <div style={createPanelToggleRowStyle}>
           <button
@@ -2317,7 +2461,7 @@ function DocumentsPageContent() {
                       value={form.description}
                       onChange={(e) => setForm({ ...form, description: e.target.value })}
                       style={compactTextareaStyle}
-                      placeholder="Short scope / description"
+                      placeholder="Short description"
                     />
                   </Field>
                 </div>
@@ -2358,8 +2502,10 @@ function DocumentsPageContent() {
           </SectionCard>
         ) : null}
       </section>
+      ) : null}
 
-      <section>
+      {["register", "review", "approval", "archive"].includes(activeView) ? (
+      <section style={registerWorkspaceGridStyle}>
         <section id="document-register">
         <SectionCard
           title="Document Register"
@@ -2373,6 +2519,16 @@ function DocumentsPageContent() {
               style={toolbarSearchStyle}
             />
 
+            <button
+              type="button"
+              onClick={() => setShowRegisterFilters((prev) => !prev)}
+              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
+            >
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showRegisterFilters ? (
             <div style={toolbarFiltersStyle}>
               <select
                 value={statusFilter}
@@ -2446,7 +2602,7 @@ function DocumentsPageContent() {
                 Clear Filters
               </button>
             </div>
-          </div>
+          ) : null}
 
           <div style={tableInfoRowStyle}>
             Showing <strong>{filteredDocuments.length}</strong> of <strong>{documents.length}</strong>{" "}
@@ -2457,7 +2613,6 @@ function DocumentsPageContent() {
             <div style={registerHeadStyle}>
               <div>Document No.</div>
               <div>Title</div>
-              <div>Scope</div>
               <div>Type</div>
               <div>Owner</div>
               <div>Revision</div>
@@ -2489,14 +2644,6 @@ function DocumentsPageContent() {
                     >
                       <div style={registerPrimaryStyle}>{doc.document_number}</div>
                       <div style={registerCellTextStyle}>{doc.title || "-"}</div>
-                      <div style={registerCellTextStyle}>
-                        <div>{getDocumentScopeLabel(doc)}</div>
-                        {doc.document_scope === "Asset" ? (
-                          <div style={{ color: "#64748b", fontSize: "12px", marginTop: "4px" }}>
-                            {getDocumentAssetContext(doc)}
-                          </div>
-                        ) : null}
-                      </div>
                       <div style={registerCellTextStyle}>{doc.document_type || "-"}</div>
                       <div style={registerCellTextStyle}>{doc.department_owner || "-"}</div>
                       <div style={registerCellTextStyle}>{doc.current_revision || "-"}</div>
@@ -2535,9 +2682,101 @@ function DocumentsPageContent() {
           </div>
         </SectionCard>
         </section>
-      </section>
 
-      {showDetailPanel && selectedDocument ? (
+        <aside style={documentSidePanelStyle}>
+          {selectedDocument ? (
+            <>
+              <div>
+                <div style={detailEyebrowStyle}>Selected Document</div>
+                <h3 style={sidePanelTitleStyle}>{selectedDocument.document_number}</h3>
+                <p style={sidePanelSubtitleStyle}>{selectedDocument.title || "Untitled document"}</p>
+              </div>
+
+              <div style={sidePanelBadgeRowStyle}>
+                <StatusBadge value={selectedDocument.status || "Unknown"} />
+                <span
+                  style={{
+                    ...reviewBadgeStyle,
+                    background: getReviewApprovalTone(normalizeApprovalStatus(selectedDocument.review_approval_status)).bg,
+                    color: getReviewApprovalTone(normalizeApprovalStatus(selectedDocument.review_approval_status)).color,
+                  }}
+                >
+                  {normalizeApprovalStatus(selectedDocument.review_approval_status)}
+                </span>
+              </div>
+
+              <ControlSnapshotCard
+                items={[
+                  { label: "Revision", value: selectedDocument.current_revision || "-" },
+                  ...(selectedDocument.document_scope === "Asset"
+                    ? [{ label: "Linked Asset", value: getDocumentAssetContext(selectedDocument) }]
+                    : []),
+                  { label: "Owner", value: selectedDocument.department_owner || "-" },
+                  { label: "Next Review", value: formatDate(selectedDocument.next_review_date) },
+                  { label: "Originator", value: selectedDocument.originator_name || "-" },
+                  { label: "Reviewer", value: selectedDocument.reviewed_by || "-" },
+                  { label: "Approver", value: selectedDocument.approved_by || "-" },
+                  { label: "Controlled File", value: selectedDocument.file_name ? "Uploaded" : "Missing" },
+                ]}
+              />
+
+              <div style={sidePanelActionStackStyle}>
+                {selectedDocument.file_path ? (
+                  <button type="button" style={reportLinkButtonStyle} onClick={() => void openDocumentFile(selectedDocument.file_path || "")}>
+                    Open Controlled File
+                  </button>
+                ) : null}
+                <button type="button" style={primaryButtonStyle} onClick={() => setShowDetailPanel(true)}>
+                  Open Full Detail / Edit
+                </button>
+              </div>
+            </>
+          ) : (
+            <div style={emptyRevisionStyle}>Select a document to view its control summary.</div>
+          )}
+        </aside>
+      </section>
+      ) : null}
+
+      {activeView === "reports" ? (
+        <section style={reportsGridStyle}>
+          <SectionCard title="Document Control Reports" subtitle="Generate focused review reports from the current document register.">
+            <div style={reportActionGridStyle}>
+              <button
+                type="button"
+                style={reportActionCardStyle}
+                onClick={() => exportDocumentsReport("Overdue Document Review Report", overdueReviewDocuments)}
+              >
+                <span style={quickActionLabelStyle}>Overdue Review Report</span>
+                <strong style={quickActionValueStyle}>{overdueReviewDocuments.length}</strong>
+                <span style={reportActionHintStyle}>Documents past their next review date.</span>
+              </button>
+
+              <button
+                type="button"
+                style={reportActionCardStyle}
+                onClick={() => exportDocumentsReport("Documents Due Soon Review Report", dueSoonDocuments)}
+              >
+                <span style={quickActionLabelStyle}>Due Soon Review Report</span>
+                <strong style={quickActionValueStyle}>{dueSoonDocuments.length}</strong>
+                <span style={reportActionHintStyle}>Documents due for review within 60 days.</span>
+              </button>
+
+              <button
+                type="button"
+                style={reportActionCardStyle}
+                onClick={() => exportDocumentsReport("Master Document Register", filteredDocuments)}
+              >
+                <span style={quickActionLabelStyle}>Filtered Register Report</span>
+                <strong style={quickActionValueStyle}>{filteredDocuments.length}</strong>
+                <span style={reportActionHintStyle}>Uses the active search and filter state.</span>
+              </button>
+            </div>
+          </SectionCard>
+        </section>
+      ) : null}
+
+      {["register", "review", "approval", "archive"].includes(activeView) && showDetailPanel && selectedDocument ? (
         <section style={{ marginTop: "20px" }}>
           <SectionCard
             title="Document Detail"
@@ -2644,10 +2883,6 @@ function DocumentsPageContent() {
                 <div style={detailContentGridStyle}>
                   <div style={formLayoutStyle}>
                     <FormSection title="A. Document Details">
-                    <Field label="Document Scope">
-                      <input value={detailForm.document_scope} readOnly style={readOnlyInputStyle} />
-                    </Field>
-
                     {detailForm.document_scope === "Asset" ? (
                       <>
                         <Field label="Linked Asset">
@@ -3366,11 +3601,72 @@ const statusBannerStyle: CSSProperties = {
   color: "#0f172a",
 };
 
+const documentViewNavStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "20px",
+};
+
+const viewButtonStyle: CSSProperties = {
+  background: "#e2e8f0",
+  color: "#0f172a",
+  border: "none",
+  padding: "10px 14px",
+  borderRadius: "10px",
+  cursor: "pointer",
+  fontWeight: 800,
+};
+
+const activeViewButtonStyle: CSSProperties = {
+  ...viewButtonStyle,
+  background: "#0f766e",
+  color: "#ffffff",
+};
+
 const statsGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "16px",
   marginBottom: "20px",
+};
+
+const dashboardPanelGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+  gap: "16px",
+  marginBottom: "20px",
+};
+
+const quickActionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+};
+
+const quickActionCardStyle: CSSProperties = {
+  border: "1px solid #dbe4ef",
+  background: "#f8fafc",
+  borderRadius: "14px",
+  padding: "14px",
+  cursor: "pointer",
+  textAlign: "left",
+  display: "grid",
+  gap: "6px",
+};
+
+const quickActionLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 800,
+  color: "#475569",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const quickActionValueStyle: CSSProperties = {
+  fontSize: "28px",
+  color: "#0f172a",
+  lineHeight: 1,
 };
 
 const createPanelSectionStyle: CSSProperties = {
@@ -3849,10 +4145,85 @@ const toolbarStyle: CSSProperties = {
   marginBottom: "12px",
 };
 
-const toolbarFiltersStyle: CSSProperties = {
+const registerWorkspaceGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 2.4fr) minmax(320px, 0.9fr)",
+  gap: "16px",
+  alignItems: "start",
+};
+
+const documentSidePanelStyle: CSSProperties = {
+  background: "#ffffff",
+  borderRadius: "18px",
+  padding: "18px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  border: "1px solid #e2e8f0",
+  display: "grid",
+  gap: "14px",
+  position: "sticky",
+  top: "96px",
+  maxHeight: "calc(100vh - 116px)",
+  overflowY: "auto",
+  alignSelf: "start",
+};
+
+const sidePanelTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: "22px",
+  color: "#0f172a",
+  wordBreak: "break-word",
+};
+
+const sidePanelSubtitleStyle: CSSProperties = {
+  margin: "6px 0 0",
+  color: "#475569",
+  fontSize: "14px",
+  lineHeight: 1.45,
+};
+
+const sidePanelBadgeRowStyle: CSSProperties = {
   display: "flex",
-  gap: "10px",
+  gap: "8px",
   flexWrap: "wrap",
+};
+
+const sidePanelActionStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const reportsGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "16px",
+  marginBottom: "20px",
+};
+
+const reportActionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+  gap: "12px",
+};
+
+const reportActionCardStyle: CSSProperties = {
+  ...quickActionCardStyle,
+  minHeight: "150px",
+};
+
+const reportActionHintStyle: CSSProperties = {
+  color: "#64748b",
+  fontSize: "13px",
+  lineHeight: 1.45,
+};
+
+const toolbarFiltersStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: "10px",
+  marginBottom: "12px",
+  padding: "12px",
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  borderRadius: "14px",
 };
 
 const tableInfoRowStyle: CSSProperties = {
@@ -3869,7 +4240,7 @@ const registerTableWrapStyle: CSSProperties = {
 
 const registerHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.2fr 1.8fr 1.2fr 0.9fr 1fr 0.7fr 1fr 0.9fr 1fr",
+  gridTemplateColumns: "1.2fr 2fr 0.9fr 1fr 0.7fr 1fr 0.9fr 1fr",
   gap: "12px",
   padding: "14px 16px",
   background: "#f8fafc",
@@ -3891,7 +4262,7 @@ const registerRowStyle: CSSProperties = {
   width: "100%",
   textAlign: "left",
   display: "grid",
-  gridTemplateColumns: "1.2fr 1.8fr 1.2fr 0.9fr 1fr 0.7fr 1fr 0.9fr 1fr",
+  gridTemplateColumns: "1.2fr 2fr 0.9fr 1fr 0.7fr 1fr 0.9fr 1fr",
   gap: "12px",
   padding: "14px 16px",
   border: "none",
