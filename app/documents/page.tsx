@@ -653,7 +653,14 @@ function DocumentsPageContent() {
         (doc.asset_code || "").toLowerCase().includes(lower) ||
         (doc.asset_document_id_code || "").toLowerCase().includes(lower);
 
-      const matchesStatus = !statusFilter || (doc.status || "") === statusFilter;
+      const matchesStatus =
+        !statusFilter ||
+        (statusFilter.startsWith("__multi:")
+          ? statusFilter
+              .replace("__multi:", "")
+              .split("|")
+              .includes(doc.status || "")
+          : (doc.status || "") === statusFilter);
       const matchesType = !typeFilter || (doc.document_type || "") === typeFilter;
       const matchesOwner = !ownerFilter || (doc.department_owner || "") === ownerFilter;
       const matchesApproval = !approvalFilter || normalizedApproval === approvalFilter;
@@ -880,6 +887,10 @@ function DocumentsPageContent() {
   const totalDocuments = documents.length;
   const liveDocuments = documents.filter((doc) => (doc.status || "").trim().toLowerCase() === "live").length;
   const draftDocuments = documents.filter((doc) => (doc.status || "").trim().toLowerCase() === "draft").length;
+  const proposedDocuments = documents.filter((doc) => {
+    const status = (doc.status || "").trim().toLowerCase();
+    return status === "proposed" || status === "not drafted";
+  }).length;
   const archivedDocuments = documents.filter(
     (doc) => (doc.status || "").trim().toLowerCase() === "archived"
   ).length;
@@ -1040,16 +1051,20 @@ function DocumentsPageContent() {
 
   function applySnapshotFilter(filter: {
     status?: string;
+    statuses?: string[];
     approval?: string;
     review?: string;
   }) {
     setSearch("");
     setTypeFilter("");
     setOwnerFilter("");
-    setStatusFilter(filter.status || "");
+    setStatusFilter(filter.statuses?.length ? `__multi:${filter.statuses.join("|")}` : filter.status || "");
     setApprovalFilter(filter.approval || "");
     setReviewFilter(filter.review || "");
     setMessage("Snapshot filter applied.");
+    window.setTimeout(() => {
+      document.getElementById("document-register")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   }
 
   function exportDocumentsReport(title: string, rows: DocumentRow[]) {
@@ -1944,10 +1959,42 @@ function DocumentsPageContent() {
       </div>
 
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Total Documents" value={totalDocuments} accent="#0f766e" />
-        <QualityKpiCard title="Live Documents" value={liveDocuments} accent="#16a34a" />
-        <QualityKpiCard title="Approved (Approval Status)" value={approvedDocuments} accent="#2563eb" />
-        <QualityKpiCard title="Review Overdue" value={overdueReviews} accent="#dc2626" />
+        <QualityKpiCard
+          title="Total Documents"
+          value={totalDocuments}
+          accent="#0f766e"
+          onClick={() => applySnapshotFilter({})}
+        />
+        <QualityKpiCard
+          title="Live Documents"
+          value={liveDocuments}
+          accent="#16a34a"
+          onClick={() => applySnapshotFilter({ status: "Live" })}
+        />
+        <QualityKpiCard
+          title="Draft Documents"
+          value={draftDocuments}
+          accent="#2563eb"
+          onClick={() => applySnapshotFilter({ status: "Draft" })}
+        />
+        <QualityKpiCard
+          title="Proposed / Not Drafted"
+          value={proposedDocuments}
+          accent="#8b5cf6"
+          onClick={() => applySnapshotFilter({ statuses: ["Proposed", "Not drafted"] })}
+        />
+        <QualityKpiCard
+          title="Archived Documents"
+          value={archivedDocuments}
+          accent="#f97316"
+          onClick={() => applySnapshotFilter({ status: "Archived" })}
+        />
+        <QualityKpiCard
+          title="Review Overdue"
+          value={overdueReviews}
+          accent="#dc2626"
+          onClick={() => applySnapshotFilter({ review: "Overdue" })}
+        />
       </section>
 
       <section style={createPanelSectionStyle}>
@@ -2313,6 +2360,7 @@ function DocumentsPageContent() {
       </section>
 
       <section>
+        <section id="document-register">
         <SectionCard
           title="Document Register"
           subtitle="Full-width register. Click a row to open the detail panel below."
@@ -2333,6 +2381,8 @@ function DocumentsPageContent() {
               >
                 <option value="">All Status</option>
                 <option value="Draft">Draft</option>
+                <option value="Not drafted">Not drafted</option>
+                <option value="Proposed">Proposed</option>
                 <option value="Under Review">Under Review</option>
                 <option value="Approved">Approved</option>
                 <option value="Live">Live</option>
@@ -2484,6 +2534,7 @@ function DocumentsPageContent() {
             </div>
           </div>
         </SectionCard>
+        </section>
       </section>
 
       {showDetailPanel && selectedDocument ? (
@@ -2576,12 +2627,12 @@ function DocumentsPageContent() {
                     </button>
                   ) : null}
 
-                  <button type="button" style={secondaryButtonStyle} onClick={issueNextRevision}>
+                  <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={issueNextRevision}>
                     Up-rev to {getNextRevision(selectedDocument.current_revision || "A")}
                   </button>
 
                   {selectedDocument.file_name ? (
-                    <button type="button" style={secondaryButtonStyle} onClick={removeControlledFile}>
+                    <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={removeControlledFile}>
                       Remove file
                     </button>
                   ) : null}
@@ -2940,12 +2991,12 @@ function DocumentsPageContent() {
                           </button>
                         ) : null}
 
-                        <button type="button" style={secondaryButtonStyle} onClick={issueNextRevision}>
+                        <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={issueNextRevision}>
                           Up-rev to {getNextRevision(selectedDocument.current_revision || "A")}
                         </button>
 
                         {selectedDocument.file_name ? (
-                          <button type="button" style={secondaryButtonStyle} onClick={removeControlledFile}>
+                          <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={removeControlledFile}>
                             Remove file
                           </button>
                         ) : null}
@@ -3710,7 +3761,11 @@ const uploadButtonStyle: CSSProperties = {
   padding: "10px 16px",
   fontWeight: 700,
   cursor: "pointer",
-  whiteSpace: "nowrap",
+  width: "100%",
+  minHeight: "42px",
+  boxSizing: "border-box",
+  textAlign: "center",
+  lineHeight: 1.2,
 };
 
 const reportLinkButtonStyle: CSSProperties = {
@@ -3723,7 +3778,19 @@ const reportLinkButtonStyle: CSSProperties = {
   padding: "10px 16px",
   fontWeight: 700,
   textDecoration: "none",
-  whiteSpace: "nowrap",
+  width: "100%",
+  minHeight: "42px",
+  boxSizing: "border-box",
+  textAlign: "center",
+  lineHeight: 1.2,
+};
+
+const fileActionButtonStyle: CSSProperties = {
+  width: "100%",
+  minHeight: "42px",
+  boxSizing: "border-box",
+  textAlign: "center",
+  lineHeight: 1.2,
 };
 
 const reportButtonStyle: CSSProperties = {
@@ -3904,13 +3971,13 @@ const detailTitleStyle: CSSProperties = {
 
 const fileStripStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr auto",
-  gap: "16px",
+  gridTemplateColumns: "minmax(0, 1fr)",
+  gap: "14px",
   border: "1px solid #cfe8e5",
   background: "linear-gradient(180deg, #f7fffd 0%, #eefbf8 100%)",
   borderRadius: "16px",
   padding: "16px",
-  alignItems: "center",
+  alignItems: "stretch",
 };
 
 const fileMetaWrapStyle: CSSProperties = {
@@ -3941,10 +4008,10 @@ const fileMetaSubStyle: CSSProperties = {
 };
 
 const fileButtonsWrapStyle: CSSProperties = {
-  display: "flex",
+  display: "grid",
+  gridTemplateColumns: "1fr",
   gap: "10px",
-  flexWrap: "wrap",
-  justifyContent: "flex-end",
+  width: "100%",
 };
 
 const detailSectionStyle: CSSProperties = {

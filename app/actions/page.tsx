@@ -101,11 +101,33 @@ type ActionView = "dashboard" | "register" | "create" | "my" | "priority" | "rep
 type ChartDatum = {
   name: string;
   value: number;
+  filterValue?: string;
 };
 
 type TrendDatum = {
   name: string;
   closed: number;
+};
+
+type RegisterDrilldownOptions = {
+  search?: string;
+  status?: string;
+  priority?: string;
+  owner?: string;
+  project?: string;
+  source?: string;
+  department?: string;
+  overdue?: boolean;
+  openOnly?: boolean;
+  closedOnly?: boolean;
+  quickFilter?: QuickFilter;
+  evidenceOnly?: boolean;
+  linkedIssuesOnly?: boolean;
+  dueStart?: number;
+  dueWindow?: number;
+  noDueDateOnly?: boolean;
+  createdMonth?: string;
+  closedMonth?: string;
 };
 
 type LinkedRecordChip = {
@@ -623,7 +645,16 @@ function ActionsPageContent() {
   const [sourceFilter, setSourceFilter] = useState(linkedSource);
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [showOverdueOnly, setShowOverdueOnly] = useState(linkedOverdueOnly);
+  const [showOpenOnly, setShowOpenOnly] = useState(false);
+  const [showClosedOnly, setShowClosedOnly] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
+  const [showEvidenceOnly, setShowEvidenceOnly] = useState(false);
+  const [showLinkedIssuesOnly, setShowLinkedIssuesOnly] = useState(false);
+  const [dueStartFilter, setDueStartFilter] = useState(0);
+  const [dueWindowFilter, setDueWindowFilter] = useState(dueWindow);
+  const [showNoDueDateOnly, setShowNoDueDateOnly] = useState(false);
+  const [createdMonthFilter, setCreatedMonthFilter] = useState(linkedCreatedMonth);
+  const [closedMonthFilter, setClosedMonthFilter] = useState(linkedClosedMonth);
   const [activeView, setActiveView] = useState<ActionView>(initialView);
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [currentPersonName, setCurrentPersonName] = useState("");
@@ -946,8 +977,20 @@ function ActionsPageContent() {
     return countBy(actions, (action) => action.status || "Unspecified");
   }, [actions]);
 
-  const sourceChartData = useMemo(() => {
-    return countBy(actions, (action) => getActionSourceLabel(action));
+  const sourceChartData = useMemo<ChartDatum[]>(() => {
+    const counts = new Map<string, number>();
+    actions.forEach((action) => {
+      const source = getActionSourceValue(action);
+      counts.set(source, (counts.get(source) || 0) + 1);
+    });
+
+    return [...counts.entries()]
+      .map(([source, value]) => ({
+        name: source === "NCR/CAPA" ? "NCR / CAPA" : source,
+        value,
+        filterValue: source,
+      }))
+      .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
   }, [actions]);
 
   const openOwnerChartData = useMemo(() => {
@@ -1001,13 +1044,27 @@ function ActionsPageContent() {
   const filteredActions = useMemo(() => {
     return actions.filter((action) => {
       const matchesSearch = matchesSearchTerm(action, search);
-      const matchesStatus = !statusFilter || (action.status || "") === statusFilter;
-      const matchesPriority = !priorityFilter || (action.priority || "") === priorityFilter;
-      const matchesOwner = !ownerFilter || (action.owner || "") === ownerFilter;
+      const matchesStatus =
+        !statusFilter ||
+        (statusFilter === "Unspecified" ? !(action.status || "").trim() : (action.status || "") === statusFilter);
+      const matchesPriority =
+        !priorityFilter ||
+        (priorityFilter === "Unspecified"
+          ? !(action.priority || "").trim()
+          : (action.priority || "") === priorityFilter);
+      const matchesOwner =
+        !ownerFilter ||
+        (ownerFilter === "Unassigned" ? !(action.owner || "").trim() : (action.owner || "") === ownerFilter);
       const matchesProject = !projectFilter || (action.project || "") === projectFilter;
       const matchesSource = !sourceFilter || getActionSourceValue(action) === sourceFilter;
       const matchesDepartment = !departmentFilter || (action.department || "") === departmentFilter;
       const matchesOverdue = !showOverdueOnly || isOverdue(action);
+      const matchesOpenOnly = !showOpenOnly || !isClosedLikeStatus(action.status);
+      const matchesClosedOnly = !showClosedOnly || isClosedLikeStatus(action.status);
+      const matchesEvidenceOnly = !showEvidenceOnly || (evidenceCountMap.get(action.id) || 0) > 0;
+      const matchesLinkedIssuesOnly =
+        !showLinkedIssuesOnly ||
+        (sourceImpliesLinkedRecord(getActionSourceValue(action)) && !hasLinkedRecord(action));
       const matchesMyActions =
         quickFilter !== "my" || (Boolean(currentPersonName) && matchesPersonName(action.owner, currentPersonName));
       const matchesQuickOverdue = quickFilter !== "overdue" || isOverdue(action);
@@ -1022,18 +1079,19 @@ function ActionsPageContent() {
         quickFilter !== "highPriority" ||
         ((action.priority || "").toLowerCase() === "high" && !isClosedLikeStatus(action.status));
       const matchesCreatedMonth =
-        !linkedCreatedMonth || getMonthKey(action.created_at) === linkedCreatedMonth;
+        !createdMonthFilter || getMonthKey(action.created_at) === createdMonthFilter;
       const matchesClosedMonth =
-        !linkedClosedMonth ||
+        !closedMonthFilter ||
         (isClosedLikeStatus(action.status) &&
-          getMonthKey(action.updated_at || action.created_at) === linkedClosedMonth);
+          getMonthKey(action.updated_at || action.created_at) === closedMonthFilter);
       const matchesDueWindow =
-        dueWindow <= 0 ||
+        dueWindowFilter <= 0 ||
         (() => {
           if (!action.due_date || isClosedLikeStatus(action.status)) return false;
           const days = getDaysFromToday(action.due_date);
-          return days !== null && days >= 0 && days <= dueWindow;
+          return days !== null && days >= dueStartFilter && days <= dueWindowFilter;
         })();
+      const matchesNoDueDateOnly = !showNoDueDateOnly || (!action.due_date && !isClosedLikeStatus(action.status));
 
       return (
         matchesSearch &&
@@ -1044,17 +1102,23 @@ function ActionsPageContent() {
         matchesSource &&
         matchesDepartment &&
         matchesOverdue &&
+        matchesOpenOnly &&
+        matchesClosedOnly &&
+        matchesEvidenceOnly &&
+        matchesLinkedIssuesOnly &&
         matchesMyActions &&
         matchesQuickOverdue &&
         matchesQuickDueWeek &&
         matchesQuickHighPriority &&
         matchesCreatedMonth &&
         matchesClosedMonth &&
-        matchesDueWindow
+        matchesDueWindow &&
+        matchesNoDueDateOnly
       );
     });
   }, [
     actions,
+    evidenceCountMap,
     search,
     statusFilter,
     priorityFilter,
@@ -1063,11 +1127,17 @@ function ActionsPageContent() {
     sourceFilter,
     departmentFilter,
     showOverdueOnly,
+    showOpenOnly,
+    showClosedOnly,
+    showEvidenceOnly,
+    showLinkedIssuesOnly,
     quickFilter,
     currentPersonName,
-    linkedCreatedMonth,
-    linkedClosedMonth,
-    dueWindow,
+    createdMonthFilter,
+    closedMonthFilter,
+    dueWindowFilter,
+    dueStartFilter,
+    showNoDueDateOnly,
   ]);
 
   const overdueList = useMemo(() => {
@@ -1753,6 +1823,19 @@ function ActionsPageContent() {
         ["Source", sourceFilter || "All"],
         ["Department", departmentFilter || "All"],
         ["Overdue Only", showOverdueOnly ? "Yes" : "No"],
+        ["Open / Non-Closed Only", showOpenOnly ? "Yes" : "No"],
+        ["Closed / Complete Only", showClosedOnly ? "Yes" : "No"],
+        ["Evidence Attached Only", showEvidenceOnly ? "Yes" : "No"],
+        ["Linked Record Issues Only", showLinkedIssuesOnly ? "Yes" : "No"],
+        [
+          "Due Window",
+          dueWindowFilter > 0
+            ? `${dueStartFilter > 0 ? `${dueStartFilter}-` : "0-"}${dueWindowFilter} days`
+            : "All",
+        ],
+        ["No Due Date Only", showNoDueDateOnly ? "Yes" : "No"],
+        ["Created Month", createdMonthFilter || "All"],
+        ["Closed Month", closedMonthFilter || "All"],
         ["Quick Filter", quickFilter || "None"],
       ];
 
@@ -1906,8 +1989,65 @@ function ActionsPageContent() {
     setSourceFilter("");
     setDepartmentFilter("");
     setShowOverdueOnly(false);
+    setShowOpenOnly(false);
+    setShowClosedOnly(false);
     setQuickFilter("");
+    setShowEvidenceOnly(false);
+    setShowLinkedIssuesOnly(false);
+    setDueStartFilter(0);
+    setDueWindowFilter(0);
+    setShowNoDueDateOnly(false);
+    setCreatedMonthFilter("");
+    setClosedMonthFilter("");
     setSelectedEvidenceAction(null);
+  }
+
+  function openRegisterDrilldown(options: RegisterDrilldownOptions = {}) {
+    setActiveView("register");
+    setSelectedEvidenceAction(null);
+    setSearch(options.search || "");
+    setStatusFilter(options.status || "");
+    setPriorityFilter(options.priority || "");
+    setOwnerFilter(options.owner || "");
+    setProjectFilter(options.project || "");
+    setSourceFilter(options.source || "");
+    setDepartmentFilter(options.department || "");
+    setShowOverdueOnly(Boolean(options.overdue));
+    setShowOpenOnly(Boolean(options.openOnly));
+    setShowClosedOnly(Boolean(options.closedOnly));
+    setQuickFilter(options.quickFilter || "");
+    setShowEvidenceOnly(Boolean(options.evidenceOnly));
+    setShowLinkedIssuesOnly(Boolean(options.linkedIssuesOnly));
+    setDueStartFilter(options.dueStart || 0);
+    setDueWindowFilter(options.dueWindow || 0);
+    setShowNoDueDateOnly(Boolean(options.noDueDateOnly));
+    setCreatedMonthFilter(options.createdMonth || "");
+    setClosedMonthFilter(options.closedMonth || "");
+  }
+
+  function handleStatusDrilldown(status: string) {
+    openRegisterDrilldown({ status });
+  }
+
+  function handleDuePressureDrilldown(label: string) {
+    if (label === "Overdue") {
+      openRegisterDrilldown({ overdue: true, quickFilter: "overdue" });
+      return;
+    }
+
+    if (label === "Due 7 Days") {
+      openRegisterDrilldown({ dueStart: 0, dueWindow: 7, quickFilter: "dueWeek" });
+      return;
+    }
+
+    if (label === "Due 30 Days") {
+      openRegisterDrilldown({ dueStart: 8, dueWindow: 30 });
+      return;
+    }
+
+    if (label === "No Due Date") {
+      openRegisterDrilldown({ noDueDateOnly: true });
+    }
   }
 
   function openActionInRegister(action: ActionItem) {
@@ -1915,6 +2055,15 @@ function ActionsPageContent() {
     setSelectedEvidenceAction(action);
     setSearch(action.action_number || "");
     setQuickFilter("");
+    setShowOpenOnly(false);
+    setShowClosedOnly(false);
+    setShowEvidenceOnly(false);
+    setShowLinkedIssuesOnly(false);
+    setDueStartFilter(0);
+    setDueWindowFilter(0);
+    setShowNoDueDateOnly(false);
+    setCreatedMonthFilter("");
+    setClosedMonthFilter("");
   }
 
   return (
@@ -1958,12 +2107,42 @@ function ActionsPageContent() {
       {activeView === "dashboard" ? (
         <>
           <section style={statsGridStyle}>
-            <QualityKpiCard title="Open Actions" value={openActions} accent="#2563eb" />
-            <QualityKpiCard title="Closed / Complete" value={closedActions} accent="#16a34a" />
-            <QualityKpiCard title="Overdue Actions" value={overdueActions} accent="#dc2626" />
-            <QualityKpiCard title="Evidence Files" value={linkedEvidenceFiles.length} accent="#7c3aed" />
-            <QualityKpiCard title="My Open Actions" value={myOpenActions} accent="#0f766e" />
-            <QualityKpiCard title="Linked Record Issues" value={linkedRecordIssues} accent="#f59e0b" />
+            <QualityKpiCard
+              title="Open Actions"
+              value={openActions}
+              accent="#2563eb"
+              onClick={() => openRegisterDrilldown({ openOnly: true })}
+            />
+            <QualityKpiCard
+              title="Closed / Complete"
+              value={closedActions}
+              accent="#16a34a"
+              onClick={() => openRegisterDrilldown({ closedOnly: true })}
+            />
+            <QualityKpiCard
+              title="Overdue Actions"
+              value={overdueActions}
+              accent="#dc2626"
+              onClick={() => openRegisterDrilldown({ overdue: true, quickFilter: "overdue" })}
+            />
+            <QualityKpiCard
+              title="Evidence Files"
+              value={linkedEvidenceFiles.length}
+              accent="#7c3aed"
+              onClick={() => openRegisterDrilldown({ evidenceOnly: true })}
+            />
+            <QualityKpiCard
+              title="My Open Actions"
+              value={myOpenActions}
+              accent="#0f766e"
+              onClick={() => openRegisterDrilldown({ openOnly: true, quickFilter: "my" })}
+            />
+            <QualityKpiCard
+              title="Linked Record Issues"
+              value={linkedRecordIssues}
+              accent="#f59e0b"
+              onClick={() => openRegisterDrilldown({ linkedIssuesOnly: true })}
+            />
           </section>
 
           <SectionCard
@@ -1978,7 +2157,13 @@ function ActionsPageContent() {
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#0f766e" radius={[6, 6, 0, 0]} />
+                    <Bar
+                      dataKey="value"
+                      fill="#0f766e"
+                      radius={[6, 6, 0, 0]}
+                      onClick={(entry) => handleStatusDrilldown(String((entry as ChartDatum).name || ""))}
+                      cursor="pointer"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartPanel>
@@ -1990,7 +2175,15 @@ function ActionsPageContent() {
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={92} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#2563eb" radius={[0, 6, 6, 0]} />
+                    <Bar
+                      dataKey="value"
+                      fill="#2563eb"
+                      radius={[0, 6, 6, 0]}
+                      onClick={(entry) =>
+                        openRegisterDrilldown({ source: String((entry as ChartDatum).filterValue || "") })
+                      }
+                      cursor="pointer"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartPanel>
@@ -2002,7 +2195,13 @@ function ActionsPageContent() {
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={104} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#7c3aed" radius={[0, 6, 6, 0]} />
+                    <Bar
+                      dataKey="value"
+                      fill="#7c3aed"
+                      radius={[0, 6, 6, 0]}
+                      onClick={(entry) => openRegisterDrilldown({ owner: String((entry as ChartDatum).name || "") })}
+                      cursor="pointer"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartPanel>
@@ -2014,7 +2213,12 @@ function ActionsPageContent() {
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    <Bar
+                      dataKey="value"
+                      radius={[6, 6, 0, 0]}
+                      onClick={(entry) => handleDuePressureDrilldown(String((entry as ChartDatum).name || ""))}
+                      cursor="pointer"
+                    >
                       {duePressureData.map((entry, index) => (
                         <Cell key={entry.name} fill={chartColours[index % chartColours.length]} />
                       ))}
@@ -2034,6 +2238,8 @@ function ActionsPageContent() {
                       outerRadius={82}
                       paddingAngle={2}
                       label
+                      onClick={(entry) => openRegisterDrilldown({ priority: String((entry as ChartDatum).name || "") })}
+                      cursor="pointer"
                     >
                       {priorityMixData.map((entry, index) => (
                         <Cell key={entry.name} fill={chartColours[index % chartColours.length]} />
@@ -2046,7 +2252,14 @@ function ActionsPageContent() {
 
               <ChartPanel title="Closure Trend">
                 <ResponsiveContainer width="100%" height={230}>
-                  <LineChart data={closureTrendData}>
+                  <LineChart
+                    data={closureTrendData}
+                    onClick={(state: any) => {
+                      const month = state?.activePayload?.[0]?.payload?.name;
+                      if (month) openRegisterDrilldown({ closedMonth: month });
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
@@ -2549,6 +2762,48 @@ function ActionsPageContent() {
               <>
                 {" "}
                 with quick filter <strong>{quickFilter === "dueWeek" ? "Due This Week" : quickFilter === "highPriority" ? "High Priority" : quickFilter === "my" ? "My Actions" : "Overdue"}</strong>
+              </>
+            ) : null}
+            {showOpenOnly ? (
+              <>
+                {" "}
+                showing <strong>open/non-closed</strong>
+              </>
+            ) : null}
+            {showClosedOnly ? (
+              <>
+                {" "}
+                showing <strong>closed/complete</strong>
+              </>
+            ) : null}
+            {showEvidenceOnly ? (
+              <>
+                {" "}
+                with <strong>attached evidence</strong>
+              </>
+            ) : null}
+            {showLinkedIssuesOnly ? (
+              <>
+                {" "}
+                with <strong>linked record issues</strong>
+              </>
+            ) : null}
+            {dueWindowFilter > 0 ? (
+              <>
+                {" "}
+                due in <strong>{dueStartFilter > 0 ? `${dueStartFilter}-` : "0-"}{dueWindowFilter} days</strong>
+              </>
+            ) : null}
+            {showNoDueDateOnly ? (
+              <>
+                {" "}
+                with <strong>no due date</strong>
+              </>
+            ) : null}
+            {closedMonthFilter ? (
+              <>
+                {" "}
+                closed in <strong>{closedMonthFilter}</strong>
               </>
             ) : null}
           </span>
