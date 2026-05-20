@@ -41,3 +41,4 @@ yarn-error.log*
 next-env.d.ts
 external-assets-review/
 external-assets-review/
+scripts/output/
