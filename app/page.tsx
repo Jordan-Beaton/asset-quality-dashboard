@@ -11,6 +11,8 @@ import {
   Legend,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -48,6 +50,7 @@ type ActionItem = {
   id: string;
   action_number: string | null;
   title: string | null;
+  department: string | null;
   owner: string | null;
   priority: string | null;
   status: string | null;
@@ -259,14 +262,23 @@ function isNearingTemporaryMoc(record: MocRecord) {
   return days !== null && days >= 0 && days <= 7;
 }
 
-function isDraftAgedMoc(record: MocRecord) {
-  if (normaliseStatus(record.status) !== "draft") return false;
-  const created = new Date(record.created_at || record.updated_at || 0);
-  if (Number.isNaN(created.getTime())) return false;
-  const today = new Date();
-  created.setHours(0, 0, 0, 0);
-  today.setHours(0, 0, 0, 0);
-  return (today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24) > 14;
+function percentage(part: number, total: number) {
+  if (total <= 0) return 0;
+  return Math.round((part / total) * 100);
+}
+
+function getChartPayloadName(data: unknown) {
+  if (typeof data !== "object" || data === null) return "";
+  if ("name" in data && typeof (data as { name?: unknown }).name === "string") {
+    return (data as { name: string }).name;
+  }
+  if (
+    "payload" in data &&
+    typeof (data as { payload?: { name?: unknown } }).payload?.name === "string"
+  ) {
+    return (data as { payload: { name: string } }).payload.name;
+  }
+  return "";
 }
 
 export default function Home() {
@@ -353,13 +365,14 @@ export default function Home() {
   }, []);
 
   const openNcrs = ncrs.filter((item) => !isClosedLikeStatus(item.status)).length;
-  const openActions = actions.filter((item) => !isClosedLikeStatus(item.status)).length;
   const openAuditFindings = auditFindings.filter((item) => !isClosedLikeStatus(item.status)).length;
   const openMocs = mocs.filter((item) => normaliseStatus(item.status) !== "closed").length;
   const temporaryMocs = mocs.filter((item) => (item.change_type || "") === "Temporary").length;
   const inReviewMocs = mocs.filter((item) => normaliseStatus(item.status) === "in review").length;
+  const hseqActions = actions.filter((item) => normaliseStatus(item.department) === "hseq");
+  const openHseqActions = hseqActions.filter((item) => !isClosedLikeStatus(item.status)).length;
 
-  const overdueActions = actions.filter((action) => {
+  const overdueHseqActions = hseqActions.filter((action) => {
     if (isClosedLikeStatus(action.status)) return false;
     const days = getDaysFromToday(action.due_date);
     return days !== null && days < 0;
@@ -368,12 +381,17 @@ export default function Home() {
   const overdueDocuments = documents.filter((doc) => getDocumentBucket(doc) === "Overdue").length;
   const expiredTemporaryMocs = mocs.filter((item) => isExpiredTemporaryMoc(item)).length;
   const nearingTemporaryMocs = mocs.filter((item) => isNearingTemporaryMoc(item)).length;
-  const agedDraftMocs = mocs.filter((item) => isDraftAgedMoc(item)).length;
 
   const overdueNcrs = ncrs.filter((item) => {
     if (isClosedLikeStatus(item.status)) return false;
     const days = getDaysFromToday(item.due_date || null);
     return days !== null && days < 0;
+  }).length;
+
+  const dueSoonNcrs = ncrs.filter((item) => {
+    if (isClosedLikeStatus(item.status)) return false;
+    const days = getDaysFromToday(item.due_date || null);
+    return days !== null && days >= 0 && days <= 7;
   }).length;
 
   const ncrStatusData = useMemo(
@@ -392,12 +410,44 @@ export default function Home() {
     [ncrs]
   );
 
+  const ncrTrendData = useMemo(() => {
+    const keys = new Set<string>();
+    const openedMap: Record<string, number> = {};
+    const closedMap: Record<string, number> = {};
+
+    ncrs.forEach((ncr) => {
+      const openedKey = monthKey(ncr.created_at);
+      if (openedKey) {
+        keys.add(openedKey);
+        openedMap[openedKey] = (openedMap[openedKey] || 0) + 1;
+      }
+
+      if (isClosedLikeStatus(ncr.status)) {
+        const closedKey = monthKey(ncr.created_at);
+        if (closedKey) {
+          keys.add(closedKey);
+          closedMap[closedKey] = (closedMap[closedKey] || 0) + 1;
+        }
+      }
+    });
+
+    return [...keys]
+      .sort()
+      .slice(-6)
+      .map((key) => ({
+        month: monthLabel(key),
+        rawMonth: key,
+        Raised: openedMap[key] || 0,
+        Closed: closedMap[key] || 0,
+      }));
+  }, [ncrs]);
+
   const actionsTrendData = useMemo(() => {
     const keys = new Set<string>();
     const openedMap: Record<string, number> = {};
     const closedMap: Record<string, number> = {};
 
-    actions.forEach((action) => {
+    hseqActions.forEach((action) => {
       const openedKey = monthKey(action.created_at);
       if (openedKey) {
         keys.add(openedKey);
@@ -422,9 +472,24 @@ export default function Home() {
         Opened: openedMap[key] || 0,
         Closed: closedMap[key] || 0,
       }));
-  }, [actions]);
+  }, [hseqActions]);
 
-  const findingsBreakdownData = useMemo(() => {
+  const documentStatusData = useMemo(() => {
+    const counts = {
+      Draft: 0,
+      "Under Review": 0,
+      Approved: 0,
+      Overdue: 0,
+    };
+
+    documents.forEach((document) => {
+      counts[getDocumentBucket(document)] += 1;
+    });
+
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [documents]);
+
+  const auditFindingMixData = useMemo(() => {
     const counts = {
       Major: 0,
       Minor: 0,
@@ -441,21 +506,6 @@ export default function Home() {
 
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [auditFindings]);
-
-  const documentStatusData = useMemo(() => {
-    const counts = {
-      Draft: 0,
-      "Under Review": 0,
-      Approved: 0,
-      Overdue: 0,
-    };
-
-    documents.forEach((document) => {
-      counts[getDocumentBucket(document)] += 1;
-    });
-
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [documents]);
 
   const mocStatusData = useMemo(() => {
     const counts = {
@@ -490,6 +540,123 @@ export default function Home() {
 
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [mocs]);
+
+  const hseqActionDuePressureData = useMemo(() => {
+    const open = hseqActions.filter((action) => !isClosedLikeStatus(action.status));
+    const overdue = open.filter((action) => {
+      const days = getDaysFromToday(action.due_date);
+      return days !== null && days < 0;
+    }).length;
+    const due7 = open.filter((action) => {
+      const days = getDaysFromToday(action.due_date);
+      return days !== null && days >= 0 && days <= 7;
+    }).length;
+    const due30 = open.filter((action) => {
+      const days = getDaysFromToday(action.due_date);
+      return days !== null && days > 7 && days <= 30;
+    }).length;
+    const noDueDate = open.filter((action) => !action.due_date).length;
+
+    return [
+      { name: "Overdue", value: overdue, fill: "#dc2626" },
+      { name: "Due 7 Days", value: due7, fill: "#f59e0b" },
+      { name: "Due 30 Days", value: due30, fill: "#2563eb" },
+      { name: "No Due Date", value: noDueDate, fill: "#64748b" },
+    ];
+  }, [hseqActions]);
+
+  const auditStatusData = useMemo(() => {
+    const counts = {
+      Planned: 0,
+      "In Progress": 0,
+      Overdue: 0,
+      Completed: 0,
+    };
+
+    audits.forEach((audit) => {
+      const status = audit.status || "Planned";
+      if (status === "Completed") {
+        counts.Completed += 1;
+      } else if (status === "In Progress") {
+        counts["In Progress"] += 1;
+      } else {
+        const auditKey = getAuditMonthKey(audit);
+        counts[auditKey && auditKey < dateMonthKey(new Date()) ? "Overdue" : "Planned"] += 1;
+      }
+    });
+
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [audits]);
+
+  const qualityHealthData = useMemo(() => {
+    const totalNcrs = ncrs.length;
+    const closedNcrs = ncrs.filter((item) => isClosedLikeStatus(item.status)).length;
+    const totalFindings = auditFindings.length;
+    const closedFindings = auditFindings.filter((item) => isClosedLikeStatus(item.status)).length;
+    const totalDocs = documents.length;
+    const docsInDate = documents.filter((document) => getDocumentBucket(document) !== "Overdue").length;
+    const totalMocs = mocs.length;
+    const closedMocs = mocs.filter((item) => normaliseStatus(item.status) === "closed").length;
+
+    return [
+      { name: "NCR Closure", value: percentage(closedNcrs, totalNcrs), fill: "#0f766e", href: "/ncr-capa" },
+      {
+        name: "Finding Closure",
+        value: percentage(closedFindings, totalFindings),
+        fill: "#7c3aed",
+        href: buildHref("/audits", { view: "findings" }),
+      },
+      {
+        name: "Docs In Date",
+        value: percentage(docsInDate, totalDocs),
+        fill: "#2563eb",
+        href: buildHref("/documents", { view: "dashboard" }),
+      },
+      { name: "MOC Closure", value: percentage(closedMocs, totalMocs), fill: "#16a34a", href: "/moc" },
+    ];
+  }, [auditFindings, documents, mocs, ncrs]);
+
+  const managementFocusItems = useMemo(
+    () => [
+      {
+        label: "Overdue NCRs",
+        value: overdueNcrs,
+        href: buildHref("/ncr-capa", { view: "register", status: "Open" }),
+        tone: "critical" as const,
+      },
+      {
+        label: "NCRs Due in 7 Days",
+        value: dueSoonNcrs,
+        href: buildHref("/ncr-capa", { view: "register", dueWindow: 7 }),
+        tone: "warning" as const,
+      },
+      {
+        label: "Overdue HSEQ Actions",
+        value: overdueHseqActions,
+        href: buildHref("/actions", { view: "register", department: "HSEQ", overdue: 1 }),
+        tone: "critical" as const,
+      },
+      {
+        label: "Document Reviews Overdue",
+        value: overdueDocuments,
+        href: buildHref("/documents", { review: "Overdue" }),
+        tone: "critical" as const,
+      },
+      {
+        label: "Temporary MOCs Near Expiry",
+        value: nearingTemporaryMocs,
+        href: buildHref("/moc", { attention: "expiry-soon" }),
+        tone: "warning" as const,
+      },
+      {
+        label: "Expired Temporary MOCs",
+        value: expiredTemporaryMocs,
+        href: buildHref("/moc", { attention: "expired-temporary" }),
+        tone: "critical" as const,
+      },
+    ],
+    [dueSoonNcrs, expiredTemporaryMocs, nearingTemporaryMocs, overdueDocuments, overdueHseqActions, overdueNcrs]
+  );
 
   const topProblemAreas = useMemo(() => {
     const repeatCounts = auditFindings.reduce<Record<string, number>>((acc, finding) => {
@@ -581,7 +748,7 @@ export default function Home() {
   }, [audits, auditFindings]);
 
   const priorityActions = useMemo(() => {
-    return [...actions]
+    return [...hseqActions]
       .filter((action) => !isClosedLikeStatus(action.status))
       .sort((a, b) => {
         const aDays = getDaysFromToday(a.due_date);
@@ -598,7 +765,7 @@ export default function Home() {
         return aDate - bDate;
       })
       .slice(0, 5);
-  }, [actions]);
+  }, [hseqActions]);
 
   const currentMonthAuditKey = useMemo(() => dateMonthKey(new Date()), []);
 
@@ -669,19 +836,19 @@ export default function Home() {
       label: "Open NCRs",
       value: openNcrs,
       accent: "#dc2626",
-      href: buildHref("/ncr-capa", { type: "NCR", status: "Open" }),
+      href: buildHref("/ncr-capa", { view: "register", status: "Open" }),
     },
     {
-      label: "Open Actions",
-      value: openActions,
+      label: "HSEQ Open Actions",
+      value: openHseqActions,
       accent: "#2563eb",
-      href: buildHref("/actions", { status: "Open" }),
+      href: buildHref("/actions", { view: "register", department: "HSEQ", status: "Open" }),
     },
     {
       label: "Open Audit Findings",
       value: openAuditFindings,
       accent: "#7c3aed",
-      href: buildHref("/audits", { findingStatus: "Open" }),
+      href: buildHref("/audits", { view: "findings", findingStatus: "Open" }),
     },
     {
       label: "Open MOCs",
@@ -702,10 +869,10 @@ export default function Home() {
       href: buildHref("/moc", { status: "In Review" }),
     },
     {
-      label: "Overdue Actions",
-      value: overdueActions,
+      label: "HSEQ Overdue Actions",
+      value: overdueHseqActions,
       accent: "#b91c1c",
-      href: buildHref("/actions", { overdue: 1 }),
+      href: buildHref("/actions", { view: "register", department: "HSEQ", overdue: 1 }),
     },
     {
       label: "Overdue Documents",
@@ -740,7 +907,7 @@ export default function Home() {
       <QualityPageHero
         label="QUALITY MANAGEMENT"
         title="Dashboard"
-        description="Live operational view across MOCs, NCRs, audits, actions, and documents, built for fast drill-down into the next items that need follow-up."
+        description="Management view of HSEQ performance across NCRs, audits, MOCs, document control, and department-owned actions, built for fast drill-down into the items that need attention."
         contextCards={[
           {
             label: "Last Refreshed",
@@ -772,25 +939,46 @@ export default function Home() {
         ))}
       </section>
 
+      <section style={healthGridStyle}>
+        {qualityHealthData.map((item) => (
+          <Link key={item.name} href={item.href} style={healthCardStyle}>
+            <div>
+              <div style={healthLabelStyle}>{item.name}</div>
+              <div style={healthHintStyle}>Click to review source records</div>
+            </div>
+            <div style={healthGaugeStyle}>
+              <span>{isLoading ? "-" : `${item.value}%`}</span>
+              <div style={healthGaugeTrackStyle}>
+                <div style={{ ...healthGaugeFillStyle, width: `${item.value}%`, background: item.fill }} />
+              </div>
+            </div>
+          </Link>
+        ))}
+      </section>
+
       <section style={chartGridStyle}>
-        <SectionCard title="NCR Status" subtitle="Open versus closed NCR records.">
+        <SectionCard title="Quality Health Snapshot" subtitle="Percentage view of core HSEQ controls.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ncrStatusData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
+                <BarChart data={qualityHealthData} layout="vertical" margin={{ left: 18, right: 18 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
+                  <YAxis type="category" dataKey="name" width={98} />
+                  <Tooltip formatter={(value) => `${value}%`} />
                   <Bar
                     dataKey="value"
-                    radius={[6, 6, 0, 0]}
+                    radius={[0, 8, 8, 0]}
                     cursor="pointer"
-                    onClick={(data: { name?: string }) => router.push(buildHref("/ncr-capa", { status: data?.name || "" }))}
+                    onClick={(data: unknown) => {
+                      const name = getChartPayloadName(data);
+                      const target = qualityHealthData.find((item) => item.name === name);
+                      if (target) router.push(target.href);
+                    }}
                   >
-                    {ncrStatusData.map((entry) => (
+                    {qualityHealthData.map((entry) => (
                       <Cell key={entry.name} fill={entry.fill} />
                     ))}
                   </Bar>
@@ -800,13 +988,44 @@ export default function Home() {
           )}
         </SectionCard>
 
-        <SectionCard title="Actions Trend" subtitle="Monthly opened versus closed actions.">
+        <SectionCard title="NCR Closure Mix" subtitle="Open versus closed NCR records.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={actionsTrendData}>
+                <PieChart>
+                  <Tooltip />
+                  <Pie
+                    data={ncrStatusData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={72}
+                    outerRadius={108}
+                    paddingAngle={4}
+                    cursor="pointer"
+                    onClick={(data: unknown) =>
+                      router.push(buildHref("/ncr-capa", { view: "register", status: getChartPayloadName(data) }))
+                    }
+                  >
+                    {ncrStatusData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="NCR Trend" subtitle="Monthly raised versus closed NCRs.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={ncrTrendData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="month" />
                   <YAxis allowDecimals={false} />
@@ -814,14 +1033,15 @@ export default function Home() {
                   <Legend />
                   <Line
                     type="monotone"
-                    dataKey="Opened"
-                    stroke="#2563eb"
+                    dataKey="Raised"
+                    stroke="#dc2626"
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     activeDot={{ r: 5, cursor: "pointer" }}
                     onClick={(data: unknown) =>
                       router.push(
-                        buildHref("/actions", {
+                        buildHref("/ncr-capa", {
+                          view: "register",
                           createdMonth:
                             typeof data === "object" &&
                             data !== null &&
@@ -842,7 +1062,8 @@ export default function Home() {
                     activeDot={{ r: 5, cursor: "pointer" }}
                     onClick={(data: unknown) =>
                       router.push(
-                        buildHref("/actions", {
+                        buildHref("/ncr-capa", {
+                          view: "register",
                           status: "Closed",
                           closedMonth:
                             typeof data === "object" &&
@@ -861,13 +1082,13 @@ export default function Home() {
           )}
         </SectionCard>
 
-        <SectionCard title="Audit Findings Breakdown" subtitle="Major, Minor, OFI and OBS totals.">
+        <SectionCard title="Audit Programme Status" subtitle="Planned, in progress, overdue, and completed audits.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={findingsBreakdownData}>
+                <BarChart data={auditStatusData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
                   <YAxis allowDecimals={false} />
@@ -877,11 +1098,22 @@ export default function Home() {
                     radius={[6, 6, 0, 0]}
                     cursor="pointer"
                     onClick={(data: { name?: string }) =>
-                      router.push(buildHref("/audits", { findingCategory: data?.name || "" }))
+                      router.push(buildHref("/audits", { status: data?.name || "" }))
                     }
                   >
-                    {findingsBreakdownData.map((entry) => (
-                      <Cell key={entry.name} fill={getFindingBarColor(entry.name)} />
+                    {auditStatusData.map((entry) => (
+                      <Cell
+                        key={entry.name}
+                        fill={
+                          entry.name === "Completed"
+                            ? "#16a34a"
+                            : entry.name === "Overdue"
+                              ? "#dc2626"
+                              : entry.name === "In Progress"
+                                ? "#7c3aed"
+                                : "#2563eb"
+                        }
+                      />
                     ))}
                   </Bar>
                 </BarChart>
@@ -890,31 +1122,78 @@ export default function Home() {
           )}
         </SectionCard>
 
-        <SectionCard title="Document Status" subtitle="Draft, under review, approved, and overdue review positions.">
+        <SectionCard title="Audit Finding Mix" subtitle="Major, Minor, OFI and OBS finding split.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={documentStatusData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
+                <PieChart>
                   <Tooltip />
-                  <Bar
+                  <Pie
+                    data={auditFindingMixData}
                     dataKey="value"
-                    fill="#0f766e"
-                    radius={[6, 6, 0, 0]}
+                    nameKey="name"
+                    innerRadius={66}
+                    outerRadius={104}
+                    paddingAngle={3}
                     cursor="pointer"
-                    onClick={(data: { name?: string }) => openDocumentStatusBucket(data?.name || "")}
-                  />
-                </BarChart>
+                    onClick={(data: unknown) =>
+                      router.push(buildHref("/audits", { view: "findings", findingCategory: getChartPayloadName(data) }))
+                    }
+                  >
+                    {auditFindingMixData.map((entry) => (
+                      <Cell key={entry.name} fill={getFindingCategoryColour(entry.name)} />
+                    ))}
+                  </Pie>
+                  <Legend />
+                </PieChart>
               </ResponsiveContainer>
             </div>
           )}
         </SectionCard>
 
-        <SectionCard title="MOC Status" subtitle="Draft, in review, approved, and closed MOC positions.">
+        <SectionCard title="Document Control Health" subtitle="Draft, under review, approved, and overdue review positions.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip />
+                  <Pie
+                    data={documentStatusData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={66}
+                    outerRadius={104}
+                    paddingAngle={3}
+                    cursor="pointer"
+                    onClick={(data: unknown) => openDocumentStatusBucket(getChartPayloadName(data))}
+                  >
+                    {documentStatusData.map((entry) => (
+                      <Cell
+                        key={entry.name}
+                        fill={
+                          entry.name === "Overdue"
+                            ? "#dc2626"
+                            : entry.name === "Draft"
+                              ? "#64748b"
+                              : entry.name === "Under Review"
+                                ? "#f59e0b"
+                                : "#16a34a"
+                        }
+                      />
+                    ))}
+                  </Pie>
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="MOC Control" subtitle="Draft, in review, approved, and closed MOC positions.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
@@ -938,13 +1217,80 @@ export default function Home() {
           )}
         </SectionCard>
 
-        <SectionCard title="MOC Change Type" subtitle="Permanent versus temporary change records.">
+        <SectionCard title="MOC Type Split" subtitle="Permanent versus temporary change records.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mocChangeTypeData}>
+                <PieChart>
+                  <Tooltip />
+                  <Pie
+                    data={mocChangeTypeData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={66}
+                    outerRadius={104}
+                    paddingAngle={4}
+                    cursor="pointer"
+                    onClick={(data: unknown) =>
+                      router.push(buildHref("/moc", { change_type: getChartPayloadName(data) }))
+                    }
+                  >
+                    {mocChangeTypeData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.name === "Temporary" ? "#f59e0b" : "#2563eb"} />
+                    ))}
+                  </Pie>
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="HSEQ Action Trend" subtitle="Department-owned actions opened versus closed.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={actionsTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="Opened"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                    dot={{ r: 4, cursor: "pointer" }}
+                    onClick={() => router.push(buildHref("/actions", { view: "register", department: "HSEQ" }))}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Closed"
+                    stroke="#16a34a"
+                    strokeWidth={3}
+                    dot={{ r: 4, cursor: "pointer" }}
+                    onClick={() =>
+                      router.push(buildHref("/actions", { view: "register", department: "HSEQ", status: "Closed" }))
+                    }
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="HSEQ Action Due Pressure" subtitle="Open HSEQ actions by due-date pressure.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading chart...</p>
+          ) : (
+            <div style={chartWrapStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={hseqActionDuePressureData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
                   <YAxis allowDecimals={false} />
@@ -953,12 +1299,25 @@ export default function Home() {
                     dataKey="value"
                     radius={[6, 6, 0, 0]}
                     cursor="pointer"
-                    onClick={(data: { name?: string }) =>
-                      router.push(buildHref("/moc", { change_type: data?.name || "" }))
-                    }
+                    onClick={(data: { name?: string }) => {
+                      const name = data?.name || "";
+                      if (name === "Overdue") {
+                        router.push(buildHref("/actions", { view: "register", department: "HSEQ", overdue: 1 }));
+                        return;
+                      }
+                      if (name === "Due 7 Days") {
+                        router.push(buildHref("/actions", { view: "register", department: "HSEQ", dueWindow: 7 }));
+                        return;
+                      }
+                      if (name === "Due 30 Days") {
+                        router.push(buildHref("/actions", { view: "register", department: "HSEQ", dueWindow: 30 }));
+                        return;
+                      }
+                      router.push(buildHref("/actions", { view: "register", department: "HSEQ" }));
+                    }}
                   >
-                    {mocChangeTypeData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.name === "Temporary" ? "#f59e0b" : "#2563eb"} />
+                    {hseqActionDuePressureData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -969,6 +1328,21 @@ export default function Home() {
       </section>
 
       <section style={insightGridStyle}>
+        <SectionCard title="Management Focus" subtitle="The current pressure points a manager should see first.">
+          <div style={focusGridStyle}>
+            {managementFocusItems.map((item) => (
+              <SummaryRow
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                href={item.href}
+                isLoading={isLoading}
+                tone={item.tone}
+              />
+            ))}
+          </div>
+        </SectionCard>
+
         <SectionCard title="Top Problem Areas" subtitle="Current highest-finding audit areas using the existing risk scoring approach.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading insight...</p>
@@ -997,58 +1371,14 @@ export default function Home() {
             </div>
           )}
         </SectionCard>
-
-        <SectionCard title="Overdue Work & MOC Attention" subtitle="Current overdue workload plus management visibility for temporary and ageing MOCs.">
-          <div style={stackCompactStyle}>
-            <SummaryRow
-              label="Overdue Actions"
-              value={overdueActions}
-              href={buildHref("/actions", { overdue: 1 })}
-              isLoading={isLoading}
-            />
-            <SummaryRow
-              label="Overdue NCRs"
-              value={overdueNcrs}
-              href={buildHref("/ncr-capa", { status: "Open" })}
-              isLoading={isLoading}
-            />
-            <SummaryRow
-              label="Overdue Documents"
-              value={overdueDocuments}
-              href={buildHref("/documents", { review: "Overdue" })}
-              isLoading={isLoading}
-            />
-            <SummaryRow
-              label="Expired Temporary MOCs"
-              value={expiredTemporaryMocs}
-              href={buildHref("/moc", { attention: "expired-temporary" })}
-              isLoading={isLoading}
-              tone="critical"
-            />
-            <SummaryRow
-              label="Temporary MOCs Near Expiry"
-              value={nearingTemporaryMocs}
-              href={buildHref("/moc", { attention: "expiry-soon" })}
-              isLoading={isLoading}
-              tone="warning"
-            />
-            <SummaryRow
-              label="Draft MOCs > 14 Days"
-              value={agedDraftMocs}
-              href={buildHref("/moc", { attention: "draft-ageing" })}
-              isLoading={isLoading}
-              tone="warning"
-            />
-          </div>
-        </SectionCard>
       </section>
 
       <section style={bottomGridStyle}>
         <SectionCard
-          title="Priority Actions"
-          subtitle="Top five overdue or high-priority actions."
+          title="HSEQ Priority Actions"
+          subtitle="Top five overdue or high-priority HSEQ-owned actions."
           action={
-            <Link href="/actions" style={sectionLinkStyle}>
+            <Link href={buildHref("/actions", { view: "register", department: "HSEQ" })} style={sectionLinkStyle}>
               Open actions {"->"}
             </Link>
           }
@@ -1268,8 +1598,8 @@ function MetaChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getFindingBarColor(name: string) {
-  if (name === "Major") return "#b91c1c";
+function getFindingCategoryColour(name: string) {
+  if (name === "Major") return "#dc2626";
   if (name === "Minor") return "#f59e0b";
   if (name === "OFI") return "#16a34a";
   return "#2563eb";
@@ -1403,6 +1733,56 @@ const kpiGridStyle: CSSProperties = {
   marginBottom: "18px",
 };
 
+const healthGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: "12px",
+  marginBottom: "18px",
+};
+
+const healthCardStyle: CSSProperties = {
+  textDecoration: "none",
+  color: "#0f172a",
+  background: "white",
+  borderRadius: "18px",
+  padding: "16px",
+  border: "1px solid #e2e8f0",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  display: "grid",
+  gap: "14px",
+};
+
+const healthLabelStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 900,
+  color: "#0f172a",
+};
+
+const healthHintStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "12px",
+  color: "#64748b",
+};
+
+const healthGaugeStyle: CSSProperties = {
+  display: "grid",
+  gap: "8px",
+  fontSize: "26px",
+  fontWeight: 900,
+};
+
+const healthGaugeTrackStyle: CSSProperties = {
+  height: "10px",
+  borderRadius: "999px",
+  background: "#e2e8f0",
+  overflow: "hidden",
+};
+
+const healthGaugeFillStyle: CSSProperties = {
+  height: "100%",
+  borderRadius: "999px",
+};
+
 const chartGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
@@ -1415,6 +1795,12 @@ const insightGridStyle: CSSProperties = {
   gridTemplateColumns: "1fr 1fr",
   gap: "18px",
   marginBottom: "18px",
+};
+
+const focusGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "10px",
 };
 
 const bottomGridStyle: CSSProperties = {

@@ -557,6 +557,7 @@ function ActionsPageContent() {
   const linkedOwner = searchParams.get("owner")?.trim() || "";
   const linkedProject = searchParams.get("project")?.trim() || "";
   const linkedSource = searchParams.get("source")?.trim() || "";
+  const linkedDepartment = searchParams.get("department")?.trim() || "";
   const linkedOverdueOnly = searchParams.get("overdue") === "1";
   const dueWindow = Number(searchParams.get("dueWindow") || "0");
   const linkedCreatedMonth = searchParams.get("createdMonth")?.trim() || "";
@@ -570,6 +571,7 @@ function ActionsPageContent() {
   const prefillOwner = searchParams.get("prefill_owner")?.trim() || "";
   const prefillTitle = searchParams.get("prefill_title")?.trim() || "";
   const prefillDescription = searchParams.get("prefill_description")?.trim() || "";
+  const prefillDueDate = searchParams.get("prefill_due_date")?.trim() || "";
   const prefillLinkedAssetId = searchParams.get("linked_asset_id")?.trim() || "";
   const prefillLinkedAssetCode = searchParams.get("linked_asset_code")?.trim() || "";
   const prefillLinkedInspectionId = searchParams.get("linked_inspection_id")?.trim() || "";
@@ -587,6 +589,7 @@ function ActionsPageContent() {
       prefillOwner ||
       prefillTitle ||
       prefillDescription ||
+      prefillDueDate ||
       prefillLinkedAssetId ||
       prefillLinkedAssetCode ||
       prefillLinkedInspectionId ||
@@ -607,6 +610,7 @@ function ActionsPageContent() {
       linkedOwner ||
       linkedProject ||
       linkedSource ||
+      linkedDepartment ||
       linkedOverdueOnly ||
       dueWindow > 0 ||
       linkedCreatedMonth ||
@@ -643,7 +647,7 @@ function ActionsPageContent() {
   const [ownerFilter, setOwnerFilter] = useState(linkedOwner);
   const [projectFilter, setProjectFilter] = useState(linkedProject);
   const [sourceFilter, setSourceFilter] = useState(linkedSource);
-  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState(linkedDepartment);
   const [showOverdueOnly, setShowOverdueOnly] = useState(linkedOverdueOnly);
   const [showOpenOnly, setShowOpenOnly] = useState(false);
   const [showClosedOnly, setShowClosedOnly] = useState(false);
@@ -864,6 +868,7 @@ function ActionsPageContent() {
       !prefillOwner &&
       !prefillTitle &&
       !prefillDescription &&
+      !prefillDueDate &&
       !prefillLinkedAssetId &&
       !prefillLinkedInspectionId &&
       !prefillLinkedMaintenanceId &&
@@ -891,6 +896,7 @@ function ActionsPageContent() {
         owner: prefillOwner || current.owner,
         title: prefillTitle || current.title,
         description: prefillDescription || current.description,
+        due_date: prefillDueDate || current.due_date,
         linked_asset_id: prefillLinkedAssetId || current.linked_asset_id,
         linked_asset_code: prefillLinkedAssetCode || current.linked_asset_code,
         linked_inspection_id: prefillLinkedInspectionId || current.linked_inspection_id,
@@ -911,6 +917,7 @@ function ActionsPageContent() {
     hasAppliedPrefill,
     prefillDepartment,
     prefillDescription,
+    prefillDueDate,
     prefillLinkedAssetCode,
     prefillLinkedAssetId,
     prefillLinkedInspectionId,

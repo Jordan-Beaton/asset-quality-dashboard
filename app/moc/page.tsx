@@ -4,9 +4,29 @@ import Link from "next/link";
 import Image from "next/image";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ChangeEvent, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  AlignmentType,
+  BorderStyle,
+  Document as WordDocument,
+  Footer,
+  HeadingLevel,
+  Header,
+  ImageRun,
+  Packer,
+  Paragraph,
+  ShadingType,
+  SimpleField,
+  Table,
+  TableCell,
+  TableLayoutType,
+  TableRow,
+  TextRun,
+  VerticalAlign,
+  WidthType,
+} from "docx";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { supabase } from "../../src/lib/supabase";
@@ -16,7 +36,7 @@ export const dynamic = "force-dynamic";
 type MocStatus = "Draft" | "In Review" | "Approved" | "Closed";
 type ChangeType = "Permanent" | "Temporary";
 type YesNoNa = "Yes" | "No" | "N/A";
-type ApprovedChoice = "Yes" | "No";
+type ApprovedChoice = "" | "Yes" | "No";
 type NoticeTone = "neutral" | "success" | "warning" | "error";
 type MocViewFilter = "All" | "Recent" | "Expired Temporary" | "Expiry Soon" | "Draft Ageing";
 type MocWorkspaceView = "dashboard" | "register" | "create" | "reports";
@@ -137,6 +157,14 @@ type MocStarterForm = {
   status: MocStatus;
 };
 
+type PeopleOption = {
+  id: string;
+  name: string;
+  email: string | null;
+  department: string | null;
+  active: boolean;
+};
+
 type MocBundle = {
   report: MocReport;
   actionItems: MocActionPlanItem[];
@@ -244,7 +272,10 @@ function normaliseYesNoNa(value: string | null | undefined): YesNoNa {
 }
 
 function normaliseApprovedChoice(value: string | null | undefined): ApprovedChoice {
-  return (value || "").trim().toLowerCase() === "no" ? "No" : "Yes";
+  const text = (value || "").trim().toLowerCase();
+  if (text === "yes") return "Yes";
+  if (text === "no") return "No";
+  return "";
 }
 
 function normaliseActionPlanStatus(value: string | null | undefined) {
@@ -271,6 +302,34 @@ function buildMocLinkedActionHref(report: MocReport) {
     prefill_title: `${report.moc_report_no} - ${report.moc_report_title || "Untitled MOC"}`,
     prefill_description: descriptionSections.join("\n\n"),
     prefill_owner: report.responsible_manager_name || report.moc_coordinator_name || "",
+    linked_moc_id: report.id,
+    linked_moc_number: report.moc_report_no,
+  });
+
+  return `/actions?${params.toString()}`;
+}
+
+function buildMocActionPlanLinkedActionHref(report: MocReport, row: MocActionPlanItem) {
+  const actionSummary = row.description.trim();
+  const actionTitle = actionSummary
+    ? actionSummary.split(/\s+/).slice(0, 12).join(" ")
+    : report.moc_report_title || "MOC action";
+  const descriptionSections = [
+    `MOC Action Plan Item:\n${actionSummary || "No action description entered."}`,
+    report.proposed_change_description ? `MOC Proposed Change:\n${report.proposed_change_description}` : "",
+    report.reason_for_change ? `Reason for Change:\n${report.reason_for_change}` : "",
+    report.hazard_risks_description ? `Risk / Impact Summary:\n${report.hazard_risks_description}` : "",
+    report.proposed_risk_mitigations ? `Mitigation Summary:\n${report.proposed_risk_mitigations}` : "",
+  ].filter(Boolean);
+
+  const params = new URLSearchParams({
+    prefill_source: "MOC",
+    prefill_department: "HSEQ",
+    prefill_project: report.project_worksite_address || "",
+    prefill_title: `${report.moc_report_no} ${row.action_no || "Action"} - ${actionTitle}`,
+    prefill_description: descriptionSections.join("\n\n"),
+    prefill_owner: row.responsible_person || report.responsible_manager_name || report.moc_coordinator_name || "",
+    prefill_due_date: row.target_date || "",
     linked_moc_id: report.id,
     linked_moc_number: report.moc_report_no,
   });
@@ -388,7 +447,7 @@ function createReviewRows(): MocReviewRow[] {
     inform_flag: false,
     name: "",
     position: "",
-    approved_value: "Yes",
+    approved_value: "",
     signature: "",
     review_date: "",
     comments: "",
@@ -414,6 +473,14 @@ function getStatusTone(status: string) {
   if (value.includes("approved")) return { bg: "#fef3c7", color: "#92400e" };
   if (value.includes("review")) return { bg: "#dbeafe", color: "#1d4ed8" };
   return { bg: "#e2e8f0", color: "#334155" };
+}
+
+function getActionPlanStatusTone(status: string) {
+  const value = normaliseActionPlanStatus(status);
+  if (value === "Complete") return { background: "#dcfce7", color: "#166534" };
+  if (value === "Ongoing") return { background: "#dbeafe", color: "#1d4ed8" };
+  if (value === "Hold") return { background: "#fef3c7", color: "#92400e" };
+  return { background: "#fee2e2", color: "#991b1b" };
 }
 
 function getChangeTypeTone(value: ChangeType) {
@@ -741,9 +808,9 @@ function getNextWorkflowStatus(status: MocStatus): MocStatus | null {
 }
 
 function getWorkflowButtonLabel(status: MocStatus) {
-  if (status === "Draft") return "Submit for Review";
-  if (status === "In Review") return "Approve";
-  if (status === "Approved") return "Close";
+  if (status === "Draft") return "Mark In Review";
+  if (status === "In Review") return "Mark Approved";
+  if (status === "Approved") return "Mark Closed";
   return "";
 }
 
@@ -784,9 +851,11 @@ function MOCPageContent() {
   const [acceptanceRows, setAcceptanceRows] = useState<MocSignoffRow[]>([]);
   const [closeoutRows, setCloseoutRows] = useState<MocSignoffRow[]>([]);
   const [attachments, setAttachments] = useState<MocAttachment[]>([]);
+  const [peopleOptions, setPeopleOptions] = useState<PeopleOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingWord, setGeneratingWord] = useState(false);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [attachmentActionId, setAttachmentActionId] = useState("");
   const [message, setMessage] = useState("Loading MOC register...");
@@ -880,6 +949,14 @@ function MOCPageContent() {
       .sort((a, b) => getCreatedOrUpdatedTime(b) - getCreatedOrUpdatedTime(a));
   }, [reports, search, statusFilter, changeTypeFilter, viewFilter]);
 
+  const peopleNameOptions = useMemo(
+    () =>
+      Array.from(new Set(peopleOptions.map((person) => person.name.trim()).filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [peopleOptions]
+  );
+
   const openCount = useMemo(
     () => reports.filter((report) => report.status !== "Closed").length,
     [reports]
@@ -914,9 +991,9 @@ function MOCPageContent() {
   const canSaveDetail = Boolean(selectedReportId) && detailReport.status !== "Closed";
   const detailWorkflowMessage =
     detailReport.status === "Draft"
-      ? "Draft records are fully editable."
+      ? "Draft records are fully editable. Status progression is manual until routed workflow approvals are enabled."
       : detailReport.status === "In Review"
-      ? "In Review records allow content edits only. Structural row changes are locked."
+      ? "In Review records allow content edits only. Structural row changes are locked; approval routing is currently manual."
       : detailReport.status === "Approved"
       ? "Approved records stay live for implementation and close-out updates, but proposal and review structure is locked."
       : "Closed records are fully locked.";
@@ -970,6 +1047,7 @@ function MOCPageContent() {
       acceptanceRes,
       closeoutRes,
       attachmentsRes,
+      peopleRes,
     ] = await Promise.all([
       supabase.from("moc_reports").select("*").order("updated_at", { ascending: false }),
       supabase.from("moc_action_plan_items").select("*").order("sort_order", { ascending: true }),
@@ -979,6 +1057,7 @@ function MOCPageContent() {
       supabase.from("moc_acceptance_rows").select("*").order("sort_order", { ascending: true }),
       supabase.from("moc_closeout_rows").select("*").order("sort_order", { ascending: true }),
       supabase.from("moc_attachments").select("*").order("uploaded_at", { ascending: false }),
+      supabase.from("people").select("id,name,email,department,active").eq("active", true).order("name", { ascending: true }),
     ]);
 
     if (
@@ -1088,6 +1167,17 @@ function MOCPageContent() {
       content_type: row.content_type == null ? null : String(row.content_type),
       uploaded_at: String(row.uploaded_at || ""),
     }));
+    const nextPeopleOptions = peopleRes.error
+      ? []
+      : ((peopleRes.data || []) as Record<string, unknown>[])
+          .map((row) => ({
+            id: String(row.id || row.name || ""),
+            name: String(row.name || "").trim(),
+            email: row.email == null ? null : String(row.email),
+            department: row.department == null ? null : String(row.department),
+            active: Boolean(row.active),
+          }))
+          .filter((person) => person.name);
 
     setReports(nextReports);
     setActionPlanItems(nextActionItems);
@@ -1097,6 +1187,7 @@ function MOCPageContent() {
     setAcceptanceRows(nextAcceptanceRows);
     setCloseoutRows(nextCloseoutRows);
     setAttachments(nextAttachments);
+    setPeopleOptions(nextPeopleOptions);
     setRefreshStamp(new Date().toLocaleString("en-GB"));
     showMessage("MOC register loaded.");
     setLoading(false);
@@ -1647,7 +1738,7 @@ function MOCPageContent() {
         inform_flag: false,
         name: "",
         position: "",
-        approved_value: "Yes",
+        approved_value: "",
         signature: "",
         review_date: "",
         comments: "",
@@ -1727,7 +1818,7 @@ function MOCPageContent() {
     setDetailCloseoutRows((prev) => syncSimpleOrders(moveArrayItem(prev, index, direction)));
   }
 
-  async function handleAttachmentUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleAttachmentUpload(event: ChangeEvent<HTMLInputElement>) {
     if (!selectedReportId) {
       showMessage("Select an MOC first.", "warning");
       return;
@@ -1968,6 +2059,7 @@ function MOCPageContent() {
       columnStyles?: Record<string | number, Record<string, unknown>>;
       signatureColumns?: number[];
       signatureImages?: Map<string, PdfImageMeta>;
+      rowPageBreak?: "auto" | "avoid";
     }
   ) {
     autoTable(doc, {
@@ -1994,7 +2086,7 @@ function MOCPageContent() {
       alternateRowStyles: { fillColor: [248, 250, 252] },
       bodyStyles: { fillColor: [255, 255, 255] },
       columnStyles: config.columnStyles,
-      rowPageBreak: "avoid",
+      rowPageBreak: config.rowPageBreak ?? "avoid",
       didParseCell: (hook) => {
         if (
           hook.section === "body" &&
@@ -2026,26 +2118,34 @@ function MOCPageContent() {
   function drawReportDetails(doc: jsPDF, y: number, bundle: MocBundle) {
     drawSectionHeading(doc, y, "A. MOC REPORT DETAILS");
     y += 10;
-    drawFieldBlock(doc, 12, y, 42, "MOC Report No.", bundle.report.moc_report_no, 17);
-    drawFieldBlock(doc, 54, y, 88, "MOC Report Title", bundle.report.moc_report_title, 17);
-    drawFieldBlock(doc, 142, y, 56, "Project/Worksite Address", bundle.report.project_worksite_address, 17);
-    y += 19;
-    drawFieldBlock(doc, 12, y, 60, "MOC Co-Ordinator Name", bundle.report.moc_coordinator_name, 17);
-    drawFieldBlock(doc, 72, y, 60, "MOC Co-Ordinator Position", bundle.report.moc_coordinator_position, 17);
-    drawFieldBlock(doc, 132, y, 66, "Responsible ENS Manager / Supervisor Name", bundle.report.responsible_manager_name, 17);
-    y += 19;
-    drawFieldBlock(doc, 12, y, 186, "Responsible ENS Manager / Supervisor Position", bundle.report.responsible_manager_position, 17);
-    return y + 24;
+    y = drawFormTable(doc, {
+      startY: y,
+      head: [["Field", "Details"]],
+      body: [
+        ["MOC Report No.", getPdfText(bundle.report.moc_report_no)],
+        ["MOC Report Title", getPdfText(bundle.report.moc_report_title)],
+        ["Project/Worksite Address", getPdfText(bundle.report.project_worksite_address)],
+        ["MOC Co-Ordinator Name", getPdfText(bundle.report.moc_coordinator_name)],
+        ["MOC Co-Ordinator Position", getPdfText(bundle.report.moc_coordinator_position)],
+        ["Responsible ENS Manager / Supervisor Name", getPdfText(bundle.report.responsible_manager_name)],
+        ["Responsible ENS Manager / Supervisor Position", getPdfText(bundle.report.responsible_manager_position)],
+      ],
+      fontSize: 7.9,
+      cellPadding: 2.4,
+      minCellHeight: 9,
+      rowPageBreak: "auto",
+      columnStyles: {
+        0: { cellWidth: 58, fontStyle: "bold" },
+        1: { cellWidth: 128 },
+      },
+    });
+    return y + 9;
   }
 
   function drawChangeIdentification(doc: jsPDF, y: number, bundle: MocBundle) {
     y = ensurePageSpace(doc, y, 64);
     drawSectionHeading(doc, y, "B. CHANGE IDENTIFICATION");
     y += 10;
-    drawFieldBlock(doc, 12, y, 186, "Description of the change (proposed change)", bundle.report.proposed_change_description, 24);
-    y += 26;
-    drawFieldBlock(doc, 12, y, 186, "Reason for the change", bundle.report.reason_for_change, 22);
-    y += 24;
     drawChoiceBlock(
       doc,
       12,
@@ -2060,10 +2160,26 @@ function MOCPageContent() {
     );
     drawFieldBlock(doc, 70, y, 64, "If Temporary, From", getPdfDate(bundle.report.temporary_valid_from), 22);
     drawFieldBlock(doc, 134, y, 64, "If Temporary, To", getPdfDate(bundle.report.temporary_valid_to), 22);
-    y += 24;
-    drawFieldBlock(doc, 12, y, 93, "How will the change be implemented?", bundle.report.implementation_plan, 24);
-    drawFieldBlock(doc, 105, y, 93, "Supporting documentation note / field", bundle.report.supporting_documentation_note, 24);
-    return y + 30;
+    y += 26;
+    y = drawFormTable(doc, {
+      startY: y,
+      head: [["Field", "Details"]],
+      body: [
+        ["Description of the change (proposed change)", getPdfText(bundle.report.proposed_change_description)],
+        ["Reason for the change", getPdfText(bundle.report.reason_for_change)],
+        ["How will the change be implemented?", getPdfText(bundle.report.implementation_plan)],
+        ["Supporting documentation note / field", getPdfText(bundle.report.supporting_documentation_note)],
+      ],
+      fontSize: 7.8,
+      cellPadding: 2.5,
+      minCellHeight: 11,
+      rowPageBreak: "auto",
+      columnStyles: {
+        0: { cellWidth: 52, fontStyle: "bold" },
+        1: { cellWidth: 134 },
+      },
+    });
+    return y + 9;
   }
 
   function drawActionPlan(doc: jsPDF, y: number, bundle: MocBundle) {
@@ -2166,7 +2282,7 @@ function MOCPageContent() {
   }
 
   function drawRiskSection(doc: jsPDF, y: number, bundle: MocBundle) {
-    y = ensurePageSpace(doc, y, 94);
+    y = ensurePageSpace(doc, y, 72);
     drawSectionHeading(doc, y, "F. RISK MANAGEMENT");
     y += 10;
     y = drawFormTable(doc, {
@@ -2183,76 +2299,117 @@ function MOCPageContent() {
       },
     });
     y += 5;
-    drawChoiceBlock(
-      doc,
-      12,
-      y,
-      60,
-      "Is a HIRA required?",
-      [{ label: "Yes", checked: bundle.report.hira_required === "Yes" }, { label: "No", checked: bundle.report.hira_required === "No" }, { label: "N/A", checked: bundle.report.hira_required === "N/A" }],
-      22
-    );
-    drawFieldBlock(doc, 74, y, 124, "If No, give reasons why", getPdfText(bundle.report.hira_reason), 22);
-    y += 24;
-    drawChoiceBlock(
-      doc,
-      12,
-      y,
-      60,
-      "Change in lifting philosophy?",
-      [{ label: "Yes", checked: bundle.report.lifting_change_status === "Yes" }, { label: "No", checked: bundle.report.lifting_change_status === "No" }, { label: "N/A", checked: bundle.report.lifting_change_status === "N/A" }],
-      22
-    );
-    drawFieldBlock(doc, 74, y, 124, "Describe change", getPdfText(bundle.report.lifting_change_description), 22);
-    y += 24;
-    drawChoiceBlock(
-      doc,
-      12,
-      y,
-      60,
-      "Change in PTW philosophy?",
-      [{ label: "Yes", checked: bundle.report.ptw_change_status === "Yes" }, { label: "No", checked: bundle.report.ptw_change_status === "No" }, { label: "N/A", checked: bundle.report.ptw_change_status === "N/A" }],
-      22
-    );
-    drawFieldBlock(doc, 74, y, 124, "Describe change", getPdfText(bundle.report.ptw_change_description), 22);
-    y += 24;
-    drawFieldBlock(doc, 12, y, 186, "Environmental Impact (Describe)", getPdfText(bundle.report.environmental_impact_description), 20);
-    return y + 26;
+    y = drawFormTable(doc, {
+      startY: y,
+      head: [["Question", "Response", "Details"]],
+      body: [
+        ["Is a HIRA required?", getPdfText(bundle.report.hira_required), getPdfText(bundle.report.hira_reason)],
+        [
+          "Change in lifting philosophy?",
+          getPdfText(bundle.report.lifting_change_status),
+          getPdfText(bundle.report.lifting_change_description),
+        ],
+        ["Change in PTW philosophy?", getPdfText(bundle.report.ptw_change_status), getPdfText(bundle.report.ptw_change_description)],
+        ["Environmental Impact", "", getPdfText(bundle.report.environmental_impact_description)],
+      ],
+      fontSize: 7.7,
+      cellPadding: 2.4,
+      minCellHeight: 11,
+      rowPageBreak: "auto",
+      columnStyles: {
+        0: { cellWidth: 52, fontStyle: "bold" },
+        1: { cellWidth: 24, halign: "center" },
+        2: { cellWidth: 110 },
+      },
+    });
+    return y + 9;
   }
 
   function drawHazards(doc: jsPDF, y: number, bundle: MocBundle) {
     y = ensurePageSpace(doc, y, 48);
     drawSectionHeading(doc, y, "G. HAZARDS & MITIGATING ACTIONS");
     y += 10;
-    drawFieldBlock(doc, 12, y, 92, "Describe potential Hazards & Risks", getPdfText(bundle.report.hazard_risks_description), 28);
-    drawFieldBlock(doc, 106, y, 92, "Proposed Risk Mitigations", getPdfText(bundle.report.proposed_risk_mitigations), 28);
-    return y + 34;
+    y = drawFormTable(doc, {
+      startY: y,
+      head: [["Area", "Details"]],
+      body: [
+        ["Potential Hazards & Risks", getPdfText(bundle.report.hazard_risks_description)],
+        ["Proposed Risk Mitigations", getPdfText(bundle.report.proposed_risk_mitigations)],
+      ],
+      fontSize: 7.8,
+      cellPadding: 2.5,
+      minCellHeight: 12,
+      rowPageBreak: "auto",
+      columnStyles: {
+        0: { cellWidth: 44, fontStyle: "bold" },
+        1: { cellWidth: 142 },
+      },
+    });
+    return y + 9;
   }
 
   function drawCostSchedule(doc: jsPDF, y: number, bundle: MocBundle) {
     y = ensurePageSpace(doc, y, 34);
     drawSectionHeading(doc, y, "H. COST REVIEW");
     y += 10;
-    drawFieldBlock(doc, 12, y, 186, "Description of cost impact (incl. future savings)", getPdfText(bundle.report.cost_review_description), 22);
-    y += 28;
+    y = drawFormTable(doc, {
+      startY: y,
+      head: [["Field", "Details"]],
+      body: [["Description of cost impact (incl. future savings)", getPdfText(bundle.report.cost_review_description)]],
+      fontSize: 7.8,
+      cellPadding: 2.5,
+      minCellHeight: 12,
+      rowPageBreak: "auto",
+      columnStyles: {
+        0: { cellWidth: 58, fontStyle: "bold" },
+        1: { cellWidth: 128 },
+      },
+    });
+    y += 9;
 
     y = ensurePageSpace(doc, y, 34);
     drawSectionHeading(doc, y, "I. SCHEDULE REVIEW");
     y += 10;
-    drawFieldBlock(doc, 12, y, 186, "Description of the schedule impact (incl. future savings)", getPdfText(bundle.report.schedule_review_description), 22);
-    return y + 28;
+    y = drawFormTable(doc, {
+      startY: y,
+      head: [["Field", "Details"]],
+      body: [["Description of the schedule impact (incl. future savings)", getPdfText(bundle.report.schedule_review_description)]],
+      fontSize: 7.8,
+      cellPadding: 2.5,
+      minCellHeight: 12,
+      rowPageBreak: "auto",
+      columnStyles: {
+        0: { cellWidth: 58, fontStyle: "bold" },
+        1: { cellWidth: 128 },
+      },
+    });
+    return y + 9;
   }
 
   function drawSupportingDocs(doc: jsPDF, y: number, bundle: MocBundle) {
     y = ensurePageSpace(doc, y, 38);
     drawSectionHeading(doc, y, "J. SUPPORTING DOCUMENTATION AND INFORMATION");
     y += 10;
-    drawFieldBlock(doc, 12, y, 138, "Supporting documentation / information", getPdfText(bundle.report.supporting_documentation_information), 24);
+    y = drawFormTable(doc, {
+      startY: y,
+      head: [["Field", "Details"]],
+      body: [["Supporting documentation / information", getPdfText(bundle.report.supporting_documentation_information)]],
+      fontSize: 7.8,
+      cellPadding: 2.5,
+      minCellHeight: 12,
+      rowPageBreak: "auto",
+      columnStyles: {
+        0: { cellWidth: 58, fontStyle: "bold" },
+        1: { cellWidth: 128 },
+      },
+    });
+    y += 5;
+    y = ensurePageSpace(doc, y, 30);
     drawChoiceBlock(
       doc,
-      152,
+      12,
       y,
-      46,
+      186,
       "Variation Order",
       [
         { label: `Ref: ${getPdfText(bundle.report.variation_order_reference_no)}`, checked: !bundle.report.variation_order_na },
@@ -2287,15 +2444,15 @@ function MOCPageContent() {
       signatureColumns: [6],
       signatureImages,
       columnStyles: {
-        0: { cellWidth: 13 },
-        1: { cellWidth: 13 },
+        0: { cellWidth: 12, halign: "center" },
+        1: { cellWidth: 12, halign: "center" },
         2: { cellWidth: 22 },
         3: { cellWidth: 22 },
-        4: { cellWidth: 24 },
+        4: { cellWidth: 22 },
         5: { cellWidth: 16 },
-        6: { cellWidth: 22 },
+        6: { cellWidth: 24 },
         7: { cellWidth: 18 },
-        8: { cellWidth: 24 },
+        8: { cellWidth: 38 },
       },
     });
     return y + 9;
@@ -2307,11 +2464,11 @@ function MOCPageContent() {
     y += 10;
     y = drawFormTable(doc, {
       startY: y,
-      head: [["Role", "Position", "Name", "Signature", "Date"]],
+      head: [["Role", "Name", "Position", "Signature", "Date"]],
       body: bundle.acceptanceRows.map((row) => [
         getPdfText(row.role_label),
-        getPdfText(row.position),
         getPdfText(row.name),
+        getPdfText(row.position),
         row.signature || "",
         getPdfDate(row.signoff_date),
       ]),
@@ -2322,8 +2479,8 @@ function MOCPageContent() {
       signatureImages,
       columnStyles: {
         0: { cellWidth: 62 },
-        1: { cellWidth: 38 },
-        2: { cellWidth: 34 },
+        1: { cellWidth: 34 },
+        2: { cellWidth: 38 },
         3: { cellWidth: 34 },
         4: { cellWidth: 18 },
       },
@@ -2337,11 +2494,11 @@ function MOCPageContent() {
     y += 10;
     return drawFormTable(doc, {
       startY: y,
-      head: [["Role", "Position", "Name", "Signature", "Date"]],
+      head: [["Role", "Name", "Position", "Signature", "Date"]],
       body: bundle.closeoutRows.map((row) => [
         getPdfText(row.role_label),
-        getPdfText(row.position),
         getPdfText(row.name),
+        getPdfText(row.position),
         row.signature || "",
         getPdfDate(row.signoff_date),
       ]),
@@ -2352,12 +2509,698 @@ function MOCPageContent() {
       signatureImages,
       columnStyles: {
         0: { cellWidth: 62 },
-        1: { cellWidth: 38 },
-        2: { cellWidth: 34 },
+        1: { cellWidth: 34 },
+        2: { cellWidth: 38 },
         3: { cellWidth: 34 },
         4: { cellWidth: 18 },
       },
     });
+  }
+
+  function wordValue(value: string | null | undefined) {
+    const text = String(value || "").trim();
+    return text;
+  }
+
+  function wordDate(value: string | null | undefined) {
+    return getPdfDate(value);
+  }
+
+  function dataUrlToUint8Array(dataUrl: string) {
+    const base64 = dataUrl.split(",")[1] || "";
+    const binary = window.atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
+  }
+
+  const wordTableBorder = { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 };
+  const wordTableBorders = {
+    top: wordTableBorder,
+    bottom: wordTableBorder,
+    left: wordTableBorder,
+    right: wordTableBorder,
+    insideHorizontal: wordTableBorder,
+    insideVertical: wordTableBorder,
+  };
+  const wordNoBorder = { style: BorderStyle.NONE, color: "FFFFFF", size: 0 };
+  const wordNoBorders = {
+    top: wordNoBorder,
+    bottom: wordNoBorder,
+    left: wordNoBorder,
+    right: wordNoBorder,
+    insideHorizontal: wordNoBorder,
+    insideVertical: wordNoBorder,
+  };
+  const wordBodyWidth = 9360;
+
+  function wordPara(text: string, bold = false, options?: { after?: number; italic?: boolean; color?: string }) {
+    return new Paragraph({
+      children: [
+            new TextRun({
+              text,
+              font: "Calibri",
+              bold,
+              italics: options?.italic,
+              color: options?.color || "0F172A",
+          size: 18,
+        }),
+      ],
+      spacing: { after: options?.after ?? 100 },
+    });
+  }
+
+  function wordSectionTitle(text: string) {
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      borders: wordNoBorders,
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+              margins: { top: 110, bottom: 110, left: 150, right: 150 },
+              children: [
+                new Paragraph({
+                  children: [new TextRun({ text: text.toUpperCase(), font: "Calibri", bold: true, color: "FFFFFF", size: 20 })],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  function wordSpacer(size = 100) {
+    return new Paragraph({ children: [new TextRun({ text: "", font: "Calibri", size: 1 })], spacing: { after: size } });
+  }
+
+  function wordCell(
+    text: string,
+    options?: {
+      header?: boolean;
+      label?: boolean;
+      width?: number;
+      shaded?: boolean;
+      align?: (typeof AlignmentType)[keyof typeof AlignmentType];
+      fontSize?: number;
+    }
+  ) {
+    const header = Boolean(options?.header);
+    const label = Boolean(options?.label);
+    return new TableCell({
+      width: options?.width ? { size: options.width, type: WidthType.DXA } : undefined,
+      verticalAlign: VerticalAlign.CENTER,
+      shading: header
+        ? { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" }
+        : options?.shaded
+          ? { type: ShadingType.CLEAR, fill: "F8FAFC", color: "auto" }
+          : undefined,
+      margins: { top: 110, bottom: 110, left: 120, right: 120 },
+      children: [
+        new Paragraph({
+          alignment: options?.align,
+          children: [
+            new TextRun({
+              text: wordValue(text),
+              font: "Calibri",
+              bold: header || label,
+              color: header ? "FFFFFF" : "0F172A",
+              size: options?.fontSize ?? (header ? 18 : 17),
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  function wordTable(
+    headers: string[],
+    rows: string[][],
+    options?: {
+      columnWidths?: number[];
+      labelFirstColumn?: boolean;
+      headerFill?: string;
+      headerFontSize?: number;
+      bodyFontSize?: number;
+      centerColumns?: number[];
+    }
+  ) {
+    const rowsToRender = rows.length ? rows : [headers.map(() => "")];
+    const columnWidths =
+      options?.columnWidths ||
+      headers.map(() => Math.floor(wordBodyWidth / Math.max(headers.length, 1)));
+
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      columnWidths,
+      borders: wordTableBorders,
+      rows: [
+        new TableRow({
+          tableHeader: true,
+          children: headers.map((header, index) =>
+            wordCell(header, {
+              header: true,
+              width: columnWidths[index],
+              fontSize: options?.headerFontSize,
+              align: options?.centerColumns?.includes(index) ? AlignmentType.CENTER : undefined,
+            })
+          ),
+        }),
+        ...rowsToRender.map(
+          (row, rowIndex) =>
+            new TableRow({
+              cantSplit: true,
+              children: row.map((cell, cellIndex) =>
+                wordCell(cell, {
+                  width: columnWidths[cellIndex],
+                  shaded: rowIndex % 2 === 0,
+                  label: Boolean(options?.labelFirstColumn && cellIndex === 0),
+                  fontSize: options?.bodyFontSize,
+                  align: options?.centerColumns?.includes(cellIndex) ? AlignmentType.CENTER : undefined,
+                })
+              ),
+            })
+        ),
+      ],
+    });
+  }
+
+  function wordFieldTable(rows: string[][]) {
+    return wordTable(["Field", "Details"], rows, {
+      columnWidths: [2800, 6560],
+      labelFirstColumn: true,
+    });
+  }
+
+  function wordChoiceTable(rows: string[][]) {
+    return wordTable(["Field", "Selection / Details"], rows, {
+      columnWidths: [3000, 6360],
+      labelFirstColumn: true,
+    });
+  }
+
+  function wordCheckbox(checked: boolean) {
+    return checked ? "[X]" : "[ ]";
+  }
+
+  function wordImpactCell(items: string[]) {
+    return new TableCell({
+      width: { size: 3120, type: WidthType.DXA },
+      verticalAlign: VerticalAlign.CENTER,
+      margins: { top: 95, bottom: 95, left: 120, right: 120 },
+      children: items.map(
+        (item) =>
+          new Paragraph({
+            spacing: { after: 45 },
+            children: [new TextRun({ text: item, font: "Calibri", color: "0F172A", size: 17 })],
+          })
+      ),
+    });
+  }
+
+  function wordImpactTable(report: MocReport) {
+    const impactLines = [
+      `${wordCheckbox(report.impact_health_safety)} Health & Safety`,
+      `${wordCheckbox(report.impact_environment)} Environment`,
+      `${wordCheckbox(report.impact_quality)} Quality`,
+      `${wordCheckbox(report.impact_scm)} SCM`,
+      `${wordCheckbox(report.impact_schedule)} Schedule`,
+      `${wordCheckbox(report.impact_equipment)} Equipment`,
+      `${wordCheckbox(report.impact_fabrication_opps)} Fabrication Opps`,
+      `${wordCheckbox(report.impact_engineering)} Engineering`,
+      `${wordCheckbox(report.impact_marine_operations)} Marine operations`,
+      `${wordCheckbox(report.impact_organization)} Organization`,
+      `${wordCheckbox(report.impact_regulatory)} Regulatory`,
+      `${wordCheckbox(report.impact_documentation)} Documentation`,
+      `${wordCheckbox(report.impact_reputation)} Reputation`,
+      `${wordCheckbox(report.impact_simops)} SIMOPS`,
+      `${wordCheckbox(report.impact_other)} Other${report.impact_other_text ? `: ${report.impact_other_text}` : ""}`,
+    ];
+    const rows = Math.ceil(impactLines.length / 3);
+    const columns = [0, 1, 2].map((columnIndex) =>
+      impactLines.slice(columnIndex * rows, columnIndex * rows + rows)
+    );
+
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [3120, 3120, 3120],
+      borders: wordTableBorders,
+      rows: [
+        new TableRow({
+          tableHeader: true,
+          children: [
+            new TableCell({
+              columnSpan: 3,
+              shading: { type: ShadingType.CLEAR, fill: "F1F5F9", color: "auto" },
+              margins: { top: 90, bottom: 90, left: 120, right: 120 },
+              children: [
+                new Paragraph({
+                  children: [new TextRun({ text: "Impact areas", font: "Calibri", bold: true, color: "475569", size: 15 })],
+                }),
+              ],
+            }),
+          ],
+        }),
+        new TableRow({
+          cantSplit: true,
+          children: columns.map((items) => wordImpactCell(items)),
+        }),
+      ],
+    });
+  }
+
+  function wordVariationOrderTable(report: MocReport) {
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [wordBodyWidth],
+      borders: wordTableBorders,
+      rows: [
+        new TableRow({
+          tableHeader: true,
+          children: [
+            new TableCell({
+              shading: { type: ShadingType.CLEAR, fill: "F1F5F9", color: "auto" },
+              margins: { top: 90, bottom: 90, left: 120, right: 120 },
+              children: [
+                new Paragraph({
+                  children: [new TextRun({ text: "Variation Order", font: "Calibri", bold: true, color: "475569", size: 15 })],
+                }),
+              ],
+            }),
+          ],
+        }),
+        new TableRow({
+          cantSplit: true,
+          children: [
+            new TableCell({
+              verticalAlign: VerticalAlign.CENTER,
+              margins: { top: 110, bottom: 110, left: 120, right: 120 },
+              children: [
+                new Paragraph({
+                  spacing: { after: 55 },
+                  children: [
+                    new TextRun({
+                      text: `${wordCheckbox(!report.variation_order_na)} Ref: ${wordValue(report.variation_order_reference_no)}`,
+                      font: "Calibri",
+                      color: "0F172A",
+                      size: 17,
+                    }),
+                  ],
+                }),
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: `${wordCheckbox(report.variation_order_na)} N/A`,
+                      font: "Calibri",
+                      color: "0F172A",
+                      size: 17,
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  function wordHeader(report: MocReport, logoData: string) {
+    const logoCellChildren =
+      logoData && logoData.startsWith("data:image/")
+        ? [
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  type: "png",
+                  data: dataUrlToUint8Array(logoData),
+                  transformation: { width: 98, height: 30 },
+                }),
+              ],
+            }),
+          ]
+        : [
+            new Paragraph({
+              children: [new TextRun({ text: "ENSHORE", font: "Calibri", bold: true, size: 22, color: "0F172A" })],
+            }),
+          ];
+
+    return new Header({
+      children: [
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          layout: TableLayoutType.FIXED,
+          columnWidths: [2400, 4560, 2400],
+          borders: wordNoBorders,
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({ borders: wordNoBorders, margins: { top: 0, bottom: 45, left: 0, right: 80 }, children: logoCellChildren }),
+                new TableCell({
+                  borders: wordNoBorders,
+                  margins: { top: 20, bottom: 45, left: 80, right: 80 },
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.CENTER,
+                      heading: HeadingLevel.HEADING_1,
+                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form", font: "Calibri", bold: true, size: 24, color: "0F172A" })],
+                    }),
+                  ],
+                }),
+                new TableCell({
+                  borders: wordNoBorders,
+                  margins: { top: 20, bottom: 45, left: 80, right: 0 },
+                  children: [
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Rev D", font: "Calibri", size: 17, color: "475569" })] }),
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: wordValue(report.moc_report_no), font: "Calibri", size: 17, color: "475569" })] }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+        new Paragraph({
+          border: { bottom: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 5 } },
+          spacing: { after: 90 },
+        }),
+      ],
+    });
+  }
+
+  function wordFooter() {
+    return new Footer({
+      children: [
+        new Paragraph({
+          border: { top: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 4 } },
+          spacing: { before: 80 },
+                  children: [new TextRun({ text: "", font: "Calibri", size: 1 })],
+        }),
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          layout: TableLayoutType.FIXED,
+          columnWidths: [7000, 2360],
+          borders: wordNoBorders,
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  borders: wordNoBorders,
+                  children: [
+                    new Paragraph({
+                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form Rev D", font: "Calibri", size: 16, color: "475569" })],
+                    }),
+                  ],
+                }),
+                new TableCell({
+                  borders: wordNoBorders,
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.RIGHT,
+                      children: [
+                        new TextRun({ text: "Page ", font: "Calibri", size: 16, color: "475569" }),
+                        new SimpleField("PAGE"),
+                        new TextRun({ text: " of ", font: "Calibri", size: 16, color: "475569" }),
+                        new SimpleField("NUMPAGES"),
+                      ],
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  function wordSignatureValue(value: string) {
+    if (!value) return "";
+    if (isDataImageUrl(value)) return "Signature image attached in system / PDF output";
+    return value;
+  }
+
+  async function generateWordFor(reportId: string, preferCurrentDetail = false) {
+    const bundle =
+      preferCurrentDetail && detailReport.id === reportId
+        ? buildCurrentDetailBundle()
+        : getBundleFromData(reportId);
+
+    if (!bundle) return;
+
+    setGeneratingWord(true);
+
+    try {
+      const report = bundle.report;
+      const logoData = await getLogoDataUrl();
+
+      const bundleAttachments = attachments
+        .filter((file) => file.moc_report_id === reportId)
+        .sort((a, b) => new Date(b.uploaded_at || 0).getTime() - new Date(a.uploaded_at || 0).getTime());
+
+      const children = [
+        wordPara(`Generated ${new Date().toLocaleString("en-GB")}`, false, { italic: true, color: "475569", after: 60 }),
+        wordPara("Generated from IMS as an editable working circulation copy. Controlled PDF output remains the formal record.", true, {
+          color: "475569",
+          after: 160,
+        }),
+
+        wordSectionTitle("A. MOC Report Details"),
+        wordSpacer(50),
+        wordFieldTable([
+          ["MOC Report No.", report.moc_report_no],
+          ["MOC Report Title", report.moc_report_title],
+          ["Project/Worksite Address", report.project_worksite_address],
+          ["MOC Co-Ordinator Name", report.moc_coordinator_name],
+          ["MOC Co-Ordinator Position", report.moc_coordinator_position],
+          ["Responsible ENS Manager / Supervisor Name", report.responsible_manager_name],
+          ["Responsible ENS Manager / Supervisor Position", report.responsible_manager_position],
+          ["Status", report.status],
+        ]),
+        wordSpacer(),
+
+        wordSectionTitle("B. Change Identification"),
+        wordSpacer(50),
+        wordChoiceTable([
+          ["Description of the change", report.proposed_change_description],
+          ["Reason for the change", report.reason_for_change],
+          ["Change type", report.change_type],
+          ["Temporary valid from", wordDate(report.temporary_valid_from)],
+          ["Temporary valid to", wordDate(report.temporary_valid_to)],
+          ["How will the change be implemented?", report.implementation_plan],
+          ["Supporting documentation note / field", report.supporting_documentation_note],
+        ]),
+        wordSpacer(),
+
+        wordSectionTitle("C. Action Plan"),
+        wordSpacer(50),
+        wordTable(
+          ["No", "Description", "Responsible Person", "Target Date", "Status"],
+          bundle.actionItems.map((row, index) => [
+            row.action_no || String(index + 1),
+            row.description,
+            row.responsible_person,
+            wordDate(row.target_date),
+            normaliseActionPlanStatus(row.status),
+          ]),
+          { columnWidths: [900, 4300, 1750, 1250, 1160] }
+        ),
+        wordSpacer(),
+
+        wordSectionTitle("D. Change Impact"),
+        wordSpacer(50),
+        wordImpactTable(report),
+        wordSpacer(),
+
+        wordSectionTitle("E. Affected Documentation"),
+        wordSpacer(50),
+        wordTable(["Number", "Title", "Rev."], bundle.affectedDocuments.map((row) => [row.number, row.title, row.rev]), {
+          columnWidths: [2500, 5600, 1260],
+        }),
+        wordSpacer(),
+
+        wordSectionTitle("F. Risk Management"),
+        wordSpacer(50),
+        wordTable(
+          ["Question", "Response", "Details"],
+          [
+            ["Is a HIRA required?", report.hira_required, report.hira_reason],
+            ["Change in lifting philosophy?", report.lifting_change_status, report.lifting_change_description],
+            ["Change in PTW philosophy?", report.ptw_change_status, report.ptw_change_description],
+            ["Environmental Impact", "", report.environmental_impact_description],
+          ],
+          { columnWidths: [3100, 1300, 4960], labelFirstColumn: true }
+        ),
+        wordSpacer(60),
+        wordTable(["Risk Document Number", "Title", "Rev."], bundle.riskDocuments.map((row) => [row.number, row.title, row.rev]), {
+          columnWidths: [2500, 5600, 1260],
+        }),
+        wordSpacer(),
+
+        wordSectionTitle("G. Hazards & Mitigating Actions"),
+        wordSpacer(50),
+        wordFieldTable([
+          ["Potential Hazards & Risks", report.hazard_risks_description],
+          ["Proposed Risk Mitigations", report.proposed_risk_mitigations],
+        ]),
+        wordSpacer(),
+
+        wordSectionTitle("H. Cost Review"),
+        wordSpacer(50),
+        wordFieldTable([["Description of cost impact", report.cost_review_description]]),
+        wordSpacer(),
+
+        wordSectionTitle("I. Schedule Review"),
+        wordSpacer(50),
+        wordFieldTable([["Description of schedule impact", report.schedule_review_description]]),
+        wordSpacer(),
+
+        wordSectionTitle("J. Supporting Documentation and Information"),
+        wordSpacer(50),
+        wordFieldTable([
+          ["Supporting documentation / information", report.supporting_documentation_information],
+        ]),
+        wordSpacer(60),
+        wordVariationOrderTable(report),
+        wordSpacer(60),
+
+        wordSectionTitle("Supporting Documents"),
+        wordSpacer(50),
+        wordTable(
+          ["File Name", "Size", "Uploaded"],
+          bundleAttachments.map((file) => [
+            file.file_name,
+            formatFileSize(file.file_size),
+            formatDateTime(file.uploaded_at),
+          ]),
+          { columnWidths: [5600, 1300, 2460] }
+        ),
+        wordSpacer(),
+
+        wordSectionTitle("K. Review and Endorsement"),
+        wordSpacer(50),
+        wordTable(
+          ["Approve", "Inform", "Involved Party", "Name", "Position", "Approved", "Signature", "Date", "Comments"],
+          bundle.reviewRows.map((row) => [
+            wordCheckbox(row.approve_flag),
+            wordCheckbox(row.inform_flag),
+            row.involved_party,
+            row.name,
+            row.position,
+            row.approved_value,
+            wordSignatureValue(row.signature),
+            wordDate(row.review_date),
+            row.comments,
+          ]),
+          {
+            columnWidths: [900, 800, 1260, 1160, 1160, 1080, 1120, 940, 940],
+            headerFontSize: 15,
+            bodyFontSize: 15,
+            centerColumns: [0, 1, 5, 7],
+          }
+        ),
+        wordSpacer(),
+
+        wordSectionTitle("L. MOC Change Acceptance"),
+        wordSpacer(50),
+        wordTable(
+          ["Role", "Name", "Position", "Signature", "Date"],
+          bundle.acceptanceRows.map((row) => [
+            row.role_label,
+            row.name,
+            row.position,
+            wordSignatureValue(row.signature),
+            wordDate(row.signoff_date),
+          ]),
+          { columnWidths: [3200, 1700, 1900, 1600, 960] }
+        ),
+        wordSpacer(),
+
+        wordSectionTitle("M. MOC Close-Out Verification"),
+        wordSpacer(50),
+        wordTable(
+          ["Role", "Name", "Position", "Signature", "Date"],
+          bundle.closeoutRows.map((row) => [
+            row.role_label,
+            row.name,
+            row.position,
+            wordSignatureValue(row.signature),
+            wordDate(row.signoff_date),
+          ]),
+          { columnWidths: [3200, 1700, 1900, 1600, 960] }
+        ),
+      ];
+
+      const document = new WordDocument({
+        styles: {
+          default: {
+            document: {
+              run: {
+                font: "Calibri",
+                size: 18,
+                color: "0F172A",
+              },
+            },
+            title: {
+              run: {
+                font: "Calibri",
+                size: 28,
+                bold: true,
+                color: "0F172A",
+              },
+            },
+            heading1: {
+              run: {
+                font: "Calibri",
+                size: 24,
+                bold: true,
+                color: "0F172A",
+              },
+            },
+            heading2: {
+              run: {
+                font: "Calibri",
+                size: 20,
+                bold: true,
+                color: "0F172A",
+              },
+            },
+          },
+        },
+        sections: [
+          {
+            headers: { default: wordHeader(report, logoData) },
+            footers: { default: wordFooter() },
+            properties: {
+              page: {
+                margin: { top: 920, right: 720, bottom: 920, left: 720, header: 360, footer: 360 },
+              },
+            },
+            children,
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(document);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = `${report.moc_report_no || "MOC"}-${sanitizeFileName(report.moc_report_title || "Management-of-Change")}.docx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      showMessage(`Generated Word circulation copy for ${report.moc_report_no}.`, "success");
+    } catch (error) {
+      showMessage(`Word export failed: ${getErrorMessage(error)}`, "error");
+    } finally {
+      setGeneratingWord(false);
+    }
   }
 
   async function generatePdfFor(reportId: string, preferCurrentDetail = false) {
@@ -2482,6 +3325,11 @@ function MOCPageContent() {
           </button>
         ))}
       </nav>
+      <datalist id="moc-people-options">
+        {peopleNameOptions.map((personName) => (
+          <option key={personName} value={personName} />
+        ))}
+      </datalist>
 
       {activeView === "dashboard" ? (
         <>
@@ -2597,18 +3445,20 @@ function MOCPageContent() {
 
               <div style={starterAlignedRowStyle}>
                 <Field label="MOC Co-Ordinator Name">
-                  <input
+                  <PeopleNameInput
                     value={starterForm.moc_coordinator_name}
                     onChange={(e) => setStarterForm((prev) => ({ ...prev, moc_coordinator_name: e.target.value }))}
-                    style={inputStyle}
+                    listId="moc-people-options"
+                    placeholder="Select or type a name"
                   />
                 </Field>
 
                 <Field label="Responsible ENS Manager / Supervisor">
-                  <input
+                  <PeopleNameInput
                     value={starterForm.responsible_manager_name}
                     onChange={(e) => setStarterForm((prev) => ({ ...prev, responsible_manager_name: e.target.value }))}
-                    style={inputStyle}
+                    listId="moc-people-options"
+                    placeholder="Select or type a name"
                   />
                 </Field>
 
@@ -2853,10 +3703,11 @@ function MOCPageContent() {
                     </Field>
                   </div>
                   <Field label="MOC Co-Ordinator Name">
-                    <input
+                    <PeopleNameInput
                       value={detailReport.moc_coordinator_name}
                       onChange={(e) => updateDetailField("moc_coordinator_name", e.target.value)}
-                      style={inputStyle}
+                      listId="moc-people-options"
+                      placeholder="Select or type a name"
                     />
                   </Field>
                   <Field label="MOC Co-Ordinator Position">
@@ -2867,10 +3718,11 @@ function MOCPageContent() {
                     />
                   </Field>
                   <Field label="Responsible ENS Manager / Supervisor Name">
-                    <input
+                    <PeopleNameInput
                       value={detailReport.responsible_manager_name}
                       onChange={(e) => updateDetailField("responsible_manager_name", e.target.value)}
-                      style={inputStyle}
+                      listId="moc-people-options"
+                      placeholder="Select or type a name"
                     />
                   </Field>
                   <Field label="Responsible ENS Manager / Supervisor Position">
@@ -2975,69 +3827,111 @@ function MOCPageContent() {
 
               <DetailSubsection title="C. ACTION PLAN">
                 <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
+                <div style={actionPlanIntroStyle}>
+                  <div>
+                    <strong style={actionPlanIntroTitleStyle}>MOC implementation actions</strong>
+                    <span style={actionPlanIntroTextStyle}>
+                      Keep immediate MOC steps here. Send any item that needs wider tracking to central Action Management for ownership, reminders, and reporting.
+                    </span>
+                  </div>
+                </div>
                 <RepeatTableToolbar
                   onAdd={addActionRow}
                   label="Add Action Row"
                   disabled={!canEditImplementationStructure}
                 />
-                <div style={tableEditorWrapStyle}>
-                  <div style={actionPlanHeadStyle}>
-                    <div>No</div>
-                    <div>Description of Action</div>
-                    <div>Responsible Person</div>
-                    <div>Target Date</div>
-                    <div>Status</div>
-                    <div>Order / Remove</div>
-                  </div>
+                <div style={repeatCardStackStyle}>
                   {detailActionItems.map((row, index) => (
-                    <div key={`${row.id || "new"}-${index}`} style={actionPlanRowStyle}>
-                      <input
-                        value={row.action_no}
-                        readOnly
-                        style={readOnlyInputStyle}
-                      />
-                      <input
-                        value={row.description}
-                        onChange={(e) => updateActionRow(index, "description", e.target.value)}
-                        style={inputStyle}
-                      />
-                      <input
-                        value={row.responsible_person}
-                        onChange={(e) => updateActionRow(index, "responsible_person", e.target.value)}
-                        style={inputStyle}
-                      />
-                      <input
-                        type="date"
-                        value={row.target_date}
-                        onChange={(e) => updateActionRow(index, "target_date", e.target.value)}
-                        style={inputStyle}
-                      />
-                      <select
-                        value={normaliseActionPlanStatus(row.status)}
-                        onChange={(e) => updateActionRow(index, "status", e.target.value)}
-                        style={inputStyle}
-                      >
-                        {actionPlanStatusOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                      <div style={rowActionsWrapStyle}>
-                        <RowOrderControls
-                          index={index}
-                          total={detailActionItems.length}
-                          onMove={(direction) => moveActionRow(index, direction)}
-                          disabled={!canEditImplementationStructure}
-                        />
-                        <button
-                          type="button"
-                          style={removeRowButtonStyle}
-                          onClick={() => removeActionRow(index)}
-                          disabled={!canEditImplementationStructure}
-                        >
-                          Remove
-                        </button>
+                    <div key={`${row.id || "new"}-${index}`} style={repeatCardStyle}>
+                      <div style={repeatCardHeaderStyle}>
+                        <div>
+                          <div style={repeatCardKickerStyle}>Action item</div>
+                          <div style={actionPlanCardTitleRowStyle}>
+                            <span style={repeatCardTitleStyle}>{row.action_no || `Action ${index + 1}`}</span>
+                            <span style={{ ...badgeStyle, ...getActionPlanStatusTone(normaliseActionPlanStatus(row.status)) }}>
+                              {normaliseActionPlanStatus(row.status)}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={rowActionsWrapStyle}>
+                          <Link
+                            href={buildMocActionPlanLinkedActionHref(detailReport, row)}
+                            style={centralActionLinkStyle}
+                          >
+                            Create Central Action
+                          </Link>
+                          <RowOrderControls
+                            index={index}
+                            total={detailActionItems.length}
+                            onMove={(direction) => moveActionRow(index, direction)}
+                            disabled={!canEditImplementationStructure}
+                          />
+                          <button
+                            type="button"
+                            style={removeRowButtonStyle}
+                            onClick={() => removeActionRow(index)}
+                            disabled={!canEditImplementationStructure}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                      <div style={actionPlanSummaryStyle}>
+                        <div>
+                          <span style={miniMetaLabelStyle}>Owner</span>
+                          <strong style={miniMetaValueStyle}>{row.responsible_person || "-"}</strong>
+                        </div>
+                        <div>
+                          <span style={miniMetaLabelStyle}>Target</span>
+                          <strong style={miniMetaValueStyle}>{formatDate(row.target_date)}</strong>
+                        </div>
+                        <div>
+                          <span style={miniMetaLabelStyle}>Central tracking</span>
+                          <strong style={miniMetaValueStyle}>Review before save in Action Management</strong>
+                        </div>
+                      </div>
+                      <div style={actionPlanCardGridStyle}>
+                        <Field label="Action No.">
+                          <input value={row.action_no} readOnly style={readOnlyInputStyle} />
+                        </Field>
+                        <Field label="Responsible Person">
+                          <PeopleNameInput
+                            value={row.responsible_person}
+                            onChange={(e) => updateActionRow(index, "responsible_person", e.target.value)}
+                            listId="moc-people-options"
+                            placeholder="Responsible person"
+                          />
+                        </Field>
+                        <Field label="Target Date">
+                          <input
+                            type="date"
+                            value={row.target_date}
+                            onChange={(e) => updateActionRow(index, "target_date", e.target.value)}
+                            style={inputStyle}
+                          />
+                        </Field>
+                        <Field label="Status">
+                          <select
+                            value={normaliseActionPlanStatus(row.status)}
+                            onChange={(e) => updateActionRow(index, "status", e.target.value)}
+                            style={inputStyle}
+                          >
+                            {actionPlanStatusOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <Field label="Description of Action">
+                            <textarea
+                              value={row.description}
+                              onChange={(e) => updateActionRow(index, "description", e.target.value)}
+                              style={textareaStyle}
+                            />
+                          </Field>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -3382,91 +4276,112 @@ function MOCPageContent() {
               <DetailSubsection title="K. REVIEW AND ENDORSEMENT">
                 <fieldset style={fieldsetResetStyle} disabled={!canEditReviewSections}>
                 <RepeatTableToolbar onAdd={addReviewRow} label="Add Review Row" disabled={!canEditStructural} />
-                <div style={reviewTableWrapStyle}>
-                  <div style={reviewHeadStyle}>
-                    <div>Approve</div>
-                    <div>Inform</div>
-                    <div>Involved Party</div>
-                    <div>Name</div>
-                    <div>Position</div>
-                    <div>Approved</div>
-                    <div>Signature</div>
-                    <div>Date</div>
-                    <div>Comments</div>
-                    <div>Order / Remove</div>
-                  </div>
+                <div style={repeatCardStackStyle}>
                   {detailReviewRows.map((row, index) => (
-                    <div key={`${row.id || "new"}-${index}`} style={reviewRowStyle}>
-                      <label style={checkboxCellStyle}>
-                        <input
-                          type="checkbox"
-                          checked={row.approve_flag}
-                          onChange={(e) => updateReviewRow(index, "approve_flag", e.target.checked)}
-                        />
-                      </label>
-                      <label style={checkboxCellStyle}>
-                        <input
-                          type="checkbox"
-                          checked={row.inform_flag}
-                          onChange={(e) => updateReviewRow(index, "inform_flag", e.target.checked)}
-                        />
-                      </label>
-                      <input
-                        value={row.involved_party}
-                        onChange={(e) => updateReviewRow(index, "involved_party", e.target.value)}
-                        style={inputStyle}
-                      />
-                      <input
-                        value={row.name}
-                        onChange={(e) => updateReviewRow(index, "name", e.target.value)}
-                        style={inputStyle}
-                      />
-                      <input
-                        value={row.position}
-                        onChange={(e) => updateReviewRow(index, "position", e.target.value)}
-                        style={inputStyle}
-                      />
-                      <select
-                        value={row.approved_value}
-                        onChange={(e) => updateReviewRow(index, "approved_value", e.target.value as ApprovedChoice)}
-                        style={inputStyle}
-                      >
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                      </select>
-                      <SignatureFieldInput
-                        value={row.signature}
-                        onTextChange={(value) => updateReviewRow(index, "signature", value)}
-                        onFileSelect={(file) => uploadReviewSignature(index, file)}
-                        inputId={`moc-review-signature-${index}`}
-                        disabled={!canEditReviewSections}
-                      />
-                      <input
-                        type="date"
-                        value={row.review_date}
-                        onChange={(e) => updateReviewRow(index, "review_date", e.target.value)}
-                        style={inputStyle}
-                      />
-                      <input
-                        value={row.comments}
-                        onChange={(e) => updateReviewRow(index, "comments", e.target.value)}
-                        style={inputStyle}
-                      />
-                      <div style={rowActionsWrapStyle}>
-                        <RowOrderControls
-                          index={index}
-                          total={detailReviewRows.length}
-                          onMove={(direction) => moveReviewRow(index, direction)}
-                          disabled={!canEditStructural}
-                        />
-                        <button
-                          type="button"
-                          style={removeRowButtonStyle}
-                          onClick={() => removeReviewRow(index)}
-                          disabled={!canEditStructural}
-                        >
-                          Remove
-                        </button>
+                    <div key={`${row.id || "new"}-${index}`} style={repeatCardStyle}>
+                      <div style={repeatCardHeaderStyle}>
+                        <div>
+                          <div style={repeatCardKickerStyle}>Review / endorsement</div>
+                          <div style={repeatCardTitleStyle}>{row.involved_party || `Review row ${index + 1}`}</div>
+                        </div>
+                        <div style={rowActionsWrapStyle}>
+                          <RowOrderControls
+                            index={index}
+                            total={detailReviewRows.length}
+                            onMove={(direction) => moveReviewRow(index, direction)}
+                            disabled={!canEditStructural}
+                          />
+                          <button
+                            type="button"
+                            style={removeRowButtonStyle}
+                            onClick={() => removeReviewRow(index)}
+                            disabled={!canEditStructural}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                      <div style={reviewIntentGridStyle}>
+                        <label style={reviewChoiceStyle}>
+                          <input
+                            type="checkbox"
+                            checked={row.approve_flag}
+                            onChange={(e) => updateReviewRow(index, "approve_flag", e.target.checked)}
+                          />
+                          <span>Approve</span>
+                        </label>
+                        <label style={reviewChoiceStyle}>
+                          <input
+                            type="checkbox"
+                            checked={row.inform_flag}
+                            onChange={(e) => updateReviewRow(index, "inform_flag", e.target.checked)}
+                          />
+                          <span>Inform</span>
+                        </label>
+                      </div>
+                      <div style={reviewCardGridStyle}>
+                        <Field label="Involved Party">
+                          <input
+                            value={row.involved_party}
+                            onChange={(e) => updateReviewRow(index, "involved_party", e.target.value)}
+                            style={inputStyle}
+                          />
+                        </Field>
+                        <Field label="Name">
+                          <PeopleNameInput
+                            value={row.name}
+                            onChange={(e) => updateReviewRow(index, "name", e.target.value)}
+                            listId="moc-people-options"
+                            placeholder="Select or type a name"
+                          />
+                        </Field>
+                        <Field label="Position">
+                          <input
+                            value={row.position}
+                            onChange={(e) => updateReviewRow(index, "position", e.target.value)}
+                            style={inputStyle}
+                          />
+                        </Field>
+                        <Field label="Approved">
+                          <select
+                            value={row.approved_value}
+                            onChange={(e) => updateReviewRow(index, "approved_value", e.target.value as ApprovedChoice)}
+                            style={inputStyle}
+                          >
+                            <option value="">Select</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                          </select>
+                        </Field>
+                        <Field label="Date">
+                          <input
+                            type="date"
+                            value={row.review_date}
+                            onChange={(e) => updateReviewRow(index, "review_date", e.target.value)}
+                            style={inputStyle}
+                          />
+                        </Field>
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <Field label="Signature">
+                            <SignatureFieldInput
+                              value={row.signature}
+                              onTextChange={(value) => updateReviewRow(index, "signature", value)}
+                              onFileSelect={(file) => uploadReviewSignature(index, file)}
+                              inputId={`moc-review-signature-${index}`}
+                              disabled={!canEditReviewSections}
+                            />
+                          </Field>
+                        </div>
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <Field label="Comments">
+                            <textarea
+                              value={row.comments}
+                              onChange={(e) => updateReviewRow(index, "comments", e.target.value)}
+                              style={reviewCommentsStyle}
+                              placeholder="Add review comments"
+                            />
+                          </Field>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -3485,6 +4400,7 @@ function MOCPageContent() {
                   onSignatureUpload={uploadAcceptanceSignature}
                   disabled={!canEditReviewSections}
                   inputIdPrefix="moc-acceptance-signature"
+                  peopleListId="moc-people-options"
                 />
                 </fieldset>
               </DetailSubsection>
@@ -3504,6 +4420,7 @@ function MOCPageContent() {
                   onSignatureUpload={uploadCloseoutSignature}
                   disabled={!canEditCloseoutStructure}
                   inputIdPrefix="moc-closeout-signature"
+                  peopleListId="moc-people-options"
                 />
                 </fieldset>
               </DetailSubsection>
@@ -3525,6 +4442,14 @@ function MOCPageContent() {
                 disabled={generatingPdf}
               >
                 {generatingPdf ? "Generating PDF..." : "Generate PDF"}
+              </button>
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => void generateWordFor(selectedReportId, true)}
+                disabled={generatingWord}
+              >
+                {generatingWord ? "Generating Word..." : "Generate Word"}
               </button>
               <Link
                 href={buildMocLinkedActionHref(detailReport)}
@@ -3662,6 +4587,31 @@ function ImpactToggle({ label, checked, onToggle }: { label: string; checked: bo
   );
 }
 
+function PeopleNameInput({
+  value,
+  onChange,
+  listId,
+  placeholder,
+  disabled,
+}: {
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  listId: string;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <input
+      value={value}
+      onChange={onChange}
+      list={listId}
+      style={inputStyle}
+      placeholder={placeholder}
+      disabled={disabled}
+    />
+  );
+}
+
 function SignatureFieldInput({
   value,
   onTextChange,
@@ -3683,7 +4633,7 @@ function SignatureFieldInput({
         value={usingImage ? "" : value}
         onChange={(e) => onTextChange(e.target.value)}
         style={inputStyle}
-        placeholder={usingImage ? "Signature image stored" : "Typed signature"}
+        placeholder={usingImage ? "Signature image stored" : "Typed signature / approval note"}
       />
       {usingImage ? (
         <div style={signaturePreviewStyle}>
@@ -3695,10 +4645,10 @@ function SignatureFieldInput({
             unoptimized
             style={signatureImageThumbStyle}
           />
-          <span style={signaturePreviewTextStyle}>Signature image attached</span>
+          <span style={signaturePreviewTextStyle}>Image attached</span>
         </div>
       ) : (
-        <div style={signatureHintStyle}>Type a signature or upload a stored signature image.</div>
+        <div style={signatureHintStyle}>Typed text is saved, or upload an image for the PDF.</div>
       )}
       <div style={signatureFieldActionsStyle}>
         <input
@@ -3746,28 +4696,36 @@ function SimpleDocumentTable({
   disabled?: boolean;
 }) {
   return (
-    <div style={tableEditorWrapStyle}>
-      <div style={simpleDocHeadStyle}>
-        <div>Number</div>
-        <div>Title</div>
-        <div>Rev.</div>
-        <div>Order / Remove</div>
-      </div>
+    <div style={repeatCardStackStyle}>
       {rows.map((row, index) => (
-        <div key={`${row.id || "new"}-${index}`} style={simpleDocRowStyle}>
-          <input value={row.number} onChange={(e) => onChange(index, "number", e.target.value)} style={inputStyle} />
-          <input value={row.title} onChange={(e) => onChange(index, "title", e.target.value)} style={inputStyle} />
-          <input value={row.rev} onChange={(e) => onChange(index, "rev", e.target.value)} style={inputStyle} />
-          <div style={rowActionsWrapStyle}>
-            <RowOrderControls
-              index={index}
-              total={rows.length}
-              onMove={(direction) => onMove(index, direction)}
-              disabled={disabled}
-            />
-            <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
-              Remove
-            </button>
+        <div key={`${row.id || "new"}-${index}`} style={compactRepeatCardStyle}>
+          <div style={repeatCardHeaderStyle}>
+            <div>
+              <div style={repeatCardKickerStyle}>Document row</div>
+              <div style={repeatCardTitleStyle}>{row.number || `Document ${index + 1}`}</div>
+            </div>
+            <div style={rowActionsWrapStyle}>
+              <RowOrderControls
+                index={index}
+                total={rows.length}
+                onMove={(direction) => onMove(index, direction)}
+                disabled={disabled}
+              />
+              <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
+                Remove
+              </button>
+            </div>
+          </div>
+          <div style={documentCardGridStyle}>
+            <Field label="Number">
+              <input value={row.number} onChange={(e) => onChange(index, "number", e.target.value)} style={inputStyle} />
+            </Field>
+            <Field label="Title">
+              <input value={row.title} onChange={(e) => onChange(index, "title", e.target.value)} style={inputStyle} />
+            </Field>
+            <Field label="Rev.">
+              <input value={row.rev} onChange={(e) => onChange(index, "rev", e.target.value)} style={inputStyle} />
+            </Field>
           </div>
         </div>
       ))}
@@ -3783,6 +4741,7 @@ function SimpleSignoffTable({
   onSignatureUpload,
   disabled,
   inputIdPrefix,
+  peopleListId,
 }: {
   rows: MocSignoffRow[];
   onChange: (index: number, key: keyof MocSignoffRow, value: string | number) => void;
@@ -3791,45 +4750,64 @@ function SimpleSignoffTable({
   onSignatureUpload: (index: number, file: File | null) => void;
   disabled?: boolean;
   inputIdPrefix: string;
+  peopleListId: string;
 }) {
   return (
-    <div style={tableEditorWrapStyle}>
-      <div style={simpleSignoffHeadStyle}>
-        <div>Role</div>
-        <div>Position</div>
-        <div>Name</div>
-        <div>Signature</div>
-        <div>Date</div>
-        <div>Order / Remove</div>
-      </div>
+    <div style={repeatCardStackStyle}>
       {rows.map((row, index) => (
-        <div key={`${row.id || "new"}-${index}`} style={simpleSignoffRowStyle}>
-          <input value={row.role_label} onChange={(e) => onChange(index, "role_label", e.target.value)} style={inputStyle} />
-          <input value={row.position} onChange={(e) => onChange(index, "position", e.target.value)} style={inputStyle} />
-          <input value={row.name} onChange={(e) => onChange(index, "name", e.target.value)} style={inputStyle} />
-          <SignatureFieldInput
-            value={row.signature}
-            onTextChange={(value) => onChange(index, "signature", value)}
-            onFileSelect={(file) => onSignatureUpload(index, file)}
-            inputId={`${inputIdPrefix}-${index}`}
-            disabled={disabled}
-          />
-          <input
-            type="date"
-            value={row.signoff_date}
-            onChange={(e) => onChange(index, "signoff_date", e.target.value)}
-            style={inputStyle}
-          />
-          <div style={rowActionsWrapStyle}>
-            <RowOrderControls
-              index={index}
-              total={rows.length}
-              onMove={(direction) => onMove(index, direction)}
-              disabled={disabled}
-            />
-            <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
-              Remove
-            </button>
+        <div key={`${row.id || "new"}-${index}`} style={repeatCardStyle}>
+          <div style={repeatCardHeaderStyle}>
+            <div>
+              <div style={repeatCardKickerStyle}>Signoff row</div>
+              <div style={repeatCardTitleStyle}>{row.role_label || `Signoff ${index + 1}`}</div>
+            </div>
+            <div style={rowActionsWrapStyle}>
+              <RowOrderControls
+                index={index}
+                total={rows.length}
+                onMove={(direction) => onMove(index, direction)}
+                disabled={disabled}
+              />
+              <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
+                Remove
+              </button>
+            </div>
+          </div>
+          <div style={signoffCardGridStyle}>
+            <Field label="Role">
+              <input value={row.role_label} onChange={(e) => onChange(index, "role_label", e.target.value)} style={inputStyle} />
+            </Field>
+            <Field label="Name">
+              <PeopleNameInput
+                value={row.name}
+                onChange={(e) => onChange(index, "name", e.target.value)}
+                listId={peopleListId}
+                placeholder="Select or type a name"
+                disabled={disabled}
+              />
+            </Field>
+            <Field label="Position">
+              <input value={row.position} onChange={(e) => onChange(index, "position", e.target.value)} style={inputStyle} />
+            </Field>
+            <Field label="Date">
+              <input
+                type="date"
+                value={row.signoff_date}
+                onChange={(e) => onChange(index, "signoff_date", e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Field label="Signature">
+                <SignatureFieldInput
+                  value={row.signature}
+                  onTextChange={(value) => onChange(index, "signature", value)}
+                  onFileSelect={(file) => onSignatureUpload(index, file)}
+                  inputId={`${inputIdPrefix}-${index}`}
+                  disabled={disabled}
+                />
+              </Field>
+            </div>
           </div>
         </div>
       ))}
@@ -4299,6 +5277,166 @@ const repeatToolbarStyle: CSSProperties = {
 const tableEditorWrapStyle: CSSProperties = {
   display: "grid",
   gap: "10px",
+  overflowX: "auto",
+  paddingBottom: "4px",
+};
+
+const repeatCardStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "14px",
+};
+
+const repeatCardStyle: CSSProperties = {
+  border: "1px solid #d7dee7",
+  borderRadius: "16px",
+  background: "#ffffff",
+  padding: "14px",
+  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)",
+};
+
+const compactRepeatCardStyle: CSSProperties = {
+  ...repeatCardStyle,
+  padding: "12px",
+};
+
+const repeatCardHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "flex-start",
+  marginBottom: "12px",
+  flexWrap: "wrap",
+};
+
+const repeatCardKickerStyle: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 800,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const repeatCardTitleStyle: CSSProperties = {
+  marginTop: "3px",
+  fontSize: "15px",
+  fontWeight: 900,
+  color: "#0f172a",
+};
+
+const actionPlanCardGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(110px, 0.6fr) minmax(180px, 1fr) minmax(150px, 0.8fr) minmax(140px, 0.7fr)",
+  gap: "12px",
+};
+
+const actionPlanIntroStyle: CSSProperties = {
+  marginBottom: "12px",
+  padding: "12px 14px",
+  borderRadius: "14px",
+  border: "1px solid #99f6e4",
+  background: "#f0fdfa",
+  color: "#0f172a",
+};
+
+const actionPlanIntroTitleStyle: CSSProperties = {
+  display: "block",
+  fontSize: "13px",
+  fontWeight: 900,
+  color: "#0f766e",
+  marginBottom: "4px",
+};
+
+const actionPlanIntroTextStyle: CSSProperties = {
+  display: "block",
+  fontSize: "13px",
+  lineHeight: 1.45,
+  color: "#475569",
+};
+
+const actionPlanCardTitleRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  flexWrap: "wrap",
+};
+
+const actionPlanSummaryStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: "10px",
+  marginBottom: "12px",
+};
+
+const miniMetaLabelStyle: CSSProperties = {
+  display: "block",
+  fontSize: "11px",
+  fontWeight: 800,
+  color: "#64748b",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  marginBottom: "3px",
+};
+
+const miniMetaValueStyle: CSSProperties = {
+  display: "block",
+  fontSize: "13px",
+  color: "#0f172a",
+  lineHeight: 1.35,
+};
+
+const centralActionLinkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: "38px",
+  padding: "9px 12px",
+  borderRadius: "10px",
+  border: "1px solid #99f6e4",
+  background: "#ecfdf5",
+  color: "#0f766e",
+  fontSize: "13px",
+  fontWeight: 800,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+};
+
+const documentCardGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(150px, 0.8fr) minmax(260px, 1.6fr) minmax(90px, 0.45fr)",
+  gap: "12px",
+};
+
+const reviewIntentGridStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "12px",
+};
+
+const reviewChoiceStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+  minHeight: "38px",
+  padding: "8px 12px",
+  borderRadius: "999px",
+  border: "1px solid #cbd5e1",
+  background: "#f8fafc",
+  color: "#0f172a",
+  fontSize: "13px",
+  fontWeight: 800,
+};
+
+const reviewCardGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(5, minmax(140px, 1fr))",
+  gap: "12px",
+};
+
+const signoffCardGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(220px, 1.3fr) minmax(180px, 1fr) minmax(160px, 0.9fr) minmax(140px, 0.7fr)",
+  gap: "12px",
 };
 
 const actionPlanHeadStyle: CSSProperties = {
@@ -4339,32 +5477,39 @@ const simpleDocRowStyle: CSSProperties = {
 const reviewTableWrapStyle: CSSProperties = {
   display: "grid",
   gap: "12px",
+  overflowX: "auto",
+  paddingBottom: "4px",
 };
 
 const reviewHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "0.65fr 0.65fr 1.15fr 1fr 1fr 0.85fr 1.35fr 0.95fr 1.05fr 1.1fr",
+  gridTemplateColumns:
+    "72px 72px minmax(130px, 1fr) minmax(150px, 1.1fr) minmax(130px, 1fr) 94px minmax(170px, 1.2fr) 124px minmax(220px, 1.5fr) 128px",
   gap: "10px",
   padding: "10px 12px",
   borderRadius: "14px",
   border: "1px solid #d7dee7",
   background: "#f8fafc",
+  minWidth: "1320px",
   fontSize: "12px",
   fontWeight: 800,
   color: "#64748b",
   textTransform: "uppercase",
   letterSpacing: 0.3,
+  alignItems: "center",
 };
 
 const reviewRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "0.65fr 0.65fr 1.15fr 1fr 1fr 0.85fr 1.35fr 0.95fr 1.05fr 1.1fr",
+  gridTemplateColumns:
+    "72px 72px minmax(130px, 1fr) minmax(150px, 1.1fr) minmax(130px, 1fr) 94px minmax(170px, 1.2fr) 124px minmax(220px, 1.5fr) 128px",
   gap: "10px",
   alignItems: "center",
   padding: "12px",
   borderRadius: "14px",
   border: "1px solid #d7dee7",
   background: "#ffffff",
+  minWidth: "1320px",
 };
 
 const checkboxCellStyle: CSSProperties = {
@@ -4379,12 +5524,13 @@ const checkboxCellStyle: CSSProperties = {
 
 const simpleSignoffHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.25fr 1fr 1fr 1.3fr 0.95fr 1.1fr",
+  gridTemplateColumns: "1.3fr 1.1fr 1fr 1.35fr 0.95fr 1.1fr",
   gap: "10px",
   padding: "10px 12px",
   borderRadius: "14px",
   border: "1px solid #d7dee7",
   background: "#f8fafc",
+  minWidth: "1040px",
   fontSize: "12px",
   fontWeight: 800,
   color: "#64748b",
@@ -4394,13 +5540,21 @@ const simpleSignoffHeadStyle: CSSProperties = {
 
 const simpleSignoffRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.25fr 1fr 1fr 1.3fr 0.95fr 1.1fr",
+  gridTemplateColumns: "1.3fr 1.1fr 1fr 1.35fr 0.95fr 1.1fr",
   gap: "10px",
   alignItems: "center",
   padding: "12px",
   borderRadius: "14px",
   border: "1px solid #d7dee7",
   background: "#ffffff",
+  minWidth: "1040px",
+};
+
+const reviewCommentsStyle: CSSProperties = {
+  ...inputStyle,
+  minHeight: "74px",
+  resize: "vertical",
+  lineHeight: 1.45,
 };
 
 const rowActionsWrapStyle: CSSProperties = {
@@ -4416,7 +5570,8 @@ const rowActionsStyle: CSSProperties = {
 
 const signatureFieldStackStyle: CSSProperties = {
   display: "grid",
-  gap: "6px",
+  gap: "8px",
+  minWidth: 0,
 };
 
 const hiddenFileInputStyle: CSSProperties = {
@@ -4433,21 +5588,22 @@ const hiddenFileInputStyle: CSSProperties = {
 
 const signatureFieldActionsStyle: CSSProperties = {
   display: "flex",
-  gap: "6px",
+  gap: "8px",
   alignItems: "center",
   flexWrap: "wrap",
 };
 
 const signatureButtonStyle: CSSProperties = {
-  padding: "8px 10px",
+  padding: "9px 11px",
   borderRadius: 8,
-  border: "1px solid #93c5fd",
-  background: "#eff6ff",
-  color: "#1d4ed8",
+  border: "1px solid #99f6e4",
+  background: "#ecfdf5",
+  color: "#0f766e",
   fontWeight: 700,
   cursor: "pointer",
   fontSize: "12px",
   lineHeight: 1.2,
+  whiteSpace: "nowrap",
 };
 
 const signaturePreviewStyle: CSSProperties = {
@@ -4457,8 +5613,8 @@ const signaturePreviewStyle: CSSProperties = {
   minHeight: "38px",
   padding: "8px 10px",
   borderRadius: "10px",
-  border: "1px solid #d7dee7",
-  background: "#f8fafc",
+  border: "1px solid #99f6e4",
+  background: "#f0fdfa",
 };
 
 const signatureImageThumbStyle: CSSProperties = {

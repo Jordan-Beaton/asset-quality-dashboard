@@ -562,6 +562,9 @@ function NcrCapaPageContent() {
   const linkedSource = searchParams.get("source")?.trim() || "All";
   const linkedProject = searchParams.get("project")?.trim() || "All";
   const linkedOverdueOnly = searchParams.get("overdue") === "1";
+  const linkedDueWindow = Number(searchParams.get("dueWindow") || "0");
+  const linkedCreatedMonth = searchParams.get("createdMonth")?.trim() || "";
+  const linkedClosedMonth = searchParams.get("closedMonth")?.trim() || "";
   const directNcrNumber = searchParams.get("ncr")?.trim() || "";
   const directNcrId = searchParams.get("ncrId")?.trim() || "";
   const requestedWorkspaceView = parseNcrWorkspaceView(searchParams.get("view"));
@@ -572,6 +575,9 @@ function NcrCapaPageContent() {
     linkedSource !== "All" ||
     linkedProject !== "All" ||
     linkedOverdueOnly ||
+    linkedDueWindow > 0 ||
+    Boolean(linkedCreatedMonth) ||
+    Boolean(linkedClosedMonth) ||
     Boolean(directNcrNumber) ||
     Boolean(directNcrId);
 
@@ -952,7 +958,18 @@ function NcrCapaPageContent() {
         activeLogTab === "CAPA" || sourceFilter === "All" || row.source_type === sourceFilter;
       const matchesProject = projectFilter === "All" || row.project === projectFilter;
       const matchesOverdueOnly = !linkedOverdueOnly || dueState(row.due_date) === "overdue";
+      const matchesDueWindow =
+        linkedDueWindow <= 0 ||
+        (() => {
+          if (!row.due_date || row.status === "Closed") return false;
+          const days = getOverdueDays(row.due_date);
+          return days !== null && days >= 0 && days <= linkedDueWindow;
+        })();
       const rowYear = row.created_at ? String(new Date(row.created_at).getFullYear()) : "";
+      const matchesCreatedMonth = !linkedCreatedMonth || row.created_at?.startsWith(linkedCreatedMonth);
+      const matchesClosedMonth =
+        !linkedClosedMonth ||
+        (row.status === "Closed" && (row.closed_at || row.created_at || "").startsWith(linkedClosedMonth));
       const matchesYear = yearFilter === "All Years" || rowYear === yearFilter;
       const matchesQuickFilter =
         !ncrQuickFilter ||
@@ -973,6 +990,9 @@ function NcrCapaPageContent() {
         matchesSeverity &&
         matchesSource &&
         matchesProject &&
+        matchesDueWindow &&
+        matchesCreatedMonth &&
+        matchesClosedMonth &&
         matchesYear &&
         matchesOverdueOnly &&
         matchesQuickFilter &&
@@ -1032,6 +1052,9 @@ function NcrCapaPageContent() {
     yearFilter,
     ncrQuickFilter,
     linkedOverdueOnly,
+    linkedDueWindow,
+    linkedCreatedMonth,
+    linkedClosedMonth,
     showAttentionOnly,
     activeLogTab,
     ncrSort,
