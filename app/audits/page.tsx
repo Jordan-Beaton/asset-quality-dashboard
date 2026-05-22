@@ -6,6 +6,24 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  AlignmentType,
+  BorderStyle,
+  Document as WordDocument,
+  ExternalHyperlink,
+  Footer,
+  Packer,
+  Paragraph,
+  ShadingType,
+  SimpleField,
+  Table,
+  TableCell,
+  TableLayoutType,
+  TableRow,
+  TextRun,
+  VerticalAlign,
+  WidthType,
+} from "docx";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
@@ -617,6 +635,7 @@ function AuditsPageContent() {
   const [isUploadingReport, setIsUploadingReport] = useState(false);
   const [uploadingFindingEvidenceId, setUploadingFindingEvidenceId] = useState("");
   const [generatingFindingPdfId, setGeneratingFindingPdfId] = useState("");
+  const [generatingFindingWordId, setGeneratingFindingWordId] = useState("");
   const [isSavingLinks, setIsSavingLinks] = useState(false);
   const [selectedOpenFindingId, setSelectedOpenFindingId] = useState("");
   const [openFindingCategoryFilter, setOpenFindingCategoryFilter] = useState<
@@ -1969,6 +1988,375 @@ function AuditsPageContent() {
     );
   }
 
+  function exportText(value: string | null | undefined) {
+    return String(value || "").trim();
+  }
+
+  function exportDate(value: string | null | undefined) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  function exportDateTime(value: string | null | undefined) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function exportFileSize(value: number | null) {
+    if (!value || value <= 0) return "";
+    return formatFileSize(value);
+  }
+
+  const wordBorder = { style: BorderStyle.SINGLE, color: "E2E8F0", size: 2 };
+  const wordBorders = {
+    top: wordBorder,
+    bottom: wordBorder,
+    left: wordBorder,
+    right: wordBorder,
+    insideHorizontal: wordBorder,
+    insideVertical: wordBorder,
+  };
+  const wordBodyWidth = 9360;
+
+  function wordRun(text: string, options?: { bold?: boolean; color?: string; size?: number; italics?: boolean }) {
+    return new TextRun({
+      text: exportText(text),
+      font: "Calibri",
+      bold: options?.bold,
+      italics: options?.italics,
+      color: options?.color || "0F172A",
+      size: options?.size ?? 19,
+    });
+  }
+
+  function wordCell(
+    text: string,
+    options?: {
+      width?: number;
+      fill?: string;
+      color?: string;
+      bold?: boolean;
+      size?: number;
+      align?: (typeof AlignmentType)[keyof typeof AlignmentType];
+    }
+  ) {
+    return new TableCell({
+      width: options?.width ? { size: options.width, type: WidthType.DXA } : undefined,
+      verticalAlign: VerticalAlign.CENTER,
+      shading: options?.fill ? { type: ShadingType.CLEAR, fill: options.fill, color: "auto" } : undefined,
+      margins: { top: 120, bottom: 120, left: 120, right: 120 },
+      children: [
+        new Paragraph({
+          alignment: options?.align,
+          children: [
+            wordRun(text, {
+              bold: options?.bold,
+              color: options?.color,
+              size: options?.size,
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  function wordTable(headers: string[], rows: string[][], widths: number[], options?: { labelColumns?: number[] }) {
+    const tableRows = rows.length ? rows : [headers.map(() => "")];
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      columnWidths: widths,
+      borders: wordBorders,
+      rows: [
+        new TableRow({
+          tableHeader: true,
+          children: headers.map((header, index) =>
+            wordCell(header, { width: widths[index], fill: "0F766E", color: "FFFFFF", bold: true, size: 18 })
+          ),
+        }),
+        ...tableRows.map((row, rowIndex) =>
+          new TableRow({
+            cantSplit: true,
+            children: row.map((cell, cellIndex) =>
+              wordCell(cell, {
+                width: widths[cellIndex],
+                fill: options?.labelColumns?.includes(cellIndex) || rowIndex % 2 === 0 ? "F8FAFC" : undefined,
+                bold: options?.labelColumns?.includes(cellIndex),
+                size: 18,
+              })
+            ),
+          })
+        ),
+      ],
+    });
+  }
+
+  function wordSectionTitle(title: string) {
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [wordBodyWidth],
+      borders: wordBorders,
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+              margins: { top: 110, bottom: 110, left: 140, right: 140 },
+              children: [new Paragraph({ children: [wordRun(title, { bold: true, color: "FFFFFF", size: 20 })] })],
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  function wordTextBox(title: string, value: string) {
+    return [
+      new Paragraph({
+        spacing: { before: 160, after: 70 },
+        children: [wordRun(title, { bold: true, size: 20 })],
+      }),
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
+        columnWidths: [wordBodyWidth],
+        borders: wordBorders,
+        rows: [
+          new TableRow({
+            cantSplit: true,
+            children: [
+              new TableCell({
+                shading: { type: ShadingType.CLEAR, fill: "F8FAFC", color: "auto" },
+                margins: { top: 170, bottom: 170, left: 150, right: 150 },
+                children: [
+                  new Paragraph({
+                    spacing: { line: 260 },
+                    children: [wordRun(value, { size: 18, color: "1E293B" })],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ];
+  }
+
+  function wordFooter(reference: string) {
+    return new Footer({
+      children: [
+        new Paragraph({
+          border: { top: { style: BorderStyle.SINGLE, color: "0F766E", size: 4 } },
+          spacing: { before: 80 },
+          children: [wordRun("", { size: 1 })],
+        }),
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          layout: TableLayoutType.FIXED,
+          columnWidths: [6500, 2860],
+          borders: {
+            top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            insideVertical: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+          },
+          rows: [
+            new TableRow({
+              children: [
+                wordCell(`Enshore Subsea | ${reference}`, { width: 6500, size: 16, color: "64748B" }),
+                new TableCell({
+                  width: { size: 2860, type: WidthType.DXA },
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.RIGHT,
+                      children: [wordRun("Page ", { size: 16, color: "64748B" }), new SimpleField("PAGE"), wordRun(" of ", { size: 16, color: "64748B" }), new SimpleField("NUMPAGES")],
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  async function generateFindingWord(finding: FindingRecord) {
+    const audit = audits.find((item) => item.id === finding.audit_id);
+    if (!audit) {
+      setMessage("Parent audit could not be found for this finding.");
+      return;
+    }
+
+    setGeneratingFindingWordId(finding.id);
+
+    try {
+      const evidenceFiles = getFindingEvidenceFiles(finding);
+      const evidenceWithUrls = await Promise.all(
+        evidenceFiles.map(async (file) => ({
+          file,
+          url: file.file_path ? await createSignedFileUrl(file.file_path) : "",
+        }))
+      );
+
+      const evidenceRows = evidenceWithUrls.map(({ file, url }) => [
+        getFindingEvidenceDisplayName(file, finding),
+        exportFileSize(file.file_size),
+        exportDateTime(file.uploaded_at),
+        url ? "Open evidence" : "",
+      ]);
+
+      const evidenceTableRows = evidenceRows.length ? evidenceRows : [["", "", "", ""]];
+
+      const evidenceTable = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
+        columnWidths: [4200, 1100, 2300, 1760],
+        borders: wordBorders,
+        rows: [
+          new TableRow({
+            tableHeader: true,
+            children: ["File", "Size", "Uploaded", "Evidence Link"].map((header, index) =>
+              wordCell(header, { width: [4200, 1100, 2300, 1760][index], fill: "0F766E", color: "FFFFFF", bold: true, size: 18 })
+            ),
+          }),
+          ...evidenceTableRows.map((row, rowIndex) =>
+            new TableRow({
+              cantSplit: true,
+              children: row.map((cell, cellIndex) => {
+                if (cellIndex === 3 && evidenceWithUrls[rowIndex]?.url) {
+                  return new TableCell({
+                    width: { size: 1760, type: WidthType.DXA },
+                    verticalAlign: VerticalAlign.CENTER,
+                    margins: { top: 120, bottom: 120, left: 120, right: 120 },
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new ExternalHyperlink({
+                            link: evidenceWithUrls[rowIndex].url,
+                            children: [wordRun("Open evidence", { bold: true, color: "1D4ED8", size: 18 })],
+                          }),
+                        ],
+                      }),
+                    ],
+                  });
+                }
+
+                return wordCell(cell, {
+                  width: [4200, 1100, 2300, 1760][cellIndex],
+                  fill: rowIndex % 2 === 0 ? "F8FAFC" : undefined,
+                  size: 18,
+                });
+              }),
+            })
+          ),
+        ],
+      });
+
+      const document = new WordDocument({
+        styles: {
+          default: {
+            document: { run: { font: "Calibri", size: 19, color: "0F172A" } },
+          },
+        },
+        sections: [
+          {
+            properties: {
+              page: { margin: { top: 720, right: 720, bottom: 900, left: 720, footer: 360 } },
+            },
+            footers: { default: wordFooter(finding.reference || "Audit Finding") },
+            children: [
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                layout: TableLayoutType.FIXED,
+                columnWidths: [wordBodyWidth],
+                borders: {
+                  top: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+                        margins: { top: 180, bottom: 180, left: 180, right: 180 },
+                        children: [
+                          new Paragraph({ children: [wordRun("ENSHORE SUBSEA", { bold: true, color: "FFFFFF", size: 36 })] }),
+                          new Paragraph({ children: [wordRun("Audit Finding Report", { bold: true, color: "FFFFFF", size: 20 })] }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new Paragraph({ spacing: { after: 180 }, children: [wordRun("", { size: 1 })] }),
+              new Paragraph({ children: [wordRun(finding.reference || "Audit Finding", { bold: true, size: 36 })] }),
+              new Paragraph({ spacing: { after: 180 }, children: [wordRun(`${audit.audit_number} - ${audit.title}`, { color: "475569", size: 20 })] }),
+              new Paragraph({ spacing: { after: 180 }, children: [wordRun(`Generated: ${exportDateTime(new Date().toISOString())}`, { color: "475569", size: 18 })] }),
+              wordTable(
+                ["Field", "Details", "Field", "Details"],
+                [
+                  ["Finding Ref", finding.reference, "Category", finding.category],
+                  ["Status", finding.status, "Owner", finding.owner],
+                  ["Due Date", exportDate(finding.due_date), "Closure Date", exportDate(finding.closure_date)],
+                  ["Clause / Reference", finding.clause, "Audit Type", audit.audit_type],
+                  ["Auditee", audit.auditee, "Lead Auditor", audit.lead_auditor],
+                ],
+                [1700, 3100, 1700, 2860],
+                { labelColumns: [0, 2] }
+              ),
+              ...wordTextBox("Description / Objective Evidence", finding.description),
+              ...wordTextBox("Root Cause", finding.root_cause),
+              ...wordTextBox("Containment Action", finding.containment_action),
+              ...wordTextBox("Corrective Action", finding.corrective_action),
+              new Paragraph({ spacing: { before: 170, after: 70 }, children: [wordRun("Uploaded Evidence", { bold: true, size: 24 })] }),
+              evidenceTable,
+              new Paragraph({
+                spacing: { before: 80 },
+                children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "64748B", size: 16 })],
+              }),
+            ],
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(document);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = `${sanitizeFileName(finding.reference || "audit-finding")}-finding-report.docx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage(`Finding Word report generated for ${finding.reference}.`);
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Finding Word generation failed: ${err.message}`);
+    } finally {
+      setGeneratingFindingWordId("");
+    }
+  }
+
   async function generateFindingPdf(finding: FindingRecord) {
     const audit = audits.find((item) => item.id === finding.audit_id);
     if (!audit) {
@@ -2019,11 +2407,11 @@ function AuditsPageContent() {
         theme: "grid",
         margin: { left: margin, right: margin },
         body: [
-          ["Finding Ref", finding.reference || "-", "Category", finding.category],
-          ["Status", finding.status, "Owner", finding.owner || "-"],
-          ["Due Date", formatDate(finding.due_date), "Closure Date", formatDate(finding.closure_date)],
-          ["Clause / Reference", finding.clause || "-", "Audit Type", audit.audit_type],
-          ["Auditee", audit.auditee || "-", "Lead Auditor", audit.lead_auditor || "-"],
+          ["Finding Ref", exportText(finding.reference), "Category", exportText(finding.category)],
+          ["Status", exportText(finding.status), "Owner", exportText(finding.owner)],
+          ["Due Date", exportDate(finding.due_date), "Closure Date", exportDate(finding.closure_date)],
+          ["Clause / Reference", exportText(finding.clause), "Audit Type", exportText(audit.audit_type)],
+          ["Auditee", exportText(audit.auditee), "Lead Auditor", exportText(audit.lead_auditor)],
         ],
         columnStyles: {
           0: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 34 },
@@ -2056,7 +2444,7 @@ function AuditsPageContent() {
         doc.text(title, margin, y);
         y += 4;
 
-        const lines = doc.splitTextToSize(value || "-", pageWidth - margin * 2 - 6);
+        const lines = doc.splitTextToSize(exportText(value), pageWidth - margin * 2 - 6);
         const boxHeight = Math.max(minHeight, lines.length * 4.5 + 8);
 
         doc.setDrawColor(226, 232, 240);
@@ -2099,8 +2487,8 @@ function AuditsPageContent() {
           head: [["File", "Size", "Uploaded", "Evidence Link"]],
           body: evidenceWithUrls.map(({ file, url }) => [
             getFindingEvidenceDisplayName(file, finding),
-            formatFileSize(file.file_size),
-            formatDateTime(file.uploaded_at || ""),
+            exportFileSize(file.file_size),
+            exportDateTime(file.uploaded_at),
             url ? "Open evidence" : "Unavailable",
           ]),
           headStyles: {
@@ -3132,6 +3520,14 @@ function AuditsPageContent() {
                     >
                       {generatingFindingPdfId === openFindingForm.id ? "Generating PDF..." : "Generate PDF Report"}
                     </button>
+                    <button
+                      type="button"
+                      style={secondaryButtonStyle}
+                      onClick={() => void generateFindingWord(openFindingForm)}
+                      disabled={Boolean(generatingFindingWordId)}
+                    >
+                      {generatingFindingWordId === openFindingForm.id ? "Generating Word..." : "Generate Word Report"}
+                    </button>
                     {renderFindingEvidenceActions(openFindingForm)}
                     <label
                       style={{
@@ -4068,6 +4464,14 @@ function AuditsPageContent() {
                               disabled={Boolean(generatingFindingPdfId)}
                             >
                               {generatingFindingPdfId === finding.id ? "Generating PDF..." : "Generate PDF Report"}
+                            </button>
+                            <button
+                              type="button"
+                              style={secondaryButtonStyle}
+                              onClick={() => void generateFindingWord(finding)}
+                              disabled={Boolean(generatingFindingWordId)}
+                            >
+                              {generatingFindingWordId === finding.id ? "Generating Word..." : "Generate Word Report"}
                             </button>
                             <label
                               style={{
