@@ -44,6 +44,7 @@ const riskNavItems = [
 const hseNavItems = [
   { href: "/home", label: "Home" },
   { href: "/hse", label: "Dashboard" },
+  { href: "/hse/ainm", label: "AINM" },
   { href: "/hse/incidents", label: "Incidents" },
   { href: "/hse/inspections", label: "Inspections" },
   { href: "/hse/risk-assessments", label: "Risk Assess." },
@@ -215,7 +216,12 @@ export default function AppShell({ children }: AppShellProps) {
                 >
                   {navItems.map((item) => {
                     const isActive =
-                      item.href === "/" || item.href === "/home" || item.href === "/assets" || item.href === "/risk"
+                      item.href === "/" ||
+                      item.href === "/home" ||
+                      item.href === "/assets" ||
+                      item.href === "/risk" ||
+                      item.href === "/hse" ||
+                      item.href === "/admin"
                         ? pathname === item.href
                         : pathname.startsWith(item.href);
 
