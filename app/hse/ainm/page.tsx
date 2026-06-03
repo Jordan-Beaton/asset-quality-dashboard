@@ -115,6 +115,18 @@ type AINMAction = {
   updated_at: string;
 };
 
+type CentralAction = {
+  id: string;
+  action_number: string | null;
+  title: string | null;
+  owner: string | null;
+  status: string | null;
+  priority: string | null;
+  due_date: string | null;
+  linked_ainm_id?: string | null;
+  linked_ainm_number?: string | null;
+};
+
 type AINMEvidence = {
   id: string;
   ainm_id: string;
@@ -429,12 +441,14 @@ function buildActionHref(record: AINMRecord, action?: AINMAction) {
     record.initial_cause ? `Initial cause:\n${record.initial_cause}` : "",
   ].filter(Boolean).join("\n\n");
   const params = new URLSearchParams({
-    prefill_source: "HSE",
+    prefill_source: "AINM",
     prefill_department: "HSEQ",
     prefill_project: record.project || "",
     prefill_title: title,
     prefill_description: description,
     prefill_owner: action?.assigned || record.owner || "",
+    linked_ainm_id: record.id,
+    linked_ainm_number: record.ainm_number,
   });
   return `/actions?${params.toString()}`;
 }
@@ -472,6 +486,7 @@ function dataUrlToBytes(dataUrl: string) {
 export default function HseAinmPage() {
   const [records, setRecords] = useState<AINMRecord[]>([]);
   const [actions, setActions] = useState<AINMAction[]>([]);
+  const [centralActions, setCentralActions] = useState<CentralAction[]>([]);
   const [evidence, setEvidence] = useState<AINMEvidence[]>([]);
   const [generatedDocuments, setGeneratedDocuments] = useState<AINMGeneratedDocument[]>([]);
   const [peopleOptions, setPeopleOptions] = useState<PeopleOption[]>([]);
@@ -509,6 +524,13 @@ export default function HseAinmPage() {
 
   const selected = useMemo(() => records.find((record) => record.id === selectedId) || null, [records, selectedId]);
   const selectedActions = useMemo(() => actions.filter((action) => action.ainm_id === selectedId), [actions, selectedId]);
+  const selectedCentralActions = useMemo(() => {
+    const selectedNumber = selected?.ainm_number || "";
+    return centralActions.filter((action) =>
+      (selectedId && action.linked_ainm_id === selectedId) ||
+      (selectedNumber && action.linked_ainm_number === selectedNumber)
+    );
+  }, [centralActions, selected?.ainm_number, selectedId]);
   const selectedEvidence = useMemo(() => evidence.filter((file) => file.ainm_id === selectedId), [evidence, selectedId]);
   const compiledPdfReports = useMemo(
     () => generatedDocuments.filter((document) => document.document_stage === "compiled-pdf"),
@@ -655,6 +677,19 @@ export default function HseAinmPage() {
   }, []);
 
   useEffect(() => {
+    if (!records.length || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const directId = params.get("ainmId")?.trim() || "";
+    const directNumber = params.get("ainm")?.trim() || "";
+    if (!directId && !directNumber) return;
+    const matched = records.find((record) => record.id === directId || record.ainm_number === directNumber);
+    if (!matched) return;
+    setSelectedId(matched.id);
+    setDraft(matched);
+    setActiveView("register");
+  }, [records]);
+
+  useEffect(() => {
     if (!selected) return;
     const nextDraft = {
       ...selected,
@@ -673,10 +708,11 @@ export default function HseAinmPage() {
 
   async function loadData() {
     setLoading(true);
-    const [recordRes, actionRes, evidenceRes] = await Promise.all([
+    const [recordRes, actionRes, evidenceRes, centralActionRes] = await Promise.all([
       supabase.from("hse_ainm_records").select("*").order("event_date", { ascending: false }).order("ainm_number", { ascending: false }),
       supabase.from("hse_ainm_actions").select("*").order("date_raised", { ascending: false }),
       supabase.from("hse_ainm_evidence").select("*").order("uploaded_at", { ascending: false }),
+      supabase.from("actions").select("*").order("action_number", { ascending: true }),
     ]);
     const generatedRes = await supabase.from("hse_ainm_generated_documents").select("*").order("generated_at", { ascending: false });
     const peopleRes = await supabase
@@ -691,8 +727,8 @@ export default function HseAinmPage() {
       return;
     }
 
-    if (actionRes.error || evidenceRes.error || generatedRes.error) {
-      setMessage(`AINM related data load warning: ${actionRes.error?.message || evidenceRes.error?.message || generatedRes.error?.message}`);
+    if (actionRes.error || evidenceRes.error || generatedRes.error || centralActionRes.error) {
+      setMessage(`AINM related data load warning: ${actionRes.error?.message || evidenceRes.error?.message || generatedRes.error?.message || centralActionRes.error?.message}`);
     } else {
       setMessage("AINM records loaded.");
     }
@@ -703,6 +739,7 @@ export default function HseAinmPage() {
     }));
     setRecords(nextRecords);
     setActions((actionRes.data || []) as AINMAction[]);
+    setCentralActions(((centralActionRes.data || []) as CentralAction[]).filter((action) => action.linked_ainm_id || action.linked_ainm_number));
     setEvidence((evidenceRes.data || []) as AINMEvidence[]);
     setGeneratedDocuments((generatedRes.data || []) as AINMGeneratedDocument[]);
     if (!peopleRes.error) setPeopleOptions((peopleRes.data || []) as PeopleOption[]);
@@ -2559,6 +2596,32 @@ export default function HseAinmPage() {
                   <div style={buttonRowStyle}>
                     <Link href={buildActionHref(draft)} style={linkButtonStyle}>Create Central Action</Link>
                   </div>
+
+                  <div style={{ marginTop: 16 }}>
+                    <h3 style={inlineSectionTitleStyle}>Linked Central Actions</h3>
+                  </div>
+                  <div style={actionGridStyle}>
+                    {selectedCentralActions.map((action) => (
+                      <div key={action.id} style={actionCardStyle}>
+                        <div style={actionCardHeaderStyle}>
+                          <strong>{action.action_number || "Action"} - {action.title || "Untitled action"}</strong>
+                          <StatusPill status={action.status || "Open"} />
+                        </div>
+                        <span>{action.owner || "Unassigned"} | Due {displayDate(action.due_date)} | Priority {action.priority || "Not set"}</span>
+                        <Link
+                          href={`/actions?actionId=${encodeURIComponent(action.id)}`}
+                          style={smallLinkButtonStyle}
+                        >
+                          Open Linked Action
+                        </Link>
+                      </div>
+                    ))}
+                    {!selectedCentralActions.length ? <div style={emptyBoxStyle}>No central Action Management actions linked to this AINM yet.</div> : null}
+                  </div>
+
+                  <div style={{ marginTop: 18 }}>
+                    <h3 style={inlineSectionTitleStyle}>AINM Tracker Actions</h3>
+                  </div>
                   <div style={actionGridStyle}>
                     {selectedActions.map((action) => (
                       <div key={action.id} style={actionCardStyle}>
@@ -2922,6 +2985,7 @@ const signoffBlockStyle: CSSProperties = { gridColumn: "1 / -1", display: "grid"
 const signoffBlockTitleStyle: CSSProperties = { gridColumn: "1 / -1", margin: 0, background: "#e5e7eb", borderRadius: 8, padding: "10px 12px", color: "#0f172a", fontSize: 15 };
 const actionGridStyle: CSSProperties = { display: "grid", gap: 12 };
 const actionCardStyle: CSSProperties = { display: "grid", gap: 8, background: "white", border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, color: "#0f172a" };
+const actionCardHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" };
 const emptyBoxStyle: CSSProperties = { border: "1px dashed #cbd5e1", borderRadius: 12, padding: 16, color: "#64748b", background: "white" };
 const evidenceListStyle: CSSProperties = { display: "grid", gap: 12 };
 const notificationEvidencePanelStyle: CSSProperties = { display: "grid", gap: 12, marginTop: 16, border: "1px solid #dbe3ef", borderRadius: 14, padding: 16, background: "white" };

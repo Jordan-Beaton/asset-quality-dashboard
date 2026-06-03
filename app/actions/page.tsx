@@ -56,6 +56,8 @@ type ActionItem = {
   linked_capa_number: string | null;
   linked_moc_id: string | null;
   linked_moc_number: string | null;
+  linked_ainm_id: string | null;
+  linked_ainm_number: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -86,6 +88,46 @@ type MocOption = {
   title: string;
 };
 
+type AinmOption = {
+  id: string;
+  number: string;
+  title: string;
+  project: string;
+  event_date: string;
+  classification: string;
+};
+
+type AssetOption = {
+  id: string;
+  asset_code: string;
+  name: string;
+};
+
+type AssetInspectionOption = {
+  id: string;
+  asset_id: string;
+  inspection_number: string;
+  inspection_date: string;
+  result: string;
+};
+
+type AssetMaintenanceOption = {
+  id: string;
+  asset_id: string;
+  maintenance_number: string;
+  maintenance_date: string;
+  description: string;
+};
+
+type AssetCalibrationOption = {
+  id: string;
+  asset_id: string;
+  reference: string;
+  certificate_number: string;
+  calibration_date: string;
+  calibration_due_date: string;
+};
+
 type ActionPerson = {
   id: string;
   name: string;
@@ -97,6 +139,7 @@ type ActionPerson = {
 type QuickFilter = "" | "my" | "overdue" | "dueWeek" | "highPriority";
 
 type ActionView = "dashboard" | "register" | "create" | "my" | "priority" | "reports";
+type MyActionFilter = "all" | "open" | "closed" | "overdue" | "dueWeek";
 
 type ChartDatum = {
   name: string;
@@ -174,6 +217,8 @@ type ActionForm = {
   linked_capa_number: string;
   linked_moc_id: string;
   linked_moc_number: string;
+  linked_ainm_id: string;
+  linked_ainm_number: string;
 };
 
 const emptyForm: ActionForm = {
@@ -203,6 +248,8 @@ const emptyForm: ActionForm = {
   linked_capa_number: "",
   linked_moc_id: "",
   linked_moc_number: "",
+  linked_ainm_id: "",
+  linked_ainm_number: "",
 };
 
 const actionSourceOptions = [
@@ -213,6 +260,7 @@ const actionSourceOptions = [
   "Asset Calibration",
   "NCR/CAPA",
   "MOC",
+  "AINM",
   "Risk",
   "HSE",
   "Other",
@@ -390,7 +438,8 @@ function matchesSearchTerm(action: ActionItem, query: string) {
     (action.linked_finding_reference || "").toLowerCase().includes(lower) ||
     (action.linked_ncr_number || "").toLowerCase().includes(lower) ||
     (action.linked_capa_number || "").toLowerCase().includes(lower) ||
-    (action.linked_moc_number || "").toLowerCase().includes(lower)
+    (action.linked_moc_number || "").toLowerCase().includes(lower) ||
+    (action.linked_ainm_number || "").toLowerCase().includes(lower)
   );
 }
 
@@ -414,6 +463,7 @@ function getSourceChipTone(source: string): LinkedRecordChip["tone"] {
   if (isAssetLinkedSource(source)) return "teal";
   if (source === "NCR/CAPA") return "red";
   if (source === "MOC") return "purple";
+  if (source === "AINM") return "red";
   if (source === "Risk") return "amber";
   if (source === "HSE") return "teal";
   return "slate";
@@ -435,6 +485,7 @@ function sourceImpliesLinkedRecord(source: string | null | undefined) {
     source === "Asset Calibration" ||
     source === "NCR/CAPA" ||
     source === "MOC" ||
+    source === "AINM" ||
     source === "Risk" ||
     source === "HSE"
   );
@@ -449,9 +500,11 @@ function buildLinkedRecordChips(action: ActionItem): LinkedRecordChip[] {
   if (action.linked_asset_code) chips.push({ label: `Asset ${action.linked_asset_code}`, tone: "teal" });
   if (action.linked_inspection_number) chips.push({ label: `Inspection ${action.linked_inspection_number}`, tone: "teal" });
   if (action.linked_maintenance_number) chips.push({ label: `Maintenance ${action.linked_maintenance_number}`, tone: "teal" });
+  if (action.linked_calibration_id) chips.push({ label: "Calibration linked", tone: "teal" });
   if (action.linked_ncr_number) chips.push({ label: `NCR ${action.linked_ncr_number}`, tone: "red" });
   if (action.linked_capa_number) chips.push({ label: `CAPA ${action.linked_capa_number}`, tone: "red" });
   if (action.linked_moc_number) chips.push({ label: `MOC ${action.linked_moc_number}`, tone: "purple" });
+  if (action.linked_ainm_number) chips.push({ label: `AINM ${action.linked_ainm_number}`, tone: "red" });
 
   if (chips.length === 0 && sourceImpliesLinkedRecord(source)) {
     chips.push({ label: "Missing linked record", tone: "amber" });
@@ -495,9 +548,13 @@ function buildActionSourceLabel(action: ActionItem) {
   if (source === "Asset Maintenance" && action.linked_maintenance_number) {
     parts.push(`Maintenance ${action.linked_maintenance_number}`);
   }
+  if (source === "Asset Calibration" && action.linked_calibration_id) {
+    parts.push("Calibration linked");
+  }
   if (source === "NCR/CAPA" && action.linked_ncr_number) parts.push(`NCR ${action.linked_ncr_number}`);
   if (source === "NCR/CAPA" && action.linked_capa_number) parts.push(`CAPA ${action.linked_capa_number}`);
   if (source === "MOC" && action.linked_moc_number) parts.push(`MOC ${action.linked_moc_number}`);
+  if (source === "AINM" && action.linked_ainm_number) parts.push(`AINM ${action.linked_ainm_number}`);
   return parts.join(" | ");
 }
 
@@ -509,9 +566,11 @@ function buildLinkedRecordDisplay(action: ActionItem) {
     action.linked_asset_code ? `Asset ${action.linked_asset_code}` : "",
     action.linked_inspection_number ? `Inspection ${action.linked_inspection_number}` : "",
     action.linked_maintenance_number ? `Maintenance ${action.linked_maintenance_number}` : "",
+    action.linked_calibration_id ? "Calibration linked" : "",
     action.linked_ncr_number ? `NCR ${action.linked_ncr_number}` : "",
     action.linked_capa_number ? `CAPA ${action.linked_capa_number}` : "",
     action.linked_moc_number ? `MOC ${action.linked_moc_number}` : "",
+    action.linked_ainm_number ? `AINM ${action.linked_ainm_number}` : "",
   ].filter(Boolean);
 
   if (values.length) return values.join(" | ");
@@ -546,6 +605,8 @@ function buildActionFormFromItem(action: ActionItem): ActionForm {
     linked_capa_number: action.linked_capa_number || "",
     linked_moc_id: action.linked_moc_id || "",
     linked_moc_number: action.linked_moc_number || "",
+    linked_ainm_id: action.linked_ainm_id || "",
+    linked_ainm_number: action.linked_ainm_number || "",
   };
 }
 
@@ -582,6 +643,8 @@ function ActionsPageContent() {
   const prefillLinkedNcrNumber = searchParams.get("linked_ncr_number")?.trim() || "";
   const prefillLinkedMocId = searchParams.get("linked_moc_id")?.trim() || "";
   const prefillLinkedMocNumber = searchParams.get("linked_moc_number")?.trim() || "";
+  const prefillLinkedAinmId = searchParams.get("linked_ainm_id")?.trim() || "";
+  const prefillLinkedAinmNumber = searchParams.get("linked_ainm_number")?.trim() || "";
   const hasCreatePrefillParams = Boolean(
     prefillSource ||
       prefillDepartment ||
@@ -599,7 +662,9 @@ function ActionsPageContent() {
       prefillLinkedNcrId ||
       prefillLinkedNcrNumber ||
       prefillLinkedMocId ||
-      prefillLinkedMocNumber
+      prefillLinkedMocNumber ||
+      prefillLinkedAinmId ||
+      prefillLinkedAinmNumber
   );
   const hasRegisterFilterParams = Boolean(
     linkedSearch ||
@@ -629,6 +694,11 @@ function ActionsPageContent() {
   const [findingOptions, setFindingOptions] = useState<FindingOption[]>([]);
   const [ncrCapaOptions, setNcrCapaOptions] = useState<NcrCapaOption[]>([]);
   const [mocOptions, setMocOptions] = useState<MocOption[]>([]);
+  const [ainmOptions, setAinmOptions] = useState<AinmOption[]>([]);
+  const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]);
+  const [assetInspectionOptions, setAssetInspectionOptions] = useState<AssetInspectionOption[]>([]);
+  const [assetMaintenanceOptions, setAssetMaintenanceOptions] = useState<AssetMaintenanceOption[]>([]);
+  const [assetCalibrationOptions, setAssetCalibrationOptions] = useState<AssetCalibrationOption[]>([]);
   const [people, setPeople] = useState<ActionPerson[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
   const [message, setMessage] = useState("Loading actions...");
@@ -652,6 +722,7 @@ function ActionsPageContent() {
   const [showOpenOnly, setShowOpenOnly] = useState(false);
   const [showClosedOnly, setShowClosedOnly] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
+  const [myActionFilter, setMyActionFilter] = useState<MyActionFilter>("all");
   const [showEvidenceOnly, setShowEvidenceOnly] = useState(false);
   const [showLinkedIssuesOnly, setShowLinkedIssuesOnly] = useState(false);
   const [dueStartFilter, setDueStartFilter] = useState(0);
@@ -812,6 +883,102 @@ function ActionsPageContent() {
     setMocOptions(options);
   }
 
+  async function loadAinmOptions() {
+    const { data, error } = await supabase
+      .from("hse_ainm_records")
+      .select("id,ainm_number,title,project,event_date,event_classification")
+      .order("event_date", { ascending: false })
+      .order("ainm_number", { ascending: false });
+
+    if (error) return;
+
+    const options = ((data || []) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        id: String(row.id || ""),
+        number: String(row.ainm_number || ""),
+        title: String(row.title || ""),
+        project: String(row.project || ""),
+        event_date: String(row.event_date || ""),
+        classification: String(row.event_classification || ""),
+      }))
+      .filter((row) => row.id && row.number);
+
+    setAinmOptions(options);
+  }
+
+  async function loadAssetLinkedOptions() {
+    const [assetsRes, inspectionsRes, maintenanceRes, calibrationsRes] = await Promise.all([
+      supabase.from("assets").select("id,asset_code,name").order("asset_code", { ascending: true }),
+      supabase
+        .from("asset_inspection_records")
+        .select("id,asset_id,inspection_number,inspection_date,result")
+        .order("inspection_number", { ascending: true }),
+      supabase
+        .from("asset_maintenance_records")
+        .select("id,asset_id,maintenance_number,maintenance_date,description")
+        .order("maintenance_number", { ascending: true }),
+      supabase
+        .from("asset_calibration_records")
+        .select("id,asset_id,reference,certificate_number,calibration_date,calibration_due_date")
+        .order("calibration_date", { ascending: false }),
+    ]);
+
+    if (!assetsRes.error) {
+      setAssetOptions(
+        ((assetsRes.data || []) as Array<Record<string, unknown>>)
+          .map((row) => ({
+            id: String(row.id || ""),
+            asset_code: String(row.asset_code || ""),
+            name: String(row.name || ""),
+          }))
+          .filter((row) => row.id && row.asset_code)
+      );
+    }
+
+    if (!inspectionsRes.error) {
+      setAssetInspectionOptions(
+        ((inspectionsRes.data || []) as Array<Record<string, unknown>>)
+          .map((row) => ({
+            id: String(row.id || ""),
+            asset_id: String(row.asset_id || ""),
+            inspection_number: String(row.inspection_number || ""),
+            inspection_date: String(row.inspection_date || ""),
+            result: String(row.result || ""),
+          }))
+          .filter((row) => row.id && row.asset_id && row.inspection_number)
+      );
+    }
+
+    if (!maintenanceRes.error) {
+      setAssetMaintenanceOptions(
+        ((maintenanceRes.data || []) as Array<Record<string, unknown>>)
+          .map((row) => ({
+            id: String(row.id || ""),
+            asset_id: String(row.asset_id || ""),
+            maintenance_number: String(row.maintenance_number || ""),
+            maintenance_date: String(row.maintenance_date || ""),
+            description: String(row.description || ""),
+          }))
+          .filter((row) => row.id && row.asset_id && row.maintenance_number)
+      );
+    }
+
+    if (!calibrationsRes.error) {
+      setAssetCalibrationOptions(
+        ((calibrationsRes.data || []) as Array<Record<string, unknown>>)
+          .map((row) => ({
+            id: String(row.id || ""),
+            asset_id: String(row.asset_id || ""),
+            reference: String(row.reference || ""),
+            certificate_number: String(row.certificate_number || ""),
+            calibration_date: String(row.calibration_date || ""),
+            calibration_due_date: String(row.calibration_due_date || ""),
+          }))
+          .filter((row) => row.id && row.asset_id)
+      );
+    }
+  }
+
   async function loadPeople() {
     const { data, error } = await supabase
       .from("people")
@@ -853,6 +1020,8 @@ function ActionsPageContent() {
         loadFindingOptions(),
         loadNcrCapaOptions(),
         loadMocOptions(),
+        loadAinmOptions(),
+        loadAssetLinkedOptions(),
         loadPeople(),
         loadCurrentUser(),
       ]);
@@ -875,7 +1044,9 @@ function ActionsPageContent() {
       !prefillLinkedNcrId &&
       !prefillLinkedNcrNumber &&
       !prefillLinkedMocId &&
-      !prefillLinkedMocNumber
+      !prefillLinkedMocNumber &&
+      !prefillLinkedAinmId &&
+      !prefillLinkedAinmNumber
     ) {
       return;
     }
@@ -886,6 +1057,7 @@ function ActionsPageContent() {
         : current.source || "Manual";
       const nextDepartment =
         prefillDepartment ||
+        (nextSource === "AINM" ? "HSEQ" : "") ||
         (isAssetLinkedSource(nextSource) ? "Assets" : current.department);
 
       return {
@@ -907,6 +1079,8 @@ function ActionsPageContent() {
         linked_ncr_number: prefillLinkedNcrNumber || current.linked_ncr_number,
         linked_moc_id: prefillLinkedMocId || current.linked_moc_id,
         linked_moc_number: prefillLinkedMocNumber || current.linked_moc_number,
+        linked_ainm_id: prefillLinkedAinmId || current.linked_ainm_id,
+        linked_ainm_number: prefillLinkedAinmNumber || current.linked_ainm_number,
       };
     });
 
@@ -919,6 +1093,8 @@ function ActionsPageContent() {
     prefillDescription,
     prefillDueDate,
     prefillLinkedAssetCode,
+    prefillLinkedAinmId,
+    prefillLinkedAinmNumber,
     prefillLinkedAssetId,
     prefillLinkedInspectionId,
     prefillLinkedInspectionNumber,
@@ -1206,6 +1382,25 @@ function ActionsPageContent() {
     const days = getDaysFromToday(action.due_date);
     return days !== null && days >= 0 && days <= 7;
   });
+  const myClosedActions = myActionList.filter((action) => isClosedLikeStatus(action.status));
+  const myFilteredActions = useMemo(() => {
+    if (myActionFilter === "open") return myActionList.filter((action) => !isClosedLikeStatus(action.status));
+    if (myActionFilter === "closed") return myClosedActions;
+    if (myActionFilter === "overdue") return myOverdueActions;
+    if (myActionFilter === "dueWeek") return myDueThisWeekActions;
+    return myActionList;
+  }, [myActionFilter, myActionList, myClosedActions, myDueThisWeekActions, myOverdueActions]);
+
+  const myActionFilterLabel =
+    myActionFilter === "open"
+      ? "Open Actions"
+      : myActionFilter === "closed"
+      ? "Closed / Complete Actions"
+      : myActionFilter === "overdue"
+      ? "Overdue Actions"
+      : myActionFilter === "dueWeek"
+      ? "Due This Week"
+      : "All Actions";
 
   const linkedAction = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1321,6 +1516,21 @@ function ActionsPageContent() {
   }, [editForm.linked_moc_id, editForm.linked_moc_number, editForm.source, mocOptions]);
 
   useEffect(() => {
+    if (editForm.source !== "AINM") return;
+    if (editForm.linked_ainm_id || !editForm.linked_ainm_number) return;
+
+    const matched = ainmOptions.find((option) => option.number === editForm.linked_ainm_number);
+    if (!matched) return;
+
+    setEditForm((current) => ({
+      ...current,
+      linked_ainm_id: matched.id,
+      linked_ainm_number: matched.number,
+      project: current.project || matched.project,
+    }));
+  }, [ainmOptions, editForm.linked_ainm_id, editForm.linked_ainm_number, editForm.source]);
+
+  useEffect(() => {
     if (!selectedEvidenceAction) return;
     const refreshed = actions.find((action) => action.id === selectedEvidenceAction.id);
     if (refreshed && refreshed !== selectedEvidenceAction) {
@@ -1382,6 +1592,36 @@ function ActionsPageContent() {
     [findingOptions, editForm.linked_audit_id]
   );
 
+  const createInspectionOptions = useMemo(
+    () => assetInspectionOptions.filter((record) => !form.linked_asset_id || record.asset_id === form.linked_asset_id),
+    [assetInspectionOptions, form.linked_asset_id]
+  );
+
+  const editInspectionOptions = useMemo(
+    () => assetInspectionOptions.filter((record) => !editForm.linked_asset_id || record.asset_id === editForm.linked_asset_id),
+    [assetInspectionOptions, editForm.linked_asset_id]
+  );
+
+  const createMaintenanceOptions = useMemo(
+    () => assetMaintenanceOptions.filter((record) => !form.linked_asset_id || record.asset_id === form.linked_asset_id),
+    [assetMaintenanceOptions, form.linked_asset_id]
+  );
+
+  const editMaintenanceOptions = useMemo(
+    () => assetMaintenanceOptions.filter((record) => !editForm.linked_asset_id || record.asset_id === editForm.linked_asset_id),
+    [assetMaintenanceOptions, editForm.linked_asset_id]
+  );
+
+  const createCalibrationOptions = useMemo(
+    () => assetCalibrationOptions.filter((record) => !form.linked_asset_id || record.asset_id === form.linked_asset_id),
+    [assetCalibrationOptions, form.linked_asset_id]
+  );
+
+  const editCalibrationOptions = useMemo(
+    () => assetCalibrationOptions.filter((record) => !editForm.linked_asset_id || record.asset_id === editForm.linked_asset_id),
+    [assetCalibrationOptions, editForm.linked_asset_id]
+  );
+
   function handleCreateFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
     setCreateFiles(files);
@@ -1414,6 +1654,8 @@ function ActionsPageContent() {
         linked_capa_number: "",
         linked_moc_id: "",
         linked_moc_number: "",
+        linked_ainm_id: "",
+        linked_ainm_number: "",
       };
     }
 
@@ -1432,6 +1674,8 @@ function ActionsPageContent() {
         linked_capa_number: "",
         linked_moc_id: "",
         linked_moc_number: "",
+        linked_ainm_id: "",
+        linked_ainm_number: "",
       };
     }
 
@@ -1452,6 +1696,8 @@ function ActionsPageContent() {
         linked_calibration_id: "",
         linked_moc_id: "",
         linked_moc_number: "",
+        linked_ainm_id: "",
+        linked_ainm_number: "",
       };
     }
 
@@ -1474,6 +1720,33 @@ function ActionsPageContent() {
         linked_ncr_number: "",
         linked_capa_id: "",
         linked_capa_number: "",
+        linked_ainm_id: "",
+        linked_ainm_number: "",
+      };
+    }
+
+    if (source === "AINM") {
+      return {
+        ...current,
+        source,
+        department: "HSEQ",
+        linked_audit_id: "",
+        linked_audit_number: "",
+        linked_finding_id: "",
+        linked_finding_reference: "",
+        linked_asset_id: "",
+        linked_asset_code: "",
+        linked_inspection_id: "",
+        linked_inspection_number: "",
+        linked_maintenance_id: "",
+        linked_maintenance_number: "",
+        linked_calibration_id: "",
+        linked_ncr_id: "",
+        linked_ncr_number: "",
+        linked_capa_id: "",
+        linked_capa_number: "",
+        linked_moc_id: "",
+        linked_moc_number: "",
       };
     }
 
@@ -1497,6 +1770,8 @@ function ActionsPageContent() {
       linked_capa_number: "",
       linked_moc_id: "",
       linked_moc_number: "",
+      linked_ainm_id: "",
+      linked_ainm_number: "",
     };
   }
 
@@ -1537,6 +1812,73 @@ function ActionsPageContent() {
       ...current,
       linked_moc_id: selected?.id || "",
       linked_moc_number: selected?.number || "",
+    };
+  }
+
+  function applyAinmSelection(current: ActionForm, ainmId: string): ActionForm {
+    const selected = ainmOptions.find((option) => option.id === ainmId);
+    return {
+      ...current,
+      linked_ainm_id: selected?.id || "",
+      linked_ainm_number: selected?.number || "",
+      project: current.project || selected?.project || "",
+    };
+  }
+
+  function applyAssetSelection(current: ActionForm, assetId: string): ActionForm {
+    const selected = assetOptions.find((option) => option.id === assetId);
+    return {
+      ...current,
+      linked_asset_id: selected?.id || "",
+      linked_asset_code: selected?.asset_code || "",
+      linked_inspection_id: "",
+      linked_inspection_number: "",
+      linked_maintenance_id: "",
+      linked_maintenance_number: "",
+      linked_calibration_id: "",
+      project: current.project || selected?.asset_code || "",
+    };
+  }
+
+  function applyInspectionSelection(current: ActionForm, inspectionId: string): ActionForm {
+    const selected = assetInspectionOptions.find((option) => option.id === inspectionId);
+    const selectedAsset = selected ? assetOptions.find((option) => option.id === selected.asset_id) : null;
+    return {
+      ...current,
+      linked_asset_id: selected?.asset_id || current.linked_asset_id,
+      linked_asset_code: selectedAsset?.asset_code || current.linked_asset_code,
+      linked_inspection_id: selected?.id || "",
+      linked_inspection_number: selected?.inspection_number || "",
+      project: current.project || selectedAsset?.asset_code || "",
+      title: current.title || (selected ? `Inspection follow-up - ${selected.inspection_number}` : current.title),
+    };
+  }
+
+  function applyMaintenanceSelection(current: ActionForm, maintenanceId: string): ActionForm {
+    const selected = assetMaintenanceOptions.find((option) => option.id === maintenanceId);
+    const selectedAsset = selected ? assetOptions.find((option) => option.id === selected.asset_id) : null;
+    return {
+      ...current,
+      linked_asset_id: selected?.asset_id || current.linked_asset_id,
+      linked_asset_code: selectedAsset?.asset_code || current.linked_asset_code,
+      linked_maintenance_id: selected?.id || "",
+      linked_maintenance_number: selected?.maintenance_number || "",
+      project: current.project || selectedAsset?.asset_code || "",
+      title: current.title || (selected ? `Maintenance follow-up - ${selected.maintenance_number}` : current.title),
+    };
+  }
+
+  function applyCalibrationSelection(current: ActionForm, calibrationId: string): ActionForm {
+    const selected = assetCalibrationOptions.find((option) => option.id === calibrationId);
+    const selectedAsset = selected ? assetOptions.find((option) => option.id === selected.asset_id) : null;
+    const label = selected?.certificate_number || selected?.reference || "calibration record";
+    return {
+      ...current,
+      linked_asset_id: selected?.asset_id || current.linked_asset_id,
+      linked_asset_code: selectedAsset?.asset_code || current.linked_asset_code,
+      linked_calibration_id: selected?.id || "",
+      project: current.project || selectedAsset?.asset_code || "",
+      title: current.title || (selected ? `Calibration follow-up - ${label}` : current.title),
     };
   }
 
@@ -1633,6 +1975,8 @@ function ActionsPageContent() {
           linked_capa_number: form.linked_capa_number.trim() || null,
           linked_moc_id: form.linked_moc_id || null,
           linked_moc_number: form.linked_moc_number.trim() || null,
+          linked_ainm_id: form.linked_ainm_id || null,
+          linked_ainm_number: form.linked_ainm_number.trim() || null,
         },
       ])
       .select("*")
@@ -1700,6 +2044,8 @@ function ActionsPageContent() {
         linked_capa_number: editForm.linked_capa_number.trim() || null,
         linked_moc_id: editForm.linked_moc_id || null,
         linked_moc_number: editForm.linked_moc_number.trim() || null,
+        linked_ainm_id: editForm.linked_ainm_id || null,
+        linked_ainm_number: editForm.linked_ainm_number.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
@@ -2473,21 +2819,98 @@ function ActionsPageContent() {
                 </Field>
               ) : null}
 
+              {form.source === "AINM" ? (
+                <Field label="AINM Record">
+                  <select
+                    value={form.linked_ainm_id}
+                    onChange={(e) => setForm((current) => applyAinmSelection(current, e.target.value))}
+                    style={inputStyle}
+                  >
+                    <option value="">Select AINM</option>
+                    {ainmOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.number} - {option.title || "Untitled"}{option.project ? ` (${option.project})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
               {isAssetLinkedSource(form.source) ? (
                 <>
-                  <Field label="Linked Asset Code">
-                    <input value={form.linked_asset_code} readOnly style={readOnlyInputStyle} />
+                  <Field label="Linked Asset">
+                    <select
+                      value={form.linked_asset_id}
+                      onChange={(e) => setForm((current) => applyAssetSelection(current, e.target.value))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select asset</option>
+                      {assetOptions.map((asset) => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.asset_code} - {asset.name || "Unnamed asset"}
+                        </option>
+                      ))}
+                    </select>
                   </Field>
 
                   {form.source === "Asset Inspection" ? (
-                    <Field label="Inspection Number">
-                      <input value={form.linked_inspection_number} readOnly style={readOnlyInputStyle} />
+                    <Field label="Inspection Record">
+                      <select
+                        value={form.linked_inspection_id}
+                        onChange={(e) => setForm((current) => applyInspectionSelection(current, e.target.value))}
+                        style={inputStyle}
+                      >
+                        <option value="">Select inspection</option>
+                        {createInspectionOptions.map((record) => {
+                          const asset = assetOptions.find((option) => option.id === record.asset_id);
+                          return (
+                            <option key={record.id} value={record.id}>
+                              {record.inspection_number} - {asset?.asset_code || "Asset"}{record.inspection_date ? ` (${formatDate(record.inspection_date)})` : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
                     </Field>
                   ) : null}
 
                   {form.source === "Asset Maintenance" ? (
-                    <Field label="Maintenance Number">
-                      <input value={form.linked_maintenance_number} readOnly style={readOnlyInputStyle} />
+                    <Field label="Maintenance Record">
+                      <select
+                        value={form.linked_maintenance_id}
+                        onChange={(e) => setForm((current) => applyMaintenanceSelection(current, e.target.value))}
+                        style={inputStyle}
+                      >
+                        <option value="">Select maintenance</option>
+                        {createMaintenanceOptions.map((record) => {
+                          const asset = assetOptions.find((option) => option.id === record.asset_id);
+                          return (
+                            <option key={record.id} value={record.id}>
+                              {record.maintenance_number} - {asset?.asset_code || "Asset"}{record.maintenance_date ? ` (${formatDate(record.maintenance_date)})` : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </Field>
+                  ) : null}
+
+                  {form.source === "Asset Calibration" ? (
+                    <Field label="Calibration Record">
+                      <select
+                        value={form.linked_calibration_id}
+                        onChange={(e) => setForm((current) => applyCalibrationSelection(current, e.target.value))}
+                        style={inputStyle}
+                      >
+                        <option value="">Select calibration</option>
+                        {createCalibrationOptions.map((record) => {
+                          const asset = assetOptions.find((option) => option.id === record.asset_id);
+                          const label = record.certificate_number || record.reference || "Calibration record";
+                          return (
+                            <option key={record.id} value={record.id}>
+                              {label} - {asset?.asset_code || "Asset"}{record.calibration_date ? ` (${formatDate(record.calibration_date)})` : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
                     </Field>
                   ) : null}
                 </>
@@ -2576,47 +2999,127 @@ function ActionsPageContent() {
           </div>
 
           <section style={statsGridStyle}>
-            <QualityKpiCard title="My Total Actions" value={myActionList.length} accent="#0f766e" />
-            <QualityKpiCard title="My Open Actions" value={myOpenActions} accent="#2563eb" />
-            <QualityKpiCard title="My Overdue" value={myOverdueActions.length} accent="#dc2626" />
-            <QualityKpiCard title="My Due This Week" value={myDueThisWeekActions.length} accent="#f59e0b" />
+            <QualityKpiCard title="My Total Actions" value={myActionList.length} accent="#0f766e" onClick={() => setMyActionFilter("all")} />
+            <QualityKpiCard title="My Open Actions" value={myOpenActions} accent="#2563eb" onClick={() => setMyActionFilter("open")} />
+            <QualityKpiCard title="My Closed Actions" value={myClosedActions.length} accent="#16a34a" onClick={() => setMyActionFilter("closed")} />
+            <QualityKpiCard title="My Overdue" value={myOverdueActions.length} accent="#dc2626" onClick={() => setMyActionFilter("overdue")} />
+            <QualityKpiCard title="My Due This Week" value={myDueThisWeekActions.length} accent="#f59e0b" onClick={() => setMyActionFilter("dueWeek")} />
           </section>
 
           {currentPersonName ? (
-            <div style={listGridStyle}>
-              <MiniListCard
-                title="My Overdue Actions"
-                emptyText="No overdue actions are assigned to you."
-                onItemClick={(id) => {
-                  const action = actions.find((item) => item.id === id);
-                  if (action) openActionInRegister(action);
-                }}
-                items={myOverdueActions.slice(0, 8).map((action) => ({
-                  id: action.id,
-                  line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
-                  line2: `${action.project || "No project"} | ${getActionSourceLabel(action)} | ${getDueLabel(
-                    action.due_date
-                  )}`,
-                  tone: "red" as const,
-                }))}
-              />
-              <MiniListCard
-                title="My Due This Week"
-                emptyText="No actions assigned to you are due this week."
-                onItemClick={(id) => {
-                  const action = actions.find((item) => item.id === id);
-                  if (action) openActionInRegister(action);
-                }}
-                items={myDueThisWeekActions.slice(0, 8).map((action) => ({
-                  id: action.id,
-                  line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
-                  line2: `${action.project || "No project"} | ${getActionSourceLabel(action)} | ${getDueLabel(
-                    action.due_date
-                  )}`,
-                  tone: "amber" as const,
-                }))}
-              />
-            </div>
+            <>
+              <div style={listGridStyle}>
+                <MiniListCard
+                  title="My Overdue Actions"
+                  emptyText="No overdue actions are assigned to you."
+                  onItemClick={(id) => {
+                    const action = actions.find((item) => item.id === id);
+                    if (action) openActionInRegister(action);
+                  }}
+                  items={myOverdueActions.slice(0, 8).map((action) => ({
+                    id: action.id,
+                    line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
+                    line2: `${action.project || "No project"} | ${getActionSourceLabel(action)} | ${getDueLabel(
+                      action.due_date
+                    )}`,
+                    tone: "red" as const,
+                  }))}
+                />
+                <MiniListCard
+                  title="My Due This Week"
+                  emptyText="No actions assigned to you are due this week."
+                  onItemClick={(id) => {
+                    const action = actions.find((item) => item.id === id);
+                    if (action) openActionInRegister(action);
+                  }}
+                  items={myDueThisWeekActions.slice(0, 8).map((action) => ({
+                    id: action.id,
+                    line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
+                    line2: `${action.project || "No project"} | ${getActionSourceLabel(action)} | ${getDueLabel(
+                      action.due_date
+                    )}`,
+                    tone: "amber" as const,
+                  }))}
+                />
+              </div>
+
+              <div style={myRegisterHeaderStyle}>
+                <div>
+                  <h3 style={myRegisterTitleStyle}>My Action Register</h3>
+                  <p style={myRegisterSubtitleStyle}>
+                    Showing {myFilteredActions.length} {myActionFilterLabel.toLowerCase()} for {currentPersonName}.
+                  </p>
+                </div>
+                <button type="button" style={secondaryButtonStyle} onClick={() => setMyActionFilter("all")}>
+                  Show All Mine
+                </button>
+              </div>
+
+              <div style={{ overflowX: "auto" }}>
+                <table style={tableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={tableHeadStyle}>Action No.</th>
+                      <th style={tableHeadStyle}>Title</th>
+                      <th style={tableHeadStyle}>Source</th>
+                      <th style={tableHeadStyle}>Linked Record</th>
+                      <th style={tableHeadStyle}>Priority</th>
+                      <th style={tableHeadStyle}>Due Date</th>
+                      <th style={tableHeadStyle}>Status</th>
+                      <th style={tableHeadStyle}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myFilteredActions.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={emptyTableCellStyle}>
+                          No actions match this My Actions filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      myFilteredActions.map((action) => {
+                        const overdue = isOverdue(action);
+                        return (
+                          <tr
+                            key={action.id}
+                            style={{ ...tableRowStyle, cursor: "pointer", background: overdue ? "#fff7f7" : "white" }}
+                            onClick={() => openActionInRegister(action)}
+                          >
+                            <td style={tableCellStyle}><div style={actionNumberCellStyle}>{action.action_number || "-"}</div></td>
+                            <td style={tableCellStyle}>
+                              <div style={primaryCellTextStyle}>{action.title || "-"}</div>
+                              <div style={secondaryCellTextStyle}>{action.project || "No project"}</div>
+                            </td>
+                            <td style={tableCellStyle}><SourceChip action={action} /></td>
+                            <td style={tableCellStyle}><LinkedRecordChips action={action} /></td>
+                            <td style={tableCellStyle}><span style={badgeStyle}>{action.priority || "-"}</span></td>
+                            <td style={tableCellStyle}>
+                              <div style={primaryCellTextStyle}>{formatDate(action.due_date)}</div>
+                              <div style={{ ...secondaryCellTextStyle, color: overdue ? "#b91c1c" : "#64748b", fontWeight: overdue ? 700 : 500 }}>
+                                {getDueLabel(action.due_date)}
+                              </div>
+                            </td>
+                            <td style={tableCellStyle}><StatusBadge value={action.status || "Unknown"} /></td>
+                            <td style={tableCellStyle}>
+                              <button
+                                type="button"
+                                style={miniButtonStyle}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openActionInRegister(action);
+                                }}
+                              >
+                                Open
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <div style={emptyEvidencePanelStyle}>No personal action list is available until your login email matches an active People record.</div>
           )}
@@ -3151,21 +3654,98 @@ function ActionsPageContent() {
                   </Field>
                 ) : null}
 
+                {editForm.source === "AINM" ? (
+                  <Field label="AINM Record">
+                    <select
+                      value={editForm.linked_ainm_id}
+                      onChange={(e) => setEditForm((current) => applyAinmSelection(current, e.target.value))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select AINM</option>
+                      {ainmOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.number} - {option.title || "Untitled"}{option.project ? ` (${option.project})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : null}
+
                 {isAssetLinkedSource(editForm.source) ? (
                   <>
-                    <Field label="Linked Asset Code">
-                      <input value={editForm.linked_asset_code} readOnly style={readOnlyInputStyle} />
+                    <Field label="Linked Asset">
+                      <select
+                        value={editForm.linked_asset_id}
+                        onChange={(e) => setEditForm((current) => applyAssetSelection(current, e.target.value))}
+                        style={inputStyle}
+                      >
+                        <option value="">Select asset</option>
+                        {assetOptions.map((asset) => (
+                          <option key={asset.id} value={asset.id}>
+                            {asset.asset_code} - {asset.name || "Unnamed asset"}
+                          </option>
+                        ))}
+                      </select>
                     </Field>
 
                     {editForm.source === "Asset Inspection" ? (
-                      <Field label="Inspection Number">
-                        <input value={editForm.linked_inspection_number} readOnly style={readOnlyInputStyle} />
+                      <Field label="Inspection Record">
+                        <select
+                          value={editForm.linked_inspection_id}
+                          onChange={(e) => setEditForm((current) => applyInspectionSelection(current, e.target.value))}
+                          style={inputStyle}
+                        >
+                          <option value="">Select inspection</option>
+                          {editInspectionOptions.map((record) => {
+                            const asset = assetOptions.find((option) => option.id === record.asset_id);
+                            return (
+                              <option key={record.id} value={record.id}>
+                                {record.inspection_number} - {asset?.asset_code || "Asset"}{record.inspection_date ? ` (${formatDate(record.inspection_date)})` : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
                       </Field>
                     ) : null}
 
                     {editForm.source === "Asset Maintenance" ? (
-                      <Field label="Maintenance Number">
-                        <input value={editForm.linked_maintenance_number} readOnly style={readOnlyInputStyle} />
+                      <Field label="Maintenance Record">
+                        <select
+                          value={editForm.linked_maintenance_id}
+                          onChange={(e) => setEditForm((current) => applyMaintenanceSelection(current, e.target.value))}
+                          style={inputStyle}
+                        >
+                          <option value="">Select maintenance</option>
+                          {editMaintenanceOptions.map((record) => {
+                            const asset = assetOptions.find((option) => option.id === record.asset_id);
+                            return (
+                              <option key={record.id} value={record.id}>
+                                {record.maintenance_number} - {asset?.asset_code || "Asset"}{record.maintenance_date ? ` (${formatDate(record.maintenance_date)})` : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </Field>
+                    ) : null}
+
+                    {editForm.source === "Asset Calibration" ? (
+                      <Field label="Calibration Record">
+                        <select
+                          value={editForm.linked_calibration_id}
+                          onChange={(e) => setEditForm((current) => applyCalibrationSelection(current, e.target.value))}
+                          style={inputStyle}
+                        >
+                          <option value="">Select calibration</option>
+                          {editCalibrationOptions.map((record) => {
+                            const asset = assetOptions.find((option) => option.id === record.asset_id);
+                            const label = record.certificate_number || record.reference || "Calibration record";
+                            return (
+                              <option key={record.id} value={record.id}>
+                                {label} - {asset?.asset_code || "Asset"}{record.calibration_date ? ` (${formatDate(record.calibration_date)})` : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
                       </Field>
                     ) : null}
                   </>
@@ -3278,6 +3858,23 @@ function ActionsPageContent() {
                     <div style={linkedSourceMetaStyle}>
                       MOC: <strong>{editForm.linked_moc_number}</strong>
                     </div>
+                  ) : null}
+                  {editForm.source === "AINM" && editForm.linked_ainm_number ? (
+                    <div style={linkedSourceMetaStyle}>
+                      AINM: <strong>{editForm.linked_ainm_number}</strong>
+                    </div>
+                  ) : null}
+                  {editForm.source === "AINM" && (editForm.linked_ainm_id || editForm.linked_ainm_number) ? (
+                    <Link
+                      href={
+                        editForm.linked_ainm_id
+                          ? `/hse/ainm?ainmId=${encodeURIComponent(editForm.linked_ainm_id)}`
+                          : `/hse/ainm?ainm=${encodeURIComponent(editForm.linked_ainm_number)}`
+                      }
+                      style={backLinkStyle}
+                    >
+                      Open Linked AINM
+                    </Link>
                   ) : null}
                 </div>
               ) : null}
@@ -4252,6 +4849,28 @@ const emptyEvidencePanelStyle: CSSProperties = {
   background: "#f8fafc",
   border: "1px dashed #cbd5e1",
   color: "#64748b",
+};
+
+const myRegisterHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "center",
+  margin: "18px 0 12px",
+  flexWrap: "wrap",
+};
+
+const myRegisterTitleStyle: CSSProperties = {
+  margin: 0,
+  color: "#0f172a",
+  fontSize: "18px",
+  fontWeight: 800,
+};
+
+const myRegisterSubtitleStyle: CSSProperties = {
+  margin: "4px 0 0",
+  color: "#64748b",
+  fontSize: "13px",
 };
 
 const evidencePanelGridStyle: CSSProperties = {

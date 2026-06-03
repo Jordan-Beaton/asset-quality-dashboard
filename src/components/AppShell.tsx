@@ -16,7 +16,7 @@ const qualityNavItems = [
   { href: "/moc", label: "MOC" },
   { href: "/ncr-capa", label: "NCR / CAPA" },
   { href: "/audits", label: "Audits" },
-  { href: "/actions", label: "Actions" },
+  { href: "/quality/actions", label: "Actions" },
   { href: "/reports", label: "Reports" },
 ];
 
@@ -27,6 +27,7 @@ const assetNavItems = [
   { href: "/assets/calibration", label: "Calibration" },
   { href: "/assets/inspection", label: "Inspection" },
   { href: "/assets/maintenance", label: "Maintenance" },
+  { href: "/assets/actions", label: "Actions" },
   { href: "/assets/reports", label: "Reports" },
 ];
 

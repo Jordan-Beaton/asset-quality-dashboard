@@ -9,7 +9,7 @@ import { supabase } from "../../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-type HseActionView = "dashboard" | "register" | "create";
+type AssetActionView = "dashboard" | "register" | "create";
 
 type ActionItem = {
   id: string;
@@ -130,7 +130,7 @@ const emptyForm: ActionForm = {
   linked_ainm_number: "",
 };
 
-const viewTabs: Array<{ id: HseActionView; label: string }> = [
+const viewTabs: Array<{ id: AssetActionView; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
   { id: "register", label: "Action Register" },
   { id: "create", label: "Create Action" },
@@ -221,7 +221,7 @@ function countByOwner(actions: ActionItem[]) {
     .slice(0, 8);
 }
 
-export default function HseActionsPage() {
+export default function AssetActionsPage() {
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
@@ -233,7 +233,7 @@ export default function HseActionsPage() {
   const [assetInspectionOptions, setAssetInspectionOptions] = useState<AssetInspectionOption[]>([]);
   const [assetMaintenanceOptions, setAssetMaintenanceOptions] = useState<AssetMaintenanceOption[]>([]);
   const [assetCalibrationOptions, setAssetCalibrationOptions] = useState<AssetCalibrationOption[]>([]);
-  const [activeView, setActiveView] = useState<HseActionView>("dashboard");
+  const [activeView, setActiveView] = useState<AssetActionView>("dashboard");
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -241,7 +241,7 @@ export default function HseActionsPage() {
   const [priorityFilter, setPriorityFilter] = useState("");
   const [pressureFilter, setPressureFilter] = useState<"" | "overdue" | "dueWeek">("");
   const [form, setForm] = useState<ActionForm>(emptyForm);
-  const [message, setMessage] = useState("Loading HSE actions...");
+  const [message, setMessage] = useState("Loading Asset actions...");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState("");
@@ -268,7 +268,7 @@ export default function HseActionsPage() {
     ]);
 
     if (actionsRes.error) {
-      setMessage(`HSE actions failed to load: ${actionsRes.error.message}`);
+      setMessage(`Asset actions failed to load: ${actionsRes.error.message}`);
       setLoading(false);
       return;
     }
@@ -279,8 +279,8 @@ export default function HseActionsPage() {
       if (aNum !== null && bNum !== null) return aNum - bNum;
       return (a.action_number || "").localeCompare(b.action_number || "");
     });
-    const hseqActions = allActions.filter((action) => (action.department || "").trim().toUpperCase() === "HSEQ");
-    setActions(hseqActions);
+    const assetActions = allActions.filter((action) => (action.department || "").trim().toUpperCase() === "ASSETS");
+    setActions(assetActions);
     if (peopleRes.data && !peopleRes.error) setPeople((peopleRes.data || []) as PersonOption[]);
     if (auditRes.data && !auditRes.error) {
       setAuditOptions(((auditRes.data || []) as Array<Record<string, unknown>>).map((row) => ({
@@ -368,7 +368,7 @@ export default function HseActionsPage() {
       })).filter((row) => row.id && row.asset_id));
     }
     setLastRefreshed(new Date().toLocaleString("en-GB"));
-    setMessage(`Loaded ${hseqActions.length} HSEQ action${hseqActions.length === 1 ? "" : "s"}.`);
+    setMessage(`Loaded ${assetActions.length} Asset action${assetActions.length === 1 ? "" : "s"}.`);
     setLoading(false);
   }
 
@@ -471,7 +471,7 @@ export default function HseActionsPage() {
       action_number: nextNumber,
       title: form.title.trim(),
       description: form.description.trim() || null,
-      department: "HSEQ",
+      department: "Assets",
       project: form.project.trim() || null,
       owner: form.owner.trim() || null,
       priority: form.priority,
@@ -505,7 +505,7 @@ export default function HseActionsPage() {
       return;
     }
     setForm(emptyForm);
-    setMessage(`${nextNumber} created in central Action Management as an HSEQ action.`);
+    setMessage(`${nextNumber} created in central Action Management as an Asset action.`);
     setActiveView("register");
     await loadData();
   }
@@ -664,19 +664,19 @@ export default function HseActionsPage() {
   return (
     <main>
       <QualityPageHero
-        label="HSE MANAGEMENT"
-        title="HSE Actions"
-        description="HSE-specific action dashboard, register, and creation view backed by the central Action Management register."
+        label="ASSET MANAGEMENT"
+        title="Asset Actions"
+        description="Asset-specific action dashboard, register, and creation view backed by the central Action Management register."
         contextCards={[
           { label: "Last Refreshed", value: lastRefreshed || (loading ? "Loading" : "-") },
-          { label: "Latest HSE Action", value: latestAction ? `${latestAction.action_number} - ${latestAction.title}` : "No HSEQ actions" },
+          { label: "Latest Asset Action", value: latestAction ? `${latestAction.action_number} - ${latestAction.title}` : "No Asset actions" },
         ]}
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/hse" style={backLinkStyle}>← Back to Dashboard</Link>
+        <Link href="/assets/dashboard" style={backLinkStyle}>← Back to Dashboard</Link>
         <div style={topMetaActionsStyle}>
-          <Link href="/actions?department=HSEQ" style={primaryLinkStyle}>Open Central Actions</Link>
+          <Link href="/actions?department=Assets" style={primaryLinkStyle}>Open Central Actions</Link>
           <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
         </div>
       </div>
@@ -692,7 +692,7 @@ export default function HseActionsPage() {
       {activeView === "dashboard" ? (
         <>
           <section style={statsGridStyle}>
-            <QualityKpiCard title="HSE Actions" value={kpis.total} accent="#0f766e" onClick={() => openRegister()} />
+            <QualityKpiCard title="Asset Actions" value={kpis.total} accent="#0f766e" onClick={() => openRegister()} />
             <QualityKpiCard title="Open Actions" value={kpis.open} accent="#2563eb" onClick={() => openRegister("Open")} />
             <QualityKpiCard title="Overdue Actions" value={kpis.overdue} accent="#dc2626" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("overdue"); setActiveView("register"); }} />
             <QualityKpiCard title="Due This Week" value={kpis.dueWeek} accent="#f59e0b" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("dueWeek"); setActiveView("register"); }} />
@@ -701,16 +701,16 @@ export default function HseActionsPage() {
           </section>
 
           <section style={dashboardGridStyle}>
-            <SectionCard title="Open Actions by Person" subtitle="Who is carrying the current HSEQ action load.">
+            <SectionCard title="Open Actions by Person" subtitle="Who is carrying the current Asset action load.">
               <BarList rows={ownerRows} total={Math.max(1, kpis.open)} accent="#2563eb" onClick={(owner) => { setOwnerFilter(owner === "Unassigned" ? "" : owner); setActiveView("register"); }} />
             </SectionCard>
-            <SectionCard title="HSEQ Action Status" subtitle="Open, in progress, and closed position.">
+            <SectionCard title="Asset Action Status" subtitle="Open, in progress, and closed position.">
               <BarList rows={statusRows} total={Math.max(1, actions.length)} accent="#0f766e" onClick={(status) => openRegister(status)} />
             </SectionCard>
-            <SectionCard title="Source Split" subtitle="Where HSEQ actions are being generated from.">
+            <SectionCard title="Source Split" subtitle="Where Asset actions are being generated from.">
               <BarList rows={sourceRows} total={Math.max(1, actions.length)} accent="#7c3aed" />
             </SectionCard>
-            <SectionCard title="Manager Focus" subtitle="Immediate HSEQ action pressure requiring management attention.">
+            <SectionCard title="Manager Focus" subtitle="Immediate Asset action pressure requiring management attention.">
               <div style={focusGridStyle}>
                 <MiniFocus label="Overdue" value={kpis.overdue} tone="red" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setSearch(""); setPressureFilter("overdue"); setActiveView("register"); }} />
                 <MiniFocus label="Due this week" value={kpis.dueWeek} tone="amber" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setSearch(""); setPressureFilter("dueWeek"); setActiveView("register"); }} />
@@ -722,9 +722,9 @@ export default function HseActionsPage() {
       ) : null}
 
       {activeView === "register" ? (
-        <SectionCard title="HSEQ Action Register" subtitle="Central Action Management records filtered to department HSEQ.">
+        <SectionCard title="Asset Action Register" subtitle="Central Action Management records filtered to department Assets.">
           <div style={toolbarStyle}>
-            <input style={inputStyle} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HSEQ Actions..." />
+            <input style={inputStyle} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search Asset Actions..." />
             <select style={inputStyle} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="">All Status</option>
               {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -740,7 +740,7 @@ export default function HseActionsPage() {
             <button type="button" style={secondaryButtonStyle} onClick={() => { setSearch(""); setStatusFilter(""); setOwnerFilter(""); setPriorityFilter(""); setPressureFilter(""); }}>Clear</button>
           </div>
 
-          <div style={tableInfoStyle}>Showing {filteredActions.length} of {actions.length} HSEQ Actions</div>
+          <div style={tableInfoStyle}>Showing {filteredActions.length} of {actions.length} Asset Actions</div>
           <div style={{ overflowX: "auto" }}>
             <table style={tableStyle}>
               <thead>
@@ -774,7 +774,7 @@ export default function HseActionsPage() {
                     <td style={tdStyle}><Link href={`/actions?actionId=${encodeURIComponent(action.id)}`} style={smallLinkStyle}>Open Central</Link></td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={8} style={emptyCellStyle}>No HSEQ actions match the current filters.</td></tr>
+                  <tr><td colSpan={8} style={emptyCellStyle}>No Asset actions match the current filters.</td></tr>
                 )}
               </tbody>
             </table>
@@ -797,7 +797,7 @@ export default function HseActionsPage() {
       ) : null}
 
       {activeView === "create" ? (
-        <SectionCard title="Create HSEQ Action" subtitle="Creates a central Action Management record with department HSEQ.">
+        <SectionCard title="Create Asset Action" subtitle="Creates a central Action Management record with department Assets.">
           <form onSubmit={createAction}>
             <div style={formGridStyle}>
               <Field label="Action Number"><input style={readOnlyInputStyle} value="Auto generated" readOnly /></Field>
@@ -934,7 +934,7 @@ export default function HseActionsPage() {
               </div>
             </div>
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={saving}>{saving ? "Creating..." : "Create HSEQ Action"}</button>
+              <button type="submit" style={primaryButtonStyle} disabled={saving}>{saving ? "Creating..." : "Create Asset Action"}</button>
               <span style={emptyTextStyle}>This will appear in the central Action Management register automatically.</span>
             </div>
           </form>
