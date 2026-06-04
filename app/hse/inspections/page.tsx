@@ -1065,6 +1065,161 @@ export default function HseInspectionsPage() {
     setMessage(`Generated PDF for ${record.inspection_number}.`);
   }
 
+  async function generateBlankInspectionPdf(template: InspectionTemplate) {
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const logoData = await getLogoDataUrl();
+    const blankRecord = {
+      ...makeDraft(template),
+      inspection_number: "Blank form",
+      title: template.title,
+      status: "Draft" as InspectionStatus,
+      inspection_date: "",
+    };
+    pdfHeader(doc, `${template.documentNumber} ${template.title}`, blankRecord, logoData);
+    let y = 36;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${template.documentNumber} - ${template.title}`, 12, y);
+    y += 7;
+
+    autoTable(doc, {
+      startY: y,
+      theme: "grid",
+      margin: { left: 12, right: 12 },
+      tableWidth: 186,
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
+      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      head: [["Field", "Details", "Field", "Details"]],
+      body: [
+        ["Form No.", template.documentNumber, "Revision", template.revision || ""],
+        ["Revision Date", displayDate(template.revisionDate), "Status", ""],
+        ["Department", "HSEQ", "Inspection Date", ""],
+        ["Project / Work Scope", "", "Vessel / Spread", ""],
+        ["Area / Zone", "", "Inspector", ""],
+      ],
+      columnStyles: { 0: { cellWidth: 38, fontStyle: "bold" }, 1: { cellWidth: 55 }, 2: { cellWidth: 38, fontStyle: "bold" }, 3: { cellWidth: 55 } },
+    });
+
+    y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 72;
+    y += 8;
+
+    if (template.id === defaultTemplateId) {
+      baseSiteChecklist.forEach((section) => {
+        if (y > 250) {
+          doc.addPage();
+          pdfHeader(doc, `${template.documentNumber} ${template.title}`, blankRecord, logoData);
+          y = 36;
+        }
+        y = pdfSection(doc, section.title, y);
+        autoTable(doc, {
+          startY: y,
+          theme: "grid",
+          margin: { left: 12, right: 12 },
+          tableWidth: 186,
+          styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.8, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42], overflow: "linebreak" },
+          headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
+          head: [["Item", "Description", "N/A", "Yes", "No", "Comments / Action Notes"]],
+          body: section.items.map((item) => [item.number, item.text, "", "", "", ""]),
+          columnStyles: {
+            0: { cellWidth: 15, fontStyle: "bold" },
+            1: { cellWidth: 77 },
+            2: { cellWidth: 12, halign: "center" },
+            3: { cellWidth: 12, halign: "center" },
+            4: { cellWidth: 12, halign: "center" },
+            5: { cellWidth: 58, minCellHeight: 10 },
+          },
+        });
+        y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 6;
+      });
+    } else {
+      template.sections.forEach((sectionTitle, index) => {
+        if (y > 232) {
+          doc.addPage();
+          pdfHeader(doc, `${template.documentNumber} ${template.title}`, blankRecord, logoData);
+          y = 36;
+        }
+        y = pdfSection(doc, `${index + 1}. ${sectionTitle}`, y);
+        autoTable(doc, {
+          startY: y,
+          theme: "grid",
+          margin: { left: 12, right: 12 },
+          tableWidth: 186,
+          styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
+          headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
+          head: [["Item", "Check / Requirement", "N/A", "Yes", "No", "Comments"]],
+          body: Array.from({ length: 5 }, (_, rowIndex) => [`${index + 1}.${rowIndex + 1}`, "", "", "", "", ""]),
+          columnStyles: {
+            0: { cellWidth: 15, fontStyle: "bold" },
+            1: { cellWidth: 77 },
+            2: { cellWidth: 12, halign: "center" },
+            3: { cellWidth: 12, halign: "center" },
+            4: { cellWidth: 12, halign: "center" },
+            5: { cellWidth: 58, minCellHeight: 11 },
+          },
+        });
+        y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 6;
+      });
+    }
+
+    if (y > 230) {
+      doc.addPage();
+      pdfHeader(doc, `${template.documentNumber} ${template.title}`, blankRecord, logoData);
+      y = 36;
+    }
+    y = pdfSection(doc, "Additional Comments", y);
+    autoTable(doc, {
+      startY: y,
+      theme: "grid",
+      margin: { left: 12, right: 12 },
+      tableWidth: 186,
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
+      body: [[""]],
+      columnStyles: { 0: { cellWidth: 186, minCellHeight: 24 } },
+    });
+    y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 8;
+
+    y = pdfSection(doc, "Evidence Register", y);
+    autoTable(doc, {
+      startY: y,
+      theme: "grid",
+      margin: { left: 12, right: 12 },
+      tableWidth: 186,
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
+      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      head: [["Item", "Evidence / Photo Reference", "Notes"]],
+      body: Array.from({ length: 5 }, () => ["", "", ""]),
+      columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 76 }, 2: { cellWidth: 86 } },
+    });
+    y = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 8;
+
+    y = pdfSection(doc, "Sign-Off", y);
+    autoTable(doc, {
+      startY: y,
+      theme: "grid",
+      margin: { left: 12, right: 12 },
+      tableWidth: 186,
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
+      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      head: [["Name", "Position", "Company", "Date", "Signature"]],
+      body: [["", "", "", "", ""]],
+      columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 42 }, 2: { cellWidth: 36 }, 3: { cellWidth: 28 }, 4: { cellWidth: 40 } },
+    });
+
+    const pageCount = doc.getNumberOfPages();
+    for (let page = 1; page <= pageCount; page += 1) {
+      doc.setPage(page);
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Page ${page} of ${pageCount}`, 198, 287, { align: "right" });
+    }
+
+    const url = doc.output("bloburl");
+    window.open(url, "_blank", "noopener,noreferrer");
+    setMessage(`Opened blank PDF for ${template.documentNumber}.`);
+  }
+
   return (
     <main style={isMobile ? mobileMainStyle : undefined}>
       {isMobile && !isFieldCreateMode ? (
@@ -1096,6 +1251,7 @@ export default function HseInspectionsPage() {
           onCreate={() => startCreate()}
           onFilter={(status) => { setStatusFilter(status); setActiveView("register"); }}
           isMobile={isMobile}
+          onGenerateBlankPdf={(template) => void generateBlankInspectionPdf(template)}
         />
       ) : null}
 
@@ -1195,12 +1351,14 @@ function DashboardView({
   onCreate,
   onFilter,
   isMobile,
+  onGenerateBlankPdf,
 }: {
   kpis: { open: number; complete: number; findings: number; evidenceCount: number };
   qrDataUrl: string;
   onCreate: () => void;
   onFilter: (status: string) => void;
   isMobile: boolean;
+  onGenerateBlankPdf: (template: InspectionTemplate) => void;
 }) {
   return (
     <>
@@ -1215,11 +1373,12 @@ function DashboardView({
         <SectionCard title="Inspection Form Library">
           <div style={isMobile ? mobileStoryGridStyle : storyGridStyle}>
             {inspectionTemplates.map((template) => (
-              <div key={template.id} style={miniTemplateStyle}>
+              <button key={template.id} type="button" style={miniTemplateButtonStyle} onClick={() => onGenerateBlankPdf(template)}>
                 <strong>{template.documentNumber}</strong>
                 <span>{template.title}</span>
-                <small>{template.enabled ? `Rev ${template.revision} - ${displayDate(template.revisionDate)}` : "Template queued"}</small>
-              </div>
+                <small>{template.enabled ? `Rev ${template.revision} - ${displayDate(template.revisionDate)}` : "Blank printable template"}</small>
+                <small style={blankPdfCueStyle}>Open blank PDF</small>
+              </button>
             ))}
           </div>
         </SectionCard>
@@ -1877,7 +2036,7 @@ function PeopleSelect({ people, value, onChange }: { people: PeopleOption[]; val
     <select style={inputStyle} value={value} onChange={(event) => onChange(event.target.value)}>
       <option value="">Select person</option>
       {hasLegacyValue ? <option value={value}>{value}</option> : null}
-      {people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+      {people.map((person) => <option key={person.id} value={person.name}>{person.name}</option>)}
     </select>
   );
 }
@@ -1952,6 +2111,8 @@ const sectionTitleStyle: CSSProperties = { margin: "0 0 10px", fontSize: "18px",
 const emptyTextStyle: CSSProperties = { color: "#475569", margin: "0 0 14px", lineHeight: 1.55 };
 const storyGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" };
 const miniTemplateStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "4px", color: "#0f172a", background: "#f8fafc" };
+const miniTemplateButtonStyle: CSSProperties = { ...miniTemplateStyle, textAlign: "left", cursor: "pointer", font: "inherit" };
+const blankPdfCueStyle: CSSProperties = { marginTop: "6px", color: "#0f766e", fontWeight: 900 };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" };
 const panelHeaderStyle: CSSProperties = { background: "#0f766e", color: "white", borderRadius: "10px", padding: "14px 16px", marginBottom: "18px" };
 const panelTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", fontWeight: 800 };
