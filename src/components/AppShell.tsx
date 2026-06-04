@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 type AppShellProps = {
@@ -78,6 +79,7 @@ const actionNavItems = [
 
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const [isFieldInspectionMode, setIsFieldInspectionMode] = useState(false);
   const isLoginPage = pathname === "/login";
   const isHomePage = pathname === "/home";
   const isAssetModule = pathname.startsWith("/assets");
@@ -131,6 +133,25 @@ export default function AppShell({ children }: AppShellProps) {
     ? actionNavItems
     : qualityNavItems;
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const updateFieldInspectionMode = () => {
+      const params = new URLSearchParams(window.location.search);
+      setIsFieldInspectionMode(
+        pathname === "/hse/inspections" &&
+        window.innerWidth <= 720 &&
+        params.get("view") === "create",
+      );
+    };
+    updateFieldInspectionMode();
+    window.addEventListener("resize", updateFieldInspectionMode);
+    window.addEventListener("popstate", updateFieldInspectionMode);
+    return () => {
+      window.removeEventListener("resize", updateFieldInspectionMode);
+      window.removeEventListener("popstate", updateFieldInspectionMode);
+    };
+  }, [pathname]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/login";
@@ -152,23 +173,23 @@ export default function AppShell({ children }: AppShellProps) {
           style={{
             maxWidth: "1320px",
             margin: "0 auto",
-            padding: "14px 24px",
+            padding: isFieldInspectionMode ? "8px 12px" : "14px 24px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: "20px",
+            gap: isFieldInspectionMode ? "8px" : "20px",
             flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: isFieldInspectionMode ? "8px" : "14px", flexWrap: "wrap" }}>
             {showLogo ? (
               <Image
                 src="/enshore-logo.png"
                 alt="Enshore"
-                width={128}
+                width={isFieldInspectionMode ? 84 : 128}
                 height={32}
                 priority
-                style={{ width: "128px", height: "auto", objectFit: "contain" }}
+                style={{ width: isFieldInspectionMode ? "84px" : "128px", height: "auto", objectFit: "contain" }}
               />
             ) : null}
 
@@ -177,13 +198,13 @@ export default function AppShell({ children }: AppShellProps) {
                 style={{
                   color: "white",
                   fontWeight: 700,
-                  fontSize: "20px",
+                  fontSize: isFieldInspectionMode ? "15px" : "20px",
                   letterSpacing: "-0.01em",
                 }}
               >
-                {moduleTitle}
+                {isFieldInspectionMode ? "HSE Field Inspection" : moduleTitle}
               </div>
-              {moduleSubtitle ? (
+              {moduleSubtitle && !isFieldInspectionMode ? (
                 <div
                   style={{
                     color: "rgba(255,255,255,0.75)",
@@ -197,7 +218,7 @@ export default function AppShell({ children }: AppShellProps) {
             </div>
           </div>
 
-          {!isLoginPage && (
+          {!isLoginPage && !isFieldInspectionMode && (
             <div
               style={{
                 display: "flex",
@@ -277,7 +298,7 @@ export default function AppShell({ children }: AppShellProps) {
           style={{
             maxWidth: "1320px",
             margin: "0 auto",
-            padding: "28px 24px 36px",
+            padding: isFieldInspectionMode ? "12px 10px 28px" : "28px 24px 36px",
           }}
         >
           {children}

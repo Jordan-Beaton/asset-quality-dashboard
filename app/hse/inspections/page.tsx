@@ -452,6 +452,7 @@ export default function HseInspectionsPage() {
   const [pendingEvidence, setPendingEvidence] = useState<PendingEvidence[]>([]);
   const [uploadItemNumber, setUploadItemNumber] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+  const [isFieldCreateMode, setIsFieldCreateMode] = useState(false);
 
   const selectedTemplate = useMemo(
     () => inspectionTemplates.find((template) => template.id === selectedTemplateId) ?? inspectionTemplates.find((template) => template.id === defaultTemplateId)!,
@@ -506,6 +507,21 @@ export default function HseInspectionsPage() {
     updateMobileState();
     window.addEventListener("resize", updateMobileState);
     return () => window.removeEventListener("resize", updateMobileState);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const updateFieldCreateMode = () => {
+      const params = new URLSearchParams(window.location.search);
+      setIsFieldCreateMode(window.innerWidth <= 720 && params.get("view") === "create");
+    };
+    updateFieldCreateMode();
+    window.addEventListener("resize", updateFieldCreateMode);
+    window.addEventListener("popstate", updateFieldCreateMode);
+    return () => {
+      window.removeEventListener("resize", updateFieldCreateMode);
+      window.removeEventListener("popstate", updateFieldCreateMode);
+    };
   }, []);
 
   useEffect(() => {
@@ -1051,9 +1067,9 @@ export default function HseInspectionsPage() {
 
   return (
     <main style={isMobile ? mobileMainStyle : undefined}>
-      {isMobile ? (
+      {isMobile && !isFieldCreateMode ? (
         <MobileInspectionHero latestSummary={latestSummary} />
-      ) : (
+      ) : !isMobile ? (
         <QualityPageHero
           label="HSE MANAGEMENT"
           title="Site Inspections"
@@ -1063,15 +1079,15 @@ export default function HseInspectionsPage() {
             { label: "Latest Inspection", value: latestSummary },
           ]}
         />
-      )}
+      ) : null}
 
-      <TopRow status={message} />
+      {!isFieldCreateMode ? <TopRow status={message} /> : null}
 
-      <nav style={tabRowStyle} aria-label="HSE inspection views">
+      {!isFieldCreateMode ? <nav style={tabRowStyle} aria-label="HSE inspection views">
         <TabButton active={activeView === "dashboard"} onClick={() => setActiveView("dashboard")}>Dashboard</TabButton>
         <TabButton active={activeView === "register"} onClick={() => setActiveView("register")}>Inspection Register</TabButton>
         <TabButton active={activeView === "create"} onClick={() => startCreate()}>Create Inspection</TabButton>
-      </nav>
+      </nav> : null}
 
       {activeView === "dashboard" ? (
         <DashboardView
@@ -1137,6 +1153,7 @@ export default function HseInspectionsPage() {
           onRemovePendingEvidence={removePendingEvidence}
           onSave={() => void saveInspection()}
           isMobile={isMobile}
+          isFieldCreateMode={isFieldCreateMode}
         />
       ) : null}
     </main>
@@ -1461,6 +1478,7 @@ function CreateInspectionView({
   onRemovePendingEvidence,
   onSave,
   isMobile,
+  isFieldCreateMode,
 }: {
   selectedTemplate: InspectionTemplate;
   selectedTemplateId: string;
@@ -1479,12 +1497,16 @@ function CreateInspectionView({
   onRemovePendingEvidence: (id: string) => void;
   onSave: () => void;
   isMobile: boolean;
+  isFieldCreateMode: boolean;
 }) {
   return (
     <section style={isMobile ? mobilePanelStyle : panelStyle}>
-      <PanelHeader title="Create Inspection" description="Choose the Enshore inspection form. FRM-044 is wired first so we can prove the layout, evidence, and PDF before rolling out the other five." />
+      <PanelHeader
+        title={isFieldCreateMode ? selectedTemplate.title : "Create Inspection"}
+        description={isFieldCreateMode ? `${selectedTemplate.documentNumber} Rev ${selectedTemplate.revision || ""} - Complete the inspection and upload evidence as you go.` : "Choose the Enshore inspection form. FRM-044 is wired first so we can prove the layout, evidence, and PDF before rolling out the other five."}
+      />
 
-      <div style={isMobile ? mobileTemplateGridStyle : templateGridStyle}>
+      {!isFieldCreateMode ? <div style={isMobile ? mobileTemplateGridStyle : templateGridStyle}>
         {inspectionTemplates.map((template) => (
           <button
             key={template.id}
@@ -1502,9 +1524,9 @@ function CreateInspectionView({
             <span style={templateStatusStyle}>{template.enabled ? `Live build - Rev ${template.revision}` : "Queued"}</span>
           </button>
         ))}
-      </div>
+      </div> : null}
 
-      <div style={isMobile ? mobileSelectedHeaderStyle : selectedHeaderStyle}>
+      {!isFieldCreateMode ? <div style={isMobile ? mobileSelectedHeaderStyle : selectedHeaderStyle}>
         <div>
           <div style={selectedEyebrowStyle}>{selectedTemplate.documentNumber}</div>
           <h2 style={selectedTitleStyle}>{selectedTemplate.title}</h2>
@@ -1515,7 +1537,7 @@ function CreateInspectionView({
           </p>
         </div>
         <span style={statusPillStyle}>{selectedTemplate.enabled ? "Ready to complete" : "Template queued"}</span>
-      </div>
+      </div> : null}
 
       {selectedTemplate.enabled ? (
         <>
