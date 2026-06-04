@@ -843,10 +843,12 @@ export default function HseInspectionsPage() {
   }
 
   async function generatePdf(record: HseInspectionRecord, evidenceFiles = selectedEvidence) {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const logoData = await getLogoDataUrl();
-    pdfHeader(doc, `${record.form_number} ${record.form_title}`, record, logoData);
-    let y = 36;
+    try {
+      setMessage(`Generating PDF for ${record.inspection_number}...`);
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const logoData = await getLogoDataUrl();
+      pdfHeader(doc, `${record.form_number} ${record.form_title}`, record, logoData);
+      let y = 36;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
@@ -1061,8 +1063,15 @@ export default function HseInspectionsPage() {
       doc.text(`Page ${page} of ${pageCount}`, 198, 287, { align: "right" });
     }
 
-    doc.save(`${record.inspection_number}-${sanitizeFileName(record.form_title)}.pdf`);
-    setMessage(`Generated PDF for ${record.inspection_number}.`);
+      const fileName = `${record.inspection_number}-${sanitizeFileName(record.form_title)}.pdf`;
+      const url = doc.output("bloburl");
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) doc.save(fileName);
+      setMessage(`Generated PDF for ${record.inspection_number}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown PDF generation error";
+      setMessage(`PDF generation failed for ${record.inspection_number}: ${message}`);
+    }
   }
 
   async function generateBlankInspectionPdf(template: InspectionTemplate) {
