@@ -137,13 +137,13 @@ const inspectionTemplates: InspectionTemplate[] = [
   {
     id: "workplace-office",
     documentNumber: "ENS-HSEQ-FRM-041",
-    revision: "",
-    revisionDate: "",
+    revision: "B",
+    revisionDate: "2024-02-23",
     title: "Workplace Inspection - Office",
     description: "Office workplace inspection covering welfare, housekeeping, fire safety, access, electrical safety, and local actions.",
     focus: ["Office safety", "Housekeeping", "Fire/access controls", "Corrective actions"],
     sections: ["Inspection details", "Office environment", "Fire and emergency controls", "Electrical and workstation checks", "Findings", "Actions and evidence"],
-    enabled: false,
+    enabled: true,
   },
   {
     id: "workplace-offshore",
@@ -288,10 +288,106 @@ const baseSiteChecklist: ChecklistSection[] = [
   },
 ];
 
-const checklistItemOptions = baseSiteChecklist.flatMap((section) => section.items.map((item) => ({
-  id: item.id,
-  label: `${item.number} - ${item.text}`,
-})));
+const officeChecklist: ChecklistSection[] = [
+  {
+    id: "office_access",
+    title: "1.0 Access and Egress",
+    items: [
+      { id: "1.1", number: "1.1", text: "Ramps / steps around building satisfactory?" },
+      { id: "1.2", number: "1.2", text: "Stairways in building satisfactory?" },
+      { id: "1.3", number: "1.3", text: "Elevator satisfactory and examination in date?" },
+      { id: "1.4", number: "1.4", text: "Other access and egress observations." },
+    ],
+  },
+  {
+    id: "office",
+    title: "2.0 Office",
+    items: [
+      { id: "2.1", number: "2.1", text: "Housekeeping / cleanliness satisfactory?" },
+      { id: "2.2", number: "2.2", text: "Eating and drinking facilities satisfactory?" },
+      { id: "2.3", number: "2.3", text: "Toilets and washing facilities satisfactory?" },
+      { id: "2.4", number: "2.4", text: "Ventilation satisfactory?" },
+      { id: "2.5", number: "2.5", text: "Lighting satisfactory?" },
+      { id: "2.6", number: "2.6", text: "Noise levels satisfactory?" },
+      { id: "2.7", number: "2.7", text: "Waste segregation satisfactory?" },
+      { id: "2.8", number: "2.8", text: "Cabling condition satisfactory?" },
+      { id: "2.9", number: "2.9", text: "Handrails satisfactory?" },
+      { id: "2.10", number: "2.10", text: "Computer set-up satisfactory?" },
+      { id: "2.11", number: "2.11", text: "Workstation ergonomics satisfactory?" },
+      { id: "2.12", number: "2.12", text: "Portable Appliance Testing completed?" },
+      { id: "2.13", number: "2.13", text: "Hazard signage satisfactory?" },
+      { id: "2.14", number: "2.14", text: "HSE Notice Board up to date?" },
+      { id: "2.15", number: "2.15", text: "Other office observations." },
+    ],
+  },
+  {
+    id: "floor_surface",
+    title: "3.0 Floor Surface",
+    items: [
+      { id: "3.1", number: "3.1", text: "Wet / slippery floor surfaces?" },
+      { id: "3.2", number: "3.2", text: "Uneven / worn floor surfaces?" },
+      { id: "3.3", number: "3.3", text: "Trip hazards present?" },
+      { id: "3.4", number: "3.4", text: "Loose surface / loose items present?" },
+      { id: "3.5", number: "3.5", text: "Obstructions present?" },
+      { id: "3.6", number: "3.6", text: "Other floor surface observations." },
+    ],
+  },
+  {
+    id: "fire_emergency",
+    title: "4.0 Fire and Emergency Safety",
+    items: [
+      { id: "4.1", number: "4.1", text: "Escape exits clear?" },
+      { id: "4.2", number: "4.2", text: "Evacuation routes clear?" },
+      { id: "4.3", number: "4.3", text: "Safety signs, fire, first aid in place?" },
+      { id: "4.4", number: "4.4", text: "Fire alarm logbook up to date?" },
+      { id: "4.5", number: "4.5", text: "First aid equipment available and up to date?" },
+      { id: "4.6", number: "4.6", text: "Defibrillator available and checked?" },
+      { id: "4.7", number: "4.7", text: "First Aider on-site recorded?" },
+      { id: "4.8", number: "4.8", text: "Other fire and emergency safety observations." },
+    ],
+  },
+  {
+    id: "cleaners_cupboard",
+    title: "5.0 Cleaners Cupboard",
+    items: [
+      { id: "5.1", number: "5.1", text: "PPE signage in place?" },
+      { id: "5.2", number: "5.2", text: "COSHH assessments available and in place?" },
+      { id: "5.3", number: "5.3", text: "PPE available for use?" },
+      { id: "5.4", number: "5.4", text: "Storage adequate for supplies?" },
+      { id: "5.5", number: "5.5", text: "Step ladders condition satisfactory?" },
+      { id: "5.6", number: "5.6", text: "Other cleaners cupboard observations." },
+    ],
+  },
+];
+
+function getChecklistForTemplateId(templateId: string | null | undefined) {
+  if (templateId === "workplace-office") return officeChecklist;
+  return baseSiteChecklist;
+}
+
+function checklistOptionsForTemplate(templateId: string | null | undefined) {
+  return getChecklistForTemplateId(templateId).flatMap((section) => section.items.map((item) => ({
+    id: item.id,
+    label: `${item.number} - ${item.text}`,
+  })));
+}
+
+function additionalCommentsTitle(templateId: string | null | undefined) {
+  const nextSectionNumber = getChecklistForTemplateId(templateId).length + 1;
+  return `${nextSectionNumber}.0 Additional Comments`;
+}
+
+function templateRevisionLabel(template: Pick<InspectionTemplate, "revision" | "revisionDate">) {
+  const revision = template.revision ? `Rev ${template.revision}` : "Rev not stated";
+  const date = displayDate(template.revisionDate);
+  return date ? `${revision} - ${date}` : revision;
+}
+
+function recordRevisionLabel(record: Pick<HseInspectionRecord, "form_revision" | "form_revision_date">) {
+  const revision = record.form_revision ? `Rev ${record.form_revision}` : "Rev not stated";
+  const date = displayDate(record.form_revision_date);
+  return date ? `${revision} - ${date}` : revision;
+}
 
 const emptyRecord: HseInspectionRecord = {
   id: "",
@@ -556,7 +652,7 @@ export default function HseInspectionsPage() {
       form_revision: template.revision,
       form_revision_date: template.revisionDate,
       form_title: template.title,
-      title: current.title || (template.enabled ? template.title : ""),
+      title: current.form_id === template.id && current.title ? current.title : (template.enabled ? template.title : ""),
     }));
   }, [selectedTemplateId]);
 
@@ -691,7 +787,7 @@ export default function HseInspectionsPage() {
 
   async function saveInspection() {
     if (!selectedTemplate.enabled) {
-      setMessage(`${selectedTemplate.documentNumber} is visible for planning but only ENS-HSEQ-FRM-044 is wired in this first pass.`);
+      setMessage(`${selectedTemplate.documentNumber} is visible for planning but is not wired for digital completion yet.`);
       return;
     }
     if (!draft.title.trim()) {
@@ -877,7 +973,7 @@ export default function HseInspectionsPage() {
     y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 72;
     y += 8;
 
-    baseSiteChecklist.forEach((section) => {
+    getChecklistForTemplateId(record.form_id).forEach((section) => {
       if (y > 250) {
         doc.addPage();
         pdfHeader(doc, `${record.form_number} ${record.form_title}`, record, logoData);
@@ -924,7 +1020,7 @@ export default function HseInspectionsPage() {
       y = 36;
     }
 
-    y = pdfSection(doc, "5.0 Additional Comments", y);
+    y = pdfSection(doc, additionalCommentsTitle(record.form_id), y);
     autoTable(doc, {
       startY: y,
       theme: "grid",
@@ -1114,8 +1210,9 @@ export default function HseInspectionsPage() {
     y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 72;
     y += 8;
 
-    if (template.id === defaultTemplateId) {
-      baseSiteChecklist.forEach((section) => {
+    const templateChecklist = template.enabled ? getChecklistForTemplateId(template.id) : [];
+    if (templateChecklist.length) {
+      templateChecklist.forEach((section) => {
         if (y > 250) {
           doc.addPage();
           pdfHeader(doc, `${template.documentNumber} ${template.title}`, blankRecord, logoData);
@@ -1257,7 +1354,7 @@ export default function HseInspectionsPage() {
         <DashboardView
           kpis={kpis}
           qrDataUrl={fieldQrDataUrl}
-          onCreate={() => startCreate()}
+          onCreate={(templateId) => startCreate(templateId)}
           onFilter={(status) => { setStatusFilter(status); setActiveView("register"); }}
           isMobile={isMobile}
           onGenerateBlankPdf={(template) => void generateBlankInspectionPdf(template)}
@@ -1364,7 +1461,7 @@ function DashboardView({
 }: {
   kpis: { open: number; complete: number; findings: number; evidenceCount: number };
   qrDataUrl: string;
-  onCreate: () => void;
+  onCreate: (templateId?: string) => void;
   onFilter: (status: string) => void;
   isMobile: boolean;
   onGenerateBlankPdf: (template: InspectionTemplate) => void;
@@ -1385,18 +1482,21 @@ function DashboardView({
               <button key={template.id} type="button" style={miniTemplateButtonStyle} onClick={() => onGenerateBlankPdf(template)}>
                 <strong>{template.documentNumber}</strong>
                 <span>{template.title}</span>
-                <small>{template.enabled ? `Rev ${template.revision} - ${displayDate(template.revisionDate)}` : "Blank printable template"}</small>
+                <small>{template.enabled ? templateRevisionLabel(template) : "Blank printable template"}</small>
                 <small style={blankPdfCueStyle}>Open blank PDF</small>
               </button>
             ))}
           </div>
         </SectionCard>
 
-        <SectionCard title="Base and Site Inspection Ready">
+        <SectionCard title="Live Digital Inspections">
           <p style={emptyTextStyle}>
-            FRM-044 is now wired for laptop entry, mobile-friendly completion, evidence upload, register tracking, and PDF output.
+            FRM-041 and FRM-044 are now wired for laptop entry, mobile-friendly completion, evidence upload, register tracking, and PDF output.
           </p>
-          <button type="button" onClick={onCreate} style={primaryButtonStyle}>Create Base and Site Inspection</button>
+          <div style={buttonRowStyle}>
+            <button type="button" onClick={() => onCreate("workplace-office")} style={primaryButtonStyle}>Create Office Inspection</button>
+            <button type="button" onClick={() => onCreate(defaultTemplateId)} style={primaryButtonStyle}>Create Base and Site Inspection</button>
+          </div>
         </SectionCard>
 
         <SectionCard title="Mobile QR Access">
@@ -1415,7 +1515,7 @@ function DashboardView({
 
         <SectionCard title="Next Forms">
           <p style={emptyTextStyle}>
-            Once FRM-044 feels right, the same pattern can be applied to vessel pre-sail, office, offshore, mobilisation, and dropped object inspections.
+            The same pattern can now be applied to vessel pre-sail, offshore, mobilisation, and dropped object inspections.
           </p>
         </SectionCard>
       </section>
@@ -1593,7 +1693,7 @@ function RegisterView({
           <div style={emptyBoxStyle}>Select an inspection to open the detail/edit panel.</div>
         ) : (
           <>
-            <PanelHeader title={`${draft.inspection_number} - ${draft.title}`} description={`${draft.form_number} Rev ${draft.form_revision || ""} - ${displayDate(draft.form_revision_date)}`} />
+            <PanelHeader title={`${draft.inspection_number} - ${draft.title}`} description={`${draft.form_number} ${recordRevisionLabel(draft)}`} />
             <InspectionForm
               draft={draft}
               people={people}
@@ -1611,6 +1711,7 @@ function RegisterView({
               evidence={evidence}
               uploading={uploading}
               uploadItemNumber={uploadItemNumber}
+              formId={draft.form_id}
               onUploadItemNumberChange={onUploadItemNumberChange}
               onUpload={onUpload}
               onOpen={onOpenEvidence}
@@ -1671,7 +1772,7 @@ function CreateInspectionView({
     <section style={isMobile ? mobilePanelStyle : panelStyle}>
       <PanelHeader
         title={isFieldCreateMode ? selectedTemplate.title : "Create Inspection"}
-        description={isFieldCreateMode ? `${selectedTemplate.documentNumber} Rev ${selectedTemplate.revision || ""} - Complete the inspection and upload evidence as you go.` : "Choose the Enshore inspection form. FRM-044 is wired first so we can prove the layout, evidence, and PDF before rolling out the other five."}
+        description={isFieldCreateMode ? `${selectedTemplate.documentNumber} ${templateRevisionLabel(selectedTemplate)} - Complete the inspection and upload evidence as you go.` : "Choose the Enshore inspection form. FRM-041 and FRM-044 are wired first so we can prove the layout, evidence, and PDF before rolling out the remaining forms."}
       />
 
       {!isFieldCreateMode ? <div style={isMobile ? mobileTemplateGridStyle : templateGridStyle}>
@@ -1689,7 +1790,7 @@ function CreateInspectionView({
             <span style={docNumberStyle}>{template.documentNumber}</span>
             <strong>{template.title}</strong>
             <small>{template.description}</small>
-            <span style={templateStatusStyle}>{template.enabled ? `Live build - Rev ${template.revision}` : "Queued"}</span>
+            <span style={templateStatusStyle}>{template.enabled ? `Live build - ${templateRevisionLabel(template)}` : "Queued"}</span>
           </button>
         ))}
       </div> : null}
@@ -1700,8 +1801,8 @@ function CreateInspectionView({
           <h2 style={selectedTitleStyle}>{selectedTemplate.title}</h2>
           <p style={selectedDescriptionStyle}>
             {selectedTemplate.enabled
-              ? `Revision ${selectedTemplate.revision}, dated ${displayDate(selectedTemplate.revisionDate)}.`
-              : "This template is staged for the next rollout after FRM-044 is signed off."}
+              ? `${templateRevisionLabel(selectedTemplate)}.`
+              : "This template is staged for the next rollout."}
           </p>
         </div>
         <span style={statusPillStyle}>{selectedTemplate.enabled ? "Ready to complete" : "Template queued"}</span>
@@ -1723,6 +1824,7 @@ function CreateInspectionView({
           <PendingEvidencePanel
             pendingEvidence={pendingEvidence}
             uploadItemNumber={uploadItemNumber}
+            formId={draft.form_id}
             onUploadItemNumberChange={onUploadItemNumberChange}
             onUpload={onPendingUpload}
             onRemove={onRemovePendingEvidence}
@@ -1733,7 +1835,7 @@ function CreateInspectionView({
         </>
       ) : (
         <div style={emptyBoxStyle}>
-          {selectedTemplate.documentNumber} will use this same inspection engine once FRM-044 is approved: structured form, evidence upload, mobile completion, and PDF output.
+          {selectedTemplate.documentNumber} will use this same inspection engine once it is wired: structured form, evidence upload, mobile completion, and PDF output.
         </div>
       )}
     </section>
@@ -1786,7 +1888,7 @@ function InspectionForm({
         </div>
       </InspectionSection>
 
-      {baseSiteChecklist.map((section) => (
+      {getChecklistForTemplateId(draft.form_id).map((section) => (
         <InspectionSection key={section.id} title={section.title}>
           {isMobile ? (
             <div style={mobileChecklistListStyle}>
@@ -1846,18 +1948,18 @@ function InspectionForm({
               <div style={checklistHeaderStyle}>
                 <span>Item</span>
                 <span>Description</span>
-                <span>N/A</span>
-                <span>Yes</span>
-                <span>No</span>
+              <span style={centerHeaderCellStyle}>N/A</span>
+              <span style={centerHeaderCellStyle}>Yes</span>
+              <span style={centerHeaderCellStyle}>No</span>
                 <span>Comments / action notes</span>
                 <span>Evidence</span>
               </div>
               {section.items.map((item) => {
                 const response = draft.checklist_responses[item.id] || { answer: "", comments: "" };
                 return (
-                  <div key={item.id} style={checklistRowStyle}>
-                    <strong>{item.number}</strong>
-                    <span>{item.text}</span>
+                <div key={item.id} style={checklistRowStyle}>
+                  <strong style={centeredChecklistCellStyle}>{item.number}</strong>
+                  <span style={centeredChecklistCellStyle}>{item.text}</span>
                     {(["N/A", "Yes", "No"] as ChecklistAnswer[]).map((answer) => (
                       <label key={answer} style={radioCellStyle}>
                         <input
@@ -1889,7 +1991,7 @@ function InspectionForm({
         </InspectionSection>
       ))}
 
-      <InspectionSection title="5.0 Additional Comments">
+      <InspectionSection title={additionalCommentsTitle(draft.form_id)}>
         <textarea style={largeTextareaStyle} value={draft.additional_comments || ""} onChange={(event) => onDraftChange("additional_comments", event.target.value)} />
       </InspectionSection>
 
@@ -1940,13 +2042,14 @@ function LinkedActionsPanel({ inspection, linkedActions }: { inspection: HseInsp
   );
 }
 
-function EvidenceItemPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function EvidenceItemPicker({ value, formId, onChange }: { value: string; formId: string; onChange: (value: string) => void }) {
+  const itemOptions = checklistOptionsForTemplate(formId);
   return (
     <label style={fieldStyle}>
       <span style={labelStyle}>Link evidence to item number</span>
       <select style={inputStyle} value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">General inspection evidence</option>
-        {checklistItemOptions.map((item) => (
+        {itemOptions.map((item) => (
           <option key={item.id} value={item.id}>{item.label}</option>
         ))}
       </select>
@@ -1957,12 +2060,14 @@ function EvidenceItemPicker({ value, onChange }: { value: string; onChange: (val
 function PendingEvidencePanel({
   pendingEvidence,
   uploadItemNumber,
+  formId,
   onUploadItemNumberChange,
   onUpload,
   onRemove,
 }: {
   pendingEvidence: PendingEvidence[];
   uploadItemNumber: string;
+  formId: string;
   onUploadItemNumberChange: (value: string) => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onRemove: (id: string) => void;
@@ -1970,7 +2075,7 @@ function PendingEvidencePanel({
   return (
     <InspectionSection title="Evidence Upload">
       <p style={emptyTextStyle}>Upload photos/files while creating the inspection. They will be uploaded when the inspection is saved.</p>
-      <EvidenceItemPicker value={uploadItemNumber} onChange={onUploadItemNumberChange} />
+      <EvidenceItemPicker value={uploadItemNumber} formId={formId} onChange={onUploadItemNumberChange} />
       <label style={uploadButtonStyle}>
         Upload Photos / Files
         <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" capture="environment" style={{ display: "none" }} onChange={onUpload} />
@@ -1995,6 +2100,7 @@ function EvidencePanel({
   evidence,
   uploading,
   uploadItemNumber,
+  formId,
   onUploadItemNumberChange,
   onUpload,
   onOpen,
@@ -2003,6 +2109,7 @@ function EvidencePanel({
   evidence: InspectionEvidence[];
   uploading: boolean;
   uploadItemNumber: string;
+  formId: string;
   onUploadItemNumberChange: (value: string) => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onOpen: (file: InspectionEvidence) => void;
@@ -2012,7 +2119,7 @@ function EvidencePanel({
   return (
     <InspectionSection title="Evidence Upload">
       <p style={emptyTextStyle}>Upload inspection photos or supporting files. On mobile, choose the camera option to capture evidence at the inspection point.</p>
-      <EvidenceItemPicker value={uploadItemNumber} onChange={onUploadItemNumberChange} />
+      <EvidenceItemPicker value={uploadItemNumber} formId={formId} onChange={onUploadItemNumberChange} />
       <label style={uploadButtonStyle}>
         {uploading ? "Uploading..." : "Upload Evidence"}
         <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" capture="environment" style={{ display: "none" }} onChange={onUpload} disabled={uploading} />
@@ -2166,6 +2273,8 @@ const inspectionSectionBodyStyle: CSSProperties = { padding: "14px" };
 const checklistShellStyle: CSSProperties = { display: "grid", gap: "0", border: "1px solid #dbe3ef", borderRadius: "10px", overflow: "hidden" };
 const checklistHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "center", background: "#f1f5f9", fontWeight: 900, color: "#0f172a", fontSize: "12px" };
 const checklistRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "stretch", borderTop: "1px solid #dbe3ef", fontSize: "13px" };
+const centerHeaderCellStyle: CSSProperties = { textAlign: "center", justifySelf: "center", width: "100%" };
+const centeredChecklistCellStyle: CSSProperties = { display: "flex", alignItems: "center", padding: "8px 8px 8px 0", lineHeight: 1.35 };
 const radioCellStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid #dbe3ef" };
 const itemUploadButtonStyle: CSSProperties = { margin: "8px", minHeight: "30px", border: "1px solid #99f6e4", background: "#ecfdf5", color: "#0f766e", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "11px", cursor: "pointer" };
 const smallTextareaStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px", fontSize: "13px", resize: "vertical", boxSizing: "border-box" };

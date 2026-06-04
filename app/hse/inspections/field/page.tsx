@@ -5,7 +5,7 @@ import Link from "next/link";
 
 const inspectionTemplates = [
   { id: "vessel-pre-sail", number: "ENS-HSEQ-FRM-046", title: "Vessel Pre-Sail Inspection", ready: false },
-  { id: "workplace-office", number: "ENS-HSEQ-FRM-041", title: "Workplace Inspection - Office", ready: false },
+  { id: "workplace-office", number: "ENS-HSEQ-FRM-041", title: "Workplace Inspection - Office", ready: true },
   { id: "workplace-offshore", number: "ENS-HSEQ-FRM-042", title: "Workplace Inspection - Offshore", ready: false },
   { id: "workplace-mobilisation", number: "ENS-HSEQ-FRM-043", title: "Workplace Inspection - Mobilisation", ready: false },
   { id: "workplace-base-site", number: "ENS-HSEQ-FRM-044", title: "Workplace Inspection - Base and Site", ready: true },
@@ -20,7 +20,7 @@ export default function HseInspectionFieldPage() {
         <section style={summaryCardStyle}>
           <div style={eyebrowStyle}>Inspection Type</div>
           <h1 style={titleStyle}>Choose Inspection</h1>
-          <p style={introStyle}>Select the inspection form you want to carry out. FRM-044 is live first while the remaining forms are queued for rollout.</p>
+          <p style={introStyle}>Select the inspection form you want to carry out. FRM-041 and FRM-044 are live, with the remaining forms queued for rollout.</p>
         </section>
 
         <section style={templateListStyle}>
