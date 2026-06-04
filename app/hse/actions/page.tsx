@@ -42,6 +42,8 @@ type ActionItem = {
   linked_moc_number?: string | null;
   linked_ainm_id?: string | null;
   linked_ainm_number?: string | null;
+  linked_hse_inspection_id?: string | null;
+  linked_hse_inspection_number?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -81,6 +83,8 @@ type ActionForm = {
   linked_moc_number: string;
   linked_ainm_id: string;
   linked_ainm_number: string;
+  linked_hse_inspection_id: string;
+  linked_hse_inspection_number: string;
 };
 
 type AuditOption = { id: string; audit_number: string; title: string };
@@ -99,6 +103,7 @@ type AssetOption = { id: string; asset_code: string; name: string };
 type AssetInspectionOption = { id: string; asset_id: string; inspection_number: string; inspection_date: string; result: string };
 type AssetMaintenanceOption = { id: string; asset_id: string; maintenance_number: string; maintenance_date: string; description: string };
 type AssetCalibrationOption = { id: string; asset_id: string; reference: string; certificate_number: string; calibration_date: string; calibration_due_date: string };
+type HseInspectionOption = { id: string; inspection_number: string; title: string; form_title: string; project_work_scope: string; area_zone: string; inspection_date: string };
 
 const emptyForm: ActionForm = {
   title: "",
@@ -128,6 +133,8 @@ const emptyForm: ActionForm = {
   linked_moc_number: "",
   linked_ainm_id: "",
   linked_ainm_number: "",
+  linked_hse_inspection_id: "",
+  linked_hse_inspection_number: "",
 };
 
 const viewTabs: Array<{ id: HseActionView; label: string }> = [
@@ -147,6 +154,7 @@ const sourceOptions = [
   "NCR/CAPA",
   "MOC",
   "AINM",
+  "HSE Inspection",
   "Risk",
   "HSE",
   "Other",
@@ -233,6 +241,7 @@ export default function HseActionsPage() {
   const [assetInspectionOptions, setAssetInspectionOptions] = useState<AssetInspectionOption[]>([]);
   const [assetMaintenanceOptions, setAssetMaintenanceOptions] = useState<AssetMaintenanceOption[]>([]);
   const [assetCalibrationOptions, setAssetCalibrationOptions] = useState<AssetCalibrationOption[]>([]);
+  const [hseInspectionOptions, setHseInspectionOptions] = useState<HseInspectionOption[]>([]);
   const [activeView, setActiveView] = useState<HseActionView>("dashboard");
   const [selectedId, setSelectedId] = useState("");
   const [search, setSearch] = useState("");
@@ -250,9 +259,42 @@ export default function HseActionsPage() {
     void loadData();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view");
+    const prefillSource = params.get("prefill_source") || "";
+    const linkedHseInspectionId = params.get("linked_hse_inspection_id") || "";
+    const linkedHseInspectionNumber = params.get("linked_hse_inspection_number") || "";
+    if (view === "create" || prefillSource || linkedHseInspectionId || linkedHseInspectionNumber) {
+      setActiveView("create");
+      setForm((current) => ({
+        ...current,
+        source: prefillSource || current.source,
+        project: params.get("prefill_project") || current.project,
+        title: params.get("prefill_title") || current.title,
+        description: params.get("prefill_description") || current.description,
+        linked_hse_inspection_id: linkedHseInspectionId || current.linked_hse_inspection_id,
+        linked_hse_inspection_number: linkedHseInspectionNumber || current.linked_hse_inspection_number,
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !actions.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const actionId = params.get("actionId") || "";
+    const actionNumber = params.get("action") || "";
+    if (!actionId && !actionNumber) return;
+    const matched = actions.find((action) => action.id === actionId || action.action_number === actionNumber);
+    if (!matched) return;
+    setSelectedId(matched.id);
+    setActiveView("register");
+  }, [actions]);
+
   async function loadData() {
     setLoading(true);
-    const [actionsRes, peopleRes, auditRes, findingRes, ncrRes, capaRes, mocRes, ainmRes, assetsRes, inspectionsRes, maintenanceRes, calibrationsRes] = await Promise.all([
+    const [actionsRes, peopleRes, auditRes, findingRes, ncrRes, capaRes, mocRes, ainmRes, hseInspectionRes, assetsRes, inspectionsRes, maintenanceRes, calibrationsRes] = await Promise.all([
       supabase.from("actions").select("*").order("action_number", { ascending: true }),
       supabase.from("people").select("id,name,role,department,active").eq("active", true).order("name", { ascending: true }),
       supabase.from("audits").select("id,audit_number,title").order("audit_number", { ascending: true }),
@@ -261,6 +303,7 @@ export default function HseActionsPage() {
       supabase.from("capas").select("id,capa_number,title").order("capa_number", { ascending: true }),
       supabase.from("moc_reports").select("id,moc_report_no,moc_report_title").order("moc_report_no", { ascending: true }),
       supabase.from("hse_ainm_records").select("id,ainm_number,title,project,event_date,event_classification").order("event_date", { ascending: false }).order("ainm_number", { ascending: false }),
+      supabase.from("hse_inspection_records").select("id,inspection_number,title,form_title,project_work_scope,area_zone,inspection_date").order("inspection_date", { ascending: false }).order("inspection_number", { ascending: false }),
       supabase.from("assets").select("id,asset_code,name").order("asset_code", { ascending: true }),
       supabase.from("asset_inspection_records").select("id,asset_id,inspection_number,inspection_date,result").order("inspection_number", { ascending: true }),
       supabase.from("asset_maintenance_records").select("id,asset_id,maintenance_number,maintenance_date,description").order("maintenance_number", { ascending: true }),
@@ -331,6 +374,17 @@ export default function HseActionsPage() {
         event_date: String(row.event_date || ""),
         classification: String(row.event_classification || ""),
       })).filter((row) => row.id && row.number));
+    }
+    if (hseInspectionRes.data && !hseInspectionRes.error) {
+      setHseInspectionOptions(((hseInspectionRes.data || []) as Array<Record<string, unknown>>).map((row) => ({
+        id: String(row.id || ""),
+        inspection_number: String(row.inspection_number || ""),
+        title: String(row.title || ""),
+        form_title: String(row.form_title || ""),
+        project_work_scope: String(row.project_work_scope || ""),
+        area_zone: String(row.area_zone || ""),
+        inspection_date: String(row.inspection_date || ""),
+      })).filter((row) => row.id && row.inspection_number));
     }
     if (assetsRes.data && !assetsRes.error) {
       setAssetOptions(((assetsRes.data || []) as Array<Record<string, unknown>>).map((row) => ({
@@ -440,6 +494,7 @@ export default function HseActionsPage() {
         action.owner,
         action.source,
         action.linked_ainm_number,
+        action.linked_hse_inspection_number,
       ].join(" ").toLowerCase();
       return (
         (!query || haystack.includes(query)) &&
@@ -497,6 +552,8 @@ export default function HseActionsPage() {
           linked_moc_number: form.linked_moc_number || null,
           linked_ainm_id: form.linked_ainm_id || null,
           linked_ainm_number: form.linked_ainm_number || null,
+          linked_hse_inspection_id: form.linked_hse_inspection_id || null,
+          linked_hse_inspection_number: form.linked_hse_inspection_number || null,
     }]);
 
     setSaving(false);
@@ -544,6 +601,8 @@ export default function HseActionsPage() {
       linked_moc_number: source === "MOC" ? current.linked_moc_number : "",
       linked_ainm_id: source === "AINM" ? current.linked_ainm_id : "",
       linked_ainm_number: source === "AINM" ? current.linked_ainm_number : "",
+      linked_hse_inspection_id: source === "HSE Inspection" ? current.linked_hse_inspection_id : "",
+      linked_hse_inspection_number: source === "HSE Inspection" ? current.linked_hse_inspection_number : "",
     }));
   }
 
@@ -599,6 +658,18 @@ export default function HseActionsPage() {
       project: current.project || selected?.project || "",
       title: current.title || (selected ? `${selected.number} - ${selected.title}` : ""),
       source: "AINM",
+    }));
+  }
+
+  function applyHseInspectionSelection(inspectionId: string) {
+    const selected = hseInspectionOptions.find((option) => option.id === inspectionId);
+    setForm((current) => ({
+      ...current,
+      linked_hse_inspection_id: selected?.id || "",
+      linked_hse_inspection_number: selected?.inspection_number || "",
+      project: current.project || selected?.project_work_scope || selected?.area_zone || "",
+      title: current.title || (selected ? `${selected.inspection_number} - ${selected.title || selected.form_title}` : current.title),
+      source: "HSE Inspection",
     }));
   }
 
@@ -761,7 +832,11 @@ export default function HseActionsPage() {
                     <td style={tdStrongStyle}>{action.action_number || "-"}</td>
                     <td style={tdStyle}>
                       <strong>{action.title || "-"}</strong>
-                      <div style={mutedTextStyle}>{action.project || "No project"}{action.linked_ainm_number ? ` | AINM ${action.linked_ainm_number}` : ""}</div>
+                      <div style={mutedTextStyle}>
+                        {action.project || "No project"}
+                        {action.linked_ainm_number ? ` | AINM ${action.linked_ainm_number}` : ""}
+                        {action.linked_hse_inspection_number ? ` | HSE Inspection ${action.linked_hse_inspection_number}` : ""}
+                      </div>
                     </td>
                     <td style={tdStyle}>{action.owner || "-"}</td>
                     <td style={tdStyle}>{action.source || "-"}</td>
@@ -878,6 +953,18 @@ export default function HseActionsPage() {
                     {ainmOptions.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.number} - {option.title || "Untitled"}{option.project ? ` (${option.project})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+              {form.source === "HSE Inspection" ? (
+                <Field label="HSE Inspection Record">
+                  <select style={inputStyle} value={form.linked_hse_inspection_id} onChange={(event) => applyHseInspectionSelection(event.target.value)}>
+                    <option value="">Select HSE inspection</option>
+                    {hseInspectionOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.inspection_number} - {option.title || option.form_title}{option.inspection_date ? ` (${formatDate(option.inspection_date)})` : ""}
                       </option>
                     ))}
                   </select>

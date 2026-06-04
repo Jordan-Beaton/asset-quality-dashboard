@@ -58,6 +58,8 @@ type ActionItem = {
   linked_moc_number: string | null;
   linked_ainm_id: string | null;
   linked_ainm_number: string | null;
+  linked_hse_inspection_id: string | null;
+  linked_hse_inspection_number: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -126,6 +128,16 @@ type AssetCalibrationOption = {
   certificate_number: string;
   calibration_date: string;
   calibration_due_date: string;
+};
+
+type HseInspectionOption = {
+  id: string;
+  inspection_number: string;
+  title: string;
+  form_title: string;
+  project_work_scope: string;
+  area_zone: string;
+  inspection_date: string;
 };
 
 type ActionPerson = {
@@ -219,6 +231,8 @@ type ActionForm = {
   linked_moc_number: string;
   linked_ainm_id: string;
   linked_ainm_number: string;
+  linked_hse_inspection_id: string;
+  linked_hse_inspection_number: string;
 };
 
 const emptyForm: ActionForm = {
@@ -250,6 +264,8 @@ const emptyForm: ActionForm = {
   linked_moc_number: "",
   linked_ainm_id: "",
   linked_ainm_number: "",
+  linked_hse_inspection_id: "",
+  linked_hse_inspection_number: "",
 };
 
 const actionSourceOptions = [
@@ -261,6 +277,7 @@ const actionSourceOptions = [
   "NCR/CAPA",
   "MOC",
   "AINM",
+  "HSE Inspection",
   "Risk",
   "HSE",
   "Other",
@@ -439,7 +456,8 @@ function matchesSearchTerm(action: ActionItem, query: string) {
     (action.linked_ncr_number || "").toLowerCase().includes(lower) ||
     (action.linked_capa_number || "").toLowerCase().includes(lower) ||
     (action.linked_moc_number || "").toLowerCase().includes(lower) ||
-    (action.linked_ainm_number || "").toLowerCase().includes(lower)
+    (action.linked_ainm_number || "").toLowerCase().includes(lower) ||
+    (action.linked_hse_inspection_number || "").toLowerCase().includes(lower)
   );
 }
 
@@ -464,6 +482,7 @@ function getSourceChipTone(source: string): LinkedRecordChip["tone"] {
   if (source === "NCR/CAPA") return "red";
   if (source === "MOC") return "purple";
   if (source === "AINM") return "red";
+  if (source === "HSE Inspection") return "teal";
   if (source === "Risk") return "amber";
   if (source === "HSE") return "teal";
   return "slate";
@@ -486,6 +505,7 @@ function sourceImpliesLinkedRecord(source: string | null | undefined) {
     source === "NCR/CAPA" ||
     source === "MOC" ||
     source === "AINM" ||
+    source === "HSE Inspection" ||
     source === "Risk" ||
     source === "HSE"
   );
@@ -505,6 +525,7 @@ function buildLinkedRecordChips(action: ActionItem): LinkedRecordChip[] {
   if (action.linked_capa_number) chips.push({ label: `CAPA ${action.linked_capa_number}`, tone: "red" });
   if (action.linked_moc_number) chips.push({ label: `MOC ${action.linked_moc_number}`, tone: "purple" });
   if (action.linked_ainm_number) chips.push({ label: `AINM ${action.linked_ainm_number}`, tone: "red" });
+  if (action.linked_hse_inspection_number) chips.push({ label: `HSE Inspection ${action.linked_hse_inspection_number}`, tone: "teal" });
 
   if (chips.length === 0 && sourceImpliesLinkedRecord(source)) {
     chips.push({ label: "Missing linked record", tone: "amber" });
@@ -555,6 +576,7 @@ function buildActionSourceLabel(action: ActionItem) {
   if (source === "NCR/CAPA" && action.linked_capa_number) parts.push(`CAPA ${action.linked_capa_number}`);
   if (source === "MOC" && action.linked_moc_number) parts.push(`MOC ${action.linked_moc_number}`);
   if (source === "AINM" && action.linked_ainm_number) parts.push(`AINM ${action.linked_ainm_number}`);
+  if (source === "HSE Inspection" && action.linked_hse_inspection_number) parts.push(`HSE Inspection ${action.linked_hse_inspection_number}`);
   return parts.join(" | ");
 }
 
@@ -571,6 +593,7 @@ function buildLinkedRecordDisplay(action: ActionItem) {
     action.linked_capa_number ? `CAPA ${action.linked_capa_number}` : "",
     action.linked_moc_number ? `MOC ${action.linked_moc_number}` : "",
     action.linked_ainm_number ? `AINM ${action.linked_ainm_number}` : "",
+    action.linked_hse_inspection_number ? `HSE Inspection ${action.linked_hse_inspection_number}` : "",
   ].filter(Boolean);
 
   if (values.length) return values.join(" | ");
@@ -607,6 +630,8 @@ function buildActionFormFromItem(action: ActionItem): ActionForm {
     linked_moc_number: action.linked_moc_number || "",
     linked_ainm_id: action.linked_ainm_id || "",
     linked_ainm_number: action.linked_ainm_number || "",
+    linked_hse_inspection_id: action.linked_hse_inspection_id || "",
+    linked_hse_inspection_number: action.linked_hse_inspection_number || "",
   };
 }
 
@@ -645,6 +670,8 @@ function ActionsPageContent() {
   const prefillLinkedMocNumber = searchParams.get("linked_moc_number")?.trim() || "";
   const prefillLinkedAinmId = searchParams.get("linked_ainm_id")?.trim() || "";
   const prefillLinkedAinmNumber = searchParams.get("linked_ainm_number")?.trim() || "";
+  const prefillLinkedHseInspectionId = searchParams.get("linked_hse_inspection_id")?.trim() || "";
+  const prefillLinkedHseInspectionNumber = searchParams.get("linked_hse_inspection_number")?.trim() || "";
   const hasCreatePrefillParams = Boolean(
     prefillSource ||
       prefillDepartment ||
@@ -664,7 +691,9 @@ function ActionsPageContent() {
       prefillLinkedMocId ||
       prefillLinkedMocNumber ||
       prefillLinkedAinmId ||
-      prefillLinkedAinmNumber
+      prefillLinkedAinmNumber ||
+      prefillLinkedHseInspectionId ||
+      prefillLinkedHseInspectionNumber
   );
   const hasRegisterFilterParams = Boolean(
     linkedSearch ||
@@ -699,6 +728,7 @@ function ActionsPageContent() {
   const [assetInspectionOptions, setAssetInspectionOptions] = useState<AssetInspectionOption[]>([]);
   const [assetMaintenanceOptions, setAssetMaintenanceOptions] = useState<AssetMaintenanceOption[]>([]);
   const [assetCalibrationOptions, setAssetCalibrationOptions] = useState<AssetCalibrationOption[]>([]);
+  const [hseInspectionOptions, setHseInspectionOptions] = useState<HseInspectionOption[]>([]);
   const [people, setPeople] = useState<ActionPerson[]>([]);
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
   const [message, setMessage] = useState("Loading actions...");
@@ -906,6 +936,30 @@ function ActionsPageContent() {
     setAinmOptions(options);
   }
 
+  async function loadHseInspectionOptions() {
+    const { data, error } = await supabase
+      .from("hse_inspection_records")
+      .select("id,inspection_number,title,form_title,project_work_scope,area_zone,inspection_date")
+      .order("inspection_date", { ascending: false })
+      .order("inspection_number", { ascending: false });
+
+    if (error) return;
+
+    const options = ((data || []) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        id: String(row.id || ""),
+        inspection_number: String(row.inspection_number || ""),
+        title: String(row.title || ""),
+        form_title: String(row.form_title || ""),
+        project_work_scope: String(row.project_work_scope || ""),
+        area_zone: String(row.area_zone || ""),
+        inspection_date: String(row.inspection_date || ""),
+      }))
+      .filter((row) => row.id && row.inspection_number);
+
+    setHseInspectionOptions(options);
+  }
+
   async function loadAssetLinkedOptions() {
     const [assetsRes, inspectionsRes, maintenanceRes, calibrationsRes] = await Promise.all([
       supabase.from("assets").select("id,asset_code,name").order("asset_code", { ascending: true }),
@@ -1021,6 +1075,7 @@ function ActionsPageContent() {
         loadNcrCapaOptions(),
         loadMocOptions(),
         loadAinmOptions(),
+        loadHseInspectionOptions(),
         loadAssetLinkedOptions(),
         loadPeople(),
         loadCurrentUser(),
@@ -1046,7 +1101,9 @@ function ActionsPageContent() {
       !prefillLinkedMocId &&
       !prefillLinkedMocNumber &&
       !prefillLinkedAinmId &&
-      !prefillLinkedAinmNumber
+      !prefillLinkedAinmNumber &&
+      !prefillLinkedHseInspectionId &&
+      !prefillLinkedHseInspectionNumber
     ) {
       return;
     }
@@ -1057,7 +1114,7 @@ function ActionsPageContent() {
         : current.source || "Manual";
       const nextDepartment =
         prefillDepartment ||
-        (nextSource === "AINM" ? "HSEQ" : "") ||
+        (nextSource === "AINM" || nextSource === "HSE Inspection" ? "HSEQ" : "") ||
         (isAssetLinkedSource(nextSource) ? "Assets" : current.department);
 
       return {
@@ -1081,6 +1138,8 @@ function ActionsPageContent() {
         linked_moc_number: prefillLinkedMocNumber || current.linked_moc_number,
         linked_ainm_id: prefillLinkedAinmId || current.linked_ainm_id,
         linked_ainm_number: prefillLinkedAinmNumber || current.linked_ainm_number,
+        linked_hse_inspection_id: prefillLinkedHseInspectionId || current.linked_hse_inspection_id,
+        linked_hse_inspection_number: prefillLinkedHseInspectionNumber || current.linked_hse_inspection_number,
       };
     });
 
@@ -1095,6 +1154,8 @@ function ActionsPageContent() {
     prefillLinkedAssetCode,
     prefillLinkedAinmId,
     prefillLinkedAinmNumber,
+    prefillLinkedHseInspectionId,
+    prefillLinkedHseInspectionNumber,
     prefillLinkedAssetId,
     prefillLinkedInspectionId,
     prefillLinkedInspectionNumber,
@@ -1656,6 +1717,8 @@ function ActionsPageContent() {
         linked_moc_number: "",
         linked_ainm_id: "",
         linked_ainm_number: "",
+        linked_hse_inspection_id: "",
+        linked_hse_inspection_number: "",
       };
     }
 
@@ -1676,6 +1739,8 @@ function ActionsPageContent() {
         linked_moc_number: "",
         linked_ainm_id: "",
         linked_ainm_number: "",
+        linked_hse_inspection_id: "",
+        linked_hse_inspection_number: "",
       };
     }
 
@@ -1722,6 +1787,8 @@ function ActionsPageContent() {
         linked_capa_number: "",
         linked_ainm_id: "",
         linked_ainm_number: "",
+        linked_hse_inspection_id: "",
+        linked_hse_inspection_number: "",
       };
     }
 
@@ -1747,6 +1814,35 @@ function ActionsPageContent() {
         linked_capa_number: "",
         linked_moc_id: "",
         linked_moc_number: "",
+        linked_hse_inspection_id: "",
+        linked_hse_inspection_number: "",
+      };
+    }
+
+    if (source === "HSE Inspection") {
+      return {
+        ...current,
+        source,
+        department: "HSEQ",
+        linked_audit_id: "",
+        linked_audit_number: "",
+        linked_finding_id: "",
+        linked_finding_reference: "",
+        linked_asset_id: "",
+        linked_asset_code: "",
+        linked_inspection_id: "",
+        linked_inspection_number: "",
+        linked_maintenance_id: "",
+        linked_maintenance_number: "",
+        linked_calibration_id: "",
+        linked_ncr_id: "",
+        linked_ncr_number: "",
+        linked_capa_id: "",
+        linked_capa_number: "",
+        linked_moc_id: "",
+        linked_moc_number: "",
+        linked_ainm_id: "",
+        linked_ainm_number: "",
       };
     }
 
@@ -1772,6 +1868,8 @@ function ActionsPageContent() {
       linked_moc_number: "",
       linked_ainm_id: "",
       linked_ainm_number: "",
+      linked_hse_inspection_id: "",
+      linked_hse_inspection_number: "",
     };
   }
 
@@ -1822,6 +1920,18 @@ function ActionsPageContent() {
       linked_ainm_id: selected?.id || "",
       linked_ainm_number: selected?.number || "",
       project: current.project || selected?.project || "",
+    };
+  }
+
+  function applyHseInspectionSelection(current: ActionForm, inspectionId: string): ActionForm {
+    const selected = hseInspectionOptions.find((option) => option.id === inspectionId);
+    return {
+      ...current,
+      linked_hse_inspection_id: selected?.id || "",
+      linked_hse_inspection_number: selected?.inspection_number || "",
+      department: "HSEQ",
+      project: current.project || selected?.project_work_scope || selected?.area_zone || "",
+      title: current.title || (selected ? `${selected.inspection_number} - ${selected.title || selected.form_title}` : current.title),
     };
   }
 
@@ -1977,6 +2087,8 @@ function ActionsPageContent() {
           linked_moc_number: form.linked_moc_number.trim() || null,
           linked_ainm_id: form.linked_ainm_id || null,
           linked_ainm_number: form.linked_ainm_number.trim() || null,
+          linked_hse_inspection_id: form.linked_hse_inspection_id || null,
+          linked_hse_inspection_number: form.linked_hse_inspection_number.trim() || null,
         },
       ])
       .select("*")
@@ -2046,6 +2158,8 @@ function ActionsPageContent() {
         linked_moc_number: editForm.linked_moc_number.trim() || null,
         linked_ainm_id: editForm.linked_ainm_id || null,
         linked_ainm_number: editForm.linked_ainm_number.trim() || null,
+        linked_hse_inspection_id: editForm.linked_hse_inspection_id || null,
+        linked_hse_inspection_number: editForm.linked_hse_inspection_number.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
@@ -2830,6 +2944,23 @@ function ActionsPageContent() {
                     {ainmOptions.map((option) => (
                       <option key={option.id} value={option.id}>
                         {option.number} - {option.title || "Untitled"}{option.project ? ` (${option.project})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
+              {form.source === "HSE Inspection" ? (
+                <Field label="HSE Inspection Record">
+                  <select
+                    value={form.linked_hse_inspection_id}
+                    onChange={(e) => setForm((current) => applyHseInspectionSelection(current, e.target.value))}
+                    style={inputStyle}
+                  >
+                    <option value="">Select HSE inspection</option>
+                    {hseInspectionOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.inspection_number} - {option.title || option.form_title}{option.inspection_date ? ` (${formatDate(option.inspection_date)})` : ""}
                       </option>
                     ))}
                   </select>
@@ -3665,6 +3796,23 @@ function ActionsPageContent() {
                       {ainmOptions.map((option) => (
                         <option key={option.id} value={option.id}>
                           {option.number} - {option.title || "Untitled"}{option.project ? ` (${option.project})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : null}
+
+                {editForm.source === "HSE Inspection" ? (
+                  <Field label="HSE Inspection Record">
+                    <select
+                      value={editForm.linked_hse_inspection_id}
+                      onChange={(e) => setEditForm((current) => applyHseInspectionSelection(current, e.target.value))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select HSE inspection</option>
+                      {hseInspectionOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.inspection_number} - {option.title || option.form_title}{option.inspection_date ? ` (${formatDate(option.inspection_date)})` : ""}
                         </option>
                       ))}
                     </select>
