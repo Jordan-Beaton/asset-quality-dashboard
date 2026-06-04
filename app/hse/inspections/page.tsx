@@ -451,6 +451,7 @@ export default function HseInspectionsPage() {
   const [fieldQrDataUrl, setFieldQrDataUrl] = useState("");
   const [pendingEvidence, setPendingEvidence] = useState<PendingEvidence[]>([]);
   const [uploadItemNumber, setUploadItemNumber] = useState("");
+  const [isMobile, setIsMobile] = useState(false);
 
   const selectedTemplate = useMemo(
     () => inspectionTemplates.find((template) => template.id === selectedTemplateId) ?? inspectionTemplates.find((template) => template.id === defaultTemplateId)!,
@@ -497,6 +498,14 @@ export default function HseInspectionsPage() {
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const updateMobileState = () => setIsMobile(window.innerWidth <= 720);
+    updateMobileState();
+    window.addEventListener("resize", updateMobileState);
+    return () => window.removeEventListener("resize", updateMobileState);
   }, []);
 
   useEffect(() => {
@@ -1041,16 +1050,20 @@ export default function HseInspectionsPage() {
   }
 
   return (
-    <main>
-      <QualityPageHero
-        label="HSE MANAGEMENT"
-        title="Site Inspections"
-        description="Plan, complete, evidence, and report HSE inspections across vessels, offices, offshore worksites, mobilisation, base/site areas, and dropped object controls."
-        contextCards={[
-          { label: "Last Refreshed", value: new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) },
-          { label: "Latest Inspection", value: latestSummary },
-        ]}
-      />
+    <main style={isMobile ? mobileMainStyle : undefined}>
+      {isMobile ? (
+        <MobileInspectionHero latestSummary={latestSummary} />
+      ) : (
+        <QualityPageHero
+          label="HSE MANAGEMENT"
+          title="Site Inspections"
+          description="Plan, complete, evidence, and report HSE inspections across vessels, offices, offshore worksites, mobilisation, base/site areas, and dropped object controls."
+          contextCards={[
+            { label: "Last Refreshed", value: new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) },
+            { label: "Latest Inspection", value: latestSummary },
+          ]}
+        />
+      )}
 
       <TopRow status={message} />
 
@@ -1066,6 +1079,7 @@ export default function HseInspectionsPage() {
           qrDataUrl={fieldQrDataUrl}
           onCreate={() => startCreate()}
           onFilter={(status) => { setStatusFilter(status); setActiveView("register"); }}
+          isMobile={isMobile}
         />
       ) : null}
 
@@ -1100,6 +1114,7 @@ export default function HseInspectionsPage() {
           onGeneratePdf={() => selected ? void generatePdf(draft) : undefined}
           onGeneratePdfForRecord={(record) => void generatePdf(record, evidence.filter((file) => file.inspection_id === record.id))}
           linkedActions={selectedLinkedActions}
+          isMobile={isMobile}
         />
       ) : null}
 
@@ -1121,9 +1136,30 @@ export default function HseInspectionsPage() {
           onUploadItemNumberChange={setUploadItemNumber}
           onRemovePendingEvidence={removePendingEvidence}
           onSave={() => void saveInspection()}
+          isMobile={isMobile}
         />
       ) : null}
     </main>
+  );
+}
+
+function MobileInspectionHero({ latestSummary }: { latestSummary: string }) {
+  return (
+    <section style={mobileHeroStyle}>
+      <div style={mobileHeroEyebrowStyle}>HSE Management</div>
+      <h1 style={mobileHeroTitleStyle}>Site Inspections</h1>
+      <p style={mobileHeroDescriptionStyle}>Choose, complete, evidence, and report HSE inspections from the field.</p>
+      <div style={mobileHeroCardGridStyle}>
+        <div style={mobileHeroCardStyle}>
+          <span>Last Refreshed</span>
+          <strong>{new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</strong>
+        </div>
+        <div style={mobileHeroCardStyle}>
+          <span>Latest Inspection</span>
+          <strong>{latestSummary}</strong>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1141,24 +1177,26 @@ function DashboardView({
   qrDataUrl,
   onCreate,
   onFilter,
+  isMobile,
 }: {
   kpis: { open: number; complete: number; findings: number; evidenceCount: number };
   qrDataUrl: string;
   onCreate: () => void;
   onFilter: (status: string) => void;
+  isMobile: boolean;
 }) {
   return (
     <>
-      <section style={statsGridStyle}>
+      <section style={isMobile ? mobileStatsGridStyle : statsGridStyle}>
         <QualityKpiCard title="Open Inspections" value={kpis.open} accent="#2563eb" onClick={() => onFilter("Open")} />
         <QualityKpiCard title="Completed / Closed" value={kpis.complete} accent="#16a34a" onClick={() => onFilter("Complete")} />
         <QualityKpiCard title="Open Findings" value={kpis.findings} accent="#dc2626" />
         <QualityKpiCard title="Evidence Files" value={kpis.evidenceCount} accent="#7c3aed" />
       </section>
 
-      <section style={dashboardGridStyle}>
+      <section style={isMobile ? mobileDashboardGridStyle : dashboardGridStyle}>
         <SectionCard title="Inspection Form Library">
-          <div style={storyGridStyle}>
+          <div style={isMobile ? mobileStoryGridStyle : storyGridStyle}>
             {inspectionTemplates.map((template) => (
               <div key={template.id} style={miniTemplateStyle}>
                 <strong>{template.documentNumber}</strong>
@@ -1230,6 +1268,7 @@ function RegisterView({
   onGeneratePdf,
   onGeneratePdfForRecord,
   linkedActions,
+  isMobile,
 }: {
   records: HseInspectionRecord[];
   totalRecords: number;
@@ -1260,12 +1299,13 @@ function RegisterView({
   onGeneratePdf: () => void;
   onGeneratePdfForRecord: (record: HseInspectionRecord) => void;
   linkedActions: CentralAction[];
+  isMobile: boolean;
 }) {
   return (
     <section style={splitGridStyle}>
-      <div style={panelStyle}>
+      <div style={isMobile ? mobilePanelStyle : panelStyle}>
         <PanelHeader title="Inspection Register" description="Logged HSE inspections with status, findings, evidence, and report output." />
-        <div style={registerToolbarStyle}>
+        <div style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
           <input style={inputStyle} placeholder="Search inspections" value={search} onChange={(event) => onSearch(event.target.value)} />
           <select style={selectStyle} value={statusFilter} onChange={(event) => onStatusFilter(event.target.value)}>
             <option value="">All Statuses</option>
@@ -1275,6 +1315,47 @@ function RegisterView({
           <button type="button" onClick={onCreate} style={primaryButtonStyle}>Create Inspection</button>
         </div>
         <div style={tableInfoStyle}>Showing {records.length} of {totalRecords} inspections</div>
+        {isMobile ? (
+          <div style={mobileRegisterListStyle}>
+            {records.map((record) => (
+              <button
+                key={record.id}
+                type="button"
+                onClick={() => onSelect(record)}
+                style={{ ...mobileRegisterCardStyle, borderColor: selected?.id === record.id ? "#0f766e" : "#dbe3ef" }}
+              >
+                <div>
+                  <strong style={mobileRegisterNumberStyle}>{record.inspection_number}</strong>
+                  <span style={mobileRegisterTitleStyle}>{record.form_title}</span>
+                  <span style={mutedTextStyle}>{record.area_zone || record.vessel_spread || "No area"} - {record.inspector_name || "No inspector"}</span>
+                </div>
+                <div style={mobileRegisterMetaStyle}>
+                  <StatusPill status={record.status} />
+                  <span>{displayDate(record.inspection_date) || "-"}</span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    style={pdfButtonStyle}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onGeneratePdfForRecord(record);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onGeneratePdfForRecord(record);
+                      }
+                    }}
+                  >
+                    PDF
+                  </span>
+                </div>
+              </button>
+            ))}
+            {!records.length ? <div style={emptyBoxStyle}>No inspections match the current filter.</div> : null}
+          </div>
+        ) : (
         <div style={tableShellStyle}>
           <table style={tableStyle}>
             <thead>
@@ -1319,9 +1400,10 @@ function RegisterView({
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
-      <div style={detailPanelStyle}>
+      <div style={isMobile ? mobileDetailPanelStyle : detailPanelStyle}>
         {!selected ? (
           <div style={emptyBoxStyle}>Select an inspection to open the detail/edit panel.</div>
         ) : (
@@ -1337,6 +1419,7 @@ function RegisterView({
               canUploadEvidence={Boolean(selectedId)}
               uploading={uploading}
               onUploadEvidenceForItem={onUploadForItem}
+              isMobile={isMobile}
             />
             <LinkedActionsPanel inspection={draft} linkedActions={linkedActions} />
             <EvidencePanel
@@ -1377,6 +1460,7 @@ function CreateInspectionView({
   onUploadItemNumberChange,
   onRemovePendingEvidence,
   onSave,
+  isMobile,
 }: {
   selectedTemplate: InspectionTemplate;
   selectedTemplateId: string;
@@ -1394,12 +1478,13 @@ function CreateInspectionView({
   onUploadItemNumberChange: (value: string) => void;
   onRemovePendingEvidence: (id: string) => void;
   onSave: () => void;
+  isMobile: boolean;
 }) {
   return (
-    <section style={panelStyle}>
+    <section style={isMobile ? mobilePanelStyle : panelStyle}>
       <PanelHeader title="Create Inspection" description="Choose the Enshore inspection form. FRM-044 is wired first so we can prove the layout, evidence, and PDF before rolling out the other five." />
 
-      <div style={templateGridStyle}>
+      <div style={isMobile ? mobileTemplateGridStyle : templateGridStyle}>
         {inspectionTemplates.map((template) => (
           <button
             key={template.id}
@@ -1419,7 +1504,7 @@ function CreateInspectionView({
         ))}
       </div>
 
-      <div style={selectedHeaderStyle}>
+      <div style={isMobile ? mobileSelectedHeaderStyle : selectedHeaderStyle}>
         <div>
           <div style={selectedEyebrowStyle}>{selectedTemplate.documentNumber}</div>
           <h2 style={selectedTitleStyle}>{selectedTemplate.title}</h2>
@@ -1443,6 +1528,7 @@ function CreateInspectionView({
             canUploadEvidence
             uploading={false}
             onUploadEvidenceForItem={onPendingUploadForItem}
+            isMobile={isMobile}
           />
           <PendingEvidencePanel
             pendingEvidence={pendingEvidence}
@@ -1474,6 +1560,7 @@ function InspectionForm({
   canUploadEvidence,
   uploading,
   onUploadEvidenceForItem,
+  isMobile = false,
 }: {
   draft: HseInspectionRecord;
   people: PeopleOption[];
@@ -1484,11 +1571,12 @@ function InspectionForm({
   canUploadEvidence: boolean;
   uploading: boolean;
   onUploadEvidenceForItem: (itemNumber: string, event: ChangeEvent<HTMLInputElement>) => void;
+  isMobile?: boolean;
 }) {
   return (
-    <div style={compact ? compactFormStyle : undefined}>
+    <div style={compact ? (isMobile ? mobileCompactFormStyle : compactFormStyle) : undefined}>
       <InspectionSection title="Report Details">
-        <div style={formGridStyle}>
+        <div style={isMobile ? mobileFormGridStyle : formGridStyle}>
           <Field label="Inspection No."><input style={{ ...inputStyle, background: "#f8fafc" }} value={draft.inspection_number} readOnly /></Field>
           <Field label="Status">
             <select style={inputStyle} value={draft.status} onChange={(event) => onDraftChange("status", event.target.value as InspectionStatus)}>
@@ -1510,49 +1598,104 @@ function InspectionForm({
 
       {baseSiteChecklist.map((section) => (
         <InspectionSection key={section.id} title={section.title}>
-          <div style={checklistShellStyle}>
-            <div style={checklistHeaderStyle}>
-              <span>Item</span>
-              <span>Description</span>
-              <span>N/A</span>
-              <span>Yes</span>
-              <span>No</span>
-              <span>Comments / action notes</span>
-              <span>Evidence</span>
-            </div>
-            {section.items.map((item) => {
-              const response = draft.checklist_responses[item.id] || { answer: "", comments: "" };
-              return (
-                <div key={item.id} style={checklistRowStyle}>
-                  <strong>{item.number}</strong>
-                  <span>{item.text}</span>
-                  {(["N/A", "Yes", "No"] as ChecklistAnswer[]).map((answer) => (
-                    <label key={answer} style={radioCellStyle}>
+          {isMobile ? (
+            <div style={mobileChecklistListStyle}>
+              {section.items.map((item) => {
+                const response = draft.checklist_responses[item.id] || { answer: "", comments: "" };
+                return (
+                  <div key={item.id} style={mobileChecklistCardStyle}>
+                    <div style={mobileChecklistItemHeaderStyle}>
+                      <strong>{item.number}</strong>
+                      <span>{item.text}</span>
+                    </div>
+                    <div style={mobileAnswerGridStyle}>
+                      {(["N/A", "Yes", "No"] as ChecklistAnswer[]).map((answer) => (
+                        <label
+                          key={answer}
+                          style={{
+                            ...mobileAnswerOptionStyle,
+                            borderColor: response.answer === answer ? "#0f766e" : "#cbd5e1",
+                            background: response.answer === answer ? "#ecfdf5" : "#ffffff",
+                            color: response.answer === answer ? "#0f766e" : "#0f172a",
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name={`${item.id}-${compact ? "edit" : "create"}`}
+                            checked={response.answer === answer}
+                            onChange={() => onChecklistChange(item.id, "answer", answer)}
+                          />
+                          {answer}
+                        </label>
+                      ))}
+                    </div>
+                    <textarea
+                      style={smallTextareaStyle}
+                      placeholder="Comments / action notes"
+                      value={response.comments}
+                      onChange={(event) => onChecklistChange(item.id, "comments", event.target.value)}
+                    />
+                    <label style={{ ...mobileItemUploadButtonStyle, opacity: canUploadEvidence ? 1 : 0.55 }}>
+                      {uploading ? "Uploading..." : `Upload evidence for item ${item.number}`}
                       <input
-                        type="radio"
-                        name={`${item.id}-${compact ? "edit" : "create"}`}
-                        checked={response.answer === answer}
-                        onChange={() => onChecklistChange(item.id, "answer", answer)}
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                        capture="environment"
+                        style={{ display: "none" }}
+                        disabled={!canUploadEvidence || uploading}
+                        onChange={(event) => onUploadEvidenceForItem(item.id, event)}
                       />
                     </label>
-                  ))}
-                  <textarea style={smallTextareaStyle} value={response.comments} onChange={(event) => onChecklistChange(item.id, "comments", event.target.value)} />
-                  <label style={{ ...itemUploadButtonStyle, opacity: canUploadEvidence ? 1 : 0.55 }}>
-                    {uploading ? "..." : "Upload"}
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                      capture="environment"
-                      style={{ display: "none" }}
-                      disabled={!canUploadEvidence || uploading}
-                      onChange={(event) => onUploadEvidenceForItem(item.id, event)}
-                    />
-                  </label>
-                </div>
-              );
-            })}
-          </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={checklistShellStyle}>
+              <div style={checklistHeaderStyle}>
+                <span>Item</span>
+                <span>Description</span>
+                <span>N/A</span>
+                <span>Yes</span>
+                <span>No</span>
+                <span>Comments / action notes</span>
+                <span>Evidence</span>
+              </div>
+              {section.items.map((item) => {
+                const response = draft.checklist_responses[item.id] || { answer: "", comments: "" };
+                return (
+                  <div key={item.id} style={checklistRowStyle}>
+                    <strong>{item.number}</strong>
+                    <span>{item.text}</span>
+                    {(["N/A", "Yes", "No"] as ChecklistAnswer[]).map((answer) => (
+                      <label key={answer} style={radioCellStyle}>
+                        <input
+                          type="radio"
+                          name={`${item.id}-${compact ? "edit" : "create"}`}
+                          checked={response.answer === answer}
+                          onChange={() => onChecklistChange(item.id, "answer", answer)}
+                        />
+                      </label>
+                    ))}
+                    <textarea style={smallTextareaStyle} value={response.comments} onChange={(event) => onChecklistChange(item.id, "comments", event.target.value)} />
+                    <label style={{ ...itemUploadButtonStyle, opacity: canUploadEvidence ? 1 : 0.55 }}>
+                      {uploading ? "..." : "Upload"}
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                        capture="environment"
+                        style={{ display: "none" }}
+                        disabled={!canUploadEvidence || uploading}
+                        onChange={(event) => onUploadEvidenceForItem(item.id, event)}
+                      />
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </InspectionSection>
       ))}
 
@@ -1561,7 +1704,7 @@ function InspectionForm({
       </InspectionSection>
 
       <InspectionSection title="Sign-Off">
-        <div style={formGridStyle}>
+        <div style={isMobile ? mobileFormGridStyle : formGridStyle}>
           <Field label="Name">
             <PeopleSelect people={people} value={draft.signoff_name || ""} onChange={(value) => onPersonSelect(value, "signoff")} />
           </Field>
@@ -1846,3 +1989,214 @@ const evidenceCardStyle: CSSProperties = { display: "flex", justifyContent: "spa
 const mutedTextStyle: CSSProperties = { color: "#64748b", fontSize: "12px", marginTop: "4px" };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: "8px", flexWrap: "wrap" };
 const qrImageStyle: CSSProperties = { width: "160px", height: "160px", border: "1px solid #dbe3ef", borderRadius: "12px", padding: "8px", background: "white", marginBottom: "10px" };
+
+const mobileMainStyle: CSSProperties = {
+  maxWidth: "100%",
+  overflowX: "hidden",
+};
+
+const mobileHeroStyle: CSSProperties = {
+  marginBottom: "16px",
+  padding: "20px 18px",
+  borderRadius: "20px",
+  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  color: "#ffffff",
+  display: "grid",
+  gap: "12px",
+  boxShadow: "0 16px 30px rgba(15, 118, 110, 0.18)",
+};
+
+const mobileHeroEyebrowStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 900,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  color: "rgba(255,255,255,0.86)",
+};
+
+const mobileHeroTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: "34px",
+  lineHeight: 1.05,
+  fontWeight: 600,
+};
+
+const mobileHeroDescriptionStyle: CSSProperties = {
+  margin: 0,
+  fontSize: "14px",
+  lineHeight: 1.45,
+  color: "rgba(255,255,255,0.95)",
+};
+
+const mobileHeroCardGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: "10px",
+};
+
+const mobileHeroCardStyle: CSSProperties = {
+  minHeight: "74px",
+  border: "1px solid rgba(255,255,255,0.18)",
+  borderRadius: "14px",
+  padding: "12px",
+  background: "rgba(255,255,255,0.12)",
+  display: "grid",
+  gap: "8px",
+  fontSize: "13px",
+  wordBreak: "break-word",
+};
+
+const mobileStatsGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: "12px",
+  marginBottom: "16px",
+};
+
+const mobileDashboardGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: "14px",
+};
+
+const mobileStoryGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: "10px",
+};
+
+const mobilePanelStyle: CSSProperties = {
+  ...panelStyle,
+  padding: "12px",
+  borderRadius: "14px",
+};
+
+const mobileRegisterToolbarStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: "8px",
+  marginBottom: "12px",
+};
+
+const mobileRegisterListStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const mobileRegisterCardStyle: CSSProperties = {
+  width: "100%",
+  border: "1px solid #dbe3ef",
+  borderRadius: "12px",
+  background: "#ffffff",
+  padding: "12px",
+  textAlign: "left",
+  display: "grid",
+  gap: "10px",
+  color: "#0f172a",
+  cursor: "pointer",
+  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)",
+};
+
+const mobileRegisterNumberStyle: CSSProperties = {
+  display: "block",
+  color: "#0f766e",
+  fontWeight: 900,
+  marginBottom: "4px",
+};
+
+const mobileRegisterTitleStyle: CSSProperties = {
+  display: "block",
+  fontWeight: 800,
+  lineHeight: 1.35,
+};
+
+const mobileRegisterMetaStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "8px",
+  flexWrap: "wrap",
+  color: "#475569",
+  fontSize: "12px",
+};
+
+const mobileDetailPanelStyle: CSSProperties = {
+  ...detailPanelStyle,
+  padding: "12px",
+  borderRadius: "14px",
+};
+
+const mobileTemplateGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: "10px",
+  marginBottom: "16px",
+};
+
+const mobileSelectedHeaderStyle: CSSProperties = {
+  ...selectedHeaderStyle,
+  flexDirection: "column",
+  padding: "12px",
+};
+
+const mobileCompactFormStyle: CSSProperties = {
+  maxHeight: "none",
+  overflow: "visible",
+  paddingRight: 0,
+};
+
+const mobileFormGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: "10px",
+};
+
+const mobileChecklistListStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const mobileChecklistCardStyle: CSSProperties = {
+  border: "1px solid #dbe3ef",
+  borderRadius: "12px",
+  padding: "12px",
+  background: "#f8fafc",
+  display: "grid",
+  gap: "10px",
+};
+
+const mobileChecklistItemHeaderStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "44px 1fr",
+  gap: "8px",
+  alignItems: "start",
+  lineHeight: 1.35,
+  color: "#0f172a",
+};
+
+const mobileAnswerGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: "8px",
+};
+
+const mobileAnswerOptionStyle: CSSProperties = {
+  minHeight: "40px",
+  border: "1px solid #cbd5e1",
+  borderRadius: "10px",
+  background: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  fontWeight: 900,
+  fontSize: "13px",
+};
+
+const mobileItemUploadButtonStyle: CSSProperties = {
+  ...itemUploadButtonStyle,
+  margin: 0,
+  minHeight: "38px",
+  width: "100%",
+  boxSizing: "border-box",
+};
