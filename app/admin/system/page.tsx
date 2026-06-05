@@ -11,7 +11,7 @@ export default function AdminSystemSettingsPage() {
       latestLabel="Latest System Setting"
       status="System Settings shell ready. No system configuration is editable in this pass."
       kpis={[
-        { title: "Organisation Profile", value: "Future", accent: "#0f766e" },
+        { title: "Organisation Profile", value: "Future", accent: "#3A9B98" },
         { title: "Branding", value: "Current", accent: "#2563eb" },
         { title: "Email Defaults", value: "Pending IT", accent: "#f59e0b" },
         { title: "Governance", value: "Future", accent: "#64748b" },
@@ -30,8 +30,20 @@ function AdminSettingsPage({ title, description, latestLabel, status, kpis, pane
   return <main><QualityPageHero label="ADMIN / SETTINGS" title={title} description={description} contextCards={[{ label: "Last Refreshed", value: "Shell only" }, { label: latestLabel, value: "No settings changes yet" }]} /><div style={topMetaRowStyle}><Link href="/admin" style={backLinkStyle}>← Back to Dashboard</Link><div style={statusBannerStyle}><strong>Status:</strong> {status}</div></div><section style={statsGridStyle}>{kpis.map((kpi) => <QualityKpiCard key={kpi.title} title={kpi.title} value={kpi.value} accent={kpi.accent} />)}</section><section style={panelGridStyle}>{panels.map((panel) => <SectionCard key={panel.title} title={panel.title}>{panel.text}</SectionCard>)}</section></main>;
 }
 function SectionCard({ title, children }: { title: string; children: ReactNode }) { return <section style={panelStyle}><h2 style={sectionTitleStyle}>{title}</h2><p style={emptyTextStyle}>{children}</p></section>; }
-const topMetaRowStyle: CSSProperties = { marginBottom: 20, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" };
-const backLinkStyle: CSSProperties = { color: "#0f766e", fontWeight: 700, textDecoration: "none" };
+const topMetaRowStyle: CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
+const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

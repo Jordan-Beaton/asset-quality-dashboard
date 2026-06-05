@@ -239,6 +239,7 @@ export default function AssetActionsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
   const [pressureFilter, setPressureFilter] = useState<"" | "overdue" | "dueWeek">("");
   const [form, setForm] = useState<ActionForm>(emptyForm);
   const [message, setMessage] = useState("Loading Asset actions...");
@@ -692,7 +693,7 @@ export default function AssetActionsPage() {
       {activeView === "dashboard" ? (
         <>
           <section style={statsGridStyle}>
-            <QualityKpiCard title="Asset Actions" value={kpis.total} accent="#0f766e" onClick={() => openRegister()} />
+            <QualityKpiCard title="Asset Actions" value={kpis.total} accent="#3A9B98" onClick={() => openRegister()} />
             <QualityKpiCard title="Open Actions" value={kpis.open} accent="#2563eb" onClick={() => openRegister("Open")} />
             <QualityKpiCard title="Overdue Actions" value={kpis.overdue} accent="#dc2626" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("overdue"); setActiveView("register"); }} />
             <QualityKpiCard title="Due This Week" value={kpis.dueWeek} accent="#f59e0b" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("dueWeek"); setActiveView("register"); }} />
@@ -705,7 +706,7 @@ export default function AssetActionsPage() {
               <BarList rows={ownerRows} total={Math.max(1, kpis.open)} accent="#2563eb" onClick={(owner) => { setOwnerFilter(owner === "Unassigned" ? "" : owner); setActiveView("register"); }} />
             </SectionCard>
             <SectionCard title="Asset Action Status" subtitle="Open, in progress, and closed position.">
-              <BarList rows={statusRows} total={Math.max(1, actions.length)} accent="#0f766e" onClick={(status) => openRegister(status)} />
+              <BarList rows={statusRows} total={Math.max(1, actions.length)} accent="#3A9B98" onClick={(status) => openRegister(status)} />
             </SectionCard>
             <SectionCard title="Source Split" subtitle="Where Asset actions are being generated from.">
               <BarList rows={sourceRows} total={Math.max(1, actions.length)} accent="#7c3aed" />
@@ -725,6 +726,13 @@ export default function AssetActionsPage() {
         <SectionCard title="Asset Action Register" subtitle="Central Action Management records filtered to department Assets.">
           <div style={toolbarStyle}>
             <input style={inputStyle} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search Asset Actions..." />
+            <button type="button" style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowRegisterFilters((current) => !current)}>
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showRegisterFilters ? (
+          <div style={toolbarStyle}>
             <select style={inputStyle} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="">All Status</option>
               {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -739,6 +747,7 @@ export default function AssetActionsPage() {
             </select>
             <button type="button" style={secondaryButtonStyle} onClick={() => { setSearch(""); setStatusFilter(""); setOwnerFilter(""); setPriorityFilter(""); setPressureFilter(""); }}>Clear</button>
           </div>
+          ) : null}
 
           <div style={tableInfoStyle}>Showing {filteredActions.length} of {actions.length} Asset Actions</div>
           <div style={{ overflowX: "auto" }}>
@@ -967,38 +976,111 @@ function MiniFocus({ label, value, tone, onClick }: { label: string; value: numb
   return <button type="button" style={{ ...miniFocusStyle, borderTop: `4px solid ${colours[tone]}` }} onClick={onClick}><span>{label}</span><strong>{value}</strong></button>;
 }
 
-const topMetaRowStyle: CSSProperties = { marginBottom: 20, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" };
+const topMetaRowStyle: CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
 const topMetaActionsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
-const backLinkStyle: CSSProperties = { color: "#0f766e", fontWeight: 800, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
-const primaryLinkStyle: CSSProperties = { background: "#0f766e", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
+const primaryLinkStyle: CSSProperties = { background: "#3A9B98", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
 const smallLinkStyle: CSSProperties = { ...primaryLinkStyle, padding: "8px 10px", fontSize: 12 };
-const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20, background: "white", padding: 10, borderRadius: 14, boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" };
-const viewButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "white", borderRadius: 10, padding: "10px 14px", color: "#0f172a", fontWeight: 800, cursor: "pointer" };
-const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#0f766e", borderColor: "#0f766e", color: "white" };
+const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 };
+const viewButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
+const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#3A9B98", color: "white" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: 20 };
-const sectionHeaderStyle: CSSProperties = { background: "#0f766e", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
+const sectionHeaderStyle: CSSProperties = { background: "#3A9B98", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
 const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", color: "white" };
 const sectionSubtitleStyle: CSSProperties = { color: "rgba(255,255,255,0.82)", margin: "4px 0 0", lineHeight: 1.45, fontSize: 13 };
 const emptyTextStyle: CSSProperties = { color: "#64748b", margin: 0, lineHeight: 1.55, fontSize: 13 };
-const toolbarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 160px 190px 160px auto", gap: 10, alignItems: "center", marginBottom: 14 };
+const toolbarStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+};
 const inputStyle: CSSProperties = { width: "100%", minHeight: 42, border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", color: "#0f172a", background: "white" };
 const readOnlyInputStyle: CSSProperties = { ...inputStyle, background: "#f8fafc", color: "#64748b" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: 110, resize: "vertical", lineHeight: 1.45 };
 const secondaryButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "#e2e8f0", color: "#0f172a", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
-const primaryButtonStyle: CSSProperties = { border: "none", background: "#0f766e", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
-const tableInfoStyle: CSSProperties = { color: "#475569", fontSize: 13, fontWeight: 700, margin: "12px 0" };
-const tableStyle: CSSProperties = { width: "100%", borderCollapse: "collapse", background: "white", minWidth: 980, border: "1px solid #e2e8f0" };
-const thStyle: CSSProperties = { textAlign: "left", padding: "12px 14px", background: "#f8fafc", color: "#475569", fontSize: 12, textTransform: "uppercase", borderBottom: "1px solid #e2e8f0" };
-const tdStyle: CSSProperties = { padding: "12px 14px", borderBottom: "1px solid #e2e8f0", color: "#0f172a", verticalAlign: "top", fontSize: 13 };
-const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#0f766e" };
+const primaryButtonStyle: CSSProperties = { border: "none", background: "#3A9B98", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
+const tableInfoStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "4px",
+  flexWrap: "wrap",
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
+};
+const tableStyle: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
+};
+const thStyle: CSSProperties = {
+  textAlign: "left",
+  padding: "13px 14px",
+  background: "#f8fafc",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
+  whiteSpace: "nowrap",
+};
+const tdStyle: CSSProperties = {
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
+  color: "#0f172a",
+  verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
+};
+const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#3A9B98" };
 const trStyle: CSSProperties = { cursor: "pointer" };
 const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ecfeff" };
 const mutedTextStyle: CSSProperties = { color: "#64748b", fontSize: 12, marginTop: 4 };
-const emptyCellStyle: CSSProperties = { ...tdStyle, textAlign: "center", color: "#64748b", padding: 22 };
-const detailCardStyle: CSSProperties = { marginTop: 18, border: "1px solid #dbe3ef", borderRadius: 14, padding: 16, background: "#f8fafc", display: "grid", gap: 12 };
+const emptyCellStyle: CSSProperties = {
+  padding: "26px 14px",
+  textAlign: "center",
+  color: "#64748b",
+  background: "#f8fafc",
+  borderBottom: "1px dashed #cbd5e1",
+};
+const detailCardStyle: CSSProperties = {
+  marginTop: 18,
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  display: "grid",
+  gap: 12,
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  minWidth: 0,
+};
 const detailTitleStyle: CSSProperties = { margin: 0, color: "#0f172a", fontSize: 18 };
 const detailMetaGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, color: "#334155", fontSize: 13 };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 };

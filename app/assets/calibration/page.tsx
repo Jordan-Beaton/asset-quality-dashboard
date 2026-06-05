@@ -234,6 +234,7 @@ function CalibrationPageContent() {
   const [assetFilter, setAssetFilter] = useState(linkedAsset);
   const [searchFilter, setSearchFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | CalibrationStatus>("");
+  const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAsset));
   const [isSaving, setIsSaving] = useState(false);
   const [isOpeningId, setIsOpeningId] = useState<string>("");
   const [deletingId, setDeletingId] = useState<string>("");
@@ -725,7 +726,7 @@ function CalibrationPageContent() {
             </div>
           </div>
 
-          <div style={formGridStyle}>
+          <div style={filterGridStyle}>
             <Field label="Search Serial / Certificate">
               <input
                 value={searchFilter}
@@ -734,7 +735,17 @@ function CalibrationPageContent() {
                 placeholder="Search serial number or certificate number"
               />
             </Field>
+            <button
+              type="button"
+              style={showRegisterFilters ? secondaryButtonStyle : miniButtonStyle}
+              onClick={() => setShowRegisterFilters((prev) => !prev)}
+            >
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
 
+          {showRegisterFilters ? (
+            <div style={formGridStyle}>
             <Field label="Asset">
               <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={inputStyle}>
                 <option value="">All assets</option>
@@ -763,20 +774,23 @@ function CalibrationPageContent() {
                 <option value="Not Set">Not Set</option>
               </select>
             </Field>
-          </div>
+            </div>
+          ) : null}
 
           <div style={buttonRowStyle}>
-            <button
-              type="button"
-              style={secondaryButtonStyle}
-              onClick={() => {
-                setAssetFilter("");
-                setSearchFilter("");
-                setStatusFilter("");
-              }}
-            >
-              Clear Filters
-            </button>
+            {showRegisterFilters ? (
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => {
+                  setAssetFilter("");
+                  setSearchFilter("");
+                  setStatusFilter("");
+                }}
+              >
+                Clear Filters
+              </button>
+            ) : null}
             <div style={registerCountStyle}>
               Showing <strong>{calibrationRows.length}</strong> records
             </div>
@@ -975,10 +989,15 @@ const topMetaRowStyle: CSSProperties = {
   gap: 12,
   flexWrap: "wrap",
   alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -1065,6 +1084,19 @@ const formGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: "14px",
+};
+
+const filterGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
 };
 
 const fieldWrapStyle: CSSProperties = {
@@ -1176,7 +1208,7 @@ const uploadButtonStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   borderRadius: "10px",
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
   padding: "10px 14px",
   fontWeight: 700,
@@ -1194,7 +1226,7 @@ const buttonRowStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "12px",
@@ -1222,33 +1254,40 @@ const registerCountStyle: CSSProperties = {
 
 const tableStyle: CSSProperties = {
   width: "100%",
-  borderCollapse: "separate",
-  borderSpacing: 0,
-  minWidth: "980px",
+  borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
 };
 
 const tableHeadStyle: CSSProperties = {
   textAlign: "left",
-  padding: "12px 14px",
+  padding: "13px 14px",
   background: "#f8fafc",
-  color: "#0f172a",
-  fontWeight: 800,
-  fontSize: "13px",
-  borderBottom: "1px solid #dbe7f3",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
+  whiteSpace: "nowrap",
 };
 
 const tableCellStyle: CSSProperties = {
-  padding: "12px 14px",
-  borderBottom: "1px solid #e2e8f0",
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
   color: "#0f172a",
-  fontSize: "14px",
-  verticalAlign: "top",
+  verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
 };
 
 const emptyCellStyle: CSSProperties = {
-  ...tableCellStyle,
+  padding: "26px 14px",
   textAlign: "center",
   color: "#64748b",
+  background: "#f8fafc",
+  borderBottom: "1px dashed #cbd5e1",
 };
 
 const cellTitleStyle: CSSProperties = {
@@ -1264,7 +1303,7 @@ const cellMetaStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",

@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -51,8 +52,26 @@ type ActionItem = {
 type PersonOption = {
   id: string;
   name: string;
+  email: string | null;
   role: string | null;
   department: string | null;
+};
+
+type HseActionImportRow = {
+  rowNumber: number;
+  title: string;
+  description: string;
+  department: string;
+  project: string;
+  owner: string;
+  priority: string;
+  status: string;
+  due_date: string;
+  source: string;
+  linkedReference: string;
+  errors: string[];
+  skipReasons: string[];
+  personWillBeCreated: boolean;
 };
 
 type ActionForm = {
@@ -160,6 +179,101 @@ const sourceOptions = [
   "Other",
 ];
 
+function normalizeImportHeader(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeLookupValue(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase();
+}
+
+function getImportCell(row: Record<string, unknown>, candidates: string[]) {
+  const normalizedCandidates = candidates.map(normalizeImportHeader);
+  const entry = Object.entries(row).find(([key]) => normalizedCandidates.includes(normalizeImportHeader(key)));
+  const value = entry?.[1];
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function normalizeImportDate(value: unknown) {
+  if (value === null || value === undefined || value === "") return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) {
+      const month = String(parsed.m).padStart(2, "0");
+      const day = String(parsed.d).padStart(2, "0");
+      return `${parsed.y}-${month}-${day}`;
+    }
+  }
+  const text = String(value).trim();
+  if (!text) return "";
+  const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2].padStart(2, "0")}-${isoMatch[3].padStart(2, "0")}`;
+  const ukMatch = text.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+  if (ukMatch) {
+    const year = ukMatch[3].length === 2 ? `20${ukMatch[3]}` : ukMatch[3];
+    return `${year}-${ukMatch[2].padStart(2, "0")}-${ukMatch[1].padStart(2, "0")}`;
+  }
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function getRawDateCell(row: Record<string, unknown>, candidates: string[]) {
+  const normalizedCandidates = candidates.map(normalizeImportHeader);
+  const entry = Object.entries(row).find(([key]) => normalizedCandidates.includes(normalizeImportHeader(key)));
+  return entry?.[1] ?? "";
+}
+
+function titleCaseName(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((part) => part ? `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}` : part)
+    .join(" ");
+}
+
+function generateEmailFromName(name: string) {
+  const clean = titleCaseName(name).replace(/[^a-zA-Z\s'-]/g, "").trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return "";
+  const firstInitial = parts[0].charAt(0).toLowerCase();
+  const surname = parts[parts.length - 1].replace(/[^a-zA-Z]/g, "").toLowerCase();
+  return firstInitial && surname ? `${firstInitial}${surname}@enshoresubsea.com` : "";
+}
+
+function normalizeImportPriority(value: string) {
+  const match = priorityOptions.find((option) => option.toLowerCase() === value.trim().toLowerCase());
+  return match || "Medium";
+}
+
+function normalizeImportStatus(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return "Open";
+  if (["closed", "complete", "completed"].includes(trimmed)) return "Closed";
+  if (["in progress", "progress", "ongoing"].includes(trimmed)) return "In Progress";
+  return "Open";
+}
+
+function normalizeImportSource(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "HSE";
+  const matched = sourceOptions.find((option) => option.toLowerCase() === trimmed.toLowerCase());
+  return matched || "HSE";
+}
+
+function normalizeImportDepartment(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === "quality" || trimmed === "qa" || trimmed === "qc") return "Quality";
+  if (trimmed === "hse" || trimmed === "h&s" || trimmed === "health safety environment") return "HSE";
+  if (trimmed === "hseq") return "HSE";
+  return "HSE";
+}
+
 function normaliseStatus(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
 }
@@ -248,12 +362,17 @@ export default function HseActionsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
   const [pressureFilter, setPressureFilter] = useState<"" | "overdue" | "dueWeek">("");
   const [form, setForm] = useState<ActionForm>(emptyForm);
   const [message, setMessage] = useState("Loading HSE actions...");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState("");
+  const [showImportPanel, setShowImportPanel] = useState(false);
+  const [importRows, setImportRows] = useState<HseActionImportRow[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [isImportingActions, setIsImportingActions] = useState(false);
 
   useEffect(() => {
     void loadData();
@@ -296,7 +415,7 @@ export default function HseActionsPage() {
     setLoading(true);
     const [actionsRes, peopleRes, auditRes, findingRes, ncrRes, capaRes, mocRes, ainmRes, hseInspectionRes, assetsRes, inspectionsRes, maintenanceRes, calibrationsRes] = await Promise.all([
       supabase.from("actions").select("*").order("action_number", { ascending: true }),
-      supabase.from("people").select("id,name,role,department,active").eq("active", true).order("name", { ascending: true }),
+      supabase.from("people").select("id,name,email,role,department,active").eq("active", true).order("name", { ascending: true }),
       supabase.from("audits").select("id,audit_number,title").order("audit_number", { ascending: true }),
       supabase.from("audit_findings").select("id,audit_id,reference,description").order("reference", { ascending: true }),
       supabase.from("ncrs").select("id,ncr_number,title").order("ncr_number", { ascending: true }),
@@ -322,8 +441,8 @@ export default function HseActionsPage() {
       if (aNum !== null && bNum !== null) return aNum - bNum;
       return (a.action_number || "").localeCompare(b.action_number || "");
     });
-    const hseqActions = allActions.filter((action) => (action.department || "").trim().toUpperCase() === "HSEQ");
-    setActions(hseqActions);
+    const hseActions = allActions.filter((action) => (action.department || "").trim().toUpperCase() === "HSE");
+    setActions(hseActions);
     if (peopleRes.data && !peopleRes.error) setPeople((peopleRes.data || []) as PersonOption[]);
     if (auditRes.data && !auditRes.error) {
       setAuditOptions(((auditRes.data || []) as Array<Record<string, unknown>>).map((row) => ({
@@ -422,7 +541,7 @@ export default function HseActionsPage() {
       })).filter((row) => row.id && row.asset_id));
     }
     setLastRefreshed(new Date().toLocaleString("en-GB"));
-    setMessage(`Loaded ${hseqActions.length} HSEQ action${hseqActions.length === 1 ? "" : "s"}.`);
+    setMessage(`Loaded ${hseActions.length} HSE action${hseActions.length === 1 ? "" : "s"}.`);
     setLoading(false);
   }
 
@@ -462,6 +581,16 @@ export default function HseActionsPage() {
     const peopleNames = people.map((person) => person.name).filter(Boolean);
     return [...new Set([...peopleNames, ...savedOwners])].sort();
   }, [actions, people]);
+
+  const importableRows = useMemo(
+    () => importRows.filter((row) => row.errors.length === 0 && row.skipReasons.length === 0),
+    [importRows]
+  );
+
+  const skippedImportRows = useMemo(
+    () => importRows.filter((row) => row.errors.length > 0 || row.skipReasons.length > 0),
+    [importRows]
+  );
 
   const createFindingOptions = useMemo(
     () => findingOptions.filter((finding) => finding.audit_id === form.linked_audit_id),
@@ -513,6 +642,216 @@ export default function HseActionsPage() {
     });
   }, [actions, ownerFilter, pressureFilter, priorityFilter, search, statusFilter]);
 
+  async function handleImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    setImportRows([]);
+    setMessage(`Reading ${file.name}...`);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        setMessage("Import failed: workbook does not contain any sheets.");
+        return;
+      }
+
+      const sheet = workbook.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+        defval: "",
+        raw: true,
+      });
+
+      if (!rawRows.length) {
+        setMessage("Import failed: first sheet has no action rows.");
+        return;
+      }
+
+      const existingPeople = new Set(people.map((person) => normalizeLookupValue(person.name)).filter(Boolean));
+      const existingEmails = new Set(people.map((person) => normalizeLookupValue(person.email)).filter(Boolean));
+      const uploadKeys = new Set<string>();
+      const uploadPeople = new Set<string>();
+
+      const parsedRows = rawRows.map((row, index): HseActionImportRow => {
+        const title = getImportCell(row, ["Title", "Action Title", "Action", "Action Required"]);
+        const descriptionParts = [
+          getImportCell(row, ["Description", "Action Description", "Details"]),
+          getImportCell(row, ["Comments", "Comment", "Notes"]),
+        ].filter(Boolean);
+        const project = getImportCell(row, ["Project", "Project / Work Scope", "Work Scope", "Project Work Scope"]);
+        const department = normalizeImportDepartment(getImportCell(row, ["Department", "Allocation", "Action Department", "Function"]));
+        const rawOwner = getImportCell(row, ["Owner", "Assigned", "Assigned To", "Action Owner", "Responsible Person"]);
+        const owner = rawOwner ? titleCaseName(rawOwner) : "";
+        const priority = normalizeImportPriority(getImportCell(row, ["Priority"]));
+        const status = normalizeImportStatus(getImportCell(row, ["Status"]));
+        const dueDate = normalizeImportDate(getRawDateCell(row, ["Due Date", "Target Date", "Target Response Date"]));
+        const source = normalizeImportSource(getImportCell(row, ["Source", "Source Type", "Module"]));
+        const linkedReference = getImportCell(row, ["Linked Record", "Linked Reference", "AINM No", "AINM Number", "Inspection No", "Inspection Number", "NCR No", "NCR Number"]);
+        const errors: string[] = [];
+        const skipReasons: string[] = [];
+        const rowKey = normalizeLookupValue(`${title}|${project}|${owner}|${dueDate}|${descriptionParts.join(" ")}`);
+        const normalizedOwner = normalizeLookupValue(owner);
+        const ownerEmail = owner ? generateEmailFromName(owner) : "";
+        const personWillBeCreated = Boolean(owner && !existingPeople.has(normalizedOwner));
+
+        if (!title) errors.push("Title/Action is required.");
+        if (owner && !ownerEmail && !existingPeople.has(normalizedOwner)) {
+          errors.push("Owner needs a first name and surname to create People record.");
+        }
+        if (ownerEmail && existingEmails.has(normalizeLookupValue(ownerEmail)) && !existingPeople.has(normalizedOwner)) {
+          skipReasons.push("Generated owner email already exists for another person.");
+        }
+        if (rowKey && uploadKeys.has(rowKey)) skipReasons.push("Duplicate action in uploaded file.");
+        if (rowKey) uploadKeys.add(rowKey);
+        if (normalizedOwner && uploadPeople.has(normalizedOwner) && personWillBeCreated) {
+          // Only the first row needs to create the person. Later rows can still import against the same new owner.
+        } else if (normalizedOwner && personWillBeCreated) {
+          uploadPeople.add(normalizedOwner);
+        }
+
+        return {
+          rowNumber: index + 2,
+          title,
+          description: descriptionParts.join("\n\n"),
+          department,
+          project,
+          owner,
+          priority,
+          status,
+          due_date: dueDate,
+          source,
+          linkedReference,
+          errors,
+          skipReasons,
+          personWillBeCreated,
+        };
+      });
+
+      setImportRows(parsedRows);
+      setMessage(`Preview ready: ${parsedRows.length} action row${parsedRows.length === 1 ? "" : "s"} loaded from ${file.name}.`);
+    } catch (error) {
+      setMessage(`Import preview failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function buildLinkedImportFields(row: HseActionImportRow) {
+    const reference = row.linkedReference.trim();
+    const payload: Partial<ActionItem> = {};
+    if (!reference) return payload;
+
+    const normalizedSource = row.source.toLowerCase();
+    if (normalizedSource === "ainm" || /^a?r?\d+/i.test(reference)) {
+      const matched = ainmOptions.find((option) => option.number.toLowerCase() === reference.toLowerCase());
+      payload.linked_ainm_id = matched?.id || null;
+      payload.linked_ainm_number = matched?.number || reference;
+      return payload;
+    }
+
+    if (normalizedSource === "hse inspection" || /^hse-ins-/i.test(reference)) {
+      const matched = hseInspectionOptions.find((option) => option.inspection_number.toLowerCase() === reference.toLowerCase());
+      payload.linked_hse_inspection_id = matched?.id || null;
+      payload.linked_hse_inspection_number = matched?.inspection_number || reference;
+      return payload;
+    }
+
+    if (normalizedSource === "ncr/capa" || /^ncr-/i.test(reference)) {
+      const matched = ncrCapaOptions.find((option) => option.number.toLowerCase() === reference.toLowerCase());
+      if (matched?.type === "NCR") {
+        payload.linked_ncr_id = matched.id;
+        payload.linked_ncr_number = matched.number;
+      } else if (matched?.type === "CAPA") {
+        payload.linked_capa_id = matched.id;
+        payload.linked_capa_number = matched.number;
+      } else {
+        payload.linked_ncr_number = reference;
+      }
+      return payload;
+    }
+
+    if (normalizedSource === "moc") {
+      const matched = mocOptions.find((option) => option.number.toLowerCase() === reference.toLowerCase());
+      payload.linked_moc_id = matched?.id || null;
+      payload.linked_moc_number = matched?.number || reference;
+      return payload;
+    }
+
+    return payload;
+  }
+
+  async function importPreviewedActions() {
+    if (!importRows.length) {
+      setMessage("Select an Excel file before importing HSE/Quality actions.");
+      return;
+    }
+    if (!importableRows.length) {
+      setMessage("No valid HSE/Quality action rows are available to import.");
+      return;
+    }
+
+    setIsImportingActions(true);
+    try {
+      const existingPeople = new Set(people.map((person) => normalizeLookupValue(person.name)).filter(Boolean));
+      const missingPeople = Array.from(
+        new Map(
+          importableRows
+            .filter((row) => row.owner && row.personWillBeCreated && !existingPeople.has(normalizeLookupValue(row.owner)))
+            .map((row) => [normalizeLookupValue(row.owner), { name: row.owner, department: row.department || "HSE" }])
+        ).values()
+      );
+
+      if (missingPeople.length) {
+        const peopleRows = missingPeople.map((person) => ({
+          name: person.name,
+          email: generateEmailFromName(person.name) || null,
+          role: null,
+          department: person.department,
+          active: true,
+        }));
+        const { error: peopleError } = await supabase.from("people").insert(peopleRows);
+        if (peopleError) throw new Error(`People import failed: ${peopleError.message}`);
+      }
+
+      const { data: allActionNumbers, error: numbersError } = await supabase.from("actions").select("action_number");
+      if (numbersError) throw new Error(`Could not allocate action numbers: ${numbersError.message}`);
+      const existingActions = (allActionNumbers || []) as ActionItem[];
+      const highest = existingActions.reduce((max, action) => Math.max(max, extractActionNumber(action.action_number) || 0), 0);
+
+      const actionRows = importableRows.map((row, index) => ({
+        action_number: `ACT-${String(highest + index + 1).padStart(3, "0")}`,
+        title: row.title.trim(),
+        description: row.description.trim() || null,
+        department: row.department || "HSE",
+        project: row.project.trim() || null,
+        owner: row.owner.trim() || null,
+        priority: row.priority,
+        status: row.status,
+        due_date: row.due_date || null,
+        source: row.source || "HSE",
+        ...buildLinkedImportFields(row),
+      }));
+
+      const { error: actionError } = await supabase.from("actions").insert(actionRows);
+      if (actionError) throw new Error(`Action import failed: ${actionError.message}`);
+
+      setMessage(`Imported ${actionRows.length} HSE/Quality action${actionRows.length === 1 ? "" : "s"} from ${importFileName}.`);
+      setImportRows([]);
+      setImportFileName("");
+      setShowImportPanel(false);
+      setActiveView("register");
+      await loadData();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "HSE/Quality action import failed.");
+    } finally {
+      setIsImportingActions(false);
+    }
+  }
+
   async function createAction(event: React.FormEvent) {
     event.preventDefault();
     if (!form.title.trim()) {
@@ -526,7 +865,7 @@ export default function HseActionsPage() {
       action_number: nextNumber,
       title: form.title.trim(),
       description: form.description.trim() || null,
-      department: "HSEQ",
+      department: "HSE",
       project: form.project.trim() || null,
       owner: form.owner.trim() || null,
       priority: form.priority,
@@ -562,7 +901,7 @@ export default function HseActionsPage() {
       return;
     }
     setForm(emptyForm);
-    setMessage(`${nextNumber} created in central Action Management as an HSEQ action.`);
+    setMessage(`${nextNumber} created in central Action Management as an HSE action.`);
     setActiveView("register");
     await loadData();
   }
@@ -740,14 +1079,14 @@ export default function HseActionsPage() {
         description="HSE-specific action dashboard, register, and creation view backed by the central Action Management register."
         contextCards={[
           { label: "Last Refreshed", value: lastRefreshed || (loading ? "Loading" : "-") },
-          { label: "Latest HSE Action", value: latestAction ? `${latestAction.action_number} - ${latestAction.title}` : "No HSEQ actions" },
+          { label: "Latest HSE Action", value: latestAction ? `${latestAction.action_number} - ${latestAction.title}` : "No HSE actions" },
         ]}
       />
 
       <div style={topMetaRowStyle}>
         <Link href="/hse" style={backLinkStyle}>← Back to Dashboard</Link>
         <div style={topMetaActionsStyle}>
-          <Link href="/actions?department=HSEQ" style={primaryLinkStyle}>Open Central Actions</Link>
+          <Link href="/actions?department=HSE" style={primaryLinkStyle}>Open Central Actions</Link>
           <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
         </div>
       </div>
@@ -763,7 +1102,7 @@ export default function HseActionsPage() {
       {activeView === "dashboard" ? (
         <>
           <section style={statsGridStyle}>
-            <QualityKpiCard title="HSE Actions" value={kpis.total} accent="#0f766e" onClick={() => openRegister()} />
+            <QualityKpiCard title="HSE Actions" value={kpis.total} accent="#3A9B98" onClick={() => openRegister()} />
             <QualityKpiCard title="Open Actions" value={kpis.open} accent="#2563eb" onClick={() => openRegister("Open")} />
             <QualityKpiCard title="Overdue Actions" value={kpis.overdue} accent="#dc2626" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("overdue"); setActiveView("register"); }} />
             <QualityKpiCard title="Due This Week" value={kpis.dueWeek} accent="#f59e0b" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("dueWeek"); setActiveView("register"); }} />
@@ -772,16 +1111,16 @@ export default function HseActionsPage() {
           </section>
 
           <section style={dashboardGridStyle}>
-            <SectionCard title="Open Actions by Person" subtitle="Who is carrying the current HSEQ action load.">
+            <SectionCard title="Open Actions by Person" subtitle="Who is carrying the current HSE action load.">
               <BarList rows={ownerRows} total={Math.max(1, kpis.open)} accent="#2563eb" onClick={(owner) => { setOwnerFilter(owner === "Unassigned" ? "" : owner); setActiveView("register"); }} />
             </SectionCard>
-            <SectionCard title="HSEQ Action Status" subtitle="Open, in progress, and closed position.">
-              <BarList rows={statusRows} total={Math.max(1, actions.length)} accent="#0f766e" onClick={(status) => openRegister(status)} />
+            <SectionCard title="HSE Action Status" subtitle="Open, in progress, and closed position.">
+              <BarList rows={statusRows} total={Math.max(1, actions.length)} accent="#3A9B98" onClick={(status) => openRegister(status)} />
             </SectionCard>
-            <SectionCard title="Source Split" subtitle="Where HSEQ actions are being generated from.">
+            <SectionCard title="Source Split" subtitle="Where HSE actions are being generated from.">
               <BarList rows={sourceRows} total={Math.max(1, actions.length)} accent="#7c3aed" />
             </SectionCard>
-            <SectionCard title="Manager Focus" subtitle="Immediate HSEQ action pressure requiring management attention.">
+            <SectionCard title="Manager Focus" subtitle="Immediate HSE action pressure requiring management attention.">
               <div style={focusGridStyle}>
                 <MiniFocus label="Overdue" value={kpis.overdue} tone="red" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setSearch(""); setPressureFilter("overdue"); setActiveView("register"); }} />
                 <MiniFocus label="Due this week" value={kpis.dueWeek} tone="amber" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setSearch(""); setPressureFilter("dueWeek"); setActiveView("register"); }} />
@@ -793,9 +1132,16 @@ export default function HseActionsPage() {
       ) : null}
 
       {activeView === "register" ? (
-        <SectionCard title="HSEQ Action Register" subtitle="Central Action Management records filtered to department HSEQ.">
+        <SectionCard title="HSE Action Register" subtitle="Central Action Management records filtered to department HSE.">
           <div style={toolbarStyle}>
-            <input style={inputStyle} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HSEQ Actions..." />
+            <input style={inputStyle} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HSE Actions..." />
+            <button type="button" style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowRegisterFilters((current) => !current)}>
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showRegisterFilters ? (
+          <div style={toolbarStyle}>
             <select style={inputStyle} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="">All Status</option>
               {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -810,8 +1156,9 @@ export default function HseActionsPage() {
             </select>
             <button type="button" style={secondaryButtonStyle} onClick={() => { setSearch(""); setStatusFilter(""); setOwnerFilter(""); setPriorityFilter(""); setPressureFilter(""); }}>Clear</button>
           </div>
+          ) : null}
 
-          <div style={tableInfoStyle}>Showing {filteredActions.length} of {actions.length} HSEQ Actions</div>
+          <div style={tableInfoStyle}>Showing {filteredActions.length} of {actions.length} HSE Actions</div>
           <div style={{ overflowX: "auto" }}>
             <table style={tableStyle}>
               <thead>
@@ -849,7 +1196,7 @@ export default function HseActionsPage() {
                     <td style={tdStyle}><Link href={`/actions?actionId=${encodeURIComponent(action.id)}`} style={smallLinkStyle}>Open Central</Link></td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={8} style={emptyCellStyle}>No HSEQ actions match the current filters.</td></tr>
+                  <tr><td colSpan={8} style={emptyCellStyle}>No HSE actions match the current filters.</td></tr>
                 )}
               </tbody>
             </table>
@@ -872,7 +1219,86 @@ export default function HseActionsPage() {
       ) : null}
 
       {activeView === "create" ? (
-        <SectionCard title="Create HSEQ Action" subtitle="Creates a central Action Management record with department HSEQ.">
+        <SectionCard title="Create HSE Action" subtitle="Creates a central Action Management record with department HSE.">
+          <div style={importToggleRowStyle}>
+            <button type="button" style={showImportPanel ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowImportPanel((current) => !current)}>
+              {showImportPanel ? "Hide Bulk Upload" : "Bulk Upload HSE / Quality Actions"}
+            </button>
+            <span style={emptyTextStyle}>Upload an Excel action tracker and preview rows before creating central Action Management records.</span>
+          </div>
+
+          {showImportPanel ? (
+            <div style={importPanelStyle}>
+              <div style={importControlRowStyle}>
+                <input type="file" accept=".xlsx" onChange={(event) => void handleImportFileChange(event)} style={fileInputStyle} />
+                <button type="button" style={primaryButtonStyle} disabled={!importableRows.length || isImportingActions} onClick={() => void importPreviewedActions()}>
+                  {isImportingActions ? "Importing..." : `Import ${importableRows.length} Actions`}
+                </button>
+                <button
+                  type="button"
+                  style={secondaryButtonStyle}
+                  onClick={() => {
+                    setImportRows([]);
+                    setImportFileName("");
+                  }}
+                >
+                  Clear Preview
+                </button>
+              </div>
+
+              {importRows.length ? (
+                <>
+                  <div style={tableInfoStyle}>
+                    Previewing {importRows.length} row{importRows.length === 1 ? "" : "s"} from {importFileName || "selected workbook"}.
+                    {" "}
+                    <strong>{importableRows.length}</strong> ready, <strong>{skippedImportRows.length}</strong> requiring attention/skipped.
+                  </div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={importTableStyle}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>Row</th>
+                          <th style={thStyle}>Title</th>
+                          <th style={thStyle}>Owner</th>
+                          <th style={thStyle}>Department</th>
+                          <th style={thStyle}>Project</th>
+                          <th style={thStyle}>Source</th>
+                          <th style={thStyle}>Due Date</th>
+                          <th style={thStyle}>Status</th>
+                          <th style={thStyle}>Import Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importRows.slice(0, 60).map((row) => {
+                          const issues = [...row.errors, ...row.skipReasons];
+                          return (
+                            <tr key={`${row.rowNumber}-${row.title}`} style={issues.length ? importWarningRowStyle : trStyle}>
+                              <td style={tdStrongStyle}>{row.rowNumber}</td>
+                              <td style={tdStyle}>{row.title || "-"}</td>
+                              <td style={tdStyle}>
+                                {row.owner || "-"}
+                                {row.personWillBeCreated && !issues.length ? <div style={mutedTextStyle}>Will add to People Management</div> : null}
+                              </td>
+                              <td style={tdStyle}>{row.department || "HSE"}</td>
+                              <td style={tdStyle}>{row.project || "-"}</td>
+                              <td style={tdStyle}>{row.source || "HSE"}</td>
+                              <td style={tdStyle}>{row.due_date ? formatDate(row.due_date) : "-"}</td>
+                              <td style={tdStyle}>{row.status}</td>
+                              <td style={tdStyle}>{issues.length ? issues.join(" ") : "Ready"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {importRows.length > 60 ? <p style={emptyTextStyle}>Showing first 60 preview rows only. All valid rows will import.</p> : null}
+                </>
+              ) : (
+                <div style={emptyBoxStyle}>Choose an Excel workbook to preview HSE/Quality action rows before import.</div>
+              )}
+            </div>
+          ) : null}
+
           <form onSubmit={createAction}>
             <div style={formGridStyle}>
               <Field label="Action Number"><input style={readOnlyInputStyle} value="Auto generated" readOnly /></Field>
@@ -1021,7 +1447,7 @@ export default function HseActionsPage() {
               </div>
             </div>
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={saving}>{saving ? "Creating..." : "Create HSEQ Action"}</button>
+              <button type="submit" style={primaryButtonStyle} disabled={saving}>{saving ? "Creating..." : "Create HSE Action"}</button>
               <span style={emptyTextStyle}>This will appear in the central Action Management register automatically.</span>
             </div>
           </form>
@@ -1054,38 +1480,155 @@ function MiniFocus({ label, value, tone, onClick }: { label: string; value: numb
   return <button type="button" style={{ ...miniFocusStyle, borderTop: `4px solid ${colours[tone]}` }} onClick={onClick}><span>{label}</span><strong>{value}</strong></button>;
 }
 
-const topMetaRowStyle: CSSProperties = { marginBottom: 20, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" };
+const topMetaRowStyle: CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
 const topMetaActionsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
-const backLinkStyle: CSSProperties = { color: "#0f766e", fontWeight: 800, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
-const primaryLinkStyle: CSSProperties = { background: "#0f766e", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
+const primaryLinkStyle: CSSProperties = { background: "#3A9B98", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
 const smallLinkStyle: CSSProperties = { ...primaryLinkStyle, padding: "8px 10px", fontSize: 12 };
-const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20, background: "white", padding: 10, borderRadius: 14, boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" };
-const viewButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "white", borderRadius: 10, padding: "10px 14px", color: "#0f172a", fontWeight: 800, cursor: "pointer" };
-const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#0f766e", borderColor: "#0f766e", color: "white" };
+const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 };
+const viewButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
+const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#3A9B98", color: "white" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: 20 };
-const sectionHeaderStyle: CSSProperties = { background: "#0f766e", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
+const sectionHeaderStyle: CSSProperties = { background: "#3A9B98", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
 const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", color: "white" };
 const sectionSubtitleStyle: CSSProperties = { color: "rgba(255,255,255,0.82)", margin: "4px 0 0", lineHeight: 1.45, fontSize: 13 };
 const emptyTextStyle: CSSProperties = { color: "#64748b", margin: 0, lineHeight: 1.55, fontSize: 13 };
-const toolbarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 160px 190px 160px auto", gap: 10, alignItems: "center", marginBottom: 14 };
+const toolbarStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+};
+const importToggleRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "14px",
+};
+const importPanelStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  padding: "14px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  marginBottom: "18px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+};
+const importControlRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(220px, 1fr) auto auto",
+  gap: "10px",
+  alignItems: "center",
+};
+const fileInputStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 42,
+  border: "1px solid #cbd5e1",
+  borderRadius: 10,
+  padding: "9px 12px",
+  fontSize: 14,
+  boxSizing: "border-box",
+  color: "#0f172a",
+  background: "white",
+};
+const importTableStyle: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 1040,
+  fontSize: "13px",
+};
+const importWarningRowStyle: CSSProperties = {
+  background: "#fff7ed",
+};
 const inputStyle: CSSProperties = { width: "100%", minHeight: 42, border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", color: "#0f172a", background: "white" };
 const readOnlyInputStyle: CSSProperties = { ...inputStyle, background: "#f8fafc", color: "#64748b" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: 110, resize: "vertical", lineHeight: 1.45 };
 const secondaryButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "#e2e8f0", color: "#0f172a", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
-const primaryButtonStyle: CSSProperties = { border: "none", background: "#0f766e", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
-const tableInfoStyle: CSSProperties = { color: "#475569", fontSize: 13, fontWeight: 700, margin: "12px 0" };
-const tableStyle: CSSProperties = { width: "100%", borderCollapse: "collapse", background: "white", minWidth: 980, border: "1px solid #e2e8f0" };
-const thStyle: CSSProperties = { textAlign: "left", padding: "12px 14px", background: "#f8fafc", color: "#475569", fontSize: 12, textTransform: "uppercase", borderBottom: "1px solid #e2e8f0" };
-const tdStyle: CSSProperties = { padding: "12px 14px", borderBottom: "1px solid #e2e8f0", color: "#0f172a", verticalAlign: "top", fontSize: 13 };
-const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#0f766e" };
+const primaryButtonStyle: CSSProperties = { border: "none", background: "#3A9B98", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
+const tableInfoStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "4px",
+  flexWrap: "wrap",
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
+};
+const tableStyle: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
+};
+const thStyle: CSSProperties = {
+  textAlign: "left",
+  padding: "13px 14px",
+  background: "#f8fafc",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
+  whiteSpace: "nowrap",
+};
+const tdStyle: CSSProperties = {
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
+  color: "#0f172a",
+  verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
+};
+const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#3A9B98" };
 const trStyle: CSSProperties = { cursor: "pointer" };
 const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ecfeff" };
 const mutedTextStyle: CSSProperties = { color: "#64748b", fontSize: 12, marginTop: 4 };
-const emptyCellStyle: CSSProperties = { ...tdStyle, textAlign: "center", color: "#64748b", padding: 22 };
-const detailCardStyle: CSSProperties = { marginTop: 18, border: "1px solid #dbe3ef", borderRadius: 14, padding: 16, background: "#f8fafc", display: "grid", gap: 12 };
+const emptyCellStyle: CSSProperties = {
+  padding: "26px 14px",
+  textAlign: "center",
+  color: "#64748b",
+  background: "#f8fafc",
+  borderBottom: "1px dashed #cbd5e1",
+};
+const detailCardStyle: CSSProperties = {
+  marginTop: 18,
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  display: "grid",
+  gap: 12,
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  minWidth: 0,
+};
 const detailTitleStyle: CSSProperties = { margin: 0, color: "#0f172a", fontSize: 18 };
 const detailMetaGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, color: "#334155", fontSize: 13 };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 };

@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { imsHeroStyle, imsRadii } from "./imsTheme";
 
 type HeroContextCard = {
   label: string;
@@ -16,27 +17,15 @@ type QualityPageHeroProps = {
 };
 
 const heroStyle: CSSProperties = {
-  marginBottom: "24px",
-  padding: "28px 30px",
-  borderRadius: "24px",
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
-  color: "#ffffff",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "24px",
-  flexWrap: "wrap",
-  alignItems: "stretch",
-  minHeight: "220px",
-  boxShadow: "0 24px 44px rgba(15, 118, 110, 0.18)",
+  ...imsHeroStyle,
 };
 
 const copyStyle: CSSProperties = {
-  flex: "1 1 620px",
   display: "flex",
   flexDirection: "column",
   justifyContent: "center",
   gap: "12px",
-  minWidth: "280px",
+  minWidth: 0,
 };
 
 const labelStyle: CSSProperties = {
@@ -61,11 +50,13 @@ const descriptionStyle: CSSProperties = {
   fontSize: "0.98rem",
   lineHeight: 1.55,
   color: "rgba(255,255,255,0.96)",
+  overflow: "hidden",
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
 };
 
 const metaGridStyle: CSSProperties = {
-  flex: "0 1 476px",
-  minWidth: "260px",
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(160px, 1fr))",
   gap: "12px",
@@ -73,11 +64,10 @@ const metaGridStyle: CSSProperties = {
 };
 
 const rightColumnStyle: CSSProperties = {
-  flex: "0 1 476px",
-  minWidth: "260px",
   display: "grid",
   gap: "12px",
-  alignContent: "start",
+  alignContent: "center",
+  minWidth: 0,
 };
 
 const actionsWrapStyle: CSSProperties = {
@@ -89,15 +79,16 @@ const actionsWrapStyle: CSSProperties = {
 };
 
 const metaCardStyle: CSSProperties = {
-  minHeight: "88px",
+  height: "88px",
   padding: "16px 18px",
-  borderRadius: "16px",
+  borderRadius: imsRadii.card,
   background: "rgba(255,255,255,0.12)",
   border: "1px solid rgba(255,255,255,0.16)",
   display: "flex",
   flexDirection: "column",
   justifyContent: "space-between",
   gap: "10px",
+  boxSizing: "border-box",
   backdropFilter: "blur(4px)",
 };
 
@@ -112,6 +103,10 @@ const metaValueStyle: CSSProperties = {
   lineHeight: 1.35,
   fontWeight: 700,
   color: "#ffffff",
+  overflow: "hidden",
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
   wordBreak: "break-word",
 };
 

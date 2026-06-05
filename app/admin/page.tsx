@@ -22,7 +22,7 @@ export default function AdminDashboardPage() {
       </div>
 
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Departments" value="Configured" accent="#0f766e" />
+        <QualityKpiCard title="Departments" value="Configured" accent="#3A9B98" />
         <QualityKpiCard title="People / Roles" value="Linked" accent="#2563eb" />
         <QualityKpiCard title="Document Settings" value="Pending" accent="#7c3aed" />
         <QualityKpiCard title="Asset Settings" value="Pending" accent="#f59e0b" />
@@ -49,7 +49,19 @@ function DashboardPanel({ title, text }: { title: string; text: string }) {
   );
 }
 
-const topMetaRowStyle: CSSProperties = { marginBottom: 20, display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" };
+const topMetaRowStyle: CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import Link from "next/link";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 
@@ -16,8 +17,11 @@ export default function HseDashboardPage() {
       />
 
       <div style={topMetaRowStyle}>
+        <Link href="/hse" style={{ ...backLinkStyle, visibility: "hidden" }} aria-hidden="true" tabIndex={-1}>
+          &larr; Back to Dashboard
+        </Link>
         <div style={statusBannerStyle}>
-          <strong>Status:</strong> HSE Management shell ready. No database functionality has been configured yet.
+          <strong>Status:</strong> HSE Management dashboard ready.
         </div>
       </div>
 
@@ -26,7 +30,7 @@ export default function HseDashboardPage() {
         <QualityKpiCard title="Near Misses This Month" value="-" accent="#f59e0b" />
         <QualityKpiCard title="Inspections Due" value="-" accent="#2563eb" />
         <QualityKpiCard title="Open HSE Actions" value="-" accent="#7c3aed" />
-        <QualityKpiCard title="Environmental Items" value="-" accent="#0f766e" />
+        <QualityKpiCard title="Environmental Items" value="-" accent="#3A9B98" />
         <QualityKpiCard title="Reports Ready" value="Pending" accent="#64748b" />
       </section>
 
@@ -53,9 +57,21 @@ function DashboardPanel({ title, subtitle }: { title: string; subtitle: string }
 const topMetaRowStyle: CSSProperties = {
   marginBottom: 20,
   display: "flex",
-  justifyContent: "flex-end",
+  justifyContent: "space-between",
   gap: 12,
   flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
+
+const backLinkStyle: CSSProperties = {
+  color: "#3A9B98",
+  fontWeight: 700,
+  textDecoration: "none",
 };
 
 const statusBannerStyle: CSSProperties = {

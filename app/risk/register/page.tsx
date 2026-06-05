@@ -347,6 +347,7 @@ export default function RiskRegisterPage() {
   const [ownerFilter, setOwnerFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
+  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
 
   async function loadData(showLoadedMessage = true) {
     setIsLoading(true);
@@ -749,7 +750,7 @@ export default function RiskRegisterPage() {
       </div>
 
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Total Risks" value={risks.length} accent="#0f766e" />
+        <QualityKpiCard title="Total Risks" value={risks.length} accent="#3A9B98" />
         <QualityKpiCard title="Open Risks" value={openRisks} accent="#2563eb" />
         <QualityKpiCard title="High / Critical" value={highCriticalRisks} accent="#dc2626" />
         <QualityKpiCard title="Overdue Reviews" value={overdueReviews} accent="#f59e0b" />
@@ -770,6 +771,17 @@ export default function RiskRegisterPage() {
           </button>
         </div>
 
+        <div style={filterGridStyle}>
+          <button
+            type="button"
+            style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
+            onClick={() => setShowRegisterFilters((current) => !current)}
+          >
+            {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+          </button>
+        </div>
+
+        {showRegisterFilters ? (
         <div style={filterGridStyle}>
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={inputStyle}>
             <option value="">All statuses</option>
@@ -809,6 +821,7 @@ export default function RiskRegisterPage() {
           </select>
           <button type="button" style={secondaryButtonStyle} onClick={clearFilters}>Clear Filters</button>
         </div>
+        ) : null}
 
         <div style={filterSummaryStyle}>
           Showing {filteredRisks.length} of {risks.length} risk{risks.length === 1 ? "" : "s"}.
@@ -1203,9 +1216,21 @@ function SectionCard({
   );
 }
 
-const topMetaRowStyle: CSSProperties = { marginBottom: 20, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" };
+const topMetaRowStyle: CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
 const topMetaActionsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
-const backLinkStyle: CSSProperties = { color: "#0f766e", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: "20px" };
@@ -1227,21 +1252,90 @@ const scoreValueStyle: CSSProperties = { color: "#0f172a", fontSize: "24px", lin
 const checkboxCardStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "10px", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px 14px", background: "#f8fafc", color: "#334155", fontWeight: 700 };
 const formFooterStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginTop: "16px" };
 const helperTextStyle: CSSProperties = { color: "#64748b", fontSize: "13px" };
-const primaryButtonStyle: CSSProperties = { background: "#0f766e", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
+const primaryButtonStyle: CSSProperties = { background: "#3A9B98", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
 const secondaryButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
 const deleteButtonStyle: CSSProperties = { background: "#dc2626", color: "white", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
-const filterGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" };
-const filterSummaryStyle: CSSProperties = { marginTop: "14px", marginBottom: "14px", color: "#475569", fontSize: "14px" };
-const tableWrapStyle: CSSProperties = { overflowX: "auto" };
-const tableStyle: CSSProperties = { width: "100%", borderCollapse: "collapse" };
-const tableHeadStyle: CSSProperties = { textAlign: "left", padding: "12px 10px", borderBottom: "1px solid #e2e8f0", color: "#475569", fontSize: "13px", whiteSpace: "nowrap" };
-const tableRowStyle: CSSProperties = { cursor: "pointer" };
-const tableCellStyle: CSSProperties = { padding: "12px 10px", borderBottom: "1px solid #f1f5f9", color: "#0f172a", verticalAlign: "middle", fontSize: "14px" };
-const emptyTableCellStyle: CSSProperties = { padding: "24px 10px", textAlign: "center", color: "#64748b" };
-const riskNumberStyle: CSSProperties = { fontSize: "12px", fontWeight: 800, color: "#0f766e", whiteSpace: "nowrap" };
+const filterGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+};
+const filterSummaryStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "4px",
+  flexWrap: "wrap",
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
+};
+const tableWrapStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+};
+const tableStyle: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
+};
+const tableHeadStyle: CSSProperties = {
+  textAlign: "left",
+  padding: "13px 14px",
+  background: "#f8fafc",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
+  whiteSpace: "nowrap",
+};
+const tableRowStyle: CSSProperties = {
+  cursor: "pointer",
+  transition: "background 140ms ease",
+};
+const tableCellStyle: CSSProperties = {
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
+  color: "#0f172a",
+  verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
+};
+const emptyTableCellStyle: CSSProperties = {
+  padding: "26px 14px",
+  textAlign: "center",
+  color: "#64748b",
+  background: "#f8fafc",
+  borderBottom: "1px dashed #cbd5e1",
+};
+const riskNumberStyle: CSSProperties = { fontSize: "12px", fontWeight: 800, color: "#3A9B98", whiteSpace: "nowrap" };
 const primaryCellTextStyle: CSSProperties = { fontWeight: 700, color: "#0f172a" };
 const secondaryCellTextStyle: CSSProperties = { fontSize: "12px", color: "#64748b", marginTop: "4px" };
 const badgeStyle: CSSProperties = { padding: "5px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 800, display: "inline-block", whiteSpace: "nowrap" };
-const detailHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "16px", flexWrap: "wrap", marginBottom: "16px" };
+const detailHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "14px",
+  alignItems: "center",
+  flexWrap: "wrap",
+  paddingBottom: "14px",
+  marginBottom: "18px",
+  borderBottom: "1px solid #e2e8f0",
+};
 const detailTitleStyle: CSSProperties = { marginTop: "4px", fontSize: "22px", fontWeight: 800, color: "#0f172a" };
 const emptyTextStyle: CSSProperties = { color: "#64748b", margin: 0 };

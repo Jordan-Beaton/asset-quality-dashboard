@@ -719,7 +719,7 @@ function formatFileSize(value: number | null | undefined) {
 }
 
 function getNoticeColours(tone: NoticeTone) {
-  if (tone === "success") return { bg: "#ecfdf5", border: "#a7f3d0", text: "#166534" };
+  if (tone === "success") return { bg: "#EEF8F7", border: "#a7f3d0", text: "#166534" };
   if (tone === "warning") return { bg: "#fffbeb", border: "#fde68a", text: "#92400e" };
   if (tone === "error") return { bg: "#fef2f2", border: "#fecaca", text: "#b91c1c" };
   return { bg: "#ffffff", border: "#e2e8f0", text: "#0f172a" };
@@ -881,6 +881,9 @@ function MOCPageContent() {
     linkedSearch || linkedStatus !== "All" || linkedChangeType !== "All" || linkedRecent || linkedAttention
       ? "register"
       : "dashboard"
+  );
+  const [showRegisterFilters, setShowRegisterFilters] = useState(
+    Boolean(linkedStatus !== "All" || linkedChangeType !== "All" || linkedRecent || linkedAttention)
   );
   const [selectedReportId, setSelectedReportId] = useState("");
   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());
@@ -3471,7 +3474,7 @@ function MOCPageContent() {
                         style={{
                           ...segmentedButtonStyle,
                           ...segmentedButtonFillStyle,
-                          background: starterForm.change_type === option ? "#0f766e" : "transparent",
+                          background: starterForm.change_type === option ? "#3A9B98" : "transparent",
                           color: starterForm.change_type === option ? "#ffffff" : "#0f172a",
                         }}
                         onClick={() => setStarterForm((prev) => ({ ...prev, change_type: option }))}
@@ -3507,6 +3510,16 @@ function MOCPageContent() {
               placeholder="Search MOC number, title, project, coordinator or manager..."
             />
 
+            <button
+              type="button"
+              onClick={() => setShowRegisterFilters((current) => !current)}
+              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
+            >
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showRegisterFilters ? (
             <div style={toolbarFiltersStyle}>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "All" | "Active" | MocStatus)}>
                 <option value="All">All statuses</option>
@@ -3538,7 +3551,7 @@ function MOCPageContent() {
                 ))}
               </select>
             </div>
-          </div>
+          ) : null}
 
           <div style={tableInfoRowStyle}>
             Showing <strong>{filteredReports.length}</strong> of <strong>{reports.length}</strong> MOC records
@@ -3585,7 +3598,7 @@ function MOCPageContent() {
                       style={{
                         ...mocRegisterRowStyle,
                         background: active ? "#eff6ff" : "#ffffff",
-                        borderLeft: active ? "4px solid #0f766e" : "4px solid transparent",
+                        borderLeft: active ? "4px solid #3A9B98" : "4px solid transparent",
                       }}
                       onClick={() => openBundle(report.id)}
                     >
@@ -3767,7 +3780,7 @@ function MOCPageContent() {
                             style={{
                               ...segmentedButtonStyle,
                               ...segmentedButtonFillStyle,
-                              background: detailReport.change_type === option ? "#0f766e" : "transparent",
+                              background: detailReport.change_type === option ? "#3A9B98" : "transparent",
                               color: detailReport.change_type === option ? "#ffffff" : "#0f172a",
                               opacity: canEditStructural ? 1 : 0.65,
                             }}
@@ -4453,7 +4466,7 @@ function MOCPageContent() {
               </button>
               <Link
                 href={buildMocLinkedActionHref(detailReport)}
-                style={{ ...secondaryButtonStyle, border: "1px solid #99f6e4", color: "#0f766e", textDecoration: "none" }}
+                style={{ ...secondaryButtonStyle, border: "1px solid #BFE5E3", color: "#3A9B98", textDecoration: "none" }}
               >
                 Generate Linked Action
               </Link>
@@ -4575,11 +4588,11 @@ function ImpactToggle({ label, checked, onToggle }: { label: string; checked: bo
       style={{
         ...impactToggleStyle,
         background: checked ? "#ecfeff" : "#ffffff",
-        borderColor: checked ? "#0f766e" : "#cbd5e1",
+        borderColor: checked ? "#3A9B98" : "#cbd5e1",
       }}
       onClick={onToggle}
     >
-      <span style={{ ...impactCheckboxStyle, background: checked ? "#0f766e" : "#ffffff", color: checked ? "#ffffff" : "#0f172a" }}>
+      <span style={{ ...impactCheckboxStyle, background: checked ? "#3A9B98" : "#ffffff", color: checked ? "#ffffff" : "#0f172a" }}>
         {checked ? "x" : ""}
       </span>
       <span>{label}</span>
@@ -4821,6 +4834,12 @@ const topMetaRowStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: 12,
   flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const topMetaActionsStyle: CSSProperties = {
@@ -4831,7 +4850,7 @@ const topMetaActionsStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -4879,11 +4898,17 @@ const viewButtonStyle: CSSProperties = {
   borderRadius: "10px",
   cursor: "pointer",
   fontWeight: 800,
+  minHeight: "44px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1.2,
+  boxSizing: "border-box",
 };
 
 const activeViewButtonStyle: CSSProperties = {
   ...viewButtonStyle,
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
 };
 
@@ -5088,12 +5113,16 @@ const segmentedButtonFillStyle: CSSProperties = {
 };
 
 const toolbarStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "12px",
-  alignItems: "center",
-  flexWrap: "wrap",
-  marginBottom: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
 };
 
 const toolbarSearchStyle: CSSProperties = {
@@ -5114,15 +5143,23 @@ const toolbarSelectStyle: CSSProperties = {
 };
 
 const tableInfoRowStyle: CSSProperties = {
-  marginBottom: "12px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "4px",
+  flexWrap: "wrap",
   color: "#475569",
-  fontSize: "14px",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
 };
 
 const registerTableWrapStyle: CSSProperties = {
-  border: "1px solid #d7dee7",
-  borderRadius: "18px",
-  overflow: "hidden",
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const mocRegisterHeadStyle: CSSProperties = {
@@ -5187,10 +5224,12 @@ const temporaryMetaStyle: CSSProperties = {
 const detailHeaderStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  gap: "16px",
-  alignItems: "flex-start",
+  gap: "14px",
+  alignItems: "center",
   flexWrap: "wrap",
+  paddingBottom: "14px",
   marginBottom: "18px",
+  borderBottom: "1px solid #e2e8f0",
 };
 
 const detailRecordNumberStyle: CSSProperties = {
@@ -5222,8 +5261,8 @@ const detailHeaderActionsStyle: CSSProperties = {
 const workflowButtonStyle: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
-  border: "1px solid #0f766e",
-  background: "#0f766e",
+  border: "1px solid #3A9B98",
+  background: "#3A9B98",
   color: "#ffffff",
   cursor: "pointer",
   fontWeight: 700,
@@ -5242,17 +5281,21 @@ const subSectionStackStyle: CSSProperties = {
 };
 
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #d7dee7",
-  borderRadius: "16px",
-  padding: "16px",
-  background: "#f8fafc",
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  minWidth: 0,
 };
 
 const detailSectionTitleStyle: CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 800,
-  color: "#0f172a",
-  marginBottom: "14px",
+  fontSize: "13px",
+  fontWeight: 900,
+  color: "#2F7F7D",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  marginBottom: "12px",
 };
 
 const detailTemporaryHintStyle: CSSProperties = {
@@ -5333,7 +5376,7 @@ const actionPlanIntroStyle: CSSProperties = {
   marginBottom: "12px",
   padding: "12px 14px",
   borderRadius: "14px",
-  border: "1px solid #99f6e4",
+  border: "1px solid #BFE5E3",
   background: "#f0fdfa",
   color: "#0f172a",
 };
@@ -5342,7 +5385,7 @@ const actionPlanIntroTitleStyle: CSSProperties = {
   display: "block",
   fontSize: "13px",
   fontWeight: 900,
-  color: "#0f766e",
+  color: "#3A9B98",
   marginBottom: "4px",
 };
 
@@ -5391,9 +5434,9 @@ const centralActionLinkStyle: CSSProperties = {
   minHeight: "38px",
   padding: "9px 12px",
   borderRadius: "10px",
-  border: "1px solid #99f6e4",
-  background: "#ecfdf5",
-  color: "#0f766e",
+  border: "1px solid #BFE5E3",
+  background: "#EEF8F7",
+  color: "#3A9B98",
   fontSize: "13px",
   fontWeight: 800,
   textDecoration: "none",
@@ -5596,9 +5639,9 @@ const signatureFieldActionsStyle: CSSProperties = {
 const signatureButtonStyle: CSSProperties = {
   padding: "9px 11px",
   borderRadius: 8,
-  border: "1px solid #99f6e4",
-  background: "#ecfdf5",
-  color: "#0f766e",
+  border: "1px solid #BFE5E3",
+  background: "#EEF8F7",
+  color: "#3A9B98",
   fontWeight: 700,
   cursor: "pointer",
   fontSize: "12px",
@@ -5613,7 +5656,7 @@ const signaturePreviewStyle: CSSProperties = {
   minHeight: "38px",
   padding: "8px 10px",
   borderRadius: "10px",
-  border: "1px solid #99f6e4",
+  border: "1px solid #BFE5E3",
   background: "#f0fdfa",
 };
 
@@ -5684,7 +5727,7 @@ const impactCheckboxStyle: CSSProperties = {
   width: "20px",
   height: "20px",
   borderRadius: "6px",
-  border: "1px solid #0f766e",
+  border: "1px solid #3A9B98",
   fontSize: "12px",
   fontWeight: 800,
 };
@@ -5713,7 +5756,7 @@ const primaryButtonStyle: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
   border: "none",
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "#ffffff",
   fontWeight: 700,
   cursor: "pointer",

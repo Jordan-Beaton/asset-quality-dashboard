@@ -27,6 +27,30 @@ The app must stay production-minded, stable, and visually consistent.
 ## Master UI / Layout rule
 Quality Management is the master reference for styling, structure, and layout.
 
+## IMS shared UI primitives rule
+The IMS layout is now partially centralised in shared components and theme tokens.
+
+For any new tab, module page, register, report page, or major layout change:
+- use `QualityPageHero` for the green hero bar
+- use `QualityKpiCard` for KPI/info cards
+- use `ModuleSectionHeader` for green section headers
+- use `src/components/imsTheme.ts` for colours, radii, shadows, buttons, filter panels, tabs, table rows, and top-meta layout
+- use `src/components/ImsPrimitives.tsx` primitives where practical:
+  - `ImsTopMetaRow`
+  - `ImsTabs`
+  - `ImsPanel`
+  - `ImsFilterPanel`
+  - `ImsButton`
+  - `ImsLinkButton`
+- do not create new one-off button colours, tab styles, filter panel styles, table count rows, or top-meta rows unless explicitly approved
+- branded primary actions must use the Enshore teal from `imsColours.brand`
+- secondary actions must use the shared neutral style
+- danger/destructive actions must use the shared danger style
+- filters should default to the shared `Show Filters` / `Hide Filters` pattern
+- table count text such as "Showing X of Y" must use the shared compact spacing pattern
+
+When a page needs something not covered by the shared primitives, extend the shared primitive/theme first unless the change is genuinely page-specific.
+
 When creating or modifying equivalent tabs in other modules:
 - copy the matching Quality Management tab layout
 - preserve the same structure, spacing, header style, KPI card style, report layout, table layout, and button placement

@@ -157,7 +157,7 @@ function LoginPageContent() {
           type="submit"
           disabled={loading}
           style={{
-            background: "#0f766e",
+            background: "#3A9B98",
             color: "white",
             border: "none",
             borderRadius: "10px",
@@ -205,7 +205,7 @@ function LoginPageContent() {
                 background: "none",
                 border: "none",
                 padding: 0,
-                color: "#0f766e",
+                color: "#3A9B98",
                 fontWeight: 700,
                 cursor: "pointer",
               }}
@@ -226,7 +226,7 @@ function LoginPageContent() {
                 background: "none",
                 border: "none",
                 padding: 0,
-                color: "#0f766e",
+                color: "#3A9B98",
                 fontWeight: 700,
                 cursor: "pointer",
               }}

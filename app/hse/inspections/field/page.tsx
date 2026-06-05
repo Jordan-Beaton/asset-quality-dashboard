@@ -4,12 +4,12 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 
 const inspectionTemplates = [
-  { id: "vessel-pre-sail", number: "ENS-HSEQ-FRM-046", title: "Vessel Pre-Sail Inspection", ready: false },
+  { id: "vessel-pre-sail", number: "ENS-HSEQ-FRM-046", title: "Vessel Pre-Sail Inspection", ready: true },
   { id: "workplace-office", number: "ENS-HSEQ-FRM-041", title: "Workplace Inspection - Office", ready: true },
-  { id: "workplace-offshore", number: "ENS-HSEQ-FRM-042", title: "Workplace Inspection - Offshore", ready: false },
-  { id: "workplace-mobilisation", number: "ENS-HSEQ-FRM-043", title: "Workplace Inspection - Mobilisation", ready: false },
+  { id: "workplace-offshore", number: "ENS-HSEQ-FRM-042", title: "Workplace Inspection - Offshore", ready: true },
+  { id: "workplace-mobilisation", number: "ENS-HSEQ-FRM-043", title: "Workplace Inspection - Mobilisation", ready: true },
   { id: "workplace-base-site", number: "ENS-HSEQ-FRM-044", title: "Workplace Inspection - Base and Site", ready: true },
-  { id: "dropped-objects", number: "ENS-HSEQ-FRM-045", title: "Workplace Inspection - Dropped Objects", ready: false },
+  { id: "dropped-objects", number: "ENS-HSEQ-FRM-045", title: "Workplace Inspection - Dropped Objects", ready: true },
 ];
 
 export default function HseInspectionFieldPage() {
@@ -20,7 +20,7 @@ export default function HseInspectionFieldPage() {
         <section style={summaryCardStyle}>
           <div style={eyebrowStyle}>Inspection Type</div>
           <h1 style={titleStyle}>Choose Inspection</h1>
-          <p style={introStyle}>Select the inspection form you want to carry out. FRM-041 and FRM-044 are live, with the remaining forms queued for rollout.</p>
+          <p style={introStyle}>Select the inspection form you want to carry out. All six current HSE inspection forms are available for field completion.</p>
         </section>
 
         <section style={templateListStyle}>
@@ -62,7 +62,7 @@ const shellStyle: CSSProperties = {
 };
 
 const brandBarStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
   color: "#ffffff",
   borderRadius: "18px",
   padding: "14px 18px",
@@ -70,7 +70,7 @@ const brandBarStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  boxShadow: "0 16px 28px rgba(15, 118, 110, 0.18)",
+  boxShadow: "0 16px 28px rgba(58, 155, 152, 0.18)",
 };
 
 const summaryCardStyle: CSSProperties = {
@@ -86,7 +86,7 @@ const summaryCardStyle: CSSProperties = {
 const eyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#0f766e",
+  color: "#3A9B98",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
 };
@@ -124,7 +124,7 @@ const templateCardStyle: CSSProperties = {
 };
 
 const docNumberStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 900,
   fontSize: "12px",
   letterSpacing: "0.04em",
@@ -151,7 +151,7 @@ const queuedPillStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 800,
   textDecoration: "none",
   textAlign: "center",

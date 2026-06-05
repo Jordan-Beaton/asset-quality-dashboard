@@ -146,7 +146,7 @@ const emptySnapshot: SnapshotState = {
   errors: [],
 };
 
-const chartColours = ["#0f766e", "#2563eb", "#7c3aed", "#f59e0b", "#dc2626", "#64748b"];
+const chartColours = ["#3A9B98", "#2563eb", "#7c3aed", "#f59e0b", "#dc2626", "#64748b"];
 
 function normalise(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
@@ -811,7 +811,7 @@ const topRowActionsStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -826,7 +826,7 @@ const statusBannerStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "11px 16px",

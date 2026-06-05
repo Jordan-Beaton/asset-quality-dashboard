@@ -398,6 +398,9 @@ export default function ReportsPage() {
   const [logoFileName, setLogoFileName] = useState("/enshore-logo.png");
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
   const [form, setForm] = useState<ReportForm>(defaultForm);
+  const [savedReportSearch, setSavedReportSearch] = useState("");
+  const [savedReportYearFilter, setSavedReportYearFilter] = useState("All Years");
+  const [showSavedReportFilters, setShowSavedReportFilters] = useState(false);
 
   async function loadData() {
     const [ncrsRes, capasRes, actionsRes, auditsRes, findingsRes, mocsRes, documentsRes, reportsRes] = await Promise.all([
@@ -582,6 +585,29 @@ export default function ReportsPage() {
     const latest = reports[0];
     return latest ? latest.month_label : "No saved reports";
   }, [reports]);
+
+  const savedReportYearOptions = useMemo(() => {
+    const years = reports
+      .map((report) => {
+        const match = (report.month_label || "").match(/\b(20\d{2})\b/);
+        return match?.[1] || "";
+      })
+      .filter(Boolean);
+    return ["All Years", ...Array.from(new Set(years)).sort((a, b) => Number(b) - Number(a))];
+  }, [reports]);
+
+  const filteredReports = useMemo(() => {
+    const query = savedReportSearch.trim().toLowerCase();
+    return reports.filter((report) => {
+      const matchesSearch =
+        !query ||
+        [report.month_label, report.summary, report.wins, report.risks, report.next_steps]
+          .some((value) => String(value || "").toLowerCase().includes(query));
+      const year = (report.month_label || "").match(/\b(20\d{2})\b/)?.[1] || "";
+      const matchesYear = savedReportYearFilter === "All Years" || year === savedReportYearFilter;
+      return matchesSearch && matchesYear;
+    });
+  }, [reports, savedReportSearch, savedReportYearFilter]);
 
   const summaryDraftPayload = useMemo<SummaryDraftPayload>(
     () => ({
@@ -1014,20 +1040,12 @@ export default function ReportsPage() {
         ]}
       />
 
-      <div
-        style={{
-          marginBottom: "20px",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "12px",
-          flexWrap: "wrap",
-        }}
-      >
+      <div style={topMetaRowStyle}>
         <Link href="/" style={backLinkStyle}>
           ← Back to Dashboard
         </Link>
 
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
           <button
             type="button"
             style={secondaryButtonStyle}
@@ -1043,12 +1061,11 @@ export default function ReportsPage() {
           >
             {isGeneratingPdf ? "Generating PDF..." : "Generate Monthly PDF"}
           </button>
+          <div style={{ ...statusBannerStyle, marginBottom: 0, borderRadius: "12px", padding: "12px 16px" }}>
+            <strong>Status:</strong> {message}
+          </div>
         </div>
       </div>
-
-      <section style={statusBannerStyle}>
-        <strong>Status:</strong> {message}
-      </section>
 
       <section style={twoColumnGridStyle}>
         <div style={panelStyle}>
@@ -1181,10 +1198,54 @@ export default function ReportsPage() {
               Reopen saved monthly management periods and generate the concise PDF directly from each row.
             </p>
           </div>
-          <div style={registerCountStyle}>{reports.length} reports</div>
+          <div style={registerCountStyle}>{filteredReports.length} of {reports.length} reports</div>
         </div>
 
-        {reports.length === 0 ? (
+        <div style={filterPanelStyle}>
+          <div style={filterActionRowStyle}>
+            <input
+              value={savedReportSearch}
+              onChange={(event) => setSavedReportSearch(event.target.value)}
+              style={inputStyle}
+              placeholder="Search saved reports"
+            />
+            <button
+              type="button"
+              style={showSavedReportFilters ? secondaryButtonStyle : primaryButtonStyle}
+              onClick={() => setShowSavedReportFilters((current) => !current)}
+            >
+              {showSavedReportFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showSavedReportFilters ? (
+            <div style={toolbarFiltersStyle}>
+              <select
+                value={savedReportYearFilter}
+                onChange={(event) => setSavedReportYearFilter(event.target.value)}
+                style={inputStyle}
+              >
+                {savedReportYearOptions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => {
+                  setSavedReportSearch("");
+                  setSavedReportYearFilter("All Years");
+                }}
+              >
+                Clear Filters
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        {filteredReports.length === 0 ? (
           <p style={emptyTextStyle}>No monthly reports saved yet.</p>
         ) : (
           <div style={{ overflowX: "auto" }}>
@@ -1198,7 +1259,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {reports.map((report) => (
+                {filteredReports.map((report) => (
                   <tr key={report.id}>
                     <td style={tableCellStyle}>{report.month_label}</td>
                     <td style={tableCellStyle}>{getSnapshotSummary(report)}</td>
@@ -1228,12 +1289,12 @@ export default function ReportsPage() {
 }
 
 const heroStyle: React.CSSProperties = {
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
   color: "white",
   borderRadius: "20px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(15, 118, 110, 0.14)",
+  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -1295,9 +1356,23 @@ const heroMetaValueStyle: React.CSSProperties = {
 };
 
 const backLinkStyle: React.CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
+};
+
+const topMetaRowStyle: React.CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const statusBannerStyle: React.CSSProperties = {
@@ -1349,6 +1424,30 @@ const formGridStyle: React.CSSProperties = {
   gap: "12px",
 };
 
+const filterPanelStyle: React.CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  padding: "14px",
+  borderRadius: "16px",
+  border: "1px solid #dbe4ef",
+  background: "#f8fafc",
+  marginBottom: "14px",
+};
+
+const filterActionRowStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(220px, 1fr) minmax(160px, 220px)",
+  gap: "10px",
+  alignItems: "center",
+};
+
+const toolbarFiltersStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "10px",
+  alignItems: "center",
+};
+
 const fieldLabelStyle: React.CSSProperties = {
   display: "grid",
   gap: "6px",
@@ -1388,7 +1487,7 @@ const textareaStyle: React.CSSProperties = {
 };
 
 const primaryButtonStyle: React.CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1408,7 +1507,7 @@ const secondaryButtonStyle: React.CSSProperties = {
 };
 
 const pdfButtonStyle: React.CSSProperties = {
-  background: "#1d4ed8",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1495,21 +1594,31 @@ const emptyTextStyle: React.CSSProperties = {
 const tableStyle: React.CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
 };
 
 const tableHeadStyle: React.CSSProperties = {
   textAlign: "left",
-  padding: "12px 10px",
-  borderBottom: "1px solid #e2e8f0",
-  color: "#475569",
-  fontSize: "13px",
+  padding: "13px 14px",
+  background: "#f8fafc",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
+  whiteSpace: "nowrap",
 };
 
 const tableCellStyle: React.CSSProperties = {
-  padding: "14px 10px",
-  borderBottom: "1px solid #f1f5f9",
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
   color: "#0f172a",
-  verticalAlign: "top",
+  verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
 };
 
 const actionButtonsWrapStyle: React.CSSProperties = {
@@ -1519,7 +1628,7 @@ const actionButtonsWrapStyle: React.CSSProperties = {
 };
 
 const miniButtonStyle: React.CSSProperties = {
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "8px 12px",

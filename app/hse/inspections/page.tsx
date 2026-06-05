@@ -126,13 +126,13 @@ const inspectionTemplates: InspectionTemplate[] = [
   {
     id: "vessel-pre-sail",
     documentNumber: "ENS-HSEQ-FRM-046",
-    revision: "",
-    revisionDate: "",
+    revision: "B",
+    revisionDate: "2024-02-08",
     title: "Vessel Pre-Sail Inspection",
     description: "Pre-sail readiness check for vessel condition, operational controls, permits, emergency preparedness, and close-out actions.",
     focus: ["Vessel readiness", "Operational controls", "Emergency preparedness", "Evidence photos"],
     sections: ["Vessel details", "Crew and readiness", "Safety equipment", "Deck and lifting controls", "Emergency response", "Actions and evidence"],
-    enabled: false,
+    enabled: true,
   },
   {
     id: "workplace-office",
@@ -148,24 +148,24 @@ const inspectionTemplates: InspectionTemplate[] = [
   {
     id: "workplace-offshore",
     documentNumber: "ENS-HSEQ-FRM-042",
-    revision: "",
-    revisionDate: "",
+    revision: "B",
+    revisionDate: "2023-08-10",
     title: "Workplace Inspection - Offshore",
     description: "Offshore workplace inspection for live worksite conditions, equipment, emergency arrangements, and operational controls.",
     focus: ["Offshore worksite", "Equipment condition", "Permit controls", "Evidence photos"],
     sections: ["Inspection details", "Worksite controls", "Equipment and tools", "Permit and procedural controls", "Emergency arrangements", "Actions and evidence"],
-    enabled: false,
+    enabled: true,
   },
   {
     id: "workplace-mobilisation",
     documentNumber: "ENS-HSEQ-FRM-043",
-    revision: "",
-    revisionDate: "",
+    revision: "B",
+    revisionDate: "2024-02-23",
     title: "Workplace Inspection - Mobilisation",
     description: "Mobilisation inspection for project readiness, packing, lifting, documents, equipment, and handover controls.",
     focus: ["Mobilisation readiness", "Packing/lifting", "Documentation", "Close-out actions"],
     sections: ["Mobilisation details", "Equipment readiness", "Packing and lifting", "Documentation and certification", "Findings", "Actions and evidence"],
-    enabled: false,
+    enabled: true,
   },
   {
     id: defaultTemplateId,
@@ -181,13 +181,13 @@ const inspectionTemplates: InspectionTemplate[] = [
   {
     id: "dropped-objects",
     documentNumber: "ENS-HSEQ-FRM-045",
-    revision: "",
-    revisionDate: "",
+    revision: "B",
+    revisionDate: "2024-02-23",
     title: "Workplace Inspection - Dropped Objects",
     description: "Dropped object focused inspection covering work at height, securing arrangements, tool control, exclusion zones, and corrective actions.",
     focus: ["Dropped object prevention", "Securing arrangements", "Tool control", "Action close-out"],
     sections: ["Inspection details", "Dropped object controls", "Work at height", "Tools and equipment", "Exclusion zones", "Actions and evidence"],
-    enabled: false,
+    enabled: true,
   },
 ];
 
@@ -360,8 +360,425 @@ const officeChecklist: ChecklistSection[] = [
   },
 ];
 
+const vesselPreSailChecklist: ChecklistSection[] = [
+  {
+    id: "vessel_access",
+    title: "3.0 Vessel Access",
+    items: [
+      { id: "3.1", number: "3.1", text: "Are walkways satisfactory? Clearly identified, clear of obstructions, and free from hazards?" },
+      { id: "3.2", number: "3.2", text: "Have deck fastenings which pose a tripping hazard been highlighted?" },
+      { id: "3.3", number: "3.3", text: "Has an evaluation been made of the adequacy of the lighting on the back deck?" },
+      { id: "3.4", number: "3.4", text: "Are emergency walkways / exits clearly identified and free from obstructions?" },
+      { id: "3.5", number: "3.5", text: "Has placement of mobilized equipment been assessed in relation to emergency walkways / exits?" },
+    ],
+  },
+  {
+    id: "inductions_project_docs",
+    title: "4.0 Inductions and Project Documentation",
+    items: [
+      { id: "4.1", number: "4.1", text: "Does the vessel have an induction for on-signers, visitors, and sub-contractors?" },
+      { id: "4.2", number: "4.2", text: "Is there evidence that vessel inductions have been carried out?" },
+      { id: "4.3", number: "4.3", text: "Is the Enshore Senior Person on board in possession of client approved project HSE documents?" },
+      { id: "4.4", number: "4.4", text: "Can the Enshore Senior Person on board access the Enshore Management System?" },
+    ],
+  },
+  {
+    id: "hse_information",
+    title: "5.0 HSE Information",
+    items: [
+      { id: "5.1", number: "5.1", text: "Are current versions of the Enshore Policies posted on the notice boards?" },
+      { id: "5.2", number: "5.2", text: "Are safety bulletins and communications displayed on the notice boards?" },
+      { id: "5.3", number: "5.3", text: "Are signs displayed detailing PPE requirements?" },
+      { id: "5.4", number: "5.4", text: "Are warning signs posted for specific hazards such as noise, rotating equipment, and hazardous substances?" },
+    ],
+  },
+  {
+    id: "ppe",
+    title: "6.0 Personal Protective Equipment",
+    items: [
+      { id: "6.1", number: "6.1", text: "Is there evidence of personnel not complying with minimum PPE requirements?" },
+      { id: "6.2", number: "6.2", text: "Is there evidence of poor standard PPE such as contaminated coveralls or exposed steel toe caps?" },
+      { id: "6.3", number: "6.3", text: "Are there adequate stock levels and suitable storage facilities for PPE?" },
+    ],
+  },
+  {
+    id: "proactive_safety",
+    title: "7.0 Proactive Safety Management",
+    items: [
+      { id: "7.1", number: "7.1", text: "Are proactive safety management tools being undertaken as per project KPIs and available?" },
+      { id: "7.2", number: "7.2", text: "Does the toolbox talk accurately reflect the work being carried out during the inspection?" },
+      { id: "7.3", number: "7.3", text: "Are actions identified in workplace inspections being managed and closed out?" },
+      { id: "7.4", number: "7.4", text: "Are daily progress meetings planned / held with HSE topics suitably covered?" },
+      { id: "7.5", number: "7.5", text: "Has a dropped objects inspection been carried out and actions completed?" },
+      { id: "7.6", number: "7.6", text: "Are observation cards available and are actions being managed and closed out?" },
+    ],
+  },
+  {
+    id: "risk_management",
+    title: "8.0 Risk Management",
+    items: [
+      { id: "8.1", number: "8.1", text: "Are operational risk assessments developed and approved for use?" },
+      { id: "8.2", number: "8.2", text: "Have the risk assessments been communicated to Enshore and applicable parties?" },
+    ],
+  },
+  {
+    id: "lifting",
+    title: "9.0 Lifting Operations",
+    items: [
+      { id: "9.1", number: "9.1", text: "Sample a lifting accessory. Is there means to identify that a thorough examination has been performed?" },
+      { id: "9.2", number: "9.2", text: "Can the sampled lifting accessory be traced back to the Lifting Equipment Register?" },
+      { id: "9.3", number: "9.3", text: "Insert description of the sampled lifting accessory." },
+      { id: "9.4", number: "9.4", text: "Are there satisfactory means of locking the rigging store(s)?" },
+      { id: "9.5", number: "9.5", text: "Is there suitable lighting in the rigging store?" },
+      { id: "9.6", number: "9.6", text: "Is there a maintained Rigger Register?" },
+      { id: "9.7", number: "9.7", text: "Is there a defined quarantine area?" },
+      { id: "9.8", number: "9.8", text: "Are Enshore personnel on board competent to develop / review lift plans?" },
+      { id: "9.9", number: "9.9", text: "Are lifting plans available and approved for use?" },
+    ],
+  },
+  {
+    id: "working_height",
+    title: "10.0 Working at Height",
+    items: [
+      { id: "10.1", number: "10.1", text: "Sample WAH equipment. Is there means to identify that an inspection has been performed?" },
+      { id: "10.2", number: "10.2", text: "Is there suitable storage for WAH equipment to prevent damage and degradation?" },
+      { id: "10.3", number: "10.3", text: "Insert description of the sampled WAH equipment." },
+      { id: "10.4", number: "10.4", text: "Are ladders, step ladders or scaffold towers stored safely to prevent accidental movement?" },
+      { id: "10.5", number: "10.5", text: "Sample access equipment. Is there evidence of an inspection record?" },
+      { id: "10.6", number: "10.6", text: "Insert description of the sampled access equipment." },
+      { id: "10.7", number: "10.7", text: "Are rescue plans in place for working at height activities?" },
+      { id: "10.8", number: "10.8", text: "Have rescue plans been communicated to personnel involved in the activity?" },
+      { id: "10.9", number: "10.9", text: "Are contingency provisions in place to execute the rescue plans?" },
+    ],
+  },
+  {
+    id: "hazardous_substances",
+    title: "11.0 Hazardous Substances",
+    items: [
+      { id: "11.1", number: "11.1", text: "Is there a Hazardous Substances Register on board the vessel?" },
+      { id: "11.2", number: "11.2", text: "Do personnel on board have access to the Enshore COSHH Inventory?" },
+      { id: "11.3", number: "11.3", text: "Sample a hazardous substance. Is it included in the Hazardous Substances Register?" },
+      { id: "11.4", number: "11.4", text: "Does the sampled hazardous substance have an associated chemical assessment?" },
+      { id: "11.5", number: "11.5", text: "Insert description of the sampled hazardous substance." },
+      { id: "11.6", number: "11.6", text: "Are spill kits strategically located around operational areas?" },
+      { id: "11.7", number: "11.7", text: "Is there sufficient surplus stock of spill kits on board?" },
+    ],
+  },
+  {
+    id: "electrical",
+    title: "12.0 Electrical Equipment",
+    items: [
+      { id: "12.1", number: "12.1", text: "Sample an electrical power tool. Is the tool tagged to identify it has been inspected?" },
+      { id: "12.2", number: "12.2", text: "Is a register in place detailing electrical equipment and last inspection date?" },
+      { id: "12.3", number: "12.3", text: "Insert description of the sampled power tool." },
+    ],
+  },
+  {
+    id: "occupational_health",
+    title: "13.0 Protection Against Occupational Illness / Injuries",
+    items: [
+      { id: "13.1", number: "13.1", text: "Is sufficient hearing protection available on board the vessel?" },
+      { id: "13.2", number: "13.2", text: "Does RPE provide sufficient protection against expected airborne hazards?" },
+      { id: "13.3", number: "13.3", text: "Is there sufficient stock of Respiratory Protective Equipment on board?" },
+      { id: "13.4", number: "13.4", text: "Are provisions in place to protect personnel from UV damage?" },
+      { id: "13.5", number: "13.5", text: "Are provisions in place to ensure personnel can remain hydrated whilst working?" },
+    ],
+  },
+  {
+    id: "waste_housekeeping",
+    title: "14.0 Waste Management / Housekeeping",
+    items: [
+      { id: "14.1", number: "14.1", text: "Is there provision for waste segregation on board the vessel?" },
+      { id: "14.2", number: "14.2", text: "Are waste receptacles clearly marked?" },
+      { id: "14.3", number: "14.3", text: "Is there evidence of cross-contamination of waste?" },
+    ],
+  },
+  {
+    id: "emergency_response",
+    title: "15.0 Emergency Response",
+    items: [
+      { id: "15.1", number: "15.1", text: "Are Emergency Notification Charts posted in key vessel locations?" },
+      { id: "15.2", number: "15.2", text: "Does the chart detail local emergency services and nearest hospital contact information?" },
+      { id: "15.3", number: "15.3", text: "Has a verification check been carried out on one or more emergency contacts?" },
+      { id: "15.4", number: "15.4", text: "Is there a muster drill planned within 24 hours after leaving port?" },
+      { id: "15.5", number: "15.5", text: "Are there sufficient survival suits on board the vessel?" },
+      { id: "15.6", number: "15.6", text: "Are there sufficient life jackets on board the vessel?" },
+      { id: "15.7", number: "15.7", text: "Sample a life jacket. Has service been carried out in the last 12 months?" },
+      { id: "15.8", number: "15.8", text: "Is there sufficient first aid / medical response and provision on board?" },
+    ],
+  },
+];
+
+const offshoreChecklist: ChecklistSection[] = [
+  {
+    id: "offshore_emergency",
+    title: "1.0 Emergency Response and Safety",
+    items: [
+      { id: "1.1", number: "1.1", text: "Are emergency exits / routes clearly signed?" },
+      { id: "1.2", number: "1.2", text: "Are emergency exits / routes free of obstructions / hazards?" },
+      { id: "1.3", number: "1.3", text: "Are muster stations clearly identified?" },
+      { id: "1.4", number: "1.4", text: "Are muster stations and emergency routes clearly illuminated?" },
+      { id: "1.5", number: "1.5", text: "Date of last emergency muster / drill recorded?" },
+      { id: "1.6", number: "1.6", text: "Is lifesaving equipment available, in good condition, and easy to access?" },
+      { id: "1.7", number: "1.7", text: "Fire extinguishers in correct positions?" },
+      { id: "1.8", number: "1.8", text: "Fire / emergency alarm in place and tested?" },
+      { id: "1.9", number: "1.9", text: "Are emergency contact numbers available?" },
+      { id: "1.10", number: "1.10", text: "AED, stretchers, first aid arrangements and eyewash stations in place and satisfactory?" },
+      { id: "1.11", number: "1.11", text: "Safety / danger / warning / PPE signs satisfactory?" },
+      { id: "1.12", number: "1.12", text: "Other emergency response and safety observations." },
+    ],
+  },
+  {
+    id: "offshore_environment",
+    title: "2.0 Environmental Control and Waste Management",
+    items: [
+      { id: "2.1", number: "2.1", text: "Is waste segregated while offshore?" },
+      { id: "2.2", number: "2.2", text: "Is there any evidence of waste cross contamination?" },
+      { id: "2.3", number: "2.3", text: "Is waste segregated for onshore collection during port calls?" },
+      { id: "2.4", number: "2.4", text: "Are chemicals stored in a safe manner?" },
+      { id: "2.5", number: "2.5", text: "Are fumes generated by plant/generators acceptable?" },
+      { id: "2.6", number: "2.6", text: "Are bunded storage areas free of oil / acceptable?" },
+      { id: "2.7", number: "2.7", text: "Are spill kits available and fully stocked where required?" },
+      { id: "2.8", number: "2.8", text: "Are drip trays available at required locations?" },
+      { id: "2.9", number: "2.9", text: "Other environmental control observations." },
+    ],
+  },
+  {
+    id: "offshore_worksite",
+    title: "3.0 General Worksite and Deck Working Area",
+    items: [
+      { id: "3.1", number: "3.1", text: "Housekeeping / cleanliness internal and external areas satisfactory?" },
+      { id: "3.2", number: "3.2", text: "Permit to Work and isolation in place?" },
+      { id: "3.3", number: "3.3", text: "Sea fastenings satisfactory?" },
+      { id: "3.4", number: "3.4", text: "Ventilation satisfactory?" },
+      { id: "3.5", number: "3.5", text: "Lighting satisfactory?" },
+      { id: "3.6", number: "3.6", text: "Noise levels satisfactory?" },
+      { id: "3.7", number: "3.7", text: "Obstructions highlighted / removed?" },
+      { id: "3.8", number: "3.8", text: "Slip / trip / fall hazards highlighted / removed?" },
+      { id: "3.9", number: "3.9", text: "Wet / slippery surfaces identified?" },
+      { id: "3.10", number: "3.10", text: "Uneven / worn surfaces identified?" },
+      { id: "3.11", number: "3.11", text: "Areas free from potential falling objects?" },
+      { id: "3.12", number: "3.12", text: "Contaminated materials identified?" },
+      { id: "3.13", number: "3.13", text: "Loose surfaces / loose items identified?" },
+      { id: "3.14", number: "3.14", text: "Cabling condition satisfactory?" },
+      { id: "3.15", number: "3.15", text: "Cabling securing arrangement satisfactory?" },
+      { id: "3.16", number: "3.16", text: "Lifting wire and attachments visually satisfactory?" },
+      { id: "3.17", number: "3.17", text: "Edge protection, guardrails, handrails, fences and accessories satisfactory?" },
+      { id: "3.18", number: "3.18", text: "Gas cylinder storage satisfactory?" },
+      { id: "3.19", number: "3.19", text: "Ladders condition satisfactory?" },
+      { id: "3.20", number: "3.20", text: "Ladders securing arrangements satisfactory?" },
+      { id: "3.21", number: "3.21", text: "Ladders identification in place?" },
+      { id: "3.22", number: "3.22", text: "Stairways condition satisfactory?" },
+      { id: "3.23", number: "3.23", text: "First aid and eyewash stations satisfactory?" },
+      { id: "3.24", number: "3.24", text: "Other worksite and deck observations." },
+    ],
+  },
+  {
+    id: "offshore_storage",
+    title: "4.0 Storage and Workshop Areas",
+    items: [
+      { id: "4.1", number: "4.1", text: "General housekeeping satisfactory?" },
+      { id: "4.2", number: "4.2", text: "Chemicals stored correctly?" },
+      { id: "4.3", number: "4.3", text: "COSHH records available?" },
+      { id: "4.4", number: "4.4", text: "Safety information signage satisfactory?" },
+      { id: "4.5", number: "4.5", text: "Areas free from potential falling objects?" },
+      { id: "4.6", number: "4.6", text: "Machinery condition satisfactory?" },
+      { id: "4.7", number: "4.7", text: "Adequate isolations in place?" },
+      { id: "4.8", number: "4.8", text: "Noise levels satisfactory?" },
+      { id: "4.9", number: "4.9", text: "Emergency exits highlighted?" },
+      { id: "4.10", number: "4.10", text: "First aid and eyewash stations satisfactory?" },
+      { id: "4.11", number: "4.11", text: "Other storage/workshop observations." },
+    ],
+  },
+  {
+    id: "offshore_equipment",
+    title: "5.0 Machinery / Equipment / Tool / Control Cabin",
+    items: [
+      { id: "5.1", number: "5.1", text: "General housekeeping satisfactory?" },
+      { id: "5.2", number: "5.2", text: "Machinery guards in place?" },
+      { id: "5.3", number: "5.3", text: "Emergency stops identified and tested?" },
+      { id: "5.4", number: "5.4", text: "Connection points and structure satisfactory?" },
+      { id: "5.5", number: "5.5", text: "Equipment securely fastened?" },
+      { id: "5.6", number: "5.6", text: "Machinery free from leaks or spillages?" },
+      { id: "5.7", number: "5.7", text: "Operating instructions available?" },
+      { id: "5.8", number: "5.8", text: "Portable Appliance Testing completed?" },
+      { id: "5.9", number: "5.9", text: "Cabling condition / management satisfactory?" },
+      { id: "5.10", number: "5.10", text: "PPE requirements identified and complied with?" },
+      { id: "5.11", number: "5.11", text: "Safety signs satisfactory?" },
+      { id: "5.12", number: "5.12", text: "Cleanliness satisfactory?" },
+      { id: "5.13", number: "5.13", text: "Storage facilities satisfactory?" },
+      { id: "5.14", number: "5.14", text: "Lifting gear colour coding in place?" },
+      { id: "5.15", number: "5.15", text: "Lifting gear certification available?" },
+      { id: "5.16", number: "5.16", text: "Computer general setup satisfactory?" },
+      { id: "5.17", number: "5.17", text: "Noise levels satisfactory?" },
+      { id: "5.18", number: "5.18", text: "Communication with bridge in place?" },
+      { id: "5.19", number: "5.19", text: "First aid and eyewash stations satisfactory?" },
+      { id: "5.20", number: "5.20", text: "Other machinery/equipment observations." },
+    ],
+  },
+  {
+    id: "offshore_personnel",
+    title: "6.0 Personnel",
+    items: [
+      { id: "6.1", number: "6.1", text: "Procedures and task plans available and in place?" },
+      { id: "6.2", number: "6.2", text: "Work equipment assessments completed?" },
+      { id: "6.3", number: "6.3", text: "Permit to Work available and in place?" },
+      { id: "6.4", number: "6.4", text: "Toolbox talks available and in place?" },
+      { id: "6.5", number: "6.5", text: "Risk assessments available and in place?" },
+      { id: "6.6", number: "6.6", text: "Lift plans available and in place?" },
+      { id: "6.7", number: "6.7", text: "Other personnel observations." },
+    ],
+  },
+  {
+    id: "offshore_procedures",
+    title: "7.0 Procedures",
+    items: [
+      { id: "7.1", number: "7.1", text: "Procedures and task plans available and in place?" },
+      { id: "7.2", number: "7.2", text: "Work equipment assessments completed?" },
+      { id: "7.3", number: "7.3", text: "Permit to Work available and in place?" },
+      { id: "7.4", number: "7.4", text: "Toolbox talks available and in place?" },
+      { id: "7.5", number: "7.5", text: "Risk assessments available and in place?" },
+      { id: "7.6", number: "7.6", text: "Lift plans available and in place?" },
+      { id: "7.7", number: "7.7", text: "COSHH controls in place and records available?" },
+      { id: "7.8", number: "7.8", text: "Other procedure observations." },
+    ],
+  },
+];
+
+const mobilisationChecklist: ChecklistSection[] = [
+  {
+    id: "mobilisation_worksite",
+    title: "1.0 General Worksite",
+    items: [
+      { id: "1.1", number: "1.1", text: "Parking sufficient and away from worksite?" },
+      { id: "1.2", number: "1.2", text: "Security in place and emergency contact list available?" },
+      { id: "1.3", number: "1.3", text: "Area free from potential falling objects?" },
+      { id: "1.4", number: "1.4", text: "Sufficient warning and information signage in place?" },
+      { id: "1.5", number: "1.5", text: "Permit to Work process available and in place?" },
+      { id: "1.6", number: "1.6", text: "Receipt of materials satisfactorily controlled, including vessel fuel receipt and intake?" },
+      { id: "1.7", number: "1.7", text: "Access / egress to and from vessel satisfactory?" },
+      { id: "1.8", number: "1.8", text: "Lifting plan available and in place?" },
+      { id: "1.9", number: "1.9", text: "Crane certification of thorough examination available and in date?" },
+      { id: "1.10", number: "1.10", text: "Lifting accessories are the correct colour code?" },
+      { id: "1.11", number: "1.11", text: "Crane operators, banksman and riggers identified?" },
+      { id: "1.12", number: "1.12", text: "Ladders inspected and acceptable for use?" },
+      { id: "1.13", number: "1.13", text: "MEWP operators competent / certified?" },
+      { id: "1.14", number: "1.14", text: "Safety barriers / controls in place during lifting operations?" },
+      { id: "1.15", number: "1.15", text: "Sufficient lighting available?" },
+      { id: "1.16", number: "1.16", text: "Noise levels satisfactory?" },
+      { id: "1.17", number: "1.17", text: "Screens available and in use during welding and grinding operations?" },
+      { id: "1.18", number: "1.18", text: "Sufficient firefighting equipment available?" },
+      { id: "1.19", number: "1.19", text: "Fumes generated by plant / generators controlled?" },
+      { id: "1.20", number: "1.20", text: "Chemical / fuel and hydraulic transfer satisfactory?" },
+      { id: "1.21", number: "1.21", text: "Chemical spill kit / drip trays available in use?" },
+      { id: "1.22", number: "1.22", text: "Spill kits available and fully stocked where required?" },
+      { id: "1.23", number: "1.23", text: "Bunded storage areas free of oil and satisfactory?" },
+      { id: "1.24", number: "1.24", text: "Personnel compliant with general and specialist PPE requirements?" },
+      { id: "1.25", number: "1.25", text: "Personnel working at height wearing fall prevention equipment?" },
+      { id: "1.26", number: "1.26", text: "Emergency Response Plan and equipment available for rescue of personnel working at height?" },
+      { id: "1.27", number: "1.27", text: "Emergency contact numbers available, including subcontractors?" },
+      { id: "1.28", number: "1.28", text: "First aid precautions available, including eyewash?" },
+      { id: "1.29", number: "1.29", text: "Waste being segregated?" },
+      { id: "1.30", number: "1.30", text: "Any evidence of waste cross-contamination?" },
+      { id: "1.31", number: "1.31", text: "Portable electrical devices PAT tested?" },
+      { id: "1.32", number: "1.32", text: "Machinery free from signs of leaks or spillages?" },
+      { id: "1.33", number: "1.33", text: "Obvious trip hazards identified?" },
+      { id: "1.34", number: "1.34", text: "Other general worksite observations." },
+    ],
+  },
+  {
+    id: "mobilisation_personnel",
+    title: "2.0 Personnel (General)",
+    items: [
+      { id: "2.1", number: "2.1", text: "Knowledge of responsibilities satisfactory?" },
+      { id: "2.2", number: "2.2", text: "Knowledge of risk assessment satisfactory?" },
+      { id: "2.3", number: "2.3", text: "Toolbox talks available and implemented?" },
+      { id: "2.4", number: "2.4", text: "Knowledge of firefighting equipment satisfactory?" },
+      { id: "2.5", number: "2.5", text: "Knowledge of vessel and shore-based muster points satisfactory?" },
+      { id: "2.6", number: "2.6", text: "Knowledge of emergency response satisfactory?" },
+      { id: "2.7", number: "2.7", text: "Have any personnel been on shift longer than 12 hours?" },
+      { id: "2.8", number: "2.8", text: "Other personnel observations." },
+    ],
+  },
+];
+
+const droppedObjectsChecklist: ChecklistSection[] = [
+  {
+    id: "dropped_housekeeping",
+    title: "1.0 General Housekeeping",
+    items: [
+      { id: "1.1", number: "1.1", text: "Platforms, open edges, beams and surfaces free from loose or unnecessary items?" },
+      { id: "1.2", number: "1.2", text: "Bolts tight and secured with lock nut or other approved secondary retention?" },
+      { id: "1.3", number: "1.3", text: "Redundant or unused equipment checked?" },
+      { id: "1.4", number: "1.4", text: "Equipment certified and in good order?" },
+    ],
+  },
+  {
+    id: "dropped_tool_storage",
+    title: "2.0 Tool and Equipment Storage",
+    items: [
+      { id: "2.1", number: "2.1", text: "Stored items secured correctly with safety securing in place?" },
+      { id: "2.2", number: "2.2", text: "Damage and deformities checked?" },
+      { id: "2.3", number: "2.3", text: "Improvised or modified lifting equipment and tools checked?" },
+      { id: "2.4", number: "2.4", text: "Tool tethering systems available, in use and controlled?" },
+    ],
+  },
+  {
+    id: "dropped_lights_comms",
+    title: "3.0 Lights and Communications System",
+    items: [
+      { id: "3.1", number: "3.1", text: "Light fixings checked and securing screws, clips, brackets and bolts in place and secure?" },
+      { id: "3.2", number: "3.2", text: "Secondary retention condition checked?" },
+      { id: "3.3", number: "3.3", text: "Stanchion posts secure and checked for wear, movement, fatigue or corrosion?" },
+    ],
+  },
+  {
+    id: "dropped_ladders_access",
+    title: "4.0 Ladders and Access Platforms",
+    items: [
+      { id: "4.1", number: "4.1", text: "Structures checked for damage or corrosion?" },
+      { id: "4.2", number: "4.2", text: "Gratings, covers, panels and clips secure?" },
+      { id: "4.3", number: "4.3", text: "Gate hinges and pins intact and operating correctly?" },
+      { id: "4.4", number: "4.4", text: "Guardrails properly secured?" },
+      { id: "4.5", number: "4.5", text: "Platform components including boards, gratings, bracings, guardrails and toe-boards checked?" },
+      { id: "4.6", number: "4.6", text: "Loose items removed?" },
+    ],
+  },
+  {
+    id: "dropped_emergency",
+    title: "5.0 Emergency Equipment and Signage",
+    items: [
+      { id: "5.1", number: "5.1", text: "Firefighting equipment and equipment boxes secure?" },
+      { id: "5.2", number: "5.2", text: "Alarm call points, signs and fixings secure?" },
+      { id: "5.3", number: "5.3", text: "Damage or corrosion checked?" },
+    ],
+  },
+  {
+    id: "dropped_junction",
+    title: "6.0 Junction Boxes",
+    items: [
+      { id: "6.1", number: "6.1", text: "Mounting, box and covers secure with fixings in place?" },
+      { id: "6.2", number: "6.2", text: "Excessive wear, fatigue or damage checked?" },
+    ],
+  },
+  {
+    id: "dropped_structure",
+    title: "7.0 General Structure and Major Equipment",
+    items: [
+      { id: "7.1", number: "7.1", text: "Equipment fixtures such as clamps, grilles and guards secure?" },
+      { id: "7.2", number: "7.2", text: "Bolts tight and secured with lock nuts or other approved secondary retention?" },
+      { id: "7.3", number: "7.3", text: "Safety lines and whip checks in place and secure?" },
+      { id: "7.4", number: "7.4", text: "Signs of corrosion, damage or fatigue checked?" },
+    ],
+  },
+];
+
 function getChecklistForTemplateId(templateId: string | null | undefined) {
+  if (templateId === "vessel-pre-sail") return vesselPreSailChecklist;
   if (templateId === "workplace-office") return officeChecklist;
+  if (templateId === "workplace-offshore") return offshoreChecklist;
+  if (templateId === "workplace-mobilisation") return mobilisationChecklist;
+  if (templateId === "dropped-objects") return droppedObjectsChecklist;
   return baseSiteChecklist;
 }
 
@@ -635,9 +1052,29 @@ export default function HseInspectionsPage() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined" || records.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const inspectionId = (params.get("inspectionId") || "").trim();
+    const inspectionNumber = (params.get("inspection") || "").trim().toLowerCase();
+    if (!inspectionId && !inspectionNumber) return;
+
+    const matchedRecord = records.find((record) => {
+      return (
+        (inspectionId && record.id === inspectionId) ||
+        (inspectionNumber && clean(record.inspection_number).toLowerCase() === inspectionNumber)
+      );
+    });
+
+    if (!matchedRecord) return;
+    selectRecord(matchedRecord);
+    setSearch(matchedRecord.inspection_number || "");
+    setStatusFilter("");
+  }, [records]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const url = `${window.location.origin}/hse/inspections/field`;
-    QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#0f766e", light: "#ffffff" } })
+    QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#3A9B98", light: "#ffffff" } })
       .then(setFieldQrDataUrl)
       .catch(() => setFieldQrDataUrl(""));
   }, []);
@@ -906,7 +1343,7 @@ export default function HseInspectionsPage() {
     setMessage("Evidence deleted.");
   }
 
-  function pdfHeader(doc: jsPDF, title: string, record: HseInspectionRecord, logoData: string) {
+  function pdfHeader(doc: jsPDF, record: HseInspectionRecord, logoData: string) {
     if (logoData) {
       try {
         doc.addImage(logoData, "PNG", 12, 10, 38, 15);
@@ -914,10 +1351,6 @@ export default function HseInspectionsPage() {
         // Keep report generation working if the logo cannot be embedded.
       }
     }
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.setTextColor(15, 23, 42);
-    doc.text(title, 105, 18, { align: "center" });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
@@ -943,7 +1376,7 @@ export default function HseInspectionsPage() {
       setMessage(`Generating PDF for ${record.inspection_number}...`);
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const logoData = await getLogoDataUrl();
-      pdfHeader(doc, `${record.form_number} ${record.form_title}`, record, logoData);
+      pdfHeader(doc, record, logoData);
       let y = 36;
 
     doc.setFont("helvetica", "bold");
@@ -976,7 +1409,7 @@ export default function HseInspectionsPage() {
     getChecklistForTemplateId(record.form_id).forEach((section) => {
       if (y > 250) {
         doc.addPage();
-        pdfHeader(doc, `${record.form_number} ${record.form_title}`, record, logoData);
+        pdfHeader(doc, record, logoData);
         y = 36;
       }
       y = pdfSection(doc, section.title, y);
@@ -1016,7 +1449,7 @@ export default function HseInspectionsPage() {
 
     if (y > 230) {
       doc.addPage();
-      pdfHeader(doc, `${record.form_number} ${record.form_title}`, record, logoData);
+      pdfHeader(doc, record, logoData);
       y = 36;
     }
 
@@ -1075,7 +1508,7 @@ export default function HseInspectionsPage() {
     if (evidenceRows.length) {
       if (y > 230) {
         doc.addPage();
-        pdfHeader(doc, `${record.form_number} ${record.form_title}`, record, logoData);
+        pdfHeader(doc, record, logoData);
         y = 36;
       }
       y = pdfSection(doc, "Evidence Register", y);
@@ -1118,7 +1551,7 @@ export default function HseInspectionsPage() {
       if (imageEvidence.length) {
         if (y > 238) {
           doc.addPage();
-          pdfHeader(doc, `${record.form_number} ${record.form_title}`, record, logoData);
+          pdfHeader(doc, record, logoData);
           y = 36;
         }
         y = pdfSection(doc, "Evidence Photos", y);
@@ -1129,7 +1562,7 @@ export default function HseInspectionsPage() {
             const x = column === 0 ? 12 : 106;
             if (y > 230) {
               doc.addPage();
-              pdfHeader(doc, `${record.form_number} ${record.form_title}`, record, logoData);
+              pdfHeader(doc, record, logoData);
               y = 36;
               column = 0;
             }
@@ -1156,6 +1589,7 @@ export default function HseInspectionsPage() {
       doc.setPage(page);
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184);
+      doc.text(`${record.form_number}${record.form_revision ? ` Rev ${record.form_revision}` : ""}`, 12, 287);
       doc.text(`Page ${page} of ${pageCount}`, 198, 287, { align: "right" });
     }
 
@@ -1180,7 +1614,7 @@ export default function HseInspectionsPage() {
       status: "Draft" as InspectionStatus,
       inspection_date: "",
     };
-    pdfHeader(doc, `${template.documentNumber} ${template.title}`, blankRecord, logoData);
+    pdfHeader(doc, blankRecord, logoData);
     let y = 36;
 
     doc.setFont("helvetica", "bold");
@@ -1215,7 +1649,7 @@ export default function HseInspectionsPage() {
       templateChecklist.forEach((section) => {
         if (y > 250) {
           doc.addPage();
-          pdfHeader(doc, `${template.documentNumber} ${template.title}`, blankRecord, logoData);
+          pdfHeader(doc, blankRecord, logoData);
           y = 36;
         }
         y = pdfSection(doc, section.title, y);
@@ -1243,7 +1677,7 @@ export default function HseInspectionsPage() {
       template.sections.forEach((sectionTitle, index) => {
         if (y > 232) {
           doc.addPage();
-          pdfHeader(doc, `${template.documentNumber} ${template.title}`, blankRecord, logoData);
+          pdfHeader(doc, blankRecord, logoData);
           y = 36;
         }
         y = pdfSection(doc, `${index + 1}. ${sectionTitle}`, y);
@@ -1271,7 +1705,7 @@ export default function HseInspectionsPage() {
 
     if (y > 230) {
       doc.addPage();
-      pdfHeader(doc, `${template.documentNumber} ${template.title}`, blankRecord, logoData);
+      pdfHeader(doc, blankRecord, logoData);
       y = 36;
     }
     y = pdfSection(doc, "Additional Comments", y);
@@ -1318,6 +1752,7 @@ export default function HseInspectionsPage() {
       doc.setPage(page);
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184);
+      doc.text(`${template.documentNumber}${template.revision ? ` Rev ${template.revision}` : ""}`, 12, 287);
       doc.text(`Page ${page} of ${pageCount}`, 198, 287, { align: "right" });
     }
 
@@ -1445,7 +1880,7 @@ function MobileInspectionHero({ latestSummary }: { latestSummary: string }) {
 function TopRow({ status }: { status: string }) {
   return (
     <div style={topMetaRowStyle}>
-      <Link href="/hse" style={backLinkStyle}>Back to Dashboard</Link>
+      <Link href="/hse" style={backLinkStyle}>&larr; Back to Dashboard</Link>
       <div style={statusBannerStyle}><strong>Status:</strong> {status}</div>
     </div>
   );
@@ -1491,11 +1926,14 @@ function DashboardView({
 
         <SectionCard title="Live Digital Inspections">
           <p style={emptyTextStyle}>
-            FRM-041 and FRM-044 are now wired for laptop entry, mobile-friendly completion, evidence upload, register tracking, and PDF output.
+            All six HSE inspection forms are now wired for laptop entry, mobile-friendly completion, evidence upload, register tracking, and PDF output.
           </p>
           <div style={buttonRowStyle}>
-            <button type="button" onClick={() => onCreate("workplace-office")} style={primaryButtonStyle}>Create Office Inspection</button>
-            <button type="button" onClick={() => onCreate(defaultTemplateId)} style={primaryButtonStyle}>Create Base and Site Inspection</button>
+            {inspectionTemplates.map((template) => (
+              <button key={template.id} type="button" onClick={() => onCreate(template.id)} style={primaryButtonStyle}>
+                Create {template.documentNumber.replace("ENS-HSEQ-", "")}
+              </button>
+            ))}
           </div>
         </SectionCard>
 
@@ -1515,7 +1953,7 @@ function DashboardView({
 
         <SectionCard title="Next Forms">
           <p style={emptyTextStyle}>
-            The same pattern can now be applied to vessel pre-sail, offshore, mobilisation, and dropped object inspections.
+            Use the form library to open blank printable PDFs, or use Create Inspection / mobile QR access to complete inspections digitally.
           </p>
         </SectionCard>
       </section>
@@ -1586,19 +2024,28 @@ function RegisterView({
   linkedActions: CentralAction[];
   isMobile: boolean;
 }) {
+  const [showFilters, setShowFilters] = useState(false);
+
   return (
     <section style={splitGridStyle}>
       <div style={isMobile ? mobilePanelStyle : panelStyle}>
         <PanelHeader title="Inspection Register" description="Logged HSE inspections with status, findings, evidence, and report output." />
         <div style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
           <input style={inputStyle} placeholder="Search inspections" value={search} onChange={(event) => onSearch(event.target.value)} />
+          <button type="button" onClick={() => setShowFilters((current) => !current)} style={showFilters ? secondaryButtonStyle : primaryButtonStyle}>
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </button>
+          <button type="button" onClick={onCreate} style={primaryButtonStyle}>Create Inspection</button>
+        </div>
+        {showFilters ? (
+        <div style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
           <select style={selectStyle} value={statusFilter} onChange={(event) => onStatusFilter(event.target.value)}>
             <option value="">All Statuses</option>
             {["Draft", "Open", "Complete", "Closed"].map((status) => <option key={status} value={status}>{status}</option>)}
           </select>
           <button type="button" onClick={() => { onSearch(""); onStatusFilter(""); }} style={secondaryButtonStyle}>Clear Filters</button>
-          <button type="button" onClick={onCreate} style={primaryButtonStyle}>Create Inspection</button>
         </div>
+        ) : null}
         <div style={tableInfoStyle}>Showing {records.length} of {totalRecords} inspections</div>
         {isMobile ? (
           <div style={mobileRegisterListStyle}>
@@ -1607,7 +2054,7 @@ function RegisterView({
                 key={record.id}
                 type="button"
                 onClick={() => onSelect(record)}
-                style={{ ...mobileRegisterCardStyle, borderColor: selected?.id === record.id ? "#0f766e" : "#dbe3ef" }}
+                style={{ ...mobileRegisterCardStyle, borderColor: selected?.id === record.id ? "#3A9B98" : "#dbe3ef" }}
               >
                 <div>
                   <strong style={mobileRegisterNumberStyle}>{record.inspection_number}</strong>
@@ -1783,8 +2230,8 @@ function CreateInspectionView({
             onClick={() => onSelectTemplate(template.id)}
             style={{
               ...templateCardStyle,
-              borderColor: selectedTemplateId === template.id ? "#0f766e" : "#cbd5e1",
-              boxShadow: selectedTemplateId === template.id ? "0 0 0 2px rgba(15, 118, 110, 0.14)" : "0 1px 2px rgba(15, 23, 42, 0.06)",
+              borderColor: selectedTemplateId === template.id ? "#3A9B98" : "#cbd5e1",
+              boxShadow: selectedTemplateId === template.id ? "0 0 0 2px rgba(58, 155, 152, 0.14)" : "0 1px 2px rgba(15, 23, 42, 0.06)",
             }}
           >
             <span style={docNumberStyle}>{template.documentNumber}</span>
@@ -1906,9 +2353,9 @@ function InspectionForm({
                           key={answer}
                           style={{
                             ...mobileAnswerOptionStyle,
-                            borderColor: response.answer === answer ? "#0f766e" : "#cbd5e1",
-                            background: response.answer === answer ? "#ecfdf5" : "#ffffff",
-                            color: response.answer === answer ? "#0f766e" : "#0f172a",
+                            borderColor: response.answer === answer ? "#3A9B98" : "#cbd5e1",
+                            background: response.answer === answer ? "#EEF8F7" : "#ffffff",
+                            color: response.answer === answer ? "#3A9B98" : "#0f172a",
                           }}
                         >
                           <input
@@ -2187,9 +2634,8 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       onClick={onClick}
       style={{
         ...tabButtonStyle,
-        background: active ? "#0f766e" : "white",
+        background: active ? "#3A9B98" : "#e2e8f0",
         color: active ? "white" : "#0f172a",
-        borderColor: active ? "#0f766e" : "#cbd5e1",
       }}
     >
       {children}
@@ -2215,11 +2661,23 @@ function SectionCard({ title, children }: { title: string; children: ReactNode }
   );
 }
 
-const topMetaRowStyle: CSSProperties = { marginBottom: 20, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" };
-const backLinkStyle: CSSProperties = { color: "#0f766e", fontWeight: 700, textDecoration: "none" };
+const topMetaRowStyle: CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
+const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
-const tabRowStyle: CSSProperties = { display: "flex", gap: "8px", flexWrap: "wrap", background: "white", borderRadius: "16px", padding: "12px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: "20px" };
-const tabButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "10px", padding: "10px 14px", fontWeight: 800, fontSize: "14px", cursor: "pointer" };
+const tabRowStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "20px" };
+const tabButtonStyle: CSSProperties = { border: "none", borderRadius: "10px", padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
 const sectionCardStyle: CSSProperties = { background: "white", borderRadius: "16px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" };
@@ -2228,26 +2686,94 @@ const emptyTextStyle: CSSProperties = { color: "#475569", margin: "0 0 14px", li
 const storyGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" };
 const miniTemplateStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "4px", color: "#0f172a", background: "#f8fafc" };
 const miniTemplateButtonStyle: CSSProperties = { ...miniTemplateStyle, textAlign: "left", cursor: "pointer", font: "inherit" };
-const blankPdfCueStyle: CSSProperties = { marginTop: "6px", color: "#0f766e", fontWeight: 900 };
+const blankPdfCueStyle: CSSProperties = { marginTop: "6px", color: "#3A9B98", fontWeight: 900 };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" };
-const panelHeaderStyle: CSSProperties = { background: "#0f766e", color: "white", borderRadius: "10px", padding: "14px 16px", marginBottom: "18px" };
+const panelHeaderStyle: CSSProperties = { background: "#3A9B98", color: "white", borderRadius: "10px", padding: "14px 16px", marginBottom: "18px" };
 const panelTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", fontWeight: 800 };
 const panelDescriptionStyle: CSSProperties = { margin: "4px 0 0", fontSize: "13px", lineHeight: 1.45 };
 const splitGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr", gap: "20px", alignItems: "start" };
-const detailPanelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", width: "100%", boxSizing: "border-box" };
-const registerToolbarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 180px auto auto", gap: "10px", alignItems: "end", marginBottom: "14px" };
+const detailPanelStyle: CSSProperties = {
+  display: "grid",
+  gap: "18px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  width: "100%",
+  boxSizing: "border-box",
+  minWidth: 0,
+};
+const registerToolbarStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+};
 const inputStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #cbd5e1", borderRadius: "9px", padding: "9px 12px", fontSize: "14px", background: "white", boxSizing: "border-box" };
 const selectStyle: CSSProperties = { ...inputStyle };
-const tableInfoStyle: CSSProperties = { fontSize: "13px", color: "#475569", marginBottom: "8px" };
-const tableShellStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "12px", overflow: "auto", maxHeight: "520px" };
-const tableStyle: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: "13px" };
-const thStyle: CSSProperties = { textAlign: "left", padding: "12px", color: "#334155", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" };
-const tdStyle: CSSProperties = { padding: "12px", borderBottom: "1px solid #e2e8f0", color: "#0f172a", verticalAlign: "middle" };
-const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#0f766e" };
+const tableInfoStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "4px",
+  flexWrap: "wrap",
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
+};
+const tableShellStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+};
+const tableStyle: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
+};
+const thStyle: CSSProperties = {
+  textAlign: "left",
+  padding: "13px 14px",
+  background: "#f8fafc",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
+  whiteSpace: "nowrap",
+};
+const tdStyle: CSSProperties = {
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
+  color: "#0f172a",
+  verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
+};
+const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#3A9B98" };
 const reportTdStyle: CSSProperties = { ...tdStyle, textAlign: "center", width: "96px" };
 const clickableRowStyle: CSSProperties = { cursor: "pointer" };
-const emptyCellStyle: CSSProperties = { padding: "22px", textAlign: "center", color: "#64748b", borderTop: "1px solid #e2e8f0" };
-const primaryButtonStyle: CSSProperties = { background: "#0f766e", color: "white", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
+const emptyCellStyle: CSSProperties = {
+  padding: "26px 14px",
+  textAlign: "center",
+  color: "#64748b",
+  background: "#f8fafc",
+  borderBottom: "1px dashed #cbd5e1",
+};
+const primaryButtonStyle: CSSProperties = { background: "#3A9B98", color: "white", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
 const secondaryButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
 const pdfButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: "9px", padding: "8px 14px", fontWeight: 900, cursor: "pointer", minWidth: "54px", lineHeight: 1 };
 const dangerButtonStyle: CSSProperties = { background: "#b91c1c", color: "white", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
@@ -2255,10 +2781,10 @@ const primaryLinkStyle: CSSProperties = { ...primaryButtonStyle, display: "inlin
 const secondaryLinkStyle: CSSProperties = { ...secondaryButtonStyle, display: "inline-flex", textDecoration: "none", alignItems: "center" };
 const templateGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "12px", marginBottom: "20px" };
 const templateCardStyle: CSSProperties = { minHeight: "164px", display: "flex", flexDirection: "column", gap: "8px", textAlign: "left", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "14px", padding: "14px", cursor: "pointer", color: "#0f172a" };
-const docNumberStyle: CSSProperties = { color: "#0f766e", fontWeight: 900, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" };
-const templateStatusStyle: CSSProperties = { marginTop: "auto", color: "#0f766e", fontWeight: 800, fontSize: "12px" };
-const selectedHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "14px", alignItems: "flex-start", border: "1px solid #99f6e4", background: "#ecfdf5", borderRadius: "14px", padding: "16px", marginBottom: "18px" };
-const selectedEyebrowStyle: CSSProperties = { fontSize: "12px", color: "#0f766e", fontWeight: 900, letterSpacing: "0.04em" };
+const docNumberStyle: CSSProperties = { color: "#3A9B98", fontWeight: 900, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" };
+const templateStatusStyle: CSSProperties = { marginTop: "auto", color: "#3A9B98", fontWeight: 800, fontSize: "12px" };
+const selectedHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "14px", alignItems: "flex-start", border: "1px solid #BFE5E3", background: "#EEF8F7", borderRadius: "14px", padding: "16px", marginBottom: "18px" };
+const selectedEyebrowStyle: CSSProperties = { fontSize: "12px", color: "#3A9B98", fontWeight: 900, letterSpacing: "0.04em" };
 const selectedTitleStyle: CSSProperties = { margin: "4px 0", fontSize: "22px", color: "#0f172a" };
 const selectedDescriptionStyle: CSSProperties = { margin: 0, color: "#475569", lineHeight: 1.45 };
 const statusPillStyle: CSSProperties = { background: "#dcfce7", color: "#166534", borderRadius: "999px", padding: "7px 10px", fontWeight: 800, fontSize: "12px", whiteSpace: "nowrap" };
@@ -2268,7 +2794,7 @@ const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "re
 const fieldStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: "6px", fontWeight: 800, color: "#334155", fontSize: "12px" };
 const labelStyle: CSSProperties = { textTransform: "uppercase", letterSpacing: "0.03em" };
 const inspectionSectionStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "14px", overflow: "hidden", marginBottom: "16px", background: "white" };
-const inspectionSectionTitleStyle: CSSProperties = { margin: 0, background: "#0f766e", color: "white", padding: "12px 14px", fontSize: "16px", fontWeight: 900 };
+const inspectionSectionTitleStyle: CSSProperties = { margin: 0, background: "#3A9B98", color: "white", padding: "12px 14px", fontSize: "16px", fontWeight: 900 };
 const inspectionSectionBodyStyle: CSSProperties = { padding: "14px" };
 const checklistShellStyle: CSSProperties = { display: "grid", gap: "0", border: "1px solid #dbe3ef", borderRadius: "10px", overflow: "hidden" };
 const checklistHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "center", background: "#f1f5f9", fontWeight: 900, color: "#0f172a", fontSize: "12px" };
@@ -2276,7 +2802,7 @@ const checklistRowStyle: CSSProperties = { display: "grid", gridTemplateColumns:
 const centerHeaderCellStyle: CSSProperties = { textAlign: "center", justifySelf: "center", width: "100%" };
 const centeredChecklistCellStyle: CSSProperties = { display: "flex", alignItems: "center", padding: "8px 8px 8px 0", lineHeight: 1.35 };
 const radioCellStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid #dbe3ef" };
-const itemUploadButtonStyle: CSSProperties = { margin: "8px", minHeight: "30px", border: "1px solid #99f6e4", background: "#ecfdf5", color: "#0f766e", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "11px", cursor: "pointer" };
+const itemUploadButtonStyle: CSSProperties = { margin: "8px", minHeight: "30px", border: "1px solid #BFE5E3", background: "#EEF8F7", color: "#3A9B98", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "11px", cursor: "pointer" };
 const smallTextareaStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px", fontSize: "13px", resize: "vertical", boxSizing: "border-box" };
 const largeTextareaStyle: CSSProperties = { ...smallTextareaStyle, minHeight: "110px" };
 const actionTableStyle: CSSProperties = { display: "grid", gap: 0, border: "1px solid #dbe3ef", borderRadius: "10px", overflow: "hidden", marginBottom: "12px" };
@@ -2300,11 +2826,11 @@ const mobileHeroStyle: CSSProperties = {
   marginBottom: "16px",
   padding: "20px 18px",
   borderRadius: "20px",
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
   color: "#ffffff",
   display: "grid",
   gap: "12px",
-  boxShadow: "0 16px 30px rgba(15, 118, 110, 0.18)",
+  boxShadow: "0 16px 30px rgba(58, 155, 152, 0.18)",
 };
 
 const mobileHeroEyebrowStyle: CSSProperties = {
@@ -2400,7 +2926,7 @@ const mobileRegisterCardStyle: CSSProperties = {
 
 const mobileRegisterNumberStyle: CSSProperties = {
   display: "block",
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 900,
   marginBottom: "4px",
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { imsColours } from "./imsTheme";
 
 type ModuleSectionHeaderProps = {
   title: string;
@@ -16,7 +17,7 @@ const headerStyle: CSSProperties = {
   alignItems: "flex-start",
   gap: "12px",
   flexWrap: "wrap",
-  background: "#0f766e",
+  background: imsColours.brand,
   color: "#ffffff",
   borderRadius: "12px",
   padding: "10px 14px",

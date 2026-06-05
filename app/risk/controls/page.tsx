@@ -11,7 +11,7 @@ export default function RiskControlsPage() {
       latestLabel="Latest Control"
       status="Controls / Mitigations shell ready. Control data storage has not been configured yet."
       kpis={[
-        { title: "Active Controls", value: "-", accent: "#0f766e" },
+        { title: "Active Controls", value: "-", accent: "#3A9B98" },
         { title: "Mitigations Due", value: "-", accent: "#f59e0b" },
         { title: "Assurance Overdue", value: "-", accent: "#dc2626" },
         { title: "Effective Controls", value: "-", accent: "#16a34a" },
@@ -110,10 +110,16 @@ const topMetaRowStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: 12,
   flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };

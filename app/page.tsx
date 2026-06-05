@@ -599,7 +599,7 @@ export default function Home() {
     const closedMocs = mocs.filter((item) => normaliseStatus(item.status) === "closed").length;
 
     return [
-      { name: "NCR Closure", value: percentage(closedNcrs, totalNcrs), fill: "#0f766e", href: "/ncr-capa" },
+      { name: "NCR Closure", value: percentage(closedNcrs, totalNcrs), fill: "#3A9B98", href: "/ncr-capa" },
       {
         name: "Finding Closure",
         value: percentage(closedFindings, totalFindings),
@@ -853,7 +853,7 @@ export default function Home() {
     {
       label: "Open MOCs",
       value: openMocs,
-      accent: "#0f766e",
+      accent: "#3A9B98",
       href: buildHref("/moc", { attention: "open" }),
     },
     {
@@ -877,7 +877,7 @@ export default function Home() {
     {
       label: "Overdue Documents",
       value: overdueDocuments,
-      accent: "#0f766e",
+      accent: "#3A9B98",
       href: buildHref("/documents", { review: "Overdue" }),
     },
   ];
@@ -1206,7 +1206,7 @@ export default function Home() {
                   <Tooltip />
                   <Bar
                     dataKey="value"
-                    fill="#0f766e"
+                    fill="#3A9B98"
                     radius={[6, 6, 0, 0]}
                     cursor="pointer"
                     onClick={(data: { name?: string }) => openMocStatusBucket(data?.name || "")}
@@ -1651,12 +1651,12 @@ function getFrequencyBadgeStyle(frequency: "Reduce" | "Maintain" | "Increase"): 
 }
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
   color: "white",
   borderRadius: "20px",
   padding: "22px 24px",
   marginBottom: "18px",
-  boxShadow: "0 10px 24px rgba(15, 118, 110, 0.14)",
+  boxShadow: "0 10px 24px rgba(58, 155, 152, 0.14)",
   display: "grid",
   gap: "16px",
 };
@@ -1840,7 +1840,7 @@ const sectionSubtitleStyle: CSSProperties = {
 
 const sectionLinkStyle: CSSProperties = {
   textDecoration: "none",
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   fontSize: "14px",
 };

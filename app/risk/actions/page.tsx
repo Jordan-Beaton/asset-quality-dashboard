@@ -32,7 +32,7 @@ export default function RiskActionsPage() {
       </div>
 
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Risk-Linked Actions" value="-" accent="#0f766e" />
+        <QualityKpiCard title="Risk-Linked Actions" value="-" accent="#3A9B98" />
         <QualityKpiCard title="Open Actions" value="-" accent="#2563eb" />
         <QualityKpiCard title="Overdue Actions" value="-" accent="#dc2626" />
         <QualityKpiCard title="Completed Actions" value="-" accent="#16a34a" />
@@ -71,6 +71,12 @@ const topMetaRowStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: 12,
   flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const topMetaActionsStyle: CSSProperties = {
@@ -81,7 +87,7 @@ const topMetaActionsStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -95,7 +101,7 @@ const statusBannerStyle: CSSProperties = {
 };
 
 const primaryLinkStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "11px 16px",

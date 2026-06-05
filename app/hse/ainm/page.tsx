@@ -507,6 +507,7 @@ export default function HseAinmPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [stageFilter, setStageFilter] = useState("");
+  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
   const [importWorkbook, setImportWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [importSheets, setImportSheets] = useState<string[]>([]);
   const [selectedImportSheet, setSelectedImportSheet] = useState("");
@@ -516,6 +517,7 @@ export default function HseAinmPage() {
   const [evidenceStage, setEvidenceStage] = useState("General");
   const [generatingStage, setGeneratingStage] = useState("");
   const [reportTypeFilter, setReportTypeFilter] = useState<"" | "IR" | "AR">("");
+  const [showReportFilters, setShowReportFilters] = useState(false);
   const [dashboardYear, setDashboardYear] = useState(String(new Date().getFullYear()));
   const [showAddReviewer, setShowAddReviewer] = useState(false);
   const [newReviewerName, setNewReviewerName] = useState("");
@@ -624,7 +626,7 @@ export default function HseAinmPage() {
       },
     ];
     const workflowRows = [
-      { label: "Notification issued/complete", value: completedNotification, color: "#0f766e" },
+      { label: "Notification issued/complete", value: completedNotification, color: "#3A9B98" },
       { label: "Part 1 complete", value: completedPart1, color: "#2563eb" },
       { label: "Part 2 complete", value: completedPart2, color: "#7c3aed" },
     ];
@@ -632,7 +634,7 @@ export default function HseAinmPage() {
       .map((classification) => ({
         label: classification,
         value: dashboardRecords.filter((record) => record.event_classification === classification).length,
-        color: "#0f766e",
+        color: "#3A9B98",
         onClick: () => {
           setSearch(classification);
           setStatusFilter("");
@@ -665,7 +667,7 @@ export default function HseAinmPage() {
         const eventDate = new Date(record.event_date);
         return !Number.isNaN(eventDate.getTime()) && eventDate.getMonth() === index;
       }).length;
-      return { label, value, color: "#0f766e" };
+      return { label, value, color: "#3A9B98" };
     });
     return { total, typeRows, workflowRows, statusRows, classificationRows, projectRows, monthRows };
   }, [kpis]);
@@ -2189,6 +2191,12 @@ export default function HseAinmPage() {
           <SectionCard title="AINM Register" subtitle="Tracker-style register with three-stage AINM workflow status.">
             <div style={toolbarStyle}>
               <input style={searchStyle} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search AINM no., title, project, owner..." />
+              <button type="button" style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowRegisterFilters((current) => !current)}>
+                {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+              </button>
+            </div>
+            {showRegisterFilters ? (
+            <div style={toolbarStyle}>
               <select style={filterStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="">All Status</option>
                 {overallStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -2199,6 +2207,7 @@ export default function HseAinmPage() {
               </select>
               <button type="button" style={secondaryButtonStyle} onClick={() => { setSearch(""); setStatusFilter(""); setStageFilter(""); }}>Clear Filters</button>
             </div>
+            ) : null}
             <div style={tableInfoRowStyle}>Showing {filteredRecords.length} of {records.length} AINMs</div>
             <div style={registerTableWrapStyle}>
               <table style={registerTableStyle}>
@@ -2697,12 +2706,19 @@ export default function HseAinmPage() {
         <SectionCard title="AINM Reports" subtitle="Compiled PDF outputs only. Generate the final pack from the selected record's Reports tab.">
           <div style={toolbarStyle}>
             <input style={searchStyle} value="" readOnly placeholder={`${filteredCompiledPdfReports.length} compiled PDF report${filteredCompiledPdfReports.length === 1 ? "" : "s"}`} />
+            <button type="button" style={showReportFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowReportFilters((current) => !current)}>
+              {showReportFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+          {showReportFilters ? (
+          <div style={toolbarStyle}>
             <select style={filterStyle} value={reportTypeFilter} onChange={(event) => setReportTypeFilter(event.target.value as "" | "IR" | "AR")}>
               <option value="">All AINM Types</option>
               <option value="IR">Incident Reports (IR)</option>
               <option value="AR">Accident Reports (AR)</option>
             </select>
           </div>
+          ) : null}
           <div style={registerTableWrapStyle}>
             <table style={registerTableStyle}>
               <thead>
@@ -2901,12 +2917,24 @@ function ColumnChart({ rows }: { rows: { label: string; value: number; color: st
   );
 }
 
-const topMetaRowStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 };
-const backLinkStyle: CSSProperties = { color: "#0f766e", fontWeight: 800, textDecoration: "none" };
+const topMetaRowStyle: CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
+const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: 12, padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 };
-const viewButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "white", borderRadius: 10, padding: "10px 14px", color: "#0f172a", fontWeight: 800, cursor: "pointer" };
-const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#0f766e", borderColor: "#0f766e", color: "white" };
+const viewButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
+const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#3A9B98", color: "white" };
 const kpiGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 16, marginBottom: 20 };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 20 };
 const dashboardStoryHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", background: "white", borderRadius: 18, padding: 20, boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: 20 };
@@ -2918,7 +2946,7 @@ const panelStyle: CSSProperties = { background: "white", borderRadius: 18, paddi
 const panelTitleStyle: CSSProperties = { margin: 0, color: "#0f172a", fontSize: 17 };
 const panelSubtitleStyle: CSSProperties = { margin: "5px 0 14px", color: "#64748b", fontSize: 12, lineHeight: 1.45, fontWeight: 700 };
 const sectionStyle: CSSProperties = { background: "white", borderRadius: 18, padding: 20, boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: 20 };
-const sectionHeaderStyle: CSSProperties = { background: "#0f766e", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
+const sectionHeaderStyle: CSSProperties = { background: "#3A9B98", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
 const sectionTitleStyle: CSSProperties = { margin: 0, color: "white", fontSize: 18 };
 const sectionSubtitleStyle: CSSProperties = { margin: "4px 0 0", color: "rgba(255,255,255,0.82)", fontSize: 13 };
 const bodyTextStyle: CSSProperties = { color: "#475569", lineHeight: 1.55, margin: 0 };
@@ -2935,20 +2963,20 @@ const columnItemStyle: CSSProperties = { display: "grid", justifyItems: "center"
 const columnValueStyle: CSSProperties = { color: "#475569", fontSize: 11, minHeight: 14, fontWeight: 800 };
 const columnBarStyle: CSSProperties = { width: "72%", borderRadius: "8px 8px 2px 2px", minHeight: 4 };
 const columnLabelStyle: CSSProperties = { color: "#64748b", fontSize: 10, fontWeight: 800 };
-const reportReadinessStyle: CSSProperties = { display: "grid", placeItems: "center", minHeight: 145, border: "1px solid #99f6e4", background: "#ecfdf5", color: "#0f766e", borderRadius: 16, cursor: "pointer", marginBottom: 14 };
+const reportReadinessStyle: CSSProperties = { display: "grid", placeItems: "center", minHeight: 145, border: "1px solid #BFE5E3", background: "#EEF8F7", color: "#3A9B98", borderRadius: 16, cursor: "pointer", marginBottom: 14 };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 };
 const stageGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 16 };
 const fieldStyle: CSSProperties = { display: "grid", gap: 6 };
 const labelStyle: CSSProperties = { color: "#334155", fontSize: 12, fontWeight: 900 };
 const helperTextStyle: CSSProperties = { color: "#64748b", fontSize: 12, fontStyle: "italic", fontWeight: 700 };
-const inlineSectionTitleStyle: CSSProperties = { margin: "4px 0 0", background: "#0f766e", color: "white", borderRadius: 10, padding: "11px 14px", fontSize: 16 };
+const inlineSectionTitleStyle: CSSProperties = { margin: "4px 0 0", background: "#3A9B98", color: "white", borderRadius: 10, padding: "11px 14px", fontSize: 16 };
 const carryForwardPanelStyle: CSSProperties = { background: "white", border: "1px solid #dbe3ef", borderRadius: 14, padding: 16, marginBottom: 16 };
 const carryForwardTitleStyle: CSSProperties = { margin: "0 0 12px", color: "#0f172a", fontSize: 18 };
 const carryForwardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, color: "#334155", fontSize: 13 };
 const inputStyle: CSSProperties = { width: "100%", minHeight: 42, border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", color: "#0f172a", background: "white" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: 96, resize: "vertical", lineHeight: 1.45 };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 14 };
-const primaryButtonStyle: CSSProperties = { border: "none", background: "#0f766e", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
+const primaryButtonStyle: CSSProperties = { border: "none", background: "#3A9B98", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
 const secondaryButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "#e2e8f0", color: "#0f172a", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
 const dangerButtonStyle: CSSProperties = { border: "none", background: "#b91c1c", color: "white", borderRadius: 10, padding: "10px 13px", fontWeight: 900, cursor: "pointer" };
 const smallDangerButtonStyle: CSSProperties = { ...dangerButtonStyle, padding: "7px 9px", fontSize: 12, alignSelf: "center" };
@@ -2956,27 +2984,85 @@ const uploadButtonStyle: CSSProperties = { ...primaryButtonStyle, display: "inli
 const importToolbarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px, auto) minmax(220px, 320px)", gap: 14, alignItems: "end", marginBottom: 14 };
 const linkButtonStyle: CSSProperties = { ...primaryButtonStyle, textDecoration: "none" };
 const smallLinkButtonStyle: CSSProperties = { ...secondaryButtonStyle, textDecoration: "none", display: "inline-flex" };
-const toolbarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(240px, 1fr) 180px 190px auto", gap: 10, marginBottom: 12, alignItems: "center" };
+const toolbarStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+};
 const searchStyle: CSSProperties = { ...inputStyle, minHeight: 44 };
 const filterStyle: CSSProperties = { ...inputStyle, minHeight: 44 };
-const tableInfoRowStyle: CSSProperties = { color: "#475569", fontSize: 13, fontWeight: 700, margin: "12px 0" };
+const tableInfoRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "4px",
+  flexWrap: "wrap",
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
+};
 const registerLayoutStyle: CSSProperties = { display: "grid", gap: 20 };
-const registerTableWrapStyle: CSSProperties = { overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: 14 };
-const registerTableStyle: CSSProperties = { width: "100%", borderCollapse: "collapse", background: "white", minWidth: 1020 };
-const thStyle: CSSProperties = { textAlign: "left", padding: "12px 14px", background: "#f8fafc", color: "#475569", fontSize: 12, textTransform: "uppercase", borderBottom: "1px solid #e2e8f0" };
-const tdStyle: CSSProperties = { padding: "12px 14px", borderBottom: "1px solid #e2e8f0", color: "#0f172a", verticalAlign: "top", fontSize: 13 };
-const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#0f766e" };
+const registerTableWrapStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+};
+const registerTableStyle: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
+};
+const thStyle: CSSProperties = {
+  textAlign: "left",
+  padding: "13px 14px",
+  background: "#f8fafc",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
+  whiteSpace: "nowrap",
+};
+const tdStyle: CSSProperties = {
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
+  color: "#0f172a",
+  verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
+};
+const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#3A9B98" };
 const trStyle: CSSProperties = { cursor: "pointer" };
 const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ecfeff" };
 const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 900 };
 const detailTabStyle: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 };
-const detailSectionStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: 14, padding: 16, background: "#f8fafc" };
+const detailSectionStyle: CSSProperties = {
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  minWidth: 0,
+};
 const detailFooterStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 };
 const checkGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, margin: "16px 0" };
 const checkItemStyle: CSSProperties = { display: "flex", gap: 8, alignItems: "center", background: "white", border: "1px solid #dbe3ef", borderRadius: 10, padding: "10px 12px", color: "#0f172a", fontWeight: 700, fontSize: 13 };
 const correctiveActionsTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "110px minmax(0, 1fr) 100px", border: "1px solid #dbe3ef", borderRadius: 12, overflow: "hidden", background: "white" };
 const referenceDocumentsTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "70px minmax(0, 1fr) 100px", border: "1px solid #dbe3ef", borderRadius: 12, overflow: "hidden", background: "white" };
-const correctiveHeaderCellStyle: CSSProperties = { background: "#0f766e", color: "white", padding: "10px 12px", fontWeight: 900, fontSize: 13 };
+const correctiveHeaderCellStyle: CSSProperties = { background: "#3A9B98", color: "white", padding: "10px 12px", fontWeight: 900, fontSize: 13 };
 const correctiveNumberCellStyle: CSSProperties = { padding: "9px 12px", borderTop: "1px solid #e2e8f0", color: "#0f172a", fontWeight: 900, background: "#f8fafc" };
 const correctiveTextareaStyle: CSSProperties = { width: "100%", minHeight: 38, border: "none", borderTop: "1px solid #e2e8f0", borderLeft: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", padding: "9px 12px", fontSize: 14, lineHeight: 1.4, resize: "vertical", boxSizing: "border-box", color: "#0f172a", background: "white" };
 const teamTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr)) 100px", border: "1px solid #dbe3ef", borderRadius: 12, overflow: "hidden", background: "white", marginTop: 12 };
@@ -2992,7 +3078,7 @@ const notificationEvidencePanelStyle: CSSProperties = { display: "grid", gap: 12
 const addPersonPanelStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 16, border: "1px dashed #94a3b8", borderRadius: 14, padding: 16, background: "#f8fafc" };
 const evidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, background: "white", color: "#0f172a" };
 const reportButtonGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 };
-const reportButtonStyle: CSSProperties = { border: "1px solid #99f6e4", background: "#ecfdf5", color: "#0f766e", borderRadius: 12, padding: "16px 14px", fontWeight: 900, cursor: "pointer" };
-const compiledReportButtonStyle: CSSProperties = { ...reportButtonStyle, background: "#0f766e", borderColor: "#0f766e", color: "white" };
+const reportButtonStyle: CSSProperties = { border: "1px solid #BFE5E3", background: "#EEF8F7", color: "#3A9B98", borderRadius: 12, padding: "16px 14px", fontWeight: 900, cursor: "pointer" };
+const compiledReportButtonStyle: CSSProperties = { ...reportButtonStyle, background: "#3A9B98", borderColor: "#3A9B98", color: "white" };
 const previewGridStyle: CSSProperties = { display: "grid", gap: 10, marginBottom: 14 };
 const previewCardStyle: CSSProperties = { display: "grid", gap: 4, border: "1px solid #dbe3ef", background: "#f8fafc", borderRadius: 12, padding: 12, color: "#0f172a" };

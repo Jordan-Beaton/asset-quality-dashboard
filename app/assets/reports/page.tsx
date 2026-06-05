@@ -559,7 +559,7 @@ export default function AssetReportsPage() {
       },
       {
         title: "E. Linked Actions",
-        accent: "#0f766e",
+        accent: "#3A9B98",
         rows: [
           ["Open linked asset actions", metrics.actionsSummary.openLinkedAssetActions],
           ["Overdue linked asset actions", metrics.actionsSummary.overdueLinkedAssetActions],
@@ -1166,7 +1166,7 @@ export default function AssetReportsPage() {
 }
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -1251,7 +1251,7 @@ const textareaStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1271,7 +1271,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const pdfButtonStyle: CSSProperties = {
-  background: "#1d4ed8",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1352,21 +1352,31 @@ const emptyTextStyle: CSSProperties = {
 const tableStyle: CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
 };
 
 const tableHeadStyle: CSSProperties = {
   textAlign: "left",
-  padding: "12px 10px",
-  borderBottom: "1px solid #e2e8f0",
-  color: "#475569",
-  fontSize: "13px",
+  padding: "13px 14px",
+  background: "#f8fafc",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
+  whiteSpace: "nowrap",
 };
 
 const tableCellStyle: CSSProperties = {
-  padding: "14px 10px",
-  borderBottom: "1px solid #f1f5f9",
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
   color: "#0f172a",
-  verticalAlign: "top",
+  verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
 };
 
 const actionButtonsWrapStyle: CSSProperties = {
@@ -1376,7 +1386,7 @@ const actionButtonsWrapStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "8px 12px",

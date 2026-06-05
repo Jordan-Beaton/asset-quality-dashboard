@@ -189,6 +189,7 @@ function MaintenancePageContent() {
   const [detailForm, setDetailForm] = useState<NewMaintenanceForm>(emptyNewMaintenance);
   const [assetFilter, setAssetFilter] = useState(linkedAssetParam);
   const [typeFilter, setTypeFilter] = useState("");
+  const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAssetParam));
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [openingId, setOpeningId] = useState("");
@@ -691,28 +692,15 @@ function MaintenancePageContent() {
           title="Filters & History"
           subtitle="Review one asset's maintenance history or the full log, with overdue work shown first."
         >
-          <div style={filterGridStyle}>
-            <Field label="Asset Filter">
-              <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={inputStyle}>
-                <option value="">All assets</option>
-                {assets.map((asset) => (
-                  <option key={asset.id} value={asset.asset_code || asset.id}>
-                    {(asset.asset_code || asset.id) + " - " + (asset.name || "Unnamed Asset")}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Maintenance Type Filter">
-              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={inputStyle}>
-                <option value="">All types</option>
-                <option value="Preventative">Preventative</option>
-                <option value="Corrective">Corrective</option>
-              </select>
-            </Field>
-          </div>
-
           <div style={buttonRowStyle}>
+            <button
+              type="button"
+              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
+              onClick={() => setShowRegisterFilters((prev) => !prev)}
+            >
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+            {showRegisterFilters ? (
             <button
               type="button"
               style={secondaryButtonStyle}
@@ -723,7 +711,31 @@ function MaintenancePageContent() {
             >
               Clear Filters
             </button>
+            ) : null}
           </div>
+
+          {showRegisterFilters ? (
+            <div style={filterGridStyle}>
+              <Field label="Asset Filter">
+                <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={inputStyle}>
+                  <option value="">All assets</option>
+                  {assets.map((asset) => (
+                    <option key={asset.id} value={asset.asset_code || asset.id}>
+                      {(asset.asset_code || asset.id) + " - " + (asset.name || "Unnamed Asset")}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Maintenance Type Filter">
+                <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={inputStyle}>
+                  <option value="">All types</option>
+                  <option value="Preventative">Preventative</option>
+                  <option value="Corrective">Corrective</option>
+                </select>
+              </Field>
+            </div>
+          ) : null}
 
           <div style={historyListStyle}>
             {filteredRecords.length === 0 ? (
@@ -1144,7 +1156,7 @@ const fieldModeEyebrowStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  color: "#0f766e",
+  color: "#3A9B98",
 };
 
 const fieldModeTitleStyle: CSSProperties = {
@@ -1162,10 +1174,15 @@ const topMetaRowStyle: CSSProperties = {
   gap: 12,
   flexWrap: "wrap",
   alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -1237,7 +1254,16 @@ const mobileFormGridStyle: CSSProperties = {
 };
 
 const filterGridStyle: CSSProperties = {
-  ...mobileFormGridStyle,
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
 };
 
 const fieldWrapStyle: CSSProperties = {
@@ -1313,7 +1339,7 @@ const buttonRowStyleTight: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1335,7 +1361,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1346,7 +1372,7 @@ const miniButtonStyle: CSSProperties = {
 };
 
 const actionLinkButtonStyle: CSSProperties = {
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1412,6 +1438,14 @@ const historyCardStyle: CSSProperties = {
 const detailPanelStyle: CSSProperties = {
   display: "grid",
   gap: "18px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  width: "100%",
+  boxSizing: "border-box",
+  minWidth: 0,
 };
 
 const detailSummaryRowStyle: CSSProperties = {

@@ -20,7 +20,9 @@ const DEPARTMENTS = [
   "Operations",
   "Procurement",
   "Project",
+  "Quality",
   "Survey",
+  "HSE",
   "HSEQ",
 ] as const;
 
@@ -127,6 +129,7 @@ function PeoplePageContent() {
   const [departmentFilter, setDepartmentFilter] = useState<"" | Department>("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [search, setSearch] = useState("");
+  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
@@ -626,6 +629,17 @@ function PeoplePageContent() {
               />
             </Field>
 
+            <button
+              type="button"
+              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
+              onClick={() => setShowRegisterFilters((current) => !current)}
+            >
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showRegisterFilters ? (
+          <div style={filterGridStyle}>
             <Field label="Department Filter">
               <select
                 value={departmentFilter}
@@ -653,6 +667,7 @@ function PeoplePageContent() {
               </select>
             </Field>
           </div>
+          ) : null}
 
           <div style={buttonRowStyle}>
             <button
@@ -919,12 +934,17 @@ export default function PeoplePage() {
 }
 
 const topMetaRowStyle: CSSProperties = {
-  marginBottom: "20px",
+  marginBottom: 20,
   display: "flex",
   justifyContent: "space-between",
-  gap: "12px",
+  gap: 12,
   flexWrap: "wrap",
   alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const statusBannerStyle: CSSProperties = {
@@ -979,8 +999,15 @@ const formGridStyle: CSSProperties = {
 
 const filterGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
 };
 
 const fieldWrapStyle: CSSProperties = {
@@ -1029,7 +1056,7 @@ const buttonRowStyleTight: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1051,7 +1078,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1114,27 +1141,26 @@ const importSummaryStyle: CSSProperties = {
 
 const peopleImportTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #dbe3ef",
   borderRadius: "16px",
+  background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const peopleImportTableStyle: CSSProperties = {
   width: "100%",
-  minWidth: "900px",
-  borderCollapse: "separate",
-  borderSpacing: 0,
+  borderCollapse: "collapse",
   background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
 };
 
 const peopleRegisterTableStyle: CSSProperties = {
   width: "100%",
-  minWidth: "860px",
-  borderCollapse: "separate",
-  borderSpacing: 0,
+  borderCollapse: "collapse",
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
-  borderRadius: "16px",
-  overflow: "hidden",
+  minWidth: 960,
+  fontSize: "13px",
 };
 
 const peopleRegisterHeaderCellStyle: CSSProperties = {
@@ -1185,6 +1211,14 @@ const pillStyle: CSSProperties = {
 const detailPanelStyle: CSSProperties = {
   display: "grid",
   gap: "18px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  width: "100%",
+  boxSizing: "border-box",
+  minWidth: 0,
 };
 
 const detailSummaryRowStyle: CSSProperties = {

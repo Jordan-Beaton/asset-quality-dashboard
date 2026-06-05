@@ -602,6 +602,10 @@ function NcrCapaPageContent() {
   const [severityFilter, setSeverityFilter] = useState(linkedSeverity);
   const [sourceFilter, setSourceFilter] = useState(linkedSource);
   const [projectFilter, setProjectFilter] = useState(linkedProject);
+  const [showRegisterFilters, setShowRegisterFilters] = useState(
+    Boolean(linkedStatus !== "All" || linkedSeverity !== "All" || linkedSource !== "All" || linkedProject !== "All")
+  );
+  const [showReportFilters, setShowReportFilters] = useState(false);
   const [showAttentionOnly, setShowAttentionOnly] = useState(false);
   const [activeLogTab, setActiveLogTab] = useState<"NCR" | "CAPA">("NCR");
   const [ncrQuickFilter, setNcrQuickFilter] = useState<NcrQuickFilter>("");
@@ -1151,7 +1155,7 @@ function NcrCapaPageContent() {
       sourceOptions.map((source) => ({
         label: source,
         value: yearScopedNcrRows.filter((row) => row.source_type === source).length,
-        color: source === "Supplier" ? "#2563eb" : source === "External" ? "#7c3aed" : "#0f766e",
+        color: source === "Supplier" ? "#2563eb" : source === "External" ? "#7c3aed" : "#3A9B98",
       })),
     [sourceOptions, yearScopedNcrRows]
   );
@@ -3318,6 +3322,16 @@ function NcrCapaPageContent() {
               placeholder="Search NCR number, title, owner, project..."
             />
 
+            <button
+              type="button"
+              style={showRegisterFilters ? secondaryButton : primaryButton}
+              onClick={() => setShowRegisterFilters((current) => !current)}
+            >
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showRegisterFilters ? (
             <div style={toolbarFiltersStyle}>
               <div style={toolbarLabeledControlStyle}>
                 <label style={toolbarLabelStyle}>Status</label>
@@ -3394,7 +3408,7 @@ function NcrCapaPageContent() {
                 </button>
               ) : null}
             </div>
-          </div>
+          ) : null}
 
           <div style={tableInfoRowStyle}>
             Showing <strong>{filteredRows.length}</strong> of{" "}
@@ -3452,7 +3466,7 @@ function NcrCapaPageContent() {
                       style={{
                         ...registerRowStyle,
                         background: active ? "#eff6ff" : "#ffffff",
-                        borderLeft: active ? "4px solid #0f766e" : "4px solid transparent",
+                        borderLeft: active ? "4px solid #3A9B98" : "4px solid transparent",
                       }}
                     >
                       <div style={registerSimpleTextStyle}>{row.number}</div>
@@ -3969,7 +3983,7 @@ function NcrCapaPageContent() {
                     <div style={buttonRowStyle}>
                       <button
                         type="button"
-                        style={{ ...secondaryButton, border: "1px solid #99f6e4", color: "#0f766e" }}
+                        style={{ ...secondaryButton, border: "1px solid #BFE5E3", color: "#3A9B98" }}
                         onClick={() => void generateNcrPdf()}
                         disabled={generatingPdf}
                       >
@@ -4044,7 +4058,7 @@ function NcrCapaPageContent() {
                   {editRow.type === "NCR" ? (
                     <Link
                       href={buildNcrLinkedActionHref(editRow)}
-                      style={{ ...secondaryButton, border: "1px solid #99f6e4", color: "#0f766e", textDecoration: "none" }}
+                      style={{ ...secondaryButton, border: "1px solid #BFE5E3", color: "#3A9B98", textDecoration: "none" }}
                     >
                       Generate Linked Action
                     </Link>
@@ -4175,13 +4189,23 @@ function NcrCapaPageContent() {
             subtitle="Filter the NCR register here, then generate a controlled PDF output from the visible records."
           >
             <div style={reportFilterPanelStyle}>
-              <input
-                style={toolbarSearchStyle}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search NCR number, title, owner, project..."
-              />
+              <div style={filterActionRowStyle}>
+                <input
+                  style={toolbarSearchStyle}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search NCR number, title, owner, project..."
+                />
+                <button
+                  type="button"
+                  style={showReportFilters ? secondaryButton : primaryButton}
+                  onClick={() => setShowReportFilters((current) => !current)}
+                >
+                  {showReportFilters ? "Hide Filters" : "Show Filters"}
+                </button>
+              </div>
 
+              {showReportFilters ? (
               <div style={toolbarFiltersStyle}>
                 <div style={toolbarLabeledControlStyle}>
                   <label style={toolbarLabelStyle}>Status</label>
@@ -4235,6 +4259,7 @@ function NcrCapaPageContent() {
                   Clear Filters
                 </button>
               </div>
+              ) : null}
             </div>
 
             <div style={reportActionGridStyle}>
@@ -4400,12 +4425,12 @@ function SelectedFilesList({ files }: { files: File[] }) {
 }
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
   color: "white",
   borderRadius: "20px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(15, 118, 110, 0.14)",
+  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -4500,6 +4525,12 @@ const topMetaRowStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: 12,
   flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const topMetaActionsStyle: CSSProperties = {
@@ -4510,7 +4541,7 @@ const topMetaActionsStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -4545,11 +4576,17 @@ const workspaceNavButtonStyle: CSSProperties = {
   borderRadius: "10px",
   cursor: "pointer",
   fontWeight: 800,
+  minHeight: "44px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1.2,
+  boxSizing: "border-box",
 };
 
 const activeWorkspaceNavButtonStyle: CSSProperties = {
   ...workspaceNavButtonStyle,
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
 };
 
@@ -4704,6 +4741,13 @@ const reportFilterPanelStyle: CSSProperties = {
   marginBottom: "14px",
 };
 
+const filterActionRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(220px, 1fr) minmax(160px, 220px)",
+  gap: "10px",
+  alignItems: "center",
+};
+
 const reportActionCardStyle: CSSProperties = {
   borderRadius: "16px",
   border: "1px solid #dbe3ec",
@@ -4728,7 +4772,7 @@ const reportActionHintStyle: CSSProperties = {
 };
 
 const reportActionValueStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontSize: "22px",
   fontWeight: 900,
 };
@@ -4833,7 +4877,7 @@ const primaryButton: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
   border: "none",
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "#ffffff",
   fontWeight: 700,
   cursor: "pointer",
@@ -4982,12 +5026,16 @@ const pillRemoveButtonStyle: CSSProperties = {
 };
 
 const toolbarStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "12px",
-  alignItems: "center",
-  flexWrap: "wrap",
-  marginBottom: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
 };
 
 const toolbarFiltersStyle: CSSProperties = {
@@ -5016,23 +5064,24 @@ const importPreviewWrapStyle: CSSProperties = {
 };
 
 const importTableStyle: CSSProperties = {
-  border: "1px solid #d7dee7",
-  borderRadius: "14px",
-  overflow: "hidden",
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
 };
 
 const importTableHeadStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "0.5fr 0.9fr 1.8fr 1fr 1fr 0.8fr 0.9fr 0.9fr 2fr",
-  gap: "10px",
-  padding: "12px",
+  textAlign: "left",
+  padding: "13px 14px",
   background: "#f8fafc",
-  borderBottom: "1px solid #e5e7eb",
-  fontSize: "11px",
-  fontWeight: 800,
-  color: "#64748b",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
   textTransform: "uppercase",
-  letterSpacing: 0.3,
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
+  whiteSpace: "nowrap",
 };
 
 const importTableRowStyle: CSSProperties = {
@@ -5190,15 +5239,23 @@ const compactInsightMetaLineStyle: CSSProperties = {
 };
 
 const tableInfoRowStyle: CSSProperties = {
-  marginBottom: "12px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "4px",
+  flexWrap: "wrap",
   color: "#475569",
-  fontSize: "14px",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
 };
 
 const registerTableWrapStyle: CSSProperties = {
-  border: "1px solid #d7dee7",
-  borderRadius: "18px",
-  overflow: "hidden",
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const registerHeadStyle: CSSProperties = {

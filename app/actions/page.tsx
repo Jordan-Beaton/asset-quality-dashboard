@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -150,8 +151,25 @@ type ActionPerson = {
 
 type QuickFilter = "" | "my" | "overdue" | "dueWeek" | "highPriority";
 
-type ActionView = "dashboard" | "register" | "create" | "my" | "priority" | "reports";
+type ActionView = "dashboard" | "register" | "create" | "my" | "priority" | "bulk" | "reports";
 type MyActionFilter = "all" | "open" | "closed" | "overdue" | "dueWeek";
+
+type ActionImportRow = {
+  rowNumber: number;
+  title: string;
+  description: string;
+  department: string;
+  project: string;
+  owner: string;
+  priority: string;
+  status: string;
+  due_date: string;
+  source: string;
+  linkedReference: string;
+  errors: string[];
+  skipReasons: string[];
+  personWillBeCreated: boolean;
+};
 
 type ChartDatum = {
   name: string;
@@ -294,11 +312,13 @@ const departmentOptions = [
   "Operations",
   "Procurement",
   "Project",
+  "Quality",
   "Survey",
+  "HSE",
   "HSEQ",
 ] as const;
 
-const chartColours = ["#0f766e", "#2563eb", "#7c3aed", "#f59e0b", "#dc2626", "#64748b", "#16a34a"];
+const chartColours = ["#3A9B98", "#2563eb", "#7c3aed", "#f59e0b", "#dc2626", "#64748b", "#16a34a"];
 
 const actionViews: Array<{ id: ActionView; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
@@ -306,6 +326,7 @@ const actionViews: Array<{ id: ActionView; label: string }> = [
   { id: "create", label: "Create Action" },
   { id: "my", label: "My Actions" },
   { id: "priority", label: "Overdue / Priority" },
+  { id: "bulk", label: "Bulk Upload" },
   { id: "reports", label: "Reports" },
 ];
 
@@ -349,6 +370,121 @@ function getNextAvailableActionNumber(actions: ActionItem[]) {
   }
 
   return formatActionNumber(next);
+}
+
+function getNextBulkActionNumbers(actions: ActionItem[], count: number) {
+  const used = new Set(
+    actions
+      .map((action) => extractActionNumber(action.action_number))
+      .filter((num): num is number => num !== null && num > 0)
+  );
+  const numbers: string[] = [];
+  let next = 1;
+
+  while (numbers.length < count) {
+    if (!used.has(next)) {
+      numbers.push(formatActionNumber(next));
+      used.add(next);
+    }
+    next += 1;
+  }
+
+  return numbers;
+}
+
+function normalizeImportHeader(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeLookupValue(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase();
+}
+
+function getImportCell(row: Record<string, unknown>, candidates: string[]) {
+  const normalizedCandidates = candidates.map(normalizeImportHeader);
+  const entry = Object.entries(row).find(([key]) => normalizedCandidates.includes(normalizeImportHeader(key)));
+  const value = entry?.[1];
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function getRawImportCell(row: Record<string, unknown>, candidates: string[]) {
+  const normalizedCandidates = candidates.map(normalizeImportHeader);
+  const entry = Object.entries(row).find(([key]) => normalizedCandidates.includes(normalizeImportHeader(key)));
+  return entry?.[1] ?? "";
+}
+
+function normalizeImportDate(value: unknown) {
+  if (value === null || value === undefined || value === "") return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed) {
+      return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+    }
+  }
+
+  const text = String(value).trim();
+  if (!text) return "";
+  const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2].padStart(2, "0")}-${isoMatch[3].padStart(2, "0")}`;
+  const ukMatch = text.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+  if (ukMatch) {
+    const year = ukMatch[3].length === 2 ? `20${ukMatch[3]}` : ukMatch[3];
+    return `${year}-${ukMatch[2].padStart(2, "0")}-${ukMatch[1].padStart(2, "0")}`;
+  }
+  const parsedDate = new Date(text);
+  return Number.isNaN(parsedDate.getTime()) ? "" : parsedDate.toISOString().slice(0, 10);
+}
+
+function titleCaseName(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((part) => (part ? `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}` : part))
+    .join(" ");
+}
+
+function generateEmailFromName(name: string) {
+  const clean = titleCaseName(name).replace(/[^a-zA-Z\s'-]/g, "").trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return "";
+  const firstInitial = parts[0].charAt(0).toLowerCase();
+  const surname = parts[parts.length - 1].replace(/[^a-zA-Z]/g, "").toLowerCase();
+  return firstInitial && surname ? `${firstInitial}${surname}@enshoresubsea.com` : "";
+}
+
+function normalizeImportPriority(value: string) {
+  const match = ["Low", "Medium", "High"].find((option) => option.toLowerCase() === value.trim().toLowerCase());
+  return match || "Medium";
+}
+
+function normalizeImportStatus(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return "Open";
+  if (["closed", "complete", "completed"].includes(trimmed)) return "Closed";
+  if (["in progress", "progress", "ongoing"].includes(trimmed)) return "In Progress";
+  return "Open";
+}
+
+function normalizeImportDepartment(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === "quality" || trimmed === "qa" || trimmed === "qc") return "Quality";
+  if (trimmed === "hse" || trimmed === "h&s" || trimmed === "health safety environment") return "HSE";
+  if (trimmed === "hseq") return "HSE";
+  const matched = departmentOptions.find((option) => option.toLowerCase() === trimmed);
+  return matched || "HSE";
+}
+
+function normalizeImportSource(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "HSE";
+  const matched = actionSourceOptions.find((option) => option.toLowerCase() === trimmed.toLowerCase());
+  return matched || "HSE";
 }
 
 function formatDate(value: string | null | undefined) {
@@ -760,6 +896,21 @@ function ActionsPageContent() {
   const [showNoDueDateOnly, setShowNoDueDateOnly] = useState(false);
   const [createdMonthFilter, setCreatedMonthFilter] = useState(linkedCreatedMonth);
   const [closedMonthFilter, setClosedMonthFilter] = useState(linkedClosedMonth);
+  const [showRegisterFilters, setShowRegisterFilters] = useState(
+    Boolean(
+      linkedSearch ||
+        linkedStatus ||
+        linkedPriority ||
+        linkedOwner ||
+        linkedProject ||
+        linkedSource ||
+        linkedDepartment ||
+        linkedOverdueOnly ||
+        dueWindow ||
+        linkedCreatedMonth ||
+        linkedClosedMonth
+    )
+  );
   const [activeView, setActiveView] = useState<ActionView>(initialView);
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [currentPersonName, setCurrentPersonName] = useState("");
@@ -771,6 +922,9 @@ function ActionsPageContent() {
   const [selectedEvidenceFiles, setSelectedEvidenceFiles] = useState<File[]>([]);
   const [selectedEvidenceNotes, setSelectedEvidenceNotes] = useState("");
   const [hasAppliedPrefill, setHasAppliedPrefill] = useState(false);
+  const [importRows, setImportRows] = useState<ActionImportRow[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [isImportingActions, setIsImportingActions] = useState(false);
 
   async function loadActions(showLoadedMessage = true) {
     setIsLoading(true);
@@ -1114,7 +1268,8 @@ function ActionsPageContent() {
         : current.source || "Manual";
       const nextDepartment =
         prefillDepartment ||
-        (nextSource === "AINM" || nextSource === "HSE Inspection" ? "HSEQ" : "") ||
+        (nextSource === "AINM" || nextSource === "HSE Inspection" || nextSource === "HSE" ? "HSE" : "") ||
+        (nextSource === "Audit Finding" || nextSource === "NCR/CAPA" || nextSource === "MOC" ? "Quality" : "") ||
         (isAssetLinkedSource(nextSource) ? "Assets" : current.department);
 
       return {
@@ -1383,6 +1538,16 @@ function ActionsPageContent() {
     dueStartFilter,
     showNoDueDateOnly,
   ]);
+
+  const importableRows = useMemo(
+    () => importRows.filter((row) => row.errors.length === 0 && row.skipReasons.length === 0),
+    [importRows]
+  );
+
+  const skippedImportRows = useMemo(
+    () => importRows.filter((row) => row.errors.length > 0 || row.skipReasons.length > 0),
+    [importRows]
+  );
 
   const overdueList = useMemo(() => {
     return [...actions]
@@ -1693,6 +1858,217 @@ function ActionsPageContent() {
     setSelectedEvidenceFiles(files);
   }
 
+  async function handleActionImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    setImportRows([]);
+    setMessage(`Reading ${file.name}...`);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        setMessage("Import failed: workbook does not contain any sheets.");
+        return;
+      }
+
+      const sheet = workbook.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+        defval: "",
+        raw: true,
+      });
+
+      if (!rawRows.length) {
+        setMessage("Import failed: first sheet has no action rows.");
+        return;
+      }
+
+      const existingPeople = new Set(people.map((person) => normalizeLookupValue(person.name)).filter(Boolean));
+      const existingEmails = new Set(people.map((person) => normalizeLookupValue(person.email)).filter(Boolean));
+      const uploadKeys = new Set<string>();
+
+      const parsedRows = rawRows.map((row, index): ActionImportRow => {
+        const title = getImportCell(row, ["Title", "Action Title", "Action", "Action Required"]);
+        const descriptionParts = [
+          getImportCell(row, ["Description", "Action Description", "Details"]),
+          getImportCell(row, ["Comments", "Comment", "Notes"]),
+        ].filter(Boolean);
+        const department = normalizeImportDepartment(getImportCell(row, ["Department", "Allocation", "Action Department", "Function"]));
+        const project = getImportCell(row, ["Project", "Project / Work Scope", "Work Scope", "Project Work Scope"]);
+        const rawOwner = getImportCell(row, ["Owner", "Assigned", "Assigned To", "Action Owner", "Responsible Person"]);
+        const owner = rawOwner ? titleCaseName(rawOwner) : "";
+        const priority = normalizeImportPriority(getImportCell(row, ["Priority"]));
+        const status = normalizeImportStatus(getImportCell(row, ["Status"]));
+        const dueDate = normalizeImportDate(getRawImportCell(row, ["Due Date", "Target Date", "Target Response Date"]));
+        const source = normalizeImportSource(getImportCell(row, ["Source", "Source Type", "Module"]));
+        const linkedReference = getImportCell(row, [
+          "Linked Record",
+          "Linked Reference",
+          "AINM No",
+          "AINM Number",
+          "Inspection No",
+          "Inspection Number",
+          "NCR No",
+          "NCR Number",
+          "MOC No",
+          "MOC Number",
+        ]);
+        const errors: string[] = [];
+        const skipReasons: string[] = [];
+        const rowKey = normalizeLookupValue(`${title}|${department}|${project}|${owner}|${dueDate}|${descriptionParts.join(" ")}`);
+        const normalizedOwner = normalizeLookupValue(owner);
+        const ownerEmail = owner ? generateEmailFromName(owner) : "";
+        const personWillBeCreated = Boolean(owner && !existingPeople.has(normalizedOwner));
+
+        if (!title) errors.push("Title/Action is required.");
+        if (owner && !ownerEmail && !existingPeople.has(normalizedOwner)) {
+          errors.push("Owner needs a first name and surname to create a People record.");
+        }
+        if (ownerEmail && existingEmails.has(normalizeLookupValue(ownerEmail)) && !existingPeople.has(normalizedOwner)) {
+          skipReasons.push("Generated owner email already exists for another person.");
+        }
+        if (rowKey && uploadKeys.has(rowKey)) skipReasons.push("Duplicate action in uploaded file.");
+        if (rowKey) uploadKeys.add(rowKey);
+
+        return {
+          rowNumber: index + 2,
+          title,
+          description: descriptionParts.join("\n\n"),
+          department,
+          project,
+          owner,
+          priority,
+          status,
+          due_date: dueDate,
+          source,
+          linkedReference,
+          errors,
+          skipReasons,
+          personWillBeCreated,
+        };
+      });
+
+      setImportRows(parsedRows);
+      setMessage(`Preview ready: ${parsedRows.length} action row${parsedRows.length === 1 ? "" : "s"} loaded from ${file.name}.`);
+    } catch (error) {
+      setMessage(`Import preview failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function buildLinkedImportFields(row: ActionImportRow) {
+    const reference = row.linkedReference.trim();
+    const source = row.source.toLowerCase();
+    const payload: Partial<ActionItem> = {};
+    if (!reference) return payload;
+
+    if (source === "ainm" || /^a?r?\d+/i.test(reference)) {
+      const matched = ainmOptions.find((option) => option.number.toLowerCase() === reference.toLowerCase());
+      payload.linked_ainm_id = matched?.id || null;
+      payload.linked_ainm_number = matched?.number || reference;
+      return payload;
+    }
+
+    if (source === "hse inspection" || /^hse-ins-/i.test(reference)) {
+      const matched = hseInspectionOptions.find((option) => option.inspection_number.toLowerCase() === reference.toLowerCase());
+      payload.linked_hse_inspection_id = matched?.id || null;
+      payload.linked_hse_inspection_number = matched?.inspection_number || reference;
+      return payload;
+    }
+
+    if (source === "ncr/capa" || /^ncr-/i.test(reference)) {
+      const matched = ncrCapaOptions.find((option) => option.number.toLowerCase() === reference.toLowerCase());
+      if (matched?.type === "NCR") {
+        payload.linked_ncr_id = matched.id;
+        payload.linked_ncr_number = matched.number;
+      } else if (matched?.type === "CAPA") {
+        payload.linked_capa_id = matched.id;
+        payload.linked_capa_number = matched.number;
+      } else {
+        payload.linked_ncr_number = reference;
+      }
+      return payload;
+    }
+
+    if (source === "moc") {
+      const matched = mocOptions.find((option) => option.number.toLowerCase() === reference.toLowerCase());
+      payload.linked_moc_id = matched?.id || null;
+      payload.linked_moc_number = matched?.number || reference;
+      return payload;
+    }
+
+    return payload;
+  }
+
+  async function importPreviewedActions() {
+    if (!importRows.length) {
+      setMessage("Select an Excel file before importing actions.");
+      return;
+    }
+
+    if (!importableRows.length) {
+      setMessage("No valid action rows are available to import.");
+      return;
+    }
+
+    setIsImportingActions(true);
+    try {
+      const existingPeople = new Set(people.map((person) => normalizeLookupValue(person.name)).filter(Boolean));
+      const missingPeople = Array.from(
+        new Map(
+          importableRows
+            .filter((row) => row.owner && row.personWillBeCreated && !existingPeople.has(normalizeLookupValue(row.owner)))
+            .map((row) => [normalizeLookupValue(row.owner), { name: row.owner, department: row.department || "HSE" }])
+        ).values()
+      );
+
+      if (missingPeople.length) {
+        const peopleRows = missingPeople.map((person) => ({
+          name: person.name,
+          email: generateEmailFromName(person.name) || null,
+          role: null,
+          department: person.department,
+          active: true,
+        }));
+        const { error: peopleError } = await supabase.from("people").insert(peopleRows);
+        if (peopleError) throw new Error(`People import failed: ${peopleError.message}`);
+      }
+
+      const nextNumbers = getNextBulkActionNumbers(actions, importableRows.length);
+      const actionRows = importableRows.map((row, index) => ({
+        action_number: nextNumbers[index],
+        title: row.title.trim(),
+        description: row.description.trim() || null,
+        department: row.department || "HSE",
+        project: row.project.trim() || null,
+        owner: row.owner.trim() || null,
+        priority: row.priority,
+        status: row.status,
+        due_date: row.due_date || null,
+        source: row.source || "HSE",
+        ...buildLinkedImportFields(row),
+      }));
+
+      const { error: actionError } = await supabase.from("actions").insert(actionRows);
+      if (actionError) throw new Error(`Action import failed: ${actionError.message}`);
+
+      setMessage(`Imported ${actionRows.length} action${actionRows.length === 1 ? "" : "s"} from ${importFileName}.`);
+      setImportRows([]);
+      setImportFileName("");
+      setActiveView("register");
+      await Promise.all([loadActions(false), loadPeople()]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Action import failed.");
+    } finally {
+      setIsImportingActions(false);
+    }
+  }
+
   function applySourceChange(
     current: ActionForm,
     source: string
@@ -1701,7 +2077,7 @@ function ActionsPageContent() {
       return {
         ...current,
         source,
-        department: current.department || "",
+        department: "Quality",
         linked_asset_id: "",
         linked_asset_code: "",
         linked_inspection_id: "",
@@ -1748,6 +2124,7 @@ function ActionsPageContent() {
       return {
         ...current,
         source,
+        department: "Quality",
         linked_audit_id: "",
         linked_audit_number: "",
         linked_finding_id: "",
@@ -1770,6 +2147,7 @@ function ActionsPageContent() {
       return {
         ...current,
         source,
+        department: "Quality",
         linked_audit_id: "",
         linked_audit_number: "",
         linked_finding_id: "",
@@ -1796,7 +2174,7 @@ function ActionsPageContent() {
       return {
         ...current,
         source,
-        department: "HSEQ",
+        department: "HSE",
         linked_audit_id: "",
         linked_audit_number: "",
         linked_finding_id: "",
@@ -1823,7 +2201,7 @@ function ActionsPageContent() {
       return {
         ...current,
         source,
-        department: "HSEQ",
+        department: "HSE",
         linked_audit_id: "",
         linked_audit_number: "",
         linked_finding_id: "",
@@ -1929,7 +2307,7 @@ function ActionsPageContent() {
       ...current,
       linked_hse_inspection_id: selected?.id || "",
       linked_hse_inspection_number: selected?.inspection_number || "",
-      department: "HSEQ",
+      department: "HSE",
       project: current.project || selected?.project_work_scope || selected?.area_zone || "",
       title: current.title || (selected ? `${selected.inspection_number} - ${selected.title || selected.form_title}` : current.title),
     };
@@ -2551,15 +2929,7 @@ function ActionsPageContent() {
         ]}
       />
 
-      <div
-        style={{
-          marginBottom: "20px",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "12px",
-          flexWrap: "wrap",
-        }}
-      >
+      <div style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           ← Back to Dashboard
         </Link>
@@ -2601,7 +2971,7 @@ function ActionsPageContent() {
             <QualityKpiCard
               title="My Open Actions"
               value={myOpenActions}
-              accent="#0f766e"
+              accent="#3A9B98"
               onClick={() => openRegisterDrilldown({ openOnly: true, quickFilter: "my" })}
             />
             <QualityKpiCard
@@ -2626,7 +2996,7 @@ function ActionsPageContent() {
                     <Tooltip />
                     <Bar
                       dataKey="value"
-                      fill="#0f766e"
+                      fill="#3A9B98"
                       radius={[6, 6, 0, 0]}
                       onClick={(entry) => handleStatusDrilldown(String((entry as ChartDatum).name || ""))}
                       cursor="pointer"
@@ -3130,7 +3500,7 @@ function ActionsPageContent() {
           </div>
 
           <section style={statsGridStyle}>
-            <QualityKpiCard title="My Total Actions" value={myActionList.length} accent="#0f766e" onClick={() => setMyActionFilter("all")} />
+            <QualityKpiCard title="My Total Actions" value={myActionList.length} accent="#3A9B98" onClick={() => setMyActionFilter("all")} />
             <QualityKpiCard title="My Open Actions" value={myOpenActions} accent="#2563eb" onClick={() => setMyActionFilter("open")} />
             <QualityKpiCard title="My Closed Actions" value={myClosedActions.length} accent="#16a34a" onClick={() => setMyActionFilter("closed")} />
             <QualityKpiCard title="My Overdue" value={myOverdueActions.length} accent="#dc2626" onClick={() => setMyActionFilter("overdue")} />
@@ -3257,6 +3627,94 @@ function ActionsPageContent() {
         </SectionCard>
       ) : null}
 
+      {activeView === "bulk" ? (
+        <SectionCard
+          title="Bulk Upload Actions"
+          subtitle="Upload an Excel action tracker, preview rows, create missing People records, and import into the central Action Management register."
+        >
+          <div style={importPanelStyle}>
+            <div style={importControlRowStyle}>
+              <input type="file" accept=".xlsx" onChange={(event) => void handleActionImportFileChange(event)} style={fileInputStyle} />
+              <button
+                type="button"
+                style={primaryButtonStyle}
+                disabled={!importableRows.length || isImportingActions}
+                onClick={() => void importPreviewedActions()}
+              >
+                {isImportingActions ? "Importing..." : `Import ${importableRows.length} Actions`}
+              </button>
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => {
+                  setImportRows([]);
+                  setImportFileName("");
+                }}
+              >
+                Clear Preview
+              </button>
+            </div>
+
+            {importRows.length ? (
+              <>
+                <div style={tableInfoRowStyle}>
+                  Previewing {importRows.length} row{importRows.length === 1 ? "" : "s"} from {importFileName || "selected workbook"}.
+                  {" "}
+                  <strong>{importableRows.length}</strong> ready, <strong>{skippedImportRows.length}</strong> requiring attention/skipped.
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={importTableStyle}>
+                    <thead>
+                      <tr>
+                        <th style={tableHeadStyle}>Row</th>
+                        <th style={tableHeadStyle}>Title</th>
+                        <th style={tableHeadStyle}>Department</th>
+                        <th style={tableHeadStyle}>Owner</th>
+                        <th style={tableHeadStyle}>Project</th>
+                        <th style={tableHeadStyle}>Source</th>
+                        <th style={tableHeadStyle}>Due Date</th>
+                        <th style={tableHeadStyle}>Status</th>
+                        <th style={tableHeadStyle}>Import Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importRows.slice(0, 80).map((row) => {
+                        const issues = [...row.errors, ...row.skipReasons];
+                        return (
+                          <tr key={`${row.rowNumber}-${row.title}`} style={issues.length ? importWarningRowStyle : tableRowStyle}>
+                            <td style={actionNumberCellStyle}>{row.rowNumber}</td>
+                            <td style={tableCellStyle}>{row.title || "-"}</td>
+                            <td style={tableCellStyle}>{row.department || "HSE"}</td>
+                            <td style={tableCellStyle}>
+                              {row.owner || "-"}
+                              {row.personWillBeCreated && !issues.length ? (
+                                <div style={secondaryCellTextStyle}>Will add to People Management</div>
+                              ) : null}
+                            </td>
+                            <td style={tableCellStyle}>{row.project || "-"}</td>
+                            <td style={tableCellStyle}>{row.source || "HSE"}</td>
+                            <td style={tableCellStyle}>{row.due_date ? formatDate(row.due_date) : "-"}</td>
+                            <td style={tableCellStyle}>{row.status}</td>
+                            <td style={tableCellStyle}>{issues.length ? issues.join(" ") : "Ready"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {importRows.length > 80 ? (
+                  <p style={helperTextStyle}>Showing first 80 preview rows only. All valid rows will import.</p>
+                ) : null}
+              </>
+            ) : (
+              <div style={emptyEvidencePanelStyle}>
+                Choose an Excel workbook to preview actions before import. Use a Department or Allocation column for HSE / Quality split.
+              </div>
+            )}
+          </div>
+        </SectionCard>
+      ) : null}
+
       {activeView === "reports" ? (
         <SectionCard
           title="Action Reports"
@@ -3294,26 +3752,28 @@ function ActionsPageContent() {
       {activeView === "register" ? (
         <>
           <SectionCard
-            title="Action Register Filters"
-            subtitle="Narrow the central register by text, status, priority, owner, project, source, department, or overdue state."
-            action={
-              <div style={filterActionRowStyle}>
-                <button type="button" onClick={() => void generateFilteredActionRegisterPdf()} style={primaryButtonStyle}>
-                  Filtered Action Register PDF
-                </button>
-                <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
-                  Clear Filters
-                </button>
-              </div>
-            }
+            title="Action Register"
+            subtitle="Search the central register or show filters to narrow the action list."
           >
-        <div style={filterBarStyle}>
-          <input
-            placeholder="Search action no. / title / project / owner"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={inputStyle}
-          />
+        <div style={simpleFilterShellStyle}>
+          <div style={simpleFilterTopRowStyle}>
+            <input
+              placeholder="Search action no. / title / project / owner"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={inputStyle}
+            />
+            <button
+              type="button"
+              onClick={() => setShowRegisterFilters((current) => !current)}
+              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
+            >
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showRegisterFilters ? (
+          <div style={filterBarStyle}>
 
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={inputStyle}>
             <option value="">All Status</option>
@@ -3394,6 +3854,11 @@ function ActionsPageContent() {
           >
             {showOverdueOnly ? "Showing Overdue Only" : "Include All Due Status"}
           </button>
+          <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
+            Clear Filters
+          </button>
+        </div>
+          ) : null}
         </div>
 
         <div style={tableInfoRowStyle}>
@@ -4024,6 +4489,23 @@ function ActionsPageContent() {
                       Open Linked AINM
                     </Link>
                   ) : null}
+                  {editForm.source === "HSE Inspection" && editForm.linked_hse_inspection_number ? (
+                    <div style={linkedSourceMetaStyle}>
+                      HSE Inspection: <strong>{editForm.linked_hse_inspection_number}</strong>
+                    </div>
+                  ) : null}
+                  {editForm.source === "HSE Inspection" && (editForm.linked_hse_inspection_id || editForm.linked_hse_inspection_number) ? (
+                    <Link
+                      href={
+                        editForm.linked_hse_inspection_id
+                          ? `/hse/inspections?inspectionId=${encodeURIComponent(editForm.linked_hse_inspection_id)}`
+                          : `/hse/inspections?inspection=${encodeURIComponent(editForm.linked_hse_inspection_number)}`
+                      }
+                      style={backLinkStyle}
+                    >
+                      Open Linked HSE Inspection
+                    </Link>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -4279,9 +4761,9 @@ function QuickFilterButton({
       onClick={onClick}
       style={{
         ...quickFilterButtonStyle,
-        background: active ? "#0f766e" : "#f8fafc",
+        background: active ? "#3A9B98" : "#f8fafc",
         color: active ? "#ffffff" : "#0f172a",
-        borderColor: active ? "#0f766e" : "#cbd5e1",
+        borderColor: active ? "#3A9B98" : "#cbd5e1",
         opacity: disabled ? 0.55 : 1,
         cursor: disabled ? "not-allowed" : "pointer",
       }}
@@ -4366,12 +4848,12 @@ function PriorityBadge({ value }: { value: string }) {
 }
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
   color: "white",
   borderRadius: "22px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(15, 118, 110, 0.14)",
+  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -4461,9 +4943,23 @@ const heroMetaValueStyleSmall: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
+};
+
+const topMetaRowStyle: CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const statusBannerStyleInline: CSSProperties = {
@@ -4479,26 +4975,26 @@ const viewTabsStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   marginBottom: "20px",
-  padding: "10px",
-  background: "#ffffff",
-  border: "1px solid #e2e8f0",
-  borderRadius: "16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const viewTabButtonStyle: CSSProperties = {
-  border: "1px solid #cbd5e1",
-  borderRadius: "999px",
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#e2e8f0",
+  color: "#0f172a",
+  border: "none",
   padding: "10px 14px",
+  borderRadius: "10px",
   cursor: "pointer",
   fontWeight: 800,
+  minHeight: "44px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1.2,
+  boxSizing: "border-box",
 };
 
 const viewTabButtonActiveStyle: CSSProperties = {
-  background: "#0f766e",
-  borderColor: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
 };
 
@@ -4609,10 +5105,74 @@ const formFooterStyle: CSSProperties = {
 };
 
 const filterActionRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+};
+
+const simpleFilterShellStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+};
+
+const simpleFilterTopRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(220px, 1fr) minmax(150px, 220px)",
   gap: "10px",
-  flexWrap: "wrap",
+  alignItems: "center",
+};
+
+const importPanelStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  padding: "14px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+};
+
+const importControlRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(220px, 1fr) auto auto",
+  gap: "10px",
+  alignItems: "center",
+};
+
+const fileInputStyle: CSSProperties = {
+  width: "100%",
+  minHeight: 42,
+  border: "1px solid #cbd5e1",
+  borderRadius: "10px",
+  padding: "9px 12px",
+  fontSize: "14px",
+  boxSizing: "border-box",
+  color: "#0f172a",
+  background: "white",
+};
+
+const importTableStyle: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 1100,
+  fontSize: "13px",
+};
+
+const importWarningRowStyle: CSSProperties = {
+  background: "#fff7ed",
 };
 
 const helperTextStyle: CSSProperties = {
@@ -4621,7 +5181,7 @@ const helperTextStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "11px 16px",
@@ -4641,7 +5201,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "8px 12px",
@@ -4755,7 +5315,7 @@ const reportSummaryLabelStyle: CSSProperties = {
 const reportSummaryValueStyle: CSSProperties = {
   fontSize: "28px",
   fontWeight: 800,
-  color: "#0f766e",
+  color: "#3A9B98",
 };
 
 const reportSummaryTextStyle: CSSProperties = {
@@ -4809,19 +5369,27 @@ const miniListLine2Style: CSSProperties = {
 
 const filterBarStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "2fr repeat(7, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "12px",
-  marginBottom: "16px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
 };
 
 const tableInfoRowStyle: CSSProperties = {
-  marginBottom: "12px",
-  color: "#475569",
-  fontSize: "14px",
   display: "flex",
-  justifyContent: "space-between",
-  gap: "12px",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "4px",
   flexWrap: "wrap",
+  color: "#475569",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
 };
 
 const linkedSearchHintStyle: CSSProperties = {
@@ -4855,7 +5423,7 @@ const linkedChipStyle: CSSProperties = {
 };
 
 const linkedChipToneStyles: Record<LinkedRecordChip["tone"], CSSProperties> = {
-  teal: { background: "#ccfbf1", color: "#115e59", borderColor: "#99f6e4" },
+  teal: { background: "#D7EFEE", color: "#2F7F7D", borderColor: "#BFE5E3" },
   blue: { background: "#dbeafe", color: "#1d4ed8", borderColor: "#bfdbfe" },
   purple: { background: "#ede9fe", color: "#6d28d9", borderColor: "#ddd6fe" },
   amber: { background: "#fef3c7", color: "#92400e", borderColor: "#fde68a" },
@@ -4876,26 +5444,36 @@ const linkedWarningStyle: CSSProperties = {
 const tableStyle: CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
+  background: "#ffffff",
+  minWidth: 960,
+  fontSize: "13px",
 };
 
 const tableHeadStyle: CSSProperties = {
   textAlign: "left",
-  padding: "12px 10px",
-  borderBottom: "1px solid #e2e8f0",
-  color: "#475569",
-  fontSize: "13px",
+  padding: "13px 14px",
+  background: "#f8fafc",
+  color: "#334155",
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  borderBottom: "1px solid #dbe3ef",
   whiteSpace: "nowrap",
 };
 
 const tableRowStyle: CSSProperties = {
-  transition: "background 0.2s ease",
+  cursor: "pointer",
+  transition: "background 140ms ease",
 };
 
 const tableCellStyle: CSSProperties = {
-  padding: "14px 10px",
-  borderBottom: "1px solid #f1f5f9",
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
   color: "#0f172a",
   verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
 };
 
 const primaryCellTextStyle: CSSProperties = {
@@ -4911,23 +5489,25 @@ const secondaryCellTextStyle: CSSProperties = {
 
 const actionNumberCellStyle: CSSProperties = {
   fontWeight: 800,
-  color: "#0f766e",
+  color: "#3A9B98",
   whiteSpace: "nowrap",
 };
 
 const readOnlyTableCellStyle: CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: "8px",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  fontWeight: 700,
-  color: "#334155",
+  padding: "13px 14px",
+  borderBottom: "1px solid #edf2f7",
+  color: "#0f172a",
+  verticalAlign: "middle",
+  fontSize: "13px",
+  lineHeight: 1.45,
 };
 
 const emptyTableCellStyle: CSSProperties = {
-  padding: "24px 10px",
+  padding: "26px 14px",
   textAlign: "center",
   color: "#64748b",
+  background: "#f8fafc",
+  borderBottom: "1px dashed #cbd5e1",
 };
 
 const actionButtonsWrapStyle: CSSProperties = {
@@ -5088,20 +5668,25 @@ const detailPanelGridStyle: CSSProperties = {
 };
 
 const detailSectionCardStyle: CSSProperties = {
-  border: "1px solid #dbe4f0",
-  borderRadius: "16px",
-  background: "#ffffff",
-  padding: "16px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  padding: "18px",
   display: "grid",
   gap: "14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  minWidth: 0,
 };
 
 const detailPanelHeaderStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  gap: "12px",
-  alignItems: "flex-start",
+  gap: "14px",
+  alignItems: "center",
   flexWrap: "wrap",
+  paddingBottom: "14px",
+  marginBottom: "4px",
+  borderBottom: "1px solid #e2e8f0",
 };
 
 const detailActionNumberStyle: CSSProperties = {
@@ -5109,7 +5694,7 @@ const detailActionNumberStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#0f766e",
+  color: "#3A9B98",
 };
 
 const detailActionTitleStyle: CSSProperties = {

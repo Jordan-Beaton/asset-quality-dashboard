@@ -17,7 +17,7 @@ export default function HseEnvironmentalPage() {
       />
       <TopRow status="Environmental / Waste shell ready. Environmental source data has not been configured yet." />
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Open Items" value="-" accent="#0f766e" />
+        <QualityKpiCard title="Open Items" value="-" accent="#3A9B98" />
         <QualityKpiCard title="Waste Records" value="-" accent="#2563eb" />
         <QualityKpiCard title="Spill Events" value="-" accent="#dc2626" />
         <QualityKpiCard title="Reports Due" value="-" accent="#f59e0b" />
@@ -38,8 +38,20 @@ function SectionCard({ title, children }: { title: string; children: ReactNode }
   return <section style={panelStyle}><h2 style={sectionTitleStyle}>{title}</h2><p style={emptyTextStyle}>{children}</p></section>;
 }
 
-const topMetaRowStyle: CSSProperties = { marginBottom: 20, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" };
-const backLinkStyle: CSSProperties = { color: "#0f766e", fontWeight: 700, textDecoration: "none" };
+const topMetaRowStyle: CSSProperties = {
+  marginBottom: 20,
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 12,
+  flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
+const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

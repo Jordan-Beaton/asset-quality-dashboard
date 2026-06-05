@@ -584,7 +584,7 @@ function DashboardContent() {
         <QualityKpiCard title="Calibration Overdue" value={overdueCalibrations.length} accent="#dc2626" />
         <QualityKpiCard title="Inspection Overdue" value={overdueInspections.length} accent="#d97706" />
         <QualityKpiCard title="Maintenance Due Soon" value={maintenanceDueSoonCount} accent="#7c3aed" />
-        <QualityKpiCard title="Assets With Files" value={assetsWithFiles} accent="#0f766e" />
+        <QualityKpiCard title="Assets With Files" value={assetsWithFiles} accent="#3A9B98" />
         <QualityKpiCard title="Recent Asset Activity" value={recentActivityCount} accent="#be185d" />
       </section>
 
@@ -966,14 +966,19 @@ export default function AssetDashboardPage() {
 const topMetaRowStyle: CSSProperties = {
   marginBottom: 20,
   display: "flex",
-  justifyContent: "flex-end",
+  justifyContent: "space-between",
   gap: 12,
   flexWrap: "wrap",
   alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -1143,7 +1148,7 @@ const sectionSubtitleStyle: CSSProperties = {
 };
 
 const panelLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
   whiteSpace: "nowrap",

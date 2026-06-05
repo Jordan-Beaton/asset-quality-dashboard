@@ -194,6 +194,7 @@ function InspectionPageContent() {
   const [detailForm, setDetailForm] = useState<InspectionForm>(emptyForm);
   const [assetFilter, setAssetFilter] = useState(linkedAssetParam);
   const [resultFilter, setResultFilter] = useState("");
+  const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAssetParam));
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
@@ -685,29 +686,15 @@ function InspectionPageContent() {
           title="Filters & History"
           subtitle="Filter by asset or result to review one asset's full inspection history over time."
         >
-          <div style={mobileFormGridStyle}>
-            <Field label="Asset Filter">
-              <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={inputStyle}>
-                <option value="">All assets</option>
-                {assets.map((asset) => (
-                  <option key={asset.id} value={asset.asset_code || asset.id}>
-                    {(asset.asset_code || asset.id) + " - " + (asset.name || "Unnamed Asset")}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Result Filter">
-              <select value={resultFilter} onChange={(e) => setResultFilter(e.target.value)} style={inputStyle}>
-                <option value="">All results</option>
-                <option value="Pass">Pass</option>
-                <option value="Fail">Fail</option>
-                <option value="Pass with Observations">Pass with Observations</option>
-              </select>
-            </Field>
-          </div>
-
           <div style={buttonRowStyle}>
+            <button
+              type="button"
+              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
+              onClick={() => setShowRegisterFilters((prev) => !prev)}
+            >
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+            {showRegisterFilters ? (
             <button
               type="button"
               style={secondaryButtonStyle}
@@ -718,7 +705,32 @@ function InspectionPageContent() {
             >
               Clear Filters
             </button>
+            ) : null}
           </div>
+
+          {showRegisterFilters ? (
+            <div style={mobileFormGridStyle}>
+              <Field label="Asset Filter">
+                <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={inputStyle}>
+                  <option value="">All assets</option>
+                  {assets.map((asset) => (
+                    <option key={asset.id} value={asset.asset_code || asset.id}>
+                      {(asset.asset_code || asset.id) + " - " + (asset.name || "Unnamed Asset")}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Result Filter">
+                <select value={resultFilter} onChange={(e) => setResultFilter(e.target.value)} style={inputStyle}>
+                  <option value="">All results</option>
+                  <option value="Pass">Pass</option>
+                  <option value="Fail">Fail</option>
+                  <option value="Pass with Observations">Pass with Observations</option>
+                </select>
+              </Field>
+            </div>
+          ) : null}
 
           <div style={historyListStyle}>
             {filteredRecords.length === 0 ? (
@@ -1151,7 +1163,7 @@ const fieldModeEyebrowStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  color: "#0f766e",
+  color: "#3A9B98",
 };
 
 const fieldModeTitleStyle: CSSProperties = {
@@ -1169,10 +1181,15 @@ const topMetaRowStyle: CSSProperties = {
   gap: 12,
   flexWrap: "wrap",
   alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -1311,7 +1328,7 @@ const buttonRowStyleTight: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1333,7 +1350,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1344,7 +1361,7 @@ const miniButtonStyle: CSSProperties = {
 };
 
 const actionLinkButtonStyle: CSSProperties = {
-  background: "#2563eb",
+  background: "#3A9B98",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1410,6 +1427,14 @@ const historyCardStyle: CSSProperties = {
 const detailPanelStyle: CSSProperties = {
   display: "grid",
   gap: "18px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  width: "100%",
+  boxSizing: "border-box",
+  minWidth: 0,
 };
 
 const detailSummaryRowStyle: CSSProperties = {

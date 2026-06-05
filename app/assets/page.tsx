@@ -439,6 +439,7 @@ function AssetsPageContent() {
   const [statusFilter, setStatusFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
+  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(true);
   const [qualityLinkedAssetIds, setQualityLinkedAssetIds] = useState<string[]>([]);
@@ -1918,7 +1919,7 @@ function AssetsPageContent() {
       </div>
 
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Total Assets" value={totalAssets} accent="#0f766e" />
+        <QualityKpiCard title="Total Assets" value={totalAssets} accent="#3A9B98" />
         <QualityKpiCard title="Active Assets" value={activeAssets} accent="#16a34a" />
         <QualityKpiCard title="Under Maintenance" value={underMaintenanceAssets} accent="#d97706" />
         <QualityKpiCard title="Quality Linked" value={qualityLinkedAssets} accent="#2563eb" />
@@ -2157,6 +2158,16 @@ function AssetsPageContent() {
               style={toolbarSearchStyle}
             />
 
+            <button
+              type="button"
+              onClick={() => setShowRegisterFilters((current) => !current)}
+              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
+            >
+              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showRegisterFilters ? (
             <div style={toolbarFiltersStyle}>
               <select
                 value={statusFilter}
@@ -2200,7 +2211,7 @@ function AssetsPageContent() {
                 Clear Filters
               </button>
             </div>
-          </div>
+          ) : null}
 
           <div style={tableInfoRowStyle}>
             <span>
@@ -2244,7 +2255,7 @@ function AssetsPageContent() {
                       ...registerRowStyle,
                       background: selectedAssetId === asset.id ? "#eff6ff" : "#ffffff",
                       borderLeft:
-                        selectedAssetId === asset.id ? "4px solid #0f766e" : "4px solid transparent",
+                        selectedAssetId === asset.id ? "4px solid #3A9B98" : "4px solid transparent",
                     }}
                   >
                     <div style={registerPrimaryStyle}>{asset.asset_code || "-"}</div>
@@ -3371,12 +3382,12 @@ function EditableLinkGroup({
 }
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
   color: "white",
   borderRadius: "20px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(15, 118, 110, 0.14)",
+  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -3471,10 +3482,16 @@ const topMetaRowStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: 12,
   flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -3649,7 +3666,7 @@ const quickActionRowStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -3692,7 +3709,7 @@ const uploadButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
   borderRadius: "10px",
   padding: "10px 16px",
@@ -3749,12 +3766,16 @@ const miniMetricValueStyle: CSSProperties = {
 };
 
 const toolbarStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "12px",
-  alignItems: "center",
-  flexWrap: "wrap",
-  marginBottom: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
 };
 
 const toolbarFiltersStyle: CSSProperties = {
@@ -3764,20 +3785,23 @@ const toolbarFiltersStyle: CSSProperties = {
 };
 
 const tableInfoRowStyle: CSSProperties = {
-  marginBottom: "12px",
   display: "flex",
-  justifyContent: "space-between",
   alignItems: "center",
-  gap: "12px",
+  justifyContent: "flex-start",
+  gap: "4px",
   flexWrap: "wrap",
   color: "#475569",
-  fontSize: "14px",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
 };
 
 const registerTableWrapStyle: CSSProperties = {
-  border: "1px solid #d7dee7",
-  borderRadius: "18px",
-  overflow: "hidden",
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const registerHeadStyle: CSSProperties = {
@@ -4046,10 +4070,11 @@ const imageMetaSubStyle: CSSProperties = {
 };
 
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #e2e8f0",
-  borderRadius: "16px",
-  padding: "16px",
-  background: "linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
   minWidth: 0,
 };
 
@@ -4086,9 +4111,11 @@ const summaryPillValueStyle: CSSProperties = {
 };
 
 const detailSectionTitleStyle: CSSProperties = {
-  fontSize: "16px",
-  fontWeight: 800,
-  color: "#0f172a",
+  fontSize: "13px",
+  fontWeight: 900,
+  color: "#2F7F7D",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
   marginBottom: "12px",
 };
 

@@ -591,9 +591,9 @@ function MultiSelectStandards({
             onClick={() => onToggle(option)}
             style={{
               ...chipButtonStyle,
-              background: active ? "#0f766e" : "#f8fafc",
+              background: active ? "#3A9B98" : "#f8fafc",
               color: active ? "#ffffff" : "#334155",
-              borderColor: active ? "#0f766e" : "#cbd5e1",
+              borderColor: active ? "#3A9B98" : "#cbd5e1",
             }}
           >
             {option}
@@ -642,6 +642,13 @@ function AuditsPageContent() {
     FindingSeverity | "All"
   >("All");
   const [openFindingTypeFilter, setOpenFindingTypeFilter] = useState<AuditType | "All">("All");
+  const [openFindingAuditTitleFilter, setOpenFindingAuditTitleFilter] = useState("All");
+  const [showFindingsFilters, setShowFindingsFilters] = useState(
+    linkedView === "open-findings" ||
+      linkedView === "closed-findings" ||
+      linkedFindingStatus !== "All" ||
+      linkedFindingCategory !== "All"
+  );
   const [generatingOpenFindingsReport, setGeneratingOpenFindingsReport] = useState(false);
   const [activeView, setActiveView] = useState<AuditWorkspaceView>(() => {
     if (linkedView === "open-findings" || linkedView === "closed-findings") return "findings";
@@ -658,6 +665,9 @@ function AuditsPageContent() {
 
     return "dashboard";
   });
+  const [showProgrammeFilters, setShowProgrammeFilters] = useState(
+    linkedStatus !== "All" || linkedType !== "All" || linkedMonth !== "All"
+  );
 
   const [form, setForm] = useState<AuditForm>(createEmptyAudit());
   const [detailForm, setDetailForm] = useState<AuditForm>(createEmptyAudit());
@@ -990,18 +1000,29 @@ function AuditsPageContent() {
       const matchesCategory =
         openFindingCategoryFilter === "All" || finding.category === openFindingCategoryFilter;
       const matchesType = openFindingTypeFilter === "All" || finding.audit_type === openFindingTypeFilter;
-      return matchesCategory && matchesType;
+      const matchesTitle =
+        openFindingAuditTitleFilter === "All" || finding.audit_title === openFindingAuditTitleFilter;
+      return matchesCategory && matchesType && matchesTitle;
     });
-  }, [openFindings, openFindingCategoryFilter, openFindingTypeFilter]);
+  }, [openFindings, openFindingAuditTitleFilter, openFindingCategoryFilter, openFindingTypeFilter]);
 
   const filteredClosedFindings = useMemo(() => {
     return closedFindings.filter((finding) => {
       const matchesCategory =
         openFindingCategoryFilter === "All" || finding.category === openFindingCategoryFilter;
       const matchesType = openFindingTypeFilter === "All" || finding.audit_type === openFindingTypeFilter;
-      return matchesCategory && matchesType;
+      const matchesTitle =
+        openFindingAuditTitleFilter === "All" || finding.audit_title === openFindingAuditTitleFilter;
+      return matchesCategory && matchesType && matchesTitle;
     });
-  }, [closedFindings, openFindingCategoryFilter, openFindingTypeFilter]);
+  }, [closedFindings, openFindingAuditTitleFilter, openFindingCategoryFilter, openFindingTypeFilter]);
+
+  const findingAuditTitleOptions = useMemo(() => {
+    const sourceRows = isClosedFindingsView ? closedFindings : openFindings;
+    return Array.from(new Set(sourceRows.map((finding) => finding.audit_title).filter(Boolean))).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }, [closedFindings, isClosedFindingsView, openFindings]);
 
   const findingStatusByAuditType = useMemo(() => {
     return (["Internal", "External", "Supplier"] as AuditType[]).map((auditType) => {
@@ -1027,13 +1048,15 @@ function AuditsPageContent() {
         acc[auditType] = openFindings.filter((finding) => {
           const matchesCategory =
             openFindingCategoryFilter === "All" || finding.category === openFindingCategoryFilter;
-          return finding.audit_type === auditType && matchesCategory;
+          const matchesTitle =
+            openFindingAuditTitleFilter === "All" || finding.audit_title === openFindingAuditTitleFilter;
+          return finding.audit_type === auditType && matchesCategory && matchesTitle;
         });
         return acc;
       },
       { Internal: [], External: [], Supplier: [] }
     );
-  }, [openFindings, openFindingCategoryFilter]);
+  }, [openFindings, openFindingAuditTitleFilter, openFindingCategoryFilter]);
 
   const activeFindingsWorkspaceRows = isClosedFindingsView ? filteredClosedFindings : filteredOpenFindings;
 
@@ -3128,7 +3151,7 @@ function AuditsPageContent() {
           <QualityKpiCard
             title="Closed Findings"
             value={kpis.closedFindings}
-            accent="#0f766e"
+            accent="#3A9B98"
             onClick={() => setAuditView("closed-findings")}
             active={isClosedFindingsView}
           />
@@ -3178,7 +3201,7 @@ function AuditsPageContent() {
                           ...findingTypeBarSegmentStyle,
                           width: `${closedWidth}%`,
                           minWidth: item.closed > 0 ? "36px" : 0,
-                          background: "#0f766e",
+                          background: "#3A9B98",
                         }}
                         onClick={() => openFindingStatusByType(item.auditType, "closed")}
                         disabled={item.closed === 0}
@@ -3193,7 +3216,7 @@ function AuditsPageContent() {
             </div>
             <div style={findingTypeLegendStyle}>
               <span><i style={{ ...findingTypeLegendDotStyle, background: "#f97316" }} />Open</span>
-              <span><i style={{ ...findingTypeLegendDotStyle, background: "#0f766e" }} />Closed</span>
+              <span><i style={{ ...findingTypeLegendDotStyle, background: "#3A9B98" }} />Closed</span>
             </div>
           </SectionCard>
 
@@ -3244,6 +3267,37 @@ function AuditsPageContent() {
                     {activeFindingsWorkspaceRows.length === 1 ? "" : "s"} across <strong>{audits.length}</strong>{" "}
                     audit{audits.length === 1 ? "" : "s"}.
                   </div>
+                  <button
+                    type="button"
+                    style={showFindingsFilters ? secondaryButtonStyle : primaryButtonStyle}
+                    onClick={() => setShowFindingsFilters((prev) => !prev)}
+                  >
+                    {showFindingsFilters ? "Hide Filters" : "Show Filters"}
+                  </button>
+                </div>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                  <button
+                    type="button"
+                    style={primaryButtonStyle}
+                    onClick={() =>
+                      isClosedFindingsView ? generateClosedAuditNcrReport() : generateOpenAuditNcrReport()
+                    }
+                    disabled={generatingOpenFindingsReport}
+                  >
+                    {generatingOpenFindingsReport
+                      ? "Generating Report..."
+                      : isClosedFindingsView
+                        ? "Generate Closed Audit NCR Report"
+                        : "Generate Open Audit NCR Report"}
+                  </button>
+                  <button type="button" style={secondaryButtonStyle} onClick={() => setAuditView(null)}>
+                    Back to Audit Register
+                  </button>
+                </div>
+              </div>
+
+              {showFindingsFilters ? (
+                <div style={toolbarFiltersStyle}>
                   <select
                     value={openFindingTypeFilter}
                     onChange={(e) => setOpenFindingTypeFilter(e.target.value as AuditType | "All")}
@@ -3267,27 +3321,31 @@ function AuditsPageContent() {
                     <option value="OFI">OFI</option>
                     <option value="OBS">OBS</option>
                   </select>
-                </div>
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                  <select
+                    value={openFindingAuditTitleFilter}
+                    onChange={(e) => setOpenFindingAuditTitleFilter(e.target.value)}
+                    style={{ ...toolbarSelectStyle, minWidth: "220px" }}
+                  >
+                    <option value="All">All Audit Titles</option>
+                    {findingAuditTitleOptions.map((title) => (
+                      <option key={title} value={title}>
+                        {title}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     type="button"
-                    style={{ ...secondaryButtonStyle, border: "1px solid #bfdbfe", color: "#1d4ed8" }}
-                    onClick={() =>
-                      isClosedFindingsView ? generateClosedAuditNcrReport() : generateOpenAuditNcrReport()
-                    }
-                    disabled={generatingOpenFindingsReport}
+                    style={secondaryButtonStyle}
+                    onClick={() => {
+                      setOpenFindingTypeFilter("All");
+                      setOpenFindingCategoryFilter("All");
+                      setOpenFindingAuditTitleFilter("All");
+                    }}
                   >
-                    {generatingOpenFindingsReport
-                      ? "Generating Report..."
-                      : isClosedFindingsView
-                        ? "Generate Closed Audit NCR Report"
-                        : "Generate Open Audit NCR Report"}
-                  </button>
-                  <button type="button" style={secondaryButtonStyle} onClick={() => setAuditView(null)}>
-                    Back to Audit Register
+                    Clear Filters
                   </button>
                 </div>
-              </div>
+              ) : null}
 
               <div style={openFindingsTableWrapStyle}>
                 <div style={openFindingsHeadStyle}>
@@ -3323,7 +3381,7 @@ function AuditsPageContent() {
                           style={{
                             ...openFindingsRowStyle,
                             background: active ? "#eff6ff" : "#ffffff",
-                            borderLeft: active ? "4px solid #0f766e" : "4px solid transparent",
+                            borderLeft: active ? "4px solid #3A9B98" : "4px solid transparent",
                           }}
                         >
                           <div style={openFindingsPrimaryCellStyle}>{finding.reference}</div>
@@ -3729,6 +3787,16 @@ function AuditsPageContent() {
               placeholder="Search audit number, title, auditor, standard, linked NCR/action..."
             />
 
+            <button
+              type="button"
+              onClick={() => setShowProgrammeFilters((current) => !current)}
+              style={showProgrammeFilters ? secondaryButtonStyle : primaryButtonStyle}
+            >
+              {showProgrammeFilters ? "Hide Filters" : "Show Filters"}
+            </button>
+          </div>
+
+          {showProgrammeFilters ? (
             <div style={toolbarFiltersStyle}>
               <select
                 value={statusFilter}
@@ -3770,7 +3838,7 @@ function AuditsPageContent() {
                 ))}
               </select>
             </div>
-          </div>
+          ) : null}
 
           <div style={sortChipRowStyle}>
             <SortChip label="Scheduled" active={sortKey === "audit_month"} asc={sortAsc} onClick={() => setSort("audit_month")} />
@@ -3819,7 +3887,7 @@ function AuditsPageContent() {
                     style={{
                       ...programmeRowStyle,
                       background: active ? "#eff6ff" : linkedMatch ? "#ecfeff" : "#ffffff",
-                      borderLeft: active ? "4px solid #0f766e" : "4px solid transparent",
+                      borderLeft: active ? "4px solid #3A9B98" : "4px solid transparent",
                     }}
                   >
                     <div style={programmePrimaryStyle}>
@@ -4698,9 +4766,9 @@ function SortChip({
       onClick={onClick}
       style={{
         ...sortChipStyle,
-        background: active ? "#0f766e" : "#f8fafc",
+        background: active ? "#3A9B98" : "#f8fafc",
         color: active ? "#ffffff" : "#334155",
-        borderColor: active ? "#0f766e" : "#cbd5e1",
+        borderColor: active ? "#3A9B98" : "#cbd5e1",
       }}
     >
       {label} {active ? (asc ? "↑" : "↓") : ""}
@@ -4722,8 +4790,8 @@ const linkedMatchTagStyle: CSSProperties = {
   marginTop: "6px",
   padding: "4px 8px",
   borderRadius: "999px",
-  background: "#ccfbf1",
-  color: "#115e59",
+  background: "#D7EFEE",
+  color: "#2F7F7D",
   fontWeight: 800,
   fontSize: "11px",
 };
@@ -4762,12 +4830,12 @@ const pickerRowStyle: CSSProperties = {
 };
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
   color: "white",
   borderRadius: "22px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(15, 118, 110, 0.14)",
+  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -4862,10 +4930,16 @@ const topMetaRowStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: 12,
   flexWrap: "wrap",
+  alignItems: "center",
+  background: "rgba(255,255,255,0.92)",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  padding: "12px 14px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#0f766e",
+  color: "#3A9B98",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -4900,11 +4974,17 @@ const viewButtonStyle: CSSProperties = {
   borderRadius: "10px",
   cursor: "pointer",
   fontWeight: 800,
+  minHeight: "44px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 1.2,
+  boxSizing: "border-box",
 };
 
 const activeViewButtonStyle: CSSProperties = {
   ...viewButtonStyle,
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
 };
 
@@ -4999,10 +5079,11 @@ const openFindingsSummaryStyle: CSSProperties = {
 };
 
 const openFindingsTableWrapStyle: CSSProperties = {
-  border: "1px solid #d7dee7",
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
   borderRadius: "16px",
-  overflow: "hidden",
   background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const openFindingsHeadStyle: CSSProperties = {
@@ -5084,19 +5165,23 @@ const openFindingsEmptyStyle: CSSProperties = {
 
 const openFindingDetailWrapStyle: CSSProperties = {
   marginTop: "16px",
-  border: "1px solid #d7dee7",
-  borderRadius: "16px",
-  padding: "16px",
-  background: "#f8fafc",
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  minWidth: 0,
 };
 
 const openFindingDetailHeadStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  gap: "12px",
+  gap: "14px",
   flexWrap: "wrap",
   alignItems: "center",
-  marginBottom: "14px",
+  paddingBottom: "14px",
+  marginBottom: "16px",
+  borderBottom: "1px solid #e2e8f0",
 };
 
 const topGridStyle: CSSProperties = {
@@ -5245,7 +5330,7 @@ const createAuditHintStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "white",
   border: "none",
   padding: "11px 16px",
@@ -5278,7 +5363,7 @@ const uploadButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#0f766e",
+  background: "#3A9B98",
   color: "#ffffff",
   borderRadius: "10px",
   padding: "11px 16px",
@@ -5365,12 +5450,16 @@ const compactProblemMetaStyle: CSSProperties = {
 };
 
 const toolbarStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "12px",
-  alignItems: "center",
-  flexWrap: "wrap",
-  marginBottom: "12px",
+  alignItems: "end",
+  marginBottom: "14px",
+  padding: "12px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
 };
 
 const toolbarSearchStyle: CSSProperties = {
@@ -5407,15 +5496,23 @@ const sortChipStyle: CSSProperties = {
 };
 
 const programmeInfoStyle: CSSProperties = {
-  marginBottom: "12px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: "4px",
+  flexWrap: "wrap",
   color: "#475569",
-  fontSize: "14px",
+  fontSize: "13px",
+  fontWeight: 700,
+  margin: "12px 0",
 };
 
 const programmeTableWrapStyle: CSSProperties = {
-  border: "1px solid #d7dee7",
-  borderRadius: "18px",
-  overflow: "hidden",
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
+  background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const programmeHeadStyle: CSSProperties = {
@@ -5456,7 +5553,7 @@ const programmeRowStyle: CSSProperties = {
 const programmePrimaryStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#0f766e",
+  color: "#3A9B98",
   lineHeight: 1.45,
   wordBreak: "break-word",
 };
@@ -5668,10 +5765,12 @@ const miniStatValueStyle: CSSProperties = {
 };
 
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #e2e8f0",
-  borderRadius: "16px",
-  padding: "16px",
-  background: "#ffffff",
+  border: "1px solid #dbe3ef",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  minWidth: 0,
 };
 
 const detailButtonRowStyle: CSSProperties = {
@@ -5692,10 +5791,11 @@ const detailTagGroupStyle: CSSProperties = {
 };
 
 const detailSectionLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 800,
-  color: "#64748b",
+  fontSize: "13px",
+  fontWeight: 900,
+  color: "#2F7F7D",
   textTransform: "uppercase",
+  letterSpacing: "0.04em",
 };
 
 const detailTagsWrapStyle: CSSProperties = {
