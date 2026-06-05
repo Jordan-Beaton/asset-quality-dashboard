@@ -1041,7 +1041,7 @@ export default function ReportsPage() {
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/" style={backLinkStyle}>
+        <Link href="/quality" style={backLinkStyle}>
           ← Back to Dashboard
         </Link>
 

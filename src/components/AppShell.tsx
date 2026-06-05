@@ -42,7 +42,7 @@ type NavIconKey =
 
 const qualityNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
-  { href: "/", label: "Dashboard", icon: "dashboard" },
+  { href: "/quality", label: "Dashboard", icon: "dashboard" },
   { href: "/documents", label: "Documents", icon: "documents" },
   { href: "/certification", label: "Certification", icon: "certification" },
   { href: "/moc", label: "MOC", icon: "moc" },
@@ -629,6 +629,7 @@ export default function AppShell({ children }: AppShellProps) {
             {navItems.map((item) => {
               const isActive =
                 item.href === "/" ||
+                item.href === "/quality" ||
                 item.href === "/home" ||
                 item.href === "/assets" ||
                 item.href === "/risk" ||
