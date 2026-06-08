@@ -210,6 +210,7 @@ export default function HomePage() {
             box-shadow: 0 22px 38px rgba(15, 23, 42, 0.13);
             border-color: #BFE5E3;
           }
+
         `}
       </style>
       <section style={heroStyle}>
@@ -459,6 +460,7 @@ const commandSurfaceStyle: CSSProperties = {
   padding: "20px",
   boxShadow: "0 16px 34px rgba(15, 23, 42, 0.08)",
 };
+
 
 const surfaceHeaderStyle: CSSProperties = {
   display: "flex",

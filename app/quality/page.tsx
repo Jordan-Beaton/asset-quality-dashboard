@@ -18,6 +18,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ImsButton, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
+import { imsColours } from "../../src/components/imsTheme";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
@@ -293,83 +295,134 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+
+  async function fetchDashboardData() {
+    setIsLoading(true);
+    setError(null);
+
+    const [
+      assetRes,
+      ncrRes,
+      capaRes,
+      actionRes,
+      auditRes,
+      findingRes,
+      assetQualityRes,
+      documentRes,
+      mocRes,
+    ] = await Promise.all([
+      supabase.from("assets").select("*"),
+      supabase.from("ncrs").select("*"),
+      supabase.from("capas").select("*"),
+      supabase.from("actions").select("*"),
+      supabase.from("audits").select("*"),
+      supabase.from("audit_findings").select("*"),
+      supabase.from("asset_quality").select("id,asset_id"),
+      supabase.from("documents").select("id,status,review_approval_status,next_review_date"),
+      supabase
+        .from("moc_reports")
+        .select("id,moc_report_no,moc_report_title,change_type,status,temporary_valid_to,created_at,updated_at"),
+    ]);
+
+    if (
+      assetRes.error ||
+      ncrRes.error ||
+      capaRes.error ||
+      actionRes.error ||
+      auditRes.error ||
+      findingRes.error ||
+      assetQualityRes.error ||
+      documentRes.error ||
+      mocRes.error
+    ) {
+      setError(
+        assetRes.error?.message ||
+          ncrRes.error?.message ||
+          capaRes.error?.message ||
+          actionRes.error?.message ||
+          auditRes.error?.message ||
+          findingRes.error?.message ||
+          assetQualityRes.error?.message ||
+          documentRes.error?.message ||
+          mocRes.error?.message ||
+          "Failed to load dashboard data."
+      );
+      setIsLoading(false);
+      return;
+    }
+
+    setNcrs((ncrRes.data || []) as Ncr[]);
+    setCapas((capaRes.data || []) as Capa[]);
+    setActions((actionRes.data || []) as ActionItem[]);
+    setAudits((auditRes.data || []) as AuditRecord[]);
+    setAuditFindings((findingRes.data || []) as AuditFindingRow[]);
+    setDocuments((documentRes.data || []) as DocumentSummary[]);
+    setMocs((mocRes.data || []) as MocRecord[]);
+    setLastRefreshed(new Date());
+    setIsLoading(false);
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      const [
-        assetRes,
-        ncrRes,
-        capaRes,
-        actionRes,
-        auditRes,
-        findingRes,
-        assetQualityRes,
-        documentRes,
-        mocRes,
-      ] = await Promise.all([
-        supabase.from("assets").select("*"),
-        supabase.from("ncrs").select("*"),
-        supabase.from("capas").select("*"),
-        supabase.from("actions").select("*"),
-        supabase.from("audits").select("*"),
-        supabase.from("audit_findings").select("*"),
-        supabase.from("asset_quality").select("id,asset_id"),
-        supabase.from("documents").select("id,status,review_approval_status,next_review_date"),
-        supabase
-          .from("moc_reports")
-          .select("id,moc_report_no,moc_report_title,change_type,status,temporary_valid_to,created_at,updated_at"),
-      ]);
-
-      if (
-        assetRes.error ||
-        ncrRes.error ||
-        capaRes.error ||
-        actionRes.error ||
-        auditRes.error ||
-        findingRes.error ||
-        assetQualityRes.error ||
-        documentRes.error ||
-        mocRes.error
-      ) {
-        setError(
-          assetRes.error?.message ||
-            ncrRes.error?.message ||
-            capaRes.error?.message ||
-            actionRes.error?.message ||
-            auditRes.error?.message ||
-            findingRes.error?.message ||
-            assetQualityRes.error?.message ||
-            documentRes.error?.message ||
-            mocRes.error?.message ||
-            "Failed to load dashboard data."
-        );
-        setIsLoading(false);
-        return;
-      }
-
-      setNcrs((ncrRes.data || []) as Ncr[]);
-      setCapas((capaRes.data || []) as Capa[]);
-      setActions((actionRes.data || []) as ActionItem[]);
-      setAudits((auditRes.data || []) as AuditRecord[]);
-      setAuditFindings((findingRes.data || []) as AuditFindingRow[]);
-      setDocuments((documentRes.data || []) as DocumentSummary[]);
-      setMocs((mocRes.data || []) as MocRecord[]);
-      setLastRefreshed(new Date());
-      setIsLoading(false);
-    };
-
-    void fetchData();
+    void fetchDashboardData();
   }, []);
 
-  const openNcrs = ncrs.filter((item) => !isClosedLikeStatus(item.status)).length;
-  const openAuditFindings = auditFindings.filter((item) => !isClosedLikeStatus(item.status)).length;
-  const openMocs = mocs.filter((item) => normaliseStatus(item.status) !== "closed").length;
-  const temporaryMocs = mocs.filter((item) => (item.change_type || "") === "Temporary").length;
-  const inReviewMocs = mocs.filter((item) => normaliseStatus(item.status) === "in review").length;
-  const hseqActions = actions.filter((item) => normaliseStatus(item.department) === "hseq");
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    [
+      ...ncrs.map((item) => item.created_at),
+      ...actions.map((item) => item.created_at || item.due_date),
+      ...audits.map((item) => item.audit_date || (item.audit_month ? `${item.audit_month}-01` : "")),
+      ...mocs.map((item) => item.created_at || item.updated_at),
+    ].forEach((value) => {
+      if (!value) return;
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) years.add(String(date.getFullYear()));
+    });
+    years.add(String(new Date().getFullYear()));
+    return [...years].sort((a, b) => Number(b) - Number(a));
+  }, [actions, audits, mocs, ncrs]);
+
+  const yearNcrs = useMemo(
+    () => ncrs.filter((item) => !item.created_at || String(new Date(item.created_at).getFullYear()) === yearFilter),
+    [ncrs, yearFilter],
+  );
+  const yearActions = useMemo(
+    () => actions.filter((item) => {
+      const value = item.created_at || item.due_date;
+      if (!value) return true;
+      return String(new Date(value).getFullYear()) === yearFilter;
+    }),
+    [actions, yearFilter],
+  );
+  const yearAudits = useMemo(
+    () => audits.filter((item) => {
+      const value = item.audit_date || (item.audit_month ? `${item.audit_month}-01` : item.created_at);
+      if (!value) return true;
+      return String(new Date(value).getFullYear()) === yearFilter;
+    }),
+    [audits, yearFilter],
+  );
+  const yearAuditIds = useMemo(() => new Set(yearAudits.map((audit) => audit.id)), [yearAudits]);
+  const yearAuditFindings = useMemo(
+    () => auditFindings.filter((finding) => yearAuditIds.has(finding.audit_id)),
+    [auditFindings, yearAuditIds],
+  );
+  const yearMocs = useMemo(
+    () => mocs.filter((item) => {
+      const value = item.created_at || item.updated_at;
+      if (!value) return true;
+      return String(new Date(value).getFullYear()) === yearFilter;
+    }),
+    [mocs, yearFilter],
+  );
+
+  const openNcrs = yearNcrs.filter((item) => !isClosedLikeStatus(item.status)).length;
+  const openAuditFindings = yearAuditFindings.filter((item) => !isClosedLikeStatus(item.status)).length;
+  const openMocs = yearMocs.filter((item) => normaliseStatus(item.status) !== "closed").length;
+  const temporaryMocs = yearMocs.filter((item) => (item.change_type || "") === "Temporary").length;
+  const inReviewMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "in review").length;
+  const hseqActions = yearActions.filter((item) => normaliseStatus(item.department) === "hseq" || normaliseStatus(item.department) === "quality");
   const openHseqActions = hseqActions.filter((item) => !isClosedLikeStatus(item.status)).length;
 
   const overdueHseqActions = hseqActions.filter((action) => {
@@ -379,16 +432,16 @@ export default function Home() {
   }).length;
 
   const overdueDocuments = documents.filter((doc) => getDocumentBucket(doc) === "Overdue").length;
-  const expiredTemporaryMocs = mocs.filter((item) => isExpiredTemporaryMoc(item)).length;
-  const nearingTemporaryMocs = mocs.filter((item) => isNearingTemporaryMoc(item)).length;
+  const expiredTemporaryMocs = yearMocs.filter((item) => isExpiredTemporaryMoc(item)).length;
+  const nearingTemporaryMocs = yearMocs.filter((item) => isNearingTemporaryMoc(item)).length;
 
-  const overdueNcrs = ncrs.filter((item) => {
+  const overdueNcrs = yearNcrs.filter((item) => {
     if (isClosedLikeStatus(item.status)) return false;
     const days = getDaysFromToday(item.due_date || null);
     return days !== null && days < 0;
   }).length;
 
-  const dueSoonNcrs = ncrs.filter((item) => {
+  const dueSoonNcrs = yearNcrs.filter((item) => {
     if (isClosedLikeStatus(item.status)) return false;
     const days = getDaysFromToday(item.due_date || null);
     return days !== null && days >= 0 && days <= 7;
@@ -398,16 +451,16 @@ export default function Home() {
     () => [
       {
         name: "Open",
-        value: ncrs.filter((item) => !isClosedLikeStatus(item.status)).length,
+        value: yearNcrs.filter((item) => !isClosedLikeStatus(item.status)).length,
         fill: "#dc2626",
       },
       {
         name: "Closed",
-        value: ncrs.filter((item) => isClosedLikeStatus(item.status)).length,
+        value: yearNcrs.filter((item) => isClosedLikeStatus(item.status)).length,
         fill: "#16a34a",
       },
     ],
-    [ncrs]
+    [yearNcrs]
   );
 
   const ncrTrendData = useMemo(() => {
@@ -415,7 +468,7 @@ export default function Home() {
     const openedMap: Record<string, number> = {};
     const closedMap: Record<string, number> = {};
 
-    ncrs.forEach((ncr) => {
+    yearNcrs.forEach((ncr) => {
       const openedKey = monthKey(ncr.created_at);
       if (openedKey) {
         keys.add(openedKey);
@@ -440,7 +493,7 @@ export default function Home() {
         Raised: openedMap[key] || 0,
         Closed: closedMap[key] || 0,
       }));
-  }, [ncrs]);
+  }, [yearNcrs]);
 
   const actionsTrendData = useMemo(() => {
     const keys = new Set<string>();
@@ -497,7 +550,7 @@ export default function Home() {
       OBS: 0,
     };
 
-    auditFindings.forEach((finding) => {
+    yearAuditFindings.forEach((finding) => {
       const category = (finding.category || "").trim();
       if (category === "Major" || category === "Minor" || category === "OFI" || category === "OBS") {
         counts[category] += 1;
@@ -505,7 +558,7 @@ export default function Home() {
     });
 
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [auditFindings]);
+  }, [yearAuditFindings]);
 
   const mocStatusData = useMemo(() => {
     const counts = {
@@ -515,7 +568,7 @@ export default function Home() {
       Closed: 0,
     };
 
-    mocs.forEach((moc) => {
+    yearMocs.forEach((moc) => {
       const status = moc.status || "Draft";
       if (status === "Draft" || status === "In Review" || status === "Approved" || status === "Closed") {
         counts[status] += 1;
@@ -523,7 +576,7 @@ export default function Home() {
     });
 
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [mocs]);
+  }, [yearMocs]);
 
   const mocChangeTypeData = useMemo(() => {
     const counts = {
@@ -531,7 +584,7 @@ export default function Home() {
       Temporary: 0,
     };
 
-    mocs.forEach((moc) => {
+    yearMocs.forEach((moc) => {
       const type = moc.change_type || "Permanent";
       if (type === "Permanent" || type === "Temporary") {
         counts[type] += 1;
@@ -539,7 +592,7 @@ export default function Home() {
     });
 
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [mocs]);
+  }, [yearMocs]);
 
   const hseqActionDuePressureData = useMemo(() => {
     const open = hseqActions.filter((action) => !isClosedLikeStatus(action.status));
@@ -573,7 +626,7 @@ export default function Home() {
       Completed: 0,
     };
 
-    audits.forEach((audit) => {
+    yearAudits.forEach((audit) => {
       const status = audit.status || "Planned";
       if (status === "Completed") {
         counts.Completed += 1;
@@ -586,17 +639,17 @@ export default function Home() {
     });
 
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [audits]);
+  }, [yearAudits]);
 
   const qualityHealthData = useMemo(() => {
-    const totalNcrs = ncrs.length;
-    const closedNcrs = ncrs.filter((item) => isClosedLikeStatus(item.status)).length;
-    const totalFindings = auditFindings.length;
-    const closedFindings = auditFindings.filter((item) => isClosedLikeStatus(item.status)).length;
+    const totalNcrs = yearNcrs.length;
+    const closedNcrs = yearNcrs.filter((item) => isClosedLikeStatus(item.status)).length;
+    const totalFindings = yearAuditFindings.length;
+    const closedFindings = yearAuditFindings.filter((item) => isClosedLikeStatus(item.status)).length;
     const totalDocs = documents.length;
     const docsInDate = documents.filter((document) => getDocumentBucket(document) !== "Overdue").length;
-    const totalMocs = mocs.length;
-    const closedMocs = mocs.filter((item) => normaliseStatus(item.status) === "closed").length;
+    const totalMocs = yearMocs.length;
+    const closedMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "closed").length;
 
     return [
       { name: "NCR Closure", value: percentage(closedNcrs, totalNcrs), fill: "#3A9B98", href: "/ncr-capa" },
@@ -614,7 +667,7 @@ export default function Home() {
       },
       { name: "MOC Closure", value: percentage(closedMocs, totalMocs), fill: "#16a34a", href: "/moc" },
     ];
-  }, [auditFindings, documents, mocs, ncrs]);
+  }, [documents, yearAuditFindings, yearMocs, yearNcrs]);
 
   const managementFocusItems = useMemo(
     () => [
@@ -918,6 +971,33 @@ export default function Home() {
             value: latestRecordSummary,
           },
         ]}
+      />
+
+      <ImsTopMetaRow
+        backHref="/home"
+        backLabel="Back to Home"
+        actions={
+          <>
+            <label style={yearFilterStyle}>
+              <span>Year</span>
+              <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
+                {availableYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <ImsButton onClick={() => void fetchDashboardData()} disabled={isLoading}>
+              Refresh
+            </ImsButton>
+          </>
+        }
+        status={
+          <>
+            <strong>Status:</strong> {isLoading ? "Loading..." : error ? `Loaded with warning: ${error}` : `Loaded ${yearFilter} quality dashboard successfully.`}
+          </>
+        }
       />
 
       {error ? (
@@ -1799,8 +1879,9 @@ const insightGridStyle: CSSProperties = {
 
 const focusGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "10px",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "12px",
+  alignItems: "stretch",
 };
 
 const bottomGridStyle: CSSProperties = {
@@ -2024,15 +2105,21 @@ const summaryRowStyle: CSSProperties = {
   alignItems: "center",
   gap: "12px",
   color: "#0f172a",
+  minHeight: "58px",
+  boxSizing: "border-box",
 };
 
 const summaryRowLabelStyle: CSSProperties = {
   color: "#334155",
-  fontWeight: 600,
+  fontWeight: 800,
+  lineHeight: 1.25,
+  minWidth: 0,
 };
 
 const summaryRowValueStyle: CSSProperties = {
   color: "#0f172a",
+  fontSize: "17px",
+  flex: "0 0 auto",
 };
 
 const workItemStyle: CSSProperties = {
@@ -2084,5 +2171,18 @@ const badgeStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   whiteSpace: "nowrap",
+};
+
+const yearFilterStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+  minHeight: "42px",
+  padding: "0 10px",
+  borderRadius: "10px",
+  background: "#ffffff",
+  border: "1px solid #dbe3ef",
+  color: imsColours.ink,
+  fontWeight: 900,
 };
 

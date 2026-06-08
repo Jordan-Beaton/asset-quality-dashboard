@@ -1,0 +1,246 @@
+"use client";
+
+import Image from "next/image";
+import { useMemo, useState } from "react";
+import type { CSSProperties, FormEvent } from "react";
+import { imsColours, imsInputStyle } from "../../src/components/imsTheme";
+
+const reporterTypes = ["Employee", "Contractor", "Client", "Visitor", "Quick Fill"];
+const observationTypes = ["Positive Observation", "Unsafe Act", "Unsafe Condition", "Near Miss", "Environmental", "Quality / Process", "Other"];
+const categories = ["People", "Equipment", "Environment", "Process", "Housekeeping", "Access / Egress", "Lifting", "Dropped Object", "PTW / Controls", "Other"];
+const riskLevels = ["Low", "Medium", "High", "Immediate attention"];
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function currentTime() {
+  const date = new Date();
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+export default function PublicObservationPage() {
+  const [reporterType, setReporterType] = useState("Quick Fill");
+  const [message, setMessage] = useState("");
+  const [submittedNumber, setSubmittedNumber] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [showContact, setShowContact] = useState(false);
+
+  const isQuickFill = reporterType === "Quick Fill";
+  const headerText = useMemo(() => {
+    if (submittedNumber) return "Observation submitted";
+    if (isQuickFill) return "Quick observation card";
+    return `${reporterType} observation card`;
+  }, [isQuickFill, reporterType, submittedNumber]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setMessage("Submitting observation...");
+    setSubmittedNumber("");
+
+    const formData = new FormData(event.currentTarget);
+    formData.set("reporter_type", reporterType);
+
+    const response = await fetch("/api/hse-observations", {
+      method: "POST",
+      body: formData,
+    });
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setMessage(result.error || "Observation could not be submitted. Please try again.");
+      setSubmitting(false);
+      return;
+    }
+
+    setSubmittedNumber(result.observationNumber || "");
+    setMessage(`Thank you. Your observation has been logged${result.observationNumber ? ` as ${result.observationNumber}` : ""}.`);
+    event.currentTarget.reset();
+    setReporterType("Quick Fill");
+    setShowContact(false);
+    setSubmitting(false);
+  }
+
+  return (
+    <main style={pageStyle}>
+      <section style={shellStyle}>
+        <header style={headerStyle}>
+          <Image src="/enshore-logo.png" alt="Enshore" width={210} height={96} priority style={{ width: "170px", height: "auto" }} />
+          <div style={headerCopyStyle}>
+            <span style={eyebrowStyle}>HSE MANAGEMENT</span>
+            <h1 style={titleStyle}>{headerText}</h1>
+            <p style={subtitleStyle}>Use this QR form to submit a site observation without accessing the full IMS.</p>
+          </div>
+        </header>
+
+        {message ? (
+          <div style={submittedNumber ? successStyle : statusStyle}>
+            <strong>{submittedNumber ? "Logged:" : "Status:"}</strong> {message}
+          </div>
+        ) : null}
+
+        <form onSubmit={handleSubmit} style={formStyle}>
+          <section style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Who is submitting?</h2>
+            <div style={choiceGridStyle}>
+              {reporterTypes.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setReporterType(type)}
+                  style={reporterType === type ? activeChoiceStyle : choiceStyle}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+            <input type="hidden" name="reporter_type" value={reporterType} />
+            {!isQuickFill ? (
+              <div style={responsiveGridStyle}>
+                <Field label="Name">
+                  <input name="reporter_name" style={inputStyle} placeholder="Your name" />
+                </Field>
+                <Field label="Company">
+                  <input name="reporter_company" style={inputStyle} placeholder="Company / organisation" />
+                </Field>
+              </div>
+            ) : null}
+            <button type="button" onClick={() => setShowContact((value) => !value)} style={ghostButtonStyle}>
+              {showContact ? "Hide optional contact details" : "Add optional contact details"}
+            </button>
+            {showContact ? (
+              <Field label="Contact details">
+                <input name="reporter_contact" style={inputStyle} placeholder="Phone or email if HSE needs to follow up" />
+              </Field>
+            ) : null}
+          </section>
+
+          <section style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Observation details</h2>
+            <div style={responsiveGridStyle}>
+              <Field label="Project / vessel / worksite">
+                <input name="project" style={inputStyle} placeholder="e.g. ENS24, Blyth Base, vessel name" />
+              </Field>
+              <Field label="Exact location">
+                <input name="site_location" style={inputStyle} placeholder="Area, deck, room, workshop, yard..." />
+              </Field>
+              <Field label="Date">
+                <input type="date" name="observation_date" defaultValue={today()} style={inputStyle} />
+              </Field>
+              <Field label="Time">
+                <input type="time" name="observation_time" defaultValue={currentTime()} style={inputStyle} />
+              </Field>
+              <Field label="Observation type">
+                <select name="observation_type" style={inputStyle} defaultValue="Unsafe Condition">
+                  {observationTypes.map((type) => <option key={type}>{type}</option>)}
+                </select>
+              </Field>
+              <Field label="Category">
+                <select name="category" style={inputStyle} defaultValue="">
+                  <option value="">Select category</option>
+                  {categories.map((category) => <option key={category}>{category}</option>)}
+                </select>
+              </Field>
+              <Field label="Risk / attention level">
+                <select name="risk_level" style={inputStyle} defaultValue="">
+                  <option value="">Select level</option>
+                  {riskLevels.map((level) => <option key={level}>{level}</option>)}
+                </select>
+              </Field>
+              <Field label="Short title">
+                <input name="title" style={inputStyle} placeholder="Short summary" />
+              </Field>
+            </div>
+            <Field label="What was observed?">
+              <textarea name="description" required style={textareaStyle} placeholder="Describe what happened, what you saw, or what could be improved." />
+            </Field>
+            <Field label="Immediate action taken">
+              <textarea name="immediate_action" style={textareaStyle} placeholder="What was done straight away, if anything?" />
+            </Field>
+            <Field label="Suggested action">
+              <textarea name="suggested_action" style={textareaStyle} placeholder="Suggested fix or follow-up action." />
+            </Field>
+          </section>
+
+          <section style={cardStyle}>
+            <h2 style={sectionTitleStyle}>Photos or supporting evidence</h2>
+            <p style={helperTextStyle}>Optional. Add photos or files that help HSE understand the observation.</p>
+            <input name="evidence" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={fileInputStyle} />
+          </section>
+
+          <button type="submit" disabled={submitting} style={{ ...submitButtonStyle, opacity: submitting ? 0.7 : 1 }}>
+            {submitting ? "Submitting..." : "Submit Observation"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={fieldStyle}>
+      <span style={labelStyle}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const pageStyle: CSSProperties = {
+  minHeight: "100vh",
+  margin: "-28px -24px -36px",
+  padding: "16px",
+  background: "linear-gradient(180deg, #eef8f7 0%, #f8fafc 48%, #eef2f5 100%)",
+  boxSizing: "border-box",
+};
+
+const shellStyle: CSSProperties = {
+  maxWidth: "860px",
+  margin: "0 auto",
+  display: "grid",
+  gap: "14px",
+};
+
+const headerStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "auto minmax(0, 1fr)",
+  gap: "16px",
+  alignItems: "center",
+  padding: "18px",
+  borderRadius: "22px",
+  background: "#ffffff",
+  border: "1px solid #dbe7f3",
+  boxShadow: "0 14px 32px rgba(15, 23, 42, 0.08)",
+};
+
+const headerCopyStyle: CSSProperties = { minWidth: 0 };
+const eyebrowStyle: CSSProperties = { color: imsColours.brandDark, fontSize: "12px", fontWeight: 900, letterSpacing: "0.12em" };
+const titleStyle: CSSProperties = {
+  margin: "4px 0",
+  fontSize: "clamp(22px, 4.4vw, 34px)",
+  color: imsColours.ink,
+  lineHeight: 1.05,
+  fontWeight: 800,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+const subtitleStyle: CSSProperties = { margin: 0, color: imsColours.slate, lineHeight: 1.45, fontSize: "14px" };
+const formStyle: CSSProperties = { display: "grid", gap: "14px" };
+const cardStyle: CSSProperties = { background: "#ffffff", borderRadius: "18px", border: "1px solid #dbe7f3", boxShadow: "0 1px 3px rgba(15,23,42,0.08)", padding: "16px", display: "grid", gap: "12px" };
+const sectionTitleStyle: CSSProperties = { margin: 0, color: imsColours.ink, fontSize: "18px", fontWeight: 900 };
+const choiceGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(126px, 1fr))", gap: "9px" };
+const choiceStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "12px", background: "#f8fafc", color: imsColours.ink, minHeight: "46px", fontWeight: 900, cursor: "pointer" };
+const activeChoiceStyle: CSSProperties = { ...choiceStyle, background: imsColours.brand, borderColor: imsColours.brand, color: "#ffffff" };
+const responsiveGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" };
+const fieldStyle: CSSProperties = { display: "grid", gap: "6px" };
+const labelStyle: CSSProperties = { color: "#334155", fontSize: "12px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.04em" };
+const inputStyle: CSSProperties = { ...imsInputStyle, minHeight: "48px", fontSize: "16px" };
+const textareaStyle: CSSProperties = { ...inputStyle, minHeight: "106px", resize: "vertical", lineHeight: 1.45 };
+const fileInputStyle: CSSProperties = { ...inputStyle, padding: "12px" };
+const helperTextStyle: CSSProperties = { margin: 0, color: imsColours.slate, fontSize: "13px", lineHeight: 1.45 };
+const ghostButtonStyle: CSSProperties = { border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft, color: imsColours.brandDark, minHeight: "44px", borderRadius: "12px", fontWeight: 900, cursor: "pointer" };
+const submitButtonStyle: CSSProperties = { border: "none", borderRadius: "14px", minHeight: "56px", background: imsColours.brand, color: "#ffffff", fontSize: "17px", fontWeight: 900, cursor: "pointer", boxShadow: "0 16px 30px rgba(58,155,152,0.24)" };
+const statusStyle: CSSProperties = { borderRadius: "14px", background: "#ffffff", border: "1px solid #dbe7f3", padding: "13px 14px", color: imsColours.ink, boxShadow: "0 1px 3px rgba(15,23,42,0.08)" };
+const successStyle: CSSProperties = { ...statusStyle, background: "#ecfdf5", borderColor: "#bbf7d0", color: "#14532d" };

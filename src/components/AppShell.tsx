@@ -27,6 +27,7 @@ type NavIconKey =
   | "actions"
   | "reports"
   | "calendar"
+  | "ptw"
   | "assets"
   | "calibration"
   | "inspection"
@@ -38,7 +39,8 @@ type NavIconKey =
   | "people"
   | "departments"
   | "system"
-  | "ainm";
+  | "ainm"
+  | "observations";
 
 const qualityNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
@@ -79,6 +81,8 @@ const hseNavItems: NavItem[] = [
   { href: "/hse", label: "Dashboard", icon: "dashboard" },
   { href: "/hse/calendar", label: "Calendar", icon: "calendar" },
   { href: "/hse/ainm", label: "AINM", icon: "ainm" },
+  { href: "/hse/observations", label: "Observations", icon: "observations" },
+  { href: "/hse/ptw", label: "PTW", icon: "ptw" },
   { href: "/hse/inspections", label: "Inspections", icon: "inspection" },
   { href: "/hse/actions", label: "Actions", icon: "actions" },
   { href: "/hse/reports", label: "Reports", icon: "reports" },
@@ -186,6 +190,26 @@ function RailIcon({ icon }: { icon: NavIconKey }) {
     );
   }
 
+  if (icon === "observations") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 19, height: 19 }}>
+        <path {...common} d="M4 5h16v12H8l-4 4z" />
+        <path {...common} d="M8 9h8M8 13h5" />
+      </svg>
+    );
+  }
+
+  if (icon === "ptw") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 19, height: 19 }}>
+        <path {...common} d="M7 3h7l4 4v14H7z" />
+        <path {...common} d="M14 3v5h5" />
+        <path {...common} d="M9 12h6M9 16h3" />
+        <path {...common} d="m14 17 1.4 1.4L19 14.5" />
+      </svg>
+    );
+  }
+
   if (icon === "people" || icon === "departments") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 19, height: 19 }}>
@@ -227,6 +251,7 @@ export default function AppShell({ children }: AppShellProps) {
   const [isRailPinned, setIsRailPinned] = useState(false);
   const [signedInName, setSignedInName] = useState("");
   const isLoginPage = pathname === "/login";
+  const isPublicObservationPage = pathname === "/observe";
   const isHomePage = pathname === "/home";
   const isAssetModule = pathname.startsWith("/assets");
   const isRiskModule = pathname.startsWith("/risk");
@@ -234,7 +259,7 @@ export default function AppShell({ children }: AppShellProps) {
   const isAdminModule = pathname.startsWith("/admin");
   const isPeopleModule = pathname.startsWith("/people");
   const isActionModule = pathname === "/actions";
-  const showLogo = !isLoginPage;
+  const showLogo = !isLoginPage && !isPublicObservationPage;
   const moduleTitle = isHomePage
     ? "Enshore Management System"
     : isActionModule
@@ -278,7 +303,7 @@ export default function AppShell({ children }: AppShellProps) {
     : isActionModule
     ? actionNavItems
     : qualityNavItems;
-  const showSideRail = !isLoginPage && !isHomePage && !isFieldInspectionMode;
+  const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldInspectionMode;
   const railOpen = isRailExpanded || isRailPinned;
 
   useEffect(() => {
@@ -345,7 +370,7 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", scrollbarGutter: "stable" }}>
-      <header
+      {!isPublicObservationPage ? <header
         style={{
           position: "sticky",
           top: 0,
@@ -396,7 +421,7 @@ export default function AppShell({ children }: AppShellProps) {
                 }}
               >
                 <Image
-                  src="/enshore-header-logo.png"
+                  src="/enshore-logo.png"
                   alt="Enshore"
                   width={isFieldInspectionMode ? 124 : 202}
                   height={isFieldInspectionMode ? 32 : 52}
@@ -527,7 +552,7 @@ export default function AppShell({ children }: AppShellProps) {
             ) : null}
           </div>
         </div>
-      </header>
+      </header> : null}
 
       {showSideRail ? (
         <aside
@@ -643,6 +668,7 @@ export default function AppShell({ children }: AppShellProps) {
                   key={item.href}
                   href={item.href}
                   title={item.label}
+                  className={isActive ? "ims-rail-link ims-rail-link--active" : "ims-rail-link"}
                   style={{
                     position: "relative",
                     display: "grid",
@@ -657,7 +683,7 @@ export default function AppShell({ children }: AppShellProps) {
                     background: isActive ? "#3A9B98" : "transparent",
                     color: isActive ? "#ffffff" : "#0f172a",
                     border: isActive ? "1px solid #3A9B98" : "1px solid transparent",
-                    transition: "background 160ms ease, color 160ms ease, border-color 160ms ease",
+                    transition: "background 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
                   }}
                 >
                   <span
@@ -676,6 +702,7 @@ export default function AppShell({ children }: AppShellProps) {
                     }}
                   />
                   <span
+                    className={isActive ? "ims-rail-icon ims-rail-icon--active" : "ims-rail-icon"}
                     style={{
                       width: "36px",
                       height: "36px",
@@ -689,6 +716,7 @@ export default function AppShell({ children }: AppShellProps) {
                       fontWeight: 900,
                       letterSpacing: "0.02em",
                       boxSizing: "border-box",
+                      transition: "background 180ms ease, color 180ms ease, transform 180ms ease",
                     }}
                   >
                     <RailIcon icon={item.icon} />
