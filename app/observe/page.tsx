@@ -20,15 +20,17 @@ function currentTime() {
 }
 
 export default function PublicObservationPage() {
-  const [reporterType, setReporterType] = useState("Quick Fill");
+  const [reporterType, setReporterType] = useState("");
   const [message, setMessage] = useState("");
   const [submittedNumber, setSubmittedNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showContact, setShowContact] = useState(false);
 
   const isQuickFill = reporterType === "Quick Fill";
+  const hasSelectedReporterType = reporterType.length > 0;
   const headerText = useMemo(() => {
     if (submittedNumber) return "Observation submitted";
+    if (!reporterType) return "Observation card";
     if (isQuickFill) return "Quick observation card";
     return `${reporterType} observation card`;
   }, [isQuickFill, reporterType, submittedNumber]);
@@ -57,7 +59,7 @@ export default function PublicObservationPage() {
     setSubmittedNumber(result.observationNumber || "");
     setMessage(`Thank you. Your observation has been logged${result.observationNumber ? ` as ${result.observationNumber}` : ""}.`);
     event.currentTarget.reset();
-    setReporterType("Quick Fill");
+    setReporterType("");
     setShowContact(false);
     setSubmitting(false);
   }
@@ -65,8 +67,23 @@ export default function PublicObservationPage() {
   return (
     <main style={pageStyle}>
       <section style={shellStyle}>
-        <header style={headerStyle}>
-          <Image src="/enshore-header-logo.png" alt="Enshore" width={210} height={54} priority style={{ width: "170px", height: "auto" }} />
+        <style>
+          {`
+            @media (max-width: 520px) {
+              .observe-header {
+                grid-template-columns: 1fr !important;
+                justify-items: start !important;
+                padding: 16px !important;
+              }
+
+              .observe-logo {
+                width: 150px !important;
+              }
+            }
+          `}
+        </style>
+        <header className="observe-header" style={headerStyle}>
+          <Image className="observe-logo" src="/enshore-header-logo.png" alt="Enshore" width={210} height={54} priority style={{ width: "170px", height: "auto" }} />
           <div style={headerCopyStyle}>
             <span style={eyebrowStyle}>HSE MANAGEMENT</span>
             <h1 style={titleStyle}>{headerText}</h1>
@@ -80,8 +97,7 @@ export default function PublicObservationPage() {
           </div>
         ) : null}
 
-        <form onSubmit={handleSubmit} style={formStyle}>
-          <section style={cardStyle}>
+        <section style={cardStyle}>
             <h2 style={sectionTitleStyle}>Who is submitting?</h2>
             <div style={choiceGridStyle}>
               {reporterTypes.map((type) => (
@@ -94,6 +110,20 @@ export default function PublicObservationPage() {
                   {type}
                 </button>
               ))}
+            </div>
+            {!hasSelectedReporterType ? (
+              <p style={helperTextStyle}>Choose the route that best describes you. The form will open after selection.</p>
+            ) : null}
+        </section>
+
+        {hasSelectedReporterType ? (
+        <form onSubmit={handleSubmit} style={formStyle}>
+          <section style={cardStyle}>
+            <div style={formHeaderRowStyle}>
+              <h2 style={sectionTitleStyle}>{reporterType} details</h2>
+              <button type="button" onClick={() => setReporterType("")} style={smallGhostButtonStyle}>
+                Change
+              </button>
             </div>
             <input type="hidden" name="reporter_type" value={reporterType} />
             {!isQuickFill ? (
@@ -173,6 +203,7 @@ export default function PublicObservationPage() {
             {submitting ? "Submitting..." : "Submit Observation"}
           </button>
         </form>
+        ) : null}
       </section>
     </main>
   );
@@ -241,6 +272,8 @@ const textareaStyle: CSSProperties = { ...inputStyle, minHeight: "106px", resize
 const fileInputStyle: CSSProperties = { ...inputStyle, padding: "12px" };
 const helperTextStyle: CSSProperties = { margin: 0, color: imsColours.slate, fontSize: "13px", lineHeight: 1.45 };
 const ghostButtonStyle: CSSProperties = { border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft, color: imsColours.brandDark, minHeight: "44px", borderRadius: "12px", fontWeight: 900, cursor: "pointer" };
+const formHeaderRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" };
+const smallGhostButtonStyle: CSSProperties = { ...ghostButtonStyle, minHeight: "36px", padding: "8px 12px" };
 const submitButtonStyle: CSSProperties = { border: "none", borderRadius: "14px", minHeight: "56px", background: imsColours.brand, color: "#ffffff", fontSize: "17px", fontWeight: 900, cursor: "pointer", boxShadow: "0 16px 30px rgba(58,155,152,0.24)" };
 const statusStyle: CSSProperties = { borderRadius: "14px", background: "#ffffff", border: "1px solid #dbe7f3", padding: "13px 14px", color: imsColours.ink, boxShadow: "0 1px 3px rgba(15,23,42,0.08)" };
 const successStyle: CSSProperties = { ...statusStyle, background: "#ecfdf5", borderColor: "#bbf7d0", color: "#14532d" };
