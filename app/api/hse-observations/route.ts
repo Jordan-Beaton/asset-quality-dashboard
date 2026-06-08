@@ -25,12 +25,24 @@ function safeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-").slice(0, 140);
 }
 
+function isSupabaseKeyError(message: string) {
+  return /invalid api key|invalid jwt|jwt/i.test(message);
+}
+
+function configurationErrorMessage() {
+  return [
+    "Observation submit is not configured correctly on Vercel.",
+    "Check NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
+    "SUPABASE_SERVICE_ROLE_KEY must be the Supabase service_role key, not the anon key.",
+  ].join(" ");
+}
+
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json({ error: "Observation submit is not configured." }, { status: 500 });
+    return NextResponse.json({ error: configurationErrorMessage() }, { status: 500 });
   }
 
   try {
@@ -71,6 +83,10 @@ export async function POST(request: Request) {
     const { error: insertError } = await supabase.from("hse_observations").insert(payload);
 
     if (insertError) {
+      if (isSupabaseKeyError(insertError.message)) {
+        return NextResponse.json({ error: configurationErrorMessage() }, { status: 500 });
+      }
+
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
@@ -106,6 +122,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Observation submit failed.";
+    if (isSupabaseKeyError(message)) {
+      return NextResponse.json({ error: configurationErrorMessage() }, { status: 500 });
+    }
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
