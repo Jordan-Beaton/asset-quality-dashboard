@@ -66,7 +66,7 @@ export default function PublicObservationPage() {
     <main style={pageStyle}>
       <section style={shellStyle}>
         <header style={headerStyle}>
-          <Image src="/enshore-logo.png" alt="Enshore" width={210} height={96} priority style={{ width: "170px", height: "auto" }} />
+          <Image src="/enshore-header-logo.png" alt="Enshore" width={210} height={54} priority style={{ width: "170px", height: "auto" }} />
           <div style={headerCopyStyle}>
             <span style={eyebrowStyle}>HSE MANAGEMENT</span>
             <h1 style={titleStyle}>{headerText}</h1>

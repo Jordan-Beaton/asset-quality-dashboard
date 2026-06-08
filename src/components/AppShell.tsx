@@ -421,7 +421,7 @@ export default function AppShell({ children }: AppShellProps) {
                 }}
               >
                 <Image
-                  src="/enshore-logo.png"
+                  src="/enshore-header-logo.png"
                   alt="Enshore"
                   width={isFieldInspectionMode ? 124 : 202}
                   height={isFieldInspectionMode ? 32 : 52}
