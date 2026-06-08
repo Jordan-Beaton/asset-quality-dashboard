@@ -145,6 +145,7 @@ export default function HseObservationsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [riskFilter, setRiskFilter] = useState("");
+  const [reporterTypeFilter, setReporterTypeFilter] = useState("");
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [showFilters, setShowFilters] = useState(false);
   const [message, setMessage] = useState("Loading observations...");
@@ -212,11 +213,12 @@ export default function HseObservationsPage() {
       const matchesStatus = !statusFilter || record.status === statusFilter;
       const matchesType = !typeFilter || record.observation_type === typeFilter;
       const matchesRisk = !riskFilter || record.risk_level === riskFilter;
-      return matchesSearch && matchesStatus && matchesType && matchesRisk;
+      const matchesReporterType = !reporterTypeFilter || record.reporter_type === reporterTypeFilter;
+      return matchesSearch && matchesStatus && matchesType && matchesRisk && matchesReporterType;
     });
-  }, [riskFilter, search, statusFilter, typeFilter, yearRecords]);
+  }, [reporterTypeFilter, riskFilter, search, statusFilter, typeFilter, yearRecords]);
 
-  const selectedRecord = useMemo(() => records.find((record) => record.id === selectedId) || filteredRecords[0] || null, [filteredRecords, records, selectedId]);
+  const selectedRecord = useMemo(() => records.find((record) => record.id === selectedId) || null, [records, selectedId]);
   const selectedEvidence = useMemo(() => evidence.filter((item) => item.observation_id === selectedRecord?.id), [evidence, selectedRecord?.id]);
   const openRecords = useMemo(() => yearRecords.filter((record) => !isClosed(record.status)), [yearRecords]);
   const highRiskRecords = useMemo(() => yearRecords.filter((record) => ["high", "immediate attention"].includes(normalise(record.risk_level))), [yearRecords]);
@@ -360,7 +362,7 @@ export default function HseObservationsPage() {
               searchPlaceholder="Search observation no., details, project, reporter..."
               showFilters={showFilters}
               onToggleFilters={() => setShowFilters((value) => !value)}
-              actions={<ImsButton variant="secondary" onClick={() => { setSearch(""); setStatusFilter(""); setTypeFilter(""); setRiskFilter(""); }}>Clear Filters</ImsButton>}
+              actions={<ImsButton variant="secondary" onClick={() => { setSearch(""); setStatusFilter(""); setTypeFilter(""); setRiskFilter(""); setReporterTypeFilter(""); }}>Clear Filters</ImsButton>}
             >
               <Field label="Status">
                 <select style={imsInputStyle} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -380,13 +382,19 @@ export default function HseObservationsPage() {
                   {riskOptions.map((risk) => <option key={risk}>{risk}</option>)}
                 </select>
               </Field>
+              <Field label="Submitted As">
+                <select style={imsInputStyle} value={reporterTypeFilter} onChange={(event) => setReporterTypeFilter(event.target.value)}>
+                  <option value="">All submitter types</option>
+                  {["Employee", "Contractor", "Client", "Visitor", "Quick Fill"].map((type) => <option key={type}>{type}</option>)}
+                </select>
+              </Field>
             </ImsFilterPanel>
             <div style={imsTableInfoRowStyle}>Showing <strong>{filteredRecords.length}</strong> of <strong>{yearRecords.length}</strong> observations</div>
             <div style={{ overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: "14px" }}>
               <table style={{ ...imsTableStyle, minWidth: 980 }}>
                 <thead>
                   <tr>
-                    {["Observation No.", "Type", "Project", "Location", "Risk", "Status", "Reporter", "Date"].map((heading) => (
+                    {["Observation No.", "Type", "Project", "Location", "Risk", "Status", "Submitted As", "Submitted By", "Date"].map((heading) => (
                       <th key={heading} style={imsTableHeadStyle}>{heading}</th>
                     ))}
                   </tr>
@@ -400,26 +408,29 @@ export default function HseObservationsPage() {
                       <td style={imsTableCellStyle}>{record.site_location || "-"}</td>
                       <td style={imsTableCellStyle}>{record.risk_level || "-"}</td>
                       <td style={imsTableCellStyle}><StatusPill status={record.status || "New"} /></td>
-                      <td style={imsTableCellStyle}>{record.reporter_name || record.reporter_type || "Quick Fill"}</td>
+                      <td style={imsTableCellStyle}>{record.reporter_type || "Quick Fill"}</td>
+                      <td style={imsTableCellStyle}>{record.reporter_name || record.reporter_company || "Not provided"}</td>
                       <td style={imsTableCellStyle}>{formatDate(record.observation_date || record.created_at)}</td>
                     </tr>
                   ))}
                   {!filteredRecords.length ? (
-                    <tr><td colSpan={8} style={emptyCellStyle}>No observations match the current filters.</td></tr>
+                    <tr><td colSpan={9} style={emptyCellStyle}>No observations match the current filters.</td></tr>
                   ) : null}
                 </tbody>
               </table>
             </div>
           </ImsPanel>
 
-          <ObservationDetail
-            record={selectedRecord}
-            evidence={selectedEvidence}
-            people={people}
-            onOpenEvidence={openEvidence}
-            onUpdate={updateSelectedRecord}
-            createActionHref={createActionHref}
-          />
+          {selectedRecord ? (
+            <ObservationDetail
+              record={selectedRecord}
+              evidence={selectedEvidence}
+              people={people}
+              onOpenEvidence={openEvidence}
+              onUpdate={updateSelectedRecord}
+              createActionHref={createActionHref}
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -480,23 +491,20 @@ function ObservationDetail({
     setDraftCloseout(record?.closeout_notes || "");
   }, [record?.id, record?.status, record?.assigned_to, record?.closeout_notes]);
 
-  if (!record) {
-    return (
-      <ImsPanel title="Selected Observation" subtitle="Click an observation row to open details.">
-        <div style={emptyStateStyle}>No observation selected.</div>
-      </ImsPanel>
-    );
-  }
+  if (!record) return null;
 
   return (
     <ImsPanel title={`Observation Detail - ${record.observation_number}`} subtitle="Review the submitted card, open evidence, assign owner, and manage status.">
       <div style={detailGridStyle}>
+        <Info label="Submitted As" value={record.reporter_type || "Quick Fill"} />
+        <Info label="Submitted By" value={record.reporter_name || "Not provided"} />
+        <Info label="Company / Organisation" value={record.reporter_company} />
+        <Info label="Contact" value={record.reporter_contact} />
         <Info label="Type" value={record.observation_type} />
         <Info label="Risk / Attention" value={record.risk_level} />
         <Info label="Project" value={record.project} />
         <Info label="Location" value={record.site_location} />
         <Info label="Date" value={`${formatDate(record.observation_date)}${record.observation_time ? ` ${record.observation_time}` : ""}`} />
-        <Info label="Reporter" value={[record.reporter_name || record.reporter_type, record.reporter_company].filter(Boolean).join(" - ")} />
       </div>
       <div style={narrativeGridStyle}>
         <Info label="Title" value={record.title} large />
@@ -593,7 +601,7 @@ const yearSelectStyle: CSSProperties = {
 };
 const kpiGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "16px", marginBottom: "20px" };
 const chartGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
-const registerGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(340px, 0.65fr)", gap: "20px", alignItems: "start" };
+const registerGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "20px", alignItems: "start" };
 const fieldStyle: CSSProperties = { display: "grid", gap: "6px" };
 const labelStyle: CSSProperties = { color: "#334155", fontSize: "12px", fontWeight: 900 };
 const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ecfeff" };

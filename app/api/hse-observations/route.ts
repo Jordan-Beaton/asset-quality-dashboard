@@ -7,18 +7,33 @@ function clean(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function makeObservationNumber() {
-  const now = new Date();
-  const stamp = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-    String(now.getHours()).padStart(2, "0"),
-    String(now.getMinutes()).padStart(2, "0"),
-    String(now.getSeconds()).padStart(2, "0"),
-  ].join("");
-  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `OBS-${stamp}-${suffix}`;
+async function makeObservationNumber(supabase: { from: (table: string) => any }) {
+  let maxNumber = 0;
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("hse_observations")
+      .select("observation_number")
+      .ilike("observation_number", "OBS-%")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const rows = (data || []) as Array<{ observation_number: string | null }>;
+
+    rows.forEach((record) => {
+      const match = String(record.observation_number || "").match(/^OBS\s*-\s*(\d+)\s*$/i);
+      if (!match) return;
+      maxNumber = Math.max(maxNumber, Number(match[1]));
+    });
+
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return `OBS-${String(maxNumber + 1).padStart(3, "0")}`;
 }
 
 function safeFileName(name: string) {
@@ -55,7 +70,7 @@ export async function POST(request: Request) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const observationId = crypto.randomUUID();
-    const observationNumber = makeObservationNumber();
+    const observationNumber = await makeObservationNumber(supabase);
     const files = formData.getAll("evidence").filter((item): item is File => item instanceof File && item.size > 0);
 
     const payload = {

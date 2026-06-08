@@ -186,7 +186,7 @@ export const imsFilterPanelStyle: CSSProperties = {
 
 export const imsFilterActionRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(220px, 1fr) minmax(160px, 220px)",
+  gridTemplateColumns: "minmax(220px, 1fr) minmax(260px, 1fr)",
   gap: "10px",
   alignItems: "center",
 };
