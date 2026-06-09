@@ -78,6 +78,18 @@ type PersonOption = {
   active: boolean | null;
 };
 
+type LinkedActionRecord = {
+  id: string;
+  action_number: string | null;
+  title: string | null;
+  owner: string | null;
+  status: string | null;
+  priority: string | null;
+  due_date: string | null;
+  linked_observation_id?: string | null;
+  linked_observation_number?: string | null;
+};
+
 const tabs: Array<{ value: View; label: string }> = [
   { value: "dashboard", label: "Dashboard" },
   { value: "register", label: "Observation Register" },
@@ -138,6 +150,7 @@ function buildCounts(records: ObservationRecord[], key: keyof ObservationRecord)
 export default function HseObservationsPage() {
   const [records, setRecords] = useState<ObservationRecord[]>([]);
   const [evidence, setEvidence] = useState<EvidenceRecord[]>([]);
+  const [actions, setActions] = useState<LinkedActionRecord[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [selectedId, setSelectedId] = useState("");
@@ -168,15 +181,17 @@ export default function HseObservationsPage() {
 
   async function loadData() {
     setLoading(true);
-    const [observationRes, evidenceRes, peopleRes] = await Promise.all([
+    const [observationRes, evidenceRes, actionRes, peopleRes] = await Promise.all([
       supabase.from("hse_observations").select("*").order("created_at", { ascending: false }),
       supabase.from("hse_observation_evidence").select("*").order("uploaded_at", { ascending: false }),
+      supabase.from("actions").select("*").order("action_number", { ascending: true }),
       supabase.from("people").select("id,name,role,department,active").eq("active", true).order("name", { ascending: true }),
     ]);
 
-    const warnings = [observationRes.error?.message, evidenceRes.error?.message, peopleRes.error?.message].filter(Boolean);
+    const warnings = [observationRes.error?.message, evidenceRes.error?.message, actionRes.error?.message, peopleRes.error?.message].filter(Boolean);
     if (!observationRes.error) setRecords((observationRes.data || []) as ObservationRecord[]);
     if (!evidenceRes.error) setEvidence((evidenceRes.data || []) as EvidenceRecord[]);
+    if (!actionRes.error) setActions((actionRes.data || []) as LinkedActionRecord[]);
     if (!peopleRes.error) setPeople((peopleRes.data || []) as PersonOption[]);
     setMessage(warnings.length ? `Loaded with warning: ${warnings[0]}` : "Observation register ready.");
     setLoading(false);
@@ -220,6 +235,13 @@ export default function HseObservationsPage() {
 
   const selectedRecord = useMemo(() => records.find((record) => record.id === selectedId) || null, [records, selectedId]);
   const selectedEvidence = useMemo(() => evidence.filter((item) => item.observation_id === selectedRecord?.id), [evidence, selectedRecord?.id]);
+  const selectedLinkedActions = useMemo(() => {
+    if (!selectedRecord) return [];
+    return actions.filter((action) => {
+      if (action.linked_observation_id && action.linked_observation_id === selectedRecord.id) return true;
+      return Boolean(action.linked_observation_number && action.linked_observation_number === selectedRecord.observation_number);
+    });
+  }, [actions, selectedRecord]);
   const openRecords = useMemo(() => yearRecords.filter((record) => !isClosed(record.status)), [yearRecords]);
   const highRiskRecords = useMemo(() => yearRecords.filter((record) => ["high", "immediate attention"].includes(normalise(record.risk_level))), [yearRecords]);
   const newRecords = useMemo(() => yearRecords.filter((record) => normalise(record.status) === "new"), [yearRecords]);
@@ -251,12 +273,12 @@ export default function HseObservationsPage() {
   }
 
   const createActionHref = selectedRecord
-    ? `/actions?view=create&prefill_source=HSE&prefill_department=HSE&prefill_project=${encodeURIComponent(selectedRecord.project || "")}&prefill_title=${encodeURIComponent(`${selectedRecord.observation_number} - ${selectedRecord.title || selectedRecord.observation_type || "Observation"}`)}&prefill_description=${encodeURIComponent([
+    ? `/actions?view=create&prefill_source=Observation&prefill_department=HSE&prefill_project=${encodeURIComponent(selectedRecord.project || "")}&prefill_title=${encodeURIComponent(`${selectedRecord.observation_number} - ${selectedRecord.title || selectedRecord.observation_type || "Observation"}`)}&prefill_description=${encodeURIComponent([
         selectedRecord.description ? `Observation: ${selectedRecord.description}` : "",
         selectedRecord.immediate_action ? `Immediate action: ${selectedRecord.immediate_action}` : "",
         selectedRecord.suggested_action ? `Suggested action: ${selectedRecord.suggested_action}` : "",
-      ].filter(Boolean).join("\n\n"))}`
-    : "/actions?view=create&prefill_source=HSE&prefill_department=HSE";
+      ].filter(Boolean).join("\n\n"))}&linked_observation_id=${encodeURIComponent(selectedRecord.id)}&linked_observation_number=${encodeURIComponent(selectedRecord.observation_number)}`
+    : "/actions?view=create&prefill_source=Observation&prefill_department=HSE";
 
   return (
     <main>
@@ -425,6 +447,7 @@ export default function HseObservationsPage() {
             <ObservationDetail
               record={selectedRecord}
               evidence={selectedEvidence}
+              linkedActions={selectedLinkedActions}
               people={people}
               onOpenEvidence={openEvidence}
               onUpdate={updateSelectedRecord}
@@ -469,6 +492,7 @@ export default function HseObservationsPage() {
 function ObservationDetail({
   record,
   evidence,
+  linkedActions,
   people,
   onOpenEvidence,
   onUpdate,
@@ -476,6 +500,7 @@ function ObservationDetail({
 }: {
   record: ObservationRecord | null;
   evidence: EvidenceRecord[];
+  linkedActions: LinkedActionRecord[];
   people: PersonOption[];
   onOpenEvidence: (path: string) => void;
   onUpdate: (payload: Partial<ObservationRecord>) => void;
@@ -533,6 +558,34 @@ function ObservationDetail({
         <div style={buttonRowStyle}>
           <ImsButton onClick={() => onUpdate({ status: draftStatus, assigned_to: draftAssigned || null, closeout_notes: draftCloseout || null })}>Save Review</ImsButton>
           <ImsLinkButton href={createActionHref}>Generate Central Action</ImsLinkButton>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "14px" }}>
+        <h3 style={subHeadingStyle}>Linked Actions</h3>
+        <div style={evidenceListStyle}>
+          {linkedActions.map((action) => (
+            <div key={action.id} style={evidenceItemStyle}>
+              <div>
+                <strong>{action.action_number || "Action"} - {action.title || "Untitled action"}</strong>
+                <small>
+                  {[action.owner ? `Owner: ${action.owner}` : "", action.due_date ? `Due: ${formatDate(action.due_date)}` : ""]
+                    .filter(Boolean)
+                    .join(" | ") || "No owner or due date"}
+                </small>
+              </div>
+              <div style={linkedActionButtonGroupStyle}>
+                <StatusPill status={action.status || "Open"} />
+                <ImsLinkButton
+                  href={action.id ? `/actions?actionId=${encodeURIComponent(action.id)}` : `/actions?action=${encodeURIComponent(action.action_number || "")}`}
+                  variant="secondary"
+                >
+                  Open Linked Action
+                </ImsLinkButton>
+              </div>
+            </div>
+          ))}
+          {!linkedActions.length ? <div style={emptyStateStyle}>No central actions are linked to this observation yet.</div> : null}
         </div>
       </div>
 
@@ -620,6 +673,7 @@ const buttonRowStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: 
 const subHeadingStyle: CSSProperties = { margin: "0 0 10px", color: imsColours.ink, fontSize: "16px", fontWeight: 900 };
 const evidenceListStyle: CSSProperties = { display: "grid", gap: "10px" };
 const evidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #dbe3ef", borderRadius: "13px", background: "#f8fafc", padding: "12px" };
+const linkedActionButtonGroupStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" };
 const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: "999px", padding: "5px 9px", fontSize: "12px", fontWeight: 900 };
 const qrGridStyle: CSSProperties = { display: "grid", gap: "16px" };
 const qrCardStyle: CSSProperties = { display: "grid", gridTemplateColumns: "110px minmax(0, 1fr)", gap: "18px", alignItems: "center", border: "1px solid #dbe3ef", background: "#f8fafc", borderRadius: "18px", padding: "18px" };
