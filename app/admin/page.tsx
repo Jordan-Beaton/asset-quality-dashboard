@@ -535,15 +535,6 @@ export default function AdminDashboardPage() {
                                 Reset Password
                               </ImsButton>
                             ) : null}
-                            {!isMaster ? (
-                              <ImsButton
-                                variant={accessStatus === "Deactivated" ? "primary" : "danger"}
-                                onClick={() => updatePersonAccess(person, { ...draft, access_status: accessStatus === "Deactivated" ? "Active" : "Deactivated" })}
-                                disabled={isSaving}
-                              >
-                                {accessStatus === "Deactivated" ? "Reactivate" : "Deactivate"}
-                              </ImsButton>
-                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -559,66 +550,55 @@ export default function AdminDashboardPage() {
       {activeView === "roles" ? (
         <section style={{ display: "grid", gap: 18 }}>
           <ImsPanel title="Roles & Permissions" subtitle="Edit role defaults here. Individual exceptions are managed below without changing someone's job role.">
-            <div style={tableWrapStyle}>
-              <table style={imsTableStyle}>
-                <thead>
-                  <tr>
-                    <th style={imsTableHeadStyle}>Role</th>
-                    <th style={imsTableHeadStyle}>Quality</th>
-                    <th style={imsTableHeadStyle}>Documents</th>
-                    <th style={imsTableHeadStyle}>HSE</th>
-                    <th style={imsTableHeadStyle}>Assets</th>
-                    <th style={imsTableHeadStyle}>Risk</th>
-                    <th style={imsTableHeadStyle}>Actions</th>
-                    <th style={imsTableHeadStyle}>Admin</th>
-                    <th style={imsTableHeadStyle}>Purpose</th>
-                    <th style={imsTableHeadStyle}>Save</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roles.map((role) => {
-                    const draft = getRoleDraft(role);
-                    const hasDraft = Boolean(roleDrafts[role.id]);
-                    return (
-                      <tr key={role.id}>
-                        <td style={imsTableCellStyle}><strong>{role.role_name}</strong></td>
-                        {[
-                          ["quality_access", roleAccessOptions],
-                          ["document_access", moduleAccessOptions],
-                          ["hse_access", roleAccessOptions],
-                          ["asset_access", roleAccessOptions],
-                          ["risk_access", roleAccessOptions],
-                          ["action_access", roleAccessOptions],
-                          ["admin_access", roleAccessOptions],
-                        ].map(([key, options]) => (
-                          <td key={String(key)} style={imsTableCellStyle}>
-                            <SelectField
-                              value={String((draft as Record<string, unknown>)[key as string] || (key === "document_access" ? "Role Default" : "None"))}
-                              onChange={(value) => setRoleDraft(role, { [key as string]: value } as Partial<RoleRow>)}
-                              disabled={isSaving || role.role_name === "Admin"}
-                            >
-                              {(options as string[]).map((option) => <option key={option} value={option}>{option}</option>)}
-                            </SelectField>
-                          </td>
-                        ))}
-                        <td style={imsTableCellStyle}>
-                          <textarea
-                            value={draft.description || ""}
-                            onChange={(event) => setRoleDraft(role, { description: event.target.value })}
-                            style={{ ...imsInputStyle, minWidth: 240, minHeight: 58 }}
-                            disabled={isSaving}
-                          />
-                        </td>
-                        <td style={imsTableCellStyle}>
-                          <ImsButton onClick={() => updateRolePermissions(role)} disabled={isSaving || !hasDraft}>
-                            Save
-                          </ImsButton>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div style={roleCardGridStyle}>
+              {roles.map((role) => {
+                const draft = getRoleDraft(role);
+                const hasDraft = Boolean(roleDrafts[role.id]);
+                const isAdminRole = role.role_name === "Admin";
+                return (
+                  <section key={role.id} style={roleCardStyle}>
+                    <div style={roleCardHeaderStyle}>
+                      <div>
+                        <h3 style={roleCardTitleStyle}>{role.role_name}</h3>
+                        {isAdminRole ? <StatusPill tone="good">Protected Full Access</StatusPill> : null}
+                      </div>
+                      <ImsButton onClick={() => updateRolePermissions(role)} disabled={isSaving || !hasDraft || isAdminRole}>
+                        Save Role
+                      </ImsButton>
+                    </div>
+
+                    <div style={rolePermissionGridStyle}>
+                      {[
+                        ["Quality", "quality_access", roleAccessOptions],
+                        ["Documents", "document_access", moduleAccessOptions],
+                        ["HSE", "hse_access", roleAccessOptions],
+                        ["Assets", "asset_access", roleAccessOptions],
+                        ["Risk", "risk_access", roleAccessOptions],
+                        ["Actions", "action_access", roleAccessOptions],
+                        ["Admin", "admin_access", roleAccessOptions],
+                      ].map(([label, key, options]) => (
+                        <Field key={String(key)} label={String(label)}>
+                          <SelectField
+                            value={String((draft as Record<string, unknown>)[key as string] || (key === "document_access" ? "Role Default" : "None"))}
+                            onChange={(value) => setRoleDraft(role, { [key as string]: value } as Partial<RoleRow>)}
+                            disabled={isSaving || isAdminRole}
+                          >
+                            {(options as string[]).map((option) => <option key={option} value={option}>{option}</option>)}
+                          </SelectField>
+                        </Field>
+                      ))}
+                      <Field label="Purpose" style={{ gridColumn: "1 / -1" }}>
+                        <textarea
+                          value={draft.description || ""}
+                          onChange={(event) => setRoleDraft(role, { description: event.target.value })}
+                          style={{ ...imsInputStyle, minHeight: 72 }}
+                          disabled={isSaving}
+                        />
+                      </Field>
+                    </div>
+                  </section>
+                );
+              })}
             </div>
           </ImsPanel>
 
@@ -881,6 +861,40 @@ const permissionGridStyle: CSSProperties = {
   gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
   gap: 12,
   padding: 12,
+};
+
+const roleCardGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+  gap: 14,
+};
+
+const roleCardStyle: CSSProperties = {
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: 16,
+  background: "#ffffff",
+  padding: 14,
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+};
+
+const roleCardHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 14,
+};
+
+const roleCardTitleStyle: CSSProperties = {
+  margin: "0 0 8px",
+  fontSize: 18,
+  color: imsColours.ink,
+};
+
+const rolePermissionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))",
+  gap: 10,
 };
 
 const paragraphStyle: CSSProperties = {
