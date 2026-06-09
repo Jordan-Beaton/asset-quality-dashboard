@@ -6,7 +6,15 @@ add column if not exists system_role text not null default 'Viewer',
 add column if not exists access_status text not null default 'Active',
 add column if not exists is_master_admin boolean not null default false,
 add column if not exists last_login_at timestamptz,
-add column if not exists permissions_notes text;
+add column if not exists permissions_notes text,
+add column if not exists permission_override text not null default 'Role Default',
+add column if not exists quality_access text,
+add column if not exists hse_access text,
+add column if not exists asset_access text,
+add column if not exists risk_access text,
+add column if not exists document_access text,
+add column if not exists action_access text,
+add column if not exists admin_access text;
 
 create index if not exists people_system_role_idx
   on public.people(system_role);
@@ -19,6 +27,14 @@ set
   system_role = 'Admin',
   access_status = 'Active',
   is_master_admin = true,
+  permission_override = 'Full System Access',
+  quality_access = 'Full',
+  hse_access = 'Full',
+  asset_access = 'Full',
+  risk_access = 'Full',
+  document_access = 'Full',
+  action_access = 'Full',
+  admin_access = 'Full',
   active = true
 where lower(coalesce(email, '')) = 'jbeaton@enshoresubsea.com'
    or lower(name) = 'jordan beaton';
@@ -80,6 +96,18 @@ values
   ('Asset Manager', 'Full Asset Management access.', 'Read', 'Read', 'Full', 'Read', 'Full', 'None'),
   ('Viewer', 'Read-only IMS visibility.', 'Read', 'Read', 'Read', 'Read', 'Read', 'None'),
   ('Contractor', 'Public HSE observation submission only.', 'None', 'Observe', 'None', 'None', 'None', 'None')
+on conflict (role_name) do nothing;
+
+insert into public.ims_roles (role_name, description, quality_access, hse_access, asset_access, risk_access, action_access, admin_access)
+values
+  ('Project Manager', 'Project-facing visibility and action ownership.', 'Read', 'Read', 'Read', 'Read', 'Full', 'None'),
+  ('Department Head', 'Department leadership visibility and approval support.', 'Approve', 'Approve', 'Read', 'Read', 'Full', 'None'),
+  ('Operations Manager', 'Operational module visibility and HSE/action ownership.', 'Read', 'Full', 'Read', 'Read', 'Full', 'None'),
+  ('Crewing Manager', 'Crewing-related read access and assigned action ownership.', 'Read', 'Read', 'None', 'None', 'Full', 'None'),
+  ('Finance User', 'Finance document visibility and assigned action ownership.', 'Read', 'Read', 'None', 'None', 'Read', 'None'),
+  ('Procurement User', 'Procurement document visibility and assigned action ownership.', 'Read', 'Read', 'None', 'None', 'Read', 'None'),
+  ('Survey User', 'Survey document visibility and assigned action ownership.', 'Read', 'Read', 'Read', 'None', 'Read', 'None'),
+  ('External Auditor', 'Read-only audit support access.', 'Read', 'Read', 'None', 'None', 'None', 'None')
 on conflict (role_name) do nothing;
 
 insert into public.ims_reference_departments (name, code)

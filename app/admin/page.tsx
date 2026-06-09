@@ -28,6 +28,14 @@ type PersonRow = {
   access_status?: string | null;
   is_master_admin?: boolean | null;
   permissions_notes?: string | null;
+  permission_override?: string | null;
+  quality_access?: string | null;
+  hse_access?: string | null;
+  asset_access?: string | null;
+  risk_access?: string | null;
+  document_access?: string | null;
+  action_access?: string | null;
+  admin_access?: string | null;
   last_login_at?: string | null;
 };
 
@@ -122,6 +130,8 @@ const roleOptions = [
 ];
 
 const accessStatusOptions = ["Active", "Invited", "Deactivated"];
+const permissionOverrideOptions = ["Role Default", "Custom", "Full System Access", "Read Only"];
+const moduleAccessOptions = ["Role Default", "None", "Read", "Edit", "Approve", "Documents", "Observe", "Full"];
 
 const initialCompany: CompanySettings = {
   company_name: "Enshore Subsea",
@@ -220,6 +230,8 @@ export default function AdminDashboardPage() {
   const [companyForm, setCompanyForm] = useState<CompanySettings>(initialCompany);
   const [newDepartment, setNewDepartment] = useState({ name: "", code: "" });
   const [newProject, setNewProject] = useState({ name: "", type: "Project" });
+  const [expandedPersonId, setExpandedPersonId] = useState("");
+  const [personDrafts, setPersonDrafts] = useState<Record<string, Partial<PersonRow>>>({});
 
   async function loadAdminData() {
     setIsLoading(true);
@@ -266,7 +278,22 @@ export default function AdminDashboardPage() {
   const departments = data?.departments || [];
   const projects = data?.projects || [];
   const roles = data?.roles || [];
+  const editableRoleOptions = roles.length ? roles.map((role) => role.role_name) : roleOptions;
   const people = data?.people || [];
+
+  function getPersonDraft(person: PersonRow) {
+    return { ...person, ...(personDrafts[person.id] || {}) };
+  }
+
+  function setPersonDraft(person: PersonRow, updates: Partial<PersonRow>) {
+    setPersonDrafts((current) => ({
+      ...current,
+      [person.id]: {
+        ...(current[person.id] || {}),
+        ...updates,
+      },
+    }));
+  }
 
   async function postAdminAction(action: string, payload: Record<string, unknown>, successMessage: string) {
     setIsSaving(true);
@@ -300,11 +327,18 @@ export default function AdminDashboardPage() {
   }
 
   async function updatePersonAccess(person: PersonRow, updates: Partial<PersonRow>) {
-    await postAdminAction(
+    const ok = await postAdminAction(
       "updatePersonAccess",
       { ...person, ...updates },
       `${updates.email || person.email || person.name} access updated successfully.`,
     );
+    if (ok) {
+      setPersonDrafts((current) => {
+        const next = { ...current };
+        delete next[person.id];
+        return next;
+      });
+    }
   }
 
   async function saveCompany() {
@@ -418,64 +452,149 @@ export default function AdminDashboardPage() {
                 </thead>
                 <tbody>
                   {people.map((person) => {
+                    const draft = getPersonDraft(person);
                     const authUser = getAuthUserForPerson(person, data?.authUsers || []);
                     const isMaster = person.is_master_admin || normaliseEmail(person.email) === "jbeaton@enshoresubsea.com" || person.name === "Jordan Beaton";
-                    const accessStatus = person.access_status || (person.active === false ? "Deactivated" : "Active");
+                    const accessStatus = draft.access_status || (person.active === false ? "Deactivated" : "Active");
+                    const isExpanded = expandedPersonId === person.id;
+                    const hasDraft = Boolean(personDrafts[person.id]);
                     return (
-                      <tr key={person.id}>
-                        <td style={imsTableCellStyle}>
-                          <strong>{person.name}</strong>
-                          {isMaster ? <div style={{ marginTop: 6 }}><StatusPill tone="good">Master Admin</StatusPill></div> : null}
-                        </td>
-                        <td style={imsTableCellStyle}>{person.email || ""}</td>
-                        <td style={imsTableCellStyle}>
-                          <SelectField
-                            value={person.department || ""}
-                            onChange={(value) => updatePersonAccess(person, { department: value })}
-                            disabled={isSaving}
-                          >
-                            <option value="">Unassigned</option>
-                            {departments.map((department) => <option key={department.id} value={department.name}>{department.name}</option>)}
-                          </SelectField>
-                        </td>
-                        <td style={imsTableCellStyle}>
-                          <SelectField
-                            value={isMaster ? "Admin" : person.system_role || "Viewer"}
-                            onChange={(value) => updatePersonAccess(person, { system_role: value })}
-                            disabled={isSaving || isMaster}
-                          >
-                            {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
-                          </SelectField>
-                        </td>
-                        <td style={imsTableCellStyle}>
-                          <SelectField
-                            value={isMaster ? "Active" : accessStatus}
-                            onChange={(value) => updatePersonAccess(person, { access_status: value })}
-                            disabled={isSaving || isMaster}
-                          >
-                            {accessStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
-                          </SelectField>
-                        </td>
-                        <td style={imsTableCellStyle}>{formatDateTime(authUser?.last_sign_in_at || person.last_login_at)}</td>
-                        <td style={imsTableCellStyle}>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            {person.email ? (
-                              <ImsButton variant="secondary" onClick={() => postAdminAction("resetPassword", { email: person.email }, `Password reset sent to ${person.email}.`)} disabled={isSaving}>
-                                Reset Password
-                              </ImsButton>
+                      <>
+                        <tr key={person.id}>
+                          <td style={imsTableCellStyle}>
+                            <strong>{person.name}</strong>
+                            {isMaster ? <div style={{ marginTop: 6 }}><StatusPill tone="good">Master Admin</StatusPill></div> : null}
+                            {draft.permission_override && draft.permission_override !== "Role Default" ? (
+                              <div style={{ marginTop: 6 }}><StatusPill tone="warn">{draft.permission_override}</StatusPill></div>
                             ) : null}
-                            {!isMaster ? (
-                              <ImsButton
-                                variant={accessStatus === "Deactivated" ? "primary" : "danger"}
-                                onClick={() => updatePersonAccess(person, { access_status: accessStatus === "Deactivated" ? "Active" : "Deactivated" })}
-                                disabled={isSaving}
-                              >
-                                {accessStatus === "Deactivated" ? "Reactivate" : "Deactivate"}
+                          </td>
+                          <td style={imsTableCellStyle}>{person.email || ""}</td>
+                          <td style={imsTableCellStyle}>
+                            <SelectField
+                              value={draft.department || ""}
+                              onChange={(value) => setPersonDraft(person, { department: value })}
+                              disabled={isSaving}
+                            >
+                              <option value="">Unassigned</option>
+                              {departments.map((department) => <option key={department.id} value={department.name}>{department.name}</option>)}
+                            </SelectField>
+                          </td>
+                          <td style={imsTableCellStyle}>
+                            <SelectField
+                              value={isMaster ? "Admin" : draft.system_role || "Viewer"}
+                              onChange={(value) => setPersonDraft(person, { system_role: value })}
+                              disabled={isSaving || isMaster}
+                            >
+                              {editableRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+                            </SelectField>
+                          </td>
+                          <td style={imsTableCellStyle}>
+                            <SelectField
+                              value={isMaster ? "Active" : accessStatus}
+                              onChange={(value) => setPersonDraft(person, { access_status: value })}
+                              disabled={isSaving || isMaster}
+                            >
+                              {accessStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+                            </SelectField>
+                          </td>
+                          <td style={imsTableCellStyle}>{formatDateTime(authUser?.last_sign_in_at || person.last_login_at)}</td>
+                          <td style={imsTableCellStyle}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <ImsButton variant="secondary" onClick={() => setExpandedPersonId(isExpanded ? "" : person.id)}>
+                                {isExpanded ? "Hide Permissions" : "Permissions"}
                               </ImsButton>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
+                              <ImsButton onClick={() => updatePersonAccess(person, draft)} disabled={isSaving || !hasDraft}>
+                                Save
+                              </ImsButton>
+                              {person.email ? (
+                                <ImsButton variant="secondary" onClick={() => postAdminAction("resetPassword", { email: person.email }, `Password reset sent to ${person.email}.`)} disabled={isSaving}>
+                                  Reset Password
+                                </ImsButton>
+                              ) : null}
+                              {!isMaster ? (
+                                <ImsButton
+                                  variant={accessStatus === "Deactivated" ? "primary" : "danger"}
+                                  onClick={() => updatePersonAccess(person, { ...draft, access_status: accessStatus === "Deactivated" ? "Active" : "Deactivated" })}
+                                  disabled={isSaving}
+                                >
+                                  {accessStatus === "Deactivated" ? "Reactivate" : "Deactivate"}
+                                </ImsButton>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded ? (
+                          <tr key={`${person.id}-permissions`}>
+                            <td style={{ ...imsTableCellStyle, background: "#f8fafc" }} colSpan={7}>
+                              <div style={permissionGridStyle}>
+                                <Field label="Permission Override">
+                                  <SelectField
+                                    value={isMaster ? "Full System Access" : draft.permission_override || "Role Default"}
+                                    onChange={(value) => {
+                                      const full = value === "Full System Access";
+                                      const readOnly = value === "Read Only";
+                                      setPersonDraft(person, {
+                                        permission_override: value,
+                                        ...(full
+                                          ? {
+                                              quality_access: "Full",
+                                              hse_access: "Full",
+                                              asset_access: "Full",
+                                              risk_access: "Full",
+                                              document_access: "Full",
+                                              action_access: "Full",
+                                              admin_access: "Full",
+                                            }
+                                          : readOnly
+                                          ? {
+                                              quality_access: "Read",
+                                              hse_access: "Read",
+                                              asset_access: "Read",
+                                              risk_access: "Read",
+                                              document_access: "Read",
+                                              action_access: "Read",
+                                              admin_access: "None",
+                                            }
+                                          : {}),
+                                      });
+                                    }}
+                                    disabled={isSaving || isMaster}
+                                  >
+                                    {permissionOverrideOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                                  </SelectField>
+                                </Field>
+                                {[
+                                  ["Quality", "quality_access"],
+                                  ["HSE", "hse_access"],
+                                  ["Assets", "asset_access"],
+                                  ["Risk", "risk_access"],
+                                  ["Documents", "document_access"],
+                                  ["Actions", "action_access"],
+                                  ["Admin", "admin_access"],
+                                ].map(([label, key]) => (
+                                  <Field key={key} label={label}>
+                                    <SelectField
+                                      value={isMaster ? "Full" : String((draft as Record<string, unknown>)[key] || "Role Default")}
+                                      onChange={(value) => setPersonDraft(person, { [key]: value === "Role Default" ? "" : value } as Partial<PersonRow>)}
+                                      disabled={isSaving || isMaster}
+                                    >
+                                      {moduleAccessOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                                    </SelectField>
+                                  </Field>
+                                ))}
+                                <Field label="Permission Notes" style={{ gridColumn: "1 / -1" }}>
+                                  <textarea
+                                    value={draft.permissions_notes || ""}
+                                    onChange={(event) => setPersonDraft(person, { permissions_notes: event.target.value })}
+                                    style={{ ...imsInputStyle, minHeight: 76 }}
+                                    placeholder="Reason for any custom access, e.g. Full access due IMS ownership."
+                                  />
+                                </Field>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </>
                     );
                   })}
                 </tbody>
@@ -681,6 +800,13 @@ const tableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: `1px solid ${imsColours.border}`,
   borderRadius: 14,
+};
+
+const permissionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+  gap: 12,
+  padding: 12,
 };
 
 const paragraphStyle: CSSProperties = {

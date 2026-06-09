@@ -27,6 +27,16 @@ type SystemRole =
   | "Contractor"
   | "";
 
+type ModuleAccess = {
+  quality?: string | null;
+  hse?: string | null;
+  assets?: string | null;
+  risk?: string | null;
+  documents?: string | null;
+  actions?: string | null;
+  admin?: string | null;
+};
+
 type NavIconKey =
   | "home"
   | "dashboard"
@@ -157,9 +167,26 @@ function getModuleKeyFromHref(href: string) {
   return "quality";
 }
 
-function filterNavItemsForRole(items: NavItem[], role: SystemRole) {
+function hasExplicitAccess(value: string | null | undefined) {
+  const cleanValue = (value || "").trim().toLowerCase();
+  return Boolean(cleanValue && cleanValue !== "role default" && cleanValue !== "none");
+}
+
+function filterNavItemsForRole(items: NavItem[], role: SystemRole, moduleAccess: ModuleAccess) {
   const allowedModules = getAllowedModuleKeys(role);
-  return items.filter((item) => allowedModules.has(getModuleKeyFromHref(item.href)));
+  return items.filter((item) => {
+    const moduleKey = getModuleKeyFromHref(item.href);
+    if (moduleKey === "home" || moduleKey === "people") return allowedModules.has(moduleKey);
+    if (moduleKey === "quality") {
+      if (hasExplicitAccess(moduleAccess.quality) || hasExplicitAccess(moduleAccess.documents)) return true;
+    }
+    if (moduleKey === "hse" && hasExplicitAccess(moduleAccess.hse)) return true;
+    if (moduleKey === "assets" && hasExplicitAccess(moduleAccess.assets)) return true;
+    if (moduleKey === "risk" && hasExplicitAccess(moduleAccess.risk)) return true;
+    if (moduleKey === "actions" && hasExplicitAccess(moduleAccess.actions)) return true;
+    if (moduleKey === "admin" && hasExplicitAccess(moduleAccess.admin)) return true;
+    return allowedModules.has(moduleKey);
+  });
 }
 
 function RailIcon({ icon }: { icon: NavIconKey }) {
@@ -303,6 +330,7 @@ export default function AppShell({ children }: AppShellProps) {
   const [isRailPinned, setIsRailPinned] = useState(false);
   const [signedInName, setSignedInName] = useState("");
   const [signedInRole, setSignedInRole] = useState<SystemRole>("");
+  const [signedInModuleAccess, setSignedInModuleAccess] = useState<ModuleAccess>({});
   const isLoginPage = pathname === "/login";
   const isPublicObservationPage = pathname === "/observe";
   const isHomePage = pathname === "/home";
@@ -356,7 +384,7 @@ export default function AppShell({ children }: AppShellProps) {
     : isActionModule
     ? actionNavItems
     : qualityNavItems;
-  const navItems = filterNavItemsForRole(baseNavItems, signedInRole);
+  const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess);
   const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldInspectionMode;
   const railOpen = isRailExpanded || isRailPinned;
 
@@ -391,6 +419,7 @@ export default function AppShell({ children }: AppShellProps) {
         if (isMounted) {
           setSignedInName("");
           setSignedInRole("");
+          setSignedInModuleAccess({});
         }
         return;
       }
@@ -399,7 +428,7 @@ export default function AppShell({ children }: AppShellProps) {
       if (email) {
         const { data: person } = await supabase
           .from("people")
-          .select("name,email,system_role,is_master_admin")
+          .select("name,email,system_role,is_master_admin,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
           .eq("email", email)
           .maybeSingle();
 
@@ -412,12 +441,22 @@ export default function AppShell({ children }: AppShellProps) {
             ? "Admin"
             : normaliseSystemRole(person?.system_role),
         );
+        setSignedInModuleAccess({
+          quality: person?.quality_access,
+          hse: person?.hse_access,
+          assets: person?.asset_access,
+          risk: person?.risk_access,
+          documents: person?.document_access,
+          actions: person?.action_access,
+          admin: person?.admin_access,
+        });
         return;
       }
 
       if (isMounted) {
         setSignedInName(user.user_metadata?.name || "");
         setSignedInRole("");
+        setSignedInModuleAccess({});
       }
     }
 

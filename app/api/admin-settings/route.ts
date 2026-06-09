@@ -232,8 +232,18 @@ export async function POST(request: Request) {
       const accessStatus = cleanText(payload.access_status) || "Active";
       const department = cleanText(payload.department);
       const permissionsNotes = cleanText(payload.permissions_notes);
+      const permissionOverride = cleanText(payload.permission_override) || "Role Default";
       const isMasterAdmin = email === MASTER_ADMIN_EMAIL || Boolean(payload.is_master_admin);
       const active = accessStatus !== "Deactivated";
+      const moduleAccessPayload = {
+        quality_access: cleanText(payload.quality_access) || null,
+        hse_access: cleanText(payload.hse_access) || null,
+        asset_access: cleanText(payload.asset_access) || null,
+        risk_access: cleanText(payload.risk_access) || null,
+        document_access: cleanText(payload.document_access) || null,
+        action_access: cleanText(payload.action_access) || null,
+        admin_access: cleanText(payload.admin_access) || null,
+      };
 
       if (!id) return NextResponse.json({ error: "Person id is required." }, { status: 400 });
       if (email === MASTER_ADMIN_EMAIL && accessStatus === "Deactivated") {
@@ -247,6 +257,18 @@ export async function POST(request: Request) {
           access_status: email === MASTER_ADMIN_EMAIL ? "Active" : accessStatus,
           department: department || null,
           permissions_notes: permissionsNotes || null,
+          permission_override: email === MASTER_ADMIN_EMAIL ? "Full System Access" : permissionOverride,
+          ...(email === MASTER_ADMIN_EMAIL
+            ? {
+                quality_access: "Full",
+                hse_access: "Full",
+                asset_access: "Full",
+                risk_access: "Full",
+                document_access: "Full",
+                action_access: "Full",
+                admin_access: "Full",
+              }
+            : moduleAccessPayload),
           is_master_admin: isMasterAdmin,
           active,
         })
