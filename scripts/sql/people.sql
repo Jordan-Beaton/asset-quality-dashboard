@@ -24,26 +24,26 @@ drop policy if exists "people_delete_all" on public.people;
 create policy "people_select_all"
 on public.people
 for select
-to anon, authenticated
+to authenticated
 using (true);
 
 create policy "people_insert_all"
 on public.people
 for insert
-to anon, authenticated
+to authenticated
 with check (true);
 
 create policy "people_update_all"
 on public.people
 for update
-to anon, authenticated
+to authenticated
 using (true)
 with check (true);
 
 create policy "people_delete_all"
 on public.people
 for delete
-to anon, authenticated
+to authenticated
 using (true);
 
 insert into public.people (name, role, department, active, created_at)

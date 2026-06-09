@@ -20,24 +20,24 @@ drop policy if exists "ncr_capa_pdfs_delete_all" on public.ncr_capa_pdfs;
 create policy "ncr_capa_pdfs_select_all"
 on public.ncr_capa_pdfs
 for select
-to anon, authenticated
+to authenticated
 using (true);
 
 create policy "ncr_capa_pdfs_insert_all"
 on public.ncr_capa_pdfs
 for insert
-to anon, authenticated
+to authenticated
 with check (true);
 
 create policy "ncr_capa_pdfs_update_all"
 on public.ncr_capa_pdfs
 for update
-to anon, authenticated
+to authenticated
 using (true)
 with check (true);
 
 create policy "ncr_capa_pdfs_delete_all"
 on public.ncr_capa_pdfs
 for delete
-to anon, authenticated
+to authenticated
 using (true);

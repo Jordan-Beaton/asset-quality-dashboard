@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient as createServerSupabaseClient } from "../../../src/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -35,7 +36,23 @@ function extractTextFromResponse(data: Record<string, unknown>) {
   return "";
 }
 
+async function requireAuthenticatedUser() {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data.user) {
+    return null;
+  }
+
+  return data.user;
+}
+
 export async function POST(request: Request) {
+  const user = await requireAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "OPENAI_API_KEY is not configured." }, { status: 500 });

@@ -190,8 +190,6 @@ type DocumentWorkspaceView =
   | "reports";
 
 const STORAGE_BUCKET = "document-files";
-const DEFAULT_USER_NAME = "Jordan Beaton";
-const DEFAULT_USER_EMAIL = "jbeaton@enshoresubsea.com";
 const DOCUMENT_TYPE_OPTIONS: DocumentTypeOption[] = [
   "Procedure",
   "Form",
@@ -521,6 +519,7 @@ function DocumentsPageContent() {
   const [revisionsByDocumentId, setRevisionsByDocumentId] = useState<Record<string, DocumentRevisionRow[]>>({});
   const [assets, setAssets] = useState<AssetOption[]>([]);
   const [people, setPeople] = useState<PersonRow[]>([]);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [, setContacts] = useState<NotificationContactRow[]>([]);
   const [message, setMessage] = useState("Loading documents...");
   const [lastRefreshed, setLastRefreshed] = useState("");
@@ -614,6 +613,22 @@ function DocumentsPageContent() {
 
   useEffect(() => {
     void loadDocuments();
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadCurrentUser() {
+      const { data } = await supabase.auth.getUser();
+      if (!isActive) return;
+      setCurrentUserEmail(data.user?.email || "");
+    }
+
+    void loadCurrentUser();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -744,6 +759,20 @@ function DocumentsPageContent() {
     () => documents.some((doc) => Object.prototype.hasOwnProperty.call(doc, "approver_email")),
     [documents]
   );
+
+  const currentUserPerson = useMemo(() => {
+    const email = currentUserEmail.trim().toLowerCase();
+    if (!email) return null;
+    return people.find((person) => (person.email || "").trim().toLowerCase() === email) || null;
+  }, [currentUserEmail, people]);
+
+  function resolveWorkflowActor(fieldValue: string, label: string) {
+    const selectedName = fieldValue.trim();
+    if (selectedName) return selectedName;
+    if (currentUserPerson?.name?.trim()) return currentUserPerson.name.trim();
+    setMessage(`${label} is required. Select a person from People Management before continuing.`);
+    return "";
+  }
 
   function resolveDocumentPersonEmail(name: string) {
     const matchedPerson = findPersonByName(people, name);
@@ -1519,11 +1548,13 @@ function DocumentsPageContent() {
 
     const reviewDate =
       detailForm.reviewed_at && detailForm.reviewed_at.trim() ? detailForm.reviewed_at : todayIsoDate();
+    const reviewedBy = resolveWorkflowActor(detailForm.reviewed_by, "Reviewed By");
+    if (!reviewedBy) return;
 
     const payload: Record<string, unknown> = {
       status: "Under Review" as DocumentStatus,
       review_approval_status: "Reviewed" as ReviewApprovalStatus,
-      reviewed_by: detailForm.reviewed_by.trim() || DEFAULT_USER_NAME,
+      reviewed_by: reviewedBy,
       reviewed_at: reviewDate,
       rejected_by: "",
       rejected_at: null,
@@ -1582,11 +1613,13 @@ function DocumentsPageContent() {
     }
 
     const approvedDate = todayIsoDate();
+    const approvedBy = resolveWorkflowActor(detailForm.approved_by, "Approved By");
+    if (!approvedBy) return;
 
     const payload: Record<string, unknown> = {
       status: "Live" as DocumentStatus,
       review_approval_status: "Approved" as ReviewApprovalStatus,
-      approved_by: detailForm.approved_by.trim() || DEFAULT_USER_NAME,
+      approved_by: approvedBy,
       approved_at:
         detailForm.approved_at && detailForm.approved_at.trim() ? detailForm.approved_at : approvedDate,
       rejected_by: "",
@@ -1646,12 +1679,14 @@ function DocumentsPageContent() {
     }
 
     const rejectedDate = todayIsoDate();
+    const rejectedBy = resolveWorkflowActor(detailForm.rejected_by, "Rejected By");
+    if (!rejectedBy) return;
 
     const payload: Record<string, unknown> = {
       status: "Draft" as DocumentStatus,
       review_approval_status: "Rejected" as ReviewApprovalStatus,
       approved_by: "",
-      rejected_by: detailForm.rejected_by.trim() || DEFAULT_USER_NAME,
+      rejected_by: rejectedBy,
       rejected_at: detailForm.rejected_at || rejectedDate,
       rejection_reason: detailForm.rejection_reason.trim(),
       notification_emails: deriveStoredNotificationEmails(detailForm),

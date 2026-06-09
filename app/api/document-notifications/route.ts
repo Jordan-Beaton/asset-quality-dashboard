@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
+import { createClient as createServerSupabaseClient } from "../../../src/lib/supabase/server";
 
 type NotificationRequest = {
   eventType?: string;
@@ -82,6 +83,17 @@ function buildHtml(payload: Required<Pick<NotificationRequest, "eventType" | "do
   `;
 }
 
+async function requireAuthenticatedUser() {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data.user) {
+    return null;
+  }
+
+  return data.user;
+}
+
 async function logEmailAttempt(
   body: NotificationRequest,
   recipientEmails: string[],
@@ -95,7 +107,7 @@ async function logEmailAttempt(
   if (!supabaseUrl || !serviceRoleKey) return;
 
   try {
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createServiceClient(supabaseUrl, serviceRoleKey);
 
     const logPayload = {
       event_type: body.eventType || "",
@@ -126,6 +138,11 @@ export async function POST(request: Request) {
   let body: NotificationRequest | null = null;
 
   try {
+    const user = await requireAuthenticatedUser();
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
+
     const resendApiKey = process.env.RESEND_API_KEY;
     const fromEmail = process.env.DOCUMENT_NOTIFICATIONS_FROM_EMAIL;
 
@@ -156,11 +173,14 @@ export async function POST(request: Request) {
         )
       : [];
 
-    console.log("EMAIL TRIGGERED", {
-      eventType: body.eventType,
-      documentNumber: body.documentNumber,
-      recipientEmails,
-    });
+    if (process.env.NODE_ENV !== "production") {
+      console.log("EMAIL TRIGGERED", {
+        eventType: body.eventType,
+        documentNumber: body.documentNumber,
+        recipientCount: recipientEmails.length,
+        requestedBy: user.email,
+      });
+    }
 
     if (!recipientEmails.length) {
       return NextResponse.json({ error: "No recipients provided." }, { status: 400 });
@@ -182,7 +202,9 @@ export async function POST(request: Request) {
       }),
     });
 
-    console.log("EMAIL RESULT", sendResult);
+    if (process.env.NODE_ENV !== "production") {
+      console.log("EMAIL RESULT", sendResult);
+    }
 
     await logEmailAttempt(body, recipientEmails, true, sendResult.data?.id || null, null);
 

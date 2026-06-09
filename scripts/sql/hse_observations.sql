@@ -26,6 +26,38 @@ create table if not exists public.hse_observations (
   updated_at timestamptz not null default now()
 );
 
+create sequence if not exists public.hse_observation_number_seq;
+
+do $$
+declare
+  max_observation_number integer;
+begin
+  select coalesce(max((regexp_match(observation_number, '^OBS\s*-\s*(\d+)\s*$'))[1]::integer), 0)
+  into max_observation_number
+  from public.hse_observations
+  where observation_number ~* '^OBS\s*-\s*\d+\s*$';
+
+  if max_observation_number > 0 then
+    perform setval('public.hse_observation_number_seq', max_observation_number, true);
+  else
+    perform setval('public.hse_observation_number_seq', 1, false);
+  end if;
+end $$;
+
+create or replace function public.next_hse_observation_number()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  next_number bigint;
+begin
+  next_number := nextval('public.hse_observation_number_seq');
+  return 'OBS-' || lpad(next_number::text, 3, '0');
+end;
+$$;
+
 create table if not exists public.hse_observation_evidence (
   id uuid primary key default gen_random_uuid(),
   observation_id uuid not null references public.hse_observations(id) on delete cascade,
