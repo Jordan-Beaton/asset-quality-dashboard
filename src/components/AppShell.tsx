@@ -16,6 +16,17 @@ type NavItem = {
   icon: NavIconKey;
 };
 
+type SystemRole =
+  | "Admin"
+  | "Manager"
+  | "HSE Officer"
+  | "Quality Engineer"
+  | "Document Controller"
+  | "Asset Manager"
+  | "Viewer"
+  | "Contractor"
+  | "";
+
 type NavIconKey =
   | "home"
   | "dashboard"
@@ -109,6 +120,47 @@ const actionNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/actions", label: "Actions", icon: "actions" },
 ];
+
+function normaliseSystemRole(role: string | null | undefined): SystemRole {
+  const cleanRole = (role || "").trim().toLowerCase();
+  if (cleanRole === "admin") return "Admin";
+  if (cleanRole === "manager") return "Manager";
+  if (cleanRole === "hse officer" || cleanRole === "hse manager") return "HSE Officer";
+  if (cleanRole === "quality engineer" || cleanRole === "quality manager") return "Quality Engineer";
+  if (cleanRole === "document controller") return "Document Controller";
+  if (cleanRole === "asset manager") return "Asset Manager";
+  if (cleanRole === "viewer") return "Viewer";
+  if (cleanRole === "contractor") return "Contractor";
+  return "";
+}
+
+function getAllowedModuleKeys(role: SystemRole) {
+  if (role === "Admin") return new Set(["home", "quality", "hse", "assets", "risk", "actions", "people", "admin"]);
+  if (role === "Manager") return new Set(["home", "quality", "hse", "assets", "risk", "actions", "people"]);
+  if (role === "HSE Officer") return new Set(["home", "hse", "actions", "people"]);
+  if (role === "Quality Engineer") return new Set(["home", "quality", "actions", "people"]);
+  if (role === "Document Controller") return new Set(["home", "quality", "actions", "people"]);
+  if (role === "Asset Manager") return new Set(["home", "assets", "actions", "people"]);
+  if (role === "Viewer") return new Set(["home", "quality", "hse", "assets", "risk", "actions", "people"]);
+  if (role === "Contractor") return new Set(["home"]);
+  return new Set(["home", "quality", "hse", "assets", "risk", "actions", "people"]);
+}
+
+function getModuleKeyFromHref(href: string) {
+  if (href === "/home" || href === "/") return "home";
+  if (href === "/actions") return "actions";
+  if (href === "/people") return "people";
+  if (href.startsWith("/admin")) return "admin";
+  if (href.startsWith("/hse")) return "hse";
+  if (href.startsWith("/assets")) return "assets";
+  if (href.startsWith("/risk")) return "risk";
+  return "quality";
+}
+
+function filterNavItemsForRole(items: NavItem[], role: SystemRole) {
+  const allowedModules = getAllowedModuleKeys(role);
+  return items.filter((item) => allowedModules.has(getModuleKeyFromHref(item.href)));
+}
 
 function RailIcon({ icon }: { icon: NavIconKey }) {
   const common = {
@@ -250,6 +302,7 @@ export default function AppShell({ children }: AppShellProps) {
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [isRailPinned, setIsRailPinned] = useState(false);
   const [signedInName, setSignedInName] = useState("");
+  const [signedInRole, setSignedInRole] = useState<SystemRole>("");
   const isLoginPage = pathname === "/login";
   const isPublicObservationPage = pathname === "/observe";
   const isHomePage = pathname === "/home";
@@ -290,7 +343,7 @@ export default function AppShell({ children }: AppShellProps) {
     : isPeopleModule
     ? "Shared people directory and status management"
     : "Quality management system";
-  const navItems = isAssetModule
+  const baseNavItems = isAssetModule
     ? assetNavItems
     : isRiskModule
     ? riskNavItems
@@ -303,6 +356,7 @@ export default function AppShell({ children }: AppShellProps) {
     : isActionModule
     ? actionNavItems
     : qualityNavItems;
+  const navItems = filterNavItemsForRole(baseNavItems, signedInRole);
   const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldInspectionMode;
   const railOpen = isRailExpanded || isRailPinned;
 
@@ -334,7 +388,10 @@ export default function AppShell({ children }: AppShellProps) {
       } = await supabase.auth.getUser();
 
       if (!isMounted || !user) {
-        if (isMounted) setSignedInName("");
+        if (isMounted) {
+          setSignedInName("");
+          setSignedInRole("");
+        }
         return;
       }
 
@@ -342,17 +399,25 @@ export default function AppShell({ children }: AppShellProps) {
       if (email) {
         const { data: person } = await supabase
           .from("people")
-          .select("name,email")
+          .select("name,email,system_role,is_master_admin")
           .eq("email", email)
           .maybeSingle();
 
         if (!isMounted) return;
         setSignedInName(person?.name || user.user_metadata?.name || email);
+        setSignedInRole(
+          email.toLowerCase() === "jbeaton@enshoresubsea.com" ||
+            person?.is_master_admin ||
+            (person?.name || "").trim().toLowerCase() === "jordan beaton"
+            ? "Admin"
+            : normaliseSystemRole(person?.system_role),
+        );
         return;
       }
 
       if (isMounted) {
         setSignedInName(user.user_metadata?.name || "");
+        setSignedInRole("");
       }
     }
 
