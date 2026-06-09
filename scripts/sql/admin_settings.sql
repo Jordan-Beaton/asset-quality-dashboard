@@ -86,6 +86,9 @@ create table if not exists public.ims_roles (
   created_at timestamptz not null default now()
 );
 
+alter table public.ims_roles
+add column if not exists document_access text not null default 'Role Default';
+
 insert into public.ims_roles (role_name, description, quality_access, hse_access, asset_access, risk_access, action_access, admin_access)
 values
   ('Admin', 'Full IMS administration and operational access.', 'Full', 'Full', 'Full', 'Full', 'Full', 'Full'),
@@ -109,6 +112,20 @@ values
   ('Survey User', 'Survey document visibility and assigned action ownership.', 'Read', 'Read', 'Read', 'None', 'Read', 'None'),
   ('External Auditor', 'Read-only audit support access.', 'Read', 'Read', 'None', 'None', 'None', 'None')
 on conflict (role_name) do nothing;
+
+update public.ims_roles
+set document_access = case role_name
+  when 'Admin' then 'Full'
+  when 'Manager' then 'Approve'
+  when 'Document Controller' then 'Full'
+  when 'Quality Engineer' then 'Full'
+  when 'External Auditor' then 'Read'
+  when 'Viewer' then 'Read'
+  else coalesce(nullif(document_access, 'Role Default'), 'Read')
+end
+where document_access is null
+   or document_access = 'Role Default'
+   or role_name in ('Admin', 'Manager', 'Document Controller', 'Quality Engineer');
 
 insert into public.ims_reference_departments (name, code)
 values

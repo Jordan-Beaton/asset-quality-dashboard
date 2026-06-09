@@ -10,6 +10,7 @@ type AdminAction =
   | "resetPassword"
   | "updatePersonAccess"
   | "updateCompany"
+  | "updateRole"
   | "addDepartment"
   | "updateDepartment"
   | "addProject"
@@ -313,6 +314,28 @@ export async function POST(request: Request) {
       }
 
       await writeAuditLog(service, actorEmail, "Update Company Settings", "Company", updatePayload.company_name, "Company profile updated.");
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "updateRole") {
+      const id = cleanText(payload.id);
+      if (!id) return NextResponse.json({ error: "Role id is required." }, { status: 400 });
+
+      const rolePayload = {
+        quality_access: cleanText(payload.quality_access) || "None",
+        hse_access: cleanText(payload.hse_access) || "None",
+        asset_access: cleanText(payload.asset_access) || "None",
+        risk_access: cleanText(payload.risk_access) || "None",
+        document_access: cleanText(payload.document_access) || "Role Default",
+        action_access: cleanText(payload.action_access) || "None",
+        admin_access: cleanText(payload.admin_access) || "None",
+        description: cleanText(payload.description) || null,
+      };
+
+      const { error } = await service.from("ims_roles").update(rolePayload).eq("id", id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+      await writeAuditLog(service, actorEmail, "Update Role Permissions", "Role", cleanText(payload.role_name), `${cleanText(payload.role_name)} permissions updated.`);
       return NextResponse.json({ ok: true });
     }
 

@@ -433,22 +433,31 @@ export default function AppShell({ children }: AppShellProps) {
           .maybeSingle();
 
         if (!isMounted) return;
-        setSignedInName(person?.name || user.user_metadata?.name || email);
-        setSignedInRole(
+        const resolvedRole =
           email.toLowerCase() === "jbeaton@enshoresubsea.com" ||
-            person?.is_master_admin ||
-            (person?.name || "").trim().toLowerCase() === "jordan beaton"
+          person?.is_master_admin ||
+          (person?.name || "").trim().toLowerCase() === "jordan beaton"
             ? "Admin"
-            : normaliseSystemRole(person?.system_role),
-        );
+            : normaliseSystemRole(person?.system_role);
+        const { data: roleDefaults } = person?.system_role
+          ? await (supabase as any)
+              .from("ims_roles")
+              .select("quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
+              .eq("role_name", resolvedRole || person.system_role)
+              .maybeSingle()
+          : { data: null };
+
+        if (!isMounted) return;
+        setSignedInName(person?.name || user.user_metadata?.name || email);
+        setSignedInRole(resolvedRole);
         setSignedInModuleAccess({
-          quality: person?.quality_access,
-          hse: person?.hse_access,
-          assets: person?.asset_access,
-          risk: person?.risk_access,
-          documents: person?.document_access,
-          actions: person?.action_access,
-          admin: person?.admin_access,
+          quality: person?.quality_access || roleDefaults?.quality_access,
+          hse: person?.hse_access || roleDefaults?.hse_access,
+          assets: person?.asset_access || roleDefaults?.asset_access,
+          risk: person?.risk_access || roleDefaults?.risk_access,
+          documents: person?.document_access || roleDefaults?.document_access,
+          actions: person?.action_access || roleDefaults?.action_access,
+          admin: person?.admin_access || roleDefaults?.admin_access,
         });
         return;
       }

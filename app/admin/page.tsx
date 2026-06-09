@@ -81,6 +81,7 @@ type RoleRow = {
   hse_access?: string | null;
   asset_access?: string | null;
   risk_access?: string | null;
+  document_access?: string | null;
   action_access?: string | null;
   admin_access?: string | null;
   active?: boolean | null;
@@ -132,6 +133,7 @@ const roleOptions = [
 const accessStatusOptions = ["Active", "Invited", "Deactivated"];
 const permissionOverrideOptions = ["Role Default", "Custom", "Full System Access", "Read Only"];
 const moduleAccessOptions = ["Role Default", "None", "Read", "Edit", "Approve", "Documents", "Observe", "Full"];
+const roleAccessOptions = ["None", "Read", "Edit", "Approve", "Documents", "Observe", "Full"];
 
 const initialCompany: CompanySettings = {
   company_name: "Enshore Subsea",
@@ -230,8 +232,9 @@ export default function AdminDashboardPage() {
   const [companyForm, setCompanyForm] = useState<CompanySettings>(initialCompany);
   const [newDepartment, setNewDepartment] = useState({ name: "", code: "" });
   const [newProject, setNewProject] = useState({ name: "", type: "Project" });
-  const [expandedPersonId, setExpandedPersonId] = useState("");
   const [personDrafts, setPersonDrafts] = useState<Record<string, Partial<PersonRow>>>({});
+  const [selectedOverridePersonId, setSelectedOverridePersonId] = useState("");
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, Partial<RoleRow>>>({});
 
   async function loadAdminData() {
     setIsLoading(true);
@@ -295,6 +298,20 @@ export default function AdminDashboardPage() {
     }));
   }
 
+  function getRoleDraft(role: RoleRow) {
+    return { ...role, ...(roleDrafts[role.id] || {}) };
+  }
+
+  function setRoleDraft(role: RoleRow, updates: Partial<RoleRow>) {
+    setRoleDrafts((current) => ({
+      ...current,
+      [role.id]: {
+        ...(current[role.id] || {}),
+        ...updates,
+      },
+    }));
+  }
+
   async function postAdminAction(action: string, payload: Record<string, unknown>, successMessage: string) {
     setIsSaving(true);
     try {
@@ -336,6 +353,18 @@ export default function AdminDashboardPage() {
       setPersonDrafts((current) => {
         const next = { ...current };
         delete next[person.id];
+        return next;
+      });
+    }
+  }
+
+  async function updateRolePermissions(role: RoleRow) {
+    const draft = getRoleDraft(role);
+    const ok = await postAdminAction("updateRole", draft as Record<string, unknown>, `${role.role_name} permissions saved successfully.`);
+    if (ok) {
+      setRoleDrafts((current) => {
+        const next = { ...current };
+        delete next[role.id];
         return next;
       });
     }
@@ -456,145 +485,68 @@ export default function AdminDashboardPage() {
                     const authUser = getAuthUserForPerson(person, data?.authUsers || []);
                     const isMaster = person.is_master_admin || normaliseEmail(person.email) === "jbeaton@enshoresubsea.com" || person.name === "Jordan Beaton";
                     const accessStatus = draft.access_status || (person.active === false ? "Deactivated" : "Active");
-                    const isExpanded = expandedPersonId === person.id;
                     const hasDraft = Boolean(personDrafts[person.id]);
                     return (
-                      <>
-                        <tr key={person.id}>
-                          <td style={imsTableCellStyle}>
-                            <strong>{person.name}</strong>
-                            {isMaster ? <div style={{ marginTop: 6 }}><StatusPill tone="good">Master Admin</StatusPill></div> : null}
-                            {draft.permission_override && draft.permission_override !== "Role Default" ? (
-                              <div style={{ marginTop: 6 }}><StatusPill tone="warn">{draft.permission_override}</StatusPill></div>
+                      <tr key={person.id}>
+                        <td style={imsTableCellStyle}>
+                          <strong>{person.name}</strong>
+                          {isMaster ? <div style={{ marginTop: 6 }}><StatusPill tone="good">Master Admin</StatusPill></div> : null}
+                          {person.permission_override && person.permission_override !== "Role Default" ? (
+                            <div style={{ marginTop: 6 }}><StatusPill tone="warn">{person.permission_override}</StatusPill></div>
+                          ) : null}
+                        </td>
+                        <td style={imsTableCellStyle}>{person.email || ""}</td>
+                        <td style={imsTableCellStyle}>
+                          <SelectField
+                            value={draft.department || ""}
+                            onChange={(value) => setPersonDraft(person, { department: value })}
+                            disabled={isSaving}
+                          >
+                            <option value="">Unassigned</option>
+                            {departments.map((department) => <option key={department.id} value={department.name}>{department.name}</option>)}
+                          </SelectField>
+                        </td>
+                        <td style={imsTableCellStyle}>
+                          <SelectField
+                            value={isMaster ? "Admin" : draft.system_role || "Viewer"}
+                            onChange={(value) => setPersonDraft(person, { system_role: value })}
+                            disabled={isSaving || isMaster}
+                          >
+                            {editableRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+                          </SelectField>
+                        </td>
+                        <td style={imsTableCellStyle}>
+                          <SelectField
+                            value={isMaster ? "Active" : accessStatus}
+                            onChange={(value) => setPersonDraft(person, { access_status: value })}
+                            disabled={isSaving || isMaster}
+                          >
+                            {accessStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+                          </SelectField>
+                        </td>
+                        <td style={imsTableCellStyle}>{formatDateTime(authUser?.last_sign_in_at || person.last_login_at)}</td>
+                        <td style={imsTableCellStyle}>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <ImsButton onClick={() => updatePersonAccess(person, draft)} disabled={isSaving || !hasDraft}>
+                              Save
+                            </ImsButton>
+                            {person.email ? (
+                              <ImsButton variant="secondary" onClick={() => postAdminAction("resetPassword", { email: person.email }, `Password reset sent to ${person.email}.`)} disabled={isSaving}>
+                                Reset Password
+                              </ImsButton>
                             ) : null}
-                          </td>
-                          <td style={imsTableCellStyle}>{person.email || ""}</td>
-                          <td style={imsTableCellStyle}>
-                            <SelectField
-                              value={draft.department || ""}
-                              onChange={(value) => setPersonDraft(person, { department: value })}
-                              disabled={isSaving}
-                            >
-                              <option value="">Unassigned</option>
-                              {departments.map((department) => <option key={department.id} value={department.name}>{department.name}</option>)}
-                            </SelectField>
-                          </td>
-                          <td style={imsTableCellStyle}>
-                            <SelectField
-                              value={isMaster ? "Admin" : draft.system_role || "Viewer"}
-                              onChange={(value) => setPersonDraft(person, { system_role: value })}
-                              disabled={isSaving || isMaster}
-                            >
-                              {editableRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
-                            </SelectField>
-                          </td>
-                          <td style={imsTableCellStyle}>
-                            <SelectField
-                              value={isMaster ? "Active" : accessStatus}
-                              onChange={(value) => setPersonDraft(person, { access_status: value })}
-                              disabled={isSaving || isMaster}
-                            >
-                              {accessStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
-                            </SelectField>
-                          </td>
-                          <td style={imsTableCellStyle}>{formatDateTime(authUser?.last_sign_in_at || person.last_login_at)}</td>
-                          <td style={imsTableCellStyle}>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              <ImsButton variant="secondary" onClick={() => setExpandedPersonId(isExpanded ? "" : person.id)}>
-                                {isExpanded ? "Hide Permissions" : "Permissions"}
+                            {!isMaster ? (
+                              <ImsButton
+                                variant={accessStatus === "Deactivated" ? "primary" : "danger"}
+                                onClick={() => updatePersonAccess(person, { ...draft, access_status: accessStatus === "Deactivated" ? "Active" : "Deactivated" })}
+                                disabled={isSaving}
+                              >
+                                {accessStatus === "Deactivated" ? "Reactivate" : "Deactivate"}
                               </ImsButton>
-                              <ImsButton onClick={() => updatePersonAccess(person, draft)} disabled={isSaving || !hasDraft}>
-                                Save
-                              </ImsButton>
-                              {person.email ? (
-                                <ImsButton variant="secondary" onClick={() => postAdminAction("resetPassword", { email: person.email }, `Password reset sent to ${person.email}.`)} disabled={isSaving}>
-                                  Reset Password
-                                </ImsButton>
-                              ) : null}
-                              {!isMaster ? (
-                                <ImsButton
-                                  variant={accessStatus === "Deactivated" ? "primary" : "danger"}
-                                  onClick={() => updatePersonAccess(person, { ...draft, access_status: accessStatus === "Deactivated" ? "Active" : "Deactivated" })}
-                                  disabled={isSaving}
-                                >
-                                  {accessStatus === "Deactivated" ? "Reactivate" : "Deactivate"}
-                                </ImsButton>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                        {isExpanded ? (
-                          <tr key={`${person.id}-permissions`}>
-                            <td style={{ ...imsTableCellStyle, background: "#f8fafc" }} colSpan={7}>
-                              <div style={permissionGridStyle}>
-                                <Field label="Permission Override">
-                                  <SelectField
-                                    value={isMaster ? "Full System Access" : draft.permission_override || "Role Default"}
-                                    onChange={(value) => {
-                                      const full = value === "Full System Access";
-                                      const readOnly = value === "Read Only";
-                                      setPersonDraft(person, {
-                                        permission_override: value,
-                                        ...(full
-                                          ? {
-                                              quality_access: "Full",
-                                              hse_access: "Full",
-                                              asset_access: "Full",
-                                              risk_access: "Full",
-                                              document_access: "Full",
-                                              action_access: "Full",
-                                              admin_access: "Full",
-                                            }
-                                          : readOnly
-                                          ? {
-                                              quality_access: "Read",
-                                              hse_access: "Read",
-                                              asset_access: "Read",
-                                              risk_access: "Read",
-                                              document_access: "Read",
-                                              action_access: "Read",
-                                              admin_access: "None",
-                                            }
-                                          : {}),
-                                      });
-                                    }}
-                                    disabled={isSaving || isMaster}
-                                  >
-                                    {permissionOverrideOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                                  </SelectField>
-                                </Field>
-                                {[
-                                  ["Quality", "quality_access"],
-                                  ["HSE", "hse_access"],
-                                  ["Assets", "asset_access"],
-                                  ["Risk", "risk_access"],
-                                  ["Documents", "document_access"],
-                                  ["Actions", "action_access"],
-                                  ["Admin", "admin_access"],
-                                ].map(([label, key]) => (
-                                  <Field key={key} label={label}>
-                                    <SelectField
-                                      value={isMaster ? "Full" : String((draft as Record<string, unknown>)[key] || "Role Default")}
-                                      onChange={(value) => setPersonDraft(person, { [key]: value === "Role Default" ? "" : value } as Partial<PersonRow>)}
-                                      disabled={isSaving || isMaster}
-                                    >
-                                      {moduleAccessOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                                    </SelectField>
-                                  </Field>
-                                ))}
-                                <Field label="Permission Notes" style={{ gridColumn: "1 / -1" }}>
-                                  <textarea
-                                    value={draft.permissions_notes || ""}
-                                    onChange={(event) => setPersonDraft(person, { permissions_notes: event.target.value })}
-                                    style={{ ...imsInputStyle, minHeight: 76 }}
-                                    placeholder="Reason for any custom access, e.g. Full access due IMS ownership."
-                                  />
-                                </Field>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : null}
-                      </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -605,38 +557,160 @@ export default function AdminDashboardPage() {
       ) : null}
 
       {activeView === "roles" ? (
-        <ImsPanel title="Roles & Permissions" subtitle="Permission matrix for planning. Enforcement will be introduced in a separate controlled phase.">
-          <div style={tableWrapStyle}>
-            <table style={imsTableStyle}>
-              <thead>
-                <tr>
-                  <th style={imsTableHeadStyle}>Role</th>
-                  <th style={imsTableHeadStyle}>Quality</th>
-                  <th style={imsTableHeadStyle}>HSE</th>
-                  <th style={imsTableHeadStyle}>Assets</th>
-                  <th style={imsTableHeadStyle}>Risk</th>
-                  <th style={imsTableHeadStyle}>Actions</th>
-                  <th style={imsTableHeadStyle}>Admin</th>
-                  <th style={imsTableHeadStyle}>Purpose</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roles.map((role) => (
-                  <tr key={role.id}>
-                    <td style={imsTableCellStyle}><strong>{role.role_name}</strong></td>
-                    <td style={imsTableCellStyle}>{role.quality_access}</td>
-                    <td style={imsTableCellStyle}>{role.hse_access}</td>
-                    <td style={imsTableCellStyle}>{role.asset_access}</td>
-                    <td style={imsTableCellStyle}>{role.risk_access}</td>
-                    <td style={imsTableCellStyle}>{role.action_access}</td>
-                    <td style={imsTableCellStyle}>{role.admin_access}</td>
-                    <td style={imsTableCellStyle}>{role.description}</td>
+        <section style={{ display: "grid", gap: 18 }}>
+          <ImsPanel title="Roles & Permissions" subtitle="Edit role defaults here. Individual exceptions are managed below without changing someone's job role.">
+            <div style={tableWrapStyle}>
+              <table style={imsTableStyle}>
+                <thead>
+                  <tr>
+                    <th style={imsTableHeadStyle}>Role</th>
+                    <th style={imsTableHeadStyle}>Quality</th>
+                    <th style={imsTableHeadStyle}>Documents</th>
+                    <th style={imsTableHeadStyle}>HSE</th>
+                    <th style={imsTableHeadStyle}>Assets</th>
+                    <th style={imsTableHeadStyle}>Risk</th>
+                    <th style={imsTableHeadStyle}>Actions</th>
+                    <th style={imsTableHeadStyle}>Admin</th>
+                    <th style={imsTableHeadStyle}>Purpose</th>
+                    <th style={imsTableHeadStyle}>Save</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </ImsPanel>
+                </thead>
+                <tbody>
+                  {roles.map((role) => {
+                    const draft = getRoleDraft(role);
+                    const hasDraft = Boolean(roleDrafts[role.id]);
+                    return (
+                      <tr key={role.id}>
+                        <td style={imsTableCellStyle}><strong>{role.role_name}</strong></td>
+                        {[
+                          ["quality_access", roleAccessOptions],
+                          ["document_access", moduleAccessOptions],
+                          ["hse_access", roleAccessOptions],
+                          ["asset_access", roleAccessOptions],
+                          ["risk_access", roleAccessOptions],
+                          ["action_access", roleAccessOptions],
+                          ["admin_access", roleAccessOptions],
+                        ].map(([key, options]) => (
+                          <td key={String(key)} style={imsTableCellStyle}>
+                            <SelectField
+                              value={String((draft as Record<string, unknown>)[key as string] || (key === "document_access" ? "Role Default" : "None"))}
+                              onChange={(value) => setRoleDraft(role, { [key as string]: value } as Partial<RoleRow>)}
+                              disabled={isSaving || role.role_name === "Admin"}
+                            >
+                              {(options as string[]).map((option) => <option key={option} value={option}>{option}</option>)}
+                            </SelectField>
+                          </td>
+                        ))}
+                        <td style={imsTableCellStyle}>
+                          <textarea
+                            value={draft.description || ""}
+                            onChange={(event) => setRoleDraft(role, { description: event.target.value })}
+                            style={{ ...imsInputStyle, minWidth: 240, minHeight: 58 }}
+                            disabled={isSaving}
+                          />
+                        </td>
+                        <td style={imsTableCellStyle}>
+                          <ImsButton onClick={() => updateRolePermissions(role)} disabled={isSaving || !hasDraft}>
+                            Save
+                          </ImsButton>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </ImsPanel>
+
+          <ImsPanel title="Individual Permission Overrides" subtitle="Use this only for exceptions, such as someone with a normal job role but wider IMS ownership access.">
+            <div style={permissionGridStyle}>
+              <Field label="Person">
+                <SelectField value={selectedOverridePersonId} onChange={setSelectedOverridePersonId}>
+                  <option value="">Select person</option>
+                  {people.map((person) => <option key={person.id} value={person.id}>{person.name} {person.email ? `- ${person.email}` : ""}</option>)}
+                </SelectField>
+              </Field>
+              {selectedOverridePersonId ? (() => {
+                const person = people.find((item) => item.id === selectedOverridePersonId);
+                if (!person) return null;
+                const draft = getPersonDraft(person);
+                const isMaster = person.is_master_admin || normaliseEmail(person.email) === "jbeaton@enshoresubsea.com" || person.name === "Jordan Beaton";
+                return (
+                  <>
+                    <Field label="Permission Override">
+                      <SelectField
+                        value={isMaster ? "Full System Access" : draft.permission_override || "Role Default"}
+                        onChange={(value) => {
+                          const full = value === "Full System Access";
+                          const readOnly = value === "Read Only";
+                          setPersonDraft(person, {
+                            permission_override: value,
+                            ...(full
+                              ? {
+                                  quality_access: "Full",
+                                  hse_access: "Full",
+                                  asset_access: "Full",
+                                  risk_access: "Full",
+                                  document_access: "Full",
+                                  action_access: "Full",
+                                  admin_access: "Full",
+                                }
+                              : readOnly
+                              ? {
+                                  quality_access: "Read",
+                                  hse_access: "Read",
+                                  asset_access: "Read",
+                                  risk_access: "Read",
+                                  document_access: "Read",
+                                  action_access: "Read",
+                                  admin_access: "None",
+                                }
+                              : {}),
+                          });
+                        }}
+                        disabled={isSaving || isMaster}
+                      >
+                        {permissionOverrideOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </SelectField>
+                    </Field>
+                    {[
+                      ["Quality", "quality_access"],
+                      ["Documents", "document_access"],
+                      ["HSE", "hse_access"],
+                      ["Assets", "asset_access"],
+                      ["Risk", "risk_access"],
+                      ["Actions", "action_access"],
+                      ["Admin", "admin_access"],
+                    ].map(([label, key]) => (
+                      <Field key={key} label={label}>
+                        <SelectField
+                          value={isMaster ? "Full" : String((draft as Record<string, unknown>)[key] || "Role Default")}
+                          onChange={(value) => setPersonDraft(person, { [key]: value === "Role Default" ? "" : value } as Partial<PersonRow>)}
+                          disabled={isSaving || isMaster}
+                        >
+                          {moduleAccessOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                        </SelectField>
+                      </Field>
+                    ))}
+                    <Field label="Permission Notes" style={{ gridColumn: "1 / -1" }}>
+                      <textarea
+                        value={draft.permissions_notes || ""}
+                        onChange={(event) => setPersonDraft(person, { permissions_notes: event.target.value })}
+                        style={{ ...imsInputStyle, minHeight: 76 }}
+                        placeholder="Reason for any custom access, e.g. Full access due IMS ownership."
+                      />
+                    </Field>
+                    <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
+                      <ImsButton onClick={() => updatePersonAccess(person, draft)} disabled={isSaving || !personDrafts[person.id]}>
+                        Save Individual Override
+                      </ImsButton>
+                    </div>
+                  </>
+                );
+              })() : null}
+            </div>
+          </ImsPanel>
+        </section>
       ) : null}
 
       {activeView === "company" ? (
