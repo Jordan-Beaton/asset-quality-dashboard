@@ -693,11 +693,18 @@ function NcrCapaPageContent() {
       supabase.from("ncr_capa_pdfs").select("*").order("generated_at", { ascending: false }),
     ]);
 
-    if (ncrError) console.error("Error loading NCRs:", ncrError.message);
-    if (capaError) console.error("Error loading CAPAs:", capaError.message);
-    if (actionError) console.error("Error loading linked actions:", actionError.message);
-    if (evidenceError) console.error("Error loading evidence:", evidenceError.message);
-    if (pdfError) console.error("Error loading saved PDFs:", pdfError.message);
+    const loadErrors = [
+      ncrError ? `NCRs: ${ncrError.message}` : "",
+      capaError ? `legacy CAPA data: ${capaError.message}` : "",
+      actionError ? `linked actions: ${actionError.message}` : "",
+      evidenceError ? `evidence: ${evidenceError.message}` : "",
+      pdfError ? `saved PDFs: ${pdfError.message}` : "",
+    ].filter(Boolean);
+
+    if (loadErrors.length > 0) {
+      console.error("Error loading NCR module data:", loadErrors);
+      setMessage(`Load warning: ${loadErrors.join(" | ")}`);
+    }
 
     setNcrs((ncrData as Ncr[]) || []);
     setCapas((capaData as Capa[]) || []);

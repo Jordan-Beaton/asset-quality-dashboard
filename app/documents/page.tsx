@@ -561,13 +561,11 @@ function DocumentsPageContent() {
   async function loadDocuments() {
     const [
       { data: documentsData, error: documentsError },
-      { data: revisionsData, error: revisionsError },
       { data: assetsData, error: assetsError },
       { data: peopleData, error: peopleError },
       { data: contactsData, error: contactsError },
     ] = await Promise.all([
       supabase.from("documents").select("*").order("document_number", { ascending: true }),
-      supabase.from("document_revisions").select("*").order("uploaded_at", { ascending: false }),
       supabase
         .from("assets")
         .select("id, asset_code, name, document_id_code, status")
@@ -585,30 +583,40 @@ function DocumentsPageContent() {
       return;
     }
 
-    if (revisionsError) {
-      setMessage(`Revision load failed: ${revisionsError.message}`);
-      return;
-    }
-
     const rows = (documentsData || []) as DocumentRow[];
-    const revisions = (revisionsData || []) as DocumentRevisionRow[];
-
-    const grouped: Record<string, DocumentRevisionRow[]> = {};
-    revisions.forEach((revision) => {
-      if (!grouped[revision.document_id]) grouped[revision.document_id] = [];
-      grouped[revision.document_id].push(revision);
-    });
-
     const fallbackContacts: NotificationContactRow[] = [];
 
     setDocuments(rows);
-    setRevisionsByDocumentId(grouped);
     setAssets(assetsError ? [] : ((assetsData as AssetOption[]) || []));
     setPeople(peopleError ? [] : ((peopleData as PersonRow[]) || []));
     setContacts(contactsError ? fallbackContacts : ((contactsData as NotificationContactRow[]) || fallbackContacts));
     setSelectedDocumentId((current) => current || rows[0]?.id || "");
     setLastRefreshed(new Date().toLocaleString("en-GB"));
     setMessage(`Loaded ${rows.length} document${rows.length === 1 ? "" : "s"} successfully.`);
+  }
+
+  async function loadDocumentRevisions(documentId: string, options: { quiet?: boolean } = {}) {
+    if (!documentId) return [];
+
+    const { data, error } = await supabase
+      .from("document_revisions")
+      .select("*")
+      .eq("document_id", documentId)
+      .order("uploaded_at", { ascending: false });
+
+    if (error) {
+      if (!options.quiet) {
+        setMessage(`Revision load failed: ${error.message}`);
+      }
+      return [];
+    }
+
+    const revisions = ((data as DocumentRevisionRow[]) || []);
+    setRevisionsByDocumentId((current) => ({
+      ...current,
+      [documentId]: revisions,
+    }));
+    return revisions;
   }
 
   useEffect(() => {
@@ -941,6 +949,11 @@ function DocumentsPageContent() {
       rejected_by: nextDetailForm.rejected_by,
     });
   }, [people, selectedDocument]);
+
+  useEffect(() => {
+    if (!selectedDocumentId) return;
+    void loadDocumentRevisions(selectedDocumentId, { quiet: true });
+  }, [selectedDocumentId]);
 
   const totalDocuments = documents.length;
   const liveDocuments = documents.filter((doc) => (doc.status || "").trim().toLowerCase() === "live").length;
@@ -1738,7 +1751,9 @@ function DocumentsPageContent() {
     const confirmed = window.confirm(`Delete ${selectedDocument.document_number}?`);
     if (!confirmed) return;
 
-    const revisionPaths = (revisionsByDocumentId[selectedDocument.id] || [])
+    const selectedRevisionRows =
+      revisionsByDocumentId[selectedDocument.id] || (await loadDocumentRevisions(selectedDocument.id));
+    const revisionPaths = selectedRevisionRows
       .map((item) => item.file_path)
       .filter(Boolean) as string[];
 
@@ -1769,6 +1784,7 @@ function DocumentsPageContent() {
       setMessage("Select a document first.");
       return;
     }
+    const activeDocument = selectedDocument;
 
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1786,9 +1802,36 @@ function DocumentsPageContent() {
         .trim()
         .toUpperCase();
       const safeName = sanitizeFileName(file.name);
-      const path = `documents/${selectedDocument.id}/revisions/${currentRevision}/${Date.now()}-${safeName}`;
-      const oldPath = selectedDocument.file_path || "";
+      const path = `documents/${activeDocument.id}/revisions/${currentRevision}/${Date.now()}-${safeName}`;
+      const oldPath = activeDocument.file_path || "";
       const uploadTimestamp = new Date().toISOString();
+      let uploadedPath = "";
+
+      async function cleanupUploadedFile() {
+        if (uploadedPath) {
+          await supabase.storage.from(STORAGE_BUCKET).remove([uploadedPath]);
+        }
+      }
+
+      async function restorePreviousDocumentFile() {
+        await supabase
+          .from("documents")
+          .update({
+            file_name: activeDocument.file_name || null,
+            file_path: oldPath || null,
+            file_size: activeDocument.file_size || null,
+            uploaded_at: activeDocument.uploaded_at || null,
+          })
+          .eq("id", activeDocument.id);
+
+        if (oldPath) {
+          await supabase
+            .from("document_revisions")
+            .update({ is_current: true })
+            .eq("document_id", activeDocument.id)
+            .eq("file_path", oldPath);
+        }
+      }
 
       const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
         upsert: true,
@@ -1799,10 +1842,7 @@ function DocumentsPageContent() {
         return;
       }
 
-      await supabase
-        .from("document_revisions")
-        .update({ is_current: false })
-        .eq("document_id", selectedDocument.id);
+      uploadedPath = path;
 
       const fileUpdatePayload: Record<string, unknown> = {
         document_type: detailForm.document_type || null,
@@ -1839,10 +1879,23 @@ function DocumentsPageContent() {
       const { error: updateError } = await supabase
         .from("documents")
         .update(fileUpdatePayload)
-        .eq("id", selectedDocument.id);
+        .eq("id", activeDocument.id);
 
       if (updateError) {
+        await cleanupUploadedFile();
         setMessage(`Document file update failed: ${updateError.message}`);
+        return;
+      }
+
+      const { error: revisionCurrentError } = await supabase
+        .from("document_revisions")
+        .update({ is_current: false })
+        .eq("document_id", activeDocument.id);
+
+      if (revisionCurrentError) {
+        await restorePreviousDocumentFile();
+        await cleanupUploadedFile();
+        setMessage(`Revision history update failed: ${revisionCurrentError.message}`);
         return;
       }
 
@@ -1863,18 +1916,17 @@ function DocumentsPageContent() {
       });
 
       if (revisionInsertError) {
+        await restorePreviousDocumentFile();
+        await cleanupUploadedFile();
         setMessage(`Revision history update failed: ${revisionInsertError.message}`);
         return;
-      }
-
-      if (oldPath && oldPath !== path) {
-        await supabase.storage.from(STORAGE_BUCKET).remove([oldPath]);
       }
 
       setMessage(
         `Controlled copy uploaded for revision ${currentRevision}. Files remain view/download only in the system.`
       );
       await loadDocuments();
+      await loadDocumentRevisions(activeDocument.id, { quiet: true });
     } finally {
       setIsUploadingFile(false);
       event.target.value = "";
@@ -1919,13 +1971,19 @@ function DocumentsPageContent() {
       return;
     }
 
-    await supabase
+    const { error: revisionUpdateError } = await supabase
       .from("document_revisions")
       .update({ is_current: false })
       .eq("document_id", selectedDocument.id);
 
+    if (revisionUpdateError) {
+      setMessage(`Revision history update failed: ${revisionUpdateError.message}`);
+      return;
+    }
+
     setMessage(`Document moved to revision ${nextRevision}. Upload the new controlled copy next.`);
     await loadDocuments();
+    await loadDocumentRevisions(selectedDocument.id, { quiet: true });
   }
 
   async function removeControlledFile() {
