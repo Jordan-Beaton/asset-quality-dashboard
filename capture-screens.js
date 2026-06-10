@@ -1,8 +1,11 @@
 // Uses puppeteer-core with the system Chrome to capture screenshots
-const { execSync } = require("child_process");
+// Optional local-only login credentials for screenshot capture.
+// Set SCREENSHOT_LOGIN_EMAIL and SCREENSHOT_LOGIN_PASSWORD in your shell or .env.local.
+const LOGIN_EMAIL = process.env.SCREENSHOT_LOGIN_EMAIL || "";
+const LOGIN_PASSWORD = process.env.SCREENSHOT_LOGIN_PASSWORD || "";
+
 const fs = require("fs");
 const path = require("path");
-const http = require("http");
 
 const OUT_DIR = "C:\\Users\\JBeaton\\asset-quality-webapp\\screenshots";
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR);
@@ -49,8 +52,28 @@ const PAGES = [
 
   const page = await browser.newPage();
 
-  // Try to log in first if needed
-  await page.goto("http://localhost:3000/home", { waitUntil: "networkidle2", timeout: 15000 });
+  if (LOGIN_EMAIL && LOGIN_PASSWORD) {
+    console.log("Logging in for screenshot capture...");
+    await page.goto("http://localhost:3000/login", { waitUntil: "networkidle2", timeout: 20000 });
+
+    await page.waitForSelector('input[type="email"], input[name="email"], input[placeholder*="mail" i]', { timeout: 10000 });
+    const emailInput = await page.$('input[type="email"]') || await page.$('input[name="email"]');
+    await emailInput.click({ clickCount: 3 });
+    await emailInput.type(LOGIN_EMAIL);
+
+    const passwordInput = await page.$('input[type="password"]');
+    await passwordInput.click({ clickCount: 3 });
+    await passwordInput.type(LOGIN_PASSWORD);
+
+    const submitBtn = await page.$('button[type="submit"]') || await page.$('button');
+    await submitBtn.click();
+
+    await page.waitForFunction(() => !window.location.pathname.startsWith("/login"), { timeout: 15000 });
+    await new Promise(r => setTimeout(r, 2000));
+    console.log("Logged in — now at:", await page.url());
+  } else {
+    console.log("Screenshot login skipped. Set SCREENSHOT_LOGIN_EMAIL and SCREENSHOT_LOGIN_PASSWORD to capture authenticated pages.");
+  }
 
   for (const { name, url } of PAGES) {
     try {
