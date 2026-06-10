@@ -189,6 +189,18 @@ function filterNavItemsForRole(items: NavItem[], role: SystemRole, moduleAccess:
   });
 }
 
+function isModuleAllowed(moduleKey: string, role: SystemRole, moduleAccess: ModuleAccess) {
+  if (moduleKey === "public" || moduleKey === "login") return true;
+  if (moduleKey === "home" || moduleKey === "people") return getAllowedModuleKeys(role).has(moduleKey);
+  if (moduleKey === "quality") return getAllowedModuleKeys(role).has("quality") || hasExplicitAccess(moduleAccess.quality) || hasExplicitAccess(moduleAccess.documents);
+  if (moduleKey === "hse") return getAllowedModuleKeys(role).has("hse") || hasExplicitAccess(moduleAccess.hse);
+  if (moduleKey === "assets") return getAllowedModuleKeys(role).has("assets") || hasExplicitAccess(moduleAccess.assets);
+  if (moduleKey === "risk") return getAllowedModuleKeys(role).has("risk") || hasExplicitAccess(moduleAccess.risk);
+  if (moduleKey === "actions") return getAllowedModuleKeys(role).has("actions") || hasExplicitAccess(moduleAccess.actions);
+  if (moduleKey === "admin") return getAllowedModuleKeys(role).has("admin") || hasExplicitAccess(moduleAccess.admin);
+  return getAllowedModuleKeys(role).has(moduleKey);
+}
+
 function RailIcon({ icon }: { icon: NavIconKey }) {
   const common = {
     fill: "none",
@@ -331,6 +343,7 @@ export default function AppShell({ children }: AppShellProps) {
   const [signedInName, setSignedInName] = useState("");
   const [signedInRole, setSignedInRole] = useState<SystemRole>("");
   const [signedInModuleAccess, setSignedInModuleAccess] = useState<ModuleAccess>({});
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const isLoginPage = pathname === "/login";
   const isPublicObservationPage = pathname === "/observe";
   const isHomePage = pathname === "/home";
@@ -387,6 +400,30 @@ export default function AppShell({ children }: AppShellProps) {
   const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess);
   const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldInspectionMode;
   const railOpen = isRailExpanded || isRailPinned;
+  const currentModuleKey = isLoginPage
+    ? "login"
+    : isPublicObservationPage
+    ? "public"
+    : isHomePage
+    ? "home"
+    : isActionModule
+    ? "actions"
+    : isPeopleModule
+    ? "people"
+    : isAdminModule
+    ? "admin"
+    : isHseModule
+    ? "hse"
+    : isAssetModule
+    ? "assets"
+    : isRiskModule
+    ? "risk"
+    : "quality";
+  const pageAccessAllowed =
+    isLoginPage ||
+    isPublicObservationPage ||
+    !permissionsLoaded ||
+    isModuleAllowed(currentModuleKey, signedInRole, signedInModuleAccess);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -411,6 +448,7 @@ export default function AppShell({ children }: AppShellProps) {
     let isMounted = true;
 
     async function loadSignedInName() {
+      setPermissionsLoaded(false);
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -420,6 +458,7 @@ export default function AppShell({ children }: AppShellProps) {
           setSignedInName("");
           setSignedInRole("");
           setSignedInModuleAccess({});
+          setPermissionsLoaded(true);
         }
         return;
       }
@@ -459,6 +498,7 @@ export default function AppShell({ children }: AppShellProps) {
           actions: person?.action_access || roleDefaults?.action_access,
           admin: person?.admin_access || roleDefaults?.admin_access,
         });
+        setPermissionsLoaded(true);
         return;
       }
 
@@ -466,6 +506,7 @@ export default function AppShell({ children }: AppShellProps) {
         setSignedInName(user.user_metadata?.name || "");
         setSignedInRole("");
         setSignedInModuleAccess({});
+        setPermissionsLoaded(true);
       }
     }
 
@@ -869,7 +910,69 @@ export default function AppShell({ children }: AppShellProps) {
             boxSizing: "border-box",
           }}
         >
-          {children}
+          {pageAccessAllowed ? (
+            children
+          ) : (
+            <section
+              style={{
+                background: "#ffffff",
+                border: "1px solid #dbe3ef",
+                borderRadius: "18px",
+                padding: "24px",
+                boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+                display: "grid",
+                gap: "14px",
+                maxWidth: "760px",
+              }}
+            >
+              <div
+                style={{
+                  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+                  color: "#ffffff",
+                  borderRadius: "14px",
+                  padding: "18px 20px",
+                }}
+              >
+                <div style={{ fontSize: "12px", fontWeight: 900, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                  Access Restricted
+                </div>
+                <h1 style={{ margin: "8px 0 0", fontSize: "28px", lineHeight: 1.1 }}>You do not currently have access to this area.</h1>
+              </div>
+              <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
+                Your current role or individual permissions do not include the {moduleTitle} workspace. If this looks wrong, ask an Admin to review your role or permission override in Admin / Settings.
+              </p>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <Link
+                  href="/home"
+                  style={{
+                    background: "#3A9B98",
+                    color: "#ffffff",
+                    textDecoration: "none",
+                    borderRadius: "10px",
+                    padding: "12px 16px",
+                    fontWeight: 800,
+                  }}
+                >
+                  Back to Home
+                </Link>
+                {signedInName ? (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      borderRadius: "10px",
+                      padding: "12px 14px",
+                      background: "#eef4f6",
+                      color: "#334155",
+                      fontWeight: 800,
+                    }}
+                  >
+                    Signed in as {signedInName}
+                  </span>
+                ) : null}
+              </div>
+            </section>
+          )}
         </div>
       </main>
     </div>
