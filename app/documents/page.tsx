@@ -27,6 +27,16 @@ type ReviewApprovalStatus =
   | "Approved"
   | "Rejected";
 
+type WorkflowStatus =
+  | "Draft"
+  | "Pending Review"
+  | "Reviewed"
+  | "Pending Approval"
+  | "Approved"
+  | "Rejected"
+  | "Superseded"
+  | "Archived";
+
 type DocumentTypeOption =
   | "Procedure"
   | "Form"
@@ -69,6 +79,11 @@ type DocumentRow = {
   department_owner: string | null;
   status: string | null;
   review_approval_status: string | null;
+  workflow_status?: string | null;
+  workflow_reviewer_name?: string | null;
+  workflow_reviewer_email?: string | null;
+  workflow_approver_name?: string | null;
+  workflow_approver_email?: string | null;
   current_revision: string | null;
   issue_date: string | null;
   review_cycle_years: number;
@@ -151,6 +166,7 @@ type DocumentForm = {
   department_owner: DepartmentOwnerOption | "";
   status: DocumentStatus;
   review_approval_status: ReviewApprovalStatus;
+  workflow_status: WorkflowStatus;
   current_revision: string;
   issue_date: string;
   review_cycle_years: 1 | 2 | 3;
@@ -184,8 +200,7 @@ type DocumentWorkspaceView =
   | "dashboard"
   | "register"
   | "create"
-  | "review"
-  | "approval"
+  | "workflow"
   | "archive"
   | "reports";
 
@@ -259,6 +274,7 @@ const emptyForm: DocumentForm = {
   department_owner: "",
   status: "Draft",
   review_approval_status: "Draft",
+  workflow_status: "Draft",
   current_revision: "A",
   issue_date: "",
   review_cycle_years: 1,
@@ -325,6 +341,59 @@ function normalizeApprovalStatus(value: string | null | undefined): ReviewApprov
   if (text === "reviewed") return "Reviewed";
   if (text === "pending review") return "Pending Review";
   if (text === "rejected") return "Rejected";
+  return "Draft";
+}
+
+function normalizeWorkflowStatus(
+  workflowStatus: string | null | undefined,
+  reviewApprovalStatus?: string | null,
+  status?: string | null
+): WorkflowStatus {
+  const workflow = (workflowStatus || "").trim().toLowerCase();
+  if (workflow === "pending approval") return "Pending Approval";
+  if (workflow === "pending review") return "Pending Review";
+  if (workflow === "reviewed") return "Reviewed";
+  if (workflow === "approved") return "Approved";
+  if (workflow === "rejected") return "Rejected";
+  if (workflow === "superseded") return "Superseded";
+  if (workflow === "archived") return "Archived";
+
+  const approval = normalizeApprovalStatus(reviewApprovalStatus);
+  if (approval === "Approved") return "Approved";
+  if (approval === "Reviewed") return "Reviewed";
+  if (approval === "Pending Review") return "Pending Review";
+  if (approval === "Rejected") return "Rejected";
+
+  const documentStatus = (status || "").trim().toLowerCase();
+  if (documentStatus === "live" || documentStatus === "approved") return "Approved";
+  if (documentStatus === "under review") return "Pending Review";
+  if (documentStatus === "superseded") return "Superseded";
+  if (documentStatus === "archived" || documentStatus === "obsolete") return "Archived";
+  return "Draft";
+}
+
+function getWorkflowTone(status: WorkflowStatus) {
+  if (status === "Approved") return { bg: "#dcfce7", color: "#166534" };
+  if (status === "Pending Approval") return { bg: "#e0f2fe", color: "#075985" };
+  if (status === "Pending Review" || status === "Reviewed") return { bg: "#fef3c7", color: "#92400e" };
+  if (status === "Rejected") return { bg: "#fee2e2", color: "#991b1b" };
+  if (status === "Superseded" || status === "Archived") return { bg: "#e2e8f0", color: "#334155" };
+  return { bg: "#dbeafe", color: "#1d4ed8" };
+}
+
+function getLegacyStatusForWorkflow(status: WorkflowStatus): DocumentStatus {
+  if (status === "Approved") return "Live";
+  if (status === "Pending Review" || status === "Reviewed" || status === "Pending Approval") return "Under Review";
+  if (status === "Superseded") return "Superseded";
+  if (status === "Archived") return "Archived";
+  return "Draft";
+}
+
+function getLegacyApprovalForWorkflow(status: WorkflowStatus): ReviewApprovalStatus {
+  if (status === "Approved") return "Approved";
+  if (status === "Pending Approval" || status === "Reviewed") return "Reviewed";
+  if (status === "Pending Review") return "Pending Review";
+  if (status === "Rejected") return "Rejected";
   return "Draft";
 }
 
@@ -558,7 +627,7 @@ function DocumentsPageContent() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [nextSequence, setNextSequence] = useState(1);
 
-  async function loadDocuments() {
+  async function loadDocuments(options: { selectDocumentId?: string } = {}) {
     const [
       { data: documentsData, error: documentsError },
       { data: assetsData, error: assetsError },
@@ -590,9 +659,11 @@ function DocumentsPageContent() {
     setAssets(assetsError ? [] : ((assetsData as AssetOption[]) || []));
     setPeople(peopleError ? [] : ((peopleData as PersonRow[]) || []));
     setContacts(contactsError ? fallbackContacts : ((contactsData as NotificationContactRow[]) || fallbackContacts));
-    setSelectedDocumentId((current) => current || rows[0]?.id || "");
+    setSelectedDocumentId((current) => options.selectDocumentId || current || rows[0]?.id || "");
     setLastRefreshed(new Date().toLocaleString("en-GB"));
-    setMessage(`Loaded ${rows.length} document${rows.length === 1 ? "" : "s"} successfully.`);
+    if (!options.selectDocumentId) {
+      setMessage(`Loaded ${rows.length} document${rows.length === 1 ? "" : "s"} successfully.`);
+    }
   }
 
   async function loadDocumentRevisions(documentId: string, options: { quiet?: boolean } = {}) {
@@ -675,7 +746,7 @@ function DocumentsPageContent() {
 
     return documents.filter((doc) => {
       const reviewTone = getReviewTone(doc.next_review_date);
-      const normalizedApproval = normalizeApprovalStatus(doc.review_approval_status);
+      const normalizedWorkflow = normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status);
 
       const matchesSearch =
         !lower ||
@@ -699,7 +770,11 @@ function DocumentsPageContent() {
           : (doc.status || "") === statusFilter);
       const matchesType = !typeFilter || (doc.document_type || "") === typeFilter;
       const matchesOwner = !ownerFilter || (doc.department_owner || "") === ownerFilter;
-      const matchesApproval = !approvalFilter || normalizedApproval === approvalFilter;
+      const matchesApproval =
+        !approvalFilter ||
+        (approvalFilter === "Workflow"
+          ? ["Pending Review", "Reviewed", "Pending Approval", "Rejected"].includes(normalizedWorkflow)
+          : normalizedWorkflow === approvalFilter);
       const matchesReview =
         !reviewFilter ||
         (reviewFilter === "Overdue" && reviewTone.label === "Overdue") ||
@@ -726,8 +801,13 @@ function DocumentsPageContent() {
     () => documents.filter((doc) => getReviewTone(doc.next_review_date).label === "Overdue"),
     [documents]
   );
-  const approvalQueueDocuments = useMemo(
-    () => documents.filter((doc) => normalizeApprovalStatus(doc.review_approval_status) === "Pending Review"),
+  const workflowQueueDocuments = useMemo(
+    () =>
+      documents.filter((doc) =>
+        ["Pending Review", "Reviewed", "Pending Approval", "Rejected"].includes(
+          normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status)
+        )
+      ),
     [documents]
   );
   const archiveDocuments = useMemo(
@@ -743,6 +823,13 @@ function DocumentsPageContent() {
     () => documents.find((doc) => doc.id === selectedDocumentId) || null,
     [documents, selectedDocumentId]
   );
+  const selectedWorkflowStatus: WorkflowStatus = selectedDocument
+    ? normalizeWorkflowStatus(
+        selectedDocument.workflow_status,
+        selectedDocument.review_approval_status,
+        selectedDocument.status
+      )
+    : "Draft";
 
   const latestDocumentLabel = useMemo(() => {
     const latest = [...documents].sort((a, b) => {
@@ -756,7 +843,17 @@ function DocumentsPageContent() {
 
   const selectedRevisions = useMemo(() => {
     if (!selectedDocumentId) return [];
-    return revisionsByDocumentId[selectedDocumentId] || [];
+    const rows = revisionsByDocumentId[selectedDocumentId] || [];
+    const revisionsWithFiles = new Set(
+      rows
+        .filter((revision) => Boolean(revision.file_path || revision.file_name))
+        .map((revision) => revision.revision)
+    );
+
+    return rows.filter((revision) => {
+      const isBlankPlaceholder = !revision.file_path && !revision.file_name;
+      return !(isBlankPlaceholder && revisionsWithFiles.has(revision.revision));
+    });
   }, [revisionsByDocumentId, selectedDocumentId]);
 
   const supportsReviewerEmail = useMemo(
@@ -789,14 +886,17 @@ function DocumentsPageContent() {
   }
 
   function buildDocumentFormFromRow(row: DocumentRow): DocumentForm {
-    const approverName = row.approved_by || "";
+    const reviewerName = row.reviewed_by || row.workflow_reviewer_name || "";
+    const approverName = row.approved_by || row.workflow_approver_name || "";
     const rejectorName = row.rejected_by || "";
     const outcomeName = approverName || rejectorName;
     const reviewerEmail =
       (typeof row.reviewer_email === "string" ? row.reviewer_email : null) ||
-      resolveDocumentPersonEmail(row.reviewed_by || "");
+      row.workflow_reviewer_email ||
+      resolveDocumentPersonEmail(reviewerName);
     const approverEmail =
       (typeof row.approver_email === "string" ? row.approver_email : null) ||
+      row.workflow_approver_email ||
       resolveDocumentPersonEmail(outcomeName);
     const originatorEmail = row.originator_email || "";
     const extras = extractAdditionalNotificationEmails(row.notification_emails, [
@@ -818,12 +918,13 @@ function DocumentsPageContent() {
       department_owner: (row.department_owner as DepartmentOwnerOption) || "",
       status: (row.status as DocumentStatus) || "Draft",
       review_approval_status: normalizeApprovalStatus(row.review_approval_status),
+      workflow_status: normalizeWorkflowStatus(row.workflow_status, row.review_approval_status, row.status),
       current_revision: row.current_revision || "A",
       issue_date: row.issue_date || "",
       review_cycle_years: (row.review_cycle_years as 1 | 2 | 3) || 1,
       originator_name: row.originator_name || "",
       originator_email: originatorEmail,
-      reviewed_by: row.reviewed_by || "",
+      reviewed_by: reviewerName,
       reviewer_email: reviewerEmail || "",
       reviewed_at: row.reviewed_at ? row.reviewed_at.slice(0, 10) : "",
       approved_by: approverName,
@@ -970,7 +1071,7 @@ function DocumentsPageContent() {
   ).length;
   const dueSoonReviews = dueSoonDocuments.length;
   const approvedDocuments = documents.filter(
-    (doc) => normalizeApprovalStatus(doc.review_approval_status) === "Approved"
+    (doc) => normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status) === "Approved"
   ).length;
 
   const uniqueTypes = [...new Set(documents.map((doc) => doc.document_type).filter(Boolean))].sort(
@@ -996,9 +1097,6 @@ function DocumentsPageContent() {
   const nextReviewDatePreview = buildNextReviewDate(form.issue_date, form.review_cycle_years);
   const detailReviewDatePreview = buildNextReviewDate(detailForm.issue_date, detailForm.review_cycle_years);
   const formOriginatorPerson = findPersonByName(people, form.originator_name);
-  const formReviewerPerson = findPersonByName(people, form.reviewed_by);
-  const formApproverPerson = findPersonByName(people, form.approved_by);
-  const formRejectorPerson = findPersonByName(people, form.rejected_by);
   const detailOriginatorPerson = findPersonByName(people, detailForm.originator_name);
   const detailReviewerPerson = findPersonByName(people, detailForm.reviewed_by);
   const detailApproverPerson = findPersonByName(people, detailForm.approved_by);
@@ -1073,6 +1171,7 @@ function DocumentsPageContent() {
   async function notifyDocumentEvent(
     eventType: NotificationEventType,
     source: DocumentForm,
+    documentId: string,
     documentNumber: string,
     documentTitle: string,
     extraMessage?: string
@@ -1094,6 +1193,7 @@ function DocumentsPageContent() {
         },
         body: JSON.stringify({
           eventType,
+          documentId,
           documentNumber,
           documentTitle,
           currentRevision: source.current_revision,
@@ -1120,6 +1220,80 @@ function DocumentsPageContent() {
     }
   }
 
+  async function recordWorkflowActivity(
+    document: Pick<DocumentRow, "id" | "document_number" | "title">,
+    action: string,
+    fromStatus: WorkflowStatus,
+    toStatus: WorkflowStatus,
+    actorName: string,
+    actorEmail: string,
+    note?: string
+  ) {
+    const { error } = await supabase.from("document_workflow_activity").insert({
+      document_id: document.id,
+      document_number: document.document_number,
+      document_title: document.title,
+      action,
+      from_status: fromStatus,
+      to_status: toStatus,
+      actor_name: actorName || currentUserPerson?.name || "",
+      actor_email: actorEmail || currentUserEmail || "",
+      note: note || null,
+    });
+
+    return error?.message || "";
+  }
+
+  async function updateCurrentRevisionSnapshot(
+    document: Pick<DocumentRow, "id" | "current_revision">,
+    values: Partial<Pick<DocumentRevisionRow, "issue_date" | "reviewed_by" | "reviewed_at" | "approved_by" | "approved_at">>
+  ) {
+    const revision = (document.current_revision || "A").trim() || "A";
+    const snapshot = {
+      ...values,
+      issue_date: values.issue_date || detailForm.issue_date || selectedDocument?.issue_date || todayIsoDate(),
+    };
+
+    const { data: existingRows, error: existingError } = await supabase
+      .from("document_revisions")
+      .select("id")
+      .eq("document_id", document.id)
+      .eq("revision", revision)
+      .eq("is_current", true)
+      .limit(1);
+
+    if (existingError) return existingError.message;
+
+    const existingId = existingRows?.[0]?.id;
+    if (existingId) {
+      const { error } = await supabase.from("document_revisions").update(snapshot).eq("id", existingId);
+      return error?.message || "";
+    }
+
+    const { error } = await supabase.from("document_revisions").insert({
+      document_id: document.id,
+      revision,
+      revision_notes: `Revision ${revision} workflow snapshot.`,
+      file_name: null,
+      file_path: null,
+      file_size: null,
+      uploaded_at: null,
+      ...snapshot,
+      is_current: true,
+    });
+
+    return error?.message || "";
+  }
+
+  function buildWorkflowMessage(successMessage: string, notificationError?: string | null, activityError?: string) {
+    const warnings = [
+      notificationError ? `notification failed: ${notificationError}` : "",
+      activityError ? `activity log failed: ${activityError}` : "",
+    ].filter(Boolean);
+
+    return warnings.length ? `${successMessage} Warning: ${warnings.join("; ")}.` : successMessage;
+  }
+
   function applySnapshotFilter(filter: {
     status?: string;
     statuses?: string[];
@@ -1142,30 +1316,25 @@ function DocumentsPageContent() {
   function switchWorkspaceView(view: DocumentWorkspaceView) {
     setActiveView(view);
 
+    if (view === "register") {
+      clearFilters();
+      setShowCreatePanel(false);
+      return;
+    }
+
     if (view === "create") {
       setShowCreatePanel(true);
       setShowDetailPanel(false);
       return;
     }
 
-    if (view === "review") {
-      setSearch("");
-      setStatusFilter("");
-      setTypeFilter("");
-      setOwnerFilter("");
-      setApprovalFilter("");
-      setReviewFilter("Overdue");
-      setShowCreatePanel(false);
-      return;
-    }
-
-    if (view === "approval") {
+    if (view === "workflow") {
       setSearch("");
       setStatusFilter("");
       setTypeFilter("");
       setOwnerFilter("");
       setReviewFilter("");
-      setApprovalFilter("Pending Review");
+      setApprovalFilter("Workflow");
       setShowCreatePanel(false);
       return;
     }
@@ -1235,7 +1404,7 @@ function DocumentsPageContent() {
           doc.department_owner || "-",
           doc.current_revision || "-",
           doc.status || "-",
-          normalizeApprovalStatus(doc.review_approval_status),
+          normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status),
           formatDate(doc.issue_date),
           formatDate(doc.next_review_date),
         ]),
@@ -1343,7 +1512,7 @@ function DocumentsPageContent() {
       return;
     }
 
-    if (form.status === "Live" && form.review_approval_status !== "Approved") {
+    if (form.status === "Live" && form.workflow_status !== "Approved") {
       setMessage("A document cannot go Live until it has been reviewed and approved.");
       return;
     }
@@ -1362,18 +1531,21 @@ function DocumentsPageContent() {
       title: form.title.trim(),
       description: form.description.trim() || null,
       department_owner: form.department_owner,
-      status: form.status,
-      review_approval_status: form.review_approval_status,
+      status: getLegacyStatusForWorkflow(form.workflow_status),
+      review_approval_status: getLegacyApprovalForWorkflow(form.workflow_status),
+      workflow_status: form.workflow_status,
       current_revision: (form.current_revision || "A").trim().toUpperCase(),
-      issue_date: form.issue_date || null,
+      issue_date: form.issue_date || todayIsoDate(),
       review_cycle_years: form.review_cycle_years,
       originator_name: form.originator_name.trim(),
       originator_email: form.originator_email.trim(),
-      reviewed_by: form.reviewed_by.trim() || null,
+      reviewed_by: form.workflow_status === "Reviewed" || form.workflow_status === "Pending Approval" || form.workflow_status === "Approved" ? form.reviewed_by.trim() || null : null,
       reviewed_at: form.reviewed_at || null,
-      approved_by: form.approved_by.trim() || null,
-      rejected_by: form.rejected_by.trim() || null,
+      approved_by: form.workflow_status === "Approved" ? form.approved_by.trim() || null : null,
+      rejected_by: form.workflow_status === "Rejected" ? form.rejected_by.trim() || null : null,
       approved_at: form.approved_at || null,
+      rejected_at: form.workflow_status === "Rejected" ? form.rejected_at || null : null,
+      rejection_reason: form.workflow_status === "Rejected" ? form.rejection_reason.trim() || null : null,
       notification_emails: deriveStoredNotificationEmails(form),
       comments: form.comments.trim() || null,
     };
@@ -1398,6 +1570,23 @@ function DocumentsPageContent() {
       return;
     }
 
+    const createdDocument = data as DocumentRow;
+    const { error: revisionCreateError } = await supabase.from("document_revisions").insert({
+      document_id: createdDocument.id,
+      revision: createdDocument.current_revision || "A",
+      revision_notes: form.comments.trim() || "Draft document record created.",
+      file_name: null,
+      file_path: null,
+      file_size: null,
+      uploaded_at: null,
+      issue_date: form.issue_date || null,
+      reviewed_by: null,
+      reviewed_at: null,
+      approved_by: null,
+      approved_at: null,
+      is_current: true,
+    });
+
     setForm(emptyForm);
     setFormPeopleSearch({
       originator_name: emptyForm.originator_name,
@@ -1405,11 +1594,28 @@ function DocumentsPageContent() {
       approved_by: emptyForm.approved_by,
       rejected_by: emptyForm.rejected_by,
     });
-    setSelectedDocumentId((data as DocumentRow).id);
+    clearFilters();
+    setActiveView("register");
     setShowDetailPanel(true);
     setShowCreatePanel(false);
-    setMessage("Document added successfully.");
-    await loadDocuments();
+    setSelectedDocumentId(createdDocument.id);
+    setDetailForm(buildDocumentFormFromRow(createdDocument));
+    setDetailPeopleSearch({
+      originator_name: createdDocument.originator_name || "",
+      reviewed_by: createdDocument.reviewed_by || "",
+      approved_by: createdDocument.approved_by || "",
+      rejected_by: createdDocument.rejected_by || "",
+    });
+    await loadDocuments({ selectDocumentId: createdDocument.id });
+    await loadDocumentRevisions(createdDocument.id, { quiet: true });
+    window.setTimeout(() => {
+      document.getElementById("document-detail-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+    setMessage(
+      revisionCreateError
+        ? `Document added, but initial revision history failed: ${revisionCreateError.message}`
+        : "Document added successfully. Upload the controlled copy and submit it for review from the detail panel below."
+    );
   }
 
   async function saveDocumentChanges() {
@@ -1438,7 +1644,7 @@ function DocumentsPageContent() {
       return;
     }
 
-    if (detailForm.status === "Live" && detailForm.review_approval_status !== "Approved") {
+    if (detailForm.status === "Live" && detailForm.workflow_status !== "Approved") {
       setMessage("A document cannot go Live until it has been reviewed and approved.");
       return;
     }
@@ -1456,18 +1662,21 @@ function DocumentsPageContent() {
       title: detailForm.title.trim(),
       description: detailForm.description.trim() || null,
       department_owner: detailForm.department_owner,
-      status: detailForm.status,
-      review_approval_status: detailForm.review_approval_status,
+      status: getLegacyStatusForWorkflow(detailForm.workflow_status),
+      review_approval_status: getLegacyApprovalForWorkflow(detailForm.workflow_status),
+      workflow_status: detailForm.workflow_status,
       current_revision: (detailForm.current_revision || "A").trim().toUpperCase(),
       issue_date: detailForm.issue_date || null,
       review_cycle_years: detailForm.review_cycle_years,
       originator_name: detailForm.originator_name.trim(),
       originator_email: detailForm.originator_email.trim(),
-      reviewed_by: detailForm.reviewed_by.trim() || null,
+      reviewed_by: detailForm.workflow_status === "Reviewed" || detailForm.workflow_status === "Pending Approval" || detailForm.workflow_status === "Approved" ? detailForm.reviewed_by.trim() || null : null,
       reviewed_at: detailForm.reviewed_at || null,
-      approved_by: detailForm.approved_by.trim() || null,
-      rejected_by: detailForm.rejected_by.trim() || null,
+      approved_by: detailForm.workflow_status === "Approved" ? detailForm.approved_by.trim() || null : null,
+      rejected_by: detailForm.workflow_status === "Rejected" ? detailForm.rejected_by.trim() || null : null,
       approved_at: detailForm.approved_at || null,
+      rejected_at: detailForm.workflow_status === "Rejected" ? detailForm.rejected_at || null : null,
+      rejection_reason: detailForm.workflow_status === "Rejected" ? detailForm.rejection_reason.trim() || null : null,
       notification_emails: deriveStoredNotificationEmails(detailForm),
       comments: detailForm.comments.trim() || null,
     };
@@ -1506,19 +1715,49 @@ function DocumentsPageContent() {
       return;
     }
 
+    if (!detailForm.reviewed_by.trim() || !detailForm.reviewer_email.trim()) {
+      setMessage("Select a reviewer from People Management before sending for review.");
+      return;
+    }
+
+    if (!detailForm.approved_by.trim() || !detailForm.approver_email.trim()) {
+      setMessage("Select an approver before sending to the reviewer so the email workflow can continue automatically.");
+      return;
+    }
+
+    const fromStatus = selectedWorkflowStatus;
+    const toStatus: WorkflowStatus = "Pending Review";
     const payload: Record<string, unknown> = {
-      status: "Under Review" as DocumentStatus,
-      review_approval_status: "Pending Review" as ReviewApprovalStatus,
+      status: getLegacyStatusForWorkflow(toStatus),
+      review_approval_status: getLegacyApprovalForWorkflow(toStatus),
+      workflow_status: toStatus,
+      workflow_reviewer_name: detailForm.reviewed_by.trim(),
+      workflow_reviewer_email: detailForm.reviewer_email.trim(),
+      workflow_approver_name: detailForm.approved_by.trim(),
+      workflow_approver_email: detailForm.approver_email.trim(),
       originator_name: detailForm.originator_name.trim(),
       originator_email: detailForm.originator_email.trim(),
+      reviewed_by: null,
+      reviewed_at: null,
+      approved_by: null,
+      approved_at: null,
+      rejected_by: null,
+      rejected_at: null,
+      rejection_reason: null,
       notification_emails: deriveStoredNotificationEmails(detailForm),
       comments: detailForm.comments.trim(),
     };
+    if (supportsReviewerEmail) {
+      payload.reviewer_email = detailForm.reviewer_email.trim();
+    }
+    if (supportsApproverEmail) {
+      payload.approver_email = detailForm.approver_email.trim();
+    }
 
     const { error } = await supabase.from("documents").update(payload).eq("id", selectedDocument.id);
 
     if (error) {
-      setMessage(`Submit for review failed: ${error.message}`);
+      setMessage(`Send to reviewer failed: ${error.message}`);
       return;
     }
 
@@ -1526,26 +1765,35 @@ function DocumentsPageContent() {
       ...detailForm,
       status: "Under Review",
       review_approval_status: "Pending Review",
+      workflow_status: toStatus,
+      approved_by: detailForm.approved_by.trim(),
+      approver_email: detailForm.approver_email.trim(),
       originator_name: detailForm.originator_name.trim(),
       originator_email: detailForm.originator_email.trim(),
       notification_emails: deriveStoredNotificationEmails(detailForm),
       comments: detailForm.comments.trim(),
     };
 
-      const notificationError = await notifyDocumentEvent(
-        "submitted_for_review",
-        reviewSubmissionSource,
-        selectedDocument.document_number,
-        detailForm.title.trim(),
-        detailForm.comments.trim()
-      );
+    const activityError = await recordWorkflowActivity(
+      selectedDocument,
+      "sent_to_reviewer",
+      fromStatus,
+      toStatus,
+      detailForm.originator_name.trim(),
+      detailForm.originator_email.trim(),
+      `Reviewer: ${detailForm.reviewed_by.trim()}`
+    );
+    const notificationError = await notifyDocumentEvent(
+      "submitted_for_review",
+      reviewSubmissionSource,
+      selectedDocument.id,
+      selectedDocument.document_number,
+      detailForm.title.trim(),
+      detailForm.comments.trim()
+    );
 
-      setMessage(
-        notificationError
-          ? `Document updated, but notification failed: ${notificationError}`
-          : "Document submitted for review."
-      );
-      await loadDocuments();
+    setMessage(buildWorkflowMessage("Document sent to reviewer.", notificationError, activityError));
+    await loadDocuments();
   }
 
   async function markReviewed() {
@@ -1554,24 +1802,28 @@ function DocumentsPageContent() {
       return;
     }
 
-    if (normalizeApprovalStatus(selectedDocument.review_approval_status) !== "Pending Review") {
-      setMessage("Only documents pending review can be marked as reviewed.");
+    if (selectedWorkflowStatus !== "Pending Review") {
+      setMessage("Only documents pending review can be accepted by the reviewer.");
       return;
     }
 
-    const reviewDate =
-      detailForm.reviewed_at && detailForm.reviewed_at.trim() ? detailForm.reviewed_at : todayIsoDate();
+    const fromStatus = selectedWorkflowStatus;
+    const toStatus: WorkflowStatus = "Reviewed";
+    const reviewDate = todayIsoDate();
     const reviewedBy = resolveWorkflowActor(detailForm.reviewed_by, "Reviewed By");
     if (!reviewedBy) return;
 
     const payload: Record<string, unknown> = {
-      status: "Under Review" as DocumentStatus,
-      review_approval_status: "Reviewed" as ReviewApprovalStatus,
+      status: getLegacyStatusForWorkflow(toStatus),
+      review_approval_status: getLegacyApprovalForWorkflow(toStatus),
+      workflow_status: toStatus,
       reviewed_by: reviewedBy,
       reviewed_at: reviewDate,
-      rejected_by: "",
+      approved_by: null,
+      approved_at: null,
+      rejected_by: null,
       rejected_at: null,
-      rejection_reason: "",
+      rejection_reason: null,
       notification_emails: deriveStoredNotificationEmails(detailForm),
     };
     if (supportsReviewerEmail) {
@@ -1581,37 +1833,107 @@ function DocumentsPageContent() {
     const { error } = await supabase.from("documents").update(payload).eq("id", selectedDocument.id);
 
     if (error) {
-      setMessage(`Mark reviewed failed: ${error.message}`);
+      setMessage(`Accept review failed: ${error.message}`);
       return;
     }
 
-    const reviewedSource: DocumentForm = {
+    const revisionSnapshotError = await updateCurrentRevisionSnapshot(selectedDocument, {
+      reviewed_by: reviewedBy,
+      reviewed_at: reviewDate,
+    });
+    const activityError = await recordWorkflowActivity(
+      selectedDocument,
+      "review_accepted",
+      fromStatus,
+      toStatus,
+      reviewedBy,
+      detailForm.reviewer_email.trim(),
+      `Reviewed on ${formatDate(reviewDate)}.`
+    );
+    setMessage(
+      buildWorkflowMessage(
+        "Review accepted. Select an approver and send the document for approval.",
+        null,
+        [activityError, revisionSnapshotError ? `revision snapshot failed: ${revisionSnapshotError}` : ""]
+          .filter(Boolean)
+          .join("; ")
+      )
+    );
+    await loadDocuments();
+  }
+
+  async function sendToApprover() {
+    if (!selectedDocument) {
+      setMessage("Select a document first.");
+      return;
+    }
+
+    if (selectedWorkflowStatus !== "Reviewed") {
+      setMessage("The reviewer must accept the document before it can be sent to an approver.");
+      return;
+    }
+
+    if (!detailForm.approved_by.trim() || !detailForm.approver_email.trim()) {
+      setMessage("Select an approver from People Management before sending for approval.");
+      return;
+    }
+
+    const fromStatus = selectedWorkflowStatus;
+    const toStatus: WorkflowStatus = "Pending Approval";
+    const payload: Record<string, unknown> = {
+      status: getLegacyStatusForWorkflow(toStatus),
+      review_approval_status: getLegacyApprovalForWorkflow(toStatus),
+      workflow_status: toStatus,
+      workflow_approver_name: detailForm.approved_by.trim(),
+      workflow_approver_email: detailForm.approver_email.trim(),
+      approved_by: null,
+      approved_at: null,
+      rejected_by: null,
+      rejected_at: null,
+      rejection_reason: null,
+      notification_emails: deriveStoredNotificationEmails(detailForm),
+    };
+    if (supportsApproverEmail) {
+      payload.approver_email = detailForm.approver_email.trim();
+    }
+
+    const { error } = await supabase.from("documents").update(payload).eq("id", selectedDocument.id);
+
+    if (error) {
+      setMessage(`Send to approver failed: ${error.message}`);
+      return;
+    }
+
+    const approvalSource: DocumentForm = {
       ...detailForm,
       status: "Under Review",
       review_approval_status: "Reviewed",
-      reviewed_by: String(payload.reviewed_by || ""),
-      reviewer_email: detailForm.reviewer_email,
-      reviewed_at: String(payload.reviewed_at || ""),
-      rejected_by: "",
-      rejected_at: "",
-      rejection_reason: "",
+      workflow_status: toStatus,
+      approved_by: detailForm.approved_by.trim(),
+      approver_email: detailForm.approver_email.trim(),
       notification_emails: deriveStoredNotificationEmails(detailForm),
     };
 
-      const notificationError = await notifyDocumentEvent(
-        "reviewed",
-        reviewedSource,
-        selectedDocument.document_number,
-        detailForm.title.trim(),
-        `Reviewed by ${String(payload.reviewed_by || "")} on ${formatDate(String(payload.reviewed_at || ""))}.`
-      );
+    const activityError = await recordWorkflowActivity(
+      selectedDocument,
+      "sent_to_approver",
+      fromStatus,
+      toStatus,
+      detailForm.reviewed_by.trim() || currentUserPerson?.name || "",
+      detailForm.reviewer_email.trim() || currentUserEmail,
+      `Approver: ${detailForm.approved_by.trim()}`
+    );
+    const notificationError = await notifyDocumentEvent(
+      "reviewed",
+      approvalSource,
+      selectedDocument.id,
+      selectedDocument.document_number,
+      detailForm.title.trim(),
+      `Document reviewed and sent to ${detailForm.approved_by.trim()} for approval.`
+    );
 
-      setMessage(
-        notificationError
-          ? `Document updated, but notification failed: ${notificationError}`
-          : "Document marked as reviewed."
-      );
-      await loadDocuments();
+    setMessage(buildWorkflowMessage("Document sent to approver.", notificationError, activityError));
+    await loadDocuments();
   }
 
   async function approveDocument() {
@@ -1620,24 +1942,29 @@ function DocumentsPageContent() {
       return;
     }
 
-    if (normalizeApprovalStatus(selectedDocument.review_approval_status) !== "Reviewed") {
-      setMessage("A document must be reviewed before it can be approved.");
+    if (selectedWorkflowStatus !== "Pending Approval") {
+      setMessage("A document must be sent to an approver before it can be approved.");
       return;
     }
 
+    const fromStatus = selectedWorkflowStatus;
+    const toStatus: WorkflowStatus = "Approved";
     const approvedDate = todayIsoDate();
     const approvedBy = resolveWorkflowActor(detailForm.approved_by, "Approved By");
     if (!approvedBy) return;
+    const nextReviewDate = buildNextReviewDate(approvedDate, detailForm.review_cycle_years);
 
     const payload: Record<string, unknown> = {
-      status: "Live" as DocumentStatus,
-      review_approval_status: "Approved" as ReviewApprovalStatus,
+      status: getLegacyStatusForWorkflow(toStatus),
+      review_approval_status: getLegacyApprovalForWorkflow(toStatus),
+      workflow_status: toStatus,
       approved_by: approvedBy,
       approved_at:
         detailForm.approved_at && detailForm.approved_at.trim() ? detailForm.approved_at : approvedDate,
-      rejected_by: "",
+      next_review_date: nextReviewDate || null,
+      rejected_by: null,
       rejected_at: null,
-      rejection_reason: "",
+      rejection_reason: null,
       notification_emails: deriveStoredNotificationEmails(detailForm),
     };
     if (supportsApproverEmail) {
@@ -1651,10 +1978,17 @@ function DocumentsPageContent() {
       return;
     }
 
+    const revisionSnapshotError = await updateCurrentRevisionSnapshot(selectedDocument, {
+      reviewed_by: detailForm.reviewed_by.trim() || selectedDocument.reviewed_by || selectedDocument.workflow_reviewer_name || null,
+      reviewed_at: detailForm.reviewed_at || selectedDocument.reviewed_at || null,
+      approved_by: approvedBy,
+      approved_at: String(payload.approved_at || ""),
+    });
     const approvedSource: DocumentForm = {
       ...detailForm,
       status: "Live",
       review_approval_status: "Approved",
+      workflow_status: toStatus,
       approved_by: String(payload.approved_by || ""),
       approver_email: detailForm.approver_email,
       approved_at: String(payload.approved_at || ""),
@@ -1664,20 +1998,34 @@ function DocumentsPageContent() {
       notification_emails: deriveStoredNotificationEmails(detailForm),
     };
 
-      const notificationError = await notifyDocumentEvent(
-        "approved",
-        approvedSource,
-        selectedDocument.document_number,
-        detailForm.title.trim(),
-        `Approved by ${String(payload.approved_by || "")} on ${formatDate(String(payload.approved_at || ""))}.`
-      );
+    const activityError = await recordWorkflowActivity(
+      selectedDocument,
+      "approved",
+      fromStatus,
+      toStatus,
+      approvedBy,
+      detailForm.approver_email.trim(),
+      `Approved on ${formatDate(String(payload.approved_at || ""))}. Next review: ${formatDate(nextReviewDate)}.`
+    );
+    const notificationError = await notifyDocumentEvent(
+      "approved",
+      approvedSource,
+      selectedDocument.id,
+      selectedDocument.document_number,
+      detailForm.title.trim(),
+      `Approved by ${String(payload.approved_by || "")} on ${formatDate(String(payload.approved_at || ""))}.`
+    );
 
-      setMessage(
-        notificationError
-          ? `Document updated, but notification failed: ${notificationError}`
-          : "Document approved and moved live."
-      );
-      await loadDocuments();
+    setMessage(
+      buildWorkflowMessage(
+        "Document approved and moved live.",
+        notificationError,
+        [activityError, revisionSnapshotError ? `revision snapshot failed: ${revisionSnapshotError}` : ""]
+          .filter(Boolean)
+          .join("; ")
+      )
+    );
+    await loadDocuments();
   }
 
   async function rejectDocument() {
@@ -1695,10 +2043,14 @@ function DocumentsPageContent() {
     const rejectedBy = resolveWorkflowActor(detailForm.rejected_by, "Rejected By");
     if (!rejectedBy) return;
 
+    const fromStatus = selectedWorkflowStatus;
+    const toStatus: WorkflowStatus = "Rejected";
     const payload: Record<string, unknown> = {
-      status: "Draft" as DocumentStatus,
-      review_approval_status: "Rejected" as ReviewApprovalStatus,
-      approved_by: "",
+      status: getLegacyStatusForWorkflow(toStatus),
+      review_approval_status: getLegacyApprovalForWorkflow(toStatus),
+      workflow_status: toStatus,
+      approved_by: null,
+      approved_at: null,
       rejected_by: rejectedBy,
       rejected_at: detailForm.rejected_at || rejectedDate,
       rejection_reason: detailForm.rejection_reason.trim(),
@@ -1719,21 +2071,32 @@ function DocumentsPageContent() {
       ...detailForm,
       status: "Draft",
       review_approval_status: "Rejected",
+      workflow_status: toStatus,
       rejected_by: String(payload.rejected_by || ""),
       rejected_at: String(payload.rejected_at || ""),
       rejection_reason: String(payload.rejection_reason || ""),
       notification_emails: deriveStoredNotificationEmails(detailForm),
     };
 
-    await notifyDocumentEvent(
+    const activityError = await recordWorkflowActivity(
+      selectedDocument,
+      "rejected",
+      fromStatus,
+      toStatus,
+      rejectedBy,
+      detailForm.approver_email.trim() || detailForm.reviewer_email.trim() || currentUserEmail,
+      String(payload.rejection_reason || "")
+    );
+    const notificationError = await notifyDocumentEvent(
       "rejected",
       rejectedSource,
+      selectedDocument.id,
       selectedDocument.document_number,
       detailForm.title.trim(),
       `Rejected by ${String(payload.rejected_by || "")} on ${formatDate(String(payload.rejected_at || ""))}.\nReason: ${String(payload.rejection_reason || "")}`
     );
 
-    setMessage("Document rejected and originator notified.");
+    setMessage(buildWorkflowMessage("Document rejected and originator notified.", notificationError, activityError));
     await loadDocuments();
   }
 
@@ -1789,7 +2152,7 @@ function DocumentsPageContent() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (detailForm.status === "Live" && detailForm.review_approval_status !== "Approved") {
+    if (getLegacyStatusForWorkflow(detailForm.workflow_status) === "Live" && detailForm.workflow_status !== "Approved") {
       setMessage("A document cannot go Live until it has been reviewed and approved.");
       event.target.value = "";
       return;
@@ -1806,6 +2169,19 @@ function DocumentsPageContent() {
       const oldPath = activeDocument.file_path || "";
       const uploadTimestamp = new Date().toISOString();
       let uploadedPath = "";
+      const existingRevisionRows =
+        revisionsByDocumentId[activeDocument.id] || (await loadDocumentRevisions(activeDocument.id, { quiet: true }));
+      const placeholderRevision = existingRevisionRows.find(
+        (revision) =>
+          revision.revision === currentRevision &&
+          revision.is_current &&
+          !revision.file_path &&
+          !revision.file_name
+      );
+      const revisionReviewedBy =
+        detailForm.reviewed_by.trim() || activeDocument.workflow_reviewer_name || activeDocument.reviewed_by || null;
+      const revisionApprovedBy =
+        detailForm.approved_by.trim() || activeDocument.workflow_approver_name || activeDocument.approved_by || null;
 
       async function cleanupUploadedFile() {
         if (uploadedPath) {
@@ -1849,8 +2225,9 @@ function DocumentsPageContent() {
         title: detailForm.title.trim(),
         description: detailForm.description.trim() || null,
         department_owner: detailForm.department_owner || null,
-        status: detailForm.status,
-        review_approval_status: detailForm.review_approval_status,
+        status: getLegacyStatusForWorkflow(detailForm.workflow_status),
+        review_approval_status: getLegacyApprovalForWorkflow(detailForm.workflow_status),
+        workflow_status: detailForm.workflow_status,
         current_revision: currentRevision,
         issue_date: detailForm.issue_date || null,
         review_cycle_years: detailForm.review_cycle_years,
@@ -1887,39 +2264,65 @@ function DocumentsPageContent() {
         return;
       }
 
-      const { error: revisionCurrentError } = await supabase
-        .from("document_revisions")
-        .update({ is_current: false })
-        .eq("document_id", activeDocument.id);
+      if (placeholderRevision) {
+        const { error: revisionUpdateError } = await supabase
+          .from("document_revisions")
+          .update({
+            revision_notes: placeholderRevision.revision_notes || detailForm.comments.trim() || null,
+            file_name: file.name,
+            file_path: path,
+            file_size: file.size,
+            uploaded_at: uploadTimestamp,
+            issue_date: detailForm.issue_date || null,
+            reviewed_by: revisionReviewedBy,
+            reviewed_at: detailForm.reviewed_at || null,
+            approved_by: revisionApprovedBy,
+            approved_at: detailForm.approved_at || null,
+            is_current: true,
+          })
+          .eq("id", placeholderRevision.id);
 
-      if (revisionCurrentError) {
-        await restorePreviousDocumentFile();
-        await cleanupUploadedFile();
-        setMessage(`Revision history update failed: ${revisionCurrentError.message}`);
-        return;
-      }
+        if (revisionUpdateError) {
+          await restorePreviousDocumentFile();
+          await cleanupUploadedFile();
+          setMessage(`Revision history update failed: ${revisionUpdateError.message}`);
+          return;
+        }
+      } else {
+        const { error: revisionCurrentError } = await supabase
+          .from("document_revisions")
+          .update({ is_current: false })
+          .eq("document_id", activeDocument.id);
 
-      const { error: revisionInsertError } = await supabase.from("document_revisions").insert({
-        document_id: selectedDocument.id,
-        revision: currentRevision,
-        revision_notes: detailForm.comments.trim() || null,
-        file_name: file.name,
-        file_path: path,
-        file_size: file.size,
-        uploaded_at: uploadTimestamp,
-        issue_date: detailForm.issue_date || null,
-        reviewed_by: detailForm.reviewed_by.trim() || null,
-        reviewed_at: detailForm.reviewed_at || null,
-        approved_by: detailForm.approved_by.trim() || null,
-        approved_at: detailForm.approved_at || null,
-        is_current: true,
-      });
+        if (revisionCurrentError) {
+          await restorePreviousDocumentFile();
+          await cleanupUploadedFile();
+          setMessage(`Revision history update failed: ${revisionCurrentError.message}`);
+          return;
+        }
 
-      if (revisionInsertError) {
-        await restorePreviousDocumentFile();
-        await cleanupUploadedFile();
-        setMessage(`Revision history update failed: ${revisionInsertError.message}`);
-        return;
+        const { error: revisionInsertError } = await supabase.from("document_revisions").insert({
+          document_id: selectedDocument.id,
+          revision: currentRevision,
+          revision_notes: detailForm.comments.trim() || null,
+          file_name: file.name,
+          file_path: path,
+          file_size: file.size,
+          uploaded_at: uploadTimestamp,
+          issue_date: detailForm.issue_date || null,
+          reviewed_by: revisionReviewedBy,
+          reviewed_at: detailForm.reviewed_at || null,
+          approved_by: revisionApprovedBy,
+          approved_at: detailForm.approved_at || null,
+          is_current: true,
+        });
+
+        if (revisionInsertError) {
+          await restorePreviousDocumentFile();
+          await cleanupUploadedFile();
+          setMessage(`Revision history update failed: ${revisionInsertError.message}`);
+          return;
+        }
       }
 
       setMessage(
@@ -1939,12 +2342,29 @@ function DocumentsPageContent() {
       return;
     }
 
-    if (!detailForm.comments.trim()) {
-      setMessage("Enter comments / revision notes before issuing the next revision.");
+    const nextRevision = getNextRevision(selectedDocument.current_revision || "A");
+    const revisionReason = window.prompt(
+      `Comments for revision ${nextRevision}`,
+      ""
+    )?.trim();
+
+    if (!revisionReason) {
+      setMessage(`Revision ${nextRevision} was not opened. Enter a revision reason to continue.`);
       return;
     }
 
-    const nextRevision = getNextRevision(selectedDocument.current_revision || "A");
+    const outgoingSnapshotError = await updateCurrentRevisionSnapshot(selectedDocument, {
+      issue_date: detailForm.issue_date || selectedDocument.issue_date || todayIsoDate(),
+      reviewed_by: detailForm.reviewed_by.trim() || selectedDocument.reviewed_by || selectedDocument.workflow_reviewer_name || null,
+      reviewed_at: detailForm.reviewed_at || selectedDocument.reviewed_at || null,
+      approved_by: detailForm.approved_by.trim() || selectedDocument.approved_by || selectedDocument.workflow_approver_name || null,
+      approved_at: detailForm.approved_at || selectedDocument.approved_at || null,
+    });
+
+    if (outgoingSnapshotError) {
+      setMessage(`Revision snapshot failed: ${outgoingSnapshotError}`);
+      return;
+    }
 
     const { error } = await supabase
       .from("documents")
@@ -1952,6 +2372,7 @@ function DocumentsPageContent() {
         current_revision: nextRevision,
         status: "Draft",
         review_approval_status: "Draft",
+        workflow_status: "Draft",
         file_name: null,
         file_path: null,
         file_size: null,
@@ -1963,6 +2384,10 @@ function DocumentsPageContent() {
         rejected_by: null,
         rejected_at: null,
         rejection_reason: null,
+        workflow_reviewer_name: null,
+        workflow_reviewer_email: null,
+        workflow_approver_name: null,
+        workflow_approver_email: null,
       })
       .eq("id", selectedDocument.id);
 
@@ -1981,8 +2406,47 @@ function DocumentsPageContent() {
       return;
     }
 
+    const { error: nextRevisionInsertError } = await supabase.from("document_revisions").insert({
+      document_id: selectedDocument.id,
+      revision: nextRevision,
+      revision_notes: revisionReason,
+      file_name: null,
+      file_path: null,
+      file_size: null,
+      uploaded_at: null,
+      issue_date: todayIsoDate(),
+      reviewed_by: null,
+      reviewed_at: null,
+      approved_by: null,
+      approved_at: null,
+      is_current: true,
+    });
+
+    if (nextRevisionInsertError) {
+      setMessage(`Revision history update failed: ${nextRevisionInsertError.message}`);
+      return;
+    }
+
+    setDetailForm((prev) => ({
+      ...prev,
+      current_revision: nextRevision,
+      status: "Draft",
+      review_approval_status: "Draft",
+      workflow_status: "Draft",
+      reviewed_by: "",
+      reviewer_email: "",
+      reviewed_at: "",
+      approved_by: "",
+      approver_email: "",
+      approved_at: "",
+      rejected_by: "",
+      rejected_at: "",
+      rejection_reason: "",
+      comments: "",
+    }));
+
     setMessage(`Document moved to revision ${nextRevision}. Upload the new controlled copy next.`);
-    await loadDocuments();
+    await loadDocuments({ selectDocumentId: selectedDocument.id });
     await loadDocumentRevisions(selectedDocument.id, { quiet: true });
   }
 
@@ -2039,64 +2503,98 @@ function DocumentsPageContent() {
       .filter(Boolean)
       .join("\n");
 
+    const prefix = buildScopedDocumentPrefix(detailForm);
+    if (!prefix) {
+      setMessage("Replacement cannot be created until the document department/type details are complete.");
+      return;
+    }
+
+    const nextReplacementSequence = await getNextDocumentSequence(prefix, documents);
+    const replacementNumber = buildDocumentNumberFromPrefix(prefix, nextReplacementSequence);
+    const replacementPayload: Record<string, unknown> = {
+      document_scope: detailForm.document_scope,
+      asset_id: detailForm.document_scope === "Asset" ? detailForm.asset_id || null : null,
+      asset_name: detailForm.document_scope === "Asset" ? detailForm.asset_name.trim() || null : null,
+      asset_code: detailForm.document_scope === "Asset" ? detailForm.asset_code.trim() || null : null,
+      asset_document_id_code:
+        detailForm.document_scope === "Asset" ? detailForm.asset_document_id_code.trim().toUpperCase() : null,
+      document_type: detailForm.document_type,
+      document_number: replacementNumber,
+      title: detailForm.title.trim(),
+      description: detailForm.description.trim() || null,
+      department_owner: detailForm.department_owner,
+      status: "Draft",
+      review_approval_status: "Draft",
+      workflow_status: "Draft",
+      current_revision: "A",
+      issue_date: null,
+      review_cycle_years: detailForm.review_cycle_years,
+      originator_name: detailForm.originator_name.trim() || null,
+      originator_email: detailForm.originator_email.trim() || null,
+      reviewed_by: null,
+      reviewed_at: null,
+      approved_by: null,
+      approved_at: null,
+      rejected_by: null,
+      rejected_at: null,
+      rejection_reason: null,
+      notification_emails: detailForm.notification_emails || [],
+      comments: `Supersedes ${selectedDocument.document_number}`,
+    };
+    if (supportsReviewerEmail) replacementPayload.reviewer_email = null;
+    if (supportsApproverEmail) replacementPayload.approver_email = null;
+
+    const { data: replacement, error: replacementError } = await supabase
+      .from("documents")
+      .insert(replacementPayload)
+      .select("*")
+      .single();
+
+    if (replacementError || !replacement) {
+      setMessage(`Replacement create failed: ${replacementError?.message || "Unknown error"}`);
+      return;
+    }
+
+    const fromStatus = selectedWorkflowStatus;
     const { error } = await supabase
       .from("documents")
       .update({
         status: "Superseded",
+        review_approval_status: "Draft",
+        workflow_status: "Superseded",
         comments: supersedeComment,
       })
       .eq("id", selectedDocument.id);
 
     if (error) {
-      setMessage(`Supersede failed: ${error.message}`);
+      await supabase.from("documents").delete().eq("id", (replacement as DocumentRow).id);
+      setMessage(`Supersede failed after replacement create; replacement was removed: ${error.message}`);
       return;
     }
 
-    await notifyDocumentEvent(
+    const activityError = await recordWorkflowActivity(
+      selectedDocument,
+      "superseded",
+      fromStatus,
+      "Superseded",
+      currentUserPerson?.name || detailForm.originator_name,
+      currentUserEmail || detailForm.originator_email,
+      `Replacement created: ${replacementNumber}`
+    );
+    const notificationError = await notifyDocumentEvent(
       "superseded",
       detailForm,
+      selectedDocument.id,
       selectedDocument.document_number,
       detailForm.title.trim(),
       supersedeComment
     );
 
-      const replacementForm: DocumentForm = {
-        ...buildDocumentFormFromRow(selectedDocument),
-        document_number: "",
-        department_owner: selectedDocument.document_scope === "Asset" ? "Assets" : "",
-        status: "Draft",
-        review_approval_status: "Draft",
-        current_revision: "A",
-        issue_date: "",
-        originator_name: "",
-        originator_email: "",
-        reviewed_by: "",
-        reviewer_email: "",
-      reviewed_at: "",
-      approved_by: "",
-      approver_email: "",
-      approved_at: "",
-      rejected_by: "",
-      rejected_at: "",
-      rejection_reason: "",
-      comments: `Supersedes ${selectedDocument.document_number}`,
-    };
-
-    setForm(replacementForm);
-    setFormPeopleSearch({
-      originator_name: replacementForm.originator_name,
-      reviewed_by: replacementForm.reviewed_by,
-      approved_by: replacementForm.approved_by,
-      rejected_by: replacementForm.rejected_by,
-    });
-
-    setShowCreatePanel(true);
-    setShowDetailPanel(false);
-    setMessage(
-      `Old document superseded. Complete the Add Document form to create the replacement for ${selectedDocument.document_number}.`
-    );
-
     await loadDocuments();
+    setSelectedDocumentId((replacement as DocumentRow).id);
+    setShowDetailPanel(true);
+    setActiveView("register");
+    setMessage(buildWorkflowMessage(`Replacement ${replacementNumber} created and old document superseded.`, notificationError, activityError));
   }
 
   function clearFilters() {
@@ -2110,8 +2608,34 @@ function DocumentsPageContent() {
 
   function handleSelectDocument(id: string) {
     setSelectedDocumentId(id);
-    setShowDetailPanel(false);
+    setShowDetailPanel(true);
   }
+
+  const workflowActionTitle =
+    selectedWorkflowStatus === "Draft" || selectedWorkflowStatus === "Rejected"
+      ? "Send to reviewer"
+      : selectedWorkflowStatus === "Pending Review"
+      ? "Reviewer decision"
+      : selectedWorkflowStatus === "Reviewed"
+      ? "Send to approver"
+      : selectedWorkflowStatus === "Pending Approval"
+      ? "Approver decision"
+      : selectedWorkflowStatus === "Approved"
+      ? "Approved document"
+      : "Workflow complete";
+
+  const workflowActionHint =
+    selectedWorkflowStatus === "Draft" || selectedWorkflowStatus === "Rejected"
+      ? "Select the reviewer and approver, then send the review request email in one step."
+      : selectedWorkflowStatus === "Pending Review"
+      ? "The reviewer can accept the review, or reject with a reason."
+      : selectedWorkflowStatus === "Reviewed"
+      ? "Select the approver and send the approval request email in one step."
+      : selectedWorkflowStatus === "Pending Approval"
+      ? "The approver can approve the document, or reject it with a reason."
+      : selectedWorkflowStatus === "Approved"
+      ? "This document is live. Create a superseding replacement when a controlled change is required."
+      : "No forward workflow action is available for this document.";
 
   return (
     <main>
@@ -2140,8 +2664,7 @@ function DocumentsPageContent() {
           ["dashboard", "Dashboard"],
           ["register", "Document Register"],
           ["create", "Create Document"],
-          ["review", "Review Queue"],
-          ["approval", "Approval Queue"],
+          ["workflow", "Workflow"],
           ["archive", "Archive"],
           ["reports", "Reports"],
         ].map(([view, label]) => (
@@ -2220,9 +2743,9 @@ function DocumentsPageContent() {
 
           <SectionCard title="Workflow Queues" subtitle="Review and approval work in progress.">
             <div style={quickActionGridStyle}>
-              <button type="button" style={quickActionCardStyle} onClick={() => switchWorkspaceView("approval")}>
-                <span style={quickActionLabelStyle}>Pending review</span>
-                <strong style={quickActionValueStyle}>{approvalQueueDocuments.length}</strong>
+              <button type="button" style={quickActionCardStyle} onClick={() => switchWorkspaceView("workflow")}>
+                <span style={quickActionLabelStyle}>Workflow items</span>
+                <strong style={quickActionValueStyle}>{workflowQueueDocuments.length}</strong>
               </button>
               <button type="button" style={quickActionCardStyle} onClick={() => switchWorkspaceView("archive")}>
                 <span style={quickActionLabelStyle}>Archive / superseded</span>
@@ -2235,24 +2758,14 @@ function DocumentsPageContent() {
 
       {activeView === "create" ? (
       <section style={createPanelSectionStyle}>
-        <div style={createPanelToggleRowStyle}>
-          <button
-            type="button"
-            style={showCreatePanel ? secondaryButtonStyle : primaryButtonStyle}
-            onClick={() => setShowCreatePanel((prev) => !prev)}
-          >
-            {showCreatePanel ? "Hide Create Form" : "Create Document"}
-          </button>
-        </div>
-
         {showCreatePanel ? (
           <SectionCard
-            title="Add Document"
-            subtitle="Department owner + document type will build the next document number automatically."
+            title="Create New Document"
+            subtitle="Fill in the details below. Your document will be saved as a Draft — you can upload the file and submit it for review once it's created."
           >
             <form onSubmit={addDocument}>
             <div style={formLayoutStyle}>
-              <FormSection title="A. Document Details">
+              <FormSection title="Document Details">
                 <Field label="Asset Specific Document?">
                   <label style={{ display: "flex", gap: "10px", alignItems: "center", fontWeight: 700 }}>
                     <input
@@ -2352,22 +2865,6 @@ function DocumentsPageContent() {
                   </select>
                 </Field>
 
-                <Field label="Status">
-                  <select
-                    value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value as DocumentStatus })}
-                    style={inputStyle}
-                  >
-                    <option value="Draft">Draft</option>
-                    <option value="Under Review">Under Review</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Live">Live</option>
-                    <option value="Superseded">Superseded</option>
-                    <option value="Obsolete">Obsolete</option>
-                    <option value="Archived">Archived</option>
-                  </select>
-                </Field>
-
                 <Field label="Current Revision">
                   <input
                     value={form.current_revision}
@@ -2383,7 +2880,7 @@ function DocumentsPageContent() {
                 </Field>
               </FormSection>
 
-              <FormSection title="B. Review Control">
+              <FormSection title="Review Settings">
                 <Field label="Review Cycle">
                   <select
                     value={form.review_cycle_years}
@@ -2398,62 +2895,14 @@ function DocumentsPageContent() {
                   </select>
                 </Field>
 
-                <Field label="Issue Date">
-                  <input
-                    type="date"
-                    value={form.issue_date}
-                    onChange={(e) => setForm({ ...form, issue_date: e.target.value })}
-                    style={inputStyle}
-                  />
-                </Field>
-
-                <Field label="Next Review Date">
-                  <input
-                    value={nextReviewDatePreview ? formatDate(nextReviewDatePreview) : "-"}
-                    readOnly
-                    style={readOnlyInputStyle}
-                  />
-                </Field>
-
-                <Field label="Review / Approval Status">
-                  <select
-                    value={form.review_approval_status}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        review_approval_status: e.target.value as ReviewApprovalStatus,
-                      })
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="Draft">Draft</option>
-                    <option value="Pending Review">Pending Review</option>
-                    <option value="Reviewed">Reviewed</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                  </select>
-                </Field>
-
-                <Field label="Reviewed Date">
-                  <input
-                    type="date"
-                    value={form.reviewed_at}
-                    onChange={(e) => setForm({ ...form, reviewed_at: e.target.value })}
-                    style={inputStyle}
-                  />
-                </Field>
-
-                <Field label="Approved Date">
-                  <input
-                    type="date"
-                    value={form.approved_at}
-                    onChange={(e) => setForm({ ...form, approved_at: e.target.value })}
-                    style={inputStyle}
-                  />
-                </Field>
+                {nextReviewDatePreview ? (
+                  <div style={formSectionHintStyle}>
+                    Next review will fall due: <strong>{formatDate(nextReviewDatePreview)}</strong>
+                  </div>
+                ) : null}
               </FormSection>
 
-              <FormSection title="C. People">
+              <FormSection title="Originator">
                 <Field label="Originator">
                   <PeopleSelector
                     inputId="document-originator"
@@ -2475,76 +2924,15 @@ function DocumentsPageContent() {
                   />
                 </Field>
 
-                <Field label="Reviewer">
-                  <PeopleSelector
-                    inputId="document-reviewed-by"
-                    value={formPeopleSearch.reviewed_by}
-                    selectedName={form.reviewed_by}
-                    people={people}
-                    placeholder="Start typing a name"
-                    onChange={(value) => createPersonSearchHandler("create", "reviewed_by", value)}
-                    onSelect={(person) => setCreatePersonField("reviewed_by", person)}
-                    onBlur={() => handlePersonSearchBlur("create", "reviewed_by")}
-                    resolvedEmail={form.reviewer_email}
-                    warning={
-                      formPeopleSearch.reviewed_by.trim() && !formReviewerPerson
-                        ? "Reviewer must be selected from People."
-                        : formReviewerPerson && !form.reviewer_email.trim()
-                        ? "Reviewer has no email in People."
-                        : ""
-                    }
-                  />
-                </Field>
-
-                <Field label="Approver">
-                  <PeopleSelector
-                    inputId="document-approved-by"
-                    value={formPeopleSearch.approved_by}
-                    selectedName={form.approved_by}
-                    people={people}
-                    placeholder="Start typing a name"
-                    onChange={(value) => createPersonSearchHandler("create", "approved_by", value)}
-                    onSelect={(person) => setCreatePersonField("approved_by", person)}
-                    onBlur={() => handlePersonSearchBlur("create", "approved_by")}
-                    resolvedEmail={form.approver_email}
-                    disabled={Boolean(form.rejected_by.trim())}
-                    warning={
-                      formPeopleSearch.approved_by.trim() && !formApproverPerson
-                        ? "Approver must be selected from People."
-                        : formApproverPerson && !form.approver_email.trim()
-                        ? "Approver has no email in People."
-                        : ""
-                    }
-                  />
-                </Field>
-
-                <Field label="Rejected By">
-                  <PeopleSelector
-                    inputId="document-rejected-by"
-                    value={formPeopleSearch.rejected_by}
-                    selectedName={form.rejected_by}
-                    people={people}
-                    placeholder="Start typing a name"
-                    onChange={(value) => createPersonSearchHandler("create", "rejected_by", value)}
-                    onSelect={(person) => setCreatePersonField("rejected_by", person)}
-                    onBlur={() => handlePersonSearchBlur("create", "rejected_by")}
-                    resolvedEmail={form.rejected_by.trim() ? form.approver_email : ""}
-                    disabled={Boolean(form.approved_by.trim())}
-                    warning={
-                      formPeopleSearch.rejected_by.trim() && !formRejectorPerson
-                        ? "Rejected By must be selected from People."
-                        : formRejectorPerson && !form.approver_email.trim()
-                        ? "Rejected By has no email in People."
-                        : ""
-                    }
-                  />
-                </Field>
+                <div style={formSectionHintStyle}>
+                  Reviewer and approver are selected from the document detail workflow after the document is created.
+                </div>
               </FormSection>
 
-              <FormSection title="D. File / Revision Notes">
+              <FormSection title="Notes & Context">
                 <div style={{ gridColumn: "1 / -1" }}>
                   <div style={formSectionHintStyle}>
-                    Upload the controlled document after the record is created.
+                    You can upload the controlled document file once the record has been created.
                   </div>
                 </div>
 
@@ -2560,36 +2948,37 @@ function DocumentsPageContent() {
                 </div>
 
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <Field label="Comments / Revision Notes">
+                  <Field label="General Comments">
                     <textarea
                       value={form.comments}
                       onChange={(e) => setForm({ ...form, comments: e.target.value })}
                       style={compactTextareaStyle}
-                      placeholder="Optional notes for review or revision context"
+                      placeholder="Optional notes for this document record"
                     />
                   </Field>
                 </div>
 
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <Field label="Rejection Reason">
-                    <textarea
-                      value={form.rejection_reason}
-                      onChange={(e) => setForm({ ...form, rejection_reason: e.target.value })}
-                      style={compactTextareaStyle}
-                      placeholder="Only needed if this draft is being set up in a rejected state"
-                    />
-                  </Field>
-                </div>
               </FormSection>
             </div>
 
-            <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
-                {isSaving ? "Saving..." : "Add Document"}
-              </button>
-              <span style={helperTextStyle}>
-                Next sequence: {String(nextSequence).padStart(3, "0")}
-              </span>
+            <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #e2e8f0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <button type="submit" style={{ ...primaryButtonStyle, padding: "13px 28px", fontSize: "15px" }} disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Create Draft Document →"}
+                </button>
+                <button
+                  type="button"
+                  style={secondaryButtonStyle}
+                  onClick={() => setActiveView("dashboard")}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </button>
+                <span style={helperTextStyle}>Next sequence: {String(nextSequence).padStart(3, "0")}</span>
+              </div>
+              <p style={{ margin: "10px 0 0", fontSize: "13px", color: "#64748b" }}>
+                Your document will be saved as a <strong>Draft</strong>. Open it from the Document Register to upload the file and submit it for review.
+              </p>
             </div>
             </form>
           </SectionCard>
@@ -2597,7 +2986,7 @@ function DocumentsPageContent() {
       </section>
       ) : null}
 
-      {["register", "review", "approval", "archive"].includes(activeView) ? (
+      {["register", "workflow", "archive"].includes(activeView) ? (
       <section style={registerWorkspaceGridStyle}>
         <section id="document-register">
         <SectionCard
@@ -2645,10 +3034,12 @@ function DocumentsPageContent() {
                 onChange={(e) => setApprovalFilter(e.target.value)}
                 style={toolbarSelectStyle}
               >
-                <option value="">All Approval Status</option>
+                <option value="">All Workflow Status</option>
+                <option value="Workflow">All Workflow Items</option>
                 <option value="Draft">Draft</option>
                 <option value="Pending Review">Pending Review</option>
                 <option value="Reviewed">Reviewed</option>
+                <option value="Pending Approval">Pending Approval</option>
                 <option value="Approved">Approved</option>
                 <option value="Rejected">Rejected</option>
               </select>
@@ -2709,7 +3100,7 @@ function DocumentsPageContent() {
               <div>Type</div>
               <div>Owner</div>
               <div>Revision</div>
-              <div>Approval</div>
+              <div>Workflow</div>
               <div>Status</div>
               <div>Next Review</div>
             </div>
@@ -2720,8 +3111,8 @@ function DocumentsPageContent() {
               ) : (
                 filteredDocuments.map((doc) => {
                   const reviewTone = getReviewTone(doc.next_review_date);
-                  const approvalText = normalizeApprovalStatus(doc.review_approval_status);
-                  const approvalTone = getReviewApprovalTone(approvalText);
+                  const workflowText = normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status);
+                  const workflowTone = getWorkflowTone(workflowText);
 
                   return (
                     <button
@@ -2744,15 +3135,15 @@ function DocumentsPageContent() {
                         <span
                           style={{
                             ...reviewBadgeStyle,
-                            background: approvalTone.bg,
-                            color: approvalTone.color,
+                            background: workflowTone.bg,
+                            color: workflowTone.color,
                           }}
                         >
-                          {approvalText}
+                          {workflowText}
                         </span>
                       </div>
                       <div>
-                        <StatusBadge value={doc.status || "Unknown"} />
+                        <StatusBadge value={getLegacyStatusForWorkflow(workflowText)} />
                       </div>
                       <div>
                         <div style={registerCellTextStyle}>{formatDate(doc.next_review_date)}</div>
@@ -2869,8 +3260,8 @@ function DocumentsPageContent() {
         </section>
       ) : null}
 
-      {["register", "review", "approval", "archive"].includes(activeView) && showDetailPanel && selectedDocument ? (
-        <section style={{ marginTop: "20px" }}>
+      {["register", "workflow", "archive"].includes(activeView) && showDetailPanel && selectedDocument ? (
+        <section id="document-detail-panel" style={{ marginTop: "20px" }}>
           <SectionCard
             title="Document Detail"
             subtitle="Workflow-controlled record with view/download-only controlled files."
@@ -2886,11 +3277,11 @@ function DocumentsPageContent() {
                   <span
                     style={{
                       ...badgeStyle,
-                      background: getStatusTone(selectedDocument.status || "Unknown").bg,
-                      color: getStatusTone(selectedDocument.status || "Unknown").color,
+                      background: getWorkflowTone(selectedWorkflowStatus).bg,
+                      color: getWorkflowTone(selectedWorkflowStatus).color,
                     }}
                   >
-                    {selectedDocument.status || "Unknown"}
+                    {selectedWorkflowStatus}
                   </span>
 
                   <button
@@ -2903,22 +3294,175 @@ function DocumentsPageContent() {
                 </div>
               </div>
 
-              <div style={workflowButtonRowStyle}>
-                <button type="button" style={workflowButtonStyle} onClick={submitForReview}>
-                  Submit for Review
-                </button>
-                <button type="button" style={workflowButtonStyle} onClick={markReviewed}>
-                  Mark Reviewed
-                </button>
-                <button type="button" style={approveButtonStyle} onClick={approveDocument}>
-                  Approve
-                </button>
-                <button type="button" style={rejectButtonStyle} onClick={rejectDocument}>
-                  Reject
-                </button>
-                <button type="button" style={secondaryButtonStyle} onClick={supersedeAndCreateNew}>
-                  Supersede & Create New
-                </button>
+              <div style={workflowActionPanelStyle}>
+                <div>
+                  <div style={detailEyebrowStyle}>Next Step</div>
+                  <h4 style={workflowActionTitleStyle}>{workflowActionTitle}</h4>
+                  <p style={workflowActionHintStyle}>{workflowActionHint}</p>
+                </div>
+
+                {["Draft", "Rejected"].includes(selectedWorkflowStatus) ? (
+                  <div style={workflowActionGridStyle}>
+                    <Field label="Reviewer">
+                      <PeopleSelector
+                        inputId="document-workflow-reviewer"
+                        value={detailPeopleSearch.reviewed_by}
+                        selectedName={detailForm.reviewed_by}
+                        people={people}
+                        placeholder="Start typing reviewer name"
+                        onChange={(value) => createPersonSearchHandler("detail", "reviewed_by", value)}
+                        onSelect={(person) => setDetailPersonField("reviewed_by", person)}
+                        onBlur={() => handlePersonSearchBlur("detail", "reviewed_by")}
+                        resolvedEmail={detailForm.reviewer_email}
+                        warning={
+                          detailPeopleSearch.reviewed_by.trim() && !detailReviewerPerson
+                            ? "Reviewer must be selected from People."
+                            : detailReviewerPerson && !detailForm.reviewer_email.trim()
+                            ? "Reviewer has no email in People."
+                            : ""
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Approver">
+                      <PeopleSelector
+                        inputId="document-workflow-initial-approver"
+                        value={detailPeopleSearch.approved_by}
+                        selectedName={detailForm.approved_by}
+                        people={people}
+                        placeholder="Start typing approver name"
+                        onChange={(value) => createPersonSearchHandler("detail", "approved_by", value)}
+                        onSelect={(person) => setDetailPersonField("approved_by", person)}
+                        onBlur={() => handlePersonSearchBlur("detail", "approved_by")}
+                        resolvedEmail={detailForm.approver_email}
+                        warning={
+                          detailPeopleSearch.approved_by.trim() && !detailApproverPerson
+                            ? "Approver must be selected from People."
+                            : detailApproverPerson && !detailForm.approver_email.trim()
+                            ? "Approver has no email in People."
+                            : ""
+                        }
+                      />
+                    </Field>
+
+                    <div style={workflowActionButtonWrapStyle}>
+                      <button type="button" style={primaryButtonStyle} onClick={submitForReview}>
+                        Send to Reviewer
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedWorkflowStatus === "Pending Review" ? (
+                  <div style={workflowActionGridStyle}>
+                    <div style={workflowParticipantCardStyle}>
+                      <span style={workflowParticipantLabelStyle}>Reviewer</span>
+                      <strong>{detailForm.reviewed_by || selectedDocument.workflow_reviewer_name || "Reviewer not selected"}</strong>
+                      <span>{detailForm.reviewer_email || selectedDocument.workflow_reviewer_email || ""}</span>
+                    </div>
+
+                    <div style={workflowActionButtonWrapStyle}>
+                      <button type="button" style={primaryButtonStyle} onClick={markReviewed}>
+                        Accept Review
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedWorkflowStatus === "Reviewed" ? (
+                  <div style={workflowActionGridStyle}>
+                    <Field label="Approver">
+                      <PeopleSelector
+                        inputId="document-workflow-approver"
+                        value={detailPeopleSearch.approved_by}
+                        selectedName={detailForm.approved_by}
+                        people={people}
+                        placeholder="Start typing approver name"
+                        onChange={(value) => createPersonSearchHandler("detail", "approved_by", value)}
+                        onSelect={(person) => setDetailPersonField("approved_by", person)}
+                        onBlur={() => handlePersonSearchBlur("detail", "approved_by")}
+                        resolvedEmail={detailForm.approver_email}
+                        warning={
+                          detailPeopleSearch.approved_by.trim() && !detailApproverPerson
+                            ? "Approver must be selected from People."
+                            : detailApproverPerson && !detailForm.approver_email.trim()
+                            ? "Approver has no email in People."
+                            : ""
+                        }
+                      />
+                    </Field>
+
+                    <div style={workflowActionButtonWrapStyle}>
+                      <button type="button" style={primaryButtonStyle} onClick={sendToApprover}>
+                        Send to Approver
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedWorkflowStatus === "Pending Approval" ? (
+                  <div style={workflowActionGridStyle}>
+                    <div style={workflowParticipantCardStyle}>
+                      <span style={workflowParticipantLabelStyle}>Approver</span>
+                      <strong>{detailForm.approved_by || selectedDocument.workflow_approver_name || "Approver not selected"}</strong>
+                      <span>{detailForm.approver_email || selectedDocument.workflow_approver_email || ""}</span>
+                    </div>
+
+                    <div style={workflowActionButtonWrapStyle}>
+                      <button type="button" style={approveButtonStyle} onClick={approveDocument}>
+                        Approve Document
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {["Pending Review", "Pending Approval"].includes(selectedWorkflowStatus) ? (
+                  <div style={workflowRejectGridStyle}>
+                    <Field label="Rejected By">
+                      <PeopleSelector
+                        inputId="document-workflow-rejected-by"
+                        value={detailPeopleSearch.rejected_by}
+                        selectedName={detailForm.rejected_by}
+                        people={people}
+                        placeholder="Start typing rejector name"
+                        onChange={(value) => createPersonSearchHandler("detail", "rejected_by", value)}
+                        onSelect={(person) => setDetailPersonField("rejected_by", person)}
+                        onBlur={() => handlePersonSearchBlur("detail", "rejected_by")}
+                        resolvedEmail={detailForm.rejected_by.trim() ? detailForm.approver_email : ""}
+                        warning={
+                          detailPeopleSearch.rejected_by.trim() && !detailRejectorPerson
+                            ? "Rejected By must be selected from People."
+                            : detailRejectorPerson && !detailForm.approver_email.trim()
+                            ? "Rejected By has no email in People."
+                            : ""
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Rejection Reason">
+                      <textarea
+                        value={detailForm.rejection_reason}
+                        onChange={(e) => setDetailForm({ ...detailForm, rejection_reason: e.target.value })}
+                        style={compactTextareaStyle}
+                        placeholder="Required only if rejecting"
+                      />
+                    </Field>
+
+                    <div style={workflowActionButtonWrapStyle}>
+                      <button type="button" style={rejectButtonStyle} onClick={rejectDocument}>
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedWorkflowStatus === "Approved" ? (
+                  <div style={workflowActionButtonWrapStyle}>
+                    <button type="button" style={secondaryButtonStyle} onClick={supersedeAndCreateNew}>
+                      Supersede & Create New
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <div style={{ ...fileStripStyle, display: "none" }}>
@@ -3049,20 +3593,8 @@ function DocumentsPageContent() {
                       </select>
                     </Field>
 
-                    <Field label="Status">
-                      <select
-                        value={detailForm.status}
-                        onChange={(e) => setDetailForm({ ...detailForm, status: e.target.value as DocumentStatus })}
-                        style={inputStyle}
-                      >
-                        <option value="Draft">Draft</option>
-                        <option value="Under Review">Under Review</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Live">Live</option>
-                        <option value="Superseded">Superseded</option>
-                        <option value="Obsolete">Obsolete</option>
-                        <option value="Archived">Archived</option>
-                      </select>
+                    <Field label="Document Status">
+                      <input value={getLegacyStatusForWorkflow(detailForm.workflow_status)} readOnly style={readOnlyInputStyle} />
                     </Field>
 
                     <Field label="Current Revision">
@@ -3120,31 +3652,16 @@ function DocumentsPageContent() {
                       />
                     </Field>
 
-                    <Field label="Review / Approval Status">
-                      <select
-                        value={detailForm.review_approval_status}
-                        onChange={(e) =>
-                          setDetailForm({
-                            ...detailForm,
-                            review_approval_status: e.target.value as ReviewApprovalStatus,
-                          })
-                        }
-                        style={inputStyle}
-                      >
-                        <option value="Draft">Draft</option>
-                        <option value="Pending Review">Pending Review</option>
-                        <option value="Reviewed">Reviewed</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Rejected">Rejected</option>
-                      </select>
+                    <Field label="Workflow Status">
+                      <input value={detailForm.workflow_status} readOnly style={readOnlyInputStyle} />
                     </Field>
 
                     <Field label="Reviewed Date">
                       <input
                         type="date"
                         value={detailForm.reviewed_at}
-                        onChange={(e) => setDetailForm({ ...detailForm, reviewed_at: e.target.value })}
-                        style={inputStyle}
+                        readOnly
+                        style={readOnlyInputStyle}
                       />
                     </Field>
 
@@ -3152,8 +3669,8 @@ function DocumentsPageContent() {
                       <input
                         type="date"
                         value={detailForm.approved_at}
-                        onChange={(e) => setDetailForm({ ...detailForm, approved_at: e.target.value })}
-                        style={inputStyle}
+                        readOnly
+                        style={readOnlyInputStyle}
                       />
                     </Field>
                     </FormSection>
@@ -3180,73 +3697,22 @@ function DocumentsPageContent() {
                       />
                       </Field>
 
-                      <Field label="Reviewer">
-                      <PeopleSelector
-                        inputId="document-detail-reviewed-by"
-                        value={detailPeopleSearch.reviewed_by}
-                        selectedName={detailForm.reviewed_by}
-                        people={people}
-                        placeholder="Start typing a name"
-                        onChange={(value) => createPersonSearchHandler("detail", "reviewed_by", value)}
-                        onSelect={(person) => setDetailPersonField("reviewed_by", person)}
-                        onBlur={() => handlePersonSearchBlur("detail", "reviewed_by")}
-                        resolvedEmail={detailForm.reviewer_email}
-                        warning={
-                          detailPeopleSearch.reviewed_by.trim() && !detailReviewerPerson
-                            ? "Reviewer must be selected from People."
-                            : detailReviewerPerson && !detailForm.reviewer_email.trim()
-                            ? "Reviewer has no email in People."
-                            : ""
-                        }
-                      />
-                      </Field>
+                      <div style={workflowRoutingSummaryStyle}>
+                        <div style={workflowParticipantCardStyle}>
+                          <span style={workflowParticipantLabelStyle}>Reviewer</span>
+                          <strong>{detailForm.reviewed_by || selectedDocument.workflow_reviewer_name || "Not selected yet"}</strong>
+                          <span>{detailForm.reviewer_email || selectedDocument.workflow_reviewer_email || ""}</span>
+                        </div>
 
-                      <Field label="Approver">
-                      <PeopleSelector
-                        inputId="document-detail-approved-by"
-                        value={detailPeopleSearch.approved_by}
-                        selectedName={detailForm.approved_by}
-                        people={people}
-                        placeholder="Start typing a name"
-                        onChange={(value) => createPersonSearchHandler("detail", "approved_by", value)}
-                        onSelect={(person) => setDetailPersonField("approved_by", person)}
-                        onBlur={() => handlePersonSearchBlur("detail", "approved_by")}
-                        resolvedEmail={detailForm.approver_email}
-                        disabled={Boolean(detailForm.rejected_by.trim())}
-                        warning={
-                          detailPeopleSearch.approved_by.trim() && !detailApproverPerson
-                            ? "Approver must be selected from People."
-                            : detailApproverPerson && !detailForm.approver_email.trim()
-                            ? "Approver has no email in People."
-                            : ""
-                        }
-                      />
-                      </Field>
-
-                      <Field label="Rejected By">
-                        <PeopleSelector
-                          inputId="document-detail-rejected-by"
-                          value={detailPeopleSearch.rejected_by}
-                          selectedName={detailForm.rejected_by}
-                          people={people}
-                          placeholder="Start typing a name"
-                        onChange={(value) => createPersonSearchHandler("detail", "rejected_by", value)}
-                        onSelect={(person) => setDetailPersonField("rejected_by", person)}
-                        onBlur={() => handlePersonSearchBlur("detail", "rejected_by")}
-                        resolvedEmail={detailForm.rejected_by.trim() ? detailForm.approver_email : ""}
-                        disabled={Boolean(detailForm.approved_by.trim())}
-                        warning={
-                            detailPeopleSearch.rejected_by.trim() && !detailRejectorPerson
-                              ? "Rejected By must be selected from People."
-                              : detailRejectorPerson && !detailForm.approver_email.trim()
-                              ? "Rejected By has no email in People."
-                              : ""
-                          }
-                        />
-                      </Field>
+                        <div style={workflowParticipantCardStyle}>
+                          <span style={workflowParticipantLabelStyle}>Approver</span>
+                          <strong>{detailForm.approved_by || selectedDocument.workflow_approver_name || "Not selected yet"}</strong>
+                          <span>{detailForm.approver_email || selectedDocument.workflow_approver_email || ""}</span>
+                        </div>
+                      </div>
                     </FormSection>
 
-                    <FormSection title="D. File / Revision Notes">
+                    <FormSection title="D. File / General Notes">
                       <div style={{ gridColumn: "1 / -1" }}>
                         <Field label="Description">
                           <textarea
@@ -3258,7 +3724,7 @@ function DocumentsPageContent() {
                       </div>
 
                       <div style={{ gridColumn: "1 / -1" }}>
-                        <Field label="Comments / Revision Notes">
+                        <Field label="General Comments">
                           <textarea
                             value={detailForm.comments}
                             onChange={(e) => setDetailForm({ ...detailForm, comments: e.target.value })}
@@ -3267,16 +3733,13 @@ function DocumentsPageContent() {
                         </Field>
                       </div>
 
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <Field label="Rejection Reason">
-                          <textarea
-                            value={detailForm.rejection_reason}
-                            onChange={(e) => setDetailForm({ ...detailForm, rejection_reason: e.target.value })}
-                            style={textareaStyle}
-                            placeholder="Required when rejecting"
-                          />
-                        </Field>
-                      </div>
+                      {selectedWorkflowStatus === "Rejected" && detailForm.rejection_reason.trim() ? (
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <Field label="Rejection Reason">
+                            <textarea value={detailForm.rejection_reason} readOnly style={textareaStyle} />
+                          </Field>
+                        </div>
+                      ) : null}
                     </FormSection>
                   </div>
 
@@ -3360,6 +3823,19 @@ function DocumentsPageContent() {
                       <RevisionRow
                         key={revision.id}
                         revision={revision}
+                        fallbackReviewedBy={
+                          revision.is_current
+                            ? selectedDocument.reviewed_by || selectedDocument.workflow_reviewer_name || ""
+                            : ""
+                        }
+                        fallbackReviewedAt={revision.is_current ? selectedDocument.reviewed_at || "" : ""}
+                        fallbackApprovedBy={
+                          revision.is_current
+                            ? selectedDocument.approved_by || selectedDocument.workflow_approver_name || ""
+                            : ""
+                        }
+                        fallbackApprovedAt={revision.is_current ? selectedDocument.approved_at || "" : ""}
+                        fallbackIssueDate={selectedDocument.issue_date || ""}
                         onOpenFile={(path) => void openDocumentFile(path)}
                       />
                     ))}
@@ -3376,9 +3852,19 @@ function DocumentsPageContent() {
 
 function RevisionRow({
   revision,
+  fallbackReviewedBy,
+  fallbackReviewedAt,
+  fallbackApprovedBy,
+  fallbackApprovedAt,
+  fallbackIssueDate,
   onOpenFile,
 }: {
   revision: DocumentRevisionRow;
+  fallbackReviewedBy?: string;
+  fallbackReviewedAt?: string;
+  fallbackApprovedBy?: string;
+  fallbackApprovedAt?: string;
+  fallbackIssueDate?: string;
   onOpenFile: (path: string) => void;
 }) {
   return (
@@ -3418,23 +3904,23 @@ function RevisionRow({
       <div style={revisionGridStyle}>
         <div style={revisionInfoBlockStyle}>
           <div style={revisionInfoLabelStyle}>Issue Date</div>
-          <div style={revisionInfoValueStyle}>{formatDate(revision.issue_date)}</div>
+          <div style={revisionInfoValueStyle}>{formatDate(revision.issue_date || fallbackIssueDate)}</div>
         </div>
         <div style={revisionInfoBlockStyle}>
           <div style={revisionInfoLabelStyle}>Reviewed By</div>
-          <div style={revisionInfoValueStyle}>{revision.reviewed_by || "-"}</div>
+          <div style={revisionInfoValueStyle}>{revision.reviewed_by || fallbackReviewedBy || "-"}</div>
         </div>
         <div style={revisionInfoBlockStyle}>
           <div style={revisionInfoLabelStyle}>Reviewed Date</div>
-          <div style={revisionInfoValueStyle}>{formatDate(revision.reviewed_at)}</div>
+          <div style={revisionInfoValueStyle}>{formatDate(revision.reviewed_at || fallbackReviewedAt)}</div>
         </div>
         <div style={revisionInfoBlockStyle}>
           <div style={revisionInfoLabelStyle}>Approved By</div>
-          <div style={revisionInfoValueStyle}>{revision.approved_by || "-"}</div>
+          <div style={revisionInfoValueStyle}>{revision.approved_by || fallbackApprovedBy || "-"}</div>
         </div>
         <div style={revisionInfoBlockStyle}>
           <div style={revisionInfoLabelStyle}>Approved Date</div>
-          <div style={revisionInfoValueStyle}>{formatDate(revision.approved_at)}</div>
+          <div style={revisionInfoValueStyle}>{formatDate(revision.approved_at || fallbackApprovedAt)}</div>
         </div>
       </div>
 
@@ -4049,6 +4535,79 @@ const workflowButtonRowStyle: CSSProperties = {
   alignItems: "center",
 };
 
+const workflowActionPanelStyle: CSSProperties = {
+  border: "1px solid #bfdbfe",
+  background: "#f8fbff",
+  borderRadius: "16px",
+  padding: "16px",
+  display: "grid",
+  gap: "14px",
+};
+
+const workflowActionTitleStyle: CSSProperties = {
+  margin: "3px 0",
+  color: "#0f172a",
+  fontSize: "20px",
+  lineHeight: 1.2,
+};
+
+const workflowActionHintStyle: CSSProperties = {
+  margin: 0,
+  color: "#475569",
+  fontSize: "14px",
+  lineHeight: 1.45,
+};
+
+const workflowActionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(260px, 1fr) auto",
+  gap: "12px",
+  alignItems: "end",
+};
+
+const workflowRejectGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(220px, 0.8fr) minmax(260px, 1fr) auto",
+  gap: "12px",
+  alignItems: "end",
+  borderTop: "1px solid #dbe4ef",
+  paddingTop: "12px",
+};
+
+const workflowActionButtonWrapStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "10px",
+  flexWrap: "wrap",
+};
+
+const workflowParticipantCardStyle: CSSProperties = {
+  border: "1px solid #dbe4ef",
+  background: "#ffffff",
+  borderRadius: "12px",
+  padding: "11px 12px",
+  display: "grid",
+  gap: "4px",
+  color: "#0f172a",
+  fontSize: "13px",
+  minHeight: "58px",
+};
+
+const workflowParticipantLabelStyle: CSSProperties = {
+  color: "#64748b",
+  fontSize: "11px",
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const workflowRoutingSummaryStyle: CSSProperties = {
+  gridColumn: "1 / -1",
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "10px",
+};
+
 const formLayoutStyle: CSSProperties = {
   display: "grid",
   gap: "12px",
@@ -4256,18 +4815,18 @@ const toolbarStyle: CSSProperties = {
 
 const registerWorkspaceGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(0, 2.4fr) minmax(320px, 0.9fr)",
+  gridTemplateColumns: "minmax(0, 1fr)",
   gap: "16px",
   alignItems: "start",
 };
 
 const documentSidePanelStyle: CSSProperties = {
+  display: "none",
   background: "#ffffff",
   borderRadius: "18px",
   padding: "18px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
   border: "1px solid #e2e8f0",
-  display: "grid",
   gap: "14px",
   position: "sticky",
   top: "96px",
@@ -4357,7 +4916,7 @@ const registerTableWrapStyle: CSSProperties = {
 
 const registerHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.2fr 2fr 0.9fr 1fr 0.7fr 1fr 0.9fr 1fr",
+  gridTemplateColumns: "1.15fr 3fr 0.9fr 0.95fr 0.65fr 1.15fr 0.9fr 1fr",
   gap: "12px",
   padding: "14px 16px",
   background: "#f8fafc",
@@ -4379,7 +4938,7 @@ const registerRowStyle: CSSProperties = {
   width: "100%",
   textAlign: "left",
   display: "grid",
-  gridTemplateColumns: "1.2fr 2fr 0.9fr 1fr 0.7fr 1fr 0.9fr 1fr",
+  gridTemplateColumns: "1.15fr 3fr 0.9fr 0.95fr 0.65fr 1.15fr 0.9fr 1fr",
   gap: "12px",
   padding: "14px 16px",
   border: "none",

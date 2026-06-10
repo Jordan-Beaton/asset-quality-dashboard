@@ -5,6 +5,7 @@ import { createClient as createServerSupabaseClient } from "../../../src/lib/sup
 
 type NotificationRequest = {
   eventType?: string;
+  documentId?: string;
   documentNumber?: string;
   documentTitle?: string;
   currentRevision?: string;
@@ -17,6 +18,19 @@ type NotificationRequest = {
   recipientEmails?: string[];
   message?: string;
 };
+
+type WorkflowButton = {
+  label: string;
+  url: string;
+  tone: "primary" | "danger";
+};
+
+type ControlledFileLink = {
+  fileName: string;
+  url: string;
+};
+
+const STORAGE_BUCKET = "document-files";
 
 function escapeHtml(value: string) {
   return value
@@ -43,8 +57,35 @@ function buildSubject(eventType: string, documentNumber: string) {
   return subjectMap[eventType] || `${documentNumber} update`;
 }
 
-function buildHtml(payload: Required<Pick<NotificationRequest, "eventType" | "documentNumber" | "documentTitle">> &
-  Omit<NotificationRequest, "eventType" | "documentNumber" | "documentTitle">) {
+function buildActionButtons(buttons: WorkflowButton[]) {
+  if (!buttons.length) return "";
+
+  return `
+    <div style="margin: 24px 0; display: flex; gap: 12px; flex-wrap: wrap;">
+      ${buttons
+        .map((button) => {
+          const background = button.tone === "danger" ? "#b91c1c" : "#3A9B98";
+          return `
+            <a href="${escapeHtml(button.url)}"
+               style="display: inline-block; background: ${background}; color: #ffffff; text-decoration: none; border-radius: 10px; padding: 12px 18px; font-weight: 700;">
+              ${escapeHtml(button.label)}
+            </a>
+          `;
+        })
+        .join("")}
+    </div>
+    <p style="font-size: 12px; color: #64748b;">
+      These links open a secure confirmation page before the workflow is updated. Links are single-use and expire automatically.
+    </p>
+  `;
+}
+
+function buildHtml(
+  payload: Required<Pick<NotificationRequest, "eventType" | "documentNumber" | "documentTitle">> &
+    Omit<NotificationRequest, "eventType" | "documentNumber" | "documentTitle">,
+  buttons: WorkflowButton[] = [],
+  controlledFile?: ControlledFileLink | null
+) {
   const subject = buildSubject(payload.eventType, payload.documentNumber);
 
   return `
@@ -77,6 +118,19 @@ function buildHtml(payload: Required<Pick<NotificationRequest, "eventType" | "do
           ? `<p><strong>Message:</strong><br/>${formatMessage(String(payload.message))}</p>`
           : ""
       }
+      ${
+        controlledFile
+          ? `<p><strong>Controlled File:</strong> ${escapeHtml(controlledFile.fileName)}</p>
+             <p>
+               <a href="${escapeHtml(controlledFile.url)}"
+                  style="display: inline-block; background: #e2e8f0; color: #0f172a; text-decoration: none; border-radius: 10px; padding: 10px 14px; font-weight: 700;">
+                 Open Controlled File
+               </a>
+             </p>
+             <p style="font-size: 12px; color: #64748b;">File links are secure signed URLs and may expire.</p>`
+          : ""
+      }
+      ${buildActionButtons(buttons)}
       <br/>
       <p>This is an automated notification from the Document Control System.</p>
     </div>
@@ -134,6 +188,119 @@ async function logEmailAttempt(
   }
 }
 
+async function createWorkflowButtons(
+  body: NotificationRequest,
+  recipientEmails: string[],
+  request: Request
+): Promise<WorkflowButton[]> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const documentId = body.documentId || "";
+
+  if (!supabaseUrl || !serviceRoleKey || !documentId || !recipientEmails.length) {
+    return [];
+  }
+
+  const recipientEmail = recipientEmails[0];
+  const origin = new URL(request.url).origin;
+  const supabase = createServiceClient(supabaseUrl, serviceRoleKey);
+
+  const tokenDefinitions =
+    body.eventType === "submitted_for_review"
+      ? [
+          {
+            label: "Accept Review",
+            action: "accept_review",
+            tone: "primary" as const,
+            intendedName: body.reviewedBy || "",
+            fromStatus: "Pending Review",
+            toStatus: "Reviewed",
+          },
+          {
+            label: "Reject",
+            action: "reject_review",
+            tone: "danger" as const,
+            intendedName: body.reviewedBy || "",
+            fromStatus: "Pending Review",
+            toStatus: "Rejected",
+          },
+        ]
+      : body.eventType === "reviewed"
+      ? [
+          {
+            label: "Approve Document",
+            action: "approve_document",
+            tone: "primary" as const,
+            intendedName: body.approvedBy || "",
+            fromStatus: "Pending Approval",
+            toStatus: "Approved",
+          },
+          {
+            label: "Reject",
+            action: "reject_approval",
+            tone: "danger" as const,
+            intendedName: body.approvedBy || "",
+            fromStatus: "Pending Approval",
+            toStatus: "Rejected",
+          },
+        ]
+      : [];
+
+  const buttons: WorkflowButton[] = [];
+
+  for (const definition of tokenDefinitions) {
+    const token = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+    const { error } = await supabase.from("document_workflow_tokens").insert({
+      token,
+      document_id: documentId,
+      document_number: body.documentNumber || "",
+      document_title: body.documentTitle || "",
+      action: definition.action,
+      intended_name: definition.intendedName || null,
+      intended_email: recipientEmail,
+      from_status: definition.fromStatus,
+      to_status: definition.toStatus,
+    });
+
+    if (!error) {
+      buttons.push({
+        label: definition.label,
+        tone: definition.tone,
+        url: `${origin}/documents/workflow-action?token=${encodeURIComponent(token)}`,
+      });
+    }
+  }
+
+  return buttons;
+}
+
+async function createControlledFileLink(documentId: string): Promise<ControlledFileLink | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey || !documentId) return null;
+
+  const supabase = createServiceClient(supabaseUrl, serviceRoleKey);
+  const { data, error } = await supabase
+    .from("documents")
+    .select("file_name, file_path")
+    .eq("id", documentId)
+    .maybeSingle();
+
+  if (error || !data?.file_path) return null;
+
+  const { data: signed, error: signedError } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .createSignedUrl(data.file_path, 60 * 60 * 24 * 7);
+
+  if (signedError || !signed?.signedUrl) return null;
+
+  return {
+    fileName: data.file_name || "Controlled document",
+    url: signed.signedUrl,
+  };
+}
+
 export async function POST(request: Request) {
   let body: NotificationRequest | null = null;
 
@@ -189,6 +356,8 @@ export async function POST(request: Request) {
     const documentNumber = body.documentNumber || "Document";
     const documentTitle = body.documentTitle || "-";
     const eventType = body.eventType || "update";
+    const workflowButtons = await createWorkflowButtons(body, recipientEmails, request);
+    const controlledFile = await createControlledFileLink(body.documentId || "");
 
     const sendResult = await resend.emails.send({
       from: fromEmail,
@@ -199,7 +368,7 @@ export async function POST(request: Request) {
         eventType,
         documentNumber,
         documentTitle,
-      }),
+      }, workflowButtons, controlledFile),
     });
 
     if (process.env.NODE_ENV !== "production") {
