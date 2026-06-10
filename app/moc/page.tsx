@@ -28,6 +28,7 @@ import {
   WidthType,
 } from "docx";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { supabase } from "../../src/lib/supabase";
 
@@ -980,7 +981,6 @@ function MOCPageContent() {
   const recentCount = useMemo(() => {
     return reports.filter((report) => isRecentMoc(report)).length;
   }, [reports]);
-  const statusBannerColours = getNoticeColours(messageTone);
   const nextWorkflowStatus = getNextWorkflowStatus(detailReport.status);
   const canEditCoreFields = detailReport.status === "Draft" || detailReport.status === "In Review";
   const canEditImplementationFields =
@@ -3289,27 +3289,16 @@ function MOCPageContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
-        <Link href="/quality" style={backLinkStyle}>
-          ← Back to Dashboard
-        </Link>
-
-        <div style={topMetaActionsStyle}>
+      <ImsTopMetaRow
+        backHref="/quality"
+        backLabel="Back to Dashboard"
+        status={<><strong>Status:</strong> {message}</>}
+        actions={
           <button type="button" style={secondaryButtonStyle} onClick={() => void loadData()}>
             Refresh
           </button>
-          <div
-            style={{
-              ...statusBannerStyle,
-              background: statusBannerColours.bg,
-              borderColor: statusBannerColours.border,
-              color: statusBannerColours.text,
-            }}
-          >
-            <strong>Status:</strong> {message}
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <nav style={mocViewNavStyle} aria-label="MOC workspace views">
         {[
@@ -4828,41 +4817,6 @@ function SimpleSignoffTable({
   );
 }
 
-const topMetaRowStyle: CSSProperties = {
-  marginBottom: 20,
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  flexWrap: "wrap",
-  alignItems: "center",
-  background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
-  borderRadius: "16px",
-  padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-
-const topMetaActionsStyle: CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-  alignItems: "center",
-};
-
-const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
-  fontWeight: 700,
-  textDecoration: "none",
-};
-
-const statusBannerStyle: CSSProperties = {
-  background: "white",
-  border: "1px solid #e2e8f0",
-  borderRadius: "12px",
-  padding: "12px 16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
-};
 
 const topGridStyle: CSSProperties = {
   display: "grid",

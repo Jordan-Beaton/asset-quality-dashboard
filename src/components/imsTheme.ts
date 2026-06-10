@@ -38,16 +38,16 @@ export const imsShadows = {
 
 export const imsHeroStyle: CSSProperties = {
   width: "100%",
-  marginBottom: "24px",
-  padding: "28px 30px",
+  marginBottom: "20px",
+  padding: "0 28px",
   borderRadius: imsRadii.hero,
   background: `linear-gradient(135deg, ${imsColours.brand} 0%, ${imsColours.brandDark} 100%)`,
   color: "#ffffff",
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) 356px",
-  gap: "24px",
-  alignItems: "stretch",
-  height: "220px",
+  display: "flex",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: "0",
+  height: "76px",
   boxSizing: "border-box",
   overflow: "hidden",
   boxShadow: imsShadows.hero,
@@ -136,6 +136,7 @@ export const imsButtonBaseStyle: CSSProperties = {
   lineHeight: 1,
   boxSizing: "border-box",
 };
+
 
 export const imsPrimaryButtonStyle: CSSProperties = {
   ...imsButtonBaseStyle,

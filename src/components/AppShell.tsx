@@ -583,7 +583,7 @@ export default function AppShell({ children }: AppShellProps) {
               width: "100%",
               maxWidth: "1320px",
               margin: "0 auto",
-              padding: isFieldInspectionMode ? 0 : "12px 24px 12px 98px",
+              padding: isFieldInspectionMode ? 0 : "12px 24px 12px 240px",
               boxSizing: "border-box",
               display: "flex",
               alignItems: "center",
