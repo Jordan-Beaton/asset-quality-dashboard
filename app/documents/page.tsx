@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
@@ -600,6 +600,8 @@ function DocumentsPageContent() {
   const [approvalFilter, setApprovalFilter] = useState(linkedApproval);
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [showDetailPanel, setShowDetailPanel] = useState(false);
+  const detailPanelRef = useRef<HTMLElement | null>(null);
+  const shouldScrollToDetailRef = useRef(false);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
   const [activeView, setActiveView] = useState<DocumentWorkspaceView>(
     linkedSearch || linkedStatus || linkedType || linkedOwner || linkedReview || linkedApproval ? "register" : "dashboard"
@@ -1050,6 +1052,15 @@ function DocumentsPageContent() {
       rejected_by: nextDetailForm.rejected_by,
     });
   }, [people, selectedDocument]);
+
+  useEffect(() => {
+    if (!showDetailPanel || !selectedDocument || !shouldScrollToDetailRef.current) return;
+
+    shouldScrollToDetailRef.current = false;
+    window.requestAnimationFrame(() => {
+      detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [showDetailPanel, selectedDocument]);
 
   useEffect(() => {
     if (!selectedDocumentId) return;
@@ -2607,6 +2618,7 @@ function DocumentsPageContent() {
   }
 
   function handleSelectDocument(id: string) {
+    shouldScrollToDetailRef.current = true;
     setSelectedDocumentId(id);
     setShowDetailPanel(true);
   }
@@ -3261,7 +3273,7 @@ function DocumentsPageContent() {
       ) : null}
 
       {["register", "workflow", "archive"].includes(activeView) && showDetailPanel && selectedDocument ? (
-        <section id="document-detail-panel" style={{ marginTop: "20px" }}>
+        <section id="document-detail-panel" ref={detailPanelRef} style={{ marginTop: "20px" }}>
           <SectionCard
             title="Document Detail"
             subtitle="Workflow-controlled record with view/download-only controlled files."
