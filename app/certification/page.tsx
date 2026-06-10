@@ -123,6 +123,15 @@ function getFileSize(size: number | null | undefined) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return "Unknown error";
+}
+
 export default function CertificationPage() {
   const [rows, setRows] = useState<CertificationRow[]>([]);
   const [activeView, setActiveView] = useState<CertificationView>("dashboard");
@@ -212,6 +221,7 @@ export default function CertificationPage() {
     }
 
     setSaving(true);
+    let uploadedPath = "";
     try {
       let filePayload: Partial<CertificationRow> = {};
       if (form.file) {
@@ -222,6 +232,7 @@ export default function CertificationPage() {
           upsert: false,
         });
         if (uploadError) throw uploadError;
+        uploadedPath = path;
         filePayload = {
           file_name: form.file.name,
           file_path: path,
@@ -244,13 +255,17 @@ export default function CertificationPage() {
       });
 
       if (error) throw error;
+      uploadedPath = "";
       setForm(emptyForm);
       setActiveView("register");
       setMessage("Certificate uploaded successfully.");
       await loadCertifications(false);
     } catch (error) {
       console.error(error);
-      setMessage(error instanceof Error ? `Save failed: ${error.message}` : "Save failed.");
+      if (uploadedPath) {
+        await supabase.storage.from(STORAGE_BUCKET).remove([uploadedPath]);
+      }
+      setMessage(`Save failed: ${getErrorMessage(error)}`);
     } finally {
       setSaving(false);
     }
@@ -305,7 +320,7 @@ export default function CertificationPage() {
       <QualityPageHero
         label="QUALITY MANAGEMENT"
         title="Certification"
-        description="Upload, track, and review ISO-style certificates from one controlled Quality Management register."
+        description="Upload, track, and review ISO-style certificates from one controlled Document Control register."
         contextCards={[
           { label: "Last Refreshed", value: lastRefreshed || "-" },
           { label: "Latest Certificate", value: latestLabel },

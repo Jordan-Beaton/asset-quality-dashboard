@@ -37,3 +37,31 @@ create index if not exists certifications_standard_idx on public.certifications 
 create index if not exists certifications_status_idx on public.certifications (status);
 create index if not exists certifications_expiry_date_idx on public.certifications (expiry_date);
 create index if not exists certifications_created_at_idx on public.certifications (created_at);
+
+alter table public.certifications enable row level security;
+
+drop policy if exists "certifications_select_authenticated" on public.certifications;
+drop policy if exists "certifications_insert_authenticated" on public.certifications;
+drop policy if exists "certifications_update_authenticated" on public.certifications;
+drop policy if exists "certifications_delete_authenticated" on public.certifications;
+
+create policy "certifications_select_authenticated"
+on public.certifications for select
+to authenticated
+using (true);
+
+create policy "certifications_insert_authenticated"
+on public.certifications for insert
+to authenticated
+with check (true);
+
+create policy "certifications_update_authenticated"
+on public.certifications for update
+to authenticated
+using (true)
+with check (true);
+
+create policy "certifications_delete_authenticated"
+on public.certifications for delete
+to authenticated
+using (true);
