@@ -6,7 +6,7 @@ const moduleCards = [
     title: "Quality Management",
     short: "Quality",
     icon: "quality",
-    description: "NCR, audits, documents, MOC, reporting, and HSEQ workflow control.",
+    description: "NCR, audits, MOC, reporting, and HSEQ workflow control.",
     href: "/quality",
     status: "Live",
     group: "Core IMS",

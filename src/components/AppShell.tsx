@@ -68,13 +68,17 @@ type NavIconKey =
 const qualityNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/quality", label: "Dashboard", icon: "dashboard" },
-  { href: "/documents", label: "Documents", icon: "documents" },
-  { href: "/certification", label: "Certification", icon: "certification" },
   { href: "/moc", label: "MOC", icon: "moc" },
   { href: "/ncr-capa", label: "NCR / CAPA", icon: "ncr" },
   { href: "/audits", label: "Audits", icon: "audits" },
   { href: "/quality/actions", label: "Actions", icon: "actions" },
   { href: "/reports", label: "Reports", icon: "reports" },
+];
+
+const documentNavItems: NavItem[] = [
+  { href: "/home", label: "Home", icon: "home" },
+  { href: "/documents", label: "Document Control", icon: "documents" },
+  { href: "/certification", label: "Certification", icon: "certification" },
 ];
 
 const assetNavItems: NavItem[] = [
@@ -147,15 +151,15 @@ function normaliseSystemRole(role: string | null | undefined): SystemRole {
 }
 
 function getAllowedModuleKeys(role: SystemRole) {
-  if (role === "Admin") return new Set(["home", "quality", "hse", "assets", "risk", "actions", "people", "admin"]);
-  if (role === "Manager") return new Set(["home", "quality", "hse", "assets", "risk", "actions", "people"]);
+  if (role === "Admin") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "people", "admin"]);
+  if (role === "Manager") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "people"]);
   if (role === "HSE Officer") return new Set(["home", "hse", "actions", "people"]);
   if (role === "Quality Engineer") return new Set(["home", "quality", "actions", "people"]);
-  if (role === "Document Controller") return new Set(["home", "quality", "actions", "people"]);
+  if (role === "Document Controller") return new Set(["home", "documents", "actions", "people"]);
   if (role === "Asset Manager") return new Set(["home", "assets", "actions", "people"]);
-  if (role === "Viewer") return new Set(["home", "quality", "hse", "assets", "risk", "actions", "people"]);
+  if (role === "Viewer") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "people"]);
   if (role === "Contractor") return new Set(["home"]);
-  return new Set(["home", "quality", "hse", "assets", "risk", "actions", "people"]);
+  return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "people"]);
 }
 
 function getAccessAreaFromHref(href: string): AccessArea {
@@ -184,7 +188,7 @@ function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleA
   if (area === "home") return true;
   if (area === "people") return getAllowedModuleKeys(role).has("people");
   if (role === "Admin") return true;
-  if (area === "quality") return hasExplicitAccess(moduleAccess.quality) || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer";
+  if (area === "quality") return hasExplicitAccess(moduleAccess.quality) || role === "Manager" || role === "Quality Engineer" || role === "Viewer";
   if (area === "documents") return hasExplicitAccess(moduleAccess.documents) || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer";
   if (area === "hse") return hasExplicitAccess(moduleAccess.hse) || role === "Manager" || role === "HSE Officer" || role === "Viewer";
   if (area === "assets") return hasExplicitAccess(moduleAccess.assets) || role === "Manager" || role === "Asset Manager" || role === "Viewer";
@@ -343,6 +347,7 @@ export default function AppShell({ children }: AppShellProps) {
   const isAssetModule = pathname.startsWith("/assets");
   const isRiskModule = pathname.startsWith("/risk");
   const isHseModule = pathname.startsWith("/hse");
+  const isDocumentModule = pathname.startsWith("/documents") || pathname.startsWith("/certification");
   const isAdminModule = pathname.startsWith("/admin");
   const isPeopleModule = pathname.startsWith("/people");
   const isActionModule = pathname === "/actions";
@@ -351,6 +356,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? "Enshore Management System"
     : isActionModule
     ? "Action Management"
+    : isDocumentModule
+    ? "Document Control"
     : isAssetModule
     ? "Asset Management"
     : isRiskModule
@@ -366,6 +373,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? ""
     : isActionModule
     ? "Central action register and follow-up control"
+    : isDocumentModule
+    ? "Controlled documents, certification, reviews, approvals, and revision history"
     : isAssetModule
     ? "Asset register and control system"
     : isRiskModule
@@ -379,6 +388,8 @@ export default function AppShell({ children }: AppShellProps) {
     : "Quality management system";
   const baseNavItems = isAssetModule
     ? assetNavItems
+    : isDocumentModule
+    ? documentNavItems
     : isRiskModule
     ? riskNavItems
     : isHseModule
