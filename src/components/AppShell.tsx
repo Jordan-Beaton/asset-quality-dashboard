@@ -37,6 +37,8 @@ type ModuleAccess = {
   admin?: string | null;
 };
 
+type AccessArea = "public" | "login" | "home" | "people" | "quality" | "documents" | "hse" | "assets" | "risk" | "actions" | "admin";
+
 type NavIconKey =
   | "home"
   | "dashboard"
@@ -156,7 +158,7 @@ function getAllowedModuleKeys(role: SystemRole) {
   return new Set(["home", "quality", "hse", "assets", "risk", "actions", "people"]);
 }
 
-function getModuleKeyFromHref(href: string) {
+function getAccessAreaFromHref(href: string): AccessArea {
   if (href === "/home" || href === "/") return "home";
   if (href === "/actions") return "actions";
   if (href === "/people") return "people";
@@ -164,6 +166,7 @@ function getModuleKeyFromHref(href: string) {
   if (href.startsWith("/hse")) return "hse";
   if (href.startsWith("/assets")) return "assets";
   if (href.startsWith("/risk")) return "risk";
+  if (href === "/documents" || href.startsWith("/documents") || href === "/certification" || href.startsWith("/certification")) return "documents";
   return "quality";
 }
 
@@ -173,32 +176,22 @@ function hasExplicitAccess(value: string | null | undefined) {
 }
 
 function filterNavItemsForRole(items: NavItem[], role: SystemRole, moduleAccess: ModuleAccess) {
-  const allowedModules = getAllowedModuleKeys(role);
-  return items.filter((item) => {
-    const moduleKey = getModuleKeyFromHref(item.href);
-    if (moduleKey === "home" || moduleKey === "people") return allowedModules.has(moduleKey);
-    if (moduleKey === "quality") {
-      if (hasExplicitAccess(moduleAccess.quality) || hasExplicitAccess(moduleAccess.documents)) return true;
-    }
-    if (moduleKey === "hse" && hasExplicitAccess(moduleAccess.hse)) return true;
-    if (moduleKey === "assets" && hasExplicitAccess(moduleAccess.assets)) return true;
-    if (moduleKey === "risk" && hasExplicitAccess(moduleAccess.risk)) return true;
-    if (moduleKey === "actions" && hasExplicitAccess(moduleAccess.actions)) return true;
-    if (moduleKey === "admin" && hasExplicitAccess(moduleAccess.admin)) return true;
-    return allowedModules.has(moduleKey);
-  });
+  return items.filter((item) => isAreaAllowed(getAccessAreaFromHref(item.href), role, moduleAccess));
 }
 
-function isModuleAllowed(moduleKey: string, role: SystemRole, moduleAccess: ModuleAccess) {
-  if (moduleKey === "public" || moduleKey === "login") return true;
-  if (moduleKey === "home" || moduleKey === "people") return getAllowedModuleKeys(role).has(moduleKey);
-  if (moduleKey === "quality") return getAllowedModuleKeys(role).has("quality") || hasExplicitAccess(moduleAccess.quality) || hasExplicitAccess(moduleAccess.documents);
-  if (moduleKey === "hse") return getAllowedModuleKeys(role).has("hse") || hasExplicitAccess(moduleAccess.hse);
-  if (moduleKey === "assets") return getAllowedModuleKeys(role).has("assets") || hasExplicitAccess(moduleAccess.assets);
-  if (moduleKey === "risk") return getAllowedModuleKeys(role).has("risk") || hasExplicitAccess(moduleAccess.risk);
-  if (moduleKey === "actions") return getAllowedModuleKeys(role).has("actions") || hasExplicitAccess(moduleAccess.actions);
-  if (moduleKey === "admin") return getAllowedModuleKeys(role).has("admin") || hasExplicitAccess(moduleAccess.admin);
-  return getAllowedModuleKeys(role).has(moduleKey);
+function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleAccess) {
+  if (area === "public" || area === "login") return true;
+  if (area === "home") return true;
+  if (area === "people") return getAllowedModuleKeys(role).has("people");
+  if (role === "Admin") return true;
+  if (area === "quality") return hasExplicitAccess(moduleAccess.quality) || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer";
+  if (area === "documents") return hasExplicitAccess(moduleAccess.documents) || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer";
+  if (area === "hse") return hasExplicitAccess(moduleAccess.hse) || role === "Manager" || role === "HSE Officer" || role === "Viewer";
+  if (area === "assets") return hasExplicitAccess(moduleAccess.assets) || role === "Manager" || role === "Asset Manager" || role === "Viewer";
+  if (area === "risk") return hasExplicitAccess(moduleAccess.risk) || role === "Manager" || role === "Viewer";
+  if (area === "actions") return hasExplicitAccess(moduleAccess.actions) || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer";
+  if (area === "admin") return hasExplicitAccess(moduleAccess.admin);
+  return false;
 }
 
 function RailIcon({ icon }: { icon: NavIconKey }) {
@@ -400,30 +393,18 @@ export default function AppShell({ children }: AppShellProps) {
   const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess);
   const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldInspectionMode;
   const railOpen = isRailExpanded || isRailPinned;
-  const currentModuleKey = isLoginPage
+  const currentAccessArea: AccessArea = isLoginPage
     ? "login"
     : isPublicObservationPage
     ? "public"
     : isHomePage
     ? "home"
-    : isActionModule
-    ? "actions"
-    : isPeopleModule
-    ? "people"
-    : isAdminModule
-    ? "admin"
-    : isHseModule
-    ? "hse"
-    : isAssetModule
-    ? "assets"
-    : isRiskModule
-    ? "risk"
-    : "quality";
+    : getAccessAreaFromHref(pathname);
   const pageAccessAllowed =
     isLoginPage ||
     isPublicObservationPage ||
     !permissionsLoaded ||
-    isModuleAllowed(currentModuleKey, signedInRole, signedInModuleAccess);
+    isAreaAllowed(currentAccessArea, signedInRole, signedInModuleAccess);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
