@@ -351,6 +351,8 @@ export default function AppShell({ children }: AppShellProps) {
   const isAdminModule = pathname.startsWith("/admin");
   const isPeopleModule = pathname.startsWith("/people");
   const isActionModule = pathname === "/actions";
+  const isAinmFieldMode = pathname === "/hse/ainm/field";
+  const fieldModeTitle = isAinmFieldMode ? "HSE AINM Field Entry" : "HSE Field Inspection";
   const showLogo = !isLoginPage && !isPublicObservationPage;
   const moduleTitle = isHomePage
     ? "Enshore Management System"
@@ -422,9 +424,11 @@ export default function AppShell({ children }: AppShellProps) {
     const updateFieldInspectionMode = () => {
       const params = new URLSearchParams(window.location.search);
       setIsFieldInspectionMode(
-        pathname === "/hse/inspections" &&
-        window.innerWidth <= 720 &&
-        params.get("view") === "create",
+        pathname === "/hse/ainm/field" ||
+        pathname === "/hse/inspections/field" ||
+        (pathname === "/hse/inspections" &&
+          window.innerWidth <= 720 &&
+          params.get("view") === "create"),
       );
     };
     updateFieldInspectionMode();
@@ -603,7 +607,7 @@ export default function AppShell({ children }: AppShellProps) {
                   whiteSpace: isFieldInspectionMode ? undefined : "nowrap",
                 }}
               >
-                {isFieldInspectionMode ? "HSE Field Inspection" : moduleTitle}
+                {isFieldInspectionMode ? fieldModeTitle : moduleTitle}
               </div>
               {moduleSubtitle && !isFieldInspectionMode ? (
                 <div

@@ -20,7 +20,7 @@ import {
   YAxis,
 } from "recharts";
 import { ImsButton, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
-import { imsColours, imsPanelStyle } from "../../src/components/imsTheme";
+import { imsColours, imsPanelStyle, imsShadows } from "../../src/components/imsTheme";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
@@ -165,6 +165,15 @@ function buildHref(path: string, params?: Record<string, string | number | null 
   });
   const query = search.toString();
   return query ? `${path}?${query}` : path;
+}
+
+function percentage(part: number, total: number) {
+  if (!total) return 0;
+  return Math.round((part / total) * 100);
+}
+
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function ainmType(record: Pick<AinmRecord, "ainm_number" | "event_classification">) {
@@ -329,8 +338,145 @@ export default function HseDashboardPage() {
     return [...owners.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 6);
   }, [hseOpenActions]);
 
+  const hsePulse = useMemo(() => {
+    const closedAinms = yearAinms.filter((record) => isClosed(record.overall_status)).length;
+    const completeInspections = yearInspections.filter((record) => isClosed(record.status)).length;
+    const actionHealth = hseOpenActions.length ? percentage(Math.max(hseOpenActions.length - overdueActions.length, 0), hseOpenActions.length) : 100;
+    const calendarHealth = calendarItems.length ? percentage(Math.max(calendarItems.length - calendarOverdue.length, 0), calendarItems.length) : 100;
+    const ainmClosure = percentage(closedAinms, yearAinms.length);
+    const inspectionCompletion = percentage(completeInspections, yearInspections.length);
+    const score = clampPercent((ainmClosure * 0.28) + (inspectionCompletion * 0.24) + (actionHealth * 0.24) + (calendarHealth * 0.24));
+
+    return {
+      score,
+      ainmClosure,
+      inspectionCompletion,
+      actionHealth,
+      calendarHealth,
+      openWorkload: openAinms.length + openInspections.length + hseOpenActions.length,
+      criticalItems: openAinms.length + overdueActions.length + calendarOverdue.length,
+      upcomingItems: calendarUpcoming.length + dueWeekActions.length,
+    };
+  }, [
+    calendarItems.length,
+    calendarOverdue.length,
+    calendarUpcoming.length,
+    dueWeekActions.length,
+    hseOpenActions.length,
+    openAinms.length,
+    openInspections.length,
+    overdueActions.length,
+    yearAinms,
+    yearInspections,
+  ]);
+
+  const hseOperationalPressureData = useMemo(
+    () => [
+      { name: "AINMs", value: openAinms.length, fill: chartColours.red, href: buildHref("/hse/ainm", { status: "Open" }) },
+      { name: "Inspections", value: openInspections.length, fill: chartColours.teal, href: "/hse/inspections?view=register" },
+      { name: "Actions", value: hseOpenActions.length, fill: chartColours.purple, href: "/hse/actions?view=register" },
+      { name: "Calendar", value: calendarOverdue.length, fill: chartColours.amber, href: "/hse/calendar" },
+      { name: "Reports", value: reports.length, fill: chartColours.blue, href: "/hse/ainm?view=reports" },
+    ],
+    [calendarOverdue.length, hseOpenActions.length, openAinms.length, openInspections.length, reports.length],
+  );
+
+  const hseSignalItems = useMemo(
+    () => [
+      {
+        label: "Critical pressure",
+        value: hsePulse.criticalItems,
+        detail: "Open AINMs, overdue HSE actions, and overdue calendar items",
+        href: "/hse/actions?view=overdue",
+        accent: chartColours.red,
+      },
+      {
+        label: "Open workload",
+        value: hsePulse.openWorkload,
+        detail: "Open AINMs, inspections, and HSE actions",
+        href: "/hse/actions?view=register",
+        accent: chartColours.blue,
+      },
+      {
+        label: "Upcoming pressure",
+        value: hsePulse.upcomingItems,
+        detail: "Actions due this week plus calendar items due within 30 days",
+        href: "/hse/calendar",
+        accent: chartColours.amber,
+      },
+      {
+        label: "AINM profile",
+        value: `${ainmSplitData[0]?.value || 0}/${ainmSplitData[1]?.value || 0}`,
+        detail: `${yearFilter} incidents / accidents`,
+        href: buildHref("/hse/ainm", { year: yearFilter }),
+        accent: chartColours.teal,
+      },
+    ],
+    [ainmSplitData, hsePulse.criticalItems, hsePulse.openWorkload, hsePulse.upcomingItems, yearFilter],
+  );
+
   return (
     <main>
+      <style>{`
+        .hse-command-score::before {
+          content: "";
+          position: absolute;
+          inset: -40%;
+          background: radial-gradient(circle at 28% 28%, rgba(255,255,255,0.22), transparent 34%),
+            radial-gradient(circle at 78% 72%, rgba(191,229,227,0.24), transparent 32%);
+          animation: hsePulseDrift 10s ease-in-out infinite alternate;
+          pointer-events: none;
+        }
+        .hse-score-orb {
+          transition: transform 180ms ease, filter 180ms ease;
+        }
+        .hse-score-orb:hover {
+          transform: scale(1.04);
+          filter: brightness(1.08);
+        }
+        .hse-signal-card,
+        .hse-work-item,
+        .hse-section-card {
+          transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+        }
+        .hse-signal-card:hover,
+        .hse-work-item:hover,
+        .hse-section-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 18px 34px rgba(15, 23, 42, 0.11);
+          border-color: #BFE5E3;
+        }
+        .hse-live-pill {
+          animation: hseLiveGlow 1.8s ease-in-out infinite alternate;
+        }
+        @keyframes hsePulseDrift {
+          from { transform: rotate(0deg) scale(1); }
+          to { transform: rotate(8deg) scale(1.05); }
+        }
+        @keyframes hseLiveGlow {
+          from { box-shadow: 0 0 0 rgba(22, 163, 74, 0); }
+          to { box-shadow: 0 0 18px rgba(22, 163, 74, 0.28); }
+        }
+        @media (max-width: 980px) {
+          .hse-command-deck,
+          .hse-story-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .hse-kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .hse-command-score {
+            grid-template-columns: 1fr !important;
+            min-height: auto !important;
+          }
+          .hse-kpi-grid,
+          .hse-signal-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
       <QualityPageHero
         label="HSE MANAGEMENT"
         title="HSE Dashboard"
@@ -358,7 +504,69 @@ export default function HseDashboardPage() {
         status={<><strong>Status:</strong> {loading ? "Loading..." : message}</>}
       />
 
-      <section style={kpiGridStyle}>
+      <section className="hse-command-deck" style={commandDeckStyle}>
+        <div className="hse-command-score" style={commandScorePanelStyle}>
+          <div style={commandScoreCopyStyle}>
+            <span style={commandEyebrowStyle}>HSE Pulse</span>
+            <h2 style={commandTitleStyle}>HSE control picture</h2>
+            <p style={commandTextStyle}>
+              Weighted from AINM closure, inspection completion, HSE action pressure, and calendar discipline.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="hse-score-orb"
+            style={scoreOrbStyle}
+            onClick={() => router.push("/management-review")}
+            title="Open Management Review Snapshot"
+          >
+            <span style={scoreValueStyle}>{hsePulse.score}%</span>
+            <span style={scoreSubLabelStyle}>CONTROL HEALTH</span>
+          </button>
+        </div>
+
+        <div className="hse-signal-grid" style={signalGridStyle}>
+          {hseSignalItems.map((item) => (
+            <Link key={item.label} href={item.href} className="hse-signal-card" style={{ ...signalCardStyle, borderTopColor: item.accent }}>
+              <span style={signalLabelStyle}>{item.label}</span>
+              <strong style={signalValueStyle}>{item.value}</strong>
+              <small style={signalDetailStyle}>{item.detail}</small>
+            </Link>
+          ))}
+        </div>
+
+        <section style={pressurePanelStyle}>
+          <div style={pressureHeaderStyle}>
+            <div>
+              <h2 style={pressureTitleStyle}>Operational Pressure</h2>
+              <p style={pressureSubtitleStyle}>Click a bar to drill into the HSE source area.</p>
+            </div>
+            <span className="hse-live-pill" style={livePillStyle}>Live</span>
+          </div>
+          <div style={pressureChartWrapStyle}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={hseOperationalPressureData} layout="vertical" margin={{ top: 8, right: 24, left: 20, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" allowDecimals={false} />
+                <YAxis type="category" dataKey="name" width={90} />
+                <Tooltip />
+                <Bar dataKey="value" name="Open / due items" radius={[0, 10, 10, 0]}>
+                  {hseOperationalPressureData.map((entry) => (
+                    <Cell
+                      key={entry.name}
+                      fill={entry.fill}
+                      cursor="pointer"
+                      onClick={() => router.push(entry.href)}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      </section>
+
+      <section className="hse-kpi-grid" style={kpiGridStyle}>
         <QualityKpiCard title="Open AINMs" value={openAinms.length} accent={chartColours.red} onClick={() => router.push(buildHref("/hse/ainm", { status: "Open" }))} />
         <QualityKpiCard title={`${yearFilter} Incidents`} value={ainmSplitData[0]?.value || 0} accent={chartColours.blue} onClick={() => router.push(buildHref("/hse/ainm", { type: "Incident", year: yearFilter }))} />
         <QualityKpiCard title={`${yearFilter} Accidents`} value={ainmSplitData[1]?.value || 0} accent={chartColours.red} onClick={() => router.push(buildHref("/hse/ainm", { type: "Accident", year: yearFilter }))} />
@@ -367,7 +575,7 @@ export default function HseDashboardPage() {
         <QualityKpiCard title="Calendar Overdue" value={calendarOverdue.length} accent={chartColours.amber} onClick={() => router.push("/hse/calendar")} />
       </section>
 
-      <section style={storyGridStyle}>
+      <section className="hse-story-grid" style={storyGridStyle}>
         <SectionCard title="AINM Incident / Accident Split" subtitle={`Accident versus incident profile for ${yearFilter}.`} href={buildHref("/hse/ainm", { year: yearFilter })}>
           <ChartFrame>
             <ResponsiveContainer width="100%" height="100%">
@@ -475,7 +683,7 @@ export default function HseDashboardPage() {
         <SectionCard title="Upcoming HSE Focus" subtitle="Overdue and upcoming planner items needing attention." href="/hse/calendar">
           <div style={focusListStyle}>
             {[...calendarOverdue, ...calendarUpcoming].slice(0, 8).map((item) => (
-              <Link key={item.id} href="/hse/calendar" style={focusItemStyle}>
+              <Link key={item.id} href="/hse/calendar" className="hse-work-item" style={focusItemStyle}>
                 <span>
                   <strong>{item.title}</strong>
                   <small>{[item.inspection_form_ref, item.assigned_to, item.frequency].filter(Boolean).join(" | ")}</small>
@@ -494,7 +702,7 @@ export default function HseDashboardPage() {
 
 function SectionCard({ title, subtitle, href, children }: { title: string; subtitle?: string; href?: string; children: ReactNode }) {
   const content = (
-    <section style={sectionCardStyle}>
+    <section className="hse-section-card" style={sectionCardStyle}>
       <div style={sectionHeaderStyle}>
         <div>
           <h2 style={sectionTitleStyle}>{title}</h2>
@@ -523,6 +731,177 @@ function ChartFrame({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+const commandDeckStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1.08fr 1fr",
+  gap: "18px",
+  marginBottom: "20px",
+};
+
+const commandScorePanelStyle: CSSProperties = {
+  position: "relative",
+  minHeight: "178px",
+  overflow: "hidden",
+  borderRadius: "20px",
+  padding: "22px",
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) 174px",
+  alignItems: "center",
+  gap: "18px",
+  color: "#ffffff",
+  background: `linear-gradient(135deg, ${imsColours.brand} 0%, #1f6769 58%, #174b56 100%)`,
+  boxShadow: imsShadows.hero,
+};
+
+const commandScoreCopyStyle: CSSProperties = {
+  position: "relative",
+  zIndex: 1,
+  maxWidth: "460px",
+};
+
+const commandEyebrowStyle: CSSProperties = {
+  display: "block",
+  marginBottom: "8px",
+  fontSize: "12px",
+  fontWeight: 900,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  color: "#dff7f5",
+};
+
+const commandTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: "clamp(26px, 3vw, 36px)",
+  lineHeight: 1.08,
+  fontWeight: 950,
+  maxWidth: "420px",
+};
+
+const commandTextStyle: CSSProperties = {
+  margin: "12px 0 0",
+  maxWidth: "430px",
+  color: "#effdfc",
+  lineHeight: 1.5,
+  fontSize: "13px",
+  fontWeight: 700,
+};
+
+const scoreOrbStyle: CSSProperties = {
+  position: "relative",
+  zIndex: 1,
+  width: "100%",
+  minHeight: "116px",
+  borderRadius: "18px",
+  border: "1px solid rgba(255,255,255,0.24)",
+  background: "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08))",
+  color: "#ffffff",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  cursor: "pointer",
+  boxShadow: "inset 0 0 28px rgba(255,255,255,0.10), 0 14px 28px rgba(15, 23, 42, 0.16)",
+};
+
+const scoreValueStyle: CSSProperties = {
+  display: "block",
+  fontSize: "40px",
+  fontWeight: 950,
+  lineHeight: 1,
+};
+
+const scoreSubLabelStyle: CSSProperties = {
+  display: "block",
+  fontSize: "10px",
+  letterSpacing: "0.1em",
+  fontWeight: 900,
+  textAlign: "center",
+  color: "rgba(255,255,255,0.78)",
+};
+
+const signalGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "14px",
+};
+
+const signalCardStyle: CSSProperties = {
+  minHeight: "108px",
+  padding: "16px",
+  borderRadius: "18px",
+  border: "1px solid #dbe3ef",
+  borderTop: "5px solid",
+  background: "#ffffff",
+  color: imsColours.ink,
+  textDecoration: "none",
+  boxShadow: imsShadows.panel,
+  display: "grid",
+  gap: "8px",
+};
+
+const signalLabelStyle: CSSProperties = {
+  color: imsColours.slate,
+  fontSize: "12px",
+  fontWeight: 900,
+};
+
+const signalValueStyle: CSSProperties = {
+  fontSize: "30px",
+  lineHeight: 1,
+};
+
+const signalDetailStyle: CSSProperties = {
+  color: imsColours.slate,
+  lineHeight: 1.35,
+  fontWeight: 700,
+};
+
+const pressurePanelStyle: CSSProperties = {
+  ...imsPanelStyle,
+  gridColumn: "1 / -1",
+  padding: "18px",
+};
+
+const pressureHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: "12px",
+  marginBottom: "10px",
+};
+
+const pressureTitleStyle: CSSProperties = {
+  margin: 0,
+  color: imsColours.ink,
+  fontSize: "18px",
+  fontWeight: 950,
+};
+
+const pressureSubtitleStyle: CSSProperties = {
+  margin: "4px 0 0",
+  color: imsColours.slate,
+  fontSize: "13px",
+  fontWeight: 700,
+};
+
+const livePillStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  borderRadius: "999px",
+  padding: "6px 10px",
+  background: "#dcfce7",
+  color: "#166534",
+  fontSize: "12px",
+  fontWeight: 950,
+};
+
+const pressureChartWrapStyle: CSSProperties = {
+  width: "100%",
+  height: "250px",
+  minHeight: "250px",
+};
 
 const yearFilterStyle: CSSProperties = {
   display: "inline-flex",

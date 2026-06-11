@@ -98,7 +98,7 @@ const tabs: Array<{ value: View; label: string }> = [
 
 const statusOptions = ["New", "In Review", "Action Required", "Closed"];
 const riskOptions = ["Low", "Medium", "High", "Immediate attention"];
-const observationTypes = ["Positive Observation", "Unsafe Act", "Unsafe Condition", "Near Miss", "Environmental", "Quality / Process", "Other"];
+const observationTypes = ["Positive Observation", "Unsafe Act", "Unsafe Condition", "Environmental", "Quality / Process", "Other"];
 const chartColours = [imsColours.brand, imsColours.blue, imsColours.purple, imsColours.warning, imsColours.dangerBright, imsColours.success];
 const evidenceBucket = "quality-evidence";
 
@@ -260,6 +260,33 @@ export default function HseObservationsPage() {
       return;
     }
     setMessage(`${selectedRecord.observation_number} updated.`);
+    await loadData();
+  }
+
+  async function deleteSelectedRecord(record: ObservationRecord) {
+    if (!window.confirm(`Delete ${record.observation_number}? This cannot be undone.`)) return;
+    setLoading(true);
+
+    const linkedEvidence = evidence.filter((item) => item.observation_id === record.id);
+    if (linkedEvidence.length) {
+      const { error: storageError } = await supabase.storage
+        .from(evidenceBucket)
+        .remove(linkedEvidence.map((item) => item.file_path));
+
+      if (storageError) {
+        setMessage(`Evidence cleanup warning: ${storageError.message}. Deleting observation record anyway.`);
+      }
+    }
+
+    const { error } = await supabase.from("hse_observations").delete().eq("id", record.id);
+    if (error) {
+      setMessage(`Delete failed: ${error.message}`);
+      setLoading(false);
+      return;
+    }
+
+    setSelectedId("");
+    setMessage(`${record.observation_number} deleted.`);
     await loadData();
   }
 
@@ -451,6 +478,7 @@ export default function HseObservationsPage() {
               people={people}
               onOpenEvidence={openEvidence}
               onUpdate={updateSelectedRecord}
+              onDelete={deleteSelectedRecord}
               createActionHref={createActionHref}
             />
           ) : null}
@@ -496,6 +524,7 @@ function ObservationDetail({
   people,
   onOpenEvidence,
   onUpdate,
+  onDelete,
   createActionHref,
 }: {
   record: ObservationRecord | null;
@@ -504,6 +533,7 @@ function ObservationDetail({
   people: PersonOption[];
   onOpenEvidence: (path: string) => void;
   onUpdate: (payload: Partial<ObservationRecord>) => void;
+  onDelete: (record: ObservationRecord) => void;
   createActionHref: string;
 }) {
   const [draftStatus, setDraftStatus] = useState(record?.status || "New");
@@ -558,6 +588,7 @@ function ObservationDetail({
         <div style={buttonRowStyle}>
           <ImsButton onClick={() => onUpdate({ status: draftStatus, assigned_to: draftAssigned || null, closeout_notes: draftCloseout || null })}>Save Review</ImsButton>
           <ImsLinkButton href={createActionHref}>Generate Central Action</ImsLinkButton>
+          <ImsButton variant="danger" onClick={() => onDelete(record)}>Delete Observation</ImsButton>
         </div>
       </div>
 

@@ -19,7 +19,7 @@ import {
   YAxis,
 } from "recharts";
 import { ImsButton, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
-import { imsColours } from "../../src/components/imsTheme";
+import { imsColours, imsShadows } from "../../src/components/imsTheme";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
@@ -269,6 +269,10 @@ function percentage(part: number, total: number) {
   return Math.round((part / total) * 100);
 }
 
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 function getChartPayloadName(data: unknown) {
   if (typeof data !== "object" || data === null) return "";
   if ("name" in data && typeof (data as { name?: unknown }).name === "string") {
@@ -422,10 +426,10 @@ export default function Home() {
   const openMocs = yearMocs.filter((item) => normaliseStatus(item.status) !== "closed").length;
   const temporaryMocs = yearMocs.filter((item) => (item.change_type || "") === "Temporary").length;
   const inReviewMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "in review").length;
-  const hseqActions = yearActions.filter((item) => normaliseStatus(item.department) === "hseq" || normaliseStatus(item.department) === "quality");
-  const openHseqActions = hseqActions.filter((item) => !isClosedLikeStatus(item.status)).length;
+  const qualityActions = yearActions.filter((item) => normaliseStatus(item.department) === "quality");
+  const openQualityActions = qualityActions.filter((item) => !isClosedLikeStatus(item.status)).length;
 
-  const overdueHseqActions = hseqActions.filter((action) => {
+  const overdueQualityActions = qualityActions.filter((action) => {
     if (isClosedLikeStatus(action.status)) return false;
     const days = getDaysFromToday(action.due_date);
     return days !== null && days < 0;
@@ -500,7 +504,7 @@ export default function Home() {
     const openedMap: Record<string, number> = {};
     const closedMap: Record<string, number> = {};
 
-    hseqActions.forEach((action) => {
+    qualityActions.forEach((action) => {
       const openedKey = monthKey(action.created_at);
       if (openedKey) {
         keys.add(openedKey);
@@ -525,7 +529,7 @@ export default function Home() {
         Opened: openedMap[key] || 0,
         Closed: closedMap[key] || 0,
       }));
-  }, [hseqActions]);
+  }, [qualityActions]);
 
   const documentStatusData = useMemo(() => {
     const counts = {
@@ -594,8 +598,8 @@ export default function Home() {
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [yearMocs]);
 
-  const hseqActionDuePressureData = useMemo(() => {
-    const open = hseqActions.filter((action) => !isClosedLikeStatus(action.status));
+  const qualityActionDuePressureData = useMemo(() => {
+    const open = qualityActions.filter((action) => !isClosedLikeStatus(action.status));
     const overdue = open.filter((action) => {
       const days = getDaysFromToday(action.due_date);
       return days !== null && days < 0;
@@ -616,7 +620,7 @@ export default function Home() {
       { name: "Due 30 Days", value: due30, fill: "#2563eb" },
       { name: "No Due Date", value: noDueDate, fill: "#64748b" },
     ];
-  }, [hseqActions]);
+  }, [qualityActions]);
 
   const auditStatusData = useMemo(() => {
     const counts = {
@@ -669,6 +673,64 @@ export default function Home() {
     ];
   }, [documents, yearAuditFindings, yearMocs, yearNcrs]);
 
+  const qualityPulse = useMemo(() => {
+    const totalNcrs = yearNcrs.length;
+    const closedNcrs = yearNcrs.filter((item) => isClosedLikeStatus(item.status)).length;
+    const totalFindings = yearAuditFindings.length;
+    const closedFindings = yearAuditFindings.filter((item) => isClosedLikeStatus(item.status)).length;
+    const totalDocs = documents.length;
+    const docsInDate = documents.filter((document) => getDocumentBucket(document) !== "Overdue").length;
+    const totalMocs = yearMocs.length;
+    const closedMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "closed").length;
+    const openActions = qualityActions.filter((item) => !isClosedLikeStatus(item.status)).length;
+    const actionPressureScore = openActions ? percentage(Math.max(openActions - overdueQualityActions, 0), openActions) : 100;
+
+    const ncrClosure = percentage(closedNcrs, totalNcrs);
+    const findingClosure = percentage(closedFindings, totalFindings);
+    const documentHealth = percentage(docsInDate, totalDocs);
+    const mocClosure = percentage(closedMocs, totalMocs);
+    const score = clampPercent((ncrClosure * 0.24) + (findingClosure * 0.24) + (documentHealth * 0.22) + (mocClosure * 0.15) + (actionPressureScore * 0.15));
+
+    return {
+      score,
+      ncrClosure,
+      findingClosure,
+      documentHealth,
+      mocClosure,
+      actionPressureScore,
+      openWorkload: openNcrs + openAuditFindings + openMocs + openQualityActions,
+      criticalItems: overdueNcrs + overdueQualityActions + overdueDocuments + expiredTemporaryMocs,
+      warningItems: dueSoonNcrs + nearingTemporaryMocs,
+    };
+  }, [
+    documents,
+    dueSoonNcrs,
+    expiredTemporaryMocs,
+    qualityActions,
+    nearingTemporaryMocs,
+    openAuditFindings,
+    openQualityActions,
+    openMocs,
+    openNcrs,
+    overdueDocuments,
+    overdueQualityActions,
+    overdueNcrs,
+    yearAuditFindings,
+    yearMocs,
+    yearNcrs,
+  ]);
+
+  const operationalPressureData = useMemo(
+    () => [
+      { name: "NCRs", value: openNcrs, fill: "#dc2626", href: buildHref("/ncr-capa", { view: "register", status: "Open" }) },
+      { name: "Findings", value: openAuditFindings, fill: "#7c3aed", href: buildHref("/audits", { view: "findings", findingStatus: "Open" }) },
+      { name: "MOCs", value: openMocs, fill: "#3A9B98", href: buildHref("/moc", { attention: "open" }) },
+      { name: "Actions", value: openQualityActions, fill: "#2563eb", href: buildHref("/actions", { view: "register", department: "Quality", status: "Open" }) },
+      { name: "Docs", value: overdueDocuments, fill: "#f59e0b", href: buildHref("/documents", { review: "Overdue" }) },
+    ],
+    [openAuditFindings, openQualityActions, openMocs, openNcrs, overdueDocuments],
+  );
+
   const managementFocusItems = useMemo(
     () => [
       {
@@ -684,9 +746,9 @@ export default function Home() {
         tone: "warning" as const,
       },
       {
-        label: "Overdue HSEQ Actions",
-        value: overdueHseqActions,
-        href: buildHref("/actions", { view: "register", department: "HSEQ", overdue: 1 }),
+        label: "Overdue Quality Actions",
+        value: overdueQualityActions,
+        href: buildHref("/actions", { view: "register", department: "Quality", overdue: 1 }),
         tone: "critical" as const,
       },
       {
@@ -708,7 +770,7 @@ export default function Home() {
         tone: "critical" as const,
       },
     ],
-    [dueSoonNcrs, expiredTemporaryMocs, nearingTemporaryMocs, overdueDocuments, overdueHseqActions, overdueNcrs]
+    [dueSoonNcrs, expiredTemporaryMocs, nearingTemporaryMocs, overdueDocuments, overdueQualityActions, overdueNcrs]
   );
 
   const topProblemAreas = useMemo(() => {
@@ -801,7 +863,7 @@ export default function Home() {
   }, [audits, auditFindings]);
 
   const priorityActions = useMemo(() => {
-    return [...hseqActions]
+    return [...qualityActions]
       .filter((action) => !isClosedLikeStatus(action.status))
       .sort((a, b) => {
         const aDays = getDaysFromToday(a.due_date);
@@ -818,7 +880,7 @@ export default function Home() {
         return aDate - bDate;
       })
       .slice(0, 5);
-  }, [hseqActions]);
+  }, [qualityActions]);
 
   const currentMonthAuditKey = useMemo(() => dateMonthKey(new Date()), []);
 
@@ -884,6 +946,48 @@ export default function Home() {
     ? Math.round((currentMonthCompletedAudits / currentMonthAudits.length) * 100)
     : 0;
 
+  const executiveSignalItems = useMemo(
+    () => [
+      {
+        label: "Critical pressure",
+        value: qualityPulse.criticalItems,
+        detail: "Overdue NCRs, actions, documents, and expired temporary MOCs",
+        href: qualityPulse.criticalItems ? buildHref("/management-review") : buildHref("/quality"),
+        accent: "#dc2626",
+      },
+      {
+        label: "Open workload",
+        value: qualityPulse.openWorkload,
+        detail: "Open NCRs, findings, MOCs, and Quality actions",
+        href: buildHref("/actions", { view: "register", department: "Quality" }),
+        accent: "#2563eb",
+      },
+      {
+        label: "This month audits",
+        value: currentMonthAudits.length,
+        detail: `${currentMonthOutstandingAudits} outstanding / ${currentMonthCompletedAudits} complete`,
+        href: buildHref("/audits", { month: currentMonthAuditKey }),
+        accent: "#7c3aed",
+      },
+      {
+        label: "Reviews overdue",
+        value: overdueDocuments,
+        detail: "Document control items past next review date",
+        href: buildHref("/documents", { review: "Overdue" }),
+        accent: "#3A9B98",
+      },
+    ],
+    [
+      currentMonthAuditKey,
+      currentMonthAudits.length,
+      currentMonthCompletedAudits,
+      currentMonthOutstandingAudits,
+      overdueDocuments,
+      qualityPulse.criticalItems,
+      qualityPulse.openWorkload,
+    ],
+  );
+
   const kpis = [
     {
       label: "Open NCRs",
@@ -892,10 +996,10 @@ export default function Home() {
       href: buildHref("/ncr-capa", { view: "register", status: "Open" }),
     },
     {
-      label: "HSEQ Open Actions",
-      value: openHseqActions,
+      label: "Quality Open Actions",
+      value: openQualityActions,
       accent: "#2563eb",
-      href: buildHref("/actions", { view: "register", department: "HSEQ", status: "Open" }),
+      href: buildHref("/actions", { view: "register", department: "Quality", status: "Open" }),
     },
     {
       label: "Open Audit Findings",
@@ -922,10 +1026,10 @@ export default function Home() {
       href: buildHref("/moc", { status: "In Review" }),
     },
     {
-      label: "HSEQ Overdue Actions",
-      value: overdueHseqActions,
+      label: "Quality Overdue Actions",
+      value: overdueQualityActions,
       accent: "#b91c1c",
-      href: buildHref("/actions", { view: "register", department: "HSEQ", overdue: 1 }),
+      href: buildHref("/actions", { view: "register", department: "Quality", overdue: 1 }),
     },
     {
       label: "Overdue Documents",
@@ -957,10 +1061,69 @@ export default function Home() {
 
   return (
     <main>
+      <style>{`
+        .quality-command-score::before {
+          content: "";
+          position: absolute;
+          inset: -40%;
+          background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.22), transparent 34%),
+            radial-gradient(circle at 78% 70%, rgba(191,229,227,0.22), transparent 32%);
+          animation: qualityPulseDrift 10s ease-in-out infinite alternate;
+          pointer-events: none;
+        }
+        .quality-score-orb {
+          transition: transform 180ms ease, filter 180ms ease;
+        }
+        .quality-score-orb:hover {
+          transform: scale(1.04);
+          filter: brightness(1.08);
+        }
+        .quality-signal-card,
+        .quality-health-card,
+        .quality-work-item {
+          transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+        }
+        .quality-signal-card:hover,
+        .quality-health-card:hover,
+        .quality-work-item:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 18px 34px rgba(15, 23, 42, 0.11);
+          border-color: #BFE5E3;
+        }
+        .quality-live-pill {
+          animation: qualityLiveGlow 1.8s ease-in-out infinite alternate;
+        }
+        @keyframes qualityPulseDrift {
+          from { transform: rotate(0deg) scale(1); }
+          to { transform: rotate(8deg) scale(1.05); }
+        }
+        @keyframes qualityLiveGlow {
+          from { box-shadow: 0 0 0 rgba(187,247,208,0); }
+          to { box-shadow: 0 0 18px rgba(187,247,208,0.32); }
+        }
+        @media (max-width: 1100px) {
+          .quality-command-deck {
+            grid-template-columns: 1fr !important;
+          }
+          .quality-kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+        }
+        @media (max-width: 760px) {
+          .quality-kpi-grid,
+          .quality-signal-grid,
+          .quality-health-grid,
+          .quality-chart-grid,
+          .quality-insight-grid,
+          .quality-bottom-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
       <QualityPageHero
         label="QUALITY MANAGEMENT"
         title="Dashboard"
-        description="Management view of HSEQ performance across NCRs, audits, MOCs, document control, and department-owned actions, built for fast drill-down into the items that need attention."
+        description="Management view of Quality performance across NCRs, audits, MOCs, document control, and Quality-owned actions, built for fast drill-down into the items that need attention."
         contextCards={[
           {
             label: "Last Refreshed",
@@ -1007,7 +1170,81 @@ export default function Home() {
         </section>
       ) : null}
 
-      <section style={kpiGridStyle}>
+      <section className="quality-command-deck" style={commandDeckStyle}>
+        <div className="quality-command-score" style={commandScorePanelStyle}>
+          <div style={commandScoreCopyStyle}>
+            <span style={commandEyebrowStyle}>Live Quality Pulse</span>
+            <h2 style={commandTitleStyle}>Operational control score</h2>
+            <p style={commandTextStyle}>
+              Weighted from NCR closure, audit finding closure, document review health, MOC closure, and Quality action pressure.
+            </p>
+          </div>
+          <Link
+            href="/management-review"
+            className="quality-score-orb"
+            style={{
+              ...scoreOrbStyle,
+              background: `conic-gradient(${qualityPulse.score >= 75 ? "#16a34a" : qualityPulse.score >= 50 ? "#f59e0b" : "#dc2626"} ${qualityPulse.score * 3.6}deg, rgba(255,255,255,0.16) 0deg)`,
+            }}
+          >
+            <span style={scoreOrbInnerStyle}>
+              <strong style={scoreValueStyle}>{isLoading ? "-" : qualityPulse.score}</strong>
+              <small style={scoreSubLabelStyle}>/ 100</small>
+            </span>
+          </Link>
+        </div>
+
+        <div className="quality-signal-grid" style={signalGridStyle}>
+          {executiveSignalItems.map((item) => (
+            <Link key={item.label} href={item.href} className="quality-signal-card" style={{ ...signalCardStyle, borderTopColor: item.accent }}>
+              <span style={signalLabelStyle}>{item.label}</span>
+              <strong style={signalValueStyle}>{isLoading ? "-" : item.value}</strong>
+              <span style={signalDetailStyle}>{item.detail}</span>
+            </Link>
+          ))}
+        </div>
+
+        <div style={pressurePanelStyle}>
+          <div style={pressureHeaderStyle}>
+            <div>
+              <h2 style={pressureTitleStyle}>Operational Pressure</h2>
+              <p style={pressureSubtitleStyle}>Click any bar to drill into the live source records.</p>
+            </div>
+            <span className="quality-live-pill" style={livePillStyle}>Live data</span>
+          </div>
+          <div style={pressureChartWrapStyle}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={operationalPressureData} layout="vertical" margin={{ left: 0, right: 22, top: 6, bottom: 6 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.16)" />
+                <XAxis type="number" hide />
+                <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#e2f5f4", fontSize: 12, fontWeight: 800 }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: 12, border: "1px solid #BFE5E3" }}
+                  cursor={{ fill: "rgba(255,255,255,0.08)" }}
+                />
+                <Bar
+                  dataKey="value"
+                  radius={[0, 10, 10, 0]}
+                  cursor="pointer"
+                  onClick={(data: unknown) => {
+                    const payload =
+                      typeof data === "object" && data !== null && "payload" in data
+                        ? (data as { payload?: { href?: string } }).payload
+                        : (data as { href?: string });
+                    if (payload?.href) router.push(payload.href);
+                  }}
+                >
+                  {operationalPressureData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </section>
+
+      <section className="quality-kpi-grid" style={kpiGridStyle}>
         {kpis.map((item) => (
           <QualityKpiCard
             key={item.label}
@@ -1019,9 +1256,9 @@ export default function Home() {
         ))}
       </section>
 
-      <section style={healthGridStyle}>
+      <section className="quality-health-grid" style={healthGridStyle}>
         {qualityHealthData.map((item) => (
-          <Link key={item.name} href={item.href} style={healthCardStyle}>
+          <Link key={item.name} href={item.href} className="quality-health-card" style={healthCardStyle}>
             <div>
               <div style={healthLabelStyle}>{item.name}</div>
               <div style={healthHintStyle}>Click to review source records</div>
@@ -1036,8 +1273,8 @@ export default function Home() {
         ))}
       </section>
 
-      <section style={chartGridStyle}>
-        <SectionCard title="Quality Health Snapshot" subtitle="Percentage view of core HSEQ controls.">
+      <section className="quality-chart-grid" style={chartGridStyle}>
+        <SectionCard title="Quality Health Snapshot" subtitle="Percentage view of core Quality controls.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
@@ -1328,7 +1565,7 @@ export default function Home() {
           )}
         </SectionCard>
 
-        <SectionCard title="HSEQ Action Trend" subtitle="Department-owned actions opened versus closed.">
+        <SectionCard title="Quality Action Trend" subtitle="Quality-owned actions opened versus closed.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
@@ -1346,7 +1583,7 @@ export default function Home() {
                     stroke="#2563eb"
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
-                    onClick={() => router.push(buildHref("/actions", { view: "register", department: "HSEQ" }))}
+                    onClick={() => router.push(buildHref("/actions", { view: "register", department: "Quality" }))}
                   />
                   <Line
                     type="monotone"
@@ -1355,7 +1592,7 @@ export default function Home() {
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     onClick={() =>
-                      router.push(buildHref("/actions", { view: "register", department: "HSEQ", status: "Closed" }))
+                      router.push(buildHref("/actions", { view: "register", department: "Quality", status: "Closed" }))
                     }
                   />
                 </LineChart>
@@ -1364,13 +1601,13 @@ export default function Home() {
           )}
         </SectionCard>
 
-        <SectionCard title="HSEQ Action Due Pressure" subtitle="Open HSEQ actions by due-date pressure.">
+        <SectionCard title="Quality Action Due Pressure" subtitle="Open Quality actions by due-date pressure.">
           {isLoading ? (
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={hseqActionDuePressureData}>
+                <BarChart data={qualityActionDuePressureData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
                   <YAxis allowDecimals={false} />
@@ -1382,21 +1619,21 @@ export default function Home() {
                     onClick={(data: { name?: string }) => {
                       const name = data?.name || "";
                       if (name === "Overdue") {
-                        router.push(buildHref("/actions", { view: "register", department: "HSEQ", overdue: 1 }));
+                        router.push(buildHref("/actions", { view: "register", department: "Quality", overdue: 1 }));
                         return;
                       }
                       if (name === "Due 7 Days") {
-                        router.push(buildHref("/actions", { view: "register", department: "HSEQ", dueWindow: 7 }));
+                        router.push(buildHref("/actions", { view: "register", department: "Quality", dueWindow: 7 }));
                         return;
                       }
                       if (name === "Due 30 Days") {
-                        router.push(buildHref("/actions", { view: "register", department: "HSEQ", dueWindow: 30 }));
+                        router.push(buildHref("/actions", { view: "register", department: "Quality", dueWindow: 30 }));
                         return;
                       }
-                      router.push(buildHref("/actions", { view: "register", department: "HSEQ" }));
+                      router.push(buildHref("/actions", { view: "register", department: "Quality" }));
                     }}
                   >
-                    {hseqActionDuePressureData.map((entry) => (
+                    {qualityActionDuePressureData.map((entry) => (
                       <Cell key={entry.name} fill={entry.fill} />
                     ))}
                   </Bar>
@@ -1407,7 +1644,7 @@ export default function Home() {
         </SectionCard>
       </section>
 
-      <section style={insightGridStyle}>
+      <section className="quality-insight-grid" style={insightGridStyle}>
         <SectionCard title="Management Focus" subtitle="The current pressure points a manager should see first.">
           <div style={focusGridStyle}>
             {managementFocusItems.map((item) => (
@@ -1453,12 +1690,12 @@ export default function Home() {
         </SectionCard>
       </section>
 
-      <section style={bottomGridStyle}>
+      <section className="quality-bottom-grid" style={bottomGridStyle}>
         <SectionCard
-          title="HSEQ Priority Actions"
-          subtitle="Top five overdue or high-priority HSEQ-owned actions."
+          title="Quality Priority Actions"
+          subtitle="Top five overdue or high-priority Quality-owned actions."
           action={
-            <Link href={buildHref("/actions", { view: "register", department: "HSEQ" })} style={sectionLinkStyle}>
+            <Link href={buildHref("/actions", { view: "register", department: "Quality" })} style={sectionLinkStyle}>
               Open actions {"->"}
             </Link>
           }
@@ -1476,6 +1713,7 @@ export default function Home() {
                   <Link
                     key={action.id}
                     href={buildHref("/actions", { search: action.action_number || "" })}
+                    className="quality-work-item"
                     style={{
                       ...workItemStyle,
                       background: overdue ? "#fff7f7" : "#f8fafc",
@@ -1552,6 +1790,7 @@ export default function Home() {
                         search: audit.audit_number || audit.title || "",
                         month: currentMonthAuditKey,
                       })}
+                      className="quality-work-item"
                       style={workItemStyle}
                     >
                       <div style={workItemTopStyle}>
@@ -1588,6 +1827,7 @@ export default function Home() {
                           search: audit.audit_number || audit.title || "",
                           month: nextMonthAuditKey,
                         })}
+                        className="quality-work-item"
                         style={nextMonthSnippetItemStyle}
                       >
                         <span style={nextMonthSnippetNumberStyle}>{audit.audit_number || "-"}</span>
@@ -1806,11 +2046,190 @@ const errorBannerStyle: CSSProperties = {
   marginBottom: "18px",
 };
 
+const commandDeckStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(300px, 1.05fr) minmax(340px, 1.1fr) minmax(320px, 0.95fr)",
+  gap: "16px",
+  marginBottom: "18px",
+  alignItems: "stretch",
+};
+
+const commandScorePanelStyle: CSSProperties = {
+  position: "relative",
+  overflow: "hidden",
+  borderRadius: "22px",
+  padding: "22px",
+  minHeight: "226px",
+  color: "#ffffff",
+  background: "linear-gradient(135deg, #3A9B98 0%, #174b56 100%)",
+  boxShadow: "0 22px 42px rgba(15, 23, 42, 0.16)",
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  gap: "18px",
+  alignItems: "center",
+};
+
+const commandScoreCopyStyle: CSSProperties = {
+  position: "relative",
+  zIndex: 1,
+  display: "grid",
+  gap: "8px",
+};
+
+const commandEyebrowStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 900,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  color: "rgba(255,255,255,0.78)",
+};
+
+const commandTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: "26px",
+  lineHeight: 1.08,
+};
+
+const commandTextStyle: CSSProperties = {
+  margin: 0,
+  color: "rgba(255,255,255,0.84)",
+  fontSize: "13px",
+  lineHeight: 1.55,
+};
+
+const scoreOrbStyle: CSSProperties = {
+  width: "128px",
+  height: "128px",
+  borderRadius: "999px",
+  padding: "8px",
+  textDecoration: "none",
+  boxShadow: "0 0 40px rgba(255,255,255,0.18), inset 0 0 0 1px rgba(255,255,255,0.18)",
+  display: "grid",
+  placeItems: "center",
+  flexShrink: 0,
+};
+
+const scoreOrbInnerStyle: CSSProperties = {
+  width: "100%",
+  height: "100%",
+  borderRadius: "999px",
+  background: "rgba(15, 23, 42, 0.48)",
+  border: "1px solid rgba(255,255,255,0.18)",
+  display: "grid",
+  placeItems: "center",
+  alignContent: "center",
+  color: "#ffffff",
+};
+
+const scoreValueStyle: CSSProperties = {
+  fontSize: "36px",
+  lineHeight: 1,
+  letterSpacing: "-0.03em",
+};
+
+const scoreSubLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 900,
+  color: "rgba(255,255,255,0.72)",
+  marginTop: "4px",
+};
+
+const signalGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "12px",
+};
+
+const signalCardStyle: CSSProperties = {
+  minHeight: "104px",
+  textDecoration: "none",
+  color: imsColours.ink,
+  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  border: `1px solid ${imsColours.border}`,
+  borderTop: "4px solid #3A9B98",
+  borderRadius: "18px",
+  boxShadow: imsShadows.card,
+  padding: "14px 15px",
+  display: "grid",
+  gap: "6px",
+  alignContent: "start",
+};
+
+const signalLabelStyle: CSSProperties = {
+  color: imsColours.muted,
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const signalValueStyle: CSSProperties = {
+  fontSize: "28px",
+  lineHeight: 1,
+  color: imsColours.ink,
+};
+
+const signalDetailStyle: CSSProperties = {
+  color: imsColours.slate,
+  fontSize: "12px",
+  lineHeight: 1.35,
+};
+
+const pressurePanelStyle: CSSProperties = {
+  borderRadius: "22px",
+  padding: "18px",
+  color: "#ffffff",
+  background: "linear-gradient(135deg, #10202f 0%, #1f6f70 100%)",
+  boxShadow: "0 22px 42px rgba(15, 23, 42, 0.16)",
+  display: "grid",
+  gap: "12px",
+  minHeight: "226px",
+};
+
+const pressureHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: "12px",
+};
+
+const pressureTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: "20px",
+  lineHeight: 1.15,
+};
+
+const pressureSubtitleStyle: CSSProperties = {
+  margin: "5px 0 0",
+  color: "rgba(255,255,255,0.74)",
+  fontSize: "12px",
+};
+
+const livePillStyle: CSSProperties = {
+  borderRadius: "999px",
+  padding: "7px 10px",
+  background: "rgba(220,252,231,0.14)",
+  border: "1px solid rgba(187,247,208,0.28)",
+  color: "#dcfce7",
+  fontSize: "11px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  whiteSpace: "nowrap",
+};
+
+const pressureChartWrapStyle: CSSProperties = {
+  width: "100%",
+  height: "158px",
+  minHeight: "158px",
+};
+
 const kpiGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "12px",
   marginBottom: "18px",
+  alignItems: "stretch",
 };
 
 const healthGridStyle: CSSProperties = {
@@ -1891,10 +2310,11 @@ const bottomGridStyle: CSSProperties = {
 };
 
 const panelStyle: CSSProperties = {
-  background: "white",
+  background: "linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)",
   borderRadius: "18px",
   padding: "18px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  border: "1px solid #dbe7f3",
+  boxShadow: "0 14px 30px rgba(15, 23, 42, 0.06)",
 };
 
 const sectionHeaderRowStyle: CSSProperties = {

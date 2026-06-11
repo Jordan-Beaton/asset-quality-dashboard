@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import React, { ChangeEvent, CSSProperties, ReactNode, useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -31,11 +32,13 @@ import { supabase } from "../../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-type AINMView = "dashboard" | "register" | "create" | "import" | "reports";
+type AINMView = "dashboard" | "register" | "create" | "external" | "import" | "reports";
 type DetailTab = "notification" | "part1" | "part2" | "actions" | "evidence" | "reports";
 type AINMType = "Incident" | "Accident";
+type DashboardScope = "internal" | "external" | "combined";
 type StageStatus = "Not Started" | "Draft" | "Issued" | "Complete";
 type OverallStatus = "Open" | "In Progress" | "Closed";
+type ExternalAINMStatus = "Logged" | "Under Review" | "Action Required" | "Closed";
 
 type AINMRecord = {
   id: string;
@@ -151,6 +154,37 @@ type AINMGeneratedDocument = {
   generated_by: string | null;
 };
 
+type ExternalAINMRecord = {
+  id: string;
+  external_ainm_number: string;
+  external_party_type: string | null;
+  supplier_name: string | null;
+  supplier_reference: string | null;
+  project: string | null;
+  location_site: string | null;
+  event_date: string | null;
+  event_type: string | null;
+  enshore_contact: string | null;
+  summary: string | null;
+  immediate_actions: string | null;
+  status: ExternalAINMStatus;
+  include_in_statistics: boolean | null;
+  comments: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ExternalAINMEvidence = {
+  id: string;
+  external_ainm_id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  content_type: string | null;
+  notes: string | null;
+  uploaded_at: string;
+};
+
 type InvestigationTeamMember = {
   name: string;
   company: string;
@@ -190,6 +224,9 @@ type ImportGroup = {
 
 const stageStatuses: StageStatus[] = ["Not Started", "Draft", "Issued", "Complete"];
 const overallStatuses: OverallStatus[] = ["Open", "In Progress", "Closed"];
+const externalAinmStatuses: ExternalAINMStatus[] = ["Logged", "Under Review", "Action Required", "Closed"];
+const externalPartyTypes = ["Third Party", "Supplier", "Contractor", "Client", "Other"];
+const externalEventTypes = ["Incident", "Accident", "Near Miss", "Environmental", "Equipment Damage", "Other"];
 const eventClassifications = [
   "Fatality",
   "Near Miss",
@@ -294,6 +331,26 @@ const emptyRecord: AINMRecord = {
   updated_at: "",
 };
 
+const emptyExternalRecord: ExternalAINMRecord = {
+  id: "",
+  external_ainm_number: "",
+  external_party_type: "Supplier",
+  supplier_name: "",
+  supplier_reference: "",
+  project: "",
+  location_site: "",
+  event_date: "",
+  event_type: "Incident",
+  enshore_contact: "",
+  summary: "",
+  immediate_actions: "",
+  status: "Logged",
+  include_in_statistics: false,
+  comments: "",
+  created_at: "",
+  updated_at: "",
+};
+
 function clean(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -370,6 +427,18 @@ function recordYear(record: AINMRecord) {
   return record.source_import_year ? String(record.source_import_year) : "";
 }
 
+function externalRecordYear(record: ExternalAINMRecord) {
+  if (record.event_date) {
+    const year = Number.parseInt(record.event_date.slice(0, 4), 10);
+    if (Number.isFinite(year)) return String(year);
+  }
+  if (record.created_at) {
+    const date = new Date(record.created_at);
+    if (!Number.isNaN(date.getTime())) return String(date.getFullYear());
+  }
+  return "";
+}
+
 function ainmTypeLabel(record: AINMRecord) {
   const number = clean(record.ainm_number).toUpperCase();
   if (number.startsWith("AR")) return "Accident";
@@ -418,6 +487,16 @@ function getNextAinmNumber(records: AINMRecord[], type: AINMType) {
     return Number.isFinite(value) ? Math.max(max, value) : max;
   }, 0);
   return `${prefix}${String(maxNumber + 1).padStart(3, "0")}`;
+}
+
+function getNextExternalAinmNumber(records: ExternalAINMRecord[]) {
+  const maxNumber = records.reduce((max, record) => {
+    const match = clean(record.external_ainm_number).toUpperCase().match(/^EXT-AINM-(\d+)$/);
+    if (!match) return max;
+    const value = Number.parseInt(match[1], 10);
+    return Number.isFinite(value) ? Math.max(max, value) : max;
+  }, 0);
+  return `EXT-AINM-${String(maxNumber + 1).padStart(3, "0")}`;
 }
 
 function getStageTone(status: string) {
@@ -489,11 +568,16 @@ export default function HseAinmPage() {
   const [centralActions, setCentralActions] = useState<CentralAction[]>([]);
   const [evidence, setEvidence] = useState<AINMEvidence[]>([]);
   const [generatedDocuments, setGeneratedDocuments] = useState<AINMGeneratedDocument[]>([]);
+  const [externalRecords, setExternalRecords] = useState<ExternalAINMRecord[]>([]);
+  const [externalEvidence, setExternalEvidence] = useState<ExternalAINMEvidence[]>([]);
   const [peopleOptions, setPeopleOptions] = useState<PeopleOption[]>([]);
   const [activeView, setActiveView] = useState<AINMView>("dashboard");
   const [detailTab, setDetailTab] = useState<DetailTab>("notification");
   const [selectedId, setSelectedId] = useState("");
+  const [selectedExternalId, setSelectedExternalId] = useState("");
   const [draft, setDraft] = useState<AINMRecord>(emptyRecord);
+  const [externalDraft, setExternalDraft] = useState<ExternalAINMRecord>(emptyExternalRecord);
+  const [newExternalRecord, setNewExternalRecord] = useState<ExternalAINMRecord>(emptyExternalRecord);
   const [correctiveActionRows, setCorrectiveActionRows] = useState<string[]>([""]);
   const [referenceDocumentRows, setReferenceDocumentRows] = useState<string[]>([""]);
   const [investigationTeamRows, setInvestigationTeamRows] = useState<InvestigationTeamMember[]>([
@@ -519,12 +603,21 @@ export default function HseAinmPage() {
   const [reportTypeFilter, setReportTypeFilter] = useState<"" | "IR" | "AR">("");
   const [showReportFilters, setShowReportFilters] = useState(false);
   const [dashboardYear, setDashboardYear] = useState(String(new Date().getFullYear()));
+  const [dashboardScope, setDashboardScope] = useState<DashboardScope>("internal");
+  const [externalSearch, setExternalSearch] = useState("");
+  const [externalStatusFilter, setExternalStatusFilter] = useState("");
+  const [externalTypeFilter, setExternalTypeFilter] = useState("");
+  const [showExternalFilters, setShowExternalFilters] = useState(false);
   const [showAddReviewer, setShowAddReviewer] = useState(false);
   const [newReviewerName, setNewReviewerName] = useState("");
   const [newReviewerRole, setNewReviewerRole] = useState("");
   const [refreshStamp, setRefreshStamp] = useState("");
 
   const selected = useMemo(() => records.find((record) => record.id === selectedId) || null, [records, selectedId]);
+  const selectedExternal = useMemo(
+    () => externalRecords.find((record) => record.id === selectedExternalId) || null,
+    [externalRecords, selectedExternalId]
+  );
   const selectedActions = useMemo(() => actions.filter((action) => action.ainm_id === selectedId), [actions, selectedId]);
   const selectedCentralActions = useMemo(() => {
     const selectedNumber = selected?.ainm_number || "";
@@ -534,6 +627,10 @@ export default function HseAinmPage() {
     );
   }, [centralActions, selected?.ainm_number, selectedId]);
   const selectedEvidence = useMemo(() => evidence.filter((file) => file.ainm_id === selectedId), [evidence, selectedId]);
+  const selectedExternalEvidence = useMemo(
+    () => externalEvidence.filter((file) => file.external_ainm_id === selectedExternalId),
+    [externalEvidence, selectedExternalId]
+  );
   const compiledPdfReports = useMemo(
     () => generatedDocuments.filter((document) => document.document_stage === "compiled-pdf"),
     [generatedDocuments]
@@ -569,20 +666,75 @@ export default function HseAinmPage() {
     });
   }, [records, search, stageFilter, statusFilter]);
 
+  const filteredExternalRecords = useMemo(() => {
+    const query = externalSearch.trim().toLowerCase();
+    return externalRecords.filter((record) => {
+      const haystack = [
+        record.external_ainm_number,
+        record.external_party_type,
+        record.supplier_name,
+        record.supplier_reference,
+        record.project,
+        record.location_site,
+        record.event_type,
+        record.enshore_contact,
+        record.summary,
+      ].join(" ").toLowerCase();
+      const matchesSearch = !query || haystack.includes(query);
+      const matchesStatus = !externalStatusFilter || record.status === externalStatusFilter;
+      const matchesType = !externalTypeFilter || record.external_party_type === externalTypeFilter;
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [externalRecords, externalSearch, externalStatusFilter, externalTypeFilter]);
+
   const kpis = useMemo(() => {
-    const years = Array.from(new Set(records.map(recordYear).filter(Boolean))).sort((a, b) => Number(b) - Number(a));
+    const years = Array.from(
+      new Set([
+        ...records.map(recordYear).filter(Boolean),
+        ...externalRecords.map(externalRecordYear).filter(Boolean),
+      ])
+    ).sort((a, b) => Number(b) - Number(a));
     const dashboardRecords = dashboardYear ? records.filter((record) => recordYear(record) === dashboardYear) : records;
+    const dashboardExternalRecords = dashboardYear ? externalRecords.filter((record) => externalRecordYear(record) === dashboardYear) : externalRecords;
+    const statisticalExternalRecords = dashboardExternalRecords.filter((record) => record.include_in_statistics);
+    const scopedExternalRecords =
+      dashboardScope === "internal"
+        ? []
+        : dashboardScope === "external"
+        ? dashboardExternalRecords
+        : statisticalExternalRecords;
     const dashboardRecordIds = new Set(dashboardRecords.map((record) => record.id));
     const open = dashboardRecords.filter((record) => record.overall_status !== "Closed").length;
     const notificationDue = dashboardRecords.filter((record) => record.notification_status !== "Issued" && record.notification_status !== "Complete").length;
     const part1Due = dashboardRecords.filter((record) => record.part1_status !== "Complete").length;
     const part2Due = dashboardRecords.filter((record) => record.part2_status !== "Complete").length;
     const closed = dashboardRecords.filter((record) => record.overall_status === "Closed").length;
-    const incidents = dashboardRecords.filter((record) => ainmTypeLabel(record) === "Incident").length;
-    const accidents = dashboardRecords.filter((record) => ainmTypeLabel(record) === "Accident").length;
+    const internalIncidents = dashboardRecords.filter((record) => ainmTypeLabel(record) === "Incident").length;
+    const internalAccidents = dashboardRecords.filter((record) => ainmTypeLabel(record) === "Accident").length;
+    const externalIncidents = scopedExternalRecords.filter((record) => clean(record.event_type).toLowerCase().includes("incident")).length;
+    const externalAccidents = scopedExternalRecords.filter((record) => clean(record.event_type).toLowerCase().includes("accident")).length;
+    const incidents = (dashboardScope === "external" ? 0 : internalIncidents) + externalIncidents;
+    const accidents = (dashboardScope === "external" ? 0 : internalAccidents) + externalAccidents;
     const compiledReports = compiledPdfReports.filter((report) => dashboardRecordIds.has(report.ainm_id)).length;
-    return { years, dashboardRecords, open, notificationDue, part1Due, part2Due, closed, incidents, accidents, compiledReports };
-  }, [compiledPdfReports, dashboardYear, records]);
+    const externalOpen = dashboardExternalRecords.filter((record) => record.status !== "Closed").length;
+    const externalClosed = dashboardExternalRecords.filter((record) => record.status === "Closed").length;
+    return {
+      years,
+      dashboardRecords,
+      dashboardExternalRecords,
+      scopedExternalRecords,
+      open,
+      notificationDue,
+      part1Due,
+      part2Due,
+      closed,
+      incidents,
+      accidents,
+      compiledReports,
+      externalOpen,
+      externalClosed,
+    };
+  }, [compiledPdfReports, dashboardScope, dashboardYear, externalRecords, records]);
 
   const dashboardInsights = useMemo(() => {
     const dashboardRecords = kpis.dashboardRecords;
@@ -673,9 +825,22 @@ export default function HseAinmPage() {
   }, [kpis]);
 
   const latestSummary = records[0] ? `${records[0].ainm_number} - ${records[0].title}` : "No AINMs yet";
+  const [fieldQrDataUrl, setFieldQrDataUrl] = useState("");
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const fieldUrl = `${window.location.origin}/hse/ainm/field`;
+    QRCode.toDataURL(fieldUrl, {
+      margin: 1,
+      width: 220,
+      color: { dark: "#0f172a", light: "#ffffff" },
+    })
+      .then(setFieldQrDataUrl)
+      .catch(() => setFieldQrDataUrl(""));
   }, []);
 
   useEffect(() => {
@@ -705,16 +870,30 @@ export default function HseAinmPage() {
   }, [selected]);
 
   useEffect(() => {
+    if (!selectedExternal) return;
+    setExternalDraft(selectedExternal);
+  }, [selectedExternal]);
+
+  useEffect(() => {
     setNewRecord((current) => ({ ...current, ainm_number: getNextAinmNumber(records, newAinmType) }));
   }, [newAinmType, records]);
 
+  useEffect(() => {
+    setNewExternalRecord((current) => ({
+      ...current,
+      external_ainm_number: current.external_ainm_number || getNextExternalAinmNumber(externalRecords),
+    }));
+  }, [externalRecords]);
+
   async function loadData() {
     setLoading(true);
-    const [recordRes, actionRes, evidenceRes, centralActionRes] = await Promise.all([
+    const [recordRes, actionRes, evidenceRes, centralActionRes, externalRecordRes, externalEvidenceRes] = await Promise.all([
       supabase.from("hse_ainm_records").select("*").order("event_date", { ascending: false }).order("ainm_number", { ascending: false }),
       supabase.from("hse_ainm_actions").select("*").order("date_raised", { ascending: false }),
       supabase.from("hse_ainm_evidence").select("*").order("uploaded_at", { ascending: false }),
       supabase.from("actions").select("*").order("action_number", { ascending: true }),
+      supabase.from("hse_external_ainm_records").select("*").order("event_date", { ascending: false }).order("external_ainm_number", { ascending: false }),
+      supabase.from("hse_external_ainm_evidence").select("*").order("uploaded_at", { ascending: false }),
     ]);
     const generatedRes = await supabase.from("hse_ainm_generated_documents").select("*").order("generated_at", { ascending: false });
     const peopleRes = await supabase
@@ -729,8 +908,9 @@ export default function HseAinmPage() {
       return;
     }
 
-    if (actionRes.error || evidenceRes.error || generatedRes.error || centralActionRes.error) {
-      setMessage(`AINM related data load warning: ${actionRes.error?.message || evidenceRes.error?.message || generatedRes.error?.message || centralActionRes.error?.message}`);
+    if (actionRes.error || evidenceRes.error || generatedRes.error || centralActionRes.error || externalRecordRes.error || externalEvidenceRes.error) {
+      const externalMissing = externalRecordRes.error?.message || externalEvidenceRes.error?.message;
+      setMessage(`AINM related data load warning: ${actionRes.error?.message || evidenceRes.error?.message || generatedRes.error?.message || centralActionRes.error?.message || externalMissing}. Run scripts/sql/hse_external_ainm.sql for External AINM if needed.`);
     } else {
       setMessage("AINM records loaded.");
     }
@@ -744,9 +924,13 @@ export default function HseAinmPage() {
     setCentralActions(((centralActionRes.data || []) as CentralAction[]).filter((action) => action.linked_ainm_id || action.linked_ainm_number));
     setEvidence((evidenceRes.data || []) as AINMEvidence[]);
     setGeneratedDocuments((generatedRes.data || []) as AINMGeneratedDocument[]);
+    const nextExternalRecords = externalRecordRes.error ? [] : ((externalRecordRes.data || []) as ExternalAINMRecord[]);
+    setExternalRecords(nextExternalRecords);
+    setExternalEvidence(externalEvidenceRes.error ? [] : ((externalEvidenceRes.data || []) as ExternalAINMEvidence[]));
     if (!peopleRes.error) setPeopleOptions((peopleRes.data || []) as PeopleOption[]);
     setRefreshStamp(new Date().toLocaleString("en-GB"));
     if (!selectedId && nextRecords[0]) setSelectedId(nextRecords[0].id);
+    if (!selectedExternalId && nextExternalRecords[0]) setSelectedExternalId(nextExternalRecords[0].id);
     setLoading(false);
   }
 
@@ -754,8 +938,16 @@ export default function HseAinmPage() {
     setNewRecord((current) => ({ ...current, [key]: value }));
   }
 
+  function updateNewExternal<K extends keyof ExternalAINMRecord>(key: K, value: ExternalAINMRecord[K]) {
+    setNewExternalRecord((current) => ({ ...current, [key]: value }));
+  }
+
   function updateDraft<K extends keyof AINMRecord>(key: K, value: AINMRecord[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateExternalDraft<K extends keyof ExternalAINMRecord>(key: K, value: ExternalAINMRecord[K]) {
+    setExternalDraft((current) => ({ ...current, [key]: value }));
   }
 
   function toggleAttachment(value: string) {
@@ -891,6 +1083,26 @@ export default function HseAinmPage() {
     };
   }
 
+  function buildExternalPayload(record: ExternalAINMRecord) {
+    return {
+      external_ainm_number: clean(record.external_ainm_number),
+      external_party_type: clean(record.external_party_type) || null,
+      supplier_name: clean(record.supplier_name) || null,
+      supplier_reference: clean(record.supplier_reference) || null,
+      project: clean(record.project) || null,
+      location_site: clean(record.location_site) || null,
+      event_date: clean(record.event_date) || null,
+      event_type: clean(record.event_type) || null,
+      enshore_contact: clean(record.enshore_contact) || null,
+      summary: clean(record.summary) || null,
+      immediate_actions: clean(record.immediate_actions) || null,
+      status: record.status || "Logged",
+      include_in_statistics: Boolean(record.include_in_statistics),
+      comments: clean(record.comments) || null,
+      updated_at: new Date().toISOString(),
+    };
+  }
+
   function buildDraftForSave() {
     return {
       ...draft,
@@ -925,6 +1137,39 @@ export default function HseAinmPage() {
     await loadData();
   }
 
+  async function getNextExternalNumber() {
+    const { data, error } = await supabase.rpc("next_hse_external_ainm_number");
+    if (!error && data) return String(data);
+    return getNextExternalAinmNumber(externalRecords);
+  }
+
+  async function createExternalAINM() {
+    const nextNumber = newExternalRecord.external_ainm_number.trim() || await getNextExternalNumber();
+    if (!nextNumber || !newExternalRecord.supplier_name?.trim() || !newExternalRecord.summary?.trim()) {
+      setMessage("External AINM number, external party name, and summary are required.");
+      return;
+    }
+
+    setSaving(true);
+    const { data, error } = await supabase
+      .from("hse_external_ainm_records")
+      .insert([{ ...buildExternalPayload({ ...newExternalRecord, external_ainm_number: nextNumber }), created_at: new Date().toISOString() }])
+      .select("*")
+      .single();
+    setSaving(false);
+
+    if (error) {
+      setMessage(`Create External AINM failed: ${error.message}. Run scripts/sql/hse_external_ainm.sql if this is the first external record.`);
+      return;
+    }
+
+    const created = data as ExternalAINMRecord;
+    setMessage(`Created external AINM ${created.external_ainm_number}.`);
+    setSelectedExternalId(created.id);
+    setNewExternalRecord({ ...emptyExternalRecord, external_ainm_number: getNextExternalAinmNumber([...externalRecords, created]) });
+    await loadData();
+  }
+
   async function saveDraft() {
     if (!selectedId) return;
     const draftForSave = buildDraftForSave();
@@ -945,6 +1190,24 @@ export default function HseAinmPage() {
     await loadData();
   }
 
+  async function saveExternalAINM() {
+    if (!selectedExternalId) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("hse_external_ainm_records")
+      .update(buildExternalPayload(externalDraft))
+      .eq("id", selectedExternalId);
+    setSaving(false);
+
+    if (error) {
+      setMessage(`Save External AINM failed: ${error.message}`);
+      return;
+    }
+
+    setMessage(`Saved external AINM ${externalDraft.external_ainm_number}.`);
+    await loadData();
+  }
+
   async function deleteRecord(record: AINMRecord) {
     if (!window.confirm(`Delete ${record.ainm_number} and all linked AINM action/evidence rows?`)) return;
     const { error } = await supabase.from("hse_ainm_records").delete().eq("id", record.id);
@@ -954,6 +1217,20 @@ export default function HseAinmPage() {
     }
     setSelectedId("");
     setMessage(`Deleted ${record.ainm_number}.`);
+    await loadData();
+  }
+
+  async function deleteExternalRecord(record: ExternalAINMRecord) {
+    if (!window.confirm(`Delete external AINM ${record.external_ainm_number}?`)) return;
+    const files = externalEvidence.filter((file) => file.external_ainm_id === record.id);
+    if (files.length) await supabase.storage.from(evidenceBucket).remove(files.map((file) => file.file_path));
+    const { error } = await supabase.from("hse_external_ainm_records").delete().eq("id", record.id);
+    if (error) {
+      setMessage(`Delete External AINM failed: ${error.message}`);
+      return;
+    }
+    setSelectedExternalId("");
+    setMessage(`Deleted external AINM ${record.external_ainm_number}.`);
     await loadData();
   }
 
@@ -1133,7 +1410,46 @@ export default function HseAinmPage() {
     await loadData();
   }
 
+  async function uploadExternalEvidence(event: ChangeEvent<HTMLInputElement>) {
+    if (!selectedExternalId) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+
+    for (const file of files) {
+      const path = `HSE/AINM/External/${selectedExternalId}/${Date.now()}-${sanitizeFileName(file.name)}`;
+      const upload = await supabase.storage.from(evidenceBucket).upload(path, file, { upsert: false });
+      if (upload.error) {
+        setMessage(`External AINM upload failed: ${upload.error.message}`);
+        continue;
+      }
+      await supabase.from("hse_external_ainm_evidence").insert([
+        {
+          external_ainm_id: selectedExternalId,
+          file_name: file.name,
+          file_path: path,
+          file_size: file.size,
+          content_type: file.type || null,
+        },
+      ]);
+    }
+
+    setUploading(false);
+    event.target.value = "";
+    setMessage(`Uploaded ${files.length} external AINM document${files.length === 1 ? "" : "s"}.`);
+    await loadData();
+  }
+
   async function openEvidence(file: AINMEvidence) {
+    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(file.file_path, 3600);
+    if (error || !data?.signedUrl) {
+      setMessage(`Could not open ${file.file_name}.`);
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
+  async function openExternalEvidence(file: ExternalAINMEvidence) {
     const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(file.file_path, 3600);
     if (error || !data?.signedUrl) {
       setMessage(`Could not open ${file.file_name}.`);
@@ -1161,6 +1477,18 @@ export default function HseAinmPage() {
     const { error } = await supabase.from("hse_ainm_evidence").delete().eq("id", file.id);
     if (error) {
       setMessage(`Evidence delete failed: ${error.message}`);
+      return;
+    }
+    setMessage(`Deleted ${file.file_name}.`);
+    await loadData();
+  }
+
+  async function deleteExternalEvidence(file: ExternalAINMEvidence) {
+    if (!window.confirm(`Delete ${file.file_name}?`)) return;
+    await supabase.storage.from(evidenceBucket).remove([file.file_path]);
+    const { error } = await supabase.from("hse_external_ainm_evidence").delete().eq("id", file.id);
+    if (error) {
+      setMessage(`External evidence delete failed: ${error.message}`);
       return;
     }
     setMessage(`Deleted ${file.file_name}.`);
@@ -2037,6 +2365,7 @@ export default function HseAinmPage() {
           ["dashboard", "Dashboard"],
           ["register", "AINM Register"],
           ["create", "Create AINM"],
+          ["external", "External AINM"],
           ["import", "Import Tracker"],
           ["reports", "Reports"],
         ].map(([view, label]) => (
@@ -2062,6 +2391,14 @@ export default function HseAinmPage() {
                 {kpis.years.map((year) => <option key={year} value={year}>{year}</option>)}
               </select>
             </label>
+            <label style={dashboardYearFilterStyle}>
+              <span style={labelStyle}>AINM Scope</span>
+              <select style={filterStyle} value={dashboardScope} onChange={(event) => setDashboardScope(event.target.value as DashboardScope)}>
+                <option value="internal">Internal only</option>
+                <option value="external">External only</option>
+                <option value="combined">Combined reporting</option>
+              </select>
+            </label>
           </section>
 
           <section style={kpiGridStyle}>
@@ -2070,21 +2407,34 @@ export default function HseAinmPage() {
             <QualityKpiCard title="Accidents" value={kpis.accidents} accent="#dc2626" onClick={() => { setSearch("AR"); setStatusFilter(""); setStageFilter(""); setActiveView("register"); }} />
             <QualityKpiCard title="Part 1 Due" value={kpis.part1Due} accent="#f59e0b" onClick={() => { setStageFilter("Draft"); setActiveView("register"); }} />
             <QualityKpiCard title="Part 2 Due" value={kpis.part2Due} accent="#7c3aed" onClick={() => { setActiveView("register"); }} />
-            <QualityKpiCard title="Closed AINMs" value={kpis.closed} accent="#16a34a" onClick={() => { setStatusFilter("Closed"); setActiveView("register"); }} />
+            <QualityKpiCard title="External AINMs" value={kpis.dashboardExternalRecords.length} accent="#3A9B98" onClick={() => setActiveView("external")} />
           </section>
 
           <section style={dashboardVisualGridStyle}>
+            <DashboardPanel title="Mobile AINM Field Entry" subtitle="Scan to raise or continue an AINM notification from a phone.">
+              <div style={qrAccessWrapStyle}>
+                <div style={qrBoxStyle}>
+                  {fieldQrDataUrl ? <img src={fieldQrDataUrl} alt="AINM mobile field entry QR code" style={qrImageStyle} /> : <span style={bodyTextStyle}>QR loading...</span>}
+                </div>
+                <div style={qrCopyStyle}>
+                  <strong>Point-of-contact reporting</strong>
+                  <span>Initial notification, event details, and notification evidence upload.</span>
+                  <Link href="/hse/ainm/field" style={linkButtonStyle}>Open Mobile AINM</Link>
+                </div>
+              </div>
+            </DashboardPanel>
+
             <DashboardPanel title="Incident vs Accident Split" subtitle="How the selected year breaks down by report type.">
               <DonutChart
-                total={dashboardInsights.total}
+                total={kpis.incidents + kpis.accidents}
                 segments={[
                   { label: "Incidents", value: kpis.incidents, color: "#2563eb" },
                   { label: "Accidents", value: kpis.accidents, color: "#dc2626" },
                 ]}
               />
               <div style={chartLegendGridStyle}>
-                <MiniMetric label="Incident reports" value={`${kpis.incidents} (${percentage(kpis.incidents, dashboardInsights.total)}%)`} />
-                <MiniMetric label="Accident reports" value={`${kpis.accidents} (${percentage(kpis.accidents, dashboardInsights.total)}%)`} />
+                <MiniMetric label="Incident reports" value={`${kpis.incidents} (${percentage(kpis.incidents, kpis.incidents + kpis.accidents)}%)`} />
+                <MiniMetric label="Accident reports" value={`${kpis.accidents} (${percentage(kpis.accidents, kpis.incidents + kpis.accidents)}%)`} />
               </div>
             </DashboardPanel>
 
@@ -2148,6 +2498,226 @@ export default function HseAinmPage() {
             <button type="button" style={primaryButtonStyle} onClick={() => void createAINM()} disabled={saving}>{saving ? "Creating..." : "Create AINM"}</button>
           </div>
         </SectionCard>
+      ) : null}
+
+      {activeView === "external" ? (
+        <section style={registerLayoutStyle}>
+          <SectionCard
+            title="External AINM"
+            subtitle="Log third-party, supplier, contractor, or client AINMs separately from the internal Notification / Part 1 / Part 2 workflow."
+          >
+            <div style={externalNoticeStyle}>
+              <strong>Reporting rule:</strong>
+              <span>
+                External AINMs are excluded from internal AINM dashboard figures by default. Tick "Include in statistics" only when the HSE Manager wants the external event counted in combined reporting.
+              </span>
+            </div>
+
+            <div style={formGridStyle}>
+              <Field label="External AINM No.">
+                <input
+                  style={{ ...inputStyle, background: "#f8fafc" }}
+                  value={newExternalRecord.external_ainm_number || getNextExternalAinmNumber(externalRecords)}
+                  onChange={(event) => updateNewExternal("external_ainm_number", event.target.value)}
+                />
+              </Field>
+              <Field label="External Party Type">
+                <select style={inputStyle} value={newExternalRecord.external_party_type || ""} onChange={(event) => updateNewExternal("external_party_type", event.target.value)}>
+                  <option value="">Select type</option>
+                  {externalPartyTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </Field>
+              <Field label="External Party / Supplier Name">
+                <input style={inputStyle} value={newExternalRecord.supplier_name || ""} onChange={(event) => updateNewExternal("supplier_name", event.target.value)} placeholder="Supplier, contractor, client, or third party" />
+              </Field>
+              <Field label="External Reference">
+                <input style={inputStyle} value={newExternalRecord.supplier_reference || ""} onChange={(event) => updateNewExternal("supplier_reference", event.target.value)} placeholder="Supplier report number / reference" />
+              </Field>
+              <Field label="Project / Work Title">
+                <input style={inputStyle} value={newExternalRecord.project || ""} onChange={(event) => updateNewExternal("project", event.target.value)} />
+              </Field>
+              <Field label="Location / Site">
+                <input style={inputStyle} value={newExternalRecord.location_site || ""} onChange={(event) => updateNewExternal("location_site", event.target.value)} />
+              </Field>
+              <Field label="Event Date">
+                <input type="date" style={inputStyle} value={newExternalRecord.event_date || ""} onChange={(event) => updateNewExternal("event_date", event.target.value)} />
+              </Field>
+              <Field label="Event Type">
+                <select style={inputStyle} value={newExternalRecord.event_type || ""} onChange={(event) => updateNewExternal("event_type", event.target.value)}>
+                  <option value="">Select event type</option>
+                  {externalEventTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </Field>
+              <Field label="Enshore Contact">
+                <select style={inputStyle} value={peopleOptions.find((person) => person.name === newExternalRecord.enshore_contact)?.id || newExternalRecord.enshore_contact || ""} onChange={(event) => {
+                  const person = peopleOptions.find((item) => item.id === event.target.value);
+                  updateNewExternal("enshore_contact", person?.name || event.target.value);
+                }}>
+                  <option value="">Select contact</option>
+                  {newExternalRecord.enshore_contact && !peopleOptions.some((person) => person.name === newExternalRecord.enshore_contact) ? (
+                    <option value={newExternalRecord.enshore_contact}>{newExternalRecord.enshore_contact} (saved value)</option>
+                  ) : null}
+                  {peopleOptions.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Status">
+                <select style={inputStyle} value={newExternalRecord.status} onChange={(event) => updateNewExternal("status", event.target.value as ExternalAINMStatus)}>
+                  {externalAinmStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+              </Field>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <Field label="Summary">
+                  <textarea style={textareaStyle} value={newExternalRecord.summary || ""} onChange={(event) => updateNewExternal("summary", event.target.value)} placeholder="Short summary of the externally reported event." />
+                </Field>
+              </div>
+              <TextAreaField label="Immediate Actions / Enshore Follow-up" value={newExternalRecord.immediate_actions || ""} onChange={(value) => updateNewExternal("immediate_actions", value)} />
+              <TextAreaField label="Comments" value={newExternalRecord.comments || ""} onChange={(value) => updateNewExternal("comments", value)} />
+              <label style={externalCheckboxStyle}>
+                <input type="checkbox" checked={Boolean(newExternalRecord.include_in_statistics)} onChange={(event) => updateNewExternal("include_in_statistics", event.target.checked)} />
+                Include this external AINM in combined statistics
+              </label>
+            </div>
+            <div style={buttonRowStyle}>
+              <button type="button" style={primaryButtonStyle} onClick={() => void createExternalAINM()} disabled={saving}>{saving ? "Creating..." : "Create External AINM"}</button>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="External AINM Register" subtitle="External-only register for supplier, contractor, client, and third-party AINM records.">
+            <div style={toolbarStyle}>
+              <input style={searchStyle} value={externalSearch} onChange={(event) => setExternalSearch(event.target.value)} placeholder="Search external AINM no., supplier, project, reference..." />
+              <button type="button" style={showExternalFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowExternalFilters((current) => !current)}>
+                {showExternalFilters ? "Hide Filters" : "Show Filters"}
+              </button>
+            </div>
+            {showExternalFilters ? (
+              <div style={toolbarStyle}>
+                <select style={filterStyle} value={externalStatusFilter} onChange={(event) => setExternalStatusFilter(event.target.value)}>
+                  <option value="">All Status</option>
+                  {externalAinmStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+                <select style={filterStyle} value={externalTypeFilter} onChange={(event) => setExternalTypeFilter(event.target.value)}>
+                  <option value="">All External Types</option>
+                  {externalPartyTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+                <button type="button" style={secondaryButtonStyle} onClick={() => { setExternalSearch(""); setExternalStatusFilter(""); setExternalTypeFilter(""); }}>Clear Filters</button>
+              </div>
+            ) : null}
+            <div style={tableInfoRowStyle}>Showing {filteredExternalRecords.length} of {externalRecords.length} external AINMs</div>
+            <div style={registerTableWrapStyle}>
+              <table style={registerTableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>External AINM No.</th>
+                    <th style={thStyle}>External Party</th>
+                    <th style={thStyle}>Type</th>
+                    <th style={thStyle}>Project</th>
+                    <th style={thStyle}>Event Date</th>
+                    <th style={thStyle}>Event Type</th>
+                    <th style={thStyle}>Stats</th>
+                    <th style={thStyle}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredExternalRecords.map((record) => (
+                    <tr key={record.id} style={selectedExternalId === record.id ? selectedRowStyle : trStyle} onClick={() => setSelectedExternalId(record.id)}>
+                      <td style={tdStrongStyle}>{record.external_ainm_number}</td>
+                      <td style={tdStyle}>{record.supplier_name || ""}</td>
+                      <td style={tdStyle}>{record.external_party_type || ""}</td>
+                      <td style={tdStyle}>{record.project || ""}</td>
+                      <td style={tdStyle}>{displayDate(record.event_date)}</td>
+                      <td style={tdStyle}>{record.event_type || ""}</td>
+                      <td style={tdStyle}>{record.include_in_statistics ? "Included" : "Excluded"}</td>
+                      <td style={tdStyle}><StatusPill status={record.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!filteredExternalRecords.length ? <div style={emptyBoxStyle}>No external AINMs match the current filter.</div> : null}
+            </div>
+          </SectionCard>
+
+          {selectedExternal ? (
+            <SectionCard title={`${externalDraft.external_ainm_number} - ${externalDraft.supplier_name || "External AINM"}`} subtitle="Edit the external AINM record and upload external documentation.">
+              <DetailSection>
+                <div style={formGridStyle}>
+                  <Field label="External AINM No."><input style={inputStyle} value={externalDraft.external_ainm_number} onChange={(event) => updateExternalDraft("external_ainm_number", event.target.value)} /></Field>
+                  <Field label="External Party Type">
+                    <select style={inputStyle} value={externalDraft.external_party_type || ""} onChange={(event) => updateExternalDraft("external_party_type", event.target.value)}>
+                      <option value="">Select type</option>
+                      {externalPartyTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="External Party / Supplier Name"><input style={inputStyle} value={externalDraft.supplier_name || ""} onChange={(event) => updateExternalDraft("supplier_name", event.target.value)} /></Field>
+                  <Field label="External Reference"><input style={inputStyle} value={externalDraft.supplier_reference || ""} onChange={(event) => updateExternalDraft("supplier_reference", event.target.value)} /></Field>
+                  <Field label="Project / Work Title"><input style={inputStyle} value={externalDraft.project || ""} onChange={(event) => updateExternalDraft("project", event.target.value)} /></Field>
+                  <Field label="Location / Site"><input style={inputStyle} value={externalDraft.location_site || ""} onChange={(event) => updateExternalDraft("location_site", event.target.value)} /></Field>
+                  <Field label="Event Date"><input type="date" style={inputStyle} value={externalDraft.event_date || ""} onChange={(event) => updateExternalDraft("event_date", event.target.value)} /></Field>
+                  <Field label="Event Type">
+                    <select style={inputStyle} value={externalDraft.event_type || ""} onChange={(event) => updateExternalDraft("event_type", event.target.value)}>
+                      <option value="">Select event type</option>
+                      {externalEventTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Enshore Contact">
+                    <select style={inputStyle} value={peopleOptions.find((person) => person.name === externalDraft.enshore_contact)?.id || externalDraft.enshore_contact || ""} onChange={(event) => {
+                      const person = peopleOptions.find((item) => item.id === event.target.value);
+                      updateExternalDraft("enshore_contact", person?.name || event.target.value);
+                    }}>
+                      <option value="">Select contact</option>
+                      {externalDraft.enshore_contact && !peopleOptions.some((person) => person.name === externalDraft.enshore_contact) ? (
+                        <option value={externalDraft.enshore_contact}>{externalDraft.enshore_contact} (saved value)</option>
+                      ) : null}
+                      {peopleOptions.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Status">
+                    <select style={inputStyle} value={externalDraft.status} onChange={(event) => updateExternalDraft("status", event.target.value as ExternalAINMStatus)}>
+                      {externalAinmStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                    </select>
+                  </Field>
+                  <TextAreaField label="Summary" value={externalDraft.summary || ""} onChange={(value) => updateExternalDraft("summary", value)} />
+                  <TextAreaField label="Immediate Actions / Enshore Follow-up" value={externalDraft.immediate_actions || ""} onChange={(value) => updateExternalDraft("immediate_actions", value)} />
+                  <TextAreaField label="Comments" value={externalDraft.comments || ""} onChange={(value) => updateExternalDraft("comments", value)} />
+                  <label style={externalCheckboxStyle}>
+                    <input type="checkbox" checked={Boolean(externalDraft.include_in_statistics)} onChange={(event) => updateExternalDraft("include_in_statistics", event.target.checked)} />
+                    Include this external AINM in combined statistics
+                  </label>
+                </div>
+
+                <div style={notificationEvidencePanelStyle}>
+                  <div>
+                    <strong>External Documentation / Evidence</strong>
+                    <p style={bodyTextStyle}>Upload supplier reports, contractor paperwork, photographs, or supporting documents received from the external party.</p>
+                  </div>
+                  <label style={uploadButtonStyle}>
+                    {uploading ? "Uploading..." : "Upload External Documentation"}
+                    <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadExternalEvidence(event)} disabled={uploading} />
+                  </label>
+                  <div style={evidenceListStyle}>
+                    {selectedExternalEvidence.map((file) => (
+                      <div key={file.id} style={evidenceItemStyle}>
+                        <div>
+                          <strong>{file.file_name}</strong>
+                          <span>{formatFileSize(file.file_size)} | Uploaded {displayDateTime(file.uploaded_at)}</span>
+                        </div>
+                        <div style={buttonRowStyle}>
+                          <button type="button" style={secondaryButtonStyle} onClick={() => void openExternalEvidence(file)}>Open / Preview</button>
+                          <button type="button" style={dangerButtonStyle} onClick={() => void deleteExternalEvidence(file)}>Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                    {!selectedExternalEvidence.length ? <div style={emptyBoxStyle}>No external documentation uploaded yet.</div> : null}
+                  </div>
+                </div>
+
+                <div style={detailFooterStyle}>
+                  <button type="button" style={primaryButtonStyle} onClick={() => void saveExternalAINM()} disabled={saving}>{saving ? "Saving..." : "Save External AINM"}</button>
+                  <button type="button" style={dangerButtonStyle} onClick={() => void deleteExternalRecord(externalDraft)}>Delete External AINM</button>
+                </div>
+              </DetailSection>
+            </SectionCard>
+          ) : null}
+        </section>
       ) : null}
 
       {activeView === "import" ? (
@@ -2963,7 +3533,25 @@ const columnItemStyle: CSSProperties = { display: "grid", justifyItems: "center"
 const columnValueStyle: CSSProperties = { color: "#475569", fontSize: 11, minHeight: 14, fontWeight: 800 };
 const columnBarStyle: CSSProperties = { width: "72%", borderRadius: "8px 8px 2px 2px", minHeight: 4 };
 const columnLabelStyle: CSSProperties = { color: "#64748b", fontSize: 10, fontWeight: 800 };
+const qrAccessWrapStyle: CSSProperties = { display: "grid", gridTemplateColumns: "132px minmax(0, 1fr)", gap: 16, alignItems: "center" };
+const qrBoxStyle: CSSProperties = { width: 132, height: 132, border: "1px solid #BFE5E3", borderRadius: 16, background: "#ffffff", display: "grid", placeItems: "center", padding: 8, boxSizing: "border-box" };
+const qrImageStyle: CSSProperties = { width: "100%", height: "100%", objectFit: "contain", display: "block" };
+const qrCopyStyle: CSSProperties = { display: "grid", gap: 9, color: "#334155", fontSize: 13, lineHeight: 1.45 };
 const reportReadinessStyle: CSSProperties = { display: "grid", placeItems: "center", minHeight: 145, border: "1px solid #BFE5E3", background: "#EEF8F7", color: "#3A9B98", borderRadius: 16, cursor: "pointer", marginBottom: 14 };
+const externalNoticeStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+  alignItems: "center",
+  border: "1px solid #BFE5E3",
+  background: "#EEF8F7",
+  color: "#0f172a",
+  borderRadius: 14,
+  padding: "12px 14px",
+  marginBottom: 16,
+  fontSize: 13,
+  lineHeight: 1.45,
+};
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 };
 const stageGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 16 };
 const fieldStyle: CSSProperties = { display: "grid", gap: 6 };
@@ -3060,6 +3648,19 @@ const detailSectionStyle: CSSProperties = {
 const detailFooterStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 };
 const checkGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, margin: "16px 0" };
 const checkItemStyle: CSSProperties = { display: "flex", gap: 8, alignItems: "center", background: "white", border: "1px solid #dbe3ef", borderRadius: 10, padding: "10px 12px", color: "#0f172a", fontWeight: 700, fontSize: 13 };
+const externalCheckboxStyle: CSSProperties = {
+  gridColumn: "1 / -1",
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  border: "1px solid #dbe3ef",
+  background: "#f8fafc",
+  borderRadius: 12,
+  padding: "12px 14px",
+  color: "#0f172a",
+  fontWeight: 800,
+  fontSize: 13,
+};
 const correctiveActionsTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "110px minmax(0, 1fr) 100px", border: "1px solid #dbe3ef", borderRadius: 12, overflow: "hidden", background: "white" };
 const referenceDocumentsTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "70px minmax(0, 1fr) 100px", border: "1px solid #dbe3ef", borderRadius: 12, overflow: "hidden", background: "white" };
 const correctiveHeaderCellStyle: CSSProperties = { background: "#3A9B98", color: "white", padding: "10px 12px", fontWeight: 900, fontSize: 13 };

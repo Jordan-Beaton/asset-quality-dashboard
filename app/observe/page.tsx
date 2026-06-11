@@ -6,7 +6,7 @@ import type { CSSProperties, FormEvent } from "react";
 import { imsColours, imsInputStyle } from "../../src/components/imsTheme";
 
 const reporterTypes = ["Employee", "Contractor", "Client", "Visitor", "Quick Fill"];
-const observationTypes = ["Positive Observation", "Unsafe Act", "Unsafe Condition", "Near Miss", "Environmental", "Quality / Process", "Other"];
+const observationTypes = ["Positive Observation", "Unsafe Act", "Unsafe Condition", "Environmental", "Quality / Process", "Other"];
 const categories = ["People", "Equipment", "Environment", "Process", "Housekeeping", "Access / Egress", "Lifting", "Dropped Object", "PTW / Controls", "Other"];
 const riskLevels = ["Low", "Medium", "High", "Immediate attention"];
 
