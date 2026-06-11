@@ -42,3 +42,11 @@ next-env.d.ts
 external-assets-review/
 external-assets-review/
 scripts/output/
+
+# Generated presentation and screenshot outputs
+Enshore_IMS_*.pptx
+capture-screens.js
+enshore-sales-deck.js
+enshore-user-guide.js
+screenshots/
+~$*.pptx
