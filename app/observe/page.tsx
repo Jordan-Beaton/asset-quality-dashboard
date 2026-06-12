@@ -66,7 +66,6 @@ export default function PublicObservationPage() {
     setSubmittedNumber(result.observationNumber || "");
     setMessage(`Thank you. Your observation has been logged${result.observationNumber ? ` as ${result.observationNumber}` : ""}.`);
     form.reset();
-    setReporterType("");
     setShowContact(false);
     setSubmitting(false);
   }
@@ -128,7 +127,15 @@ export default function PublicObservationPage() {
           <section style={cardStyle}>
             <div style={formHeaderRowStyle}>
               <h2 style={sectionTitleStyle}>Contact Details</h2>
-              <button type="button" onClick={() => setReporterType("")} style={smallGhostButtonStyle}>
+              <button
+                type="button"
+                onClick={() => {
+                  setReporterType("");
+                  setSubmittedNumber("");
+                  setMessage("");
+                }}
+                style={smallGhostButtonStyle}
+              >
                 Change
               </button>
             </div>
