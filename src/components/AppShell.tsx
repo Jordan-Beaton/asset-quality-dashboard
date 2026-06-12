@@ -37,6 +37,22 @@ type ModuleAccess = {
   admin?: string | null;
 };
 
+type PeopleAccessRecord = {
+  name?: string | null;
+  email?: string | null;
+  role?: string | null;
+  system_role?: string | null;
+  is_master_admin?: boolean | null;
+  active?: boolean | null;
+  quality_access?: string | null;
+  hse_access?: string | null;
+  asset_access?: string | null;
+  risk_access?: string | null;
+  document_access?: string | null;
+  action_access?: string | null;
+  admin_access?: string | null;
+};
+
 type AccessArea = "public" | "login" | "home" | "people" | "quality" | "documents" | "hse" | "assets" | "risk" | "actions" | "admin";
 
 type NavIconKey =
@@ -461,16 +477,24 @@ export default function AppShell({ children }: AppShellProps) {
 
       const email = user.email || "";
       if (email) {
-        const { data: person } = await supabase
+        const normalisedEmail = email.trim().toLowerCase();
+        const { data: peopleMatches } = await supabase
           .from("people")
-          .select("name,email,role,system_role,is_master_admin,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
+          .select("name,email,role,system_role,is_master_admin,active,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
           .ilike("email", email.trim())
-          .maybeSingle();
+          .limit(10);
 
         if (!isMounted) return;
+        const matchedPeople = (peopleMatches || []) as PeopleAccessRecord[];
+        const person =
+          matchedPeople.find((item) => item.active !== false && (item.email || "").trim().toLowerCase() === normalisedEmail) ||
+          matchedPeople.find((item) => (item.email || "").trim().toLowerCase() === normalisedEmail) ||
+          matchedPeople.find((item) => item.active !== false) ||
+          matchedPeople[0] ||
+          null;
         const roleSource = person?.system_role || person?.role;
         const resolvedRole =
-          email.toLowerCase() === "jbeaton@enshoresubsea.com" ||
+          normalisedEmail === "jbeaton@enshoresubsea.com" ||
           person?.is_master_admin ||
           (person?.name || "").trim().toLowerCase() === "jordan beaton"
             ? "Admin"
