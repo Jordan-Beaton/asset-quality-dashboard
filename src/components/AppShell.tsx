@@ -463,22 +463,23 @@ export default function AppShell({ children }: AppShellProps) {
       if (email) {
         const { data: person } = await supabase
           .from("people")
-          .select("name,email,system_role,is_master_admin,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
-          .eq("email", email)
+          .select("name,email,role,system_role,is_master_admin,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
+          .ilike("email", email.trim())
           .maybeSingle();
 
         if (!isMounted) return;
+        const roleSource = person?.system_role || person?.role;
         const resolvedRole =
           email.toLowerCase() === "jbeaton@enshoresubsea.com" ||
           person?.is_master_admin ||
           (person?.name || "").trim().toLowerCase() === "jordan beaton"
             ? "Admin"
-            : normaliseSystemRole(person?.system_role);
-        const { data: roleDefaults } = person?.system_role
+            : normaliseSystemRole(roleSource);
+        const { data: roleDefaults } = roleSource
           ? await (supabase as any)
               .from("ims_roles")
               .select("quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
-              .eq("role_name", resolvedRole || person.system_role)
+              .eq("role_name", resolvedRole || roleSource)
               .maybeSingle()
           : { data: null };
 
