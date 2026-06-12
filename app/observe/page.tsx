@@ -33,13 +33,22 @@ export default function PublicObservationPage() {
     return "Observation Card";
   }, [submittedNumber]);
 
+  function chooseReporterType(type: string) {
+    setReporterType(type);
+    if (submittedNumber) {
+      setSubmittedNumber("");
+      setMessage("");
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setSubmitting(true);
     setMessage("Submitting observation...");
     setSubmittedNumber("");
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     formData.set("reporter_type", reporterType);
 
     const response = await fetch("/api/hse-observations", {
@@ -56,7 +65,7 @@ export default function PublicObservationPage() {
 
     setSubmittedNumber(result.observationNumber || "");
     setMessage(`Thank you. Your observation has been logged${result.observationNumber ? ` as ${result.observationNumber}` : ""}.`);
-    event.currentTarget.reset();
+    form.reset();
     setReporterType("");
     setShowContact(false);
     setSubmitting(false);
@@ -102,7 +111,7 @@ export default function PublicObservationPage() {
                 <button
                   key={type}
                   type="button"
-                  onClick={() => setReporterType(type)}
+                  onClick={() => chooseReporterType(type)}
                   style={reporterType === type ? activeChoiceStyle : choiceStyle}
                 >
                   {type}
@@ -197,8 +206,17 @@ export default function PublicObservationPage() {
             <input name="evidence" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={fileInputStyle} />
           </section>
 
-          <button type="submit" disabled={submitting} style={{ ...submitButtonStyle, opacity: submitting ? 0.7 : 1 }}>
-            {submitting ? "Submitting..." : "Submit Observation"}
+          <button
+            type="submit"
+            disabled={submitting || Boolean(submittedNumber)}
+            style={{
+              ...submitButtonStyle,
+              opacity: submitting ? 0.7 : 1,
+              background: submittedNumber ? "#16a34a" : submitButtonStyle.background,
+              cursor: submitting || submittedNumber ? "default" : "pointer",
+            }}
+          >
+            {submitting ? "Submitting..." : submittedNumber ? `Submitted${submittedNumber ? ` - ${submittedNumber}` : ""}` : "Submit Observation"}
           </button>
         </form>
         ) : null}
