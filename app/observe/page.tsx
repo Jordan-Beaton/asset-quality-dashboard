@@ -30,10 +30,8 @@ export default function PublicObservationPage() {
   const hasSelectedReporterType = reporterType.length > 0;
   const headerText = useMemo(() => {
     if (submittedNumber) return "Observation submitted";
-    if (!reporterType) return "Observation card";
-    if (isQuickFill) return "Quick observation card";
-    return `${reporterType} observation card`;
-  }, [isQuickFill, reporterType, submittedNumber]);
+    return "Observation Card";
+  }, [submittedNumber]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -120,7 +118,7 @@ export default function PublicObservationPage() {
         <form onSubmit={handleSubmit} style={formStyle}>
           <section style={cardStyle}>
             <div style={formHeaderRowStyle}>
-              <h2 style={sectionTitleStyle}>{reporterType} details</h2>
+              <h2 style={sectionTitleStyle}>Contact Details</h2>
               <button type="button" onClick={() => setReporterType("")} style={smallGhostButtonStyle}>
                 Change
               </button>
