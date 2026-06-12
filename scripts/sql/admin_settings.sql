@@ -154,6 +154,8 @@ create table if not exists public.ims_audit_log (
   target_type text,
   target_reference text,
   summary text,
+  previous_values jsonb,
+  new_values jsonb,
   created_at timestamptz not null default now()
 );
 

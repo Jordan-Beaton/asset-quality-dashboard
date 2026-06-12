@@ -52,7 +52,7 @@ async function ensureAdminAccess() {
 
   const { data: person, error } = await service
     .from("people")
-    .select("id,name,email,system_role,is_master_admin,active,access_status")
+    .select("id,name,email,role,system_role,is_master_admin,active,access_status")
     .or(`email.ilike.${user.email},name.ilike.${MASTER_ADMIN_NAME}`)
     .limit(5);
 
@@ -65,7 +65,12 @@ async function ensureAdminAccess() {
     return rowEmail === email || (email === MASTER_ADMIN_EMAIL && cleanText(row.name).toLowerCase() === MASTER_ADMIN_NAME.toLowerCase());
   });
 
-  if (matchedPerson?.is_master_admin || cleanText(matchedPerson?.system_role) === "Admin") {
+  if (matchedPerson?.active === false || cleanText(matchedPerson?.access_status).toLowerCase() === "deactivated") {
+    return { user, service, error: "Admin account is deactivated.", status: 403 };
+  }
+
+  const adminRole = cleanText(matchedPerson?.system_role) || cleanText(matchedPerson?.role);
+  if (matchedPerson?.is_master_admin || adminRole === "Admin") {
     return { user, service, error: null, status: 200 };
   }
 
@@ -79,14 +84,30 @@ async function writeAuditLog(
   targetType: string,
   targetReference: string,
   summary: string,
+  previousValues?: Record<string, unknown> | null,
+  newValues?: Record<string, unknown> | null,
 ) {
-  await service.from("ims_audit_log").insert({
+  const auditPayload = {
     actor_email: actorEmail,
     actor_name: actorEmail.toLowerCase() === MASTER_ADMIN_EMAIL ? MASTER_ADMIN_NAME : null,
     action_type: actionType,
     target_type: targetType,
     target_reference: targetReference,
     summary,
+    previous_values: previousValues || null,
+    new_values: newValues || null,
+  };
+
+  const { error } = await service.from("ims_audit_log").insert(auditPayload);
+  if (!error) return;
+
+  await service.from("ims_audit_log").insert({
+    actor_email: auditPayload.actor_email,
+    actor_name: auditPayload.actor_name,
+    action_type: auditPayload.action_type,
+    target_type: auditPayload.target_type,
+    target_reference: auditPayload.target_reference,
+    summary: auditPayload.summary,
   });
 }
 
@@ -251,28 +272,40 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "The master admin account cannot be deactivated." }, { status: 400 });
       }
 
+      const { data: previousPerson, error: previousPersonError } = await service
+        .from("people")
+        .select("id,name,email,department,system_role,access_status,active,is_master_admin,permission_override,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (previousPersonError) {
+        return NextResponse.json({ error: previousPersonError.message }, { status: 400 });
+      }
+
+      const nextPersonValues = {
+        system_role: email === MASTER_ADMIN_EMAIL ? "Admin" : systemRole,
+        access_status: email === MASTER_ADMIN_EMAIL ? "Active" : accessStatus,
+        department: department || null,
+        permissions_notes: permissionsNotes || null,
+        permission_override: email === MASTER_ADMIN_EMAIL ? "Full System Access" : permissionOverride,
+        ...(email === MASTER_ADMIN_EMAIL
+          ? {
+              quality_access: "Full",
+              hse_access: "Full",
+              asset_access: "Full",
+              risk_access: "Full",
+              document_access: "Full",
+              action_access: "Full",
+              admin_access: "Full",
+            }
+          : moduleAccessPayload),
+        is_master_admin: isMasterAdmin,
+        active,
+      };
+
       const { error: updateError } = await service
         .from("people")
-        .update({
-          system_role: email === MASTER_ADMIN_EMAIL ? "Admin" : systemRole,
-          access_status: email === MASTER_ADMIN_EMAIL ? "Active" : accessStatus,
-          department: department || null,
-          permissions_notes: permissionsNotes || null,
-          permission_override: email === MASTER_ADMIN_EMAIL ? "Full System Access" : permissionOverride,
-          ...(email === MASTER_ADMIN_EMAIL
-            ? {
-                quality_access: "Full",
-                hse_access: "Full",
-                asset_access: "Full",
-                risk_access: "Full",
-                document_access: "Full",
-                action_access: "Full",
-                admin_access: "Full",
-              }
-            : moduleAccessPayload),
-          is_master_admin: isMasterAdmin,
-          active,
-        })
+        .update(nextPersonValues)
         .eq("id", id);
 
       if (updateError) {
@@ -288,7 +321,16 @@ export async function POST(request: Request) {
         });
       }
 
-      await writeAuditLog(service, actorEmail, "Update Access", "Person", email, `${email} set to ${systemRole} / ${accessStatus}.`);
+      await writeAuditLog(
+        service,
+        actorEmail,
+        "Update Access",
+        "Person",
+        email,
+        `${email} set to ${systemRole} / ${accessStatus}.`,
+        previousPerson || null,
+        { id, email, ...nextPersonValues },
+      );
       return NextResponse.json({ ok: true });
     }
 
@@ -332,10 +374,27 @@ export async function POST(request: Request) {
         description: cleanText(payload.description) || null,
       };
 
+      const { data: previousRole, error: previousRoleError } = await service
+        .from("ims_roles")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (previousRoleError) return NextResponse.json({ error: previousRoleError.message }, { status: 400 });
+
       const { error } = await service.from("ims_roles").update(rolePayload).eq("id", id);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-      await writeAuditLog(service, actorEmail, "Update Role Permissions", "Role", cleanText(payload.role_name), `${cleanText(payload.role_name)} permissions updated.`);
+      await writeAuditLog(
+        service,
+        actorEmail,
+        "Update Role Permissions",
+        "Role",
+        cleanText(payload.role_name),
+        `${cleanText(payload.role_name)} permissions updated.`,
+        previousRole || null,
+        { id, role_name: cleanText(payload.role_name), ...rolePayload },
+      );
       return NextResponse.json({ ok: true });
     }
 

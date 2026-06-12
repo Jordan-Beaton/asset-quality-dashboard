@@ -427,7 +427,7 @@ export default function AdminDashboardPage() {
             </ImsPanel>
             <ImsPanel title="Governance Notes" subtitle="What this pass deliberately does and does not do.">
               <p style={paragraphStyle}>
-                This console lets Admins prepare users, roles, company settings, and reference data. It does not yet hide modules or block operational pages by role, so the existing IMS workflows continue to work while permissions are tested.
+                This console lets Admins manage users, roles, company settings, and reference data. Active roles and individual access overrides now control module visibility across the IMS shell.
               </p>
             </ImsPanel>
           </section>

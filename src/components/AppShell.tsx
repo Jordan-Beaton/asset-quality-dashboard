@@ -44,6 +44,7 @@ type PeopleAccessRecord = {
   system_role?: string | null;
   is_master_admin?: boolean | null;
   active?: boolean | null;
+  access_status?: string | null;
   quality_access?: string | null;
   hse_access?: string | null;
   asset_access?: string | null;
@@ -175,7 +176,7 @@ function getAllowedModuleKeys(role: SystemRole) {
   if (role === "Asset Manager") return new Set(["home", "assets", "actions", "people"]);
   if (role === "Viewer") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "people"]);
   if (role === "Contractor") return new Set(["home"]);
-  return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "people"]);
+  return new Set(["home"]);
 }
 
 function getAccessAreaFromHref(href: string): AccessArea {
@@ -480,7 +481,7 @@ export default function AppShell({ children }: AppShellProps) {
         const normalisedEmail = email.trim().toLowerCase();
         const { data: peopleMatches } = await supabase
           .from("people")
-          .select("name,email,role,system_role,is_master_admin,active,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
+          .select("name,email,role,system_role,is_master_admin,active,access_status,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
           .ilike("email", email.trim())
           .limit(10);
 
@@ -492,13 +493,24 @@ export default function AppShell({ children }: AppShellProps) {
           matchedPeople.find((item) => item.active !== false) ||
           matchedPeople[0] ||
           null;
-        const roleSource = person?.system_role || person?.role;
-        const resolvedRole =
+        const isMasterAdmin =
           normalisedEmail === "jbeaton@enshoresubsea.com" ||
           person?.is_master_admin ||
-          (person?.name || "").trim().toLowerCase() === "jordan beaton"
-            ? "Admin"
-            : normaliseSystemRole(roleSource);
+          (person?.name || "").trim().toLowerCase() === "jordan beaton";
+        const isPersonDeactivated =
+          !isMasterAdmin &&
+          (person?.active === false || (person?.access_status || "").trim().toLowerCase() === "deactivated");
+
+        if (isPersonDeactivated) {
+          setSignedInName(person?.name || user.user_metadata?.name || email);
+          setSignedInRole("");
+          setSignedInModuleAccess({});
+          setPermissionsLoaded(true);
+          return;
+        }
+
+        const roleSource = person?.system_role || person?.role;
+        const resolvedRole = isMasterAdmin ? "Admin" : normaliseSystemRole(roleSource);
         const { data: roleDefaults } = roleSource
           ? await (supabase as any)
               .from("ims_roles")
