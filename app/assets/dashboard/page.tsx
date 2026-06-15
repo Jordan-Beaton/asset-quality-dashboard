@@ -243,10 +243,7 @@ function DashboardContent() {
   const [linkedActions, setLinkedActions] = useState<AssetLinkedAction[]>([]);
   const [message, setMessage] = useState("Loading asset dashboard...");
   const [lastRefreshed, setLastRefreshed] = useState("");
-
-  useEffect(() => {
-    void loadDashboardData();
-  }, []);
+  const [renderTimestamp] = useState(() => Date.now());
 
   async function loadDashboardData() {
     const [assetsRes, calibrationsRes, inspectionsRes, maintenanceRes, filesRes, actionsRes] = await Promise.all([
@@ -282,6 +279,10 @@ function DashboardContent() {
     setLastRefreshed(new Date().toLocaleString("en-GB"));
     setMessage("Asset dashboard loaded.");
   }
+
+  useEffect(() => {
+    void loadDashboardData();
+  }, []);
 
   const assetMap = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
 
@@ -454,9 +455,9 @@ function DashboardContent() {
   const assetsWithFiles = useMemo(() => new Set(assetFiles.map((file) => file.asset_id)).size, [assetFiles]);
 
   const recentActivityCount = useMemo(() => {
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const thirtyDaysAgo = renderTimestamp - 30 * 24 * 60 * 60 * 1000;
     return recentAssetRecords.filter((item) => getTimestampValue(item.timestamp) >= thirtyDaysAgo).length;
-  }, [recentAssetRecords]);
+  }, [recentAssetRecords, renderTimestamp]);
 
   const latestAssetRecord = recentAssetRecords[0] || null;
   const assetCodeMap = useMemo(() => {

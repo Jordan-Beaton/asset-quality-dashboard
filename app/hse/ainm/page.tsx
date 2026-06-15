@@ -2509,7 +2509,7 @@ export default function HseAinmPage() {
             <div style={externalNoticeStyle}>
               <strong>Reporting rule:</strong>
               <span>
-                External AINMs are excluded from internal AINM dashboard figures by default. Tick "Include in statistics" only when the HSE Manager wants the external event counted in combined reporting.
+                External AINMs are excluded from internal AINM dashboard figures by default. Tick &quot;Include in statistics&quot; only when the HSE Manager wants the external event counted in combined reporting.
               </span>
             </div>
 
@@ -2844,7 +2844,7 @@ export default function HseAinmPage() {
                     </Field>
                     <div style={{ gridColumn: "1 / -1" }}>
                       <Field label="Brief details of the event">
-                        <span style={helperTextStyle}>Please avoid names - use job title or term 'IP' (Injured Person).</span>
+                        <span style={helperTextStyle}>Please avoid names - use job title or term &apos;IP&apos; (Injured Person).</span>
                         <textarea style={textareaStyle} value={draft.brief_event_details || ""} onChange={(e) => updateDraft("brief_event_details", e.target.value)} />
                       </Field>
                     </div>
@@ -3440,14 +3440,19 @@ function ProgressBars({
 function DonutChart({ total, segments }: { total: number; segments: { label: string; value: number; color: string }[] }) {
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
-  let offset = 0;
+  const segmentSlices = segments.reduce<Array<{ segment: { label: string; value: number; color: string }; length: number; offset: number }>>(
+    (slices, segment) => {
+      const previousOffset = slices.reduce((sum, slice) => sum + slice.length, 0);
+      const length = total ? (segment.value / total) * circumference : 0;
+      return [...slices, { segment, length, offset: previousOffset }];
+    },
+    [],
+  );
   return (
     <div style={donutWrapStyle}>
       <svg width="170" height="170" viewBox="0 0 120 120" role="img" aria-label="AINM type split">
         <circle cx="60" cy="60" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="17" />
-        {segments.map((segment) => {
-          const length = total ? (segment.value / total) * circumference : 0;
-          const circle = (
+        {segmentSlices.map(({ segment, length, offset }) => (
             <circle
               key={segment.label}
               cx="60"
@@ -3461,10 +3466,7 @@ function DonutChart({ total, segments }: { total: number; segments: { label: str
               strokeLinecap="round"
               transform="rotate(-90 60 60)"
             />
-          );
-          offset += length;
-          return circle;
-        })}
+        ))}
         <text x="60" y="56" textAnchor="middle" style={{ fontSize: 19, fontWeight: 900, fill: "#0f172a" }}>{total}</text>
         <text x="60" y="72" textAnchor="middle" style={{ fontSize: 8, fontWeight: 800, fill: "#64748b" }}>AINMs</text>
       </svg>

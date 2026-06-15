@@ -247,10 +247,6 @@ export default function AssetActionsPage() {
   const [saving, setSaving] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState("");
 
-  useEffect(() => {
-    void loadData();
-  }, []);
-
   async function loadData() {
     setLoading(true);
     const [actionsRes, peopleRes, auditRes, findingRes, ncrRes, capaRes, mocRes, ainmRes, assetsRes, inspectionsRes, maintenanceRes, calibrationsRes] = await Promise.all([
@@ -372,6 +368,10 @@ export default function AssetActionsPage() {
     setMessage(`Loaded ${assetActions.length} Asset action${assetActions.length === 1 ? "" : "s"}.`);
     setLoading(false);
   }
+
+  useEffect(() => {
+    void loadData();
+  }, []);
 
   const selectedAction = useMemo(() => actions.find((action) => action.id === selectedId) || null, [actions, selectedId]);
 

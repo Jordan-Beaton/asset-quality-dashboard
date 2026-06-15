@@ -302,10 +302,6 @@ export default function HseCalendarPage() {
   const selected = useMemo(() => items.find((item) => item.id === selectedId) || null, [items, selectedId]);
 
   useEffect(() => {
-    void loadData();
-  }, []);
-
-  useEffect(() => {
     if (selected) setDetailForm(formFromItem(selected));
   }, [selected]);
 
@@ -397,6 +393,10 @@ export default function HseCalendarPage() {
     setRefreshStamp(new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }));
     setLoading(false);
   }
+
+  useEffect(() => {
+    void loadData();
+  }, []);
 
   function applyPerson(value: string, target: "create" | "detail") {
     const person = peopleById.get(value);

@@ -180,10 +180,6 @@ export default function HseAinmFieldPage() {
       .slice(0, 20);
   }, [records, search]);
 
-  useEffect(() => {
-    void loadData();
-  }, []);
-
   async function loadData() {
     setLoading(true);
     const [recordRes, evidenceRes] = await Promise.all([
@@ -201,6 +197,10 @@ export default function HseAinmFieldPage() {
     setEvidence(evidenceRes.error ? [] : ((evidenceRes.data || []) as AINMEvidence[]));
     setMessage("AINM field entry ready.");
   }
+
+  useEffect(() => {
+    void loadData();
+  }, []);
 
   function startNew(type: AINMType) {
     setAinmType(type);

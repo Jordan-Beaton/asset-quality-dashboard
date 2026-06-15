@@ -165,10 +165,6 @@ export default function HseObservationsPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    void loadData();
-  }, []);
-
-  useEffect(() => {
     if (!records.length) return;
     const params = new URLSearchParams(window.location.search);
     const target = params.get("observation") || params.get("observationId") || "";
@@ -196,6 +192,10 @@ export default function HseObservationsPage() {
     setMessage(warnings.length ? `Loaded with warning: ${warnings[0]}` : "Observation register ready.");
     setLoading(false);
   }
+
+  useEffect(() => {
+    void loadData();
+  }, []);
 
   const availableYears = useMemo(() => {
     const years = new Set<string>();

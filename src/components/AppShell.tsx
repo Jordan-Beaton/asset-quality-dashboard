@@ -512,7 +512,7 @@ export default function AppShell({ children }: AppShellProps) {
         const roleSource = person?.system_role || person?.role;
         const resolvedRole = isMasterAdmin ? "Admin" : normaliseSystemRole(roleSource);
         const { data: roleDefaults } = roleSource
-          ? await (supabase as any)
+          ? await supabase
               .from("ims_roles")
               .select("quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
               .eq("role_name", resolvedRole || roleSource)

@@ -189,6 +189,14 @@ type ChartDatum = {
   filterValue?: string;
 };
 
+type RechartsClickState = {
+  activePayload?: Array<{
+    payload?: {
+      name?: string;
+    };
+  }>;
+};
+
 type TrendDatum = {
   name: string;
   closed: number;
@@ -3235,8 +3243,8 @@ function ActionsPageContent() {
                 <ResponsiveContainer width="100%" height={230}>
                   <LineChart
                     data={closureTrendData}
-                    onClick={(state: any) => {
-                      const month = state?.activePayload?.[0]?.payload?.name;
+                    onClick={(state: unknown) => {
+                      const month = (state as RechartsClickState)?.activePayload?.[0]?.payload?.name;
                       if (month) openRegisterDrilldown({ closedMonth: month });
                     }}
                     style={{ cursor: "pointer" }}

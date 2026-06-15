@@ -1213,7 +1213,7 @@ export default function Home() {
             <span className="quality-live-pill" style={livePillStyle}>Live data</span>
           </div>
           <div style={pressureChartWrapStyle}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <BarChart data={operationalPressureData} layout="vertical" margin={{ left: 0, right: 22, top: 6, bottom: 6 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.16)" />
                 <XAxis type="number" hide />
@@ -1279,7 +1279,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={qualityHealthData} layout="vertical" margin={{ left: 18, right: 18 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
@@ -1310,7 +1310,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Tooltip />
                   <Pie
@@ -1341,7 +1341,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={ncrTrendData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="month" />
@@ -1404,7 +1404,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={auditStatusData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
@@ -1444,7 +1444,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Tooltip />
                   <Pie
@@ -1475,7 +1475,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Tooltip />
                   <Pie
@@ -1515,7 +1515,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={mocStatusData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />
@@ -1539,7 +1539,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Tooltip />
                   <Pie
@@ -1570,7 +1570,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={actionsTrendData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="month" />
@@ -1606,7 +1606,7 @@ export default function Home() {
             <p style={emptyTextStyle}>Loading chart...</p>
           ) : (
             <div style={chartWrapStyle}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={qualityActionDuePressureData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="name" />

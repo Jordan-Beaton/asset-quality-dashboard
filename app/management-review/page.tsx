@@ -935,7 +935,7 @@ function ChartBlock({ data, type }: { data: ChartDatum[]; type: "bar" | "pie" })
   if (type === "pie") {
     return (
       <div style={chartWrapStyle}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height={280}>
           <PieChart>
             <Pie data={data} dataKey="value" nameKey="name" innerRadius={48} outerRadius={78} paddingAngle={2}>
               {data.map((entry, index) => (
@@ -951,7 +951,7 @@ function ChartBlock({ data, type }: { data: ChartDatum[]; type: "bar" | "pie" })
 
   return (
     <div style={chartWrapStyle}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data} layout="vertical" margin={{ left: 12, right: 18, top: 8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
           <XAxis type="number" allowDecimals={false} />

@@ -449,11 +449,6 @@ export default function HsePermitToWorkPage() {
     return attachments.filter((attachment) => attachment.ptw_id === currentId);
   }, [attachments, draft.id, selectedId]);
 
-  useEffect(() => {
-    void loadRecords();
-    void loadPeopleOptions();
-  }, []);
-
   async function loadRecords() {
     const [recordRes, attachmentRes] = await Promise.all([
       supabase
@@ -500,6 +495,11 @@ export default function HsePermitToWorkPage() {
 
     setPeopleOptions((data || []) as PeopleOption[]);
   }
+
+  useEffect(() => {
+    void loadRecords();
+    void loadPeopleOptions();
+  }, []);
 
   function update<K extends keyof PtwForm>(key: K, value: PtwForm[K]) {
     setDraft((current) => ({ ...current, [key]: value }));

@@ -247,10 +247,6 @@ export default function QualityActionsPage() {
   const [saving, setSaving] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState("");
 
-  useEffect(() => {
-    void loadData();
-  }, []);
-
   async function loadData() {
     setLoading(true);
     const [actionsRes, peopleRes, auditRes, findingRes, ncrRes, capaRes, mocRes, ainmRes, assetsRes, inspectionsRes, maintenanceRes, calibrationsRes] = await Promise.all([
@@ -372,6 +368,10 @@ export default function QualityActionsPage() {
     setMessage(`Loaded ${qualityActions.length} Quality action${qualityActions.length === 1 ? "" : "s"}.`);
     setLoading(false);
   }
+
+  useEffect(() => {
+    void loadData();
+  }, []);
 
   const selectedAction = useMemo(() => actions.find((action) => action.id === selectedId) || null, [actions, selectedId]);
 

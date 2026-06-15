@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const evidenceBucket = "quality-evidence";
 
@@ -7,7 +7,7 @@ function clean(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-async function makeObservationNumber(supabase: { from: (table: string) => any; rpc?: (fn: string) => any }) {
+async function makeObservationNumber(supabase: SupabaseClient) {
   if (typeof supabase.rpc === "function") {
     const { data, error } = await supabase.rpc("next_hse_observation_number");
     if (!error && typeof data === "string" && data.trim()) {

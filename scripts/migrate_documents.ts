@@ -43,8 +43,8 @@ import dotenv from 'dotenv'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mammoth: any = null
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let pdfParse: ((buffer: Buffer, options?: { max?: number }) => Promise<{ text: string }>) | null = null
+type PdfParseFn = NonNullable<typeof pdfParse>
 
 async function loadOptionalLibs() {
   try {
@@ -57,13 +57,20 @@ async function loadOptionalLibs() {
   }
 
   try {
-    const mod: any = await import('pdf-parse')
+    const mod = (await import('pdf-parse')) as {
+      default?: unknown
+      PDFParse?: new (options: { data: Buffer }) => {
+        getText: () => Promise<{ text?: string }>
+        destroy?: () => Promise<void> | void
+      }
+    }
     const fn = mod.default ?? mod
     if (typeof fn === 'function') {
-      pdfParse = fn
+      pdfParse = fn as PdfParseFn
     } else if (typeof mod.PDFParse === 'function') {
+      const PDFParse = mod.PDFParse
       pdfParse = async (buffer: Buffer) => {
-        const parser = new mod.PDFParse({ data: buffer })
+        const parser = new PDFParse({ data: buffer })
         const result = await parser.getText()
         if (typeof parser.destroy === 'function') await parser.destroy()
         return { text: result.text || '' }

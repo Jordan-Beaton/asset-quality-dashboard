@@ -2458,7 +2458,6 @@ function AssetsPageContent() {
                   <div style={qrCardStyle}>
                     <div style={qrPreviewWrapStyle}>
                       {selectedAssetQrDataUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={selectedAssetQrDataUrl}
                           alt={`${selectedAsset.asset_code || selectedAsset.name || "Asset"} QR code`}

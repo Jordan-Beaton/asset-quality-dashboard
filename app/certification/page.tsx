@@ -170,7 +170,6 @@ export default function CertificationPage() {
 
   useEffect(() => {
     void loadCertifications();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const standards = useMemo(() => {

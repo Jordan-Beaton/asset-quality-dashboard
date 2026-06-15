@@ -1011,10 +1011,6 @@ export default function HseInspectionsPage() {
   const latestSummary = records[0] ? `${records[0].inspection_number} - ${records[0].title}` : "No records yet";
 
   useEffect(() => {
-    void loadData();
-  }, []);
-
-  useEffect(() => {
     if (typeof window === "undefined") return;
     const updateMobileState = () => setIsMobile(window.innerWidth <= 720);
     updateMobileState();
@@ -1050,26 +1046,6 @@ export default function HseInspectionsPage() {
     if (view === "create") setActiveView("create");
     if (view === "register") setActiveView("register");
   }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || records.length === 0) return;
-    const params = new URLSearchParams(window.location.search);
-    const inspectionId = (params.get("inspectionId") || "").trim();
-    const inspectionNumber = (params.get("inspection") || "").trim().toLowerCase();
-    if (!inspectionId && !inspectionNumber) return;
-
-    const matchedRecord = records.find((record) => {
-      return (
-        (inspectionId && record.id === inspectionId) ||
-        (inspectionNumber && clean(record.inspection_number).toLowerCase() === inspectionNumber)
-      );
-    });
-
-    if (!matchedRecord) return;
-    selectRecord(matchedRecord);
-    setSearch(matchedRecord.inspection_number || "");
-    setStatusFilter("");
-  }, [records]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1123,6 +1099,10 @@ export default function HseInspectionsPage() {
     setDraft((current) => ({ ...current, inspection_number: current.inspection_number || nextInspectionNumber(nextRecords) }));
     setMessage("HSE inspections loaded.");
   }
+
+  useEffect(() => {
+    void loadData();
+  }, []);
 
   function updateDraft<K extends keyof HseInspectionRecord>(key: K, value: HseInspectionRecord[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -1179,6 +1159,26 @@ export default function HseInspectionsPage() {
     setSelectedTemplateId(record.form_id || defaultTemplateId);
     setActiveView("register");
   }
+
+  useEffect(() => {
+    if (typeof window === "undefined" || records.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const inspectionId = (params.get("inspectionId") || "").trim();
+    const inspectionNumber = (params.get("inspection") || "").trim().toLowerCase();
+    if (!inspectionId && !inspectionNumber) return;
+
+    const matchedRecord = records.find((record) => {
+      return (
+        (inspectionId && record.id === inspectionId) ||
+        (inspectionNumber && clean(record.inspection_number).toLowerCase() === inspectionNumber)
+      );
+    });
+
+    if (!matchedRecord) return;
+    selectRecord(matchedRecord);
+    setSearch(matchedRecord.inspection_number || "");
+    setStatusFilter("");
+  }, [records]);
 
   function startCreate(templateId = defaultTemplateId) {
     const template = inspectionTemplates.find((item) => item.id === templateId) || inspectionTemplates.find((item) => item.id === defaultTemplateId)!;

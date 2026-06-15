@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createClient as createServiceClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { createClient as createServerSupabaseClient } from "../../../src/lib/supabase/server";
 
 const MASTER_ADMIN_EMAIL = "jbeaton@enshoresubsea.com";
@@ -27,6 +27,8 @@ function getServiceClient() {
 
   return createServiceClient(supabaseUrl, serviceRoleKey);
 }
+
+type ServiceClient = SupabaseClient;
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -78,7 +80,7 @@ async function ensureAdminAccess() {
 }
 
 async function writeAuditLog(
-  service: any,
+  service: ServiceClient,
   actorEmail: string,
   actionType: string,
   targetType: string,
@@ -118,7 +120,7 @@ export async function GET() {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    const service = access.service as any;
+    const service = access.service;
     const [authUsersResult, peopleResult, companyResult, departmentsResult, projectsResult, rolesResult, auditLogResult] =
       await Promise.all([
         service.auth.admin.listUsers({ page: 1, perPage: 1000 }),
@@ -132,7 +134,7 @@ export async function GET() {
 
     if (peopleResult.error) throw peopleResult.error;
 
-    const authUsers = authUsersResult.data.users.map((user: any) => ({
+    const authUsers = authUsersResult.data.users.map((user: User) => ({
       id: user.id,
       email: user.email || "",
       last_sign_in_at: user.last_sign_in_at || null,
@@ -176,7 +178,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as { action?: AdminAction; payload?: Record<string, unknown> };
     const action = body.action;
     const payload = body.payload || {};
-    const service = access.service as any;
+    const service = access.service;
     const actorEmail = access.user.email;
 
     if (action === "inviteUser") {
@@ -235,7 +237,7 @@ export async function POST(request: Request) {
       if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
 
       const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
-      const resetResult = await (service.auth as any).resetPasswordForEmail(email, {
+      const resetResult = await service.auth.resetPasswordForEmail(email, {
         redirectTo: origin ? `${origin}/login` : undefined,
       });
 
@@ -313,9 +315,9 @@ export async function POST(request: Request) {
       }
 
       const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      const authUser = authUsers.data.users.find((user: any) => (user.email || "").toLowerCase() === email);
+      const authUser = authUsers.data.users.find((user: User) => (user.email || "").toLowerCase() === email);
       if (authUser?.id && email !== MASTER_ADMIN_EMAIL) {
-        await (service.auth.admin as any).updateUserById(authUser.id, {
+        await service.auth.admin.updateUserById(authUser.id, {
           ban_duration: active ? "none" : "876000h",
           user_metadata: { system_role: systemRole, department },
         });

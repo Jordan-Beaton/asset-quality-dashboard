@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
 type WorkflowTokenRow = {
@@ -218,7 +218,7 @@ async function createTokenLink({
   fromStatus,
   toStatus,
 }: {
-  supabase: any;
+  supabase: SupabaseClient;
   request: Request;
   document: DocumentRow;
   action: string;
@@ -276,7 +276,7 @@ function tokenProblem(tokenRow: WorkflowTokenRow | null, document: DocumentRow |
 }
 
 async function writeActivity(
-  supabase: any,
+  supabase: SupabaseClient,
   document: DocumentRow,
   tokenRow: WorkflowTokenRow,
   toStatus: string,
@@ -296,7 +296,7 @@ async function writeActivity(
 }
 
 async function upsertCurrentRevisionSnapshot(
-  supabase: any,
+  supabase: SupabaseClient,
   document: DocumentRow,
   values: Record<string, string | null>
 ) {

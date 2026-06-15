@@ -207,10 +207,6 @@ export default function HseDashboardPage() {
   const [loading, setLoading] = useState(false);
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
 
-  useEffect(() => {
-    void loadDashboard();
-  }, []);
-
   async function loadDashboard() {
     setLoading(true);
     const [ainmRes, inspectionRes, actionRes, calendarRes, reportRes] = await Promise.all([
@@ -237,6 +233,10 @@ export default function HseDashboardPage() {
     setMessage(warnings.length ? `Loaded with warning: ${warnings[0]}` : "HSE dashboard ready.");
     setLoading(false);
   }
+
+  useEffect(() => {
+    void loadDashboard();
+  }, []);
 
   const availableYears = useMemo(() => {
     const years = new Set<string>();
@@ -544,7 +544,7 @@ export default function HseDashboardPage() {
             <span className="hse-live-pill" style={livePillStyle}>Live</span>
           </div>
           <div style={pressureChartWrapStyle}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <BarChart data={hseOperationalPressureData} layout="vertical" margin={{ top: 8, right: 24, left: 20, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <XAxis type="number" allowDecimals={false} />
@@ -578,7 +578,7 @@ export default function HseDashboardPage() {
       <section className="hse-story-grid" style={storyGridStyle}>
         <SectionCard title="AINM Incident / Accident Split" subtitle={`Accident versus incident profile for ${yearFilter}.`} href={buildHref("/hse/ainm", { year: yearFilter })}>
           <ChartFrame>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie data={ainmSplitData} dataKey="value" innerRadius={58} outerRadius={88} paddingAngle={3}>
                   {ainmSplitData.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
@@ -592,7 +592,7 @@ export default function HseDashboardPage() {
 
         <SectionCard title="AINM Closure Mix" subtitle="Open versus closed Accident, Incident and Near Miss records." href="/hse/ainm">
           <ChartFrame>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie data={ainmStatusData} dataKey="value" innerRadius={58} outerRadius={88} paddingAngle={3}>
                   {ainmStatusData.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
@@ -606,7 +606,7 @@ export default function HseDashboardPage() {
 
         <SectionCard title="AINM Trend" subtitle="Monthly incident and accident movement." href={buildHref("/hse/ainm", { year: yearFilter })}>
           <ChartFrame>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <LineChart data={ainmTrendData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
@@ -622,7 +622,7 @@ export default function HseDashboardPage() {
 
         <SectionCard title="Inspection Status" subtitle="Current inspection register profile." href="/hse/inspections?view=register">
           <ChartFrame>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <BarChart data={inspectionStatusData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -636,7 +636,7 @@ export default function HseDashboardPage() {
 
         <SectionCard title="HSE Action Pressure" subtitle="Department HSE action urgency." href="/hse/actions">
           <ChartFrame>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <BarChart data={actionPressureData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -652,7 +652,7 @@ export default function HseDashboardPage() {
 
         <SectionCard title="Open Actions by Person" subtitle="Who currently carries HSE action load." href="/hse/actions?view=register">
           <ChartFrame>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <BarChart data={actionOwnerData} layout="vertical" margin={{ left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" allowDecimals={false} />
@@ -666,7 +666,7 @@ export default function HseDashboardPage() {
 
         <SectionCard title="Calendar Pressure" subtitle="Recurring inspections and HSE planner items." href="/hse/calendar">
           <ChartFrame>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={280}>
               <BarChart data={calendarPressureData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
