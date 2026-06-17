@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import React, { ChangeEvent, CSSProperties, ReactNode, useEffect, useMemo, useState } from "react";
+import React, { ChangeEvent, CSSProperties, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -574,6 +574,7 @@ export default function HseAinmPage() {
   const [activeView, setActiveView] = useState<AINMView>("dashboard");
   const [detailTab, setDetailTab] = useState<DetailTab>("notification");
   const [selectedId, setSelectedId] = useState("");
+  const selectedDetailRef = useRef<HTMLDivElement | null>(null);
   const [selectedExternalId, setSelectedExternalId] = useState("");
   const [draft, setDraft] = useState<AINMRecord>(emptyRecord);
   const [externalDraft, setExternalDraft] = useState<ExternalAINMRecord>(emptyExternalRecord);
@@ -591,6 +592,8 @@ export default function HseAinmPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [stageFilter, setStageFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"" | AINMType>("");
+  const [classificationFilter, setClassificationFilter] = useState("");
   const [showRegisterFilters, setShowRegisterFilters] = useState(false);
   const [importWorkbook, setImportWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [importSheets, setImportSheets] = useState<string[]>([]);
@@ -602,6 +605,7 @@ export default function HseAinmPage() {
   const [generatingStage, setGeneratingStage] = useState("");
   const [reportTypeFilter, setReportTypeFilter] = useState<"" | "IR" | "AR">("");
   const [showReportFilters, setShowReportFilters] = useState(false);
+  const [selectedReportGroupKey, setSelectedReportGroupKey] = useState("");
   const [dashboardYear, setDashboardYear] = useState(String(new Date().getFullYear()));
   const [dashboardScope, setDashboardScope] = useState<DashboardScope>("internal");
   const [externalSearch, setExternalSearch] = useState("");
@@ -626,6 +630,14 @@ export default function HseAinmPage() {
       (selectedNumber && action.linked_ainm_number === selectedNumber)
     );
   }, [centralActions, selected?.ainm_number, selectedId]);
+
+  function selectAinmAndScroll(record: AINMRecord) {
+    setSelectedId(record.id);
+    setDraft(record);
+    window.setTimeout(() => {
+      selectedDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
   const selectedEvidence = useMemo(() => evidence.filter((file) => file.ainm_id === selectedId), [evidence, selectedId]);
   const selectedExternalEvidence = useMemo(
     () => externalEvidence.filter((file) => file.external_ainm_id === selectedExternalId),
@@ -644,6 +656,29 @@ export default function HseAinmPage() {
     });
   }, [compiledPdfReports, records, reportTypeFilter]);
 
+  const groupedCompiledPdfReports = useMemo(() => {
+    const groups = new Map<string, { record: AINMRecord | null; reports: AINMGeneratedDocument[] }>();
+    filteredCompiledPdfReports.forEach((report) => {
+      const record = records.find((item) => item.id === report.ainm_id) || null;
+      const key = report.ainm_id || report.id;
+      const current = groups.get(key) || { record, reports: [] };
+      current.record = current.record || record;
+      current.reports.push(report);
+      groups.set(key, current);
+    });
+    return [...groups.entries()]
+      .map(([key, group]) => ({
+        key,
+        ...group,
+        reports: group.reports.sort((a, b) => new Date(b.generated_at || 0).getTime() - new Date(a.generated_at || 0).getTime()),
+      }))
+      .sort((a, b) => new Date(b.reports[0]?.generated_at || 0).getTime() - new Date(a.reports[0]?.generated_at || 0).getTime());
+  }, [filteredCompiledPdfReports, records]);
+  const selectedReportGroup = useMemo(
+    () => groupedCompiledPdfReports.find((group) => group.key === selectedReportGroupKey) || null,
+    [groupedCompiledPdfReports, selectedReportGroupKey]
+  );
+
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
     return records.filter((record) => {
@@ -657,14 +692,16 @@ export default function HseAinmPage() {
       ].join(" ").toLowerCase();
       const matchesSearch = !query || haystack.includes(query);
       const matchesStatus = !statusFilter || record.overall_status === statusFilter;
+      const matchesType = !typeFilter || ainmTypeLabel(record) === typeFilter;
+      const matchesClassification = !classificationFilter || record.event_classification === classificationFilter;
       const matchesStage =
         !stageFilter ||
         record.notification_status === stageFilter ||
         record.part1_status === stageFilter ||
         record.part2_status === stageFilter;
-      return matchesSearch && matchesStatus && matchesStage;
+      return matchesSearch && matchesStatus && matchesStage && matchesType && matchesClassification;
     });
-  }, [records, search, stageFilter, statusFilter]);
+  }, [classificationFilter, records, search, stageFilter, statusFilter, typeFilter]);
 
   const filteredExternalRecords = useMemo(() => {
     const query = externalSearch.trim().toLowerCase();
@@ -749,6 +786,8 @@ export default function HseAinmPage() {
       onClick: () => {
         setStatusFilter(status);
         setStageFilter("");
+        setTypeFilter("");
+        setClassificationFilter("");
         setSearch("");
         setActiveView("register");
       },
@@ -759,9 +798,11 @@ export default function HseAinmPage() {
         value: kpis.incidents,
         color: "#2563eb",
         onClick: () => {
-          setSearch("IR");
+          setTypeFilter("Incident");
+          setSearch("");
           setStatusFilter("");
           setStageFilter("");
+          setClassificationFilter("");
           setActiveView("register");
         },
       },
@@ -770,9 +811,11 @@ export default function HseAinmPage() {
         value: kpis.accidents,
         color: "#dc2626",
         onClick: () => {
-          setSearch("AR");
+          setTypeFilter("Accident");
+          setSearch("");
           setStatusFilter("");
           setStageFilter("");
+          setClassificationFilter("");
           setActiveView("register");
         },
       },
@@ -788,9 +831,11 @@ export default function HseAinmPage() {
         value: dashboardRecords.filter((record) => record.event_classification === classification).length,
         color: "#3A9B98",
         onClick: () => {
-          setSearch(classification);
+          setClassificationFilter(classification);
+          setSearch("");
           setStatusFilter("");
           setStageFilter("");
+          setTypeFilter("");
           setActiveView("register");
         },
       }))
@@ -806,6 +851,8 @@ export default function HseAinmPage() {
           setSearch(project);
           setStatusFilter("");
           setStageFilter("");
+          setTypeFilter("");
+          setClassificationFilter("");
           setActiveView("register");
         },
       }))
@@ -826,6 +873,81 @@ export default function HseAinmPage() {
 
   const latestSummary = records[0] ? `${records[0].ainm_number} - ${records[0].title}` : "No AINMs yet";
   const [fieldQrDataUrl, setFieldQrDataUrl] = useState("");
+
+  function openRegisterWithType(type: AINMType) {
+    setTypeFilter(type);
+    setSearch("");
+    setStatusFilter("");
+    setStageFilter("");
+    setClassificationFilter("");
+    setShowRegisterFilters(true);
+    setActiveView("register");
+  }
+
+  function clearRegisterFilters() {
+    setSearch("");
+    setStatusFilter("");
+    setStageFilter("");
+    setTypeFilter("");
+    setClassificationFilter("");
+  }
+
+  function exportDashboardSummaryPdf() {
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    doc.setFillColor(58, 155, 152);
+    doc.rect(12, 12, 273, 20, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(255, 255, 255);
+    doc.text("AINM Dashboard Summary", 18, 25);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Year: ${dashboardYear || "All Years"} | Scope: ${dashboardScope} | Generated: ${new Date().toLocaleString("en-GB")}`, 190, 25);
+
+    autoTable(doc, {
+      startY: 40,
+      head: [["Metric", "Value", "Context"]],
+      body: [
+        ["Open AINMs", String(kpis.open), "Internal AINM records not closed"],
+        ["Closed AINMs", String(kpis.closed), "Internal AINM records closed"],
+        ["Incidents", String(kpis.incidents), "Incident report profile for the selected dashboard scope"],
+        ["Accidents", String(kpis.accidents), "Accident report profile for the selected dashboard scope"],
+        ["Part 1 Due", String(kpis.part1Due), "Part 1 not complete"],
+        ["Part 2 Due", String(kpis.part2Due), "Part 2 not complete"],
+        ["Compiled Report Packs", String(kpis.compiledReports), "Final compiled PDF packs generated"],
+      ],
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 3, textColor: [15, 23, 42], lineColor: [203, 213, 225], lineWidth: 0.15 },
+      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      columnStyles: { 1: { halign: "center", cellWidth: 32 } },
+      margin: { left: 12, right: 12 },
+    });
+
+    autoTable(doc, {
+      startY: pdfLastY(doc, 40) + 10,
+      head: [["Classification", "Count", "Project / Worksite", "Count"]],
+      body: Array.from({ length: Math.max(dashboardInsights.classificationRows.length, dashboardInsights.projectRows.length, 1) }).map((_, index) => [
+        dashboardInsights.classificationRows[index]?.label || "",
+        dashboardInsights.classificationRows[index]?.value ? String(dashboardInsights.classificationRows[index].value) : "",
+        dashboardInsights.projectRows[index]?.label || "",
+        dashboardInsights.projectRows[index]?.value ? String(dashboardInsights.projectRows[index].value) : "",
+      ]),
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 3, textColor: [15, 23, 42], lineColor: [203, 213, 225], lineWidth: 0.15 },
+      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      columnStyles: { 1: { halign: "center", cellWidth: 25 }, 3: { halign: "center", cellWidth: 25 } },
+      margin: { left: 12, right: 12 },
+    });
+
+    const pages = doc.getNumberOfPages();
+    for (let page = 1; page <= pages; page += 1) {
+      doc.setPage(page);
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Page ${page} of ${pages}`, 285, 202, { align: "right" });
+    }
+    doc.save(`AINM-dashboard-summary-${dashboardYear || "all-years"}.pdf`);
+  }
 
   useEffect(() => {
     void loadData();
@@ -2399,12 +2521,15 @@ export default function HseAinmPage() {
                 <option value="combined">Combined reporting</option>
               </select>
             </label>
+            <button type="button" style={primaryButtonStyle} onClick={exportDashboardSummaryPdf}>
+              Export Dashboard PDF
+            </button>
           </section>
 
           <section style={kpiGridStyle}>
             <QualityKpiCard title="Open AINMs" value={kpis.open} accent="#dc2626" onClick={() => { setStatusFilter("Open"); setActiveView("register"); }} />
-            <QualityKpiCard title="Incidents" value={kpis.incidents} accent="#2563eb" onClick={() => { setSearch("IR"); setStatusFilter(""); setStageFilter(""); setActiveView("register"); }} />
-            <QualityKpiCard title="Accidents" value={kpis.accidents} accent="#dc2626" onClick={() => { setSearch("AR"); setStatusFilter(""); setStageFilter(""); setActiveView("register"); }} />
+            <QualityKpiCard title="Incidents" value={kpis.incidents} accent="#2563eb" onClick={() => openRegisterWithType("Incident")} />
+            <QualityKpiCard title="Accidents" value={kpis.accidents} accent="#dc2626" onClick={() => openRegisterWithType("Accident")} />
             <QualityKpiCard title="Part 1 Due" value={kpis.part1Due} accent="#f59e0b" onClick={() => { setStageFilter("Draft"); setActiveView("register"); }} />
             <QualityKpiCard title="Part 2 Due" value={kpis.part2Due} accent="#7c3aed" onClick={() => { setActiveView("register"); }} />
             <QualityKpiCard title="External AINMs" value={kpis.dashboardExternalRecords.length} accent="#3A9B98" onClick={() => setActiveView("external")} />
@@ -2425,6 +2550,11 @@ export default function HseAinmPage() {
             </DashboardPanel>
 
             <DashboardPanel title="Incident vs Accident Split" subtitle="How the selected year breaks down by report type.">
+              <div style={dashboardFigureStripStyle}>
+                <MiniMetric label="Total AINMs" value={String(kpis.incidents + kpis.accidents)} />
+                <MiniMetric label="Incident %" value={`${percentage(kpis.incidents, kpis.incidents + kpis.accidents)}%`} />
+                <MiniMetric label="Accident %" value={`${percentage(kpis.accidents, kpis.incidents + kpis.accidents)}%`} />
+              </div>
               <DonutChart
                 total={kpis.incidents + kpis.accidents}
                 segments={[
@@ -2439,10 +2569,20 @@ export default function HseAinmPage() {
             </DashboardPanel>
 
             <DashboardPanel title="Workflow Completion" subtitle="Visibility of the three-stage AINM process.">
+              <div style={dashboardFigureStripStyle}>
+                <MiniMetric label="AINMs in year" value={String(dashboardInsights.total)} />
+                <MiniMetric label="Part 1 complete" value={`${percentage(dashboardInsights.workflowRows[1]?.value || 0, dashboardInsights.total)}%`} />
+                <MiniMetric label="Part 2 complete" value={`${percentage(dashboardInsights.workflowRows[2]?.value || 0, dashboardInsights.total)}%`} />
+              </div>
               <ProgressBars rows={dashboardInsights.workflowRows} total={dashboardInsights.total} />
             </DashboardPanel>
 
             <DashboardPanel title="Status Position" subtitle="Open, in progress, and closed AINMs for the selected year.">
+              <div style={dashboardFigureStripStyle}>
+                <MiniMetric label="Open" value={String(kpis.open)} />
+                <MiniMetric label="Closed" value={String(kpis.closed)} />
+                <MiniMetric label="Closure" value={`${percentage(kpis.closed, dashboardInsights.total)}%`} />
+              </div>
               <ProgressBars rows={dashboardInsights.statusRows} total={dashboardInsights.total} />
             </DashboardPanel>
 
@@ -2775,7 +2915,16 @@ export default function HseAinmPage() {
                 <option value="">All Stage Status</option>
                 {stageStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
               </select>
-              <button type="button" style={secondaryButtonStyle} onClick={() => { setSearch(""); setStatusFilter(""); setStageFilter(""); }}>Clear Filters</button>
+              <select style={filterStyle} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as "" | AINMType)}>
+                <option value="">All Report Types</option>
+                <option value="Incident">Incident</option>
+                <option value="Accident">Accident</option>
+              </select>
+              <select style={filterStyle} value={classificationFilter} onChange={(e) => setClassificationFilter(e.target.value)}>
+                <option value="">All Classifications</option>
+                {eventClassifications.map((classification) => <option key={classification} value={classification}>{classification}</option>)}
+              </select>
+              <button type="button" style={secondaryButtonStyle} onClick={clearRegisterFilters}>Clear Filters</button>
             </div>
             ) : null}
             <div style={tableInfoRowStyle}>Showing {filteredRecords.length} of {records.length} AINMs</div>
@@ -2785,6 +2934,8 @@ export default function HseAinmPage() {
                   <tr>
                     <th style={thStyle}>AINM No.</th>
                     <th style={thStyle}>Title</th>
+                    <th style={thStyle}>Type</th>
+                    <th style={thStyle}>Classification</th>
                     <th style={thStyle}>Project</th>
                     <th style={thStyle}>Event Date</th>
                     <th style={thStyle}>Notification</th>
@@ -2795,9 +2946,11 @@ export default function HseAinmPage() {
                 </thead>
                 <tbody>
                   {filteredRecords.map((record) => (
-                    <tr key={record.id} style={selectedId === record.id ? selectedRowStyle : trStyle} onClick={() => { setSelectedId(record.id); setDraft(record); }}>
+                    <tr key={record.id} style={selectedId === record.id ? selectedRowStyle : trStyle} onClick={() => selectAinmAndScroll(record)}>
                       <td style={tdStrongStyle}>{record.ainm_number}</td>
                       <td style={tdStyle}>{record.title}</td>
+                      <td style={tdStyle}>{ainmTypeLabel(record)}</td>
+                      <td style={tdStyle}>{record.event_classification || ""}</td>
                       <td style={tdStyle}>{record.project}</td>
                       <td style={tdStyle}>{displayDate(record.event_date)}</td>
                       <td style={tdStyle}><StatusPill status={record.notification_status} /></td>
@@ -2812,6 +2965,7 @@ export default function HseAinmPage() {
           </SectionCard>
 
           {selected ? (
+            <div ref={selectedDetailRef}>
             <SectionCard title={`${draft.ainm_number} - ${draft.title}`} subtitle="Open/hide style detail panel for notification, Part 1, Part 2, tracker actions, evidence, and reports.">
               <nav style={detailTabStyle}>
                 {[
@@ -3268,6 +3422,7 @@ export default function HseAinmPage() {
                 <button type="button" style={dangerButtonStyle} onClick={() => void deleteRecord(draft)}>Delete AINM</button>
               </div>
             </SectionCard>
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -3275,7 +3430,7 @@ export default function HseAinmPage() {
       {activeView === "reports" ? (
         <SectionCard title="AINM Reports" subtitle="Compiled PDF outputs only. Generate the final pack from the selected record's Reports tab.">
           <div style={toolbarStyle}>
-            <input style={searchStyle} value="" readOnly placeholder={`${filteredCompiledPdfReports.length} compiled PDF report${filteredCompiledPdfReports.length === 1 ? "" : "s"}`} />
+            <input style={searchStyle} value="" readOnly placeholder={`${groupedCompiledPdfReports.length} AINM report record${groupedCompiledPdfReports.length === 1 ? "" : "s"} / ${filteredCompiledPdfReports.length} generated PDF${filteredCompiledPdfReports.length === 1 ? "" : "s"}`} />
             <button type="button" style={showReportFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowReportFilters((current) => !current)}>
               {showReportFilters ? "Hide Filters" : "Show Filters"}
             </button>
@@ -3296,29 +3451,87 @@ export default function HseAinmPage() {
                   <th style={thStyle}>AINM No.</th>
                   <th style={thStyle}>Title</th>
                   <th style={thStyle}>Type</th>
-                  <th style={thStyle}>PDF Report</th>
-                  <th style={thStyle}>Generated</th>
-                  <th style={thStyle}>Action</th>
+                  <th style={thStyle}>Versions</th>
+                  <th style={thStyle}>Latest Generated</th>
+                  <th style={thStyle}>Latest Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredCompiledPdfReports.map((report) => {
-                  const record = records.find((item) => item.id === report.ainm_id);
+                {groupedCompiledPdfReports.map((group) => {
+                  const record = group.record;
+                  const latestReport = group.reports[0];
                   return (
-                    <tr key={report.id}>
+                    <tr
+                      key={group.key}
+                      style={selectedReportGroupKey === group.key ? selectedRowStyle : trStyle}
+                      onClick={() => setSelectedReportGroupKey(group.key)}
+                    >
                       <td style={tdStrongStyle}>{record?.ainm_number || "-"}</td>
                       <td style={tdStyle}>{record?.title || "-"}</td>
                       <td style={tdStyle}>{record?.ainm_number?.startsWith("AR") ? "Accident" : record?.ainm_number?.startsWith("IR") ? "Incident" : "-"}</td>
-                      <td style={tdStyle}>{report.file_name || "-"}</td>
-                      <td style={tdStyle}>{displayDateTime(report.generated_at)}</td>
-                      <td style={tdStyle}><button type="button" style={secondaryButtonStyle} onClick={() => void openGeneratedReport(report)}>Open PDF</button></td>
+                      <td style={tdStyle}>{group.reports.length} version{group.reports.length === 1 ? "" : "s"}</td>
+                      <td style={tdStyle}>{displayDateTime(latestReport.generated_at)}</td>
+                      <td style={tdStyle}>
+                        <button
+                          type="button"
+                          style={secondaryButtonStyle}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void openGeneratedReport(latestReport);
+                          }}
+                        >
+                          Open Latest PDF
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            {!filteredCompiledPdfReports.length ? <div style={emptyBoxStyle}>No compiled PDF reports match the current filter.</div> : null}
+            {!groupedCompiledPdfReports.length ? <div style={emptyBoxStyle}>No compiled PDF reports match the current filter.</div> : null}
           </div>
+
+          {selectedReportGroup ? (
+            <div style={reportHistoryPanelStyle}>
+              <div style={sectionHeaderStyle}>
+                <h3 style={sectionTitleStyle}>{selectedReportGroup.record?.ainm_number || "AINM"} Report Version History</h3>
+                <p style={sectionSubtitleStyle}>{selectedReportGroup.record?.title || "Generated compiled PDF versions for this AINM record."}</p>
+              </div>
+              <div style={registerTableWrapStyle}>
+                <table style={registerTableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Version</th>
+                      <th style={thStyle}>PDF File</th>
+                      <th style={thStyle}>Generated</th>
+                      <th style={thStyle}>Size</th>
+                      <th style={thStyle}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedReportGroup.reports.map((report, index) => {
+                      const versionNumber = selectedReportGroup.reports.length - index;
+                      return (
+                        <tr key={report.id}>
+                          <td style={tdStrongStyle}>Version {versionNumber}</td>
+                          <td style={tdStyle}>{report.file_name || "Compiled AINM PDF"}</td>
+                          <td style={tdStyle}>{displayDateTime(report.generated_at)}</td>
+                          <td style={tdStyle}>{formatFileSize(report.file_size)}</td>
+                          <td style={tdStyle}>
+                            <button type="button" style={primaryButtonStyle} onClick={() => void openGeneratedReport(report)}>
+                              Open PDF
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : groupedCompiledPdfReports.length ? (
+            <div style={emptyBoxStyle}>Select an AINM report row to view all generated PDF versions.</div>
+          ) : null}
         </SectionCard>
       ) : null}
     </main>
@@ -3524,6 +3737,7 @@ const sectionSubtitleStyle: CSSProperties = { margin: "4px 0 0", color: "rgba(25
 const bodyTextStyle: CSSProperties = { color: "#475569", lineHeight: 1.55, margin: 0 };
 const miniMetricStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, display: "flex", justifyContent: "space-between", marginTop: 10, color: "#0f172a" };
 const chartLegendGridStyle: CSSProperties = { display: "grid", gap: 8, marginTop: 6 };
+const dashboardFigureStripStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginBottom: 12 };
 const donutWrapStyle: CSSProperties = { display: "flex", justifyContent: "center", alignItems: "center", minHeight: 170 };
 const progressListStyle: CSSProperties = { display: "grid", gap: 12 };
 const progressRowStyle: CSSProperties = { display: "grid", gap: 7, border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" };
@@ -3635,6 +3849,13 @@ const tdStyle: CSSProperties = {
   lineHeight: 1.45,
 };
 const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#3A9B98" };
+const reportHistoryPanelStyle: CSSProperties = {
+  border: "1px solid #dbe3ef",
+  borderRadius: 16,
+  padding: 14,
+  marginTop: 16,
+  background: "#f8fafc",
+};
 const trStyle: CSSProperties = { cursor: "pointer" };
 const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ecfeff" };
 const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 900 };

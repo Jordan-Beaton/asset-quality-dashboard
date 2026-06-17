@@ -1,7 +1,7 @@
 "use client";
 
-import type { ChangeEvent, CSSProperties, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent, CSSProperties, ReactNode, RefObject } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -956,6 +956,7 @@ export default function HseInspectionsPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId);
   const [draft, setDraft] = useState<HseInspectionRecord>(() => makeDraft());
   const [selectedId, setSelectedId] = useState("");
+  const selectedDetailRef = useRef<HTMLDivElement | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [message, setMessage] = useState("Loading HSE inspections...");
@@ -1158,6 +1159,13 @@ export default function HseInspectionsPage() {
     });
     setSelectedTemplateId(record.form_id || defaultTemplateId);
     setActiveView("register");
+  }
+
+  function selectRecordAndScroll(record: HseInspectionRecord) {
+    selectRecord(record);
+    window.setTimeout(() => {
+      selectedDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
   }
 
   useEffect(() => {
@@ -1813,7 +1821,7 @@ export default function HseInspectionsPage() {
           onSearch={setSearch}
           onStatusFilter={setStatusFilter}
           onCreate={() => startCreate()}
-          onSelect={selectRecord}
+          onSelect={selectRecordAndScroll}
           onDraftChange={updateDraft}
           onPersonSelect={selectPerson}
           onChecklistChange={updateChecklist}
@@ -1828,6 +1836,7 @@ export default function HseInspectionsPage() {
           onGeneratePdfForRecord={(record) => void generatePdf(record, evidence.filter((file) => file.inspection_id === record.id))}
           linkedActions={selectedLinkedActions}
           isMobile={isMobile}
+          detailPanelRef={selectedDetailRef}
         />
       ) : null}
 
@@ -1992,6 +2001,7 @@ function RegisterView({
   onGeneratePdfForRecord,
   linkedActions,
   isMobile,
+  detailPanelRef,
 }: {
   records: HseInspectionRecord[];
   totalRecords: number;
@@ -2023,6 +2033,7 @@ function RegisterView({
   onGeneratePdfForRecord: (record: HseInspectionRecord) => void;
   linkedActions: CentralAction[];
   isMobile: boolean;
+  detailPanelRef: RefObject<HTMLDivElement | null>;
 }) {
   const [showFilters, setShowFilters] = useState(false);
 
@@ -2135,7 +2146,7 @@ function RegisterView({
         )}
       </div>
 
-      <div style={isMobile ? mobileDetailPanelStyle : detailPanelStyle}>
+      <div ref={detailPanelRef} style={isMobile ? mobileDetailPanelStyle : detailPanelStyle}>
         {!selected ? (
           <div style={emptyBoxStyle}>Select an inspection to open the detail/edit panel.</div>
         ) : (

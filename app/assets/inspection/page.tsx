@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { ImsTabs } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -58,6 +59,7 @@ type InspectionForm = {
 };
 
 type InspectionStatus = "Overdue" | "Due Soon" | "In Date" | "Not Set";
+type InspectionWorkspaceView = "dashboard" | "register" | "create";
 
 const STORAGE_BUCKET = "asset-files";
 
@@ -194,13 +196,16 @@ function InspectionPageContent() {
   const [detailForm, setDetailForm] = useState<InspectionForm>(emptyForm);
   const [assetFilter, setAssetFilter] = useState(linkedAssetParam);
   const [resultFilter, setResultFilter] = useState("");
+  const [dueStatusFilter, setDueStatusFilter] = useState<"" | InspectionStatus>("");
   const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAssetParam));
+  const [activeView, setActiveView] = useState<InspectionWorkspaceView>("dashboard");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [openingId, setOpeningId] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState("");
+  const detailPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     void loadData();
@@ -302,7 +307,8 @@ function InspectionPageContent() {
           (asset?.asset_code || "").toLowerCase() === assetFilter.toLowerCase() ||
           record.asset_id.toLowerCase() === assetFilter.toLowerCase();
         const matchesResult = !resultFilter || (record.result || "") === resultFilter;
-        return matchesAsset && matchesResult && Boolean(asset);
+        const matchesDueStatus = !dueStatusFilter || status === dueStatusFilter;
+        return matchesAsset && matchesResult && matchesDueStatus && Boolean(asset);
       })
       .sort((a, b) => {
         const rankDiff = getStatusRank(a.status) - getStatusRank(b.status);
@@ -316,11 +322,28 @@ function InspectionPageContent() {
         const bDate = b.record.inspection_date ? new Date(b.record.inspection_date).getTime() : 0;
         return bDate - aDate;
       });
-  }, [assetFilter, assetMap, records, resultFilter]);
+  }, [assetFilter, assetMap, dueStatusFilter, records, resultFilter]);
 
   const overdueCount = filteredRecords.filter((item) => item.status === "Overdue").length;
   const dueSoonCount = filteredRecords.filter((item) => item.status === "Due Soon").length;
   const latestRecord = filteredRecords[0] || null;
+
+  function scrollToDetailPanel() {
+    setTimeout(() => {
+      detailPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+  }
+
+  function applyInspectionKpiFilter(status: "" | InspectionStatus) {
+    setActiveView("register");
+    setShowRegisterFilters(true);
+    setAssetFilter("");
+    setResultFilter("");
+    setDueStatusFilter(status);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -524,15 +547,44 @@ function InspectionPageContent() {
         </div>
       </div>
 
+      <ImsTabs<InspectionWorkspaceView>
+        tabs={[
+          { value: "dashboard", label: "Dashboard" },
+          { value: "register", label: "Inspection Register" },
+          { value: "create", label: "Create Inspection" },
+        ]}
+        active={activeView}
+        onChange={setActiveView}
+        ariaLabel="Asset inspection workspace views"
+      />
+
+      {activeView === "dashboard" ? (
       <section style={attentionGridStyle}>
-        <QualityKpiCard title="Overdue" value={overdueCount} accent="#dc2626" />
-        <QualityKpiCard title="Due Soon" value={dueSoonCount} accent="#f59e0b" />
-        <QualityKpiCard title="Coverage" value={filteredRecords.length} accent="#2563eb" />
+        <QualityKpiCard
+          title="Overdue"
+          value={overdueCount}
+          accent="#dc2626"
+          onClick={() => applyInspectionKpiFilter("Overdue")}
+        />
+        <QualityKpiCard
+          title="Due Soon"
+          value={dueSoonCount}
+          accent="#f59e0b"
+          onClick={() => applyInspectionKpiFilter("Due Soon")}
+        />
+        <QualityKpiCard
+          title="Coverage"
+          value={records.length}
+          accent="#2563eb"
+          onClick={() => applyInspectionKpiFilter("")}
+        />
       </section>
+      ) : null}
         </>
       )}
 
-      <section style={isFieldMode ? fieldModeStackedGridStyle : stackedGridStyle}>
+      {(isFieldMode || activeView === "create") ? (
+      <section style={isFieldMode ? fieldModeStackedGridStyle : fullWidthSectionStyle}>
         <SectionCard
           title="Add Inspection Record"
           subtitle={
@@ -679,8 +731,10 @@ function InspectionPageContent() {
             </div>
           </form>
         </SectionCard>
+      </section>
+      ) : null}
 
-        {!isFieldMode ? (
+        {!isFieldMode && activeView === "register" ? (
           <>
         <SectionCard
           title="Filters & History"
@@ -701,6 +755,7 @@ function InspectionPageContent() {
               onClick={() => {
                 setAssetFilter("");
                 setResultFilter("");
+                setDueStatusFilter("");
               }}
             >
               Clear Filters
@@ -729,6 +784,20 @@ function InspectionPageContent() {
                   <option value="Pass with Observations">Pass with Observations</option>
                 </select>
               </Field>
+
+              <Field label="Due Status">
+                <select
+                  value={dueStatusFilter}
+                  onChange={(e) => setDueStatusFilter((e.target.value || "") as "" | InspectionStatus)}
+                  style={inputStyle}
+                >
+                  <option value="">All due statuses</option>
+                  <option value="Overdue">Overdue</option>
+                  <option value="Due Soon">Due Soon</option>
+                  <option value="In Date">In Date</option>
+                  <option value="Not Set">Not Set</option>
+                </select>
+              </Field>
             </div>
           ) : null}
 
@@ -754,6 +823,7 @@ function InspectionPageContent() {
                     onClick={() => {
                       setSelectedRecordId(record.id);
                       setDetailForm(buildInspectionForm(record));
+                      scrollToDetailPanel();
                     }}
                   >
                     <div style={historyHeaderStyle}>
@@ -867,6 +937,7 @@ function InspectionPageContent() {
           </div>
         </SectionCard>
 
+        <section ref={detailPanelRef} style={fullWidthSectionStyle}>
         <SectionCard
           title={selectedRecord ? `Inspection Detail - ${selectedRecord.inspection_number || selectedRecord.reference || "Record"}` : "Inspection Detail"}
           subtitle={
@@ -1044,9 +1115,9 @@ function InspectionPageContent() {
             </div>
           )}
         </SectionCard>
+        </section>
           </>
         ) : null}
-      </section>
     </main>
   );
 }
@@ -1213,8 +1284,12 @@ const desktopStatusBannerStyle: CSSProperties = {
 
 const attentionGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   gap: "16px",
+  marginBottom: "20px",
+};
+
+const fullWidthSectionStyle: CSSProperties = {
   marginBottom: "20px",
 };
 

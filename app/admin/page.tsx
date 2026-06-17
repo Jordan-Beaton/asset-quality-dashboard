@@ -531,8 +531,8 @@ export default function AdminDashboardPage() {
                               Save
                             </ImsButton>
                             {person.email ? (
-                              <ImsButton variant="secondary" onClick={() => postAdminAction("resetPassword", { email: person.email }, `Password reset sent to ${person.email}.`)} disabled={isSaving}>
-                                Reset Password
+                              <ImsButton variant="secondary" onClick={() => postAdminAction("resetPassword", { email: person.email }, `Password reset email sent to ${person.email}.`)} disabled={isSaving}>
+                                Send Reset Email
                               </ImsButton>
                             ) : null}
                           </div>

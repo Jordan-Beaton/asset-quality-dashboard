@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import {
   Bar,
@@ -154,6 +154,7 @@ export default function HseObservationsPage() {
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [selectedId, setSelectedId] = useState("");
+  const selectedDetailRef = useRef<HTMLDivElement | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -242,6 +243,13 @@ export default function HseObservationsPage() {
       return Boolean(action.linked_observation_number && action.linked_observation_number === selectedRecord.observation_number);
     });
   }, [actions, selectedRecord]);
+
+  function selectObservationAndScroll(id: string) {
+    setSelectedId(id);
+    window.setTimeout(() => {
+      selectedDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
   const openRecords = useMemo(() => yearRecords.filter((record) => !isClosed(record.status)), [yearRecords]);
   const highRiskRecords = useMemo(() => yearRecords.filter((record) => ["high", "immediate attention"].includes(normalise(record.risk_level))), [yearRecords]);
   const newRecords = useMemo(() => yearRecords.filter((record) => normalise(record.status) === "new"), [yearRecords]);
@@ -387,7 +395,7 @@ export default function HseObservationsPage() {
             <ImsPanel title="Latest Observations" subtitle="Most recent cards submitted through the QR form or register.">
               <div style={latestListStyle}>
                 {records.slice(0, 6).map((record) => (
-                  <button key={record.id} type="button" style={latestItemStyle} onClick={() => { setSelectedId(record.id); setActiveView("register"); }}>
+                  <button key={record.id} type="button" style={latestItemStyle} onClick={() => { setActiveView("register"); selectObservationAndScroll(record.id); }}>
                     <span>
                       <strong>{record.observation_number}</strong>
                       <small>{record.title || record.description || "Observation"}</small>
@@ -450,7 +458,7 @@ export default function HseObservationsPage() {
                 </thead>
                 <tbody>
                   {filteredRecords.map((record) => (
-                    <tr key={record.id} onClick={() => setSelectedId(record.id)} style={selectedRecord?.id === record.id ? selectedRowStyle : rowStyle}>
+                    <tr key={record.id} onClick={() => selectObservationAndScroll(record.id)} style={selectedRecord?.id === record.id ? selectedRowStyle : rowStyle}>
                       <td style={{ ...imsTableCellStyle, fontWeight: 900, color: imsColours.brandDark }}>{record.observation_number}</td>
                       <td style={imsTableCellStyle}>{record.observation_type || "-"}</td>
                       <td style={imsTableCellStyle}>{record.project || "-"}</td>
@@ -471,6 +479,7 @@ export default function HseObservationsPage() {
           </ImsPanel>
 
           {selectedRecord ? (
+            <div ref={selectedDetailRef}>
             <ObservationDetail
               record={selectedRecord}
               evidence={selectedEvidence}
@@ -481,6 +490,7 @@ export default function HseObservationsPage() {
               onDelete={deleteSelectedRecord}
               createActionHref={createActionHref}
             />
+            </div>
           ) : null}
         </section>
       ) : null}

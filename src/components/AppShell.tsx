@@ -86,7 +86,7 @@ const qualityNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/quality", label: "Dashboard", icon: "dashboard" },
   { href: "/moc", label: "MOC", icon: "moc" },
-  { href: "/ncr-capa", label: "NCR / CAPA", icon: "ncr" },
+  { href: "/ncr-capa", label: "NCR", icon: "ncr" },
   { href: "/audits", label: "Audits", icon: "audits" },
   { href: "/quality/actions", label: "Actions", icon: "actions" },
   { href: "/reports", label: "Reports", icon: "reports" },

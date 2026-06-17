@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { ImsTabs } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -54,6 +55,7 @@ type NewMaintenanceForm = {
 };
 
 type DueStatus = "Overdue" | "Due Soon" | "In Date" | "Not Set";
+type MaintenanceWorkspaceView = "dashboard" | "register" | "create";
 
 const STORAGE_BUCKET = "asset-files";
 
@@ -189,12 +191,15 @@ function MaintenancePageContent() {
   const [detailForm, setDetailForm] = useState<NewMaintenanceForm>(emptyNewMaintenance);
   const [assetFilter, setAssetFilter] = useState(linkedAssetParam);
   const [typeFilter, setTypeFilter] = useState("");
+  const [dueStatusFilter, setDueStatusFilter] = useState<"" | DueStatus>("");
   const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAssetParam));
+  const [activeView, setActiveView] = useState<MaintenanceWorkspaceView>("dashboard");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [openingId, setOpeningId] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState("");
+  const detailPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     void loadData();
@@ -291,13 +296,14 @@ function MaintenancePageContent() {
           status: getDueStatus(record.next_maintenance_due),
         };
       })
-      .filter(({ record, asset }) => {
+      .filter(({ record, asset, status }) => {
         const matchesAsset =
           !assetFilter ||
           (asset?.asset_code || "").toLowerCase() === assetFilter.toLowerCase() ||
           record.asset_id.toLowerCase() === assetFilter.toLowerCase();
         const matchesType = !typeFilter || (record.maintenance_type || "") === typeFilter;
-        return matchesAsset && matchesType && Boolean(asset);
+        const matchesDueStatus = !dueStatusFilter || status === dueStatusFilter;
+        return matchesAsset && matchesType && matchesDueStatus && Boolean(asset);
       })
       .sort((a, b) => {
         const rankDiff = getStatusRank(a.status) - getStatusRank(b.status);
@@ -311,11 +317,28 @@ function MaintenancePageContent() {
         const bDate = b.record.maintenance_date ? new Date(b.record.maintenance_date).getTime() : 0;
         return bDate - aDate;
       });
-  }, [assetFilter, assetMap, records, typeFilter]);
+  }, [assetFilter, assetMap, dueStatusFilter, records, typeFilter]);
 
   const overdueCount = filteredRecords.filter((item) => item.status === "Overdue").length;
   const dueSoonCount = filteredRecords.filter((item) => item.status === "Due Soon").length;
   const latestRecord = filteredRecords[0] || null;
+
+  function scrollToDetailPanel() {
+    setTimeout(() => {
+      detailPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+  }
+
+  function applyMaintenanceKpiFilter(status: "" | DueStatus) {
+    setActiveView("register");
+    setShowRegisterFilters(true);
+    setAssetFilter("");
+    setTypeFilter("");
+    setDueStatusFilter(status);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -519,15 +542,44 @@ function MaintenancePageContent() {
         </div>
       </div>
 
+      <ImsTabs<MaintenanceWorkspaceView>
+        tabs={[
+          { value: "dashboard", label: "Dashboard" },
+          { value: "register", label: "Maintenance Register" },
+          { value: "create", label: "Create Maintenance" },
+        ]}
+        active={activeView}
+        onChange={setActiveView}
+        ariaLabel="Asset maintenance workspace views"
+      />
+
+      {activeView === "dashboard" ? (
       <section style={attentionGridStyle}>
-        <QualityKpiCard title="Overdue" value={overdueCount} accent="#dc2626" />
-        <QualityKpiCard title="Due Soon" value={dueSoonCount} accent="#f59e0b" />
-        <QualityKpiCard title="Coverage" value={filteredRecords.length} accent="#2563eb" />
+        <QualityKpiCard
+          title="Overdue"
+          value={overdueCount}
+          accent="#dc2626"
+          onClick={() => applyMaintenanceKpiFilter("Overdue")}
+        />
+        <QualityKpiCard
+          title="Due Soon"
+          value={dueSoonCount}
+          accent="#f59e0b"
+          onClick={() => applyMaintenanceKpiFilter("Due Soon")}
+        />
+        <QualityKpiCard
+          title="Coverage"
+          value={records.length}
+          accent="#2563eb"
+          onClick={() => applyMaintenanceKpiFilter("")}
+        />
       </section>
+      ) : null}
         </>
       )}
 
-      <section style={isFieldMode ? fieldModeStackedGridStyle : stackedGridStyle}>
+      {(isFieldMode || activeView === "create") ? (
+      <section style={isFieldMode ? fieldModeStackedGridStyle : fullWidthSectionStyle}>
         <SectionCard
           title="Add Maintenance Record"
           subtitle={
@@ -685,8 +737,10 @@ function MaintenancePageContent() {
             </div>
           </form>
         </SectionCard>
+      </section>
+      ) : null}
 
-        {!isFieldMode ? (
+        {!isFieldMode && activeView === "register" ? (
           <>
         <SectionCard
           title="Filters & History"
@@ -707,6 +761,7 @@ function MaintenancePageContent() {
               onClick={() => {
                 setAssetFilter("");
                 setTypeFilter("");
+                setDueStatusFilter("");
               }}
             >
               Clear Filters
@@ -734,6 +789,20 @@ function MaintenancePageContent() {
                   <option value="Corrective">Corrective</option>
                 </select>
               </Field>
+
+              <Field label="Due Status">
+                <select
+                  value={dueStatusFilter}
+                  onChange={(e) => setDueStatusFilter((e.target.value || "") as "" | DueStatus)}
+                  style={inputStyle}
+                >
+                  <option value="">All due statuses</option>
+                  <option value="Overdue">Overdue</option>
+                  <option value="Due Soon">Due Soon</option>
+                  <option value="In Date">In Date</option>
+                  <option value="Not Set">Not Set</option>
+                </select>
+              </Field>
             </div>
           ) : null}
 
@@ -759,6 +828,7 @@ function MaintenancePageContent() {
                     onClick={() => {
                       setSelectedRecordId(record.id);
                       setDetailForm(buildMaintenanceForm(record));
+                      scrollToDetailPanel();
                     }}
                   >
                     <div style={historyHeaderStyle}>
@@ -869,6 +939,7 @@ function MaintenancePageContent() {
           </div>
         </SectionCard>
 
+        <section ref={detailPanelRef} style={fullWidthSectionStyle}>
         <SectionCard
           title={selectedRecord ? `Maintenance Detail - ${selectedRecord.maintenance_number || "Record"}` : "Maintenance Detail"}
           subtitle={
@@ -1037,9 +1108,9 @@ function MaintenancePageContent() {
             </div>
           )}
         </SectionCard>
+        </section>
           </>
         ) : null}
-      </section>
     </main>
   );
 }
@@ -1206,8 +1277,12 @@ const desktopStatusBannerStyle: CSSProperties = {
 
 const attentionGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   gap: "16px",
+  marginBottom: "20px",
+};
+
+const fullWidthSectionStyle: CSSProperties = {
   marginBottom: "20px",
 };
 

@@ -53,6 +53,7 @@ type ActionItem = {
   action_number: string | null;
   title: string | null;
   department: string | null;
+  source?: string | null;
   owner: string | null;
   priority: string | null;
   status: string | null;
@@ -110,6 +111,19 @@ function normaliseStatus(value: string | null | undefined) {
 function isClosedLikeStatus(value: string | null | undefined) {
   const status = normaliseStatus(value);
   return status === "closed" || status === "complete" || status === "completed";
+}
+
+function isQualityAction(item: ActionItem) {
+  const department = normaliseStatus(item.department);
+  const source = normaliseStatus(item.source);
+  const qualitySources = new Set(["ncr/capa", "audit finding", "moc", "quality", "manual"]);
+  const hseSources = new Set(["hse", "ainm", "hse inspection", "observation", "ptw"]);
+
+  if (department === "quality") return true;
+  if (department === "hse") return false;
+  if (hseSources.has(source)) return false;
+  if (department === "hseq" && qualitySources.has(source)) return true;
+  return qualitySources.has(source);
 }
 
 function formatDate(value: string | null | undefined) {
@@ -426,7 +440,7 @@ export default function Home() {
   const openMocs = yearMocs.filter((item) => normaliseStatus(item.status) !== "closed").length;
   const temporaryMocs = yearMocs.filter((item) => (item.change_type || "") === "Temporary").length;
   const inReviewMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "in review").length;
-  const qualityActions = yearActions.filter((item) => normaliseStatus(item.department) === "quality");
+  const qualityActions = yearActions.filter(isQualityAction);
   const openQualityActions = qualityActions.filter((item) => !isClosedLikeStatus(item.status)).length;
 
   const overdueQualityActions = qualityActions.filter((action) => {
@@ -1213,7 +1227,7 @@ export default function Home() {
             <span className="quality-live-pill" style={livePillStyle}>Live data</span>
           </div>
           <div style={pressureChartWrapStyle}>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={158}>
               <BarChart data={operationalPressureData} layout="vertical" margin={{ left: 0, right: 22, top: 6, bottom: 6 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.16)" />
                 <XAxis type="number" hide />

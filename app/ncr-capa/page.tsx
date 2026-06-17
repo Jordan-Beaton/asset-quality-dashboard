@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import * as XLSX from "xlsx";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
@@ -594,6 +594,7 @@ function NcrCapaPageContent() {
     hasRegisterQuery ? "register" : requestedWorkspaceView || "dashboard"
   );
   const [selectedRow, setSelectedRow] = useState<CombinedRow | null>(null);
+  const selectedDetailRef = useRef<HTMLDivElement | null>(null);
   const [refreshStamp, setRefreshStamp] = useState<string>("");
   const [message, setMessage] = useState("");
 
@@ -883,6 +884,13 @@ function NcrCapaPageContent() {
         (action.linked_ncr_number && action.linked_ncr_number === selectedRow.number)
     );
   }, [linkedActions, selectedRow]);
+
+  function selectRowAndScroll(row: CombinedRow) {
+    setSelectedRow(row);
+    window.setTimeout(() => {
+      selectedDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
 
   const selectedNcrPdfEvidence = useMemo(() => {
     if (!selectedRow || selectedRow.type !== "NCR") return [];
@@ -3229,7 +3237,7 @@ function NcrCapaPageContent() {
                           style={secondaryButtonSmall}
                           onClick={() => {
                             setActiveLogTab("NCR");
-                            if (matchingRow) setSelectedRow(matchingRow);
+                            if (matchingRow) selectRowAndScroll(matchingRow);
                           }}
                         >
                           Quick view
@@ -3291,7 +3299,7 @@ function NcrCapaPageContent() {
                           style={secondaryButtonSmall}
                           onClick={() => {
                             setActiveLogTab("CAPA");
-                            if (matchingRow) setSelectedRow(matchingRow);
+                            if (matchingRow) selectRowAndScroll(matchingRow);
                           }}
                         >
                           Quick view
@@ -3469,7 +3477,7 @@ function NcrCapaPageContent() {
                     <button
                       key={`${row.type}-${row.id}`}
                       type="button"
-                      onClick={() => setSelectedRow(row)}
+                      onClick={() => selectRowAndScroll(row)}
                       style={{
                         ...registerRowStyle,
                         background: active ? "#eff6ff" : "#ffffff",
@@ -3575,7 +3583,7 @@ function NcrCapaPageContent() {
         </SectionCard>
 
         {selectedRow && editRow ? (
-          <div style={sidePanelStackStyle}>
+          <div ref={selectedDetailRef} style={sidePanelStackStyle}>
             <SectionCard title="Detail Panel" subtitle="Review and update the selected record.">
               <div>
                 <div style={editHeaderStyle}>

@@ -34,6 +34,8 @@ type ActionItem = {
   id: string;
   action_number: string | null;
   title: string | null;
+  department?: string | null;
+  source?: string | null;
   owner: string | null;
   priority: string | null;
   status: string | null;
@@ -220,6 +222,19 @@ function parseDate(value: string | null | undefined) {
 function isClosedStatus(value: string | null | undefined) {
   const normal = (value || "").trim().toLowerCase();
   return normal === "closed" || normal === "complete" || normal === "completed";
+}
+
+function isQualityAction(action: ActionItem) {
+  const department = (action.department || "").trim().toLowerCase();
+  const source = (action.source || "").trim().toLowerCase();
+  const qualitySources = new Set(["ncr/capa", "audit finding", "moc", "quality", "manual"]);
+  const hseSources = new Set(["hse", "ainm", "hse inspection", "observation", "ptw"]);
+
+  if (department === "quality") return true;
+  if (department === "hse") return false;
+  if (hseSources.has(source)) return false;
+  if (department === "hseq" && qualitySources.has(source)) return true;
+  return qualitySources.has(source);
 }
 
 function isCompletedAudit(value: string | null | undefined) {
@@ -468,11 +483,12 @@ export default function ReportsPage() {
       const completedAuditIds = new Set(completedAuditsInMonth.map((audit) => audit.id));
       const findingsLinkedToCompletedAudits = auditFindings.filter((finding) => completedAuditIds.has(finding.audit_id));
 
-      const actionRowsRaisedInMonth = actions.filter((action) => isDateInMonth(action.created_at, monthIndex, year));
-      const actionRowsClosedInMonth = actions.filter(
+      const qualityActions = actions.filter(isQualityAction);
+      const actionRowsRaisedInMonth = qualityActions.filter((action) => isDateInMonth(action.created_at, monthIndex, year));
+      const actionRowsClosedInMonth = qualityActions.filter(
         (action) => isClosedStatus(action.status) && isDateInMonth(action.updated_at, monthIndex, year)
       );
-      const openActionRows = actions.filter((action) => !isClosedStatus(action.status));
+      const openActionRows = qualityActions.filter((action) => !isClosedStatus(action.status));
       const actionsDueNext30Days = actions.filter((action) => {
         if (isClosedStatus(action.status)) return false;
         const days = getDaysFromToday(action.due_date);

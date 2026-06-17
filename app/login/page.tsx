@@ -5,12 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "../../src/lib/supabase";
 
 const REDIRECT_STORAGE_KEY = "asset-quality-login-redirect";
+type LoginMode = "login" | "signup" | "forgot" | "reset";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<LoginMode>("login");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const redirectTarget = searchParams.get("redirect") || "/";
@@ -24,6 +25,19 @@ function LoginPageContent() {
       window.sessionStorage.setItem(REDIRECT_STORAGE_KEY, safeRedirectTarget);
     }
   }, [safeRedirectTarget]);
+
+  useEffect(() => {
+    const requestedRecovery =
+      searchParams.get("mode") === "recovery" ||
+      searchParams.get("type") === "recovery" ||
+      searchParams.has("code") ||
+      window.location.hash.includes("type=recovery");
+
+    if (requestedRecovery) {
+      setMode("reset");
+      setMessage("Enter a new password to complete the reset.");
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +66,47 @@ function LoginPageContent() {
         finalRedirectTarget.startsWith("/") && !finalRedirectTarget.startsWith("//")
           ? finalRedirectTarget
           : "/";
+      return;
+    }
+
+    if (mode === "forgot") {
+      const origin = window.location.origin;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${origin}/login?mode=recovery`,
+      });
+
+      if (error) {
+        setMessage(error.message);
+        setLoading(false);
+        return;
+      }
+
+      setMessage("Password reset email sent. Open the link in the email to set a new password.");
+      setLoading(false);
+      return;
+    }
+
+    if (mode === "reset") {
+      if (password.length < 8) {
+        setMessage("Please enter a new password with at least 8 characters.");
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({
+        password,
+      });
+
+      if (error) {
+        setMessage(error.message);
+        setLoading(false);
+        return;
+      }
+
+      setPassword("");
+      setMode("login");
+      setMessage("Password updated. You can now sign in with your new password.");
+      setLoading(false);
       return;
     }
 
@@ -85,10 +140,20 @@ function LoginPageContent() {
     >
       <div style={{ marginBottom: "20px" }}>
         <h1 style={{ margin: 0, fontSize: "28px", color: "#0f172a" }}>
-          {mode === "login" ? "Sign in" : "Create account"}
+          {mode === "login"
+            ? "Sign in"
+            : mode === "signup"
+            ? "Create account"
+            : mode === "forgot"
+            ? "Reset password"
+            : "Set new password"}
         </h1>
         <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: "14px" }}>
-          Asset Quality Dashboard access
+          {mode === "forgot"
+            ? "Enter your email and we will send a secure reset link."
+            : mode === "reset"
+            ? "Choose a new password for your IMS account."
+            : "Enshore IMS access"}
         </p>
       </div>
 
@@ -123,7 +188,8 @@ function LoginPageContent() {
           />
         </div>
 
-        <div>
+        {mode !== "forgot" ? (
+          <div>
           <label
             htmlFor="password"
             style={{
@@ -133,7 +199,7 @@ function LoginPageContent() {
               color: "#0f172a",
             }}
           >
-            Password
+            {mode === "reset" ? "New Password" : "Password"}
           </label>
           <input
             id="password"
@@ -151,7 +217,8 @@ function LoginPageContent() {
               boxSizing: "border-box",
             }}
           />
-        </div>
+          </div>
+        ) : null}
 
         <button
           type="submit"
@@ -171,7 +238,11 @@ function LoginPageContent() {
             ? "Please wait..."
             : mode === "login"
             ? "Sign in"
-            : "Create account"}
+            : mode === "signup"
+            ? "Create account"
+            : mode === "forgot"
+            ? "Send reset email"
+            : "Update password"}
         </button>
       </form>
 
@@ -212,8 +283,27 @@ function LoginPageContent() {
             >
               Create one
             </button>
+            <span style={{ margin: "0 8px", color: "#cbd5e1" }}>•</span>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("forgot");
+                setPassword("");
+                setMessage(null);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: "#3A9B98",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Forgot password?
+            </button>
           </>
-        ) : (
+        ) : mode === "signup" ? (
           <>
             Already have an account?{" "}
             <button
@@ -232,6 +322,28 @@ function LoginPageContent() {
               }}
             >
               Sign in
+            </button>
+          </>
+        ) : (
+          <>
+            Return to{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setPassword("");
+                setMessage(null);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: "#3A9B98",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              sign in
             </button>
           </>
         )}

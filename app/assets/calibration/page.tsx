@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { ImsTabs } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -30,6 +31,7 @@ type AssetPerson = {
 
 type CalibrationType = "Internal" | "External";
 type CalibrationStatus = "Overdue" | "Due Soon" | "In Date" | "Not Set";
+type CalibrationWorkspaceView = "dashboard" | "register" | "create";
 
 type AssetCalibrationRecord = {
   id: string;
@@ -235,6 +237,7 @@ function CalibrationPageContent() {
   const [searchFilter, setSearchFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | CalibrationStatus>("");
   const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAsset));
+  const [activeView, setActiveView] = useState<CalibrationWorkspaceView>("dashboard");
   const [isSaving, setIsSaving] = useState(false);
   const [isOpeningId, setIsOpeningId] = useState<string>("");
   const [deletingId, setDeletingId] = useState<string>("");
@@ -354,13 +357,14 @@ function CalibrationPageContent() {
   }, [assetFilter, assets, records, searchFilter, statusFilter]);
 
   const heroCounts = useMemo(() => {
+    const statusRows = records.map((record) => getCalibrationStatus(record.calibration_due_date));
     return {
-      overdue: calibrationRows.filter((row) => row.status === "Overdue").length,
-      dueSoon: calibrationRows.filter((row) => row.status === "Due Soon").length,
-      inDate: calibrationRows.filter((row) => row.status === "In Date").length,
-      total: calibrationRows.length,
+      overdue: statusRows.filter((status) => status === "Overdue").length,
+      dueSoon: statusRows.filter((status) => status === "Due Soon").length,
+      inDate: statusRows.filter((status) => status === "In Date").length,
+      total: records.length,
     };
-  }, [calibrationRows]);
+  }, [records]);
   const latestCalibrationLabel = useMemo(() => {
     const latest = [...records].sort((a, b) => {
       const aTime = new Date(a.calibration_date || a.created_at || 0).getTime();
@@ -374,6 +378,14 @@ function CalibrationPageContent() {
   }, [assets, records]);
   const overdueRows = calibrationRows.filter((row) => row.status === "Overdue").slice(0, 5);
   const dueSoonRows = calibrationRows.filter((row) => row.status === "Due Soon").slice(0, 5);
+
+  function applyCalibrationKpiFilter(status: "" | CalibrationStatus) {
+    setActiveView("register");
+    setShowRegisterFilters(true);
+    setAssetFilter("");
+    setSearchFilter("");
+    setStatusFilter(status);
+  }
 
   async function handleAddCalibration(e: React.FormEvent) {
     e.preventDefault();
@@ -500,12 +512,82 @@ function CalibrationPageContent() {
         </div>
       </div>
 
-      <section style={attentionGridStyle}>
-        <QualityKpiCard title="Overdue" value={heroCounts.overdue} accent="#dc2626" />
-        <QualityKpiCard title="Due Soon" value={heroCounts.dueSoon} accent="#f59e0b" />
-        <QualityKpiCard title="Coverage" value={heroCounts.total} accent="#2563eb" />
-      </section>
+      <ImsTabs<CalibrationWorkspaceView>
+        tabs={[
+          { value: "dashboard", label: "Dashboard" },
+          { value: "register", label: "Calibration Register" },
+          { value: "create", label: "Create Calibration" },
+        ]}
+        active={activeView}
+        onChange={setActiveView}
+        ariaLabel="Asset calibration workspace views"
+      />
 
+      {activeView === "dashboard" ? (
+      <>
+      <section style={attentionGridStyle}>
+        <QualityKpiCard
+          title="Overdue"
+          value={heroCounts.overdue}
+          accent="#dc2626"
+          onClick={() => applyCalibrationKpiFilter("Overdue")}
+        />
+        <QualityKpiCard
+          title="Due Soon"
+          value={heroCounts.dueSoon}
+          accent="#f59e0b"
+          onClick={() => applyCalibrationKpiFilter("Due Soon")}
+        />
+        <QualityKpiCard
+          title="Coverage"
+          value={heroCounts.total}
+          accent="#2563eb"
+          onClick={() => applyCalibrationKpiFilter("")}
+        />
+      </section>
+      <section style={twoColumnGridStyle}>
+        <SectionCard
+          title="Overdue Watchlist"
+          subtitle="Urgent calibration items that need immediate attention."
+        >
+          {overdueRows.length === 0 ? (
+            <div style={helperTextStyle}>No overdue calibration items.</div>
+          ) : (
+            overdueRows.map((row) => (
+              <div key={row.id} style={watchlistItemStyle}>
+                <div style={watchlistItemTitleStyle}>{row.asset?.asset_code || "Unassigned"}</div>
+                <div style={watchlistItemMetaStyle}>
+                  {row.asset?.name || row.record.serial_number || "Unknown item"} • Due{" "}
+                  {formatDate(row.record.calibration_due_date)}
+                </div>
+              </div>
+            ))
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Due Soon"
+          subtitle="Calibration records coming due in the next 30 days."
+        >
+          {dueSoonRows.length === 0 ? (
+            <div style={helperTextStyle}>No due-soon calibration items.</div>
+          ) : (
+            dueSoonRows.map((row) => (
+              <div key={row.id} style={watchlistItemStyle}>
+                <div style={watchlistItemTitleStyle}>{row.asset?.asset_code || "Unassigned"}</div>
+                <div style={watchlistItemMetaStyle}>
+                  {row.asset?.name || row.record.serial_number || "Unknown item"} • Due{" "}
+                  {formatDate(row.record.calibration_due_date)}
+                </div>
+              </div>
+            ))
+          )}
+        </SectionCard>
+      </section>
+      </>
+      ) : null}
+
+      {activeView === "create" ? (
       <section style={twoColumnGridStyle}>
         <SectionCard
           title="Add Calibration Record"
@@ -687,9 +769,13 @@ function CalibrationPageContent() {
             </div>
           </form>
         </SectionCard>
+      </section>
+      ) : null}
 
+      {activeView === "register" ? (
+      <>
         <SectionCard
-          title="Watchlist & Filters"
+          title="Calibration Register Filters"
           subtitle="Review urgent calibration items first, then narrow the combined log by asset, serial number, certificate number, or calibration status."
         >
           <div style={watchlistWrapStyle}>
@@ -796,7 +882,6 @@ function CalibrationPageContent() {
             </div>
           </div>
         </SectionCard>
-      </section>
 
       <SectionCard
         title="Calibration Register"
@@ -884,6 +969,8 @@ function CalibrationPageContent() {
           </table>
         </div>
       </SectionCard>
+      </>
+      ) : null}
     </main>
   );
 }

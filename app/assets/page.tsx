@@ -6,12 +6,14 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import QRCode from "qrcode";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
+import { ImsTabs } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
 type AssetStatus = "Active" | "Inactive" | "Quarantine" | "Under Maintenance";
+type AssetWorkspaceView = "dashboard" | "register" | "create" | "reports";
 
 type Asset = {
   id: string;
@@ -439,6 +441,8 @@ function AssetsPageContent() {
   const [statusFilter, setStatusFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
+  const [qualityLinkedFilter, setQualityLinkedFilter] = useState(false);
+  const [activeView, setActiveView] = useState<AssetWorkspaceView>("dashboard");
   const [showRegisterFilters, setShowRegisterFilters] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(true);
@@ -716,7 +720,12 @@ function AssetsPageContent() {
     setStatusFilter(linkedStatus);
     setLocationFilter(linkedLocation);
     setOwnerFilter(linkedOwner);
-  }, [linkedSearch, linkedStatus, linkedLocation, linkedOwner]);
+
+    if (linkedSearch || linkedStatus || linkedLocation || linkedOwner || qualityLinkedOnly) {
+      setActiveView("register");
+      setShowRegisterFilters(true);
+    }
+  }, [linkedSearch, linkedStatus, linkedLocation, linkedOwner, qualityLinkedOnly]);
 
   useEffect(() => {
     if (assets.length === 0) return;
@@ -731,6 +740,7 @@ function AssetsPageContent() {
       assets.find((asset) => Boolean(linkedAssetId) && asset.id === linkedAssetId);
 
     if (matchedAsset) {
+      setActiveView("register");
       setSelectedAssetId(matchedAsset.id);
       setIsDetailPanelOpen(true);
     }
@@ -787,13 +797,22 @@ function AssetsPageContent() {
       result = result.filter((a) => a.owner === ownerFilter);
     }
 
-    if (qualityLinkedOnly) {
+    if (qualityLinkedOnly || qualityLinkedFilter) {
       const linkedIds = new Set(qualityLinkedAssetIds);
       result = result.filter((asset) => linkedIds.has(asset.id));
     }
 
     return result;
-  }, [assets, search, statusFilter, locationFilter, ownerFilter, qualityLinkedOnly, qualityLinkedAssetIds]);
+  }, [
+    assets,
+    search,
+    statusFilter,
+    locationFilter,
+    ownerFilter,
+    qualityLinkedOnly,
+    qualityLinkedFilter,
+    qualityLinkedAssetIds,
+  ]);
 
   const deepLinkedAssetId = useMemo(() => {
     if (!assets.length) return "";
@@ -1150,7 +1169,9 @@ function AssetsPageContent() {
     const newAsset = data as Asset;
 
     setAssets((prev) => [...prev, newAsset].sort((a, b) => compareText(a.name || "", b.name || "")));
+    setActiveView("register");
     setSelectedAssetId(newAsset.id);
+    setIsDetailPanelOpen(true);
     setForm(emptyForm);
 
     const { error: qualityError } = await supabase.from("asset_quality").upsert(
@@ -1894,6 +1915,17 @@ function AssetsPageContent() {
     setStatusFilter("");
     setLocationFilter("");
     setOwnerFilter("");
+    setQualityLinkedFilter(false);
+  }
+
+  function applyAssetKpiFilter(next: { status?: string; qualityLinked?: boolean }) {
+    setActiveView("register");
+    setShowRegisterFilters(true);
+    setSearch("");
+    setLocationFilter("");
+    setOwnerFilter("");
+    setStatusFilter(next.status || "");
+    setQualityLinkedFilter(Boolean(next.qualityLinked));
   }
 
   return (
@@ -1918,15 +1950,58 @@ function AssetsPageContent() {
         </div>
       </div>
 
+      <ImsTabs<AssetWorkspaceView>
+        tabs={[
+          { value: "dashboard", label: "Dashboard" },
+          { value: "register", label: "Asset Register" },
+          { value: "create", label: "Create Asset" },
+          { value: "reports", label: "Reports" },
+        ]}
+        active={activeView}
+        onChange={setActiveView}
+        ariaLabel="Asset workspace views"
+      />
+
+      {activeView === "dashboard" ? (
+        <>
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Total Assets" value={totalAssets} accent="#3A9B98" />
-        <QualityKpiCard title="Active Assets" value={activeAssets} accent="#16a34a" />
-        <QualityKpiCard title="Under Maintenance" value={underMaintenanceAssets} accent="#d97706" />
-        <QualityKpiCard title="Quality Linked" value={qualityLinkedAssets} accent="#2563eb" />
+        <QualityKpiCard
+          title="Total Assets"
+          value={totalAssets}
+          accent="#3A9B98"
+          onClick={() => applyAssetKpiFilter({})}
+        />
+        <QualityKpiCard
+          title="Active Assets"
+          value={activeAssets}
+          accent="#16a34a"
+          onClick={() => applyAssetKpiFilter({ status: "Active" })}
+        />
+        <QualityKpiCard
+          title="Under Maintenance"
+          value={underMaintenanceAssets}
+          accent="#d97706"
+          onClick={() => applyAssetKpiFilter({ status: "Under Maintenance" })}
+        />
+        <QualityKpiCard
+          title="Quality Linked"
+          value={qualityLinkedAssets}
+          accent="#2563eb"
+          onClick={() => applyAssetKpiFilter({ qualityLinked: true })}
+        />
         <QualityKpiCard
           title="Action Needed"
           value={overdueInspectionAssets + overdueMaintenanceAssets}
           accent="#dc2626"
+          onClick={() => {
+            setActiveView("dashboard");
+            setTimeout(() => {
+              document.getElementById("asset-workload-panel")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            }, 80);
+          }}
         />
       </section>
 
@@ -1950,8 +2025,12 @@ function AssetsPageContent() {
           tone="blue"
         />
       </section>
+        </>
+      ) : null}
 
-      <section style={topGridStyle}>
+      {activeView === "create" || activeView === "dashboard" ? (
+      <section style={activeView === "create" ? fullWidthSectionStyle : dashboardPanelsGridStyle}>
+        {activeView === "create" ? (
         <SectionCard
           title="Add Asset"
           subtitle="Create one asset record directly into the live register without leaving the module workspace."
@@ -2105,7 +2184,9 @@ function AssetsPageContent() {
             </div>
           </form>
         </SectionCard>
+        ) : null}
 
+        {activeView === "dashboard" ? (
         <SectionCard
           title="Operational Snapshot"
           subtitle="Quick cue for linked quality coverage and how the workspace should be used."
@@ -2143,8 +2224,51 @@ function AssetsPageContent() {
             still editing everything from one controlled page.
           </div>
         </SectionCard>
-      </section>
+        ) : null}
 
+        {activeView === "dashboard" ? (
+        <SectionCard
+          title="Asset Workload"
+          subtitle="Live operational pressure across inspections, maintenance, and asset record coverage."
+          id="asset-workload-panel"
+        >
+          <div style={assetWorkloadGridStyle}>
+            <MiniMetricCard
+              label="Inspection Overdue"
+              value={overdueInspectionAssets}
+              tone="#991b1b"
+              bg="#fee2e2"
+            />
+            <MiniMetricCard
+              label="Inspection Due Soon"
+              value={dueSoonInspectionAssets}
+              tone="#92400e"
+              bg="#fef3c7"
+            />
+            <MiniMetricCard
+              label="Maintenance Overdue"
+              value={overdueMaintenanceAssets}
+              tone="#991b1b"
+              bg="#fee2e2"
+            />
+            <MiniMetricCard
+              label="Maintenance Due Soon"
+              value={dueSoonMaintenanceAssets}
+              tone="#92400e"
+              bg="#fef3c7"
+            />
+          </div>
+
+          <div style={qualityIntroBoxStyle}>
+            Use the Asset Register tab for the live working panel. Create Asset is now separated so the
+            dashboard stays focused on management visibility.
+          </div>
+        </SectionCard>
+        ) : null}
+      </section>
+      ) : null}
+
+      {activeView === "register" ? (
       <section style={fullWidthSectionStyle}>
         <SectionCard
           title="Asset Register"
@@ -2250,6 +2374,12 @@ function AssetsPageContent() {
                     onClick={() => {
                       setSelectedAssetId(asset.id);
                       setIsDetailPanelOpen(true);
+                      setTimeout(() => {
+                        detailPanelRef.current?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        });
+                      }, 80);
                     }}
                     style={{
                       ...registerRowStyle,
@@ -2294,8 +2424,9 @@ function AssetsPageContent() {
           </div>
         </SectionCard>
       </section>
+      ) : null}
 
-      {isDetailPanelOpen ? (
+      {activeView === "register" && isDetailPanelOpen ? (
         <section ref={detailPanelRef} style={detailPanelSectionStyle}>
           <SectionCard
             title="Asset Detail"
@@ -3149,6 +3280,54 @@ function AssetsPageContent() {
         </SectionCard>
         </section>
       ) : null}
+
+      {activeView === "reports" ? (
+        <section style={fullWidthSectionStyle}>
+          <SectionCard
+            title="Asset Reports"
+            subtitle="Asset reporting outputs are kept separate from the live register workspace."
+          >
+            <div style={reportsGridStyle}>
+              <MiniMetricCard
+                label="Assets in Register"
+                value={totalAssets}
+                tone="#0f766e"
+                bg="#ecfeff"
+              />
+              <MiniMetricCard
+                label="Inspection Watch"
+                value={overdueInspectionAssets + dueSoonInspectionAssets}
+                tone="#991b1b"
+                bg="#fee2e2"
+              />
+              <MiniMetricCard
+                label="Maintenance Watch"
+                value={overdueMaintenanceAssets + dueSoonMaintenanceAssets}
+                tone="#92400e"
+                bg="#fef3c7"
+              />
+              <MiniMetricCard
+                label="Linked Actions"
+                value={qualitySnapshotData.find((item) => item.name === "Actions")?.value || 0}
+                tone="#1d4ed8"
+                bg="#dbeafe"
+              />
+            </div>
+
+            <div style={qualityIntroBoxStyle}>
+              Monthly asset management reporting remains available from the dedicated Asset Reports area.
+              This tab keeps the main asset workspace aligned with the Quality and HSE module layout while
+              avoiding changes to existing report generation.
+            </div>
+
+            <div style={buttonRowStyle}>
+              <Link href="/assets/reports" style={reportLinkButtonStyle}>
+                Open Asset Reports
+              </Link>
+            </div>
+          </SectionCard>
+        </section>
+      ) : null}
     </main>
   );
 }
@@ -3157,13 +3336,15 @@ function SectionCard({
   title,
   subtitle,
   children,
+  id,
   }: {
     title: string;
     subtitle?: string;
     children: ReactNode;
+    id?: string;
   }) {
     return (
-      <section style={panelStyle}>
+      <section id={id} style={panelStyle}>
         <ModuleSectionHeader title={title} subtitle={subtitle} />
         {children}
       </section>
@@ -3517,15 +3698,22 @@ const assetAttentionGridStyle: CSSProperties = {
   marginBottom: "20px",
 };
 
-const topGridStyle: CSSProperties = {
+const dashboardPanelsGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1.1fr 0.9fr",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: "20px",
   marginBottom: "20px",
 };
 
 const fullWidthSectionStyle: CSSProperties = {
   marginBottom: "20px",
+};
+
+const reportsGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: "12px",
+  marginBottom: "14px",
 };
 
 const detailPanelSectionStyle: CSSProperties = {
@@ -3733,6 +3921,13 @@ const reportLinkButtonStyle: CSSProperties = {
 };
 
 const qualityOverviewGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "12px",
+  marginBottom: "14px",
+};
+
+const assetWorkloadGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: "12px",

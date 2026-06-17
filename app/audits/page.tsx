@@ -680,6 +680,7 @@ function AuditsPageContent() {
   const [selectedNcrToAdd, setSelectedNcrToAdd] = useState("");
   const [selectedActionToAdd, setSelectedActionToAdd] = useState("");
   const programmeSectionRef = useRef<HTMLDivElement | null>(null);
+  const auditDetailPanelRef = useRef<HTMLDivElement | null>(null);
   const openFindingEditPanelRef = useRef<HTMLDivElement | null>(null);
 
   const computedAuditNumber = useMemo(
@@ -1397,6 +1398,16 @@ function AuditsPageContent() {
         block: "start",
       });
     }, 0);
+  }
+
+  function selectAuditAndScroll(auditId: string) {
+    setSelectedAuditId(auditId);
+    window.setTimeout(() => {
+      auditDetailPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
   }
 
   function hideOpenFindingPanel() {
@@ -3883,7 +3894,7 @@ function AuditsPageContent() {
                   <button
                     key={audit.id}
                     type="button"
-                    onClick={() => setSelectedAuditId(audit.id)}
+                    onClick={() => selectAuditAndScroll(audit.id)}
                     style={{
                       ...programmeRowStyle,
                       background: active ? "#eff6ff" : linkedMatch ? "#ecfeff" : "#ffffff",
@@ -3931,8 +3942,9 @@ function AuditsPageContent() {
         </SectionCard>
 
         {selectedAudit ? (
-          <SectionCard title="Audit Detail" subtitle="Editable workspace for the selected audit.">
-            <div style={detailWorkspaceStyle}>
+          <div ref={auditDetailPanelRef}>
+            <SectionCard title="Audit Detail" subtitle="Editable workspace for the selected audit.">
+              <div style={detailWorkspaceStyle}>
               <div style={detailTopBarStyle}>
                 <div>
                   <div style={detailAuditNumberStyle}>{selectedAudit.audit_number}</div>
@@ -4573,6 +4585,7 @@ function AuditsPageContent() {
               </div>
             </div>
           </SectionCard>
+          </div>
         ) : null}
       </section>
       ) : null}
