@@ -35,6 +35,7 @@ export const dynamic = "force-dynamic";
 type AINMView = "dashboard" | "register" | "create" | "external" | "import" | "reports";
 type DetailTab = "notification" | "part1" | "part2" | "actions" | "evidence" | "reports";
 type AINMType = "Incident" | "Accident";
+type NewAINMType = "" | AINMType;
 type DashboardScope = "internal" | "external" | "combined";
 type StageStatus = "Not Started" | "Draft" | "Issued" | "Complete";
 type OverallStatus = "Open" | "In Progress" | "Closed";
@@ -585,7 +586,7 @@ export default function HseAinmPage() {
     { name: "", company: "", position: "", role: "" },
   ]);
   const [newRecord, setNewRecord] = useState<AINMRecord>(emptyRecord);
-  const [newAinmType, setNewAinmType] = useState<AINMType>("Incident");
+  const [newAinmType, setNewAinmType] = useState<NewAINMType>("");
   const [message, setMessage] = useState("Loading AINM records...");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -997,7 +998,7 @@ export default function HseAinmPage() {
   }, [selectedExternal]);
 
   useEffect(() => {
-    setNewRecord((current) => ({ ...current, ainm_number: getNextAinmNumber(records, newAinmType) }));
+    setNewRecord((current) => ({ ...current, ainm_number: newAinmType ? getNextAinmNumber(records, newAinmType) : "" }));
   }, [newAinmType, records]);
 
   useEffect(() => {
@@ -1237,6 +1238,10 @@ export default function HseAinmPage() {
   }
 
   async function createAINM() {
+    if (!newAinmType) {
+      setMessage("Select AINM type before creating the record.");
+      return;
+    }
     if (!newRecord.ainm_number.trim() || !newRecord.title.trim()) {
       setMessage("AINM No. and title are required.");
       return;
@@ -1253,7 +1258,8 @@ export default function HseAinmPage() {
       return;
     }
     setMessage(`Created ${newRecord.ainm_number}.`);
-    setNewRecord({ ...emptyRecord, ainm_number: getNextAinmNumber(records, newAinmType) });
+    setNewAinmType("");
+    setNewRecord({ ...emptyRecord, ainm_number: "" });
     setSelectedId((data as AINMRecord).id);
     setActiveView("register");
     await loadData();
@@ -2551,9 +2557,9 @@ export default function HseAinmPage() {
 
             <DashboardPanel title="Incident vs Accident Split" subtitle="How the selected year breaks down by report type.">
               <div style={dashboardFigureStripStyle}>
-                <MiniMetric label="Total AINMs" value={String(kpis.incidents + kpis.accidents)} />
-                <MiniMetric label="Incident %" value={`${percentage(kpis.incidents, kpis.incidents + kpis.accidents)}%`} />
-                <MiniMetric label="Accident %" value={`${percentage(kpis.accidents, kpis.incidents + kpis.accidents)}%`} />
+                <MiniMetric label="Total" value={String(kpis.incidents + kpis.accidents)} />
+                <MiniMetric label="Incidents" value={`${kpis.incidents} / ${percentage(kpis.incidents, kpis.incidents + kpis.accidents)}%`} />
+                <MiniMetric label="Accidents" value={`${kpis.accidents} / ${percentage(kpis.accidents, kpis.incidents + kpis.accidents)}%`} />
               </div>
               <DonutChart
                 total={kpis.incidents + kpis.accidents}
@@ -2570,9 +2576,9 @@ export default function HseAinmPage() {
 
             <DashboardPanel title="Workflow Completion" subtitle="Visibility of the three-stage AINM process.">
               <div style={dashboardFigureStripStyle}>
-                <MiniMetric label="AINMs in year" value={String(dashboardInsights.total)} />
-                <MiniMetric label="Part 1 complete" value={`${percentage(dashboardInsights.workflowRows[1]?.value || 0, dashboardInsights.total)}%`} />
-                <MiniMetric label="Part 2 complete" value={`${percentage(dashboardInsights.workflowRows[2]?.value || 0, dashboardInsights.total)}%`} />
+                <MiniMetric label="AINMs" value={String(dashboardInsights.total)} />
+                <MiniMetric label="Part 1" value={`${dashboardInsights.workflowRows[1]?.value || 0} / ${percentage(dashboardInsights.workflowRows[1]?.value || 0, dashboardInsights.total)}%`} />
+                <MiniMetric label="Part 2" value={`${dashboardInsights.workflowRows[2]?.value || 0} / ${percentage(dashboardInsights.workflowRows[2]?.value || 0, dashboardInsights.total)}%`} />
               </div>
               <ProgressBars rows={dashboardInsights.workflowRows} total={dashboardInsights.total} />
             </DashboardPanel>
@@ -2613,7 +2619,12 @@ export default function HseAinmPage() {
         <SectionCard title="Create AINM" subtitle="Start the record first, then complete Notification, Part 1, Part 2, actions, and evidence from the register detail panel.">
           <div style={formGridStyle}>
             <Field label="AINM Type">
-              <select style={inputStyle} value={newAinmType} onChange={(event) => setNewAinmType(event.target.value as AINMType)}>
+              <select
+                style={newAinmType ? inputStyle : { ...inputStyle, color: "#94a3b8" }}
+                value={newAinmType}
+                onChange={(event) => setNewAinmType(event.target.value as NewAINMType)}
+              >
+                <option value="" disabled>Select Type</option>
                 <option value="Incident">Incident Report</option>
                 <option value="Accident">Accident Report</option>
               </select>
@@ -3616,7 +3627,12 @@ function DashboardPanel({ title, subtitle, children }: { title: string; subtitle
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
-  return <div style={miniMetricStyle}><span>{label}</span><strong>{value}</strong></div>;
+  return (
+    <div style={miniMetricStyle}>
+      <span style={miniMetricLabelStyle}>{label}</span>
+      <strong style={miniMetricValueStyle}>{value}</strong>
+    </div>
+  );
 }
 
 function ProgressBars({
@@ -3735,9 +3751,33 @@ const sectionHeaderStyle: CSSProperties = { background: "#3A9B98", borderRadius:
 const sectionTitleStyle: CSSProperties = { margin: 0, color: "white", fontSize: 18 };
 const sectionSubtitleStyle: CSSProperties = { margin: "4px 0 0", color: "rgba(255,255,255,0.82)", fontSize: 13 };
 const bodyTextStyle: CSSProperties = { color: "#475569", lineHeight: 1.55, margin: 0 };
-const miniMetricStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, display: "flex", justifyContent: "space-between", marginTop: 10, color: "#0f172a" };
+const miniMetricStyle: CSSProperties = {
+  border: "1px solid #dbe3ef",
+  borderRadius: 12,
+  padding: "12px 14px",
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr)",
+  gap: 6,
+  alignContent: "center",
+  minHeight: 66,
+  color: "#0f172a",
+  background: "#ffffff",
+};
+const miniMetricLabelStyle: CSSProperties = {
+  color: "#475569",
+  fontSize: 12,
+  fontWeight: 800,
+  lineHeight: 1.2,
+};
+const miniMetricValueStyle: CSSProperties = {
+  color: "#0f172a",
+  fontSize: 20,
+  fontWeight: 900,
+  lineHeight: 1.1,
+  whiteSpace: "nowrap",
+};
 const chartLegendGridStyle: CSSProperties = { display: "grid", gap: 8, marginTop: 6 };
-const dashboardFigureStripStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginBottom: 12 };
+const dashboardFigureStripStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 14 };
 const donutWrapStyle: CSSProperties = { display: "flex", justifyContent: "center", alignItems: "center", minHeight: 170 };
 const progressListStyle: CSSProperties = { display: "grid", gap: 12 };
 const progressRowStyle: CSSProperties = { display: "grid", gap: 7, border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" };
