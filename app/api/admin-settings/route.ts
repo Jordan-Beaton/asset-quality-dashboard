@@ -186,13 +186,26 @@ export async function POST(request: Request) {
       const name = cleanText(payload.name);
       const role = cleanText(payload.system_role) || "Viewer";
       const department = cleanText(payload.department);
+      const permissionOverride = cleanText(payload.permission_override) || "Role Default";
+      const moduleAccessPayload = {
+        quality_access: cleanText(payload.quality_access) || null,
+        hse_access: cleanText(payload.hse_access) || null,
+        asset_access: cleanText(payload.asset_access) || null,
+        risk_access: cleanText(payload.risk_access) || null,
+        document_access: cleanText(payload.document_access) || null,
+        action_access: cleanText(payload.action_access) || null,
+        admin_access: cleanText(payload.admin_access) || null,
+      };
 
       if (!email || !name) {
         return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
       }
 
+      const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
+
       const inviteResult = await service.auth.admin.inviteUserByEmail(email, {
         data: { name, system_role: role, department },
+        redirectTo: origin ? `${origin}/login?mode=invite` : undefined,
       });
 
       if (inviteResult.error) {
@@ -206,6 +219,19 @@ export async function POST(request: Request) {
         department: department || null,
         system_role: role,
         access_status: "Invited",
+        permissions_notes: cleanText(payload.permissions_notes) || null,
+        permission_override: email === MASTER_ADMIN_EMAIL ? "Full System Access" : permissionOverride,
+        ...(email === MASTER_ADMIN_EMAIL
+          ? {
+              quality_access: "Full",
+              hse_access: "Full",
+              asset_access: "Full",
+              risk_access: "Full",
+              document_access: "Full",
+              action_access: "Full",
+              admin_access: "Full",
+            }
+          : moduleAccessPayload),
         active: true,
         is_master_admin: email === MASTER_ADMIN_EMAIL,
       };

@@ -228,6 +228,15 @@ export default function AdminDashboardPage() {
     job_role: "",
     department: "",
     system_role: "Viewer",
+    permission_override: "Role Default",
+    quality_access: "Role Default",
+    document_access: "Role Default",
+    hse_access: "Role Default",
+    asset_access: "Role Default",
+    risk_access: "Role Default",
+    action_access: "Role Default",
+    admin_access: "Role Default",
+    permissions_notes: "",
   });
   const [companyForm, setCompanyForm] = useState<CompanySettings>(initialCompany);
   const [newDepartment, setNewDepartment] = useState({ name: "", code: "" });
@@ -339,7 +348,22 @@ export default function AdminDashboardPage() {
   async function inviteUser() {
     const ok = await postAdminAction("inviteUser", inviteForm, `${inviteForm.name || "User"} invited successfully.`);
     if (ok) {
-      setInviteForm({ name: "", email: "", job_role: "", department: "", system_role: "Viewer" });
+      setInviteForm({
+        name: "",
+        email: "",
+        job_role: "",
+        department: "",
+        system_role: "Viewer",
+        permission_override: "Role Default",
+        quality_access: "Role Default",
+        document_access: "Role Default",
+        hse_access: "Role Default",
+        asset_access: "Role Default",
+        risk_access: "Role Default",
+        action_access: "Role Default",
+        admin_access: "Role Default",
+        permissions_notes: "",
+      });
     }
   }
 
@@ -436,7 +460,7 @@ export default function AdminDashboardPage() {
 
       {activeView === "users" ? (
         <section style={{ display: "grid", gap: "18px" }}>
-          <ImsPanel title="Invite New User" subtitle="Creates a Supabase invite and a linked People Management record.">
+          <ImsPanel title="Invite New User" subtitle="Create the People record, assign access, and send the password setup invite in one step.">
             <div style={formGridStyle}>
               <Field label="Name">
                 <input value={inviteForm.name} onChange={(event) => setInviteForm({ ...inviteForm, name: event.target.value })} style={imsInputStyle} placeholder="e.g. Peter Ridley" />
@@ -454,12 +478,99 @@ export default function AdminDashboardPage() {
                 </SelectField>
               </Field>
               <Field label="System Role">
-                <SelectField value={inviteForm.system_role} onChange={(value) => setInviteForm({ ...inviteForm, system_role: value })}>
+                <SelectField
+                  value={inviteForm.system_role}
+                  onChange={(value) => {
+                    const contractor = value === "Contractor";
+                    setInviteForm({
+                      ...inviteForm,
+                      system_role: value,
+                      ...(contractor
+                        ? {
+                            permission_override: "Custom",
+                            quality_access: "None",
+                            document_access: "None",
+                            hse_access: "Observe",
+                            asset_access: "None",
+                            risk_access: "None",
+                            action_access: "Read",
+                            admin_access: "None",
+                            permissions_notes: "Contractor access tailored for HSE observations/AINM only.",
+                          }
+                        : {}),
+                    });
+                  }}
+                >
                   {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
                 </SelectField>
               </Field>
-              <div style={{ display: "flex", alignItems: "end" }}>
-                <ImsButton onClick={inviteUser} disabled={isSaving}>Invite User</ImsButton>
+            </div>
+
+            <div style={{ ...permissionGridStyle, marginTop: 14, borderTop: `1px solid ${imsColours.border}`, paddingTop: 14 }}>
+              <Field label="Permission Override">
+                <SelectField
+                  value={inviteForm.permission_override}
+                  onChange={(value) => {
+                    const full = value === "Full System Access";
+                    const readOnly = value === "Read Only";
+                    setInviteForm({
+                      ...inviteForm,
+                      permission_override: value,
+                      ...(full
+                        ? {
+                            quality_access: "Full",
+                            document_access: "Full",
+                            hse_access: "Full",
+                            asset_access: "Full",
+                            risk_access: "Full",
+                            action_access: "Full",
+                            admin_access: "Full",
+                          }
+                        : readOnly
+                        ? {
+                            quality_access: "Read",
+                            document_access: "Read",
+                            hse_access: "Read",
+                            asset_access: "Read",
+                            risk_access: "Read",
+                            action_access: "Read",
+                            admin_access: "None",
+                          }
+                        : {}),
+                    });
+                  }}
+                >
+                  {permissionOverrideOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </SelectField>
+              </Field>
+              {[
+                ["Quality", "quality_access"],
+                ["Documents", "document_access"],
+                ["HSE", "hse_access"],
+                ["Assets", "asset_access"],
+                ["Risk", "risk_access"],
+                ["Actions", "action_access"],
+                ["Admin", "admin_access"],
+              ].map(([label, key]) => (
+                <Field key={key} label={label}>
+                  <SelectField
+                    value={String((inviteForm as Record<string, string>)[key])}
+                    onChange={(value) => setInviteForm({ ...inviteForm, [key]: value })}
+                  >
+                    {moduleAccessOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </SelectField>
+                </Field>
+              ))}
+              <Field label="Access Notes" style={{ gridColumn: "1 / -1" }}>
+                <textarea
+                  value={inviteForm.permissions_notes}
+                  onChange={(event) => setInviteForm({ ...inviteForm, permissions_notes: event.target.value })}
+                  style={{ ...imsInputStyle, minHeight: 72 }}
+                  placeholder="Reason for custom access, e.g. contractor can log HSE observations and AINM only."
+                />
+              </Field>
+              <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
+                <ImsButton onClick={inviteUser} disabled={isSaving}>Send Invite Link</ImsButton>
               </div>
             </div>
           </ImsPanel>

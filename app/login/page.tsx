@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "../../src/lib/supabase";
 
 const REDIRECT_STORAGE_KEY = "asset-quality-login-redirect";
-type LoginMode = "login" | "signup" | "forgot" | "reset";
+type LoginMode = "login" | "forgot" | "reset";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
@@ -27,15 +27,19 @@ function LoginPageContent() {
   }, [safeRedirectTarget]);
 
   useEffect(() => {
-    const requestedRecovery =
+    const isInvite =
+      searchParams.get("mode") === "invite" ||
+      searchParams.get("type") === "invite" ||
+      window.location.hash.includes("type=invite");
+    const isRecovery =
       searchParams.get("mode") === "recovery" ||
       searchParams.get("type") === "recovery" ||
       searchParams.has("code") ||
       window.location.hash.includes("type=recovery");
 
-    if (requestedRecovery) {
+    if (isInvite || isRecovery) {
       setMode("reset");
-      setMessage("Enter a new password to complete the reset.");
+      setMessage(isInvite ? "Set your password to complete your IMS invite." : "Enter a new password to complete the reset.");
     }
   }, [searchParams]);
 
@@ -45,10 +49,7 @@ function LoginPageContent() {
     setMessage(null);
 
     if (mode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
         setMessage(error.message);
@@ -57,8 +58,7 @@ function LoginPageContent() {
       }
 
       const storedRedirect = window.sessionStorage.getItem(REDIRECT_STORAGE_KEY) || "";
-      const finalRedirectTarget =
-        safeRedirectTarget !== "/" ? safeRedirectTarget : storedRedirect || "/";
+      const finalRedirectTarget = safeRedirectTarget !== "/" ? safeRedirectTarget : storedRedirect || "/";
 
       await supabase.auth.getSession();
       window.sessionStorage.removeItem(REDIRECT_STORAGE_KEY);
@@ -86,34 +86,13 @@ function LoginPageContent() {
       return;
     }
 
-    if (mode === "reset") {
-      if (password.length < 8) {
-        setMessage("Please enter a new password with at least 8 characters.");
-        setLoading(false);
-        return;
-      }
-
-      const { error } = await supabase.auth.updateUser({
-        password,
-      });
-
-      if (error) {
-        setMessage(error.message);
-        setLoading(false);
-        return;
-      }
-
-      setPassword("");
-      setMode("login");
-      setMessage("Password updated. You can now sign in with your new password.");
+    if (password.length < 8) {
+      setMessage("Please enter a new password with at least 8 characters.");
       setLoading(false);
       return;
     }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
       setMessage(error.message);
@@ -121,9 +100,9 @@ function LoginPageContent() {
       return;
     }
 
-    setMessage(
-      "Account created. If email confirmation is enabled in Supabase, check your email first, then come back and sign in."
-    );
+    setPassword("");
+    setMode("login");
+    setMessage("Password updated. You can now sign in with your new password.");
     setLoading(false);
   };
 
@@ -140,83 +119,41 @@ function LoginPageContent() {
     >
       <div style={{ marginBottom: "20px" }}>
         <h1 style={{ margin: 0, fontSize: "28px", color: "#0f172a" }}>
-          {mode === "login"
-            ? "Sign in"
-            : mode === "signup"
-            ? "Create account"
-            : mode === "forgot"
-            ? "Reset password"
-            : "Set new password"}
+          {mode === "login" ? "Sign in" : mode === "forgot" ? "Reset password" : "Set new password"}
         </h1>
         <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: "14px" }}>
           {mode === "forgot"
             ? "Enter your email and we will send a secure reset link."
             : mode === "reset"
-            ? "Choose a new password for your IMS account."
-            : "Enshore IMS access"}
+              ? "Choose a new password for your IMS account."
+              : "Enshore IMS access"}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: "14px" }}>
         <div>
-          <label
-            htmlFor="email"
-            style={{
-              display: "block",
-              marginBottom: "6px",
-              fontWeight: 600,
-              color: "#0f172a",
-            }}
-          >
-            Email
-          </label>
+          <label htmlFor="email" style={labelStyle}>Email</label>
           <input
             id="email"
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 14px",
-              borderRadius: "10px",
-              border: "1px solid #cbd5e1",
-              fontSize: "14px",
-              outline: "none",
-              boxSizing: "border-box",
-            }}
+            style={inputStyle}
           />
         </div>
 
         {mode !== "forgot" ? (
           <div>
-          <label
-            htmlFor="password"
-            style={{
-              display: "block",
-              marginBottom: "6px",
-              fontWeight: 600,
-              color: "#0f172a",
-            }}
-          >
-            {mode === "reset" ? "New Password" : "Password"}
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 14px",
-              borderRadius: "10px",
-              border: "1px solid #cbd5e1",
-              fontSize: "14px",
-              outline: "none",
-              boxSizing: "border-box",
-            }}
-          />
+            <label htmlFor="password" style={labelStyle}>{mode === "reset" ? "New Password" : "Password"}</label>
+            <input
+              id="password"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={inputStyle}
+            />
           </div>
         ) : null}
 
@@ -234,19 +171,11 @@ function LoginPageContent() {
             opacity: loading ? 0.7 : 1,
           }}
         >
-          {loading
-            ? "Please wait..."
-            : mode === "login"
-            ? "Sign in"
-            : mode === "signup"
-            ? "Create account"
-            : mode === "forgot"
-            ? "Send reset email"
-            : "Update password"}
+          {loading ? "Please wait..." : mode === "login" ? "Sign in" : mode === "forgot" ? "Send reset email" : "Update password"}
         </button>
       </form>
 
-      {message && (
+      {message ? (
         <div
           style={{
             marginTop: "14px",
@@ -260,97 +189,77 @@ function LoginPageContent() {
         >
           {message}
         </div>
-      )}
+      ) : null}
 
       <div style={{ marginTop: "18px", fontSize: "14px", color: "#475569" }}>
         {mode === "login" ? (
           <>
-            Need an account?{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signup");
-                setMessage(null);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                color: "#3A9B98",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Create one
-            </button>
-            <span style={{ margin: "0 8px", color: "#cbd5e1" }}>•</span>
-            <button
-              type="button"
+            Need access? Ask an IMS Admin for an invite link.
+            <span style={{ margin: "0 8px", color: "#cbd5e1" }}>{" | "}</span>
+            <InlineButton
               onClick={() => {
                 setMode("forgot");
                 setPassword("");
                 setMessage(null);
               }}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                color: "#3A9B98",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
             >
               Forgot password?
-            </button>
-          </>
-        ) : mode === "signup" ? (
-          <>
-            Already have an account?{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setMode("login");
-                setMessage(null);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                color: "#3A9B98",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Sign in
-            </button>
+            </InlineButton>
           </>
         ) : (
           <>
             Return to{" "}
-            <button
-              type="button"
+            <InlineButton
               onClick={() => {
                 setMode("login");
                 setPassword("");
                 setMessage(null);
               }}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                color: "#3A9B98",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
             >
               sign in
-            </button>
+            </InlineButton>
           </>
         )}
       </div>
     </div>
   );
 }
+
+function InlineButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        background: "none",
+        border: "none",
+        padding: 0,
+        color: "#3A9B98",
+        fontWeight: 700,
+        cursor: "pointer",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  marginBottom: "6px",
+  fontWeight: 600,
+  color: "#0f172a",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: "10px",
+  border: "1px solid #cbd5e1",
+  fontSize: "14px",
+  outline: "none",
+  boxSizing: "border-box",
+};
 
 export default function LoginPage() {
   return (
