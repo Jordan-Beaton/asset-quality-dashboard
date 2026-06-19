@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { ImsButton, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
@@ -97,6 +97,18 @@ type AuditLogRow = {
   created_at: string;
 };
 
+type TabPermissionRow = {
+  id?: string;
+  person_id?: string | null;
+  email: string;
+  module_key: string;
+  area_key: string;
+  can_view: boolean;
+  can_create: boolean;
+  can_edit: boolean;
+  full_access: boolean;
+};
+
 type AdminData = {
   currentUserEmail: string;
   people: PersonRow[];
@@ -106,6 +118,7 @@ type AdminData = {
   projects: ReferenceProject[];
   roles: RoleRow[];
   auditLog: AuditLogRow[];
+  tabPermissions: TabPermissionRow[];
   warnings: string[];
 };
 
@@ -132,8 +145,105 @@ const roleOptions = [
 
 const accessStatusOptions = ["Active", "Invited", "Deactivated"];
 const permissionOverrideOptions = ["Role Default", "Custom", "Full System Access", "Read Only"];
-const moduleAccessOptions = ["Role Default", "None", "Read", "Edit", "Approve", "Documents", "Observe", "Full"];
+const moduleAccessOptions = ["Role Default", "None", "Part Access", "Read", "Edit", "Approve", "Documents", "Observe", "Full"];
 const roleAccessOptions = ["None", "Read", "Edit", "Approve", "Documents", "Observe", "Full"];
+
+const modulePermissionDefinitions = [
+  {
+    moduleKey: "quality",
+    label: "Quality Management",
+    accessField: "quality_access",
+    areas: [
+      ["dashboard", "Dashboard"],
+      ["moc", "MOC"],
+      ["ncr", "NCR"],
+      ["audits", "Audits"],
+      ["actions", "Actions"],
+      ["reports", "Reports"],
+    ],
+  },
+  {
+    moduleKey: "documents",
+    label: "Document Control",
+    accessField: "document_access",
+    areas: [
+      ["document-control", "Document Control"],
+      ["certification", "Certification"],
+    ],
+  },
+  {
+    moduleKey: "hse",
+    label: "HSE Management",
+    accessField: "hse_access",
+    areas: [
+      ["dashboard", "Dashboard"],
+      ["calendar", "Calendar"],
+      ["ainm", "AINM"],
+      ["observations", "Observations"],
+      ["ptw", "PTW"],
+      ["inspections", "Inspections"],
+      ["actions", "Actions"],
+      ["reports", "Reports"],
+    ],
+  },
+  {
+    moduleKey: "assets",
+    label: "Asset Management",
+    accessField: "asset_access",
+    areas: [
+      ["dashboard", "Dashboard"],
+      ["register", "Asset Register"],
+      ["calibration", "Calibration"],
+      ["inspection", "Inspection"],
+      ["maintenance", "Maintenance"],
+      ["actions", "Actions"],
+      ["reports", "Reports"],
+    ],
+  },
+  {
+    moduleKey: "risk",
+    label: "Risk Management",
+    accessField: "risk_access",
+    areas: [
+      ["dashboard", "Dashboard"],
+      ["register", "Risk Register"],
+      ["reviews", "Reviews"],
+      ["controls", "Controls"],
+      ["opportunities", "Opportunities"],
+      ["actions", "Actions"],
+      ["reports", "Reports"],
+    ],
+  },
+  {
+    moduleKey: "actions",
+    label: "Action Management",
+    accessField: "action_access",
+    areas: [
+      ["dashboard", "Dashboard"],
+      ["register", "Action Register"],
+      ["create", "Create Action"],
+      ["my-actions", "My Actions"],
+      ["overdue", "Overdue / Priority"],
+      ["reports", "Reports"],
+    ],
+  },
+  {
+    moduleKey: "admin",
+    label: "Admin / Settings",
+    accessField: "admin_access",
+    areas: [
+      ["dashboard", "Dashboard"],
+      ["users", "Users & Access"],
+      ["roles", "Roles"],
+      ["company", "Company"],
+      ["reference", "Reference Data"],
+      ["notifications", "Notifications"],
+      ["audit", "Audit Log"],
+    ],
+  },
+] as const;
+
+type ModulePermissionDefinition = (typeof modulePermissionDefinitions)[number];
 
 const initialCompany: CompanySettings = {
   company_name: "Enshore Subsea",
@@ -168,6 +278,15 @@ function getAuthUserForPerson(person: PersonRow, authUsers: AuthUserRow[]) {
   return authUsers.find((user) => normaliseEmail(user.email) === email) || null;
 }
 
+function getLoginStatus(person: PersonRow, authUser: AuthUserRow | null) {
+  if (person.active === false || person.access_status === "Deactivated") return { label: "Deactivated", tone: "danger" as const };
+  if (!person.email) return { label: "No email", tone: "warn" as const };
+  if (!authUser) return { label: "No login yet", tone: "warn" as const };
+  if (authUser.last_sign_in_at) return { label: "Active login", tone: "good" as const };
+  if (person.access_status === "Invited" || authUser.confirmed_at) return { label: "Invite pending", tone: "warn" as const };
+  return { label: "Setup pending", tone: "warn" as const };
+}
+
 function SelectField({
   value,
   onChange,
@@ -196,7 +315,7 @@ function Field({
   style?: CSSProperties;
 }) {
   return (
-    <label style={{ display: "grid", gap: "6px", fontSize: "12px", fontWeight: 900, color: "#334155", textTransform: "uppercase", letterSpacing: "0.04em", ...style }}>
+    <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700, color: imsColours.slate, letterSpacing: 0, ...style }}>
       {label}
       {children}
     </label>
@@ -228,22 +347,26 @@ export default function AdminDashboardPage() {
     job_role: "",
     department: "",
     system_role: "Viewer",
-    permission_override: "Role Default",
-    quality_access: "Role Default",
-    document_access: "Role Default",
-    hse_access: "Role Default",
-    asset_access: "Role Default",
-    risk_access: "Role Default",
-    action_access: "Role Default",
-    admin_access: "Role Default",
+    permission_override: "Custom",
+    quality_access: "None",
+    document_access: "None",
+    hse_access: "None",
+    asset_access: "None",
+    risk_access: "None",
+    action_access: "None",
+    admin_access: "None",
     permissions_notes: "",
   });
   const [companyForm, setCompanyForm] = useState<CompanySettings>(initialCompany);
   const [newDepartment, setNewDepartment] = useState({ name: "", code: "" });
   const [newProject, setNewProject] = useState({ name: "", type: "Project" });
   const [personDrafts, setPersonDrafts] = useState<Record<string, Partial<PersonRow>>>({});
+  const [userSearch, setUserSearch] = useState("");
+  const [showInvitePanel, setShowInvitePanel] = useState(false);
   const [selectedOverridePersonId, setSelectedOverridePersonId] = useState("");
   const [roleDrafts, setRoleDrafts] = useState<Record<string, Partial<RoleRow>>>({});
+  const [tabPermissionDrafts, setTabPermissionDrafts] = useState<Record<string, Record<string, TabPermissionRow>>>({});
+  const [inviteTabPermissionDrafts, setInviteTabPermissionDrafts] = useState<Record<string, TabPermissionRow>>({});
 
   async function loadAdminData() {
     setIsLoading(true);
@@ -292,6 +415,18 @@ export default function AdminDashboardPage() {
   const roles = data?.roles || [];
   const editableRoleOptions = roles.length ? roles.map((role) => role.role_name) : roleOptions;
   const people = data?.people || [];
+  const filteredPeople = useMemo(() => {
+    const search = userSearch.trim().toLowerCase();
+    if (!search) return people;
+    return people.filter((person) => {
+      return [person.name, person.email, person.role, person.department, person.system_role]
+        .some((value) => (value || "").toLowerCase().includes(search));
+    });
+  }, [people, userSearch]);
+  const selectedAccessPerson = useMemo(() => {
+    if (!selectedOverridePersonId) return null;
+    return people.find((person) => person.id === selectedOverridePersonId) || null;
+  }, [people, selectedOverridePersonId]);
 
   function getPersonDraft(person: PersonRow) {
     return { ...person, ...(personDrafts[person.id] || {}) };
@@ -305,6 +440,139 @@ export default function AdminDashboardPage() {
         ...updates,
       },
     }));
+  }
+
+  function tabPermissionKey(moduleKey: string, areaKey: string) {
+    return `${moduleKey}:${areaKey}`;
+  }
+
+  function getInviteTabPermissionDraft(moduleKey: string, areaKey: string): TabPermissionRow {
+    const key = tabPermissionKey(moduleKey, areaKey);
+    return inviteTabPermissionDrafts[key] || {
+      email: inviteForm.email || "",
+      module_key: moduleKey,
+      area_key: areaKey,
+      can_view: false,
+      can_create: false,
+      can_edit: false,
+      full_access: false,
+    };
+  }
+
+  function setInviteTabPermissionDraft(moduleKey: string, areaKey: string, updates: Partial<TabPermissionRow>) {
+    const key = tabPermissionKey(moduleKey, areaKey);
+    const current = getInviteTabPermissionDraft(moduleKey, areaKey);
+    setInviteTabPermissionDrafts((existing) => ({
+      ...existing,
+      [key]: {
+        ...current,
+        ...updates,
+        email: inviteForm.email || "",
+        module_key: moduleKey,
+        area_key: areaKey,
+      },
+    }));
+  }
+
+  function setInviteModuleAccessMode(definition: ModulePermissionDefinition, mode: "Full" | "Part Access" | "None") {
+    setInviteForm({
+      ...inviteForm,
+      permission_override: "Custom",
+      [definition.accessField]: mode,
+      system_role: mode === "Full" && definition.accessField === "admin_access" ? "Admin" : inviteForm.system_role,
+    });
+    definition.areas.forEach(([areaKey]) => {
+      const full = mode === "Full";
+      const none = mode === "None";
+      const current = getInviteTabPermissionDraft(definition.moduleKey, areaKey);
+      setInviteTabPermissionDraft(definition.moduleKey, areaKey, {
+        full_access: full,
+        can_view: full || (!none && current.can_view),
+        can_create: full || (!none && current.can_create),
+        can_edit: full || (!none && current.can_edit),
+      });
+      if (none) {
+        setInviteTabPermissionDraft(definition.moduleKey, areaKey, {
+          full_access: false,
+          can_view: false,
+          can_create: false,
+          can_edit: false,
+        });
+      }
+    });
+  }
+
+  function getInviteTabPermissionsPayload() {
+    return modulePermissionDefinitions.flatMap((definition) => {
+      return definition.areas.map(([areaKey]) => ({
+        ...getInviteTabPermissionDraft(definition.moduleKey, areaKey),
+        email: inviteForm.email || "",
+        module_key: definition.moduleKey,
+        area_key: areaKey,
+      }));
+    });
+  }
+
+  function getTabPermissionDraft(person: PersonRow, moduleKey: string, areaKey: string): TabPermissionRow {
+    const key = tabPermissionKey(moduleKey, areaKey);
+    const existingDraft = tabPermissionDrafts[person.id]?.[key];
+    if (existingDraft) return existingDraft;
+    const existing = (data?.tabPermissions || []).find((permission) => {
+      return permission.person_id === person.id && permission.module_key === moduleKey && permission.area_key === areaKey;
+    });
+    return existing || {
+      person_id: person.id,
+      email: person.email || "",
+      module_key: moduleKey,
+      area_key: areaKey,
+      can_view: false,
+      can_create: false,
+      can_edit: false,
+      full_access: false,
+    };
+  }
+
+  function setTabPermissionDraft(person: PersonRow, moduleKey: string, areaKey: string, updates: Partial<TabPermissionRow>) {
+    const key = tabPermissionKey(moduleKey, areaKey);
+    const current = getTabPermissionDraft(person, moduleKey, areaKey);
+    setTabPermissionDrafts((existing) => ({
+      ...existing,
+      [person.id]: {
+        ...(existing[person.id] || {}),
+        [key]: {
+          ...current,
+          ...updates,
+          person_id: person.id,
+          email: person.email || "",
+          module_key: moduleKey,
+          area_key: areaKey,
+        },
+      },
+    }));
+  }
+
+  function setModuleAccessMode(person: PersonRow, accessField: string, moduleKey: string, mode: "Full" | "Part Access" | "None") {
+    setPersonDraft(person, { [accessField]: mode } as Partial<PersonRow>);
+    const definition = modulePermissionDefinitions.find((item) => item.moduleKey === moduleKey);
+    if (!definition) return;
+    definition.areas.forEach(([areaKey]) => {
+      const full = mode === "Full";
+      const none = mode === "None";
+      setTabPermissionDraft(person, moduleKey, areaKey, {
+        full_access: full,
+        can_view: full || (!none && getTabPermissionDraft(person, moduleKey, areaKey).can_view),
+        can_create: full || (!none && getTabPermissionDraft(person, moduleKey, areaKey).can_create),
+        can_edit: full || (!none && getTabPermissionDraft(person, moduleKey, areaKey).can_edit),
+      });
+      if (none) {
+        setTabPermissionDraft(person, moduleKey, areaKey, {
+          full_access: false,
+          can_view: false,
+          can_create: false,
+          can_edit: false,
+        });
+      }
+    });
   }
 
   function getRoleDraft(role: RoleRow) {
@@ -346,7 +614,11 @@ export default function AdminDashboardPage() {
   }
 
   async function inviteUser() {
-    const ok = await postAdminAction("inviteUser", inviteForm, `${inviteForm.name || "User"} invited successfully.`);
+    const ok = await postAdminAction(
+      "inviteUser",
+      { ...inviteForm, tab_permissions: getInviteTabPermissionsPayload() },
+      `${inviteForm.name || "User"} invited successfully.`,
+    );
     if (ok) {
       setInviteForm({
         name: "",
@@ -354,16 +626,17 @@ export default function AdminDashboardPage() {
         job_role: "",
         department: "",
         system_role: "Viewer",
-        permission_override: "Role Default",
-        quality_access: "Role Default",
-        document_access: "Role Default",
-        hse_access: "Role Default",
-        asset_access: "Role Default",
-        risk_access: "Role Default",
-        action_access: "Role Default",
-        admin_access: "Role Default",
+        permission_override: "Custom",
+        quality_access: "None",
+        document_access: "None",
+        hse_access: "None",
+        asset_access: "None",
+        risk_access: "None",
+        action_access: "None",
+        admin_access: "None",
         permissions_notes: "",
       });
+      setInviteTabPermissionDrafts({});
     }
   }
 
@@ -380,6 +653,12 @@ export default function AdminDashboardPage() {
         return next;
       });
     }
+    return ok;
+  }
+
+  async function sendExistingInvite(person: PersonRow, authUser: AuthUserRow | null) {
+    const label = authUser ? "Password setup link" : "Invite link";
+    await postAdminAction("sendExistingInvite", { id: person.id }, `${label} sent to ${person.email || person.name}.`);
   }
 
   async function updateRolePermissions(role: RoleRow) {
@@ -392,6 +671,189 @@ export default function AdminDashboardPage() {
         return next;
       });
     }
+  }
+
+  async function saveTabPermissions(person: PersonRow) {
+    const permissions = modulePermissionDefinitions.flatMap((definition) => {
+      return definition.areas.map(([areaKey]) => getTabPermissionDraft(person, definition.moduleKey, areaKey));
+    });
+    const ok = await postAdminAction(
+      "updateTabPermissions",
+      { person_id: person.id, email: person.email, permissions },
+      `${person.name} tab permissions saved successfully.`,
+    );
+    if (ok) {
+      setTabPermissionDrafts((current) => {
+        const next = { ...current };
+        delete next[person.id];
+        return next;
+      });
+    }
+  }
+
+  function renderPersonPermissionEditor(person: PersonRow) {
+    const draft = getPersonDraft(person);
+    const isMaster = person.is_master_admin || normaliseEmail(person.email) === "jbeaton@enshoresubsea.com" || person.name === "Jordan Beaton";
+
+    return (
+      <div style={personDetailPanelStyle}>
+        <div style={personDetailHeaderStyle}>
+          <div>
+            <p style={eyebrowStyle}>Selected user</p>
+            <h3 style={personDetailTitleStyle}>{person.name}</h3>
+            <p style={personDetailMetaStyle}>{person.email || "No email set"}</p>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {isMaster ? <StatusPill tone="good">Master Admin</StatusPill> : <StatusPill tone={draft.access_status === "Deactivated" ? "danger" : "good"}>{draft.access_status || "Active"}</StatusPill>}
+            <ImsButton variant="secondary" onClick={() => setSelectedOverridePersonId("")}>Hide Panel</ImsButton>
+          </div>
+        </div>
+
+        <div style={compactFieldGridStyle}>
+          <Field label="Access">
+            <SelectField
+              value={isMaster ? "Active" : draft.access_status || "Active"}
+              onChange={(value) => setPersonDraft(person, { access_status: value })}
+              disabled={isSaving || isMaster}
+            >
+              {accessStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+            </SelectField>
+          </Field>
+          <Field label="Permission Override">
+            <SelectField
+              value={isMaster ? "Full System Access" : draft.permission_override || "Role Default"}
+              onChange={(value) => {
+                const full = value === "Full System Access";
+                const readOnly = value === "Read Only";
+                setPersonDraft(person, {
+                  permission_override: value,
+                  ...(full
+                    ? {
+                        quality_access: "Full",
+                        hse_access: "Full",
+                        asset_access: "Full",
+                        risk_access: "Full",
+                        document_access: "Full",
+                        action_access: "Full",
+                        admin_access: "Full",
+                      }
+                    : readOnly
+                    ? {
+                        quality_access: "Read",
+                        hse_access: "Read",
+                        asset_access: "Read",
+                        risk_access: "Read",
+                        document_access: "Read",
+                        action_access: "Read",
+                        admin_access: "None",
+                      }
+                    : {}),
+                });
+              }}
+              disabled={isSaving || isMaster}
+            >
+              {permissionOverrideOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </SelectField>
+          </Field>
+        </div>
+
+        <div style={modulePermissionStackStyle}>
+          {modulePermissionDefinitions.map((definition) => {
+            const moduleAccessValue = isMaster ? "Full" : String((draft as Record<string, unknown>)[definition.accessField] || "Role Default");
+            const partAccess = moduleAccessValue === "Part Access";
+            return (
+              <section key={definition.moduleKey} style={compactModuleCardStyle}>
+                <div style={modulePermissionHeaderStyle}>
+                  <div>
+                    <h4 style={modulePermissionTitleStyle}>{definition.label}</h4>
+                    <p style={modulePermissionSubtitleStyle}>
+                      {moduleAccessValue === "Full"
+                        ? "Full module access"
+                        : partAccess
+                          ? "Part access - selected tabs only"
+                          : moduleAccessValue === "None"
+                            ? "No module access"
+                            : "Using role default unless changed"}
+                    </p>
+                  </div>
+                  <div style={segmentedButtonRowStyle}>
+                    {(["Full", "Part Access", "None"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setModuleAccessMode(person, definition.accessField, definition.moduleKey, mode)}
+                        disabled={isSaving || isMaster}
+                        style={{
+                          ...permissionModeButtonStyle,
+                          ...(moduleAccessValue === mode ? permissionModeButtonActiveStyle : {}),
+                        }}
+                      >
+                        {mode === "Full" ? "Full" : mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {partAccess ? (
+                  <div style={tabPermissionTableStyle}>
+                    <div style={{ ...tabPermissionRowStyle, ...tabPermissionHeadRowStyle }}>
+                      <span>Internal tab</span>
+                      <span>View</span>
+                      <span>Create</span>
+                      <span>Edit</span>
+                    </div>
+                    {definition.areas.map(([areaKey, label]) => {
+                      const permission = getTabPermissionDraft(person, definition.moduleKey, areaKey);
+                      return (
+                        <div key={areaKey} style={tabPermissionRowStyle}>
+                          <strong>{label}</strong>
+                          {(["can_view", "can_create", "can_edit"] as const).map((field) => (
+                            <label key={field} style={checkboxCellStyle}>
+                              <input
+                                type="checkbox"
+                                checked={Boolean(permission.full_access || permission[field])}
+                                onChange={(event) => setTabPermissionDraft(person, definition.moduleKey, areaKey, { [field]: event.target.checked })}
+                                disabled={isSaving || isMaster}
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
+        </div>
+
+        <Field label="Permission Notes">
+          <textarea
+            value={draft.permissions_notes || ""}
+            onChange={(event) => setPersonDraft(person, { permissions_notes: event.target.value })}
+            style={{ ...imsInputStyle, minHeight: 74 }}
+            placeholder="Reason for custom access."
+          />
+        </Field>
+
+        <div style={detailActionRowStyle}>
+          <ImsButton
+            onClick={async () => {
+              const ok = await updatePersonAccess(person, draft);
+              if (ok) await saveTabPermissions({ ...person, ...draft });
+            }}
+            disabled={isSaving || (!personDrafts[person.id] && !tabPermissionDrafts[person.id])}
+          >
+            Save Permissions
+          </ImsButton>
+          {person.email ? (
+            <ImsButton variant="secondary" onClick={() => postAdminAction("resetPassword", { email: person.email }, `Password reset email sent to ${person.email}.`)} disabled={isSaving}>
+              Send Reset Email
+            </ImsButton>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   async function saveCompany() {
@@ -460,197 +922,212 @@ export default function AdminDashboardPage() {
 
       {activeView === "users" ? (
         <section style={{ display: "grid", gap: "18px" }}>
-          <ImsPanel title="Invite New User" subtitle="Create the People record, assign access, and send the password setup invite in one step.">
-            <div style={formGridStyle}>
-              <Field label="Name">
-                <input value={inviteForm.name} onChange={(event) => setInviteForm({ ...inviteForm, name: event.target.value })} style={imsInputStyle} placeholder="e.g. Peter Ridley" />
-              </Field>
-              <Field label="Email">
-                <input value={inviteForm.email} onChange={(event) => setInviteForm({ ...inviteForm, email: event.target.value })} style={imsInputStyle} placeholder="name@enshoresubsea.com" />
-              </Field>
-              <Field label="Job Role">
-                <input value={inviteForm.job_role} onChange={(event) => setInviteForm({ ...inviteForm, job_role: event.target.value })} style={imsInputStyle} placeholder="e.g. HSE Manager" />
-              </Field>
-              <Field label="Department">
-                <SelectField value={inviteForm.department} onChange={(value) => setInviteForm({ ...inviteForm, department: value })}>
-                  <option value="">Select department</option>
-                  {departments.map((department) => <option key={department.id} value={department.name}>{department.name}</option>)}
-                </SelectField>
-              </Field>
-              <Field label="System Role">
-                <SelectField
-                  value={inviteForm.system_role}
-                  onChange={(value) => {
-                    const contractor = value === "Contractor";
-                    setInviteForm({
-                      ...inviteForm,
-                      system_role: value,
-                      ...(contractor
-                        ? {
-                            permission_override: "Custom",
-                            quality_access: "None",
-                            document_access: "None",
-                            hse_access: "Observe",
-                            asset_access: "None",
-                            risk_access: "None",
-                            action_access: "Read",
-                            admin_access: "None",
-                            permissions_notes: "Contractor access tailored for HSE observations/AINM only.",
-                          }
-                        : {}),
-                    });
-                  }}
-                >
-                  {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
-                </SelectField>
-              </Field>
+          <ImsPanel title="Invite User" subtitle="Create a login-ready person record and send the password setup invite.">
+            <div style={inviteHeaderRowStyle}>
+              <p style={paragraphStyle}>Use this only for new system users. Existing People records can be invited from the user list below.</p>
+              <ImsButton variant={showInvitePanel ? "secondary" : "primary"} onClick={() => setShowInvitePanel(!showInvitePanel)}>
+                {showInvitePanel ? "Hide Invite" : "Invite New User"}
+              </ImsButton>
             </div>
-
-            <div style={{ ...permissionGridStyle, marginTop: 14, borderTop: `1px solid ${imsColours.border}`, paddingTop: 14 }}>
-              <Field label="Permission Override">
-                <SelectField
-                  value={inviteForm.permission_override}
-                  onChange={(value) => {
-                    const full = value === "Full System Access";
-                    const readOnly = value === "Read Only";
-                    setInviteForm({
-                      ...inviteForm,
-                      permission_override: value,
-                      ...(full
-                        ? {
-                            quality_access: "Full",
-                            document_access: "Full",
-                            hse_access: "Full",
-                            asset_access: "Full",
-                            risk_access: "Full",
-                            action_access: "Full",
-                            admin_access: "Full",
-                          }
-                        : readOnly
-                        ? {
-                            quality_access: "Read",
-                            document_access: "Read",
-                            hse_access: "Read",
-                            asset_access: "Read",
-                            risk_access: "Read",
-                            action_access: "Read",
-                            admin_access: "None",
-                          }
-                        : {}),
-                    });
-                  }}
-                >
-                  {permissionOverrideOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </SelectField>
-              </Field>
-              {[
-                ["Quality", "quality_access"],
-                ["Documents", "document_access"],
-                ["HSE", "hse_access"],
-                ["Assets", "asset_access"],
-                ["Risk", "risk_access"],
-                ["Actions", "action_access"],
-                ["Admin", "admin_access"],
-              ].map(([label, key]) => (
-                <Field key={key} label={label}>
-                  <SelectField
-                    value={String((inviteForm as Record<string, string>)[key])}
-                    onChange={(value) => setInviteForm({ ...inviteForm, [key]: value })}
-                  >
-                    {moduleAccessOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            {showInvitePanel ? (
+              <div style={inviteCompactGridStyle}>
+                <Field label="Name">
+                  <input value={inviteForm.name} onChange={(event) => setInviteForm({ ...inviteForm, name: event.target.value })} style={imsInputStyle} placeholder="e.g. Peter Ridley" />
+                </Field>
+                <Field label="Email">
+                  <input value={inviteForm.email} onChange={(event) => setInviteForm({ ...inviteForm, email: event.target.value })} style={imsInputStyle} placeholder="name@enshoresubsea.com" />
+                </Field>
+                <Field label="Job Role">
+                  <input value={inviteForm.job_role} onChange={(event) => setInviteForm({ ...inviteForm, job_role: event.target.value })} style={imsInputStyle} placeholder="e.g. HSE Manager" />
+                </Field>
+                <Field label="Department">
+                  <SelectField value={inviteForm.department} onChange={(value) => setInviteForm({ ...inviteForm, department: value })}>
+                    <option value="">Select department</option>
+                    {departments.map((department) => <option key={department.id} value={department.name}>{department.name}</option>)}
                   </SelectField>
                 </Field>
-              ))}
-              <Field label="Access Notes" style={{ gridColumn: "1 / -1" }}>
-                <textarea
-                  value={inviteForm.permissions_notes}
-                  onChange={(event) => setInviteForm({ ...inviteForm, permissions_notes: event.target.value })}
-                  style={{ ...imsInputStyle, minHeight: 72 }}
-                  placeholder="Reason for custom access, e.g. contractor can log HSE observations and AINM only."
-                />
-              </Field>
-              <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
-                <ImsButton onClick={inviteUser} disabled={isSaving}>Send Invite Link</ImsButton>
+                <div style={invitePermissionMatrixStyle}>
+                  <div style={invitePermissionMatrixHeaderStyle}>
+                    <div>
+                      <h3 style={invitePermissionTitleStyle}>Permissions</h3>
+                      <p style={invitePermissionSubtitleStyle}>Set exact module and internal tab access before sending the invite.</p>
+                    </div>
+                  </div>
+                  <div style={invitePermissionRowsStyle}>
+                    {modulePermissionDefinitions.map((module) => {
+                      const currentValue = String((inviteForm as Record<string, string>)[module.accessField] || "None");
+                      const partAccess = currentValue === "Part Access";
+                      return (
+                        <div key={module.accessField} style={invitePermissionRowStyle}>
+                          <div style={invitePermissionRowHeaderStyle}>
+                            <div>
+                              <h4 style={invitePermissionModuleTitleStyle}>{module.label}</h4>
+                              <p style={invitePermissionSubtitleStyle}>
+                                {partAccess ? "Part access - selected tabs only" : currentValue === "Full" ? "Full module access" : "No access"}
+                              </p>
+                            </div>
+                            <div style={invitePermissionOptionGroupStyle}>
+                            {(["Full", "Part Access", "None"] as const).map((option) => {
+                              const active = currentValue === option;
+                              return (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  onClick={() => setInviteModuleAccessMode(module, option)}
+                                  style={{
+                                    ...invitePermissionOptionStyle,
+                                    ...(active ? invitePermissionOptionActiveStyle : {}),
+                                  }}
+                                >
+                                  {option}
+                                </button>
+                              );
+                            })}
+                            </div>
+                          </div>
+                          {partAccess ? (
+                            <div style={tabPermissionTableStyle}>
+                              <div style={{ ...tabPermissionRowStyle, ...tabPermissionHeadRowStyle }}>
+                                <span>Internal tab</span>
+                                <span>View</span>
+                                <span>Create</span>
+                                <span>Edit</span>
+                              </div>
+                              {module.areas.map(([areaKey, areaLabel]) => {
+                                const permission = getInviteTabPermissionDraft(module.moduleKey, areaKey);
+                                return (
+                                  <div key={areaKey} style={tabPermissionRowStyle}>
+                                    <span>{areaLabel}</span>
+                                    {(["can_view", "can_create", "can_edit"] as const).map((field) => (
+                                      <label key={field} style={checkboxCellStyle}>
+                                        <input
+                                          type="checkbox"
+                                          checked={Boolean(permission.full_access || permission[field])}
+                                          onChange={(event) => setInviteTabPermissionDraft(module.moduleKey, areaKey, {
+                                            [field]: event.target.checked,
+                                            full_access: false,
+                                          })}
+                                        />
+                                      </label>
+                                    ))}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <Field label="Notes" style={{ gridColumn: "1 / -1" }}>
+                  <textarea
+                    value={inviteForm.permissions_notes}
+                    onChange={(event) => setInviteForm({ ...inviteForm, permissions_notes: event.target.value })}
+                    style={{ ...imsInputStyle, minHeight: 64 }}
+                    placeholder="Optional access note."
+                  />
+                </Field>
+                <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
+                  <ImsButton onClick={inviteUser} disabled={isSaving}>Send Invite Link</ImsButton>
+                </div>
               </div>
-            </div>
+            ) : null}
           </ImsPanel>
 
           <ImsPanel title="Users & Access" subtitle="Role and access staging. Master admin cannot be deactivated.">
-            <div style={imsTableInfoRowStyle}>Showing {people.length} user records</div>
+            <div style={userSearchRowStyle}>
+              <input
+                value={userSearch}
+                onChange={(event) => setUserSearch(event.target.value)}
+                style={imsInputStyle}
+                placeholder="Search user name, email, role or department..."
+              />
+            </div>
+            <div style={imsTableInfoRowStyle}>Showing {filteredPeople.length} of {people.length} user records</div>
             <div style={tableWrapStyle}>
               <table style={imsTableStyle}>
                 <thead>
                   <tr>
                     <th style={imsTableHeadStyle}>Name</th>
                     <th style={imsTableHeadStyle}>Email</th>
-                    <th style={imsTableHeadStyle}>Department</th>
-                    <th style={imsTableHeadStyle}>System Role</th>
                     <th style={imsTableHeadStyle}>Access</th>
                     <th style={imsTableHeadStyle}>Last Login</th>
                     <th style={imsTableHeadStyle}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {people.map((person) => {
+                  {filteredPeople.map((person) => {
                     const draft = getPersonDraft(person);
                     const authUser = getAuthUserForPerson(person, data?.authUsers || []);
                     const isMaster = person.is_master_admin || normaliseEmail(person.email) === "jbeaton@enshoresubsea.com" || person.name === "Jordan Beaton";
                     const accessStatus = draft.access_status || (person.active === false ? "Deactivated" : "Active");
-                    const hasDraft = Boolean(personDrafts[person.id]);
+                    const loginStatus = getLoginStatus(person, authUser);
+                    const canSendInvite = Boolean(person.email) && !isMaster && accessStatus !== "Deactivated" && !authUser?.last_sign_in_at;
+                    const isSelected = selectedAccessPerson?.id === person.id;
                     return (
-                      <tr key={person.id}>
-                        <td style={imsTableCellStyle}>
-                          <strong>{person.name}</strong>
-                          {isMaster ? <div style={{ marginTop: 6 }}><StatusPill tone="good">Master Admin</StatusPill></div> : null}
-                          {person.permission_override && person.permission_override !== "Role Default" ? (
-                            <div style={{ marginTop: 6 }}><StatusPill tone="warn">{person.permission_override}</StatusPill></div>
-                          ) : null}
-                        </td>
-                        <td style={imsTableCellStyle}>{person.email || ""}</td>
-                        <td style={imsTableCellStyle}>
-                          <SelectField
-                            value={draft.department || ""}
-                            onChange={(value) => setPersonDraft(person, { department: value })}
-                            disabled={isSaving}
-                          >
-                            <option value="">Unassigned</option>
-                            {departments.map((department) => <option key={department.id} value={department.name}>{department.name}</option>)}
-                          </SelectField>
-                        </td>
-                        <td style={imsTableCellStyle}>
-                          <SelectField
-                            value={isMaster ? "Admin" : draft.system_role || "Viewer"}
-                            onChange={(value) => setPersonDraft(person, { system_role: value })}
-                            disabled={isSaving || isMaster}
-                          >
-                            {editableRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
-                          </SelectField>
-                        </td>
-                        <td style={imsTableCellStyle}>
-                          <SelectField
-                            value={isMaster ? "Active" : accessStatus}
-                            onChange={(value) => setPersonDraft(person, { access_status: value })}
-                            disabled={isSaving || isMaster}
-                          >
-                            {accessStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
-                          </SelectField>
-                        </td>
-                        <td style={imsTableCellStyle}>{formatDateTime(authUser?.last_sign_in_at || person.last_login_at)}</td>
-                        <td style={imsTableCellStyle}>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <ImsButton onClick={() => updatePersonAccess(person, draft)} disabled={isSaving || !hasDraft}>
-                              Save
-                            </ImsButton>
-                            {person.email ? (
-                              <ImsButton variant="secondary" onClick={() => postAdminAction("resetPassword", { email: person.email }, `Password reset email sent to ${person.email}.`)} disabled={isSaving}>
-                                Send Reset Email
-                              </ImsButton>
+                      <Fragment key={person.id}>
+                        <tr
+                          onClick={() => setSelectedOverridePersonId(isSelected ? "" : person.id)}
+                          style={{
+                            cursor: "pointer",
+                            background: isSelected ? "rgba(58, 155, 152, 0.08)" : "#ffffff",
+                            borderLeft: isSelected ? `4px solid ${imsColours.brand}` : "4px solid transparent",
+                          }}
+                        >
+                          <td style={imsTableCellStyle}>
+                            <strong>{person.name}</strong>
+                            <div style={{ marginTop: 6 }}><StatusPill tone={loginStatus.tone}>{loginStatus.label}</StatusPill></div>
+                            {isMaster ? <div style={{ marginTop: 6 }}><StatusPill tone="good">Master Admin</StatusPill></div> : null}
+                            {person.permission_override && person.permission_override !== "Role Default" ? (
+                              <div style={{ marginTop: 6 }}><StatusPill tone="warn">{person.permission_override}</StatusPill></div>
                             ) : null}
-                          </div>
-                        </td>
-                      </tr>
+                          </td>
+                          <td style={imsTableCellStyle}>{person.email || ""}</td>
+                          <td style={imsTableCellStyle}>
+                            <StatusPill tone={accessStatus === "Deactivated" ? "danger" : "good"}>{accessStatus}</StatusPill>
+                          </td>
+                          <td style={imsTableCellStyle}>{formatDateTime(authUser?.last_sign_in_at || person.last_login_at)}</td>
+                          <td style={imsTableCellStyle}>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <ImsButton
+                                variant="secondary"
+                                onClick={() => {
+                                  setSelectedOverridePersonId(isSelected ? "" : person.id);
+                                }}
+                                disabled={isSaving}
+                              >
+                                {isSelected ? "Hide Panel" : "Open Panel"}
+                              </ImsButton>
+                              {canSendInvite ? (
+                                <ImsButton
+                                  variant="secondary"
+                                  onClick={() => {
+                                    void sendExistingInvite(person, authUser);
+                                  }}
+                                  disabled={isSaving}
+                                >
+                                  {authUser ? "Resend Setup" : "Send Invite"}
+                                </ImsButton>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                        {isSelected ? (
+                          <tr key={`${person.id}-permissions`}>
+                            <td style={{ ...imsTableCellStyle, background: "#f8fafc", padding: 16 }} colSpan={5}>
+                              <div id="selected-user-permissions">
+                                {renderPersonPermissionEditor(person)}
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
                     );
                   })}
+                  {!filteredPeople.length ? (
+                    <tr><td style={imsTableCellStyle} colSpan={5}>No users match the current search.</td></tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -764,25 +1241,75 @@ export default function AdminDashboardPage() {
                         {permissionOverrideOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                       </SelectField>
                     </Field>
-                    {[
-                      ["Quality", "quality_access"],
-                      ["Documents", "document_access"],
-                      ["HSE", "hse_access"],
-                      ["Assets", "asset_access"],
-                      ["Risk", "risk_access"],
-                      ["Actions", "action_access"],
-                      ["Admin", "admin_access"],
-                    ].map(([label, key]) => (
-                      <Field key={key} label={label}>
-                        <SelectField
-                          value={isMaster ? "Full" : String((draft as Record<string, unknown>)[key] || "Role Default")}
-                          onChange={(value) => setPersonDraft(person, { [key]: value === "Role Default" ? "" : value } as Partial<PersonRow>)}
-                          disabled={isSaving || isMaster}
-                        >
-                          {moduleAccessOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                        </SelectField>
-                      </Field>
-                    ))}
+                    <div style={{ gridColumn: "1 / -1", display: "grid", gap: 12 }}>
+                      {modulePermissionDefinitions.map((definition) => {
+                        const moduleAccessValue = isMaster ? "Full" : String((draft as Record<string, unknown>)[definition.accessField] || "Role Default");
+                        const partAccess = moduleAccessValue === "Part Access";
+                        return (
+                          <section key={definition.moduleKey} style={modulePermissionCardStyle}>
+                            <div style={modulePermissionHeaderStyle}>
+                              <div>
+                                <h4 style={modulePermissionTitleStyle}>{definition.label}</h4>
+                                <p style={modulePermissionSubtitleStyle}>
+                                  {moduleAccessValue === "Full"
+                                    ? "Full module access"
+                                    : partAccess
+                                      ? "Part access - select allowed tabs below"
+                                      : moduleAccessValue === "None"
+                                        ? "No module access"
+                                        : "Using role default unless changed"}
+                                </p>
+                              </div>
+                              <div style={segmentedButtonRowStyle}>
+                                {(["Full", "Part Access", "None"] as const).map((mode) => (
+                                  <button
+                                    key={mode}
+                                    type="button"
+                                    onClick={() => setModuleAccessMode(person, definition.accessField, definition.moduleKey, mode)}
+                                    disabled={isSaving || isMaster}
+                                    style={{
+                                      ...permissionModeButtonStyle,
+                                      ...(moduleAccessValue === mode ? permissionModeButtonActiveStyle : {}),
+                                    }}
+                                  >
+                                    {mode === "Full" ? "Full Access" : mode}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {partAccess ? (
+                              <div style={tabPermissionTableStyle}>
+                                <div style={{ ...tabPermissionRowStyle, ...tabPermissionHeadRowStyle }}>
+                                  <span>Internal tab</span>
+                                  <span>View</span>
+                                  <span>Create</span>
+                                  <span>Edit</span>
+                                </div>
+                                {definition.areas.map(([areaKey, label]) => {
+                                  const permission = getTabPermissionDraft(person, definition.moduleKey, areaKey);
+                                  return (
+                                    <div key={areaKey} style={tabPermissionRowStyle}>
+                                      <strong>{label}</strong>
+                                      {(["can_view", "can_create", "can_edit"] as const).map((field) => (
+                                        <label key={field} style={checkboxCellStyle}>
+                                          <input
+                                            type="checkbox"
+                                            checked={Boolean(permission.full_access || permission[field])}
+                                            onChange={(event) => setTabPermissionDraft(person, definition.moduleKey, areaKey, { [field]: event.target.checked })}
+                                            disabled={isSaving || isMaster}
+                                          />
+                                        </label>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+                          </section>
+                        );
+                      })}
+                    </div>
                     <Field label="Permission Notes" style={{ gridColumn: "1 / -1" }}>
                       <textarea
                         value={draft.permissions_notes || ""}
@@ -792,8 +1319,14 @@ export default function AdminDashboardPage() {
                       />
                     </Field>
                     <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
-                      <ImsButton onClick={() => updatePersonAccess(person, draft)} disabled={isSaving || !personDrafts[person.id]}>
-                        Save Individual Override
+                      <ImsButton
+                        onClick={async () => {
+                          const ok = await updatePersonAccess(person, draft);
+                          if (ok) await saveTabPermissions({ ...person, ...draft });
+                        }}
+                        disabled={isSaving || (!personDrafts[person.id] && !tabPermissionDrafts[person.id])}
+                      >
+                        Save Permissions
                       </ImsButton>
                     </div>
                   </>
@@ -967,6 +1500,108 @@ const tableWrapStyle: CSSProperties = {
   borderRadius: 14,
 };
 
+const inviteHeaderRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 16,
+  flexWrap: "wrap",
+};
+
+const inviteCompactGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 12,
+  marginTop: 16,
+  borderTop: `1px solid ${imsColours.border}`,
+  paddingTop: 16,
+};
+
+const invitePermissionMatrixStyle: CSSProperties = {
+  gridColumn: "1 / -1",
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: 16,
+  background: "#ffffff",
+  overflow: "hidden",
+};
+
+const invitePermissionMatrixHeaderStyle: CSSProperties = {
+  background: "#f8fafc",
+  borderBottom: `1px solid ${imsColours.border}`,
+  padding: "14px 16px",
+};
+
+const invitePermissionTitleStyle: CSSProperties = {
+  margin: 0,
+  color: imsColours.ink,
+  fontSize: 18,
+  fontWeight: 800,
+};
+
+const invitePermissionSubtitleStyle: CSSProperties = {
+  margin: "4px 0 0",
+  color: imsColours.slate,
+  fontSize: 14,
+  lineHeight: 1.5,
+};
+
+const invitePermissionRowsStyle: CSSProperties = {
+  display: "grid",
+};
+
+const invitePermissionRowStyle: CSSProperties = {
+  display: "grid",
+  gap: 16,
+  padding: "12px 16px",
+  borderTop: `1px solid ${imsColours.border}`,
+  color: imsColours.ink,
+};
+
+const invitePermissionRowHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: 16,
+  flexWrap: "wrap",
+};
+
+const invitePermissionModuleTitleStyle: CSSProperties = {
+  margin: 0,
+  color: imsColours.ink,
+  fontSize: 16,
+  fontWeight: 800,
+};
+
+const invitePermissionOptionGroupStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(96px, 1fr))",
+  gap: 8,
+  minWidth: 320,
+};
+
+const invitePermissionOptionStyle: CSSProperties = {
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: 10,
+  background: "#eef2f7",
+  color: imsColours.ink,
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 800,
+  padding: "9px 10px",
+};
+
+const invitePermissionOptionActiveStyle: CSSProperties = {
+  background: imsColours.brand,
+  borderColor: imsColours.brand,
+  color: "#ffffff",
+};
+
+const userSearchRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(240px, 1fr)",
+  marginBottom: 12,
+};
+
 const permissionGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
@@ -1006,6 +1641,150 @@ const rolePermissionGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))",
   gap: 10,
+};
+
+const modulePermissionCardStyle: CSSProperties = {
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: 14,
+  background: "#ffffff",
+  padding: 14,
+  display: "grid",
+  gap: 12,
+};
+
+const compactModuleCardStyle: CSSProperties = {
+  ...modulePermissionCardStyle,
+  padding: 12,
+};
+
+const modulePermissionStackStyle: CSSProperties = {
+  display: "grid",
+  gap: 10,
+};
+
+const modulePermissionHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 12,
+  flexWrap: "wrap",
+};
+
+const modulePermissionTitleStyle: CSSProperties = {
+  margin: 0,
+  color: imsColours.ink,
+  fontSize: 16,
+};
+
+const modulePermissionSubtitleStyle: CSSProperties = {
+  margin: "5px 0 0",
+  color: imsColours.slate,
+  fontSize: 13,
+};
+
+const segmentedButtonRowStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
+const permissionModeButtonStyle: CSSProperties = {
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: 10,
+  background: "#e2e8f0",
+  color: imsColours.ink,
+  fontWeight: 900,
+  padding: "10px 12px",
+  cursor: "pointer",
+};
+
+const permissionModeButtonActiveStyle: CSSProperties = {
+  background: imsColours.brand,
+  borderColor: imsColours.brand,
+  color: "#ffffff",
+};
+
+const tabPermissionTableStyle: CSSProperties = {
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: 12,
+  overflow: "hidden",
+};
+
+const tabPermissionRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(180px, 1fr) repeat(3, 92px)",
+  alignItems: "center",
+  gap: 0,
+  minHeight: 46,
+  borderTop: `1px solid ${imsColours.border}`,
+  padding: "0 12px",
+  color: imsColours.ink,
+};
+
+const tabPermissionHeadRowStyle: CSSProperties = {
+  borderTop: "none",
+  background: "#f8fafc",
+  color: imsColours.slate,
+  fontSize: 12,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const checkboxCellStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const personDetailPanelStyle: CSSProperties = {
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: 18,
+  background: "#ffffff",
+  padding: 16,
+  display: "grid",
+  gap: 14,
+  boxShadow: "0 10px 24px rgba(15, 23, 42, 0.08)",
+};
+
+const personDetailHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 12,
+};
+
+const eyebrowStyle: CSSProperties = {
+  margin: "0 0 5px",
+  color: imsColours.slate,
+  fontSize: 12,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+};
+
+const personDetailTitleStyle: CSSProperties = {
+  margin: 0,
+  color: imsColours.ink,
+  fontSize: 22,
+};
+
+const personDetailMetaStyle: CSSProperties = {
+  margin: "5px 0 0",
+  color: imsColours.slate,
+};
+
+const compactFieldGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 10,
+};
+
+const detailActionRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: 10,
+  flexWrap: "wrap",
 };
 
 const paragraphStyle: CSSProperties = {

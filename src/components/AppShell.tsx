@@ -3,11 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { ImsPermissionNotice, ImsPermissionProvider, type ImsPermissionValue } from "./ImsPermissions";
 import { supabase } from "../lib/supabase";
 
 type AppShellProps = {
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 type NavItem = {
@@ -36,6 +38,17 @@ type ModuleAccess = {
   actions?: string | null;
   admin?: string | null;
 };
+
+type TabPermissionRecord = {
+  module_key?: string | null;
+  area_key?: string | null;
+  can_view?: boolean | null;
+  can_create?: boolean | null;
+  can_edit?: boolean | null;
+  full_access?: boolean | null;
+};
+
+type PermissionTarget = { moduleKey: string; areaKey: string };
 
 type PeopleAccessRecord = {
   name?: string | null;
@@ -196,8 +209,256 @@ function hasExplicitAccess(value: string | null | undefined) {
   return Boolean(cleanValue && cleanValue !== "role default" && cleanValue !== "none");
 }
 
-function filterNavItemsForRole(items: NavItem[], role: SystemRole, moduleAccess: ModuleAccess) {
-  return items.filter((item) => isAreaAllowed(getAccessAreaFromHref(item.href), role, moduleAccess));
+function isExplicitNone(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase() === "none";
+}
+
+function isPartAccess(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase() === "part access";
+}
+
+function getNormalisedAccess(value: string | null | undefined) {
+  return (value || "").trim().toLowerCase();
+}
+
+function getModuleAccessValue(moduleKey: string, moduleAccess: ModuleAccess) {
+  if (moduleKey === "quality") return moduleAccess.quality;
+  if (moduleKey === "documents") return moduleAccess.documents;
+  if (moduleKey === "hse") return moduleAccess.hse;
+  if (moduleKey === "assets") return moduleAccess.assets;
+  if (moduleKey === "risk") return moduleAccess.risk;
+  if (moduleKey === "actions") return moduleAccess.actions;
+  if (moduleKey === "admin") return moduleAccess.admin;
+  return null;
+}
+
+function getPermissionTargetFromHref(href: string): PermissionTarget | null {
+  if (href === "/quality") return { moduleKey: "quality", areaKey: "dashboard" };
+  if (href === "/moc") return { moduleKey: "quality", areaKey: "moc" };
+  if (href === "/ncr-capa") return { moduleKey: "quality", areaKey: "ncr" };
+  if (href === "/audits") return { moduleKey: "quality", areaKey: "audits" };
+  if (href === "/quality/actions") return { moduleKey: "quality", areaKey: "actions" };
+  if (href === "/reports") return { moduleKey: "quality", areaKey: "reports" };
+
+  if (href === "/documents") return { moduleKey: "documents", areaKey: "document-control" };
+  if (href === "/certification") return { moduleKey: "documents", areaKey: "certification" };
+
+  if (href === "/hse") return { moduleKey: "hse", areaKey: "dashboard" };
+  if (href === "/hse/calendar") return { moduleKey: "hse", areaKey: "calendar" };
+  if (href.startsWith("/hse/ainm")) return { moduleKey: "hse", areaKey: "ainm" };
+  if (href === "/hse/observations") return { moduleKey: "hse", areaKey: "observations" };
+  if (href === "/hse/ptw") return { moduleKey: "hse", areaKey: "ptw" };
+  if (href.startsWith("/hse/inspections")) return { moduleKey: "hse", areaKey: "inspections" };
+  if (href === "/hse/actions") return { moduleKey: "hse", areaKey: "actions" };
+  if (href === "/hse/reports") return { moduleKey: "hse", areaKey: "reports" };
+
+  if (href === "/assets/dashboard") return { moduleKey: "assets", areaKey: "dashboard" };
+  if (href === "/assets") return { moduleKey: "assets", areaKey: "register" };
+  if (href === "/assets/calibration") return { moduleKey: "assets", areaKey: "calibration" };
+  if (href === "/assets/inspection") return { moduleKey: "assets", areaKey: "inspection" };
+  if (href === "/assets/maintenance") return { moduleKey: "assets", areaKey: "maintenance" };
+  if (href === "/assets/actions") return { moduleKey: "assets", areaKey: "actions" };
+  if (href === "/assets/reports") return { moduleKey: "assets", areaKey: "reports" };
+
+  if (href === "/risk") return { moduleKey: "risk", areaKey: "dashboard" };
+  if (href === "/risk/register") return { moduleKey: "risk", areaKey: "register" };
+  if (href === "/risk/reviews") return { moduleKey: "risk", areaKey: "reviews" };
+  if (href === "/risk/controls") return { moduleKey: "risk", areaKey: "controls" };
+  if (href === "/risk/opportunities") return { moduleKey: "risk", areaKey: "opportunities" };
+  if (href === "/risk/actions") return { moduleKey: "risk", areaKey: "actions" };
+  if (href === "/risk/reports") return { moduleKey: "risk", areaKey: "reports" };
+
+  if (href === "/actions") return { moduleKey: "actions", areaKey: "register" };
+  if (href.startsWith("/admin")) return { moduleKey: "admin", areaKey: href === "/admin" ? "dashboard" : href.replace("/admin/", "") };
+  return null;
+}
+
+function getRoleDefaultPermission(role: SystemRole, target: PermissionTarget): Pick<ImsPermissionValue, "canView" | "canCreate" | "canEdit" | "fullAccess"> {
+  if (role === "Admin") return { canView: true, canCreate: true, canEdit: true, fullAccess: true };
+  if (role === "Viewer") return { canView: true, canCreate: false, canEdit: false, fullAccess: false };
+  if (role === "Contractor") return { canView: target.moduleKey === "hse", canCreate: target.moduleKey === "hse", canEdit: false, fullAccess: false };
+  if (role === "Manager") return { canView: true, canCreate: true, canEdit: true, fullAccess: false };
+  if (role === "HSE Officer" && target.moduleKey === "hse") return { canView: true, canCreate: true, canEdit: true, fullAccess: false };
+  if (role === "Quality Engineer" && target.moduleKey === "quality") return { canView: true, canCreate: true, canEdit: true, fullAccess: false };
+  if (role === "Document Controller" && target.moduleKey === "documents") return { canView: true, canCreate: true, canEdit: true, fullAccess: false };
+  if (role === "Asset Manager" && target.moduleKey === "assets") return { canView: true, canCreate: true, canEdit: true, fullAccess: false };
+  return { canView: true, canCreate: false, canEdit: false, fullAccess: false };
+}
+
+function getAccessValuePermission(value: string | null | undefined) {
+  const access = getNormalisedAccess(value);
+  if (access === "full" || access === "edit" || access === "approve" || access === "documents") {
+    return { canView: true, canCreate: true, canEdit: true, fullAccess: access === "full" };
+  }
+  if (access === "read") return { canView: true, canCreate: false, canEdit: false, fullAccess: false };
+  if (access === "observe") return { canView: true, canCreate: true, canEdit: false, fullAccess: false };
+  if (access === "none") return { canView: false, canCreate: false, canEdit: false, fullAccess: false };
+  return null;
+}
+
+function getActivePermissionValue({
+  loaded,
+  target,
+  role,
+  moduleAccess,
+  tabPermissions,
+  isMasterAdmin,
+}: {
+  loaded: boolean;
+  target: PermissionTarget | null;
+  role: SystemRole;
+  moduleAccess: ModuleAccess;
+  tabPermissions: TabPermissionRecord[];
+  isMasterAdmin: boolean;
+}): ImsPermissionValue {
+  if (!target) {
+    return {
+      loaded,
+      moduleKey: null,
+      areaKey: null,
+      canView: true,
+      canCreate: true,
+      canEdit: true,
+      fullAccess: true,
+      isMasterAdmin,
+    };
+  }
+
+  if (isMasterAdmin || role === "Admin") {
+    return {
+      loaded,
+      moduleKey: target.moduleKey,
+      areaKey: target.areaKey,
+      canView: true,
+      canCreate: true,
+      canEdit: true,
+      fullAccess: true,
+      isMasterAdmin: true,
+    };
+  }
+
+  const moduleAccessValue = getModuleAccessValue(target.moduleKey, moduleAccess);
+  if (isPartAccess(moduleAccessValue)) {
+    const tabPermission = getTabPermission(tabPermissions, target.moduleKey, target.areaKey);
+    const fullAccess = Boolean(tabPermission?.full_access);
+    return {
+      loaded,
+      moduleKey: target.moduleKey,
+      areaKey: target.areaKey,
+      canView: fullAccess || Boolean(tabPermission?.can_view || tabPermission?.can_create || tabPermission?.can_edit),
+      canCreate: fullAccess || Boolean(tabPermission?.can_create),
+      canEdit: fullAccess || Boolean(tabPermission?.can_edit),
+      fullAccess,
+      isMasterAdmin: false,
+    };
+  }
+
+  const explicitPermission = getAccessValuePermission(moduleAccessValue);
+  const permission = explicitPermission || getRoleDefaultPermission(role, target);
+  return {
+    loaded,
+    moduleKey: target.moduleKey,
+    areaKey: target.areaKey,
+    ...permission,
+    isMasterAdmin: false,
+  };
+}
+
+const createActionWords = [
+  "create",
+  "add",
+  "new",
+  "import",
+  "bulk upload",
+  "generate",
+  "draft",
+  "issue",
+  "invite",
+];
+
+const editActionWords = [
+  "save",
+  "update",
+  "edit",
+  "delete",
+  "remove",
+  "upload",
+  "submit",
+  "send",
+  "approve",
+  "reject",
+  "close",
+  "reopen",
+  "up-rev",
+  "supersede",
+  "reset",
+  "deactivate",
+  "activate",
+];
+
+const safeActionWords = [
+  "open",
+  "view",
+  "download",
+  "preview",
+  "hide",
+  "show",
+  "clear filters",
+  "refresh",
+  "back",
+  "copy",
+  "search",
+  "filter",
+  "sign out",
+];
+
+function getElementActionLabel(element: HTMLElement) {
+  return [
+    element.getAttribute("data-ims-action"),
+    element.getAttribute("aria-label"),
+    element.getAttribute("title"),
+    element.textContent,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function getRestrictedAction(label: string): "create" | "edit" | null {
+  if (!label) return null;
+  if (safeActionWords.some((word) => label.includes(word))) return null;
+  if (editActionWords.some((word) => label.includes(word))) return "edit";
+  if (createActionWords.some((word) => label.includes(word))) return "create";
+  return null;
+}
+
+function hasTabPermission(tabPermissions: TabPermissionRecord[], moduleKey: string, areaKey: string) {
+  return tabPermissions.some((permission) => {
+    return (
+      (permission.module_key || "").trim() === moduleKey &&
+      (permission.area_key || "").trim() === areaKey &&
+      (permission.full_access || permission.can_view || permission.can_create || permission.can_edit)
+    );
+  });
+}
+
+function getTabPermission(tabPermissions: TabPermissionRecord[], moduleKey: string, areaKey: string) {
+  return tabPermissions.find((permission) => {
+    return (permission.module_key || "").trim() === moduleKey && (permission.area_key || "").trim() === areaKey;
+  });
+}
+
+function filterNavItemsForRole(items: NavItem[], role: SystemRole, moduleAccess: ModuleAccess, tabPermissions: TabPermissionRecord[]) {
+  return items.filter((item) => {
+    if (item.href === "/home" || item.href === "/") return true;
+    const target = getPermissionTargetFromHref(item.href);
+    if (target && isPartAccess(getModuleAccessValue(target.moduleKey, moduleAccess))) {
+      return hasTabPermission(tabPermissions, target.moduleKey, target.areaKey);
+    }
+    return isAreaAllowed(getAccessAreaFromHref(item.href), role, moduleAccess);
+  });
 }
 
 function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleAccess) {
@@ -205,13 +466,13 @@ function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleA
   if (area === "home") return true;
   if (area === "people") return getAllowedModuleKeys(role).has("people");
   if (role === "Admin") return true;
-  if (area === "quality") return hasExplicitAccess(moduleAccess.quality) || role === "Manager" || role === "Quality Engineer" || role === "Viewer";
-  if (area === "documents") return hasExplicitAccess(moduleAccess.documents) || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer";
-  if (area === "hse") return hasExplicitAccess(moduleAccess.hse) || role === "Manager" || role === "HSE Officer" || role === "Viewer";
-  if (area === "assets") return hasExplicitAccess(moduleAccess.assets) || role === "Manager" || role === "Asset Manager" || role === "Viewer";
-  if (area === "risk") return hasExplicitAccess(moduleAccess.risk) || role === "Manager" || role === "Viewer";
-  if (area === "actions") return hasExplicitAccess(moduleAccess.actions) || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer";
-  if (area === "admin") return hasExplicitAccess(moduleAccess.admin);
+  if (area === "quality") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
+  if (area === "documents") return !isExplicitNone(moduleAccess.documents) && (hasExplicitAccess(moduleAccess.documents) || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer");
+  if (area === "hse") return !isExplicitNone(moduleAccess.hse) && (hasExplicitAccess(moduleAccess.hse) || role === "Manager" || role === "HSE Officer" || role === "Viewer");
+  if (area === "assets") return !isExplicitNone(moduleAccess.assets) && (hasExplicitAccess(moduleAccess.assets) || role === "Manager" || role === "Asset Manager" || role === "Viewer");
+  if (area === "risk") return !isExplicitNone(moduleAccess.risk) && (hasExplicitAccess(moduleAccess.risk) || role === "Manager" || role === "Viewer");
+  if (area === "actions") return !isExplicitNone(moduleAccess.actions) && (hasExplicitAccess(moduleAccess.actions) || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer");
+  if (area === "admin") return !isExplicitNone(moduleAccess.admin) && hasExplicitAccess(moduleAccess.admin);
   return false;
 }
 
@@ -357,6 +618,8 @@ export default function AppShell({ children }: AppShellProps) {
   const [signedInName, setSignedInName] = useState("");
   const [signedInRole, setSignedInRole] = useState<SystemRole>("");
   const [signedInModuleAccess, setSignedInModuleAccess] = useState<ModuleAccess>({});
+  const [signedInTabPermissions, setSignedInTabPermissions] = useState<TabPermissionRecord[]>([]);
+  const [signedInIsMasterAdmin, setSignedInIsMasterAdmin] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const isLoginPage = pathname === "/login";
   const isPublicObservationPage = pathname === "/observe";
@@ -420,7 +683,7 @@ export default function AppShell({ children }: AppShellProps) {
     : isActionModule
     ? actionNavItems
     : qualityNavItems;
-  const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess);
+  const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess, signedInTabPermissions);
   const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldInspectionMode;
   const railOpen = isRailExpanded || isRailPinned;
   const currentAccessArea: AccessArea = isLoginPage
@@ -430,11 +693,22 @@ export default function AppShell({ children }: AppShellProps) {
     : isHomePage
     ? "home"
     : getAccessAreaFromHref(pathname);
+  const currentPermissionTarget = getPermissionTargetFromHref(pathname);
+  const activePermission = getActivePermissionValue({
+    loaded: permissionsLoaded,
+    target: currentPermissionTarget,
+    role: signedInRole,
+    moduleAccess: signedInModuleAccess,
+    tabPermissions: signedInTabPermissions,
+    isMasterAdmin: signedInIsMasterAdmin,
+  });
   const pageAccessAllowed =
     isLoginPage ||
     isPublicObservationPage ||
     !permissionsLoaded ||
-    isAreaAllowed(currentAccessArea, signedInRole, signedInModuleAccess);
+    (currentPermissionTarget && isPartAccess(getModuleAccessValue(currentPermissionTarget.moduleKey, signedInModuleAccess))
+      ? hasTabPermission(signedInTabPermissions, currentPermissionTarget.moduleKey, currentPermissionTarget.areaKey)
+      : isAreaAllowed(currentAccessArea, signedInRole, signedInModuleAccess));
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -471,6 +745,8 @@ export default function AppShell({ children }: AppShellProps) {
           setSignedInName("");
           setSignedInRole("");
           setSignedInModuleAccess({});
+          setSignedInTabPermissions([]);
+          setSignedInIsMasterAdmin(false);
           setPermissionsLoaded(true);
         }
         return;
@@ -505,6 +781,8 @@ export default function AppShell({ children }: AppShellProps) {
           setSignedInName(person?.name || user.user_metadata?.name || email);
           setSignedInRole("");
           setSignedInModuleAccess({});
+          setSignedInTabPermissions([]);
+          setSignedInIsMasterAdmin(false);
           setPermissionsLoaded(true);
           return;
         }
@@ -519,9 +797,15 @@ export default function AppShell({ children }: AppShellProps) {
               .maybeSingle()
           : { data: null };
 
+        const { data: tabPermissions } = await supabase
+          .from("ims_tab_permissions")
+          .select("module_key,area_key,can_view,can_create,can_edit,full_access")
+          .ilike("email", email.trim());
+
         if (!isMounted) return;
         setSignedInName(person?.name || user.user_metadata?.name || email);
         setSignedInRole(resolvedRole);
+        setSignedInIsMasterAdmin(Boolean(isMasterAdmin));
         setSignedInModuleAccess({
           quality: person?.quality_access || roleDefaults?.quality_access,
           hse: person?.hse_access || roleDefaults?.hse_access,
@@ -531,6 +815,7 @@ export default function AppShell({ children }: AppShellProps) {
           actions: person?.action_access || roleDefaults?.action_access,
           admin: person?.admin_access || roleDefaults?.admin_access,
         });
+        setSignedInTabPermissions((tabPermissions || []) as TabPermissionRecord[]);
         setPermissionsLoaded(true);
         return;
       }
@@ -539,6 +824,8 @@ export default function AppShell({ children }: AppShellProps) {
         setSignedInName(user.user_metadata?.name || "");
         setSignedInRole("");
         setSignedInModuleAccess({});
+        setSignedInTabPermissions([]);
+        setSignedInIsMasterAdmin(false);
         setPermissionsLoaded(true);
       }
     }
@@ -555,8 +842,55 @@ export default function AppShell({ children }: AppShellProps) {
     window.location.href = "/login";
   };
 
+  const showPermissionBlock = (message: string) => {
+    if (typeof window === "undefined") return;
+    window.alert(message);
+  };
+
+  const handlePermissionClickCapture = (event: MouseEvent<HTMLDivElement>) => {
+    if (!permissionsLoaded || activePermission.fullAccess || activePermission.isMasterAdmin || isLoginPage || isPublicObservationPage) return;
+    const target = event.target as HTMLElement | null;
+    const actionElement = target?.closest("button, a, input[type='button'], input[type='submit']") as HTMLElement | null;
+    if (!actionElement) return;
+    const label = getElementActionLabel(actionElement);
+    const restrictedAction = getRestrictedAction(label);
+    if (!restrictedAction) return;
+    const allowed = restrictedAction === "create" ? activePermission.canCreate : activePermission.canEdit;
+    if (allowed) return;
+    event.preventDefault();
+    event.stopPropagation();
+    showPermissionBlock(
+      restrictedAction === "create"
+        ? "Your current IMS permissions allow you to view this area, but not create new records here."
+        : "Your current IMS permissions allow you to view this area, but not edit, upload, approve, or delete records here.",
+    );
+  };
+
+  const handlePermissionSubmitCapture = (event: FormEvent<HTMLDivElement>) => {
+    if (!permissionsLoaded || activePermission.fullAccess || activePermission.isMasterAdmin || activePermission.canCreate || activePermission.canEdit) return;
+    event.preventDefault();
+    event.stopPropagation();
+    showPermissionBlock("Your current IMS permissions are read-only for this area, so form submissions are blocked.");
+  };
+
+  const handlePermissionChangeCapture = (event: FormEvent<HTMLDivElement>) => {
+    if (!permissionsLoaded || activePermission.fullAccess || activePermission.isMasterAdmin || activePermission.canCreate || activePermission.canEdit) return;
+    const target = event.target as HTMLInputElement | null;
+    if (target?.type !== "file") return;
+    event.preventDefault();
+    event.stopPropagation();
+    target.value = "";
+    showPermissionBlock("Your current IMS permissions are read-only for this area, so file uploads are blocked.");
+  };
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9", scrollbarGutter: "stable" }}>
+    <ImsPermissionProvider value={activePermission}>
+    <div
+      style={{ minHeight: "100vh", background: "#f1f5f9", scrollbarGutter: "stable" }}
+      onClickCapture={handlePermissionClickCapture}
+      onSubmitCapture={handlePermissionSubmitCapture}
+      onChangeCapture={handlePermissionChangeCapture}
+    >
       {!isPublicObservationPage ? <header
         style={{
           position: "sticky",
@@ -944,7 +1278,10 @@ export default function AppShell({ children }: AppShellProps) {
           }}
         >
           {pageAccessAllowed ? (
-            children
+            <>
+              {!isHomePage && !isFieldInspectionMode ? <ImsPermissionNotice /> : null}
+              {children}
+            </>
           ) : (
             <section
               style={{
@@ -1009,5 +1346,6 @@ export default function AppShell({ children }: AppShellProps) {
         </div>
       </main>
     </div>
+    </ImsPermissionProvider>
   );
 }

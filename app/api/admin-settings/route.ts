@@ -7,8 +7,10 @@ const MASTER_ADMIN_NAME = "Jordan Beaton";
 
 type AdminAction =
   | "inviteUser"
+  | "sendExistingInvite"
   | "resetPassword"
   | "updatePersonAccess"
+  | "updateTabPermissions"
   | "updateCompany"
   | "updateRole"
   | "addDepartment"
@@ -32,6 +34,10 @@ type ServiceClient = SupabaseClient;
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanBoolean(value: unknown) {
+  return value === true;
 }
 
 async function getCurrentUser() {
@@ -121,7 +127,7 @@ export async function GET() {
     }
 
     const service = access.service;
-    const [authUsersResult, peopleResult, companyResult, departmentsResult, projectsResult, rolesResult, auditLogResult] =
+    const [authUsersResult, peopleResult, companyResult, departmentsResult, projectsResult, rolesResult, auditLogResult, tabPermissionsResult] =
       await Promise.all([
         service.auth.admin.listUsers({ page: 1, perPage: 1000 }),
         service.from("people").select("*").order("name", { ascending: true }),
@@ -130,6 +136,7 @@ export async function GET() {
         service.from("ims_reference_projects").select("*").order("name", { ascending: true }),
         service.from("ims_roles").select("*").order("role_name", { ascending: true }),
         service.from("ims_audit_log").select("*").order("created_at", { ascending: false }).limit(80),
+        service.from("ims_tab_permissions").select("*").order("module_key", { ascending: true }).order("area_key", { ascending: true }),
       ]);
 
     if (peopleResult.error) throw peopleResult.error;
@@ -152,12 +159,14 @@ export async function GET() {
       projects: projectsResult.data || [],
       roles: rolesResult.data || [],
       auditLog: auditLogResult.data || [],
+      tabPermissions: tabPermissionsResult.data || [],
       warnings: [
         companyResult.error ? `Company settings: ${companyResult.error.message}` : "",
         departmentsResult.error ? `Departments: ${departmentsResult.error.message}` : "",
         projectsResult.error ? `Projects: ${projectsResult.error.message}` : "",
         rolesResult.error ? `Roles: ${rolesResult.error.message}` : "",
         auditLogResult.error ? `Audit log: ${auditLogResult.error.message}` : "",
+        tabPermissionsResult.error ? `Tab permissions: ${tabPermissionsResult.error.message}` : "",
       ].filter(Boolean),
     });
   } catch (error) {
@@ -196,6 +205,7 @@ export async function POST(request: Request) {
         action_access: cleanText(payload.action_access) || null,
         admin_access: cleanText(payload.admin_access) || null,
       };
+      const tabPermissions = Array.isArray(payload.tab_permissions) ? payload.tab_permissions : [];
 
       if (!email || !name) {
         return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
@@ -246,15 +256,109 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: existingPeopleError.message }, { status: 400 });
       }
 
-      const peopleResult = existingPeople?.[0]?.id
-        ? await service.from("people").update(personPayload).eq("id", existingPeople[0].id)
-        : await service.from("people").insert(personPayload);
+      let personId = cleanText(existingPeople?.[0]?.id);
+      if (personId) {
+        const updateResult = await service.from("people").update(personPayload).eq("id", personId);
+        if (updateResult.error) {
+          return NextResponse.json({ error: updateResult.error.message }, { status: 400 });
+        }
+      } else {
+        const insertResult = await service.from("people").insert(personPayload).select("id").single();
+        if (insertResult.error) {
+          return NextResponse.json({ error: insertResult.error.message }, { status: 400 });
+        }
+        personId = cleanText(insertResult.data?.id);
+      }
 
-      if (peopleResult.error) {
-        return NextResponse.json({ error: peopleResult.error.message }, { status: 400 });
+      if (personId && tabPermissions.length > 0) {
+        const deleteResult = await service.from("ims_tab_permissions").delete().eq("person_id", personId);
+        if (deleteResult.error) {
+          return NextResponse.json({ error: deleteResult.error.message }, { status: 400 });
+        }
+
+        const permissionRows = tabPermissions
+          .map((permission) => {
+            const row = permission as Record<string, unknown>;
+            const moduleKey = cleanText(row.module_key);
+            const areaKey = cleanText(row.area_key);
+            if (!moduleKey || !areaKey) return null;
+            return {
+              person_id: personId,
+              email,
+              module_key: moduleKey,
+              area_key: areaKey,
+              can_view: cleanBoolean(row.can_view) || cleanBoolean(row.full_access),
+              can_create: cleanBoolean(row.can_create) || cleanBoolean(row.full_access),
+              can_edit: cleanBoolean(row.can_edit) || cleanBoolean(row.full_access),
+              full_access: cleanBoolean(row.full_access),
+              updated_at: new Date().toISOString(),
+            };
+          })
+          .filter(Boolean);
+
+        if (permissionRows.length > 0) {
+          const insertPermissionResult = await service.from("ims_tab_permissions").insert(permissionRows);
+          if (insertPermissionResult.error) {
+            return NextResponse.json({ error: insertPermissionResult.error.message }, { status: 400 });
+          }
+        }
       }
 
       await writeAuditLog(service, actorEmail, "Invite User", "Person", email, `Invited ${name} as ${role}.`);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "sendExistingInvite") {
+      const id = cleanText(payload.id);
+      if (!id) return NextResponse.json({ error: "Person id is required." }, { status: 400 });
+
+      const { data: person, error: personError } = await service
+        .from("people")
+        .select("id,name,email,department,role,system_role,access_status,active")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (personError) return NextResponse.json({ error: personError.message }, { status: 400 });
+      if (!person?.email) return NextResponse.json({ error: "This person does not have an email address." }, { status: 400 });
+      if (person.active === false || cleanText(person.access_status).toLowerCase() === "deactivated") {
+        return NextResponse.json({ error: "Deactivated people cannot be invited." }, { status: 400 });
+      }
+
+      const email = cleanText(person.email).toLowerCase();
+      const name = cleanText(person.name);
+      const department = cleanText(person.department);
+      const role = cleanText(person.system_role) || "Viewer";
+      const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
+      const redirectTo = origin ? `${origin}/login?mode=invite` : undefined;
+      const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const authUser = authUsers.data.users.find((user: User) => (user.email || "").toLowerCase() === email);
+
+      const inviteResult = authUser
+        ? await service.auth.resetPasswordForEmail(email, { redirectTo })
+        : await service.auth.admin.inviteUserByEmail(email, {
+            data: { name, system_role: role, department },
+            redirectTo,
+          });
+
+      if (inviteResult.error) {
+        return NextResponse.json({ error: inviteResult.error.message }, { status: 400 });
+      }
+
+      const { error: updateError } = await service
+        .from("people")
+        .update({ access_status: "Invited", active: true })
+        .eq("id", id);
+
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
+
+      await writeAuditLog(
+        service,
+        actorEmail,
+        authUser ? "Send Password Setup" : "Send Invite",
+        "Person",
+        email,
+        authUser ? `Password setup link sent to ${name}.` : `Invite link sent to ${name}.`,
+      );
       return NextResponse.json({ ok: true });
     }
 
@@ -358,6 +462,69 @@ export async function POST(request: Request) {
         `${email} set to ${systemRole} / ${accessStatus}.`,
         previousPerson || null,
         { id, email, ...nextPersonValues },
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "updateTabPermissions") {
+      const personId = cleanText(payload.person_id);
+      const email = cleanText(payload.email).toLowerCase();
+      const permissions = Array.isArray(payload.permissions) ? payload.permissions : [];
+
+      if (!personId || !email) {
+        return NextResponse.json({ error: "Person id and email are required." }, { status: 400 });
+      }
+
+      const { data: previousPermissions } = await service
+        .from("ims_tab_permissions")
+        .select("*")
+        .eq("person_id", personId);
+
+      const { error: deleteError } = await service
+        .from("ims_tab_permissions")
+        .delete()
+        .eq("person_id", personId);
+
+      if (deleteError) {
+        return NextResponse.json({ error: deleteError.message }, { status: 400 });
+      }
+
+      const rows = permissions
+        .map((item) => {
+          const row = item as Record<string, unknown>;
+          const moduleKey = cleanText(row.module_key);
+          const areaKey = cleanText(row.area_key);
+          if (!moduleKey || !areaKey) return null;
+          return {
+            person_id: personId,
+            email,
+            module_key: moduleKey,
+            area_key: areaKey,
+            can_view: cleanBoolean(row.can_view),
+            can_create: cleanBoolean(row.can_create),
+            can_edit: cleanBoolean(row.can_edit),
+            full_access: cleanBoolean(row.full_access),
+            updated_at: new Date().toISOString(),
+          };
+        })
+        .filter(Boolean);
+
+      if (rows.length) {
+        const { error: insertError } = await service.from("ims_tab_permissions").insert(rows);
+        if (insertError) {
+          return NextResponse.json({ error: insertError.message }, { status: 400 });
+        }
+      }
+
+      await writeAuditLog(
+        service,
+        actorEmail,
+        "Update Tab Permissions",
+        "Person",
+        email,
+        `Updated tab-level permissions for ${email}.`,
+        { permissions: previousPermissions || [] },
+        { permissions: rows },
       );
       return NextResponse.json({ ok: true });
     }
