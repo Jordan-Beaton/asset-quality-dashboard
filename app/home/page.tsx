@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
 
 const moduleCards = [
   {
@@ -8,6 +11,7 @@ const moduleCards = [
     icon: "quality",
     description: "NCR, audits, MOC, reporting, and HSEQ workflow control.",
     href: "/quality",
+    moduleKey: "quality",
     status: "Live",
     group: "Core IMS",
     cta: "Enter",
@@ -18,6 +22,7 @@ const moduleCards = [
     icon: "hse",
     description: "AINM, inspections, evidence capture, HSE actions, and report packs.",
     href: "/hse",
+    moduleKey: "hse",
     status: "Live",
     group: "Operations",
     cta: "Enter",
@@ -28,6 +33,7 @@ const moduleCards = [
     icon: "assets",
     description: "Asset register, calibration, inspection, maintenance, and linked actions.",
     href: "/assets",
+    moduleKey: "assets",
     status: "Live",
     group: "Operations",
     cta: "Enter",
@@ -38,6 +44,7 @@ const moduleCards = [
     icon: "documents",
     description: "Controlled files, register status, reviews, approvals, archive, and reports.",
     href: "/documents",
+    moduleKey: "documents",
     status: "Live",
     group: "Control",
     cta: "Open",
@@ -48,6 +55,7 @@ const moduleCards = [
     icon: "actions",
     description: "Central follow-up register linking Quality, HSE, Assets, Risk, MOC, and evidence.",
     href: "/actions",
+    moduleKey: "actions",
     status: "Live",
     group: "Control",
     cta: "Open",
@@ -58,6 +66,7 @@ const moduleCards = [
     icon: "risk",
     description: "Risk register foundation, reviews, controls, opportunities, and reporting shell.",
     href: "/risk",
+    moduleKey: "risk",
     status: "Ready",
     group: "Governance",
     cta: "Open",
@@ -68,6 +77,7 @@ const moduleCards = [
     icon: "review",
     description: "Read-only management pack view across system health, actions, risk, documents, and assets.",
     href: "/management-review",
+    moduleKey: "management-review",
     status: "Ready",
     group: "Governance",
     cta: "Review",
@@ -78,6 +88,7 @@ const moduleCards = [
     icon: "people",
     description: "Shared people source for owners, inspectors, originators, reviewers, approvers, and roles.",
     href: "/people",
+    moduleKey: "people",
     status: "Ready",
     group: "Master Data",
     cta: "Open",
@@ -88,6 +99,7 @@ const moduleCards = [
     icon: "admin",
     description: "System configuration shell for master data, roles, numbering, and module settings.",
     href: "/admin",
+    moduleKey: "admin",
     status: "Shell",
     group: "Master Data",
     cta: "Configure",
@@ -187,6 +199,21 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
 }
 
 export default function HomePage() {
+  const permissions = useImsPermissions();
+  const isModuleAccessible = (moduleKey: (typeof moduleCards)[number]["moduleKey"]) => {
+    if (!permissions.loaded) return true;
+    if (moduleKey === "management-review") {
+      return (
+        permissions.canAccessModule("quality") ||
+        permissions.canAccessModule("hse") ||
+        permissions.canAccessModule("documents") ||
+        permissions.canAccessModule("assets") ||
+        permissions.canAccessModule("risk")
+      );
+    }
+    return permissions.canAccessModule(moduleKey);
+  };
+
   return (
     <main style={pageStyle}>
       <style>
@@ -264,13 +291,22 @@ export default function HomePage() {
         </div>
 
         <div style={moduleGridStyle}>
-          {moduleCards.map((card, index) => (
-            <Link
-              key={card.title}
-              href={card.href}
-              style={cardShellStyle}
-            >
-              <article className="home-module-card" style={cardStyle}>
+          {moduleCards.map((card) => {
+            const hasAccess = isModuleAccessible(card.moduleKey);
+            const status = hasAccess ? card.status : "No Access";
+            const shellStyle = {
+              ...cardShellStyle,
+              cursor: hasAccess ? "pointer" : "not-allowed",
+            };
+            const cardContent = (
+              <article
+                className={hasAccess ? "home-module-card" : undefined}
+                style={{
+                  ...cardStyle,
+                  opacity: hasAccess ? 1 : 0.64,
+                  filter: hasAccess ? "none" : "grayscale(0.18)",
+                }}
+              >
                 <span aria-hidden="true" style={cardGlowStyle} />
                 <div style={cardTopLineStyle}>
                   <span style={moduleIconStyle}>
@@ -279,11 +315,19 @@ export default function HomePage() {
                   <span
                     style={{
                       ...statusPillStyle,
-                      background: card.status === "Shell" ? "#eef2f6" : "#DFF5F3",
-                      color: card.status === "Shell" ? "#475569" : "#2F7F7D",
+                      background: hasAccess
+                        ? card.status === "Shell"
+                          ? "#eef2f6"
+                          : "#DFF5F3"
+                        : "#fee2e2",
+                      color: hasAccess
+                        ? card.status === "Shell"
+                          ? "#475569"
+                          : "#2F7F7D"
+                        : "#991b1b",
                     }}
                   >
-                    {card.status}
+                    {status}
                   </span>
                 </div>
 
@@ -296,15 +340,53 @@ export default function HomePage() {
                 </div>
 
                 <div style={cardFooterStyle}>
-                  <span style={cardShortStyle}>
-                    <span style={connectorDotStyle} />
+                  <span
+                    style={{
+                      ...cardShortStyle,
+                      color: hasAccess ? "#2F7F7D" : "#64748b",
+                    }}
+                  >
+                    <span
+                      style={{
+                        ...connectorDotStyle,
+                        background: hasAccess ? "#3A9B98" : "#94a3b8",
+                        boxShadow: hasAccess ? "0 0 0 5px rgba(58,155,152,0.12)" : "none",
+                      }}
+                    />
                     {card.short}
                   </span>
-                  <span style={ctaStyle}>{card.cta}</span>
+                  <span
+                    style={{
+                      ...ctaStyle,
+                      background: hasAccess ? "#EEF8F7" : "#eef2f6",
+                      color: hasAccess ? "#2F7F7D" : "#64748b",
+                    }}
+                  >
+                    {hasAccess ? card.cta : "Restricted"}
+                  </span>
                 </div>
               </article>
-            </Link>
-          ))}
+            );
+
+            if (!hasAccess) {
+              return (
+                <div
+                  key={card.title}
+                  style={shellStyle}
+                  aria-disabled="true"
+                  title="No access assigned for this module."
+                >
+                  {cardContent}
+                </div>
+              );
+            }
+
+            return (
+              <Link key={card.title} href={card.href} style={shellStyle}>
+                {cardContent}
+              </Link>
+            );
+          })}
         </div>
       </section>
     </main>

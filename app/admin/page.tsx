@@ -552,7 +552,7 @@ export default function AdminDashboardPage() {
   }
 
   function setModuleAccessMode(person: PersonRow, accessField: string, moduleKey: string, mode: "Full" | "Part Access" | "None") {
-    setPersonDraft(person, { [accessField]: mode } as Partial<PersonRow>);
+    setPersonDraft(person, { permission_override: "Custom", [accessField]: mode } as Partial<PersonRow>);
     const definition = modulePermissionDefinitions.find((item) => item.moduleKey === moduleKey);
     if (!definition) return;
     definition.areas.forEach(([areaKey]) => {

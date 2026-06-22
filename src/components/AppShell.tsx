@@ -311,6 +311,16 @@ function getActivePermissionValue({
   tabPermissions: TabPermissionRecord[];
   isMasterAdmin: boolean;
 }): ImsPermissionValue {
+  const canAccessModule = (moduleKey: string) => {
+    if (moduleKey === "home") return true;
+    if (isMasterAdmin) return true;
+    const moduleAccessValue = getModuleAccessValue(moduleKey, moduleAccess);
+    if (isExplicitNone(moduleAccessValue)) return false;
+    if (isPartAccess(moduleAccessValue)) return hasAnyModuleTabPermission(tabPermissions, moduleKey);
+    if (hasExplicitAccess(moduleAccessValue)) return true;
+    return getAllowedModuleKeys(role).has(moduleKey);
+  };
+
   if (!target) {
     return {
       loaded,
@@ -321,10 +331,11 @@ function getActivePermissionValue({
       canEdit: true,
       fullAccess: true,
       isMasterAdmin,
+      canAccessModule,
     };
   }
 
-  if (isMasterAdmin || role === "Admin") {
+  if (isMasterAdmin) {
     return {
       loaded,
       moduleKey: target.moduleKey,
@@ -334,6 +345,7 @@ function getActivePermissionValue({
       canEdit: true,
       fullAccess: true,
       isMasterAdmin: true,
+      canAccessModule,
     };
   }
 
@@ -350,6 +362,7 @@ function getActivePermissionValue({
       canEdit: fullAccess || Boolean(tabPermission?.can_edit),
       fullAccess,
       isMasterAdmin: false,
+      canAccessModule,
     };
   }
 
@@ -361,6 +374,7 @@ function getActivePermissionValue({
     areaKey: target.areaKey,
     ...permission,
     isMasterAdmin: false,
+    canAccessModule,
   };
 }
 
@@ -444,6 +458,15 @@ function hasTabPermission(tabPermissions: TabPermissionRecord[], moduleKey: stri
   });
 }
 
+function hasAnyModuleTabPermission(tabPermissions: TabPermissionRecord[], moduleKey: string) {
+  return tabPermissions.some((permission) => {
+    return (
+      (permission.module_key || "").trim() === moduleKey &&
+      (permission.full_access || permission.can_view || permission.can_create || permission.can_edit)
+    );
+  });
+}
+
 function getTabPermission(tabPermissions: TabPermissionRecord[], moduleKey: string, areaKey: string) {
   return tabPermissions.find((permission) => {
     return (permission.module_key || "").trim() === moduleKey && (permission.area_key || "").trim() === areaKey;
@@ -465,14 +488,13 @@ function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleA
   if (area === "public" || area === "login") return true;
   if (area === "home") return true;
   if (area === "people") return getAllowedModuleKeys(role).has("people");
-  if (role === "Admin") return true;
-  if (area === "quality") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
-  if (area === "documents") return !isExplicitNone(moduleAccess.documents) && (hasExplicitAccess(moduleAccess.documents) || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer");
-  if (area === "hse") return !isExplicitNone(moduleAccess.hse) && (hasExplicitAccess(moduleAccess.hse) || role === "Manager" || role === "HSE Officer" || role === "Viewer");
-  if (area === "assets") return !isExplicitNone(moduleAccess.assets) && (hasExplicitAccess(moduleAccess.assets) || role === "Manager" || role === "Asset Manager" || role === "Viewer");
-  if (area === "risk") return !isExplicitNone(moduleAccess.risk) && (hasExplicitAccess(moduleAccess.risk) || role === "Manager" || role === "Viewer");
-  if (area === "actions") return !isExplicitNone(moduleAccess.actions) && (hasExplicitAccess(moduleAccess.actions) || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer");
-  if (area === "admin") return !isExplicitNone(moduleAccess.admin) && hasExplicitAccess(moduleAccess.admin);
+  if (area === "quality") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
+  if (area === "documents") return !isExplicitNone(moduleAccess.documents) && (hasExplicitAccess(moduleAccess.documents) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer");
+  if (area === "hse") return !isExplicitNone(moduleAccess.hse) && (hasExplicitAccess(moduleAccess.hse) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Viewer");
+  if (area === "assets") return !isExplicitNone(moduleAccess.assets) && (hasExplicitAccess(moduleAccess.assets) || role === "Admin" || role === "Manager" || role === "Asset Manager" || role === "Viewer");
+  if (area === "risk") return !isExplicitNone(moduleAccess.risk) && (hasExplicitAccess(moduleAccess.risk) || role === "Admin" || role === "Manager" || role === "Viewer");
+  if (area === "actions") return !isExplicitNone(moduleAccess.actions) && (hasExplicitAccess(moduleAccess.actions) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer");
+  if (area === "admin") return !isExplicitNone(moduleAccess.admin) && (hasExplicitAccess(moduleAccess.admin) || role === "Admin");
   return false;
 }
 
