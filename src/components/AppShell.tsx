@@ -151,14 +151,7 @@ const hseNavItems: NavItem[] = [
 
 const adminNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
-  { href: "/admin", label: "Dashboard", icon: "dashboard" },
-  { href: "/admin/departments", label: "Depts", icon: "departments" },
-  { href: "/admin/people-roles", label: "People", icon: "people" },
-  { href: "/admin/document-control", label: "Documents", icon: "documents" },
-  { href: "/admin/assets", label: "Assets", icon: "assets" },
-  { href: "/admin/risk", label: "Risk", icon: "risk" },
-  { href: "/admin/actions", label: "Actions", icon: "actions" },
-  { href: "/admin/system", label: "System", icon: "system" },
+  { href: "/admin", label: "Admin Console", icon: "system" },
 ];
 
 const peopleNavItems: NavItem[] = [
@@ -278,7 +271,7 @@ function getPermissionTargetFromHref(href: string): PermissionTarget | null {
   if (href === "/actions") return { moduleKey: "actions", areaKey: "register" };
   if (href === "/people") return { moduleKey: "people", areaKey: "register" };
   if (href === "/management-review") return { moduleKey: "management-review", areaKey: "dashboard" };
-  if (href.startsWith("/admin")) return { moduleKey: "admin", areaKey: href === "/admin" ? "dashboard" : href.replace("/admin/", "") };
+  if (href.startsWith("/admin")) return { moduleKey: "admin", areaKey: href === "/admin" ? "users" : href.replace("/admin/", "") };
   return null;
 }
 

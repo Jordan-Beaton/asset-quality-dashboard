@@ -127,12 +127,8 @@ type AdminData = {
 };
 
 const adminTabs: Array<{ value: AdminView; label: string }> = [
-  { value: "dashboard", label: "Dashboard" },
   { value: "users", label: "Users & Access" },
-  { value: "roles", label: "Roles" },
-  { value: "company", label: "Company" },
   { value: "reference", label: "Reference Data" },
-  { value: "notifications", label: "Notifications" },
   { value: "audit", label: "Audit Log" },
 ];
 
@@ -256,12 +252,8 @@ const modulePermissionDefinitions = [
     label: "Admin / Settings",
     accessField: "admin_access",
     areas: [
-      ["dashboard", "Dashboard"],
       ["users", "Users & Access"],
-      ["roles", "Roles"],
-      ["company", "Company"],
       ["reference", "Reference Data"],
-      ["notifications", "Notifications"],
       ["audit", "Audit Log"],
     ],
   },
@@ -360,7 +352,7 @@ function StatusPill({ children, tone = "neutral" }: { children: ReactNode; tone?
 }
 
 export default function AdminDashboardPage() {
-  const [activeView, setActiveView] = useState<AdminView>("dashboard");
+  const [activeView, setActiveView] = useState<AdminView>("users");
   const [data, setData] = useState<AdminData | null>(null);
   const [message, setMessage] = useState("Loading Admin / Settings...");
   const [isLoading, setIsLoading] = useState(true);
@@ -907,7 +899,7 @@ export default function AdminDashboardPage() {
       <QualityPageHero
         label="ADMIN / SETTINGS"
         title="Admin Console"
-        description="Controlled system console for users, roles, company profile, reference data, notifications, and future permission governance."
+        description="Controlled user access, module permissions, reference data, and audit visibility for the IMS."
         contextCards={[
           { label: "Last Refreshed", value: isLoading ? "Loading" : new Date().toLocaleString("en-GB") },
           { label: "Master Admin", value: "Jordan Beaton" },
@@ -954,7 +946,7 @@ export default function AdminDashboardPage() {
 
       {activeView === "users" ? (
         <section style={{ display: "grid", gap: "18px" }}>
-          <ImsPanel title="Invite User" subtitle="Create a login-ready person record and send the password setup invite.">
+          <ImsPanel title="Invite User" subtitle="Create a login-ready person record, assign permissions, and send the setup invite.">
             <div style={inviteHeaderRowStyle}>
               <p style={paragraphStyle}>Use this only for new system users. Existing People records can be invited from the user list below.</p>
               <ImsButton variant={showInvitePanel ? "secondary" : "primary"} onClick={() => setShowInvitePanel(!showInvitePanel)}>
@@ -1067,7 +1059,7 @@ export default function AdminDashboardPage() {
             ) : null}
           </ImsPanel>
 
-          <ImsPanel title="Users & Access" subtitle="Role and access staging. Master admin cannot be deactivated.">
+          <ImsPanel title="Users & Access" subtitle="Search a user, open their panel, and manage access without changing the People Management record.">
             <div style={userSearchRowStyle}>
               <input
                 value={userSearch}

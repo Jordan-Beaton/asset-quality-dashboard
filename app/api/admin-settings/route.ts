@@ -40,6 +40,14 @@ function cleanBoolean(value: unknown) {
   return value === true;
 }
 
+function getInviteOrigin(request: Request) {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  if (configuredSiteUrl) return configuredSiteUrl;
+  if (vercelUrl) return vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`;
+  return request.headers.get("origin") || "";
+}
+
 async function getCurrentUser() {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.getUser();
@@ -213,7 +221,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
       }
 
-      const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
+      const origin = getInviteOrigin(request);
 
       const inviteResult = await service.auth.admin.inviteUserByEmail(email, {
         data: { name, system_role: role, department },
@@ -332,7 +340,7 @@ export async function POST(request: Request) {
       const name = cleanText(person.name);
       const department = cleanText(person.department);
       const role = cleanText(person.system_role) || "Viewer";
-      const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
+      const origin = getInviteOrigin(request);
       const redirectTo = origin ? `${origin}/login?mode=invite` : undefined;
       const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const authUser = authUsers.data.users.find((user: User) => (user.email || "").toLowerCase() === email);
@@ -370,7 +378,7 @@ export async function POST(request: Request) {
       const email = cleanText(payload.email).toLowerCase();
       if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
 
-      const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "";
+      const origin = getInviteOrigin(request);
       const resetResult = await service.auth.resetPasswordForEmail(email, {
         redirectTo: origin ? `${origin}/login` : undefined,
       });

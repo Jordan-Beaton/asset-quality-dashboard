@@ -11,8 +11,10 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [mode, setMode] = useState<LoginMode>("login");
   const [loading, setLoading] = useState(false);
+  const [authLinkLoading, setAuthLinkLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const redirectTarget = searchParams.get("redirect") || "/";
   const safeRedirectTarget =
@@ -27,20 +29,60 @@ function LoginPageContent() {
   }, [safeRedirectTarget]);
 
   useEffect(() => {
-    const isInvite =
-      searchParams.get("mode") === "invite" ||
-      searchParams.get("type") === "invite" ||
-      window.location.hash.includes("type=invite");
-    const isRecovery =
-      searchParams.get("mode") === "recovery" ||
-      searchParams.get("type") === "recovery" ||
-      searchParams.has("code") ||
-      window.location.hash.includes("type=recovery");
+    const hydrateAuthLinkSession = async () => {
+      const searchType = searchParams.get("type");
+      const searchMode = searchParams.get("mode");
+      const code = searchParams.get("code");
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const hashType = hashParams.get("type");
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      const isInvite = searchMode === "invite" || searchType === "invite" || hashType === "invite";
+      const isRecovery = searchMode === "recovery" || searchType === "recovery" || hashType === "recovery";
+      const isAuthLink = isInvite || isRecovery || Boolean(code) || Boolean(accessToken);
 
-    if (isInvite || isRecovery) {
+      if (!isAuthLink) return;
+
+      setAuthLinkLoading(true);
       setMode("reset");
-      setMessage(isInvite ? "Set your password to complete your IMS invite." : "Enter a new password to complete the reset.");
-    }
+      setMessage(isInvite ? "Verifying your IMS invite..." : "Verifying your password reset link...");
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          setMessage(`This invite/reset link could not be verified: ${error.message}. Ask an IMS Admin to send a fresh link.`);
+          setAuthLinkLoading(false);
+          return;
+        }
+      } else if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) {
+          setMessage(`This invite/reset link could not be verified: ${error.message}. Ask an IMS Admin to send a fresh link.`);
+          setAuthLinkLoading(false);
+          return;
+        }
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        setMessage("This invite/reset link is missing its secure session or has expired. Ask an IMS Admin to send a fresh link.");
+        setAuthLinkLoading(false);
+        return;
+      }
+
+      setEmail(session.user.email || "");
+      setMessage(isInvite ? "Invite verified. Create your password to finish setting up IMS access." : "Reset link verified. Enter your new password.");
+      window.history.replaceState(null, "", "/login?mode=recovery");
+      setAuthLinkLoading(false);
+    };
+
+    hydrateAuthLinkSession();
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,6 +134,22 @@ function LoginPageContent() {
       return;
     }
 
+    if (password !== confirmPassword) {
+      setMessage("Passwords do not match.");
+      setLoading(false);
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      setMessage("This invite/reset session has expired or was not opened from the email link. Ask an IMS Admin to send a fresh link.");
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -101,6 +159,7 @@ function LoginPageContent() {
     }
 
     setPassword("");
+    setConfirmPassword("");
     setMode("login");
     setMessage("Password updated. You can now sign in with your new password.");
     setLoading(false);
@@ -137,6 +196,7 @@ function LoginPageContent() {
             id="email"
             type="email"
             required
+            disabled={mode === "reset" && Boolean(email)}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             style={inputStyle}
@@ -157,9 +217,23 @@ function LoginPageContent() {
           </div>
         ) : null}
 
+        {mode === "reset" ? (
+          <div>
+            <label htmlFor="confirm-password" style={labelStyle}>Confirm Password</label>
+            <input
+              id="confirm-password"
+              type="password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+        ) : null}
+
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || authLinkLoading}
           style={{
             background: "#3A9B98",
             color: "white",
@@ -171,7 +245,7 @@ function LoginPageContent() {
             opacity: loading ? 0.7 : 1,
           }}
         >
-          {loading ? "Please wait..." : mode === "login" ? "Sign in" : mode === "forgot" ? "Send reset email" : "Update password"}
+          {loading || authLinkLoading ? "Please wait..." : mode === "login" ? "Sign in" : mode === "forgot" ? "Send reset email" : "Update password"}
         </button>
       </form>
 
