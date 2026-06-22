@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { ImsTabs } from "../../../src/components/ImsPrimitives";
+import { ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -502,15 +501,15 @@ function CalibrationPageContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
-        <Link href="/assets/dashboard" style={backLinkStyle}>
-          ← Back to Dashboard
-        </Link>
-
-        <div style={statusBannerStyle}>
-          <strong>Status:</strong> {message}
-        </div>
-      </div>
+      <ImsTopMetaRow
+        backHref="/assets/dashboard"
+        backLabel="Back to Dashboard"
+        status={
+          <>
+            <strong>Status:</strong> {message}
+          </>
+        }
+      />
 
       <ImsTabs<CalibrationWorkspaceView>
         tabs={[
@@ -1410,3 +1409,4 @@ const dangerButtonStyle: CSSProperties = {
   fontSize: "12px",
   cursor: "pointer",
 };
+

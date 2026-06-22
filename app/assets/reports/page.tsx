@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { ImsButton, ImsFilterPanel, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
 
@@ -363,6 +363,9 @@ export default function AssetReportsPage() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [form, setForm] = useState<ReportForm>(defaultForm);
+  const [savedReportSearch, setSavedReportSearch] = useState("");
+  const [savedReportYearFilter, setSavedReportYearFilter] = useState("All Years");
+  const [showSavedReportFilters, setShowSavedReportFilters] = useState(false);
 
   async function loadData() {
     const [assetsRes, calibrationsRes, inspectionsRes, maintenanceRes, actionsRes, reportsRes] = await Promise.all([
@@ -600,6 +603,42 @@ export default function AssetReportsPage() {
 
     return latestItems[0]?.label || "On-demand reporting";
   }, [assets, calibrationRecords, inspectionRecords, linkedAssetActions, maintenanceRecords, reports]);
+
+  const savedReportYearOptions = useMemo(() => {
+    const years = new Set<string>();
+    reports.forEach((report) => {
+      const snapshotYear =
+        typeof report.snapshot_json?.report_year === "number" ? String(report.snapshot_json.report_year) : "";
+      const labelYear = report.month_label.match(/\b(20\d{2})\b/)?.[1] || "";
+      const year = snapshotYear || labelYear;
+      if (year) years.add(year);
+    });
+
+    return ["All Years", ...Array.from(years).sort((a, b) => Number(b) - Number(a))];
+  }, [reports]);
+
+  const filteredReports = useMemo(() => {
+    const query = savedReportSearch.trim().toLowerCase();
+
+    return reports.filter((report) => {
+      const snapshotYear =
+        typeof report.snapshot_json?.report_year === "number" ? String(report.snapshot_json.report_year) : "";
+      const labelYear = report.month_label.match(/\b(20\d{2})\b/)?.[1] || "";
+      const reportYear = snapshotYear || labelYear;
+      const matchesYear = savedReportYearFilter === "All Years" || reportYear === savedReportYearFilter;
+      const haystack = [
+        report.month_label,
+        report.summary,
+        report.next_steps,
+        getSnapshotSummary(report),
+        formatDateTime(report.created_at),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return matchesYear && (!query || haystack.includes(query));
+    });
+  }, [reports, savedReportSearch, savedReportYearFilter]);
 
   function resetForm() {
     setForm(defaultForm());
@@ -975,29 +1014,20 @@ export default function AssetReportsPage() {
         ]}
       />
 
-      <div
-        style={{
-          marginBottom: "20px",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "12px",
-          flexWrap: "wrap",
-        }}
-      >
-        <Link href="/assets/dashboard" style={backLinkStyle}>
-          ← Back to Dashboard
-        </Link>
-
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          <button type="button" style={pdfButtonStyle} onClick={() => void generatePdfReport()} disabled={isGeneratingPdf}>
+      <ImsTopMetaRow
+        backHref="/assets/dashboard"
+        backLabel="Back to Dashboard"
+        actions={
+          <ImsButton onClick={() => void generatePdfReport()} disabled={isGeneratingPdf}>
             {isGeneratingPdf ? "Generating PDF..." : "Generate Monthly PDF"}
-          </button>
-        </div>
-      </div>
-
-      <section style={statusBannerStyle}>
-        <strong>Status:</strong> {message}
-      </section>
+          </ImsButton>
+        }
+        status={
+          <>
+            <strong>Status:</strong> {message}
+          </>
+        }
+      />
 
       <section style={twoColumnGridStyle}>
         <div style={panelStyle}>
@@ -1119,10 +1149,45 @@ export default function AssetReportsPage() {
               Reopen saved asset monthly periods and generate the concise PDF directly from each row.
             </p>
           </div>
-          <div style={registerCountStyle}>{reports.length} reports</div>
+          <div style={registerCountStyle}>
+            {filteredReports.length} of {reports.length} reports
+          </div>
         </div>
 
-        {reports.length === 0 ? (
+        <ImsFilterPanel
+          search={savedReportSearch}
+          onSearchChange={setSavedReportSearch}
+          searchPlaceholder="Search saved reports"
+          showFilters={showSavedReportFilters}
+          onToggleFilters={() => setShowSavedReportFilters((current) => !current)}
+        >
+          <label style={fieldLabelStyle}>
+            <span>Report Year</span>
+            <select
+              value={savedReportYearFilter}
+              onChange={(event) => setSavedReportYearFilter(event.target.value)}
+              style={inputStyle}
+            >
+              {savedReportYearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ImsButton
+            variant="secondary"
+            onClick={() => {
+              setSavedReportSearch("");
+              setSavedReportYearFilter("All Years");
+            }}
+            style={{ alignSelf: "end" }}
+          >
+            Clear Filters
+          </ImsButton>
+        </ImsFilterPanel>
+
+        {filteredReports.length === 0 ? (
           <p style={emptyTextStyle}>No asset monthly reports saved yet.</p>
         ) : (
           <div style={{ overflowX: "auto" }}>
@@ -1136,7 +1201,7 @@ export default function AssetReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {reports.map((report) => (
+                {filteredReports.map((report) => (
                   <tr key={report.id}>
                     <td style={tableCellStyle}>{report.month_label}</td>
                     <td style={tableCellStyle}>{getSnapshotSummary(report)}</td>
@@ -1404,3 +1469,4 @@ const miniButtonDeleteStyle: CSSProperties = {
   cursor: "pointer",
   fontWeight: 700,
 };
+

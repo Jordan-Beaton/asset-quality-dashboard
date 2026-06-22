@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -574,19 +575,23 @@ function DashboardContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
-        <div style={statusBannerStyle}>
-          <strong>Status:</strong> {message}
-        </div>
-      </div>
+      <ImsTopMetaRow
+        backHref="/assets"
+        backLabel="Open Asset Register"
+        status={
+          <>
+            <strong>Status:</strong> {message}
+          </>
+        }
+      />
 
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Total Assets" value={assets.length} accent="#2563eb" />
-        <QualityKpiCard title="Calibration Overdue" value={overdueCalibrations.length} accent="#dc2626" />
-        <QualityKpiCard title="Inspection Overdue" value={overdueInspections.length} accent="#d97706" />
-        <QualityKpiCard title="Maintenance Due Soon" value={maintenanceDueSoonCount} accent="#7c3aed" />
-        <QualityKpiCard title="Assets With Files" value={assetsWithFiles} accent="#3A9B98" />
-        <QualityKpiCard title="Recent Asset Activity" value={recentActivityCount} accent="#be185d" />
+        <QualityKpiCard title="Total Assets" value={assets.length} accent="#2563eb" href="/assets" />
+        <QualityKpiCard title="Calibration Overdue" value={overdueCalibrations.length} accent="#dc2626" href="/assets/calibration" />
+        <QualityKpiCard title="Inspection Overdue" value={overdueInspections.length} accent="#d97706" href="/assets/inspection" />
+        <QualityKpiCard title="Maintenance Due Soon" value={maintenanceDueSoonCount} accent="#7c3aed" href="/assets/maintenance" />
+        <QualityKpiCard title="Assets With Files" value={assetsWithFiles} accent="#3A9B98" href="/assets" />
+        <QualityKpiCard title="Recent Asset Activity" value={recentActivityCount} accent="#be185d" href="/assets" />
       </section>
 
       <section style={attentionGridStyle}>

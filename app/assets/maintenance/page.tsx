@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { ImsTabs } from "../../../src/components/ImsPrimitives";
+import { ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -343,8 +343,6 @@ function MaintenancePageContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    console.log("[maintenance save check]", newMaintenance);
-
     if (
       !newMaintenance.asset_id ||
       !newMaintenance.maintenance_date ||
@@ -533,14 +531,15 @@ function MaintenancePageContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
-        <Link href="/assets/dashboard" style={backLinkStyle}>
-          ← Back to Dashboard
-        </Link>
-        <div style={desktopStatusBannerStyle}>
-          <strong>Status:</strong> {message}
-        </div>
-      </div>
+      <ImsTopMetaRow
+        backHref="/assets/dashboard"
+        backLabel="Back to Dashboard"
+        status={
+          <>
+            <strong>Status:</strong> {message}
+          </>
+        }
+      />
 
       <ImsTabs<MaintenanceWorkspaceView>
         tabs={[
@@ -1632,3 +1631,4 @@ const emptyStateStyle: CSSProperties = {
   padding: "18px",
   fontSize: "14px",
 };
+
