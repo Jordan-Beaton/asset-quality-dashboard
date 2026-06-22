@@ -202,15 +202,6 @@ export default function HomePage() {
   const permissions = useImsPermissions();
   const isModuleAccessible = (moduleKey: (typeof moduleCards)[number]["moduleKey"]) => {
     if (!permissions.loaded) return true;
-    if (moduleKey === "management-review") {
-      return (
-        permissions.canAccessModule("quality") ||
-        permissions.canAccessModule("hse") ||
-        permissions.canAccessModule("documents") ||
-        permissions.canAccessModule("assets") ||
-        permissions.canAccessModule("risk")
-      );
-    }
     return permissions.canAccessModule(moduleKey);
   };
 

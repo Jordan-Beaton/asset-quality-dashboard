@@ -35,6 +35,8 @@ type PersonRow = {
   risk_access?: string | null;
   document_access?: string | null;
   action_access?: string | null;
+  people_access?: string | null;
+  management_review_access?: string | null;
   admin_access?: string | null;
   last_login_at?: string | null;
 };
@@ -83,6 +85,8 @@ type RoleRow = {
   risk_access?: string | null;
   document_access?: string | null;
   action_access?: string | null;
+  people_access?: string | null;
+  management_review_access?: string | null;
   admin_access?: string | null;
   active?: boolean | null;
 };
@@ -228,6 +232,26 @@ const modulePermissionDefinitions = [
     ],
   },
   {
+    moduleKey: "management-review",
+    label: "Management Review",
+    accessField: "management_review_access",
+    areas: [
+      ["dashboard", "Dashboard"],
+      ["snapshot", "Snapshot"],
+      ["reports", "Reports"],
+    ],
+  },
+  {
+    moduleKey: "people",
+    label: "People Management",
+    accessField: "people_access",
+    areas: [
+      ["register", "People Register"],
+      ["create", "Create Person"],
+      ["import", "Import People"],
+    ],
+  },
+  {
     moduleKey: "admin",
     label: "Admin / Settings",
     accessField: "admin_access",
@@ -354,6 +378,8 @@ export default function AdminDashboardPage() {
     asset_access: "None",
     risk_access: "None",
     action_access: "None",
+    people_access: "None",
+    management_review_access: "None",
     admin_access: "None",
     permissions_notes: "",
   });
@@ -633,6 +659,8 @@ export default function AdminDashboardPage() {
         asset_access: "None",
         risk_access: "None",
         action_access: "None",
+        people_access: "None",
+        management_review_access: "None",
         admin_access: "None",
         permissions_notes: "",
       });
@@ -735,6 +763,8 @@ export default function AdminDashboardPage() {
                         risk_access: "Full",
                         document_access: "Full",
                         action_access: "Full",
+                        people_access: "Full",
+                        management_review_access: "Full",
                         admin_access: "Full",
                       }
                     : readOnly
@@ -745,6 +775,8 @@ export default function AdminDashboardPage() {
                         risk_access: "Read",
                         document_access: "Read",
                         action_access: "Read",
+                        people_access: "Read",
+                        management_review_access: "Read",
                         admin_access: "None",
                       }
                     : {}),
@@ -1163,6 +1195,8 @@ export default function AdminDashboardPage() {
                         ["Assets", "asset_access", roleAccessOptions],
                         ["Risk", "risk_access", roleAccessOptions],
                         ["Actions", "action_access", roleAccessOptions],
+                        ["Management Review", "management_review_access", roleAccessOptions],
+                        ["People", "people_access", roleAccessOptions],
                         ["Admin", "admin_access", roleAccessOptions],
                       ].map(([label, key, options]) => (
                         <Field key={String(key)} label={String(label)}>
@@ -1221,6 +1255,8 @@ export default function AdminDashboardPage() {
                                   risk_access: "Full",
                                   document_access: "Full",
                                   action_access: "Full",
+                                  people_access: "Full",
+                                  management_review_access: "Full",
                                   admin_access: "Full",
                                 }
                               : readOnly
@@ -1231,6 +1267,8 @@ export default function AdminDashboardPage() {
                                   risk_access: "Read",
                                   document_access: "Read",
                                   action_access: "Read",
+                                  people_access: "Read",
+                                  management_review_access: "Read",
                                   admin_access: "None",
                                 }
                               : {}),

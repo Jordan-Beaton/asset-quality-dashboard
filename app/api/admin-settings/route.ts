@@ -203,6 +203,8 @@ export async function POST(request: Request) {
         risk_access: cleanText(payload.risk_access) || null,
         document_access: cleanText(payload.document_access) || null,
         action_access: cleanText(payload.action_access) || null,
+        people_access: cleanText(payload.people_access) || null,
+        management_review_access: cleanText(payload.management_review_access) || null,
         admin_access: cleanText(payload.admin_access) || null,
       };
       const tabPermissions = Array.isArray(payload.tab_permissions) ? payload.tab_permissions : [];
@@ -239,6 +241,8 @@ export async function POST(request: Request) {
               risk_access: "Full",
               document_access: "Full",
               action_access: "Full",
+              people_access: "Full",
+              management_review_access: "Full",
               admin_access: "Full",
             }
           : moduleAccessPayload),
@@ -396,6 +400,8 @@ export async function POST(request: Request) {
         risk_access: cleanText(payload.risk_access) || null,
         document_access: cleanText(payload.document_access) || null,
         action_access: cleanText(payload.action_access) || null,
+        people_access: cleanText(payload.people_access) || null,
+        management_review_access: cleanText(payload.management_review_access) || null,
         admin_access: cleanText(payload.admin_access) || null,
       };
 
@@ -406,7 +412,7 @@ export async function POST(request: Request) {
 
       const { data: previousPerson, error: previousPersonError } = await service
         .from("people")
-        .select("id,name,email,department,system_role,access_status,active,is_master_admin,permission_override,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
+        .select("*")
         .eq("id", id)
         .maybeSingle();
 
@@ -428,6 +434,8 @@ export async function POST(request: Request) {
               risk_access: "Full",
               document_access: "Full",
               action_access: "Full",
+              people_access: "Full",
+              management_review_access: "Full",
               admin_access: "Full",
             }
           : moduleAccessPayload),
@@ -565,6 +573,8 @@ export async function POST(request: Request) {
         risk_access: cleanText(payload.risk_access) || "None",
         document_access: cleanText(payload.document_access) || "Role Default",
         action_access: cleanText(payload.action_access) || "None",
+        people_access: cleanText(payload.people_access) || "None",
+        management_review_access: cleanText(payload.management_review_access) || "None",
         admin_access: cleanText(payload.admin_access) || "None",
         description: cleanText(payload.description) || null,
       };

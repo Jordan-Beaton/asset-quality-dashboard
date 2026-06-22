@@ -14,6 +14,8 @@ add column if not exists asset_access text,
 add column if not exists risk_access text,
 add column if not exists document_access text,
 add column if not exists action_access text,
+add column if not exists people_access text,
+add column if not exists management_review_access text,
 add column if not exists admin_access text;
 
 create index if not exists people_system_role_idx
@@ -34,6 +36,8 @@ set
   risk_access = 'Full',
   document_access = 'Full',
   action_access = 'Full',
+  people_access = 'Full',
+  management_review_access = 'Full',
   admin_access = 'Full',
   active = true
 where lower(coalesce(email, '')) = 'jbeaton@enshoresubsea.com'
@@ -81,13 +85,17 @@ create table if not exists public.ims_roles (
   asset_access text not null default 'None',
   risk_access text not null default 'None',
   action_access text not null default 'None',
+  people_access text not null default 'None',
+  management_review_access text not null default 'None',
   admin_access text not null default 'None',
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
 
 alter table public.ims_roles
-add column if not exists document_access text not null default 'Role Default';
+add column if not exists document_access text not null default 'Role Default',
+add column if not exists people_access text not null default 'None',
+add column if not exists management_review_access text not null default 'None';
 
 insert into public.ims_roles (role_name, description, quality_access, hse_access, asset_access, risk_access, action_access, admin_access)
 values
@@ -126,6 +134,28 @@ end
 where document_access is null
    or document_access = 'Role Default'
    or role_name in ('Admin', 'Manager', 'Document Controller', 'Quality Engineer');
+
+update public.ims_roles
+set
+  people_access = case role_name
+    when 'Admin' then 'Full'
+    when 'Manager' then 'Read'
+    when 'Viewer' then 'Read'
+    when 'HSE Officer' then 'Read'
+    when 'Quality Engineer' then 'Read'
+    when 'Document Controller' then 'Read'
+    when 'Asset Manager' then 'Read'
+    else coalesce(nullif(people_access, ''), 'None')
+  end,
+  management_review_access = case role_name
+    when 'Admin' then 'Full'
+    when 'Manager' then 'Read'
+    when 'Viewer' then 'Read'
+    else coalesce(nullif(management_review_access, ''), 'None')
+  end
+where people_access is null
+   or management_review_access is null
+   or role_name in ('Admin', 'Manager', 'Viewer', 'HSE Officer', 'Quality Engineer', 'Document Controller', 'Asset Manager');
 
 insert into public.ims_reference_departments (name, code)
 values

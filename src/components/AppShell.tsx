@@ -36,6 +36,8 @@ type ModuleAccess = {
   risk?: string | null;
   documents?: string | null;
   actions?: string | null;
+  people?: string | null;
+  managementReview?: string | null;
   admin?: string | null;
 };
 
@@ -64,10 +66,12 @@ type PeopleAccessRecord = {
   risk_access?: string | null;
   document_access?: string | null;
   action_access?: string | null;
+  people_access?: string | null;
+  management_review_access?: string | null;
   admin_access?: string | null;
 };
 
-type AccessArea = "public" | "login" | "home" | "people" | "quality" | "documents" | "hse" | "assets" | "risk" | "actions" | "admin";
+type AccessArea = "public" | "login" | "home" | "people" | "quality" | "documents" | "hse" | "assets" | "risk" | "actions" | "management-review" | "admin";
 
 type NavIconKey =
   | "home"
@@ -181,8 +185,8 @@ function normaliseSystemRole(role: string | null | undefined): SystemRole {
 }
 
 function getAllowedModuleKeys(role: SystemRole) {
-  if (role === "Admin") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "people", "admin"]);
-  if (role === "Manager") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "people"]);
+  if (role === "Admin") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "management-review", "people", "admin"]);
+  if (role === "Manager") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "management-review", "people"]);
   if (role === "HSE Officer") return new Set(["home", "hse", "actions", "people"]);
   if (role === "Quality Engineer") return new Set(["home", "quality", "actions", "people"]);
   if (role === "Document Controller") return new Set(["home", "documents", "actions", "people"]);
@@ -196,6 +200,7 @@ function getAccessAreaFromHref(href: string): AccessArea {
   if (href === "/home" || href === "/") return "home";
   if (href === "/actions") return "actions";
   if (href === "/people") return "people";
+  if (href === "/management-review") return "management-review";
   if (href.startsWith("/admin")) return "admin";
   if (href.startsWith("/hse")) return "hse";
   if (href.startsWith("/assets")) return "assets";
@@ -228,6 +233,8 @@ function getModuleAccessValue(moduleKey: string, moduleAccess: ModuleAccess) {
   if (moduleKey === "assets") return moduleAccess.assets;
   if (moduleKey === "risk") return moduleAccess.risk;
   if (moduleKey === "actions") return moduleAccess.actions;
+  if (moduleKey === "people") return moduleAccess.people;
+  if (moduleKey === "management-review") return moduleAccess.managementReview;
   if (moduleKey === "admin") return moduleAccess.admin;
   return null;
 }
@@ -269,6 +276,8 @@ function getPermissionTargetFromHref(href: string): PermissionTarget | null {
   if (href === "/risk/reports") return { moduleKey: "risk", areaKey: "reports" };
 
   if (href === "/actions") return { moduleKey: "actions", areaKey: "register" };
+  if (href === "/people") return { moduleKey: "people", areaKey: "register" };
+  if (href === "/management-review") return { moduleKey: "management-review", areaKey: "dashboard" };
   if (href.startsWith("/admin")) return { moduleKey: "admin", areaKey: href === "/admin" ? "dashboard" : href.replace("/admin/", "") };
   return null;
 }
@@ -487,13 +496,14 @@ function filterNavItemsForRole(items: NavItem[], role: SystemRole, moduleAccess:
 function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleAccess) {
   if (area === "public" || area === "login") return true;
   if (area === "home") return true;
-  if (area === "people") return getAllowedModuleKeys(role).has("people");
+  if (area === "people") return !isExplicitNone(moduleAccess.people) && (hasExplicitAccess(moduleAccess.people) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer");
   if (area === "quality") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
   if (area === "documents") return !isExplicitNone(moduleAccess.documents) && (hasExplicitAccess(moduleAccess.documents) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer");
   if (area === "hse") return !isExplicitNone(moduleAccess.hse) && (hasExplicitAccess(moduleAccess.hse) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Viewer");
   if (area === "assets") return !isExplicitNone(moduleAccess.assets) && (hasExplicitAccess(moduleAccess.assets) || role === "Admin" || role === "Manager" || role === "Asset Manager" || role === "Viewer");
   if (area === "risk") return !isExplicitNone(moduleAccess.risk) && (hasExplicitAccess(moduleAccess.risk) || role === "Admin" || role === "Manager" || role === "Viewer");
   if (area === "actions") return !isExplicitNone(moduleAccess.actions) && (hasExplicitAccess(moduleAccess.actions) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer");
+  if (area === "management-review") return !isExplicitNone(moduleAccess.managementReview) && (hasExplicitAccess(moduleAccess.managementReview) || role === "Admin" || role === "Manager" || role === "Viewer");
   if (area === "admin") return !isExplicitNone(moduleAccess.admin) && (hasExplicitAccess(moduleAccess.admin) || role === "Admin");
   return false;
 }
@@ -779,7 +789,7 @@ export default function AppShell({ children }: AppShellProps) {
         const normalisedEmail = email.trim().toLowerCase();
         const { data: peopleMatches } = await supabase
           .from("people")
-          .select("name,email,role,system_role,is_master_admin,active,access_status,quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
+          .select("*")
           .ilike("email", email.trim())
           .limit(10);
 
@@ -814,7 +824,7 @@ export default function AppShell({ children }: AppShellProps) {
         const { data: roleDefaults } = roleSource
           ? await supabase
               .from("ims_roles")
-              .select("quality_access,hse_access,asset_access,risk_access,document_access,action_access,admin_access")
+              .select("*")
               .eq("role_name", resolvedRole || roleSource)
               .maybeSingle()
           : { data: null };
@@ -835,6 +845,8 @@ export default function AppShell({ children }: AppShellProps) {
           risk: person?.risk_access || roleDefaults?.risk_access,
           documents: person?.document_access || roleDefaults?.document_access,
           actions: person?.action_access || roleDefaults?.action_access,
+          people: person?.people_access || roleDefaults?.people_access,
+          managementReview: person?.management_review_access || roleDefaults?.management_review_access,
           admin: person?.admin_access || roleDefaults?.admin_access,
         });
         setSignedInTabPermissions((tabPermissions || []) as TabPermissionRecord[]);
