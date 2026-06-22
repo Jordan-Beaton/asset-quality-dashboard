@@ -8,6 +8,7 @@ const MASTER_ADMIN_NAME = "Jordan Beaton";
 type AdminAction =
   | "inviteUser"
   | "sendExistingInvite"
+  | "generateSetupLink"
   | "resetPassword"
   | "updatePersonAccess"
   | "updateTabPermissions"
@@ -46,6 +47,19 @@ function getInviteOrigin(request: Request) {
   if (configuredSiteUrl) return configuredSiteUrl;
   if (vercelUrl) return vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`;
   return request.headers.get("origin") || "";
+}
+
+function getGeneratedLink(data: unknown) {
+  const result = data as {
+    action_link?: string;
+    properties?: {
+      action_link?: string;
+      email_otp?: string;
+      hashed_token?: string;
+      redirect_to?: string;
+    };
+  };
+  return cleanText(result?.properties?.action_link) || cleanText(result?.action_link);
 }
 
 async function getCurrentUser() {
@@ -221,17 +235,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Name and email are required." }, { status: 400 });
       }
 
-      const origin = getInviteOrigin(request);
-
-      const inviteResult = await service.auth.admin.inviteUserByEmail(email, {
-        data: { name, system_role: role, department },
-        redirectTo: origin ? `${origin}/login?mode=invite` : undefined,
-      });
-
-      if (inviteResult.error) {
-        return NextResponse.json({ error: inviteResult.error.message }, { status: 400 });
-      }
-
       const personPayload = {
         name,
         email,
@@ -316,6 +319,33 @@ export async function POST(request: Request) {
         }
       }
 
+      const origin = getInviteOrigin(request);
+      const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const authUser = authUsers.data.users.find((user: User) => (user.email || "").toLowerCase() === email);
+      const redirectTo = origin ? `${origin}/login?mode=invite` : undefined;
+      const inviteResult = authUser
+        ? await service.auth.resetPasswordForEmail(email, { redirectTo })
+        : await service.auth.admin.inviteUserByEmail(email, {
+            data: { name, system_role: role, department },
+            redirectTo,
+          });
+
+      if (inviteResult.error) {
+        await writeAuditLog(
+          service,
+          actorEmail,
+          "Invite User Email Failed",
+          "Person",
+          email,
+          `Created ${name} with permissions, but invite email failed: ${inviteResult.error.message}.`,
+        );
+        return NextResponse.json({
+          ok: true,
+          warning: inviteResult.error.message,
+          message: `${name} was created with permissions, but the invite email failed: ${inviteResult.error.message}. Use Send Invite again later.`,
+        });
+      }
+
       await writeAuditLog(service, actorEmail, "Invite User", "Person", email, `Invited ${name} as ${role}.`);
       return NextResponse.json({ ok: true });
     }
@@ -372,6 +402,77 @@ export async function POST(request: Request) {
         authUser ? `Password setup link sent to ${name}.` : `Invite link sent to ${name}.`,
       );
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "generateSetupLink") {
+      const id = cleanText(payload.id);
+      if (!id) return NextResponse.json({ error: "Person id is required." }, { status: 400 });
+
+      const { data: person, error: personError } = await service
+        .from("people")
+        .select("id,name,email,department,role,system_role,access_status,active")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (personError) return NextResponse.json({ error: personError.message }, { status: 400 });
+      if (!person?.email) return NextResponse.json({ error: "This person does not have an email address." }, { status: 400 });
+      if (person.active === false || cleanText(person.access_status).toLowerCase() === "deactivated") {
+        return NextResponse.json({ error: "Deactivated people cannot be given setup links." }, { status: 400 });
+      }
+
+      const email = cleanText(person.email).toLowerCase();
+      const name = cleanText(person.name);
+      const department = cleanText(person.department);
+      const role = cleanText(person.system_role) || "Viewer";
+      const origin = getInviteOrigin(request);
+      const redirectTo = origin ? `${origin}/login?mode=invite` : undefined;
+      const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const authUser = authUsers.data.users.find((user: User) => (user.email || "").toLowerCase() === email);
+
+      const linkResult = authUser
+        ? await service.auth.admin.generateLink({
+            type: "recovery",
+            email,
+            options: { redirectTo },
+          })
+        : await service.auth.admin.generateLink({
+            type: "invite",
+            email,
+            options: {
+              data: { name, system_role: role, department },
+              redirectTo,
+            },
+          });
+
+      if (linkResult.error) {
+        return NextResponse.json({ error: linkResult.error.message }, { status: 400 });
+      }
+
+      const setupLink = getGeneratedLink(linkResult.data);
+      if (!setupLink) {
+        return NextResponse.json({ error: "Supabase did not return a setup link." }, { status: 400 });
+      }
+
+      const { error: updateError } = await service
+        .from("people")
+        .update({ access_status: "Invited", active: true })
+        .eq("id", id);
+
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
+
+      await writeAuditLog(
+        service,
+        actorEmail,
+        authUser ? "Copy Password Setup Link" : "Copy Invite Link",
+        "Person",
+        email,
+        authUser ? `Password setup link generated for ${name}.` : `Invite setup link generated for ${name}.`,
+      );
+      return NextResponse.json({
+        ok: true,
+        setupLink,
+        message: `Setup link generated for ${name}.`,
+      });
     }
 
     if (action === "resetPassword") {

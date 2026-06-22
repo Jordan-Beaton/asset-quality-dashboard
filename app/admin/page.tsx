@@ -620,7 +620,7 @@ export default function AdminDashboardPage() {
         setMessage(`${successMessage.replace("successfully.", "failed")}: ${json.error || "Unknown error"}`);
         return false;
       }
-      setMessage(successMessage);
+      setMessage(json.message || successMessage);
       await loadAdminData();
       return true;
     } catch (error) {
@@ -679,6 +679,30 @@ export default function AdminDashboardPage() {
   async function sendExistingInvite(person: PersonRow, authUser: AuthUserRow | null) {
     const label = authUser ? "Password setup link" : "Invite link";
     await postAdminAction("sendExistingInvite", { id: person.id }, `${label} sent to ${person.email || person.name}.`);
+  }
+
+  async function copySetupLink(person: PersonRow) {
+    setIsSaving(true);
+    try {
+      const response = await fetch("/api/admin-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generateSetupLink", payload: { id: person.id } }),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.setupLink) {
+        setMessage(`Setup link failed: ${json.error || "Unknown error"}`);
+        return;
+      }
+
+      await navigator.clipboard.writeText(json.setupLink);
+      setMessage(json.message ? `${json.message} Link copied to clipboard.` : `Setup link copied for ${person.email || person.name}.`);
+      await loadAdminData();
+    } catch (error) {
+      setMessage(`Setup link failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function updateRolePermissions(role: RoleRow) {
@@ -1132,6 +1156,17 @@ export default function AdminDashboardPage() {
                                   disabled={isSaving}
                                 >
                                   {authUser ? "Resend Setup" : "Send Invite"}
+                                </ImsButton>
+                              ) : null}
+                              {Boolean(person.email) && !isMaster && accessStatus !== "Deactivated" ? (
+                                <ImsButton
+                                  variant="secondary"
+                                  onClick={() => {
+                                    void copySetupLink(person);
+                                  }}
+                                  disabled={isSaving}
+                                >
+                                  Copy Setup Link
                                 </ImsButton>
                               ) : null}
                             </div>
