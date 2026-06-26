@@ -2690,12 +2690,12 @@ function AuditsPageContent() {
       columnStyles: {
         0: { cellWidth: 14 },
         1: { cellWidth: 18 },
-        2: { cellWidth: 16 },
-        3: { cellWidth: 62 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 58 },
         4: { cellWidth: 20 },
-        5: { cellWidth: 18 },
-        6: { cellWidth: 18 },
-        7: { cellWidth: 18 },
+        5: { cellWidth: 17 },
+        6: { cellWidth: 17 },
+        7: { cellWidth: 16 },
       },
     });
 
