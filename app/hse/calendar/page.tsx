@@ -150,7 +150,7 @@ const viewTabs: Array<{ value: CalendarView; label: string }> = [
   { value: "dashboard", label: "Dashboard" },
   { value: "calendar", label: "Calendar" },
   { value: "register", label: "Register" },
-  { value: "create", label: "Create Task" },
+  { value: "create", label: "Create Event" },
 ];
 
 const inspectionForms = [
@@ -164,6 +164,7 @@ const inspectionForms = [
 
 const hseTeamNames = ["Peter Ridley", "John Fender", "Blerim Azizaj", "Les Middleton"];
 const frequencyOptions = ["One-off", "Weekly", "Monthly", "6-monthly", "Yearly"];
+const hseEventTypes = ["Holiday", "Event", "Training", "Meeting", "Reminder", "Inspection", "HSE Check", "Review", "Drill", "Other"];
 const statusOptions = ["Scheduled", "Due Soon", "Overdue", "Complete", "Paused"];
 const priorityOptions = ["Low", "Medium", "High"];
 const plannerSourceFilter = "Planner Items";
@@ -171,12 +172,12 @@ const plannerSourceFilter = "Planner Items";
 const emptyForm: PlannerForm = {
   title: "",
   description: "",
-  planner_type: "Inspection",
+  planner_type: "Event",
   inspection_form_ref: "",
   inspection_form_title: "",
   assigned_to: "",
   assigned_person_id: "",
-  frequency: "Yearly",
+  frequency: "One-off",
   due_date: "",
   next_due_date: "",
   last_completed_date: "",
@@ -221,6 +222,14 @@ function dueKey(item: Pick<PlannerItem, "next_due_date" | "due_date">) {
   return item.next_due_date || item.due_date || "";
 }
 
+function isEventStylePlanner(item: Pick<PlannerItem, "planner_type">) {
+  return ["Holiday", "Event", "Training", "Meeting", "Reminder"].includes((item.planner_type || "").trim());
+}
+
+function plannerEventDate(item: PlannerItem) {
+  return isEventStylePlanner(item) ? item.due_date || item.next_due_date || "" : dueKey(item);
+}
+
 function daysUntil(value: string | null | undefined) {
   const date = parseDateKey(value);
   const start = parseDateKey(todayKey());
@@ -236,7 +245,7 @@ function isClosedLike(status: string | null | undefined) {
 function effectivePlannerStatus(item: PlannerItem) {
   const stored = item.status || "Scheduled";
   if (stored === "Complete" || stored === "Paused") return stored;
-  const diff = daysUntil(dueKey(item));
+  const diff = daysUntil(plannerEventDate(item));
   if (diff === null) return stored;
   if (diff < 0) return "Overdue";
   if (diff <= 7) return "Due Soon";
@@ -360,7 +369,7 @@ function buildEvents({
   const events: CalendarEvent[] = [];
 
   plannerItems.forEach((item) => {
-    const date = dateOnly(dueKey(item));
+    const date = dateOnly(plannerEventDate(item));
     if (!date) return;
     const source = plannerSource(item);
     events.push({
@@ -605,8 +614,8 @@ export default function HseCalendarPage() {
   }
 
   async function createItem() {
-    if (!clean(createForm.title)) {
-      setMessage("Status: Add a task title before saving.");
+    if (!clean(createForm.title) || !clean(createForm.due_date)) {
+      setMessage("Status: Add a title and start date before saving.");
       return;
     }
     const { error } = await supabase.from("hse_calendar_items").insert([payloadFromForm(createForm)]);
@@ -897,13 +906,12 @@ export default function HseCalendarPage() {
       ) : null}
 
       {activeView === "create" ? (
-        <ImsPanel title="Create HSE Calendar Item" subtitle="Set up recurring inspections or HSE checks with owner, recurrence, reminder lead time, and due date.">
-          <PlannerFormFields
+        <ImsPanel title="Create HSE Calendar Item" subtitle="Add holidays, events, training, meetings, reminders, and planned HSE work.">
+          <HseEventFormFields
             form={createForm}
             people={people}
             onChange={setCreateForm}
             onPersonSelect={(value) => applyPerson(value, "create")}
-            onInspectionFormSelect={(value) => applyInspectionForm(value, "create")}
           />
           <div style={{ ...noticeStyle, marginTop: "14px" }}>
             Quick team setup: {hseTeamNames.map((name) => (
@@ -916,12 +924,85 @@ export default function HseCalendarPage() {
             ))}
           </div>
           <div style={formActionRowStyle}>
-            <ImsButton onClick={() => void createItem()}>Create Planner Item</ImsButton>
+            <ImsButton onClick={() => void createItem()}>Create Calendar Item</ImsButton>
             <ImsButton variant="secondary" onClick={() => setCreateForm(emptyForm)}>Clear Form</ImsButton>
           </div>
         </ImsPanel>
       ) : null}
     </main>
+  );
+}
+
+function HseEventFormFields({
+  form,
+  people,
+  onChange,
+  onPersonSelect,
+}: {
+  form: PlannerForm;
+  people: PersonOption[];
+  onChange: (form: PlannerForm) => void;
+  onPersonSelect: (value: string) => void;
+}) {
+  return (
+    <div style={formGridStyle}>
+      <Field label="Title">
+        <input style={imsInputStyle} value={form.title} onChange={(event) => onChange({ ...form, title: event.target.value })} />
+      </Field>
+      <Field label="Event Type">
+        <select
+          style={imsInputStyle}
+          value={form.planner_type}
+          onChange={(event) => onChange({
+            ...form,
+            planner_type: event.target.value,
+            frequency: "One-off",
+            reminder_days: form.reminder_days || "14",
+          })}
+        >
+          {hseEventTypes.map((option) => <option key={option}>{option}</option>)}
+        </select>
+      </Field>
+      <Field label="Assigned To">
+        <select style={imsInputStyle} value={form.assigned_person_id || form.assigned_to} onChange={(event) => onPersonSelect(event.target.value)}>
+          <option value="">Select person</option>
+          {form.assigned_to && !people.some((person) => person.name === form.assigned_to) ? <option value={form.assigned_to}>{form.assigned_to} (saved value)</option> : null}
+          {people.map((person) => (
+            <option key={person.id} value={person.id}>{[person.name, person.role].filter(Boolean).join(" - ")}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Start Date">
+        <input
+          type="date"
+          style={imsInputStyle}
+          value={form.due_date}
+          onChange={(event) => onChange({ ...form, due_date: event.target.value, next_due_date: form.next_due_date || event.target.value })}
+        />
+      </Field>
+      <Field label="End Date">
+        <input type="date" style={imsInputStyle} value={form.next_due_date} onChange={(event) => onChange({ ...form, next_due_date: event.target.value })} />
+      </Field>
+      <Field label="Status">
+        <select style={imsInputStyle} value={form.status} onChange={(event) => onChange({ ...form, status: event.target.value })}>
+          {statusOptions.map((option) => <option key={option}>{option}</option>)}
+        </select>
+      </Field>
+      <Field label="Priority">
+        <select style={imsInputStyle} value={form.priority} onChange={(event) => onChange({ ...form, priority: event.target.value })}>
+          {priorityOptions.map((option) => <option key={option}>{option}</option>)}
+        </select>
+      </Field>
+      <Field label="Location">
+        <input style={imsInputStyle} value={form.location} onChange={(event) => onChange({ ...form, location: event.target.value })} />
+      </Field>
+      <Field label="Description" span>
+        <textarea style={{ ...imsInputStyle, minHeight: "96px", resize: "vertical", lineHeight: 1.45 }} value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} />
+      </Field>
+      <Field label="Notes" span>
+        <textarea style={{ ...imsInputStyle, minHeight: "96px", resize: "vertical", lineHeight: 1.45 }} value={form.notes} onChange={(event) => onChange({ ...form, notes: event.target.value })} />
+      </Field>
+    </div>
   );
 }
 
