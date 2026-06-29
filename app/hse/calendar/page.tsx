@@ -1,16 +1,11 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { ImsButton, ImsFilterPanel, ImsLinkButton, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
-import {
-  ImsButton,
-  ImsFilterPanel,
-  ImsPanel,
-  ImsTabs,
-  ImsTopMetaRow,
-} from "../../../src/components/ImsPrimitives";
 import {
   imsColours,
   imsInputStyle,
@@ -24,6 +19,8 @@ import { supabase } from "../../../src/lib/supabase";
 export const dynamic = "force-dynamic";
 
 type CalendarView = "dashboard" | "calendar" | "register" | "create";
+type EventSource = "AINM" | "Inspection" | "Observation" | "HSE Action" | "Planner" | "HSE Check" | "Review" | "Drill" | "Other";
+type SourceKind = "system" | "manual";
 
 type PlannerItem = {
   id: string;
@@ -48,6 +45,59 @@ type PlannerItem = {
   linked_inspection_number: string | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+type AINMRow = {
+  id: string;
+  ainm_number: string | null;
+  title: string | null;
+  project: string | null;
+  location_site: string | null;
+  event_date: string | null;
+  event_classification: string | null;
+  overall_status: string | null;
+  owner: string | null;
+};
+
+type HseInspectionRow = {
+  id: string;
+  inspection_number: string | null;
+  title: string | null;
+  form_title: string | null;
+  project_work_scope: string | null;
+  area_zone: string | null;
+  inspection_date: string | null;
+  inspector_name: string | null;
+  status: string | null;
+};
+
+type ObservationRow = {
+  id: string;
+  observation_number: string | null;
+  title: string | null;
+  observation_date: string | null;
+  observation_type: string | null;
+  project: string | null;
+  site_location: string | null;
+  status: string | null;
+  assigned_to: string | null;
+  created_at: string | null;
+};
+
+type HseActionRow = {
+  id: string;
+  action_number: string | null;
+  title: string | null;
+  description: string | null;
+  department: string | null;
+  owner: string | null;
+  priority: string | null;
+  status: string | null;
+  due_date: string | null;
+  source: string | null;
+  linked_ainm_number?: string | null;
+  linked_hse_inspection_number?: string | null;
+  linked_observation_number?: string | null;
 };
 
 type PersonOption = {
@@ -81,56 +131,42 @@ type PlannerForm = {
   linked_inspection_number: string;
 };
 
+type CalendarEvent = {
+  id: string;
+  sourceId: string;
+  sourceKind: SourceKind;
+  source: EventSource;
+  title: string;
+  date: string;
+  status: string;
+  owner: string;
+  priority: string;
+  detail: string;
+  href?: string;
+  planner?: PlannerItem;
+};
+
 const viewTabs: Array<{ value: CalendarView; label: string }> = [
   { value: "dashboard", label: "Dashboard" },
   { value: "calendar", label: "Calendar" },
-  { value: "register", label: "Planner Register" },
+  { value: "register", label: "Register" },
   { value: "create", label: "Create Task" },
 ];
 
 const inspectionForms = [
-  {
-    ref: "ENS-HSEQ-FRM-046",
-    title: "Vessel Pre-Sail Inspection",
-    revision: "Rev B",
-    revisionDate: "08 Feb 2024",
-  },
-  {
-    ref: "ENS-HSEQ-FRM-041",
-    title: "Workplace Inspection - Office",
-    revision: "Rev B",
-    revisionDate: "23 Feb 2024",
-  },
-  {
-    ref: "ENS-HSEQ-FRM-042",
-    title: "Workplace Inspection - Offshore",
-    revision: "Rev B",
-    revisionDate: "10 Aug 2023",
-  },
-  {
-    ref: "ENS-HSEQ-FRM-043",
-    title: "Workplace Inspection - Mobilisation",
-    revision: "Rev B",
-    revisionDate: "Not stated",
-  },
-  {
-    ref: "ENS-HSEQ-FRM-044",
-    title: "Workplace Inspection - Base and Site",
-    revision: "Rev E",
-    revisionDate: "19 May 2026",
-  },
-  {
-    ref: "ENS-HSEQ-FRM-045",
-    title: "Workplace Inspection - Dropped Objects",
-    revision: "Rev B",
-    revisionDate: "Not stated",
-  },
+  { ref: "ENS-HSEQ-FRM-046", title: "Vessel Pre-Sail Inspection", revision: "Rev B", revisionDate: "08 Feb 2024" },
+  { ref: "ENS-HSEQ-FRM-041", title: "Workplace Inspection - Office", revision: "Rev B", revisionDate: "23 Feb 2024" },
+  { ref: "ENS-HSEQ-FRM-042", title: "Workplace Inspection - Offshore", revision: "Rev B", revisionDate: "10 Aug 2023" },
+  { ref: "ENS-HSEQ-FRM-043", title: "Workplace Inspection - Mobilisation", revision: "Rev B", revisionDate: "Not stated" },
+  { ref: "ENS-HSEQ-FRM-044", title: "Workplace Inspection - Base and Site", revision: "Rev E", revisionDate: "19 May 2026" },
+  { ref: "ENS-HSEQ-FRM-045", title: "Workplace Inspection - Dropped Objects", revision: "Rev B", revisionDate: "Not stated" },
 ];
 
 const hseTeamNames = ["Peter Ridley", "John Fender", "Blerim Azizaj", "Les Middleton"];
 const frequencyOptions = ["One-off", "Weekly", "Monthly", "6-monthly", "Yearly"];
 const statusOptions = ["Scheduled", "Due Soon", "Overdue", "Complete", "Paused"];
 const priorityOptions = ["Low", "Medium", "High"];
+const plannerSourceFilter = "Planner Items";
 
 const emptyForm: PlannerForm = {
   title: "",
@@ -177,10 +213,8 @@ function displayDate(value: string | null | undefined) {
   return date ? date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
 }
 
-function displayDateTime(value: string | null | undefined) {
-  if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+function dateOnly(value: string | null | undefined) {
+  return value ? value.slice(0, 10) : "";
 }
 
 function dueKey(item: Pick<PlannerItem, "next_due_date" | "due_date">) {
@@ -189,13 +223,17 @@ function dueKey(item: Pick<PlannerItem, "next_due_date" | "due_date">) {
 
 function daysUntil(value: string | null | undefined) {
   const date = parseDateKey(value);
-  if (!date) return null;
   const start = parseDateKey(todayKey());
-  if (!start) return null;
+  if (!date || !start) return null;
   return Math.ceil((date.getTime() - start.getTime()) / 86400000);
 }
 
-function effectiveStatus(item: PlannerItem) {
+function isClosedLike(status: string | null | undefined) {
+  const cleanStatus = (status || "").trim().toLowerCase();
+  return cleanStatus === "closed" || cleanStatus === "complete" || cleanStatus === "completed" || cleanStatus === "cancelled";
+}
+
+function effectivePlannerStatus(item: PlannerItem) {
   const stored = item.status || "Scheduled";
   if (stored === "Complete" || stored === "Paused") return stored;
   const diff = daysUntil(dueKey(item));
@@ -203,6 +241,15 @@ function effectiveStatus(item: PlannerItem) {
   if (diff < 0) return "Overdue";
   if (diff <= 7) return "Due Soon";
   return stored;
+}
+
+function dueStatus(date: string | null | undefined, status: string | null | undefined) {
+  if (isClosedLike(status)) return status || "Complete";
+  const diff = daysUntil(date);
+  if (diff === null) return status || "Scheduled";
+  if (diff < 0) return "Overdue";
+  if (diff <= 7) return "Due Soon";
+  return status || "Scheduled";
 }
 
 function addFrequency(dateKey: string, frequency: string | null | undefined) {
@@ -215,6 +262,10 @@ function addFrequency(dateKey: string, frequency: string | null | undefined) {
   else if (frequency === "Yearly") next.setFullYear(next.getFullYear() + 1);
   else return dateKey;
   return toDateKey(next);
+}
+
+function clean(value: string) {
+  return value.trim();
 }
 
 function formFromItem(item: PlannerItem): PlannerForm {
@@ -239,10 +290,6 @@ function formFromItem(item: PlannerItem): PlannerForm {
     linked_inspection_id: item.linked_inspection_id || "",
     linked_inspection_number: item.linked_inspection_number || "",
   };
-}
-
-function clean(value: string) {
-  return value.trim();
 }
 
 function payloadFromForm(form: PlannerForm) {
@@ -270,126 +317,257 @@ function payloadFromForm(form: PlannerForm) {
   };
 }
 
-function accentForStatus(status: string) {
+function plannerSource(item: PlannerItem): EventSource {
+  const type = (item.planner_type || "").trim();
+  if (type === "HSE Check") return "HSE Check";
+  if (type === "Review") return "Review";
+  if (type === "Drill") return "Drill";
+  if (type === "Other") return "Other";
+  return "Planner";
+}
+
+function eventAccent(source: EventSource, status: string) {
   if (status === "Overdue") return imsColours.dangerBright;
   if (status === "Due Soon") return imsColours.warning;
-  if (status === "Complete") return imsColours.success;
-  if (status === "Paused") return imsColours.muted;
-  return imsColours.blue;
+  if (source === "AINM") return imsColours.dangerBright;
+  if (source === "Inspection") return imsColours.blue;
+  if (source === "Observation") return imsColours.purple;
+  if (source === "HSE Action") return isClosedLike(status) ? imsColours.success : imsColours.warning;
+  if (source === "Planner" || source === "HSE Check") return imsColours.brand;
+  if (source === "Review") return imsColours.slate;
+  if (source === "Drill") return imsColours.purple;
+  return imsColours.brandDark;
+}
+
+function sourceLabel(source: EventSource) {
+  if (source === "HSE Action") return "Action";
+  return source;
+}
+
+function buildEvents({
+  plannerItems,
+  ainmRows,
+  inspectionRows,
+  observationRows,
+  actionRows,
+}: {
+  plannerItems: PlannerItem[];
+  ainmRows: AINMRow[];
+  inspectionRows: HseInspectionRow[];
+  observationRows: ObservationRow[];
+  actionRows: HseActionRow[];
+}) {
+  const events: CalendarEvent[] = [];
+
+  plannerItems.forEach((item) => {
+    const date = dateOnly(dueKey(item));
+    if (!date) return;
+    const source = plannerSource(item);
+    events.push({
+      id: `planner-${item.id}`,
+      sourceId: item.id,
+      sourceKind: "manual",
+      source,
+      title: item.title || "Planner item",
+      date,
+      status: effectivePlannerStatus(item),
+      owner: item.assigned_to || "",
+      priority: item.priority || "",
+      detail: [item.inspection_form_ref, item.inspection_form_title, item.location || item.project_work_scope].filter(Boolean).join(" | ") || item.description || "HSE planner item",
+      planner: item,
+    });
+  });
+
+  ainmRows.forEach((row) => {
+    const date = dateOnly(row.event_date);
+    if (!date) return;
+    events.push({
+      id: `ainm-${row.id}`,
+      sourceId: row.id,
+      sourceKind: "system",
+      source: "AINM",
+      title: `${row.ainm_number || "AINM"} event`,
+      date,
+      status: row.overall_status || "Open",
+      owner: row.owner || "",
+      priority: row.event_classification || "",
+      detail: [row.title, row.project, row.location_site, row.event_classification].filter(Boolean).join(" | ") || "AINM event date",
+      href: `/hse/ainm?ainmId=${encodeURIComponent(row.id)}`,
+    });
+  });
+
+  inspectionRows.forEach((row) => {
+    const date = dateOnly(row.inspection_date);
+    if (!date) return;
+    events.push({
+      id: `inspection-${row.id}`,
+      sourceId: row.id,
+      sourceKind: "system",
+      source: "Inspection",
+      title: `${row.inspection_number || "Inspection"} completed`,
+      date,
+      status: row.status || "Open",
+      owner: row.inspector_name || "",
+      priority: "",
+      detail: [row.title || row.form_title, row.project_work_scope, row.area_zone].filter(Boolean).join(" | ") || "HSE inspection date",
+      href: `/hse/inspections?inspectionId=${encodeURIComponent(row.id)}`,
+    });
+  });
+
+  observationRows.forEach((row) => {
+    const date = dateOnly(row.observation_date) || dateOnly(row.created_at);
+    if (!date) return;
+    events.push({
+      id: `observation-${row.id}`,
+      sourceId: row.id,
+      sourceKind: "system",
+      source: "Observation",
+      title: `${row.observation_number || "Observation"} logged`,
+      date,
+      status: row.status || "New",
+      owner: row.assigned_to || "",
+      priority: row.observation_type || "",
+      detail: [row.title, row.project, row.site_location, row.observation_type].filter(Boolean).join(" | ") || "HSE observation date",
+      href: `/hse/observations?observationId=${encodeURIComponent(row.id)}`,
+    });
+  });
+
+  actionRows.forEach((action) => {
+    if (!action.due_date || (action.department || "").trim().toUpperCase() !== "HSE") return;
+    events.push({
+      id: `action-${action.id}`,
+      sourceId: action.id,
+      sourceKind: "system",
+      source: "HSE Action",
+      title: `${action.action_number || "Action"} due`,
+      date: dateOnly(action.due_date),
+      status: dueStatus(action.due_date, action.status),
+      owner: action.owner || "",
+      priority: action.priority || "",
+      detail: [action.title, action.source, action.linked_ainm_number, action.linked_hse_inspection_number, action.linked_observation_number].filter(Boolean).join(" | ") || "HSE action due date",
+      href: `/hse/actions?actionId=${encodeURIComponent(action.id)}`,
+    });
+  });
+
+  return events.filter((event) => event.date).sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
 
 export default function HseCalendarPage() {
+  const router = useRouter();
   const [items, setItems] = useState<PlannerItem[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [activeView, setActiveView] = useState<CalendarView>("dashboard");
   const [message, setMessage] = useState("Loading HSE calendar...");
   const [loading, setLoading] = useState(false);
   const [refreshStamp, setRefreshStamp] = useState("");
   const [selectedId, setSelectedId] = useState("");
+  const [selectedDateKey, setSelectedDateKey] = useState("");
   const [createForm, setCreateForm] = useState<PlannerForm>(emptyForm);
   const [detailForm, setDetailForm] = useState<PlannerForm>(emptyForm);
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
-  const [frequencyFilter, setFrequencyFilter] = useState("");
-  const [formFilter, setFormFilter] = useState("");
   const [monthCursor, setMonthCursor] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
-  const selected = useMemo(() => items.find((item) => item.id === selectedId) || null, [items, selectedId]);
+  const selected = useMemo(() => events.find((event) => event.id === selectedId) || null, [events, selectedId]);
+  const selectedPlanner = selected?.planner || null;
 
   useEffect(() => {
-    if (selected) setDetailForm(formFromItem(selected));
-  }, [selected]);
+    if (selectedPlanner) setDetailForm(formFromItem(selectedPlanner));
+  }, [selectedPlanner]);
 
   const peopleById = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const peopleByName = useMemo(() => new Map(people.map((person) => [person.name, person])), [people]);
 
-  const filteredItems = useMemo(() => {
+  const filteredEvents = useMemo(() => {
     const text = search.trim().toLowerCase();
-    return items.filter((item) => {
-      const status = effectiveStatus(item);
-      if (statusFilter && status !== statusFilter) return false;
-      if (ownerFilter && item.assigned_to !== ownerFilter) return false;
-      if (frequencyFilter && item.frequency !== frequencyFilter) return false;
-      if (formFilter && item.inspection_form_ref !== formFilter) return false;
+    return events.filter((event) => {
+      if (sourceFilter === plannerSourceFilter && event.sourceKind !== "manual") return false;
+      if (sourceFilter && sourceFilter !== plannerSourceFilter && event.source !== sourceFilter) return false;
+      if (statusFilter && event.status !== statusFilter) return false;
+      if (ownerFilter && event.owner !== ownerFilter) return false;
       if (!text) return true;
-      return [
-        item.title,
-        item.description,
-        item.assigned_to,
-        item.inspection_form_ref,
-        item.inspection_form_title,
-        item.location,
-        item.project_work_scope,
-      ]
+      return [event.title, event.detail, event.owner, event.status, event.source, event.priority]
         .join(" ")
         .toLowerCase()
         .includes(text);
     });
-  }, [frequencyFilter, formFilter, items, ownerFilter, search, statusFilter]);
+  }, [events, ownerFilter, search, sourceFilter, statusFilter]);
 
-  const sortedItems = useMemo(
-    () => [...filteredItems].sort((a, b) => (dueKey(a) || "9999-12-31").localeCompare(dueKey(b) || "9999-12-31")),
-    [filteredItems],
-  );
-
-  const kpis = useMemo(() => {
-    const open = items.filter((item) => !["Complete", "Paused"].includes(effectiveStatus(item)));
-    return {
-      scheduled: open.filter((item) => effectiveStatus(item) === "Scheduled").length,
-      dueSoon: open.filter((item) => effectiveStatus(item) === "Due Soon").length,
-      dueThirty: open.filter((item) => {
-        const diff = daysUntil(dueKey(item));
-        return diff !== null && diff >= 0 && diff <= 30;
-      }).length,
-      overdue: open.filter((item) => effectiveStatus(item) === "Overdue").length,
-      complete: items.filter((item) => effectiveStatus(item) === "Complete").length,
-      paused: items.filter((item) => effectiveStatus(item) === "Paused").length,
-    };
-  }, [items]);
-
-  const nextDue = useMemo(() => {
-    return [...items]
-      .filter((item) => !["Complete", "Paused"].includes(effectiveStatus(item)) && dueKey(item))
-      .sort((a, b) => dueKey(a).localeCompare(dueKey(b)))[0];
-  }, [items]);
-
-  const overdueItems = useMemo(
-    () => sortedItems.filter((item) => effectiveStatus(item) === "Overdue"),
-    [sortedItems],
-  );
-
-  const upcomingItems = useMemo(
-    () => sortedItems.filter((item) => {
-      const status = effectiveStatus(item);
-      const diff = daysUntil(dueKey(item));
-      return status !== "Complete" && status !== "Paused" && diff !== null && diff >= 0 && diff <= 30;
+  const upcomingEvents = useMemo(
+    () => events.filter((event) => {
+      const diff = daysUntil(event.date);
+      return diff !== null && diff >= 0 && diff <= 30 && !isClosedLike(event.status);
     }),
-    [sortedItems],
+    [events],
   );
+
+  const overdueEvents = useMemo(
+    () => events.filter((event) => event.status === "Overdue"),
+    [events],
+  );
+
+  const nextEvent = useMemo(
+    () => upcomingEvents[0] || events.find((event) => {
+      const diff = daysUntil(event.date);
+      return diff !== null && diff >= 0;
+    }),
+    [events, upcomingEvents],
+  );
+
+  const kpis = useMemo(() => ({
+    ainm: events.filter((event) => event.source === "AINM").length,
+    inspections: events.filter((event) => event.source === "Inspection").length,
+    observations: events.filter((event) => event.source === "Observation").length,
+    actions: events.filter((event) => event.source === "HSE Action" && !isClosedLike(event.status)).length,
+    overdue: overdueEvents.length,
+    planner: events.filter((event) => event.sourceKind === "manual").length,
+  }), [events, overdueEvents.length]);
 
   async function loadData() {
     setLoading(true);
-    const [itemRes, peopleRes] = await Promise.all([
+    const [plannerRes, peopleRes, ainmRes, inspectionRes, observationRes, actionRes] = await Promise.all([
       supabase.from("hse_calendar_items").select("*").order("next_due_date", { ascending: true }),
       supabase.from("people").select("id,name,email,role,department,active").eq("active", true).order("name", { ascending: true }),
+      supabase.from("hse_ainm_records").select("id,ainm_number,title,project,location_site,event_date,event_classification,overall_status,owner").order("event_date", { ascending: false }),
+      supabase.from("hse_inspection_records").select("id,inspection_number,title,form_title,project_work_scope,area_zone,inspection_date,inspector_name,status").order("inspection_date", { ascending: false }),
+      supabase.from("hse_observations").select("id,observation_number,title,observation_date,observation_type,project,site_location,status,assigned_to,created_at").order("created_at", { ascending: false }),
+      supabase.from("actions").select("id,action_number,title,description,department,owner,priority,status,due_date,source,linked_ainm_number,linked_hse_inspection_number,linked_observation_number").order("action_number", { ascending: true }),
     ]);
 
-    if (itemRes.error) {
-      setItems([]);
-      setMessage(`HSE calendar table not ready: ${itemRes.error.message}. Run scripts/sql/hse_calendar_planner.sql in Supabase.`);
+    const warnings = [ainmRes, inspectionRes, observationRes, actionRes]
+      .filter((result) => result.error)
+      .map((result) => result.error?.message)
+      .filter(Boolean);
+
+    const plannerItems = plannerRes.error ? [] : ((plannerRes.data || []) as PlannerItem[]);
+    setItems(plannerItems);
+    if (!peopleRes.error) setPeople((peopleRes.data || []) as PersonOption[]);
+
+    const nextEvents = buildEvents({
+      plannerItems,
+      ainmRows: (ainmRes.data || []) as AINMRow[],
+      inspectionRows: (inspectionRes.data || []) as HseInspectionRow[],
+      observationRows: (observationRes.data || []) as ObservationRow[],
+      actionRows: (actionRes.data || []) as HseActionRow[],
+    });
+    setEvents(nextEvents);
+    if (!selectedId && nextEvents[0]) setSelectedId(nextEvents[0].id);
+
+    if (plannerRes.error) {
+      setMessage(`HSE calendar table not ready: ${plannerRes.error.message}. Run scripts/sql/hse_calendar_planner.sql in Supabase.`);
+    } else if (warnings.length) {
+      setMessage(`Loaded ${nextEvents.length} HSE calendar events with source warnings: ${warnings.join(" | ")}`);
     } else {
-      const rows = (itemRes.data || []) as PlannerItem[];
-      setItems(rows);
-      if (!selectedId && rows[0]) setSelectedId(rows[0].id);
-      setMessage(`Loaded ${rows.length} HSE calendar item${rows.length === 1 ? "" : "s"}.`);
+      setMessage(`Loaded ${nextEvents.length} HSE calendar event${nextEvents.length === 1 ? "" : "s"}.`);
     }
 
-    if (!peopleRes.error) setPeople((peopleRes.data || []) as PersonOption[]);
     setRefreshStamp(new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }));
     setLoading(false);
   }
@@ -415,23 +593,15 @@ export default function HseCalendarPage() {
       inspection_form_title: template?.title || "",
       title: template ? `${template.title} planner item` : "",
     };
-    if (target === "create") {
-      setCreateForm((current) => ({
-        ...current,
-        inspection_form_ref: update.inspection_form_ref,
-        inspection_form_title: update.inspection_form_title,
-        title: current.title || update.title,
-        planner_type: "Inspection",
-      }));
-    } else {
-      setDetailForm((current) => ({
-        ...current,
-        inspection_form_ref: update.inspection_form_ref,
-        inspection_form_title: update.inspection_form_title,
-        title: current.title || update.title,
-        planner_type: "Inspection",
-      }));
-    }
+    const apply = (current: PlannerForm) => ({
+      ...current,
+      inspection_form_ref: update.inspection_form_ref,
+      inspection_form_title: update.inspection_form_title,
+      title: current.title || update.title,
+      planner_type: "Inspection",
+    });
+    if (target === "create") setCreateForm(apply);
+    else setDetailForm(apply);
   }
 
   async function createItem() {
@@ -451,12 +621,12 @@ export default function HseCalendarPage() {
   }
 
   async function updateItem() {
-    if (!selected) return;
+    if (!selectedPlanner) return;
     if (!clean(detailForm.title)) {
       setMessage("Status: Add a task title before saving.");
       return;
     }
-    const { error } = await supabase.from("hse_calendar_items").update(payloadFromForm(detailForm)).eq("id", selected.id);
+    const { error } = await supabase.from("hse_calendar_items").update(payloadFromForm(detailForm)).eq("id", selectedPlanner.id);
     if (error) {
       setMessage(`Status: Calendar item could not be updated: ${error.message}`);
       return;
@@ -466,9 +636,9 @@ export default function HseCalendarPage() {
   }
 
   async function deleteItem() {
-    if (!selected) return;
-    if (!window.confirm(`Delete ${selected.title}?`)) return;
-    const { error } = await supabase.from("hse_calendar_items").delete().eq("id", selected.id);
+    if (!selectedPlanner) return;
+    if (!window.confirm(`Delete ${selectedPlanner.title}?`)) return;
+    const { error } = await supabase.from("hse_calendar_items").delete().eq("id", selectedPlanner.id);
     if (error) {
       setMessage(`Status: Calendar item could not be deleted: ${error.message}`);
       return;
@@ -479,11 +649,11 @@ export default function HseCalendarPage() {
   }
 
   async function markCompleteAndRollForward() {
-    if (!selected) return;
+    if (!selectedPlanner) return;
     const completed = todayKey();
-    const currentDue = dueKey(selected) || completed;
-    const isRecurring = selected.frequency && selected.frequency !== "One-off";
-    const nextDueDate = isRecurring ? addFrequency(currentDue, selected.frequency) : currentDue;
+    const currentDue = dueKey(selectedPlanner) || completed;
+    const isRecurring = selectedPlanner.frequency && selectedPlanner.frequency !== "One-off";
+    const nextDueDate = isRecurring ? addFrequency(currentDue, selectedPlanner.frequency) : currentDue;
     const nextStatus = isRecurring ? "Scheduled" : "Complete";
     const { error } = await supabase
       .from("hse_calendar_items")
@@ -493,7 +663,7 @@ export default function HseCalendarPage() {
         status: nextStatus,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", selected.id);
+      .eq("id", selectedPlanner.id);
     if (error) {
       setMessage(`Status: Completion could not be saved: ${error.message}`);
       return;
@@ -502,8 +672,36 @@ export default function HseCalendarPage() {
     await loadData();
   }
 
-  function openFilteredRegister(nextStatus: string) {
-    setStatusFilter(nextStatus);
+  function openFilteredRegister(source: string, status = "") {
+    setSearch("");
+    setSourceFilter(source);
+    setStatusFilter(status);
+    setOwnerFilter("");
+    setSelectedDateKey("");
+    setSelectedId("");
+    setActiveView("register");
+    setShowFilters(true);
+  }
+
+  function clearRegisterFilters() {
+    setSearch("");
+    setSourceFilter("");
+    setStatusFilter("");
+    setOwnerFilter("");
+    setSelectedDateKey("");
+  }
+
+  function openEvent(event: CalendarEvent) {
+    if (event.sourceKind === "system" && event.href) {
+      router.push(event.href);
+      return;
+    }
+    setSearch("");
+    setSourceFilter(plannerSourceFilter);
+    setStatusFilter("");
+    setOwnerFilter("");
+    setSelectedDateKey("");
+    setSelectedId(event.id);
     setActiveView("register");
     setShowFilters(true);
   }
@@ -513,10 +711,10 @@ export default function HseCalendarPage() {
       <QualityPageHero
         label="HSE MANAGEMENT"
         title="HSE Calendar"
-        description="Plan recurring HSE inspections, assign team ownership, and monitor upcoming six-monthly and yearly checks from one controlled planner."
+        description="Live HSE timeline for AINM records, inspections, observations, HSE actions, and editable planner items."
         contextCards={[
           { label: "Last Refreshed", value: refreshStamp || "Loading" },
-          { label: "Next Due", value: nextDue ? `${displayDate(dueKey(nextDue))} - ${nextDue.title}` : "No planned item" },
+          { label: "Next Event", value: nextEvent ? `${displayDate(nextEvent.date)} - ${nextEvent.title}` : "No upcoming event" },
         ]}
       />
 
@@ -531,44 +729,30 @@ export default function HseCalendarPage() {
       {activeView === "dashboard" ? (
         <div style={{ display: "grid", gap: "20px" }}>
           <section style={kpiGridStyle}>
-            <QualityKpiCard title="Scheduled" value={kpis.scheduled} accent={imsColours.blue} onClick={() => openFilteredRegister("Scheduled")} />
-            <QualityKpiCard title="Due Soon" value={kpis.dueSoon} accent={imsColours.warning} onClick={() => openFilteredRegister("Due Soon")} />
-            <QualityKpiCard title="Due in 30 Days" value={kpis.dueThirty} accent={imsColours.brand} onClick={() => { setStatusFilter(""); setActiveView("register"); setShowFilters(true); }} />
-            <QualityKpiCard title="Overdue" value={kpis.overdue} accent={imsColours.dangerBright} onClick={() => openFilteredRegister("Overdue")} />
-            <QualityKpiCard title="Completed" value={kpis.complete} accent={imsColours.success} onClick={() => openFilteredRegister("Complete")} />
-            <QualityKpiCard title="Paused" value={kpis.paused} accent={imsColours.muted} onClick={() => openFilteredRegister("Paused")} />
+            <QualityKpiCard title="AINM Events" value={kpis.ainm} accent={imsColours.dangerBright} onClick={() => openFilteredRegister("AINM")} />
+            <QualityKpiCard title="Inspections" value={kpis.inspections} accent={imsColours.blue} onClick={() => openFilteredRegister("Inspection")} />
+            <QualityKpiCard title="Observations" value={kpis.observations} accent={imsColours.purple} onClick={() => openFilteredRegister("Observation")} />
+            <QualityKpiCard title="Open Actions" value={kpis.actions} accent={imsColours.warning} onClick={() => openFilteredRegister("HSE Action")} />
+            <QualityKpiCard title="Overdue" value={kpis.overdue} accent={imsColours.dangerBright} onClick={() => openFilteredRegister("", "Overdue")} />
+            <QualityKpiCard title="Planner Items" value={kpis.planner} accent={imsColours.brand} onClick={() => openFilteredRegister(plannerSourceFilter)} />
           </section>
 
           <section style={dashboardGridStyle}>
-            <ImsPanel title="Overdue Calendar Items" subtitle="HSE inspections and checks now past their planned due date.">
-              <div style={{ display: "grid", gap: "10px" }}>
-                {overdueItems.slice(0, 10).map((item) => (
-                  <button key={item.id} type="button" style={listButtonStyle} onClick={() => { setSelectedId(item.id); setActiveView("register"); }}>
-                    <span>
-                      <strong>{item.title}</strong>
-                      <span style={mutedTextStyle}>{[item.inspection_form_ref, item.assigned_to, item.frequency].filter(Boolean).join(" | ")}</span>
-                    </span>
-                    <StatusPill status={effectiveStatus(item)} />
-                    <strong>{displayDate(dueKey(item)) || "No due date"}</strong>
-                  </button>
+            <ImsPanel title="Upcoming HSE Dates" subtitle="Next 30 days across HSE source records and planner items.">
+              <div style={listStackStyle}>
+                {upcomingEvents.slice(0, 8).map((event) => (
+                  <EventListButton key={event.id} event={event} onClick={() => openEvent(event)} />
                 ))}
-                {!overdueItems.length ? <EmptyState text="No overdue HSE calendar items." /> : null}
+                {!upcomingEvents.length ? <EmptyState text="No HSE calendar events due in the next 30 days." /> : null}
               </div>
             </ImsPanel>
 
-            <ImsPanel title="Upcoming Calendar Items" subtitle="HSE planner items due in the next 30 days.">
-              <div style={{ display: "grid", gap: "10px" }}>
-                {upcomingItems.slice(0, 10).map((item) => (
-                  <button key={item.id} type="button" style={listButtonStyle} onClick={() => { setSelectedId(item.id); setActiveView("register"); }}>
-                    <span>
-                      <strong>{item.title}</strong>
-                      <span style={mutedTextStyle}>{[item.inspection_form_ref, item.assigned_to, item.frequency].filter(Boolean).join(" | ")}</span>
-                    </span>
-                    <StatusPill status={effectiveStatus(item)} />
-                    <strong>{displayDate(dueKey(item)) || "No due date"}</strong>
-                  </button>
+            <ImsPanel title="Management Attention" subtitle="Overdue planner items and HSE actions requiring attention.">
+              <div style={listStackStyle}>
+                {overdueEvents.slice(0, 8).map((event) => (
+                  <EventListButton key={event.id} event={event} onClick={() => openEvent(event)} />
                 ))}
-                {!upcomingItems.length ? <EmptyState text="No HSE calendar items due in the next 30 days." /> : null}
+                {!overdueEvents.length ? <EmptyState text="No overdue HSE calendar events." /> : null}
               </div>
             </ImsPanel>
           </section>
@@ -576,7 +760,8 @@ export default function HseCalendarPage() {
       ) : null}
 
       {activeView === "calendar" ? (
-        <ImsPanel title="Calendar View" subtitle="Month view of planned HSE inspections and recurring checks.">
+        <ImsPanel title="Calendar View" subtitle="Month view of live HSE records and planned HSE work.">
+          <Legend />
           <div style={calendarToolbarStyle}>
             <ImsButton variant="secondary" onClick={() => setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1))}>Previous</ImsButton>
             <h2 style={{ margin: 0 }}>{monthCursor.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</h2>
@@ -584,75 +769,99 @@ export default function HseCalendarPage() {
           </div>
           <MonthGrid
             cursor={monthCursor}
-            items={items}
-            onDateSelect={(dateKey) => {
+            events={filteredEvents}
+            onDateSelect={setSelectedDateKey}
+            onCreateDate={(dateKey) => {
               setCreateForm((current) => ({ ...current, due_date: dateKey, next_due_date: dateKey }));
               setActiveView("create");
             }}
-            onSelect={(item) => {
-              setSelectedId(item.id);
-              setActiveView("register");
-            }}
+            onSelect={(event) => openEvent(event)}
           />
+          {selectedDateKey ? (
+            <div style={dateDetailStyle}>
+              <div style={dateDetailHeaderStyle}>
+                <div>
+                  <div style={fieldLabelStyle}>Selected Date</div>
+                  <strong>{displayDate(selectedDateKey)}</strong>
+                </div>
+                <ImsButton
+                  onClick={() => {
+                    setCreateForm((current) => ({ ...current, due_date: selectedDateKey, next_due_date: selectedDateKey }));
+                    setActiveView("create");
+                  }}
+                >
+                  + Add Item
+                </ImsButton>
+              </div>
+              <div style={listStackStyle}>
+                {filteredEvents
+                  .filter((event) => event.date === selectedDateKey)
+                  .map((event) => <EventListButton key={event.id} event={event} onClick={() => openEvent(event)} />)}
+                {!filteredEvents.some((event) => event.date === selectedDateKey) ? <EmptyState text="No HSE calendar items are logged on this date." /> : null}
+              </div>
+            </div>
+          ) : null}
         </ImsPanel>
       ) : null}
 
       {activeView === "register" ? (
         <div style={{ display: "grid", gap: "16px" }}>
-          <ImsPanel title="HSE Calendar Register" subtitle="Search, filter, open, edit, complete, or roll forward planned HSE work.">
+          <ImsPanel title="HSE Calendar Register" subtitle="Search and filter live HSE dates and editable planner items.">
             <ImsFilterPanel
               search={search}
               onSearchChange={setSearch}
-              searchPlaceholder="Search title, owner, form, location or project"
+              searchPlaceholder="Search title, owner, source, status or detail"
               showFilters={showFilters}
               onToggleFilters={() => setShowFilters((value) => !value)}
-              actions={<ImsButton variant="secondary" onClick={() => { setSearch(""); setStatusFilter(""); setOwnerFilter(""); setFrequencyFilter(""); setFormFilter(""); }}>Clear Filters</ImsButton>}
+              actions={<ImsButton variant="secondary" onClick={clearRegisterFilters}>Clear Filters</ImsButton>}
             >
-              <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} emptyLabel="All Statuses" />
-              <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={[...new Set(items.map((item) => item.assigned_to).filter(Boolean) as string[])]} emptyLabel="All Owners" />
-              <FilterSelect label="Frequency" value={frequencyFilter} onChange={setFrequencyFilter} options={frequencyOptions} emptyLabel="All Frequencies" />
-              <FilterSelect label="Inspection Form" value={formFilter} onChange={setFormFilter} options={inspectionForms.map((form) => form.ref)} emptyLabel="All Forms" />
+              <FilterSelect label="Type" value={sourceFilter} onChange={setSourceFilter} options={["AINM", "Inspection", "Observation", "HSE Action", plannerSourceFilter, "Planner", "HSE Check", "Review", "Drill", "Other"]} emptyLabel="All Types" />
+              <FilterSelect label="Status" value={statusFilter} onChange={setStatusFilter} options={[...new Set(events.map((event) => event.status).filter(Boolean))]} emptyLabel="All Statuses" />
+              <FilterSelect label="Owner" value={ownerFilter} onChange={setOwnerFilter} options={[...new Set(events.map((event) => event.owner).filter(Boolean))]} emptyLabel="All Owners" />
             </ImsFilterPanel>
 
             <div style={imsTableInfoRowStyle}>
-              <span>Showing</span><strong>{sortedItems.length}</strong><span>of</span><strong>{items.length}</strong><span>calendar items</span>
+              <span>Showing</span><strong>{filteredEvents.length}</strong><span>of</span><strong>{events.length}</strong><span>calendar events</span>
+              {sourceFilter || statusFilter || ownerFilter || search ? (
+                <span style={activeFilterChipStyle}>
+                  Filter: {[sourceFilter, statusFilter, ownerFilter, search ? `"${search}"` : ""].filter(Boolean).join(" / ")}
+                </span>
+              ) : null}
             </div>
 
             <div style={{ overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: "14px" }}>
-              <table style={imsTableStyle}>
+              <table style={calendarRegisterTableStyle}>
                 <thead>
                   <tr>
-                    <th style={imsTableHeadStyle}>Task</th>
-                    <th style={imsTableHeadStyle}>Form</th>
+                    <th style={dateHeadStyle}>Date</th>
+                    <th style={imsTableHeadStyle}>Type</th>
+                    <th style={imsTableHeadStyle}>Event</th>
                     <th style={imsTableHeadStyle}>Owner</th>
-                    <th style={imsTableHeadStyle}>Frequency</th>
-                    <th style={imsTableHeadStyle}>Next Due</th>
                     <th style={imsTableHeadStyle}>Status</th>
-                    <th style={imsTableHeadStyle}>Priority</th>
+                    <th style={imsTableHeadStyle}>Source</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedItems.map((item) => (
+                  {filteredEvents.map((event) => (
                     <tr
-                      key={item.id}
-                      onClick={() => setSelectedId(item.id)}
-                      style={{ cursor: "pointer", background: selectedId === item.id ? imsColours.brandSoft : "white" }}
+                      key={event.id}
+                      onClick={() => openEvent(event)}
+                      style={{ cursor: "pointer", background: selectedId === event.id ? imsColours.brandSoft : "white" }}
                     >
+                      <td style={dateCellStyle}><strong style={dateValueStyle}>{displayDate(event.date)}</strong></td>
+                      <td style={imsTableCellStyle}><SourcePill event={event} /></td>
                       <td style={imsTableCellStyle}>
-                        <strong>{item.title}</strong>
-                        <div style={mutedTextStyle}>{item.location || item.project_work_scope || ""}</div>
+                        <strong>{event.title}</strong>
+                        <div style={mutedTextStyle}>{event.detail}</div>
                       </td>
-                      <td style={imsTableCellStyle}>
-                        <strong>{item.inspection_form_ref || "-"}</strong>
-                        <div style={mutedTextStyle}>{item.inspection_form_title || ""}</div>
-                      </td>
-                      <td style={imsTableCellStyle}>{item.assigned_to || "-"}</td>
-                      <td style={imsTableCellStyle}>{item.frequency || "-"}</td>
-                      <td style={imsTableCellStyle}>{displayDate(dueKey(item)) || "-"}</td>
-                      <td style={imsTableCellStyle}><StatusPill status={effectiveStatus(item)} /></td>
-                      <td style={imsTableCellStyle}>{item.priority || "-"}</td>
+                      <td style={imsTableCellStyle}>{event.owner || "-"}</td>
+                      <td style={imsTableCellStyle}><StatusPill event={event} /></td>
+                      <td style={imsTableCellStyle}>{event.sourceKind === "manual" ? "Planner" : "HSE system"}</td>
                     </tr>
                   ))}
+                  {!filteredEvents.length ? (
+                    <tr><td colSpan={6} style={imsTableCellStyle}>No calendar events match the current filters.</td></tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -660,22 +869,28 @@ export default function HseCalendarPage() {
 
           {selected ? (
             <ImsPanel
-              title={`Planner Detail - ${selected.title}`}
-              subtitle={[selected.inspection_form_ref, selected.assigned_to, displayDate(dueKey(selected))].filter(Boolean).join(" | ")}
+              title={`${selected.sourceKind === "manual" ? "Planner Detail" : "Source Detail"} - ${selected.title}`}
+              subtitle={[sourceLabel(selected.source), displayDate(selected.date), selected.owner].filter(Boolean).join(" | ")}
               actions={<ImsButton variant="secondary" onClick={() => setSelectedId("")}>Hide Panel</ImsButton>}
             >
-              <PlannerFormFields
-                form={detailForm}
-                people={people}
-                onChange={setDetailForm}
-                onPersonSelect={(value) => applyPerson(value, "detail")}
-                onInspectionFormSelect={(value) => applyInspectionForm(value, "detail")}
-              />
-              <div style={formActionRowStyle}>
-                <ImsButton onClick={() => void updateItem()}>Save Planner Item</ImsButton>
-                <ImsButton variant="secondary" onClick={() => void markCompleteAndRollForward()}>Complete / Roll Forward</ImsButton>
-                <ImsButton variant="danger" onClick={() => void deleteItem()}>Delete Item</ImsButton>
-              </div>
+              {selectedPlanner ? (
+                <>
+                  <PlannerFormFields
+                    form={detailForm}
+                    people={people}
+                    onChange={setDetailForm}
+                    onPersonSelect={(value) => applyPerson(value, "detail")}
+                    onInspectionFormSelect={(value) => applyInspectionForm(value, "detail")}
+                  />
+                  <div style={formActionRowStyle}>
+                    <ImsButton onClick={() => void updateItem()}>Save Planner Item</ImsButton>
+                    <ImsButton variant="secondary" onClick={() => void markCompleteAndRollForward()}>Complete / Roll Forward</ImsButton>
+                    <ImsButton variant="danger" onClick={() => void deleteItem()}>Delete Item</ImsButton>
+                  </div>
+                </>
+              ) : (
+                <SystemDetail event={selected} />
+              )}
             </ImsPanel>
           ) : null}
         </div>
@@ -800,6 +1015,36 @@ function PlannerFormFields({
   );
 }
 
+function SystemDetail({ event }: { event: CalendarEvent }) {
+  return (
+    <div style={systemDetailStyle}>
+      <div>
+        <div style={fieldLabelStyle}>Source Type</div>
+        <strong>{event.source}</strong>
+      </div>
+      <div>
+        <div style={fieldLabelStyle}>Date</div>
+        <strong>{displayDate(event.date)}</strong>
+      </div>
+      <div>
+        <div style={fieldLabelStyle}>Status</div>
+        <StatusPill event={event} />
+      </div>
+      <div>
+        <div style={fieldLabelStyle}>Owner</div>
+        <strong>{event.owner || "-"}</strong>
+      </div>
+      <div style={{ gridColumn: "1 / -1" }}>
+        <div style={fieldLabelStyle}>Detail</div>
+        <p style={{ margin: "6px 0 0", color: imsColours.slate, lineHeight: 1.5 }}>{event.detail}</p>
+      </div>
+      <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
+        {event.href ? <ImsLinkButton href={event.href}>Open Source Record</ImsLinkButton> : null}
+      </div>
+    </div>
+  );
+}
+
 function Field({ label, children, span = false }: { label: string; children: ReactNode; span?: boolean }) {
   return (
     <label style={{ display: "grid", gap: "6px", gridColumn: span ? "1 / -1" : undefined }}>
@@ -833,56 +1078,81 @@ function FilterSelect({
   );
 }
 
-function StatusPill({ status }: { status: string }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: "999px",
-        padding: "6px 10px",
-        background: `${accentForStatus(status)}22`,
-        color: accentForStatus(status),
-        fontSize: "12px",
-        fontWeight: 900,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {status}
-    </span>
-  );
+function SourcePill({ event }: { event: CalendarEvent }) {
+  const accent = eventAccent(event.source, event.status);
+  return <span style={{ ...pillStyle, background: `${accent}18`, color: accent }}>{sourceLabel(event.source)}</span>;
+}
+
+function StatusPill({ event }: { event: CalendarEvent }) {
+  const accent = eventAccent(event.source, event.status);
+  return <span style={{ ...pillStyle, background: `${accent}22`, color: accent }}>{event.status || "Scheduled"}</span>;
 }
 
 function EmptyState({ text }: { text: string }) {
   return <div style={{ border: "1px dashed #cbd5e1", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: "#f8fafc" }}>{text}</div>;
 }
 
+function EventListButton({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
+  return (
+    <button type="button" style={listButtonStyle} onClick={onClick}>
+      <span style={{ width: 10, height: 10, borderRadius: "999px", background: eventAccent(event.source, event.status) }} />
+      <span style={{ minWidth: 0 }}>
+        <strong style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{event.title}</strong>
+        <span style={mutedTextStyle}>{event.detail}</span>
+      </span>
+      <SourcePill event={event} />
+      <strong>{displayDate(event.date)}</strong>
+    </button>
+  );
+}
+
+function Legend() {
+  const samples: Array<{ source: EventSource; status: string; label: string }> = [
+    { source: "AINM", status: "Open", label: "AINM" },
+    { source: "Inspection", status: "Open", label: "Inspection" },
+    { source: "Observation", status: "New", label: "Observation" },
+    { source: "HSE Action", status: "Scheduled", label: "Action" },
+    { source: "Planner", status: "Scheduled", label: "Planner" },
+  ];
+  return (
+    <div style={legendStyle}>
+      {samples.map((sample) => (
+        <span key={sample.label} style={legendItemStyle}>
+          <span style={{ width: 9, height: 9, borderRadius: "999px", background: eventAccent(sample.source, sample.status) }} />
+          {sample.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function MonthGrid({
   cursor,
-  items,
+  events,
   onSelect,
   onDateSelect,
+  onCreateDate,
 }: {
   cursor: Date;
-  items: PlannerItem[];
-  onSelect: (item: PlannerItem) => void;
+  events: CalendarEvent[];
+  onSelect: (event: CalendarEvent) => void;
   onDateSelect: (dateKey: string) => void;
+  onCreateDate: (dateKey: string) => void;
 }) {
   const month = cursor.getMonth();
   const year = cursor.getFullYear();
   const first = new Date(year, month, 1);
   const startOffset = (first.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: Array<{ key: string; day: number | null; items: PlannerItem[] }> = [];
+  const cells: Array<{ key: string; day: number | null; events: CalendarEvent[] }> = [];
 
-  for (let index = 0; index < startOffset; index += 1) cells.push({ key: `blank-${index}`, day: null, items: [] });
+  for (let index = 0; index < startOffset; index += 1) cells.push({ key: `blank-${index}`, day: null, events: [] });
   for (let day = 1; day <= daysInMonth; day += 1) {
     const key = toDateKey(new Date(year, month, day));
     cells.push({
       key,
       day,
-      items: items.filter((item) => dueKey(item) === key),
+      events: events.filter((event) => event.date === key),
     });
   }
 
@@ -892,26 +1162,35 @@ function MonthGrid({
       {cells.map((cell) => (
         <div key={cell.key} style={cell.day ? calendarCellStyle : blankCalendarCellStyle}>
           {cell.day ? (
-            <button type="button" style={calendarDayButtonStyle} onClick={() => onDateSelect(cell.key)} title="Create a calendar item for this date">
-              {cell.day}
-            </button>
+            <div style={calendarDayRowStyle}>
+              <button type="button" style={calendarDayButtonStyle} onClick={() => onDateSelect(cell.key)} title="View all items on this date">
+                {cell.day}
+              </button>
+              <button type="button" style={calendarAddButtonStyle} onClick={() => onCreateDate(cell.key)} title="Add a planner item for this date">
+                +
+              </button>
+            </div>
           ) : null}
           <div style={{ display: "grid", gap: "5px", marginTop: "8px" }}>
-            {cell.items.slice(0, 3).map((item) => (
+            {cell.events.slice(0, 4).map((event) => (
               <button
-                key={item.id}
+                key={event.id}
                 type="button"
                 style={calendarEventStyle}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelect(item);
+                onClick={(clickEvent) => {
+                  clickEvent.stopPropagation();
+                  onSelect(event);
                 }}
               >
-                <span style={{ width: 8, height: 8, borderRadius: "999px", background: accentForStatus(effectiveStatus(item)), flex: "0 0 auto" }} />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
+                <span style={{ width: 8, height: 8, borderRadius: "999px", background: eventAccent(event.source, event.status), flex: "0 0 auto" }} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{event.title}</span>
               </button>
             ))}
-            {cell.items.length > 3 ? <span style={mutedTextStyle}>+{cell.items.length - 3} more</span> : null}
+            {cell.events.length > 4 ? (
+              <button type="button" style={moreEventsButtonStyle} onClick={() => onDateSelect(cell.key)}>
+                +{cell.events.length - 4} more
+              </button>
+            ) : null}
           </div>
         </div>
       ))}
@@ -937,6 +1216,16 @@ const formGridStyle: CSSProperties = {
   gap: "12px",
 };
 
+const systemDetailStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "14px",
+  padding: "14px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "14px",
+  background: "#f8fafc",
+};
+
 const fieldLabelStyle: CSSProperties = {
   color: imsColours.ink,
   fontSize: "12px",
@@ -953,10 +1242,15 @@ const mutedTextStyle: CSSProperties = {
   marginTop: "3px",
 };
 
+const listStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
 const listButtonStyle: CSSProperties = {
   width: "100%",
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) auto auto auto",
+  gridTemplateColumns: "12px minmax(0, 1fr) auto auto",
   gap: "10px",
   alignItems: "center",
   border: "1px solid #dbe3ef",
@@ -966,6 +1260,69 @@ const listButtonStyle: CSSProperties = {
   color: imsColours.ink,
   textAlign: "left",
   cursor: "pointer",
+};
+
+const dateDetailStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  marginTop: "16px",
+  padding: "14px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "14px",
+  background: "#f8fafc",
+};
+
+const dateDetailHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "12px",
+  flexWrap: "wrap",
+};
+
+const activeFilterChipStyle: CSSProperties = {
+  marginLeft: "8px",
+  borderRadius: "999px",
+  padding: "5px 9px",
+  background: imsColours.brandSoft,
+  color: imsColours.brandDark,
+  border: "1px solid #bfe5e3",
+  fontSize: "12px",
+  fontWeight: 900,
+};
+
+const calendarRegisterTableStyle: CSSProperties = {
+  ...imsTableStyle,
+  minWidth: "980px",
+  tableLayout: "fixed",
+};
+
+const dateHeadStyle: CSSProperties = {
+  ...imsTableHeadStyle,
+  width: "126px",
+};
+
+const dateCellStyle: CSSProperties = {
+  ...imsTableCellStyle,
+  width: "126px",
+  whiteSpace: "nowrap",
+  verticalAlign: "top",
+};
+
+const dateValueStyle: CSSProperties = {
+  display: "block",
+  lineHeight: 1.25,
+};
+
+const pillStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "999px",
+  padding: "6px 10px",
+  fontSize: "12px",
+  fontWeight: 900,
+  whiteSpace: "nowrap",
 };
 
 const noticeStyle: CSSProperties = {
@@ -994,6 +1351,26 @@ const formActionRowStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   marginTop: "16px",
+};
+
+const legendStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+  marginBottom: "14px",
+};
+
+const legendItemStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "6px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "999px",
+  padding: "6px 10px",
+  background: "#f8fafc",
+  color: imsColours.slate,
+  fontSize: "12px",
+  fontWeight: 900,
 };
 
 const calendarToolbarStyle: CSSProperties = {
@@ -1031,6 +1408,18 @@ const calendarCellStyle: CSSProperties = {
   boxSizing: "border-box",
 };
 
+const blankCalendarCellStyle: CSSProperties = {
+  ...calendarCellStyle,
+  background: "#f8fafc",
+};
+
+const calendarDayRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "6px",
+};
+
 const calendarDayButtonStyle: CSSProperties = {
   border: "none",
   borderRadius: "999px",
@@ -1045,9 +1434,18 @@ const calendarDayButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const blankCalendarCellStyle: CSSProperties = {
-  ...calendarCellStyle,
-  background: "#f8fafc",
+const calendarAddButtonStyle: CSSProperties = {
+  border: "1px solid #bfe5e3",
+  borderRadius: "999px",
+  background: "#ffffff",
+  color: imsColours.brandDark,
+  width: "28px",
+  height: "28px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontWeight: 900,
+  cursor: "pointer",
 };
 
 const calendarEventStyle: CSSProperties = {
@@ -1063,5 +1461,16 @@ const calendarEventStyle: CSSProperties = {
   color: imsColours.ink,
   fontSize: "11px",
   fontWeight: 800,
+  cursor: "pointer",
+};
+
+const moreEventsButtonStyle: CSSProperties = {
+  border: "none",
+  background: "transparent",
+  color: imsColours.brandDark,
+  padding: "2px 0",
+  textAlign: "left",
+  fontSize: "12px",
+  fontWeight: 900,
   cursor: "pointer",
 };

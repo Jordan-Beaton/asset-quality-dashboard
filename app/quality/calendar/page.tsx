@@ -653,8 +653,14 @@ export default function QualityCalendarPage() {
       router.push(event.href);
       return;
     }
+    setSearch("");
+    setSourceFilter(manualSourceFilter);
+    setStatusFilter("");
+    setOwnerFilter("");
+    setSelectedDateKey("");
     setSelectedId(event.id);
     setActiveView("register");
+    setShowFilters(true);
   }
 
   return (
