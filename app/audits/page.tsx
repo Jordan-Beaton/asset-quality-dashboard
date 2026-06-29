@@ -615,6 +615,7 @@ function AuditsPageContent() {
   const linkedFindingStatus = searchParams.get("findingStatus")?.trim() || "All";
   const linkedFindingCategory = searchParams.get("findingCategory")?.trim() || "All";
   const linkedView = searchParams.get("view")?.trim() || "";
+  const directFindingId = searchParams.get("findingId")?.trim() || "";
   const isOpenFindingsView = linkedView === "open-findings";
   const isClosedFindingsView = linkedView === "closed-findings";
 
@@ -651,7 +652,7 @@ function AuditsPageContent() {
   );
   const [generatingOpenFindingsReport, setGeneratingOpenFindingsReport] = useState(false);
   const [activeView, setActiveView] = useState<AuditWorkspaceView>(() => {
-    if (linkedView === "open-findings" || linkedView === "closed-findings") return "findings";
+    if (linkedView === "open-findings" || linkedView === "closed-findings" || directFindingId) return "findings";
     if (
       linkedSearch ||
       linkedStatus !== "All" ||
@@ -1059,7 +1060,11 @@ function AuditsPageContent() {
     );
   }, [openFindings, openFindingAuditTitleFilter, openFindingCategoryFilter]);
 
-  const activeFindingsWorkspaceRows = isClosedFindingsView ? filteredClosedFindings : filteredOpenFindings;
+  const activeFindingsWorkspaceRows = directFindingId
+    ? [...filteredOpenFindings, ...filteredClosedFindings]
+    : isClosedFindingsView
+      ? filteredClosedFindings
+      : filteredOpenFindings;
 
   const selectedOpenFinding = useMemo(
     () => activeFindingsWorkspaceRows.find((finding) => finding.id === selectedOpenFindingId) || null,
@@ -1081,6 +1086,20 @@ function AuditsPageContent() {
 
     setOpenFindingForm(match);
   }, [activeFindingsWorkspaceRows, selectedOpenFindingId]);
+
+  useEffect(() => {
+    if (!directFindingId || activeFindingsWorkspaceRows.length === 0) return;
+    const match = activeFindingsWorkspaceRows.find((finding) => finding.id === directFindingId);
+    if (!match) return;
+    setActiveView("findings");
+    setSelectedOpenFindingId(match.id);
+    window.setTimeout(() => {
+      openFindingEditPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 0);
+  }, [activeFindingsWorkspaceRows, directFindingId]);
 
   const selectedAuditFiles = useMemo(
     () => auditFiles.filter((file) => file.audit_id === selectedAuditId),

@@ -155,6 +155,7 @@ const modulePermissionDefinitions = [
     accessField: "quality_access",
     areas: [
       ["dashboard", "Dashboard"],
+      ["calendar", "Calendar"],
       ["moc", "MOC"],
       ["ncr", "NCR"],
       ["audits", "Audits"],

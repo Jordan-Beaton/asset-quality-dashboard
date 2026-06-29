@@ -2,7 +2,8 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -221,7 +222,10 @@ function countByOwner(actions: ActionItem[]) {
     .slice(0, 8);
 }
 
-export default function QualityActionsPage() {
+function QualityActionsPageContent() {
+  const searchParams = useSearchParams();
+  const linkedSearch = searchParams.get("search")?.trim() || "";
+  const directActionId = searchParams.get("actionId")?.trim() || "";
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
@@ -235,7 +239,7 @@ export default function QualityActionsPage() {
   const [assetCalibrationOptions, setAssetCalibrationOptions] = useState<AssetCalibrationOption[]>([]);
   const [activeView, setActiveView] = useState<QualityActionView>("dashboard");
   const [selectedId, setSelectedId] = useState("");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(linkedSearch);
   const [statusFilter, setStatusFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
@@ -374,6 +378,21 @@ export default function QualityActionsPage() {
   }, []);
 
   const selectedAction = useMemo(() => actions.find((action) => action.id === selectedId) || null, [actions, selectedId]);
+
+  useEffect(() => {
+    if ((!linkedSearch && !directActionId) || actions.length === 0) return;
+    const value = linkedSearch.toLowerCase();
+    const match = actions.find((action) => (
+      (directActionId && action.id === directActionId) ||
+      Boolean(value && (
+        (action.action_number || "").toLowerCase() === value ||
+        (action.title || "").toLowerCase().includes(value)
+      ))
+    ));
+    if (!match) return;
+    setSelectedId(match.id);
+    setActiveView("register");
+  }, [actions, directActionId, linkedSearch]);
 
   const kpis = useMemo(() => {
     const open = actions.filter((action) => !isClosedLikeStatus(action.status)).length;
@@ -1096,3 +1115,11 @@ const barFillStyle: CSSProperties = { display: "block", height: "100%", borderRa
 const emptyBoxStyle: CSSProperties = { border: "1px dashed #cbd5e1", borderRadius: 12, padding: 16, color: "#64748b", background: "white" };
 const focusGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 };
 const miniFocusStyle: CSSProperties = { border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, display: "grid", gap: 8, color: "#0f172a", background: "white", textAlign: "left", cursor: "pointer" };
+
+export default function QualityActionsPage() {
+  return (
+    <Suspense fallback={<main style={{ padding: "24px" }}>Loading Quality actions...</main>}>
+      <QualityActionsPageContent />
+    </Suspense>
+  );
+}

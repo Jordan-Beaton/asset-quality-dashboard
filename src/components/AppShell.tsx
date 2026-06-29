@@ -102,6 +102,7 @@ type NavIconKey =
 const qualityNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/quality", label: "Dashboard", icon: "dashboard" },
+  { href: "/quality/calendar", label: "Calendar", icon: "calendar" },
   { href: "/moc", label: "MOC", icon: "moc" },
   { href: "/ncr-capa", label: "NCR", icon: "ncr" },
   { href: "/audits", label: "Audits", icon: "audits" },
@@ -234,6 +235,7 @@ function getModuleAccessValue(moduleKey: string, moduleAccess: ModuleAccess) {
 
 function getPermissionTargetFromHref(href: string): PermissionTarget | null {
   if (href === "/quality") return { moduleKey: "quality", areaKey: "dashboard" };
+  if (href === "/quality/calendar") return { moduleKey: "quality", areaKey: "calendar" };
   if (href === "/moc") return { moduleKey: "quality", areaKey: "moc" };
   if (href === "/ncr-capa") return { moduleKey: "quality", areaKey: "ncr" };
   if (href === "/audits") return { moduleKey: "quality", areaKey: "audits" };
