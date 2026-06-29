@@ -2,6 +2,25 @@
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  AlignmentType,
+  BorderStyle,
+  Document as WordDocument,
+  ExternalHyperlink,
+  Footer,
+  ImageRun,
+  Packer,
+  Paragraph,
+  ShadingType,
+  SimpleField,
+  Table,
+  TableCell,
+  TableLayoutType,
+  TableRow,
+  TextRun,
+  VerticalAlign,
+  WidthType,
+} from "docx";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -349,6 +368,211 @@ function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
+function wordText(value: string | null | undefined) {
+  const text = (value || "").trim();
+  return text;
+}
+
+function wordParagraph(text: string, options?: { bold?: boolean; size?: number; color?: string; spacingAfter?: number }) {
+  return new Paragraph({
+    spacing: { after: options?.spacingAfter ?? 120 },
+    children: [
+      new TextRun({
+        text: wordText(text),
+        font: "Calibri",
+        bold: options?.bold,
+        size: options?.size ?? 20,
+        color: options?.color ?? "0F172A",
+      }),
+    ],
+  });
+}
+
+function wordHeading(text: string) {
+  return new Paragraph({
+    spacing: { before: 180, after: 70 },
+    children: [
+      new TextRun({
+        text,
+        font: "Calibri",
+        bold: true,
+        size: 22,
+        color: "0F172A",
+      }),
+    ],
+  });
+}
+
+function wordCell(
+  children: Array<Paragraph | Table> | string,
+  options?: {
+    width?: number;
+    fill?: string;
+    bold?: boolean;
+    color?: string;
+    size?: number;
+    align?: (typeof AlignmentType)[keyof typeof AlignmentType];
+  }
+) {
+  const cellChildren =
+    typeof children === "string"
+      ? [
+          new Paragraph({
+            alignment: options?.align,
+            children: [
+              new TextRun({
+                text: wordText(children),
+                font: "Calibri",
+                bold: options?.bold,
+                color: options?.color ?? "0F172A",
+                size: options?.size ?? 18,
+              }),
+            ],
+          }),
+        ]
+      : children;
+
+  return new TableCell({
+    width: options?.width ? { size: options.width, type: WidthType.DXA } : undefined,
+    verticalAlign: VerticalAlign.CENTER,
+    shading: options?.fill ? { type: ShadingType.CLEAR, color: "auto", fill: options.fill } : undefined,
+    margins: { top: 105, bottom: 105, left: 110, right: 110 },
+    children: cellChildren,
+  });
+}
+
+function wordTable(rows: TableRow[], columnWidths?: number[]) {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    columnWidths,
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
+      bottom: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
+      left: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
+      right: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
+      insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
+    },
+    rows,
+  });
+}
+
+function wordKeyValueTable(rows: Array<[string, string, string, string]>) {
+  const widths = [1500, 3200, 1500, 3160];
+  return wordTable(
+    [
+      new TableRow({
+        tableHeader: true,
+        children: [
+          wordCell("Field", { fill: "0F766E", color: "FFFFFF", bold: true, width: widths[0] }),
+          wordCell("Value", { fill: "0F766E", color: "FFFFFF", bold: true, width: widths[1] }),
+          wordCell("Field", { fill: "0F766E", color: "FFFFFF", bold: true, width: widths[2] }),
+          wordCell("Value", { fill: "0F766E", color: "FFFFFF", bold: true, width: widths[3] }),
+        ],
+      }),
+      ...rows.map(
+        (row) =>
+          new TableRow({
+            cantSplit: true,
+            children: [
+              wordCell(row[0], { fill: "F8FAFC", bold: true, width: widths[0] }),
+              wordCell(row[1], { fill: "FFFFFF", width: widths[1] }),
+              wordCell(row[2], { fill: "F8FAFC", bold: true, width: widths[2] }),
+              wordCell(row[3], { fill: "FFFFFF", width: widths[3] }),
+            ],
+          })
+      ),
+    ],
+    widths
+  );
+}
+
+function wordParagraphBox(label: string, value: string | null | undefined) {
+  return [
+    wordParagraph(label, { bold: true, size: 18, color: "0F172A", spacingAfter: 60 }),
+    wordTable(
+      [
+        new TableRow({
+          cantSplit: true,
+          children: [
+            wordCell(
+              [
+                new Paragraph({
+                  spacing: { line: 235 },
+                  children: [
+                    new TextRun({
+                      text: wordText(value),
+                      font: "Calibri",
+                      size: 18,
+                      color: "1E293B",
+                    }),
+                  ],
+                }),
+              ],
+              {
+                width: 9360,
+                fill: "FFFFFF",
+              }
+            ),
+          ],
+        }),
+      ],
+      [9360]
+    ),
+  ];
+}
+
+function wordPlainBorders(color = "FFFFFF") {
+  return {
+    top: { style: BorderStyle.NONE, size: 0, color },
+    bottom: { style: BorderStyle.NONE, size: 0, color },
+    left: { style: BorderStyle.NONE, size: 0, color },
+    right: { style: BorderStyle.NONE, size: 0, color },
+    insideHorizontal: { style: BorderStyle.NONE, size: 0, color },
+    insideVertical: { style: BorderStyle.NONE, size: 0, color },
+  };
+}
+
+function wordReportFooter(reference: string) {
+  return new Footer({
+    children: [
+      new Paragraph({
+        border: { top: { style: BorderStyle.SINGLE, color: "0F766E", size: 4 } },
+        spacing: { before: 80 },
+        children: [new TextRun({ text: "", size: 1 })],
+      }),
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        layout: TableLayoutType.FIXED,
+        columnWidths: [6500, 2860],
+        borders: wordPlainBorders(),
+        rows: [
+          new TableRow({
+            children: [
+              wordCell(`Enshore | ${reference}`, { width: 6500, size: 16, color: "64748B" }),
+              new TableCell({
+                width: { size: 2860, type: WidthType.DXA },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    children: [
+                      new TextRun({ text: "Page ", font: "Calibri", size: 16, color: "64748B" }),
+                      new SimpleField("PAGE"),
+                      new TextRun({ text: " of ", font: "Calibri", size: 16, color: "64748B" }),
+                      new SimpleField("NUMPAGES"),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
 function normaliseEffectivenessStatus(value: string | null | undefined) {
   const trimmed = (value || "").trim();
   if (!trimmed) return "Pending";
@@ -668,6 +892,7 @@ function NcrCapaPageContent() {
   const [includeEvidenceListInPdf, setIncludeEvidenceListInPdf] = useState(true);
   const [externalFacingPdf, setExternalFacingPdf] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingWord, setGeneratingWord] = useState(false);
   const [generatingFilteredNcrReport, setGeneratingFilteredNcrReport] = useState(false);
 
   async function loadData() {
@@ -1044,8 +1269,9 @@ function NcrCapaPageContent() {
           return bCreated - aCreated;
         }
 
-        const severityRank = getSeverityRank(a.severity) - getSeverityRank(b.severity);
-        if (severityRank !== 0) return severityRank;
+        const aNumber = getTrailingNumber(a.number);
+        const bNumber = getTrailingNumber(b.number);
+        if (aNumber !== bNumber) return bNumber - aNumber;
         return bCreated - aCreated;
       }
 
@@ -2132,6 +2358,288 @@ function NcrCapaPageContent() {
       setMessage("NCR PDF generation failed.");
     } finally {
       setGeneratingPdf(false);
+    }
+  }
+
+  async function generateNcrWord() {
+    if (!selectedRow || selectedRow.type !== "NCR") {
+      setMessage("Select an NCR first.");
+      return;
+    }
+
+    try {
+      setGeneratingWord(true);
+
+      const title = externalFacingPdf
+        ? "Supplier / Client NCR Response Form"
+        : "Non-Conformance Report";
+      const generatedAt = new Date().toLocaleString("en-GB");
+      const children: Array<Paragraph | Table> = [];
+      let logoData: ArrayBuffer | null = null;
+
+      try {
+        const logoResponse = await fetch("/enshore-logo.png");
+        if (logoResponse.ok) {
+          logoData = await logoResponse.arrayBuffer();
+        }
+      } catch {
+        // Keep Word generation resilient if the logo cannot be loaded.
+      }
+
+      children.push(
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          layout: TableLayoutType.FIXED,
+          columnWidths: [3600, 5760],
+          borders: wordPlainBorders(),
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: 3600, type: WidthType.DXA },
+                  margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                  children: [
+                    new Paragraph({
+                      children: logoData
+                        ? [
+                            new ImageRun({
+                              type: "png",
+                              data: logoData,
+                              transformation: { width: 170, height: 78 },
+                            }),
+                          ]
+                        : [new TextRun({ text: "ENSHORE", font: "Calibri", bold: true, size: 30 })],
+                    }),
+                  ],
+                }),
+                new TableCell({
+                  width: { size: 5760, type: WidthType.DXA },
+                  margins: { top: 90, bottom: 0, left: 0, right: 0 },
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.RIGHT,
+                      spacing: { after: 55 },
+                      children: [new TextRun({ text: title, font: "Calibri", bold: true, size: 30, color: "0F172A" })],
+                    }),
+                    new Paragraph({
+                      alignment: AlignmentType.RIGHT,
+                      spacing: { after: 35 },
+                      children: [new TextRun({ text: `Reference: ${selectedRow.number}`, font: "Calibri", size: 20, color: "475569" })],
+                    }),
+                    new Paragraph({
+                      alignment: AlignmentType.RIGHT,
+                      children: [new TextRun({ text: `Generated: ${generatedAt}`, font: "Calibri", size: 20, color: "475569" })],
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }),
+        new Paragraph({
+          border: { bottom: { style: BorderStyle.SINGLE, color: "0F766E", size: 8 } },
+          spacing: { before: 70, after: 240 },
+          children: [new TextRun({ text: "", size: 1 })],
+        }),
+        wordKeyValueTable([
+          ["NCR Number", selectedRow.number, "Status", selectedRow.status || ""],
+          ["Title", selectedRow.title || "", "Severity", getSeverityDisplay(selectedRow.severity)],
+          ["Source Type", selectedRow.source_type || "", "Project", selectedRow.project || ""],
+          ["Owner", selectedRow.owner || "", "Due Date", formatDate(selectedRow.due_date)],
+        ]),
+        wordHeading("NCR DETAILS"),
+        ...wordParagraphBox("Issue / Description", selectedRow.description),
+        ...wordParagraphBox("Containment Action", selectedRow.containment_action),
+        ...wordParagraphBox("Corrective Action", selectedRow.corrective_action),
+        ...wordParagraphBox("Root Cause Category", selectedRow.root_cause_category),
+        ...wordParagraphBox("Root Cause Description", selectedRow.root_cause_description)
+      );
+
+      const evidenceUrlMap = new Map<string, string>();
+
+      if (externalFacingPdf) {
+        children.push(
+          wordHeading("SUPPLIER / CLIENT RESPONSE"),
+          ...wordParagraphBox("Response / Proposed Action", ""),
+          ...wordParagraphBox("Acknowledgement / Responsible Contact", "")
+        );
+      }
+
+      if (includeEvidenceListInPdf) {
+        children.push(wordHeading("EVIDENCE LIST"));
+
+        if (selectedNcrPdfEvidence.length === 0) {
+          children.push(...wordParagraphBox("Attached Evidence", "No evidence files listed for this export."));
+        } else {
+          await Promise.all(
+            selectedNcrPdfEvidence.map(async (file) => {
+              try {
+                const signedUrl = await createEvidenceSignedUrl(file.file_path);
+                evidenceUrlMap.set(file.id, signedUrl);
+              } catch (error) {
+                console.warn(`Evidence link unavailable for ${file.file_name}`, error);
+              }
+            })
+          );
+
+          children.push(
+            wordTable(
+              [
+                new TableRow({
+                  children: [
+                    wordCell("Record", { fill: "0F172A", color: "FFFFFF", bold: true, width: 1200 }),
+                    wordCell("File Name", { fill: "0F172A", color: "FFFFFF", bold: true, width: 2600 }),
+                    wordCell("Type", { fill: "0F172A", color: "FFFFFF", bold: true, width: 1200 }),
+                    wordCell("Uploaded", { fill: "0F172A", color: "FFFFFF", bold: true, width: 1600 }),
+                    wordCell("Reference", { fill: "0F172A", color: "FFFFFF", bold: true, width: 1800 }),
+                    wordCell("Link", { fill: "0F172A", color: "FFFFFF", bold: true, width: 960 }),
+                  ],
+                }),
+                ...selectedNcrPdfEvidence.map((file) => {
+                  const url = evidenceUrlMap.get(file.id);
+                  return new TableRow({
+                  children: [
+                    wordCell(selectedRow.number, { width: 1200 }),
+                    wordCell(file.file_name, { width: 2600 }),
+                    wordCell(getEvidenceTypeLabel(file), { width: 1200 }),
+                    wordCell(formatDateTime(file.uploaded_at), { width: 1600 }),
+                    wordCell(file.notes || "", { width: 1800 }),
+                    wordCell(
+                      [
+                        new Paragraph({
+                          children: url
+                            ? [
+                                new ExternalHyperlink({
+                                  link: url,
+                                  children: [
+                                    new TextRun({
+                                      text: "Open evidence",
+                                      style: "Hyperlink",
+                                    }),
+                                  ],
+                                }),
+                              ]
+                            : [new TextRun({ text: "Unavailable", size: 18 })],
+                        }),
+                      ],
+                      { width: 960 }
+                    ),
+                  ],
+                  });
+                }),
+              ],
+              [1200, 2600, 1200, 1600, 1800, 960]
+            )
+          );
+
+          const imageEvidence = selectedNcrPdfEvidence.filter((file) => isImageEvidence(file));
+
+          if (imageEvidence.length > 0) {
+            children.push(wordHeading("EVIDENCE IMAGES"));
+
+            for (const file of imageEvidence) {
+              const signedUrl = evidenceUrlMap.get(file.id);
+              if (!signedUrl) continue;
+
+              try {
+                const preview = await fetchImagePreviewData(signedUrl);
+                const imageResponse = await fetch(signedUrl);
+                if (!imageResponse.ok) continue;
+
+                const imageData = await imageResponse.arrayBuffer();
+                const maxWidth = 520;
+                const maxHeight = 640;
+                const scale = Math.min(maxWidth / preview.width, maxHeight / preview.height, 1);
+                const extension = (file.content_type || file.file_name).toLowerCase().includes("jpg") ||
+                  (file.content_type || file.file_name).toLowerCase().includes("jpeg")
+                    ? "jpg"
+                    : "png";
+
+                children.push(
+                  wordParagraph(file.notes ? `${file.file_name} - ${file.notes}` : file.file_name, {
+                    bold: true,
+                    size: 19,
+                    color: "1E293B",
+                    spacingAfter: 40,
+                  }),
+                  wordParagraph(`${selectedRow.number} | ${formatDateTime(file.uploaded_at)}`, {
+                    size: 16,
+                    color: "64748B",
+                    spacingAfter: 80,
+                  }),
+                  new Paragraph({
+                    spacing: { after: 180 },
+                    children: [
+                      new ImageRun({
+                        type: extension,
+                        data: imageData,
+                        transformation: {
+                          width: Math.round(preview.width * scale),
+                          height: Math.round(preview.height * scale),
+                        },
+                      }),
+                    ],
+                  })
+                );
+              } catch (error) {
+                console.warn(`Word image preview skipped for ${file.file_name}`, error);
+              }
+            }
+          }
+        }
+      }
+
+      const wordDoc = new WordDocument({
+        styles: {
+          default: {
+            document: {
+              run: {
+                font: "Calibri",
+                size: 19,
+                color: "0F172A",
+              },
+            },
+          },
+        },
+        sections: [
+          {
+            properties: {
+              page: {
+                margin: {
+                  top: 360,
+                  right: 720,
+                  bottom: 900,
+                  left: 720,
+                  footer: 360,
+                },
+              },
+            },
+            footers: {
+              default: wordReportFooter(selectedRow.number),
+            },
+            children,
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(wordDoc);
+      const fileName = `${selectedRow.number}-${externalFacingPdf ? "external" : "internal"}-ncr-report.docx`
+        .replace(/[^a-zA-Z0-9._-]/g, "-");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      setMessage(`${selectedRow.number} Word report generated.`);
+    } catch (error) {
+      console.error(error);
+      setMessage("NCR Word generation failed.");
+    } finally {
+      setGeneratingWord(false);
     }
   }
 
@@ -3943,9 +4451,9 @@ function NcrCapaPageContent() {
                   <div style={pdfExportPanelStyle}>
                     <div style={pdfExportHeaderStyle}>
                       <div>
-                        <div style={pdfExportTitleStyle}>PDF Export</div>
+                        <div style={pdfExportTitleStyle}>Report Export</div>
                         <div style={pdfExportSubtitleStyle}>
-                          Generate an NCR form for internal use or external supplier / client response.
+                          Generate matching PDF and Word NCR forms for internal use or external supplier / client response.
                         </div>
                       </div>
                     </div>
@@ -4007,6 +4515,15 @@ function NcrCapaPageContent() {
                           : latestSavedPdf
                           ? "Regenerate PDF"
                           : "Generate / Save PDF"}
+                      </button>
+
+                      <button
+                        type="button"
+                        style={secondaryButton}
+                        onClick={() => void generateNcrWord()}
+                        disabled={generatingWord}
+                      >
+                        {generatingWord ? "Generating Word..." : "Generate Word Report"}
                       </button>
 
                       {latestSavedPdf ? (

@@ -4,9 +4,17 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import {
+  imsColours,
+  imsInputStyle,
+  imsTableCellStyle,
+  imsTableHeadStyle,
+  imsTableInfoRowStyle,
+  imsTableStyle,
+} from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -192,6 +200,7 @@ function MaintenancePageContent() {
   const [assetFilter, setAssetFilter] = useState(linkedAssetParam);
   const [typeFilter, setTypeFilter] = useState("");
   const [dueStatusFilter, setDueStatusFilter] = useState<"" | DueStatus>("");
+  const [registerSearch, setRegisterSearch] = useState("");
   const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAssetParam));
   const [activeView, setActiveView] = useState<MaintenanceWorkspaceView>("dashboard");
   const [isSaving, setIsSaving] = useState(false);
@@ -297,13 +306,27 @@ function MaintenancePageContent() {
         };
       })
       .filter(({ record, asset, status }) => {
+        const search = registerSearch.trim().toLowerCase();
+        const matchesSearch =
+          !search ||
+          [
+            record.maintenance_number,
+            record.maintenance_type,
+            record.carried_out_by,
+            record.description,
+            asset?.asset_code,
+            asset?.name,
+            asset?.description,
+          ]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(search));
         const matchesAsset =
           !assetFilter ||
           (asset?.asset_code || "").toLowerCase() === assetFilter.toLowerCase() ||
           record.asset_id.toLowerCase() === assetFilter.toLowerCase();
         const matchesType = !typeFilter || (record.maintenance_type || "") === typeFilter;
         const matchesDueStatus = !dueStatusFilter || status === dueStatusFilter;
-        return matchesAsset && matchesType && matchesDueStatus && Boolean(asset);
+        return matchesSearch && matchesAsset && matchesType && matchesDueStatus && Boolean(asset);
       })
       .sort((a, b) => {
         const rankDiff = getStatusRank(a.status) - getStatusRank(b.status);
@@ -317,7 +340,7 @@ function MaintenancePageContent() {
         const bDate = b.record.maintenance_date ? new Date(b.record.maintenance_date).getTime() : 0;
         return bDate - aDate;
       });
-  }, [assetFilter, assetMap, dueStatusFilter, records, typeFilter]);
+  }, [assetFilter, assetMap, dueStatusFilter, records, registerSearch, typeFilter]);
 
   const overdueCount = filteredRecords.filter((item) => item.status === "Overdue").length;
   const dueSoonCount = filteredRecords.filter((item) => item.status === "Due Soon").length;
@@ -741,202 +764,189 @@ function MaintenancePageContent() {
 
         {!isFieldMode && activeView === "register" ? (
           <>
-        <SectionCard
-          title="Filters & History"
-          subtitle="Review one asset's maintenance history or the full log, with overdue work shown first."
+        <ImsPanel
+          title="Maintenance Register"
+          subtitle="Filter, scan, and open maintenance records in the same register pattern used across HSE."
         >
-          <div style={buttonRowStyle}>
-            <button
-              type="button"
-              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
-              onClick={() => setShowRegisterFilters((prev) => !prev)}
-            >
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-            {showRegisterFilters ? (
-            <button
-              type="button"
-              style={secondaryButtonStyle}
-              onClick={() => {
-                setAssetFilter("");
-                setTypeFilter("");
-                setDueStatusFilter("");
-              }}
-            >
-              Clear Filters
-            </button>
-            ) : null}
+          <ImsFilterPanel
+            search={registerSearch}
+            onSearchChange={setRegisterSearch}
+            searchPlaceholder="Search maintenance, asset, person, description..."
+            showFilters={showRegisterFilters}
+            onToggleFilters={() => setShowRegisterFilters((prev) => !prev)}
+            actions={
+              <ImsButton
+                variant="secondary"
+                onClick={() => {
+                  setRegisterSearch("");
+                  setAssetFilter("");
+                  setTypeFilter("");
+                  setDueStatusFilter("");
+                }}
+              >
+                Clear Filters
+              </ImsButton>
+            }
+          >
+            <Field label="Asset Filter">
+              <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={imsInputStyle}>
+                <option value="">All assets</option>
+                {assets.map((asset) => (
+                  <option key={asset.id} value={asset.asset_code || asset.id}>
+                    {(asset.asset_code || asset.id) + " - " + (asset.name || "Unnamed Asset")}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Maintenance Type Filter">
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={imsInputStyle}>
+                <option value="">All types</option>
+                <option value="Preventative">Preventative</option>
+                <option value="Corrective">Corrective</option>
+              </select>
+            </Field>
+
+            <Field label="Due Status">
+              <select
+                value={dueStatusFilter}
+                onChange={(e) => setDueStatusFilter((e.target.value || "") as "" | DueStatus)}
+                style={imsInputStyle}
+              >
+                <option value="">All due statuses</option>
+                <option value="Overdue">Overdue</option>
+                <option value="Due Soon">Due Soon</option>
+                <option value="In Date">In Date</option>
+                <option value="Not Set">Not Set</option>
+              </select>
+            </Field>
+          </ImsFilterPanel>
+
+          <div style={imsTableInfoRowStyle}>
+            Showing <strong>{filteredRecords.length}</strong> of <strong>{records.length}</strong> maintenance records
           </div>
 
-          {showRegisterFilters ? (
-            <div style={filterGridStyle}>
-              <Field label="Asset Filter">
-                <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={inputStyle}>
-                  <option value="">All assets</option>
-                  {assets.map((asset) => (
-                    <option key={asset.id} value={asset.asset_code || asset.id}>
-                      {(asset.asset_code || asset.id) + " - " + (asset.name || "Unnamed Asset")}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+          <div style={compactTableWrapStyle}>
+            <table style={{ ...imsTableStyle, minWidth: 1080 }}>
+              <thead>
+                <tr>
+                  <th style={imsTableHeadStyle}>Maintenance</th>
+                  <th style={imsTableHeadStyle}>Asset</th>
+                  <th style={imsTableHeadStyle}>Date</th>
+                  <th style={imsTableHeadStyle}>Carried Out By</th>
+                  <th style={imsTableHeadStyle}>Type</th>
+                  <th style={imsTableHeadStyle}>Next Due</th>
+                  <th style={imsTableHeadStyle}>Action</th>
+                  <th style={imsTableHeadStyle}>Controls</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={emptyTableCellStyle}>
+                      No maintenance records match the current filters.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRecords.map(({ record, asset, status }) => {
+                    const statusTone = getStatusTone(status);
+                    const typeTone = getTypeTone(record.maintenance_type);
+                    const daysRemaining = getDaysRemaining(record.next_maintenance_due);
+                    const selected = selectedRecordId === record.id;
 
-              <Field label="Maintenance Type Filter">
-                <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={inputStyle}>
-                  <option value="">All types</option>
-                  <option value="Preventative">Preventative</option>
-                  <option value="Corrective">Corrective</option>
-                </select>
-              </Field>
-
-              <Field label="Due Status">
-                <select
-                  value={dueStatusFilter}
-                  onChange={(e) => setDueStatusFilter((e.target.value || "") as "" | DueStatus)}
-                  style={inputStyle}
-                >
-                  <option value="">All due statuses</option>
-                  <option value="Overdue">Overdue</option>
-                  <option value="Due Soon">Due Soon</option>
-                  <option value="In Date">In Date</option>
-                  <option value="Not Set">Not Set</option>
-                </select>
-              </Field>
-            </div>
-          ) : null}
-
-          <div style={historyListStyle}>
-            {filteredRecords.length === 0 ? (
-              <div style={emptyStateStyle}>No maintenance records match the current filters.</div>
-            ) : (
-              filteredRecords.map(({ record, asset, status }) => {
-                const statusTone = getStatusTone(status);
-                const typeTone = getTypeTone(record.maintenance_type);
-                const daysRemaining = getDaysRemaining(record.next_maintenance_due);
-                const selected = selectedRecordId === record.id;
-
-                return (
-                  <div
-                    key={record.id}
-                    style={{
-                      ...historyCardStyle,
-                      cursor: "pointer",
-                      borderColor: selected ? "#93c5fd" : "#dbe7f3",
-                      boxShadow: selected ? "0 0 0 2px rgba(37,99,235,0.15)" : "none",
-                    }}
-                    onClick={() => {
-                      setSelectedRecordId(record.id);
-                      setDetailForm(buildMaintenanceForm(record));
-                      scrollToDetailPanel();
-                    }}
-                  >
-                    <div style={historyHeaderStyle}>
-                      <div>
-                        <div style={historyTitleStyle}>{record.maintenance_number || "Maintenance Record"}</div>
-                        <div style={historyMetaStyle}>{asset?.name || "Unknown asset"}</div>
-                        <div style={historyMetaStyle}>{asset?.asset_code || asset?.id || "-"}</div>
-                      </div>
-                      <div style={historyBadgeRowStyle}>
-                        <span
-                          style={{
-                            ...pillStyle,
-                            background: typeTone.bg,
-                            color: typeTone.text,
-                          }}
-                        >
-                          {record.maintenance_type || "Not Set"}
-                        </span>
-                        <span
-                          style={{
-                            ...pillStyle,
-                            background: statusTone.bg,
-                            color: statusTone.text,
-                            border: `1px solid ${statusTone.border}`,
-                          }}
-                        >
-                          {status}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={historyGridStyle}>
-                      <div>
-                        <strong>Maintenance Date:</strong> {formatDate(record.maintenance_date)}
-                      </div>
-                      <div>
-                        <strong>Carried Out By:</strong> {record.carried_out_by || "-"}
-                      </div>
-                      <div>
-                        <strong>Next Due:</strong> {formatDate(record.next_maintenance_due)}
-                      </div>
-                      <div>
-                        <strong>Action Required:</strong> {record.action_required ? "Yes" : "No"}
-                      </div>
-                      <div>
-                        <strong>Due Window:</strong>{" "}
-                        {daysRemaining === null
-                          ? "Not set"
-                          : daysRemaining < 0
-                            ? `${Math.abs(daysRemaining)} days overdue`
-                            : `${daysRemaining} days remaining`}
-                      </div>
-                    </div>
-
-                    <div style={historyBodyStyle}>
-                      <div>
-                        <strong>Description:</strong> {record.description || "-"}
-                      </div>
-                    </div>
-
-                    <div style={historyFooterStyle}>
-                      <span>{record.file_name || "No file attached"}</span>
-                      <span>{formatDateTime(record.created_at)}</span>
-                    </div>
-
-                    <div style={buttonRowStyle}>
-                      {record.action_required ? (
-                        <button
-                          type="button"
-                          style={actionLinkButtonStyle}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            generateActionFromMaintenance(record);
-                          }}
-                        >
-                          Generate Action
-                        </button>
-                      ) : null}
-                      {record.file_path ? (
-                        <button
-                          type="button"
-                          style={miniButtonStyle}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void openFile(record);
-                          }}
-                          disabled={openingId === record.id}
-                        >
-                          {openingId === record.id ? "Opening..." : "Open File"}
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        style={dangerButtonStyle}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void removeRecord(record);
+                    return (
+                      <tr
+                        key={record.id}
+                        style={selected ? selectedRegisterRowStyle : registerRowStyle}
+                        onClick={() => {
+                          setSelectedRecordId(record.id);
+                          setDetailForm(buildMaintenanceForm(record));
+                          scrollToDetailPanel();
                         }}
-                        disabled={deletingId === record.id}
                       >
-                        {deletingId === record.id ? "Removing..." : "Remove"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+                        <td style={primaryTableCellStyle}>
+                          <div>{record.maintenance_number || "Maintenance Record"}</div>
+                          <div style={tableSubTextStyle}>{record.file_name || "No file attached"}</div>
+                        </td>
+                        <td style={imsTableCellStyle}>
+                          <strong>{asset?.asset_code || asset?.id || "-"}</strong>
+                          <div style={tableSubTextStyle}>{asset?.name || "Unknown asset"}</div>
+                        </td>
+                        <td style={imsTableCellStyle}>{formatDate(record.maintenance_date)}</td>
+                        <td style={imsTableCellStyle}>{record.carried_out_by || "-"}</td>
+                        <td style={imsTableCellStyle}>
+                          <span style={{ ...pillStyle, background: typeTone.bg, color: typeTone.text }}>
+                            {record.maintenance_type || "Not Set"}
+                          </span>
+                        </td>
+                        <td style={imsTableCellStyle}>
+                          <span
+                            style={{
+                              ...pillStyle,
+                              background: statusTone.bg,
+                              color: statusTone.text,
+                              border: `1px solid ${statusTone.border}`,
+                            }}
+                          >
+                            {status}
+                          </span>
+                          <div style={tableSubTextStyle}>
+                            {daysRemaining === null
+                              ? formatDate(record.next_maintenance_due)
+                              : daysRemaining < 0
+                                ? `${Math.abs(daysRemaining)} days overdue`
+                                : `${daysRemaining} days remaining`}
+                          </div>
+                        </td>
+                        <td style={imsTableCellStyle}>{record.action_required ? "Required" : "No"}</td>
+                        <td style={actionTableCellStyle}>
+                          <div style={tableActionRowStyle}>
+                            {record.action_required ? (
+                              <button
+                                type="button"
+                                style={actionLinkButtonStyle}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  generateActionFromMaintenance(record);
+                                }}
+                              >
+                                Generate Action
+                              </button>
+                            ) : null}
+                            {record.file_path ? (
+                              <button
+                                type="button"
+                                style={miniButtonStyle}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void openFile(record);
+                                }}
+                                disabled={openingId === record.id}
+                              >
+                                {openingId === record.id ? "Opening..." : "Open File"}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              style={dangerButtonStyle}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void removeRecord(record);
+                              }}
+                              disabled={deletingId === record.id}
+                            >
+                              {deletingId === record.id ? "Removing..." : "Remove"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-        </SectionCard>
+        </ImsPanel>
 
         <section ref={detailPanelRef} style={fullWidthSectionStyle}>
         <SectionCard
@@ -1507,6 +1517,54 @@ const historyCardStyle: CSSProperties = {
   padding: "16px",
   display: "grid",
   gap: "12px",
+};
+
+const compactTableWrapStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "14px",
+  background: "#ffffff",
+};
+
+const registerRowStyle: CSSProperties = {
+  cursor: "pointer",
+};
+
+const selectedRegisterRowStyle: CSSProperties = {
+  cursor: "pointer",
+  background: imsColours.brandSoft,
+};
+
+const primaryTableCellStyle: CSSProperties = {
+  ...imsTableCellStyle,
+  fontWeight: 900,
+  color: imsColours.brandDark,
+};
+
+const actionTableCellStyle: CSSProperties = {
+  ...imsTableCellStyle,
+  minWidth: "250px",
+};
+
+const tableActionRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+  alignItems: "center",
+};
+
+const tableSubTextStyle: CSSProperties = {
+  marginTop: "3px",
+  color: imsColours.muted,
+  fontSize: "12px",
+  fontWeight: 600,
+};
+
+const emptyTableCellStyle: CSSProperties = {
+  ...imsTableCellStyle,
+  color: imsColours.muted,
+  textAlign: "center",
+  padding: "22px 14px",
 };
 
 const detailPanelStyle: CSSProperties = {

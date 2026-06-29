@@ -1,0 +1,76 @@
+# HSE Management Codex Handover
+
+HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, green hero, KPI cards, shared filters, detail panels, report outputs, and central Action links.
+
+## Routes
+
+- Dashboard: `app/hse/page.tsx`
+- Calendar: `app/hse/calendar/page.tsx`
+- AINM: `app/hse/ainm/page.tsx`
+- AINM field: `app/hse/ainm/field/page.tsx`
+- Observations: `app/hse/observations/page.tsx`
+- Public observation route: `app/observe/page.tsx`
+- PTW: `app/hse/ptw/page.tsx`
+- Inspections: `app/hse/inspections/page.tsx`
+- Inspection field: `app/hse/inspections/field/page.tsx`
+- HSE Actions: `app/hse/actions/page.tsx`
+- HSE Reports: `app/hse/reports/page.tsx`
+
+## Current Status
+
+- HSE module includes Dashboard, AINM, Inspections, Observations, PTW, Actions, Calendar, and Reports.
+- Incidents, Risk Assessments, and Environmental tabs were removed from nav earlier.
+- HSE Dashboard has graphics and a year filter.
+- HSE Actions are HSE-specific and link to central Action Management.
+
+## AINM
+
+- Uses internal tabs such as Dashboard, Register, Create, Import, and Reports.
+- Supports Internal AINM and External AINM distinction.
+- Notification is mobile-friendly; Part 1 and Part 2 remain desktop-focused.
+- Reports include Notification, Part 1, Part 2, and compiled PDF.
+- Report outputs are stored and history is visible.
+- AINM actions link to central actions.
+- Dashboard graphs were recently tidied.
+
+## AINM Known Work
+
+- AINM type dropdown should default to a grey `Select Type`, not `Incident Report`.
+- Register should use the Show Filters pattern.
+- Register should show Classification.
+- Register should filter by Accident/Incident.
+- Clicking a register item should scroll directly to the detail panel.
+
+## HSE Reports
+
+- Should replicate the Quality Reports layout exactly.
+- Monthly report structure should use live HSE data.
+- Saved reports should work like Quality Reports.
+- Executive summary must appear in PDF output.
+
+## Inspections
+
+- Mobile-friendly inspection flow exists.
+- ENS-HSEQ-FRM-044 Base and Site are completed well.
+- ENS-HSEQ-FRM-041 Office is mostly done.
+- FRM-046 Vessel Pre-Sail, FRM-042 Offshore, FRM-043 Mobilisation, and FRM-045 Dropped Objects were started/completed in one pass.
+- PDF outputs need consistent header/footer and aligned tables.
+- Item evidence upload exists per checklist item.
+- QR mobile flow exists.
+
+## Observations
+
+- Public QR route `/observe` requires no login.
+- Landing asks Employee, Contractor, Client, Visitor, or Quick Fill.
+- Wording changed to `Observation Card` and `Contact Details`.
+- Register has Show Filters, detail panel, delete, and OBS-001 numbering.
+- Observations link to Action Management.
+- Submit button fix needs verification: after submit it should say Submitted, not remain Submitting.
+
+## PTW
+
+- PTW module exists but is parked/work in progress.
+- Word/PDF output styling was being iterated.
+- Section 1/3 checkbox layouts were under refinement.
+- Do not spend more time on PTW unless asked.
+

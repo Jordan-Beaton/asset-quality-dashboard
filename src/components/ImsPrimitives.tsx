@@ -187,7 +187,11 @@ export function ImsFilterPanel({
         ) : (
           <div />
         )}
-        <ImsButton variant={showFilters ? "secondary" : "primary"} onClick={onToggleFilters}>
+        <ImsButton
+          variant={showFilters ? "secondary" : "primary"}
+          onClick={onToggleFilters}
+          style={{ justifySelf: "end", minWidth: "132px" }}
+        >
           {showFilters ? "Hide Filters" : "Show Filters"}
         </ImsButton>
       </div>
