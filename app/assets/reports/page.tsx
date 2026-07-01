@@ -7,6 +7,7 @@ import autoTable from "jspdf-autotable";
 import { ImsButton, ImsFilterPanel, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import { imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 
 type Asset = {
@@ -1222,23 +1223,23 @@ export default function AssetReportsPage() {
         {filteredReports.length === 0 ? (
           <p style={emptyTextStyle}>No asset monthly reports saved yet.</p>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={tableStyle}>
+          <div style={compactTableWrapStyle}>
+            <table style={{ ...imsTableStyle, minWidth: 900 }}>
               <thead>
                 <tr>
-                  <th style={tableHeadStyle}>Month</th>
-                  <th style={tableHeadStyle}>Snapshot</th>
-                  <th style={tableHeadStyle}>Created</th>
-                  <th style={tableHeadStyle}>Actions</th>
+                  <th style={imsTableHeadStyle}>Month</th>
+                  <th style={imsTableHeadStyle}>Snapshot</th>
+                  <th style={imsTableHeadStyle}>Created</th>
+                  <th style={imsTableHeadStyle}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredReports.map((report) => (
                   <tr key={report.id}>
-                    <td style={tableCellStyle}>{report.month_label}</td>
-                    <td style={tableCellStyle}>{getSnapshotSummary(report)}</td>
-                    <td style={tableCellStyle}>{formatDateTime(report.created_at)}</td>
-                    <td style={tableCellStyle}>
+                    <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#2F7F7D" }}>{report.month_label}</td>
+                    <td style={imsTableCellStyle}>{getSnapshotSummary(report)}</td>
+                    <td style={imsTableCellStyle}>{formatDateTime(report.created_at)}</td>
+                    <td style={imsTableCellStyle}>
                       <div style={actionButtonsWrapStyle}>
                         <button type="button" style={miniButtonStyle} onClick={() => void generatePdfReport(report)}>
                           PDF
@@ -1261,20 +1262,6 @@ export default function AssetReportsPage() {
     </main>
   );
 }
-
-const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
-  fontWeight: 700,
-  textDecoration: "none",
-};
-
-const statusBannerStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "14px",
-  padding: "14px 18px",
-  marginBottom: "24px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
 
 const twoColumnGridStyle: CSSProperties = {
   display: "grid",
@@ -1446,34 +1433,12 @@ const emptyTextStyle: CSSProperties = {
   margin: 0,
 };
 
-const tableStyle: CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
+const compactTableWrapStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
   background: "#ffffff",
-  minWidth: 960,
-  fontSize: "13px",
-};
-
-const tableHeadStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
-  fontSize: "12px",
-  fontWeight: 900,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
-  whiteSpace: "nowrap",
-};
-
-const tableCellStyle: CSSProperties = {
-  padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
-  verticalAlign: "middle",
-  fontSize: "13px",
-  lineHeight: 1.45,
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const actionButtonsWrapStyle: CSSProperties = {

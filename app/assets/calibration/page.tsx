@@ -3,10 +3,17 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import {
+  imsInputStyle,
+  imsTableCellStyle,
+  imsTableHeadStyle,
+  imsTableInfoRowStyle,
+  imsTableStyle,
+} from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -824,10 +831,10 @@ function CalibrationPageContent() {
 
       {activeView === "register" ? (
       <>
-        <SectionCard
-          title="Calibration Register Filters"
-          subtitle="Review urgent calibration items first, then narrow the combined log by asset, serial number, certificate number, or calibration status."
-        >
+      <ImsPanel
+        title="Calibration Register"
+        subtitle="Review urgent calibration items first, then narrow the combined log by asset, serial number, certificate number, or calibration status."
+      >
           <div style={watchlistWrapStyle}>
             <div>
               <div style={watchlistTitleStyle}>Overdue Watchlist</div>
@@ -862,28 +869,27 @@ function CalibrationPageContent() {
             </div>
           </div>
 
-          <div style={filterGridStyle}>
-            <Field label="Search Serial / Certificate">
-              <input
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                style={inputStyle}
-                placeholder="Search serial number or certificate number"
-              />
-            </Field>
-            <button
-              type="button"
-              style={showRegisterFilters ? secondaryButtonStyle : miniButtonStyle}
-              onClick={() => setShowRegisterFilters((prev) => !prev)}
-            >
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-          </div>
-
-          {showRegisterFilters ? (
-            <div style={formGridStyle}>
+          <ImsFilterPanel
+            search={searchFilter}
+            onSearchChange={setSearchFilter}
+            searchPlaceholder="Search serial number or certificate number"
+            showFilters={showRegisterFilters}
+            onToggleFilters={() => setShowRegisterFilters((prev) => !prev)}
+            actions={
+              <ImsButton
+                variant="secondary"
+                onClick={() => {
+                  setAssetFilter("");
+                  setSearchFilter("");
+                  setStatusFilter("");
+                }}
+              >
+                Clear Filters
+              </ImsButton>
+            }
+          >
             <Field label="Asset">
-              <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={inputStyle}>
+              <select value={assetFilter} onChange={(e) => setAssetFilter(e.target.value)} style={imsInputStyle}>
                 <option value="">All assets</option>
                 <option value="__UNASSIGNED__">Unassigned / spare items</option>
                 {assets.map((asset) => {
@@ -901,7 +907,7 @@ function CalibrationPageContent() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter((e.target.value || "") as "" | CalibrationStatus)}
-                style={inputStyle}
+                style={imsInputStyle}
               >
                 <option value="">All statuses</option>
                 <option value="Overdue">Overdue</option>
@@ -910,47 +916,26 @@ function CalibrationPageContent() {
                 <option value="Not Set">Not Set</option>
               </select>
             </Field>
-            </div>
-          ) : null}
+          </ImsFilterPanel>
 
-          <div style={buttonRowStyle}>
-            {showRegisterFilters ? (
-              <button
-                type="button"
-                style={secondaryButtonStyle}
-                onClick={() => {
-                  setAssetFilter("");
-                  setSearchFilter("");
-                  setStatusFilter("");
-                }}
-              >
-                Clear Filters
-              </button>
-            ) : null}
-            <div style={registerCountStyle}>
-              Showing <strong>{calibrationRows.length}</strong> records
-            </div>
+          <div style={imsTableInfoRowStyle}>
+            Showing <strong>{calibrationRows.length}</strong> of <strong>{records.length}</strong> calibration records
           </div>
-        </SectionCard>
 
-      <SectionCard
-        title="Calibration Register"
-        subtitle="Combined log across all assets, sorted with overdue items first, then due soon, then nearest due date."
-      >
-        <div style={{ overflowX: "auto" }}>
-          <table style={tableStyle}>
+        <div style={compactTableWrapStyle}>
+          <table style={{ ...imsTableStyle, minWidth: 1120 }}>
             <thead>
               <tr>
-                <th style={tableHeadStyle}>Status</th>
-                <th style={tableHeadStyle}>Asset No. / Code</th>
-                <th style={tableHeadStyle}>Asset / Description</th>
-                <th style={tableHeadStyle}>Serial Number</th>
-                <th style={tableHeadStyle}>Calibration Date</th>
-                <th style={tableHeadStyle}>Due Date</th>
-                <th style={tableHeadStyle}>Days Remaining</th>
-                <th style={tableHeadStyle}>Certificate No.</th>
-                <th style={tableHeadStyle}>Certificate</th>
-                <th style={tableHeadStyle}>Actions</th>
+                <th style={imsTableHeadStyle}>Status</th>
+                <th style={imsTableHeadStyle}>Asset No. / Code</th>
+                <th style={imsTableHeadStyle}>Asset / Description</th>
+                <th style={imsTableHeadStyle}>Serial Number</th>
+                <th style={imsTableHeadStyle}>Calibration Date</th>
+                <th style={imsTableHeadStyle}>Due Date</th>
+                <th style={imsTableHeadStyle}>Days Remaining</th>
+                <th style={imsTableHeadStyle}>Certificate No.</th>
+                <th style={imsTableHeadStyle}>Certificate</th>
+                <th style={imsTableHeadStyle}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -966,28 +951,28 @@ function CalibrationPageContent() {
                   const subject = buildCalibrationSubject(row);
                   return (
                     <tr key={row.id} style={{ background: tone.bg }}>
-                      <td style={tableCellStyle}>
+                      <td style={imsTableCellStyle}>
                         <StatusBadge value={row.status} />
                       </td>
-                      <td style={tableCellStyle}>{row.asset?.asset_code || "Unassigned"}</td>
-                      <td style={tableCellStyle}>
+                      <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#2F7F7D" }}>{row.asset?.asset_code || "Unassigned"}</td>
+                      <td style={imsTableCellStyle}>
                         <div style={cellTitleStyle}>{subject.title}</div>
                         <div style={cellMetaStyle}>{subject.subtitle}</div>
                       </td>
-                      <td style={tableCellStyle}>{row.record.serial_number || "-"}</td>
-                      <td style={tableCellStyle}>{formatDate(row.record.calibration_date)}</td>
-                      <td style={tableCellStyle}>{formatDate(row.record.calibration_due_date)}</td>
-                      <td style={tableCellStyle}>
+                      <td style={imsTableCellStyle}>{row.record.serial_number || "-"}</td>
+                      <td style={imsTableCellStyle}>{formatDate(row.record.calibration_date)}</td>
+                      <td style={imsTableCellStyle}>{formatDate(row.record.calibration_due_date)}</td>
+                      <td style={imsTableCellStyle}>
                         {row.daysRemaining === null
                           ? "-"
                           : row.daysRemaining < 0
                             ? `${Math.abs(row.daysRemaining)} overdue`
                             : `${row.daysRemaining} days`}
                       </td>
-                      <td style={tableCellStyle}>
+                      <td style={imsTableCellStyle}>
                         {row.record.certificate_number || row.record.reference || "-"}
                       </td>
-                      <td style={tableCellStyle}>
+                      <td style={imsTableCellStyle}>
                         {row.record.file_path ? (
                           <button
                             type="button"
@@ -1001,7 +986,7 @@ function CalibrationPageContent() {
                           <span style={cellMetaStyle}>No file</span>
                         )}
                       </td>
-                      <td style={tableCellStyle}>
+                      <td style={imsTableCellStyle}>
                         <div style={rowActionStackStyle}>
                           <button
                             type="button"
@@ -1027,7 +1012,7 @@ function CalibrationPageContent() {
             </tbody>
           </table>
         </div>
-      </SectionCard>
+      </ImsPanel>
       </>
       ) : null}
     </main>
@@ -1232,19 +1217,6 @@ const formGridStyle: CSSProperties = {
   gap: "14px",
 };
 
-const filterGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "12px",
-  alignItems: "end",
-  marginBottom: "14px",
-  padding: "12px",
-  border: "1px solid #dbe3ef",
-  borderRadius: "16px",
-  background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
-};
-
 const fieldWrapStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
@@ -1393,39 +1365,12 @@ const secondaryButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const registerCountStyle: CSSProperties = {
-  fontSize: "14px",
-  color: "#475569",
-};
-
-const tableStyle: CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
+const compactTableWrapStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
+  borderRadius: "16px",
   background: "#ffffff",
-  minWidth: 960,
-  fontSize: "13px",
-};
-
-const tableHeadStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
-  fontSize: "12px",
-  fontWeight: 900,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
-  whiteSpace: "nowrap",
-};
-
-const tableCellStyle: CSSProperties = {
-  padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
-  verticalAlign: "middle",
-  fontSize: "13px",
-  lineHeight: 1.45,
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const emptyCellStyle: CSSProperties = {

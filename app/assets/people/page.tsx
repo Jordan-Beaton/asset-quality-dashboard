@@ -3,8 +3,15 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
-import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { ImsButton, ImsFilterPanel, ImsPanel, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import {
+  imsInputStyle,
+  imsTableCellStyle,
+  imsTableHeadStyle,
+  imsTableInfoRowStyle,
+  imsTableStyle,
+} from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -273,112 +280,92 @@ function PeoplePageContent() {
           </form>
         </SectionCard>
 
-        <SectionCard
+        <ImsPanel
           title="People Register"
           subtitle="Review active and inactive people, with inactive records retained so historic asset records still show the correct names."
         >
-          <div style={filterGridStyle}>
-            <Field label="Search">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={inputStyle}
-                placeholder="Search name or role"
-              />
-            </Field>
-
-            <button
-              type="button"
-              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
-              onClick={() => setShowRegisterFilters((current) => !current)}
-            >
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-          </div>
-
-          {showRegisterFilters ? (
-          <div style={filterGridStyle}>
+          <ImsFilterPanel
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search name or role"
+            showFilters={showRegisterFilters}
+            onToggleFilters={() => setShowRegisterFilters((current) => !current)}
+            actions={
+              <ImsButton
+                variant="secondary"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("all");
+                }}
+              >
+                Clear Filters
+              </ImsButton>
+            }
+          >
             <Field label="Status Filter">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
-                style={inputStyle}
+                style={imsInputStyle}
               >
                 <option value="all">All</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
             </Field>
-          </div>
-          ) : null}
+          </ImsFilterPanel>
 
-          <div style={buttonRowStyle}>
-            <button
-              type="button"
-              style={secondaryButtonStyle}
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("all");
-              }}
-            >
-              Clear Filters
-            </button>
-          </div>
+          <div style={imsTableInfoRowStyle}>Showing <strong>{filteredPeople.length}</strong> of <strong>{people.length}</strong> Asset people</div>
 
-          <div style={registerListStyle}>
-            {filteredPeople.length === 0 ? (
-              <div style={emptyStateStyle}>No people match the current filters.</div>
-            ) : (
-              filteredPeople.map((person) => {
-                const tone = statusTone(person.active);
-                const selected = selectedPersonId === person.id;
+          <div style={compactTableWrapStyle}>
+            <table style={{ ...imsTableStyle, minWidth: 760 }}>
+              <thead>
+                <tr>
+                  <th style={imsTableHeadStyle}>Name</th>
+                  <th style={imsTableHeadStyle}>Role</th>
+                  <th style={imsTableHeadStyle}>Status</th>
+                  <th style={imsTableHeadStyle}>Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPeople.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={emptyTableCellStyle}>No people match the current filters.</td>
+                  </tr>
+                ) : (
+                  filteredPeople.map((person) => {
+                    const tone = statusTone(person.active);
+                    const selected = selectedPersonId === person.id;
 
-                return (
-                  <div
-                    key={person.id}
-                    style={{
-                      ...registerCardStyle,
-                      cursor: "pointer",
-                      borderColor: selected ? "#93c5fd" : "#dbe7f3",
-                      boxShadow: selected ? "0 0 0 2px rgba(37,99,235,0.15)" : "none",
-                    }}
-                    onClick={() => {
-                      setSelectedPersonId(person.id);
-                      setDetailForm({
-                        name: person.name,
-                        role: person.role || "",
-                        active: person.active,
-                      });
-                    }}
-                  >
-                    <div style={registerHeaderStyle}>
-                      <div>
-                        <div style={registerTitleStyle}>{person.name}</div>
-                        <div style={registerMetaStyle}>{person.role || "No role set"}</div>
-                      </div>
-                      <span
-                        style={{
-                          ...pillStyle,
-                          background: tone.bg,
-                          color: tone.text,
-                          border: `1px solid ${tone.border}`,
+                    return (
+                      <tr
+                        key={person.id}
+                        style={selected ? selectedTableRowStyle : registerTableRowStyle}
+                        onClick={() => {
+                          setSelectedPersonId(person.id);
+                          setDetailForm({
+                            name: person.name,
+                            role: person.role || "",
+                            active: person.active,
+                          });
                         }}
                       >
-                        {person.active ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-
-                    <div style={registerMetaGridStyle}>
-                      <div>
-                        <strong>Created:</strong> {formatDateTime(person.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
+                        <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#2F7F7D" }}>{person.name}</td>
+                        <td style={imsTableCellStyle}>{person.role || "No role set"}</td>
+                        <td style={imsTableCellStyle}>
+                          <span style={{ ...pillStyle, background: tone.bg, color: tone.text, border: `1px solid ${tone.border}` }}>
+                            {person.active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td style={imsTableCellStyle}>{formatDateTime(person.created_at)}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
-        </SectionCard>
+        </ImsPanel>
 
         <SectionCard
           title={selectedPerson ? `Person Detail - ${selectedPerson.name}` : "Person Detail"}
@@ -554,19 +541,6 @@ const formGridStyle: CSSProperties = {
   gap: "12px",
 };
 
-const filterGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
-  alignItems: "end",
-  marginBottom: "14px",
-  padding: "12px",
-  border: "1px solid #dbe3ef",
-  borderRadius: "16px",
-  background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
-};
-
 const fieldWrapStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
@@ -656,48 +630,30 @@ const dangerButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const registerListStyle: CSSProperties = {
-  display: "grid",
-  gap: "14px",
-  marginTop: "18px",
-};
-
-const registerCardStyle: CSSProperties = {
+const compactTableWrapStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #dbe3ef",
   borderRadius: "16px",
-  border: "1px solid #dbe7f3",
-  background: "#f8fafc",
-  padding: "16px",
-  display: "grid",
-  gap: "12px",
+  background: "#ffffff",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
-const registerHeaderStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "12px",
-  flexWrap: "wrap",
-  alignItems: "flex-start",
+const registerTableRowStyle: CSSProperties = {
+  cursor: "pointer",
 };
 
-const registerTitleStyle: CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 800,
-  color: "#0f172a",
+const selectedTableRowStyle: CSSProperties = {
+  cursor: "pointer",
+  background: "#eff6ff",
+  boxShadow: "inset 4px 0 0 #3A9B98",
 };
 
-const registerMetaStyle: CSSProperties = {
-  marginTop: "4px",
-  fontSize: "13px",
+const emptyTableCellStyle: CSSProperties = {
+  padding: "26px 14px",
+  textAlign: "center",
   color: "#64748b",
-  lineHeight: 1.5,
-};
-
-const registerMetaGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "10px 16px",
-  color: "#334155",
-  fontSize: "14px",
+  background: "#f8fafc",
+  borderBottom: "1px dashed #cbd5e1",
 };
 
 const pillStyle: CSSProperties = {

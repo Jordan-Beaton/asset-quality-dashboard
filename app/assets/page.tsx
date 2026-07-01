@@ -6,10 +6,17 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import QRCode from "qrcode";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
-import { ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
+import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import {
+  imsInputStyle,
+  imsTableCellStyle,
+  imsTableHeadStyle,
+  imsTableInfoRowStyle,
+  imsTableStyle,
+} from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -2025,73 +2032,163 @@ function AssetsPageContent() {
 
       {activeView === "dashboard" ? (
         <>
-      <section style={statsGridStyle}>
-        <QualityKpiCard
-          title="Total Assets"
-          value={totalAssets}
-          accent="#3A9B98"
-          onClick={() => applyAssetKpiFilter({})}
-        />
-        <QualityKpiCard
-          title="Active Assets"
-          value={activeAssets}
-          accent="#16a34a"
-          onClick={() => applyAssetKpiFilter({ status: "Active" })}
-        />
-        <QualityKpiCard
-          title="Under Maintenance"
-          value={underMaintenanceAssets}
-          accent="#d97706"
-          onClick={() => applyAssetKpiFilter({ status: "Under Maintenance" })}
-        />
-        <QualityKpiCard
-          title="Quality Linked"
-          value={qualityLinkedAssets}
-          accent="#2563eb"
-          onClick={() => applyAssetKpiFilter({ qualityLinked: true })}
-        />
-        <QualityKpiCard
-          title="Action Needed"
-          value={overdueInspectionAssets + overdueMaintenanceAssets}
-          accent="#dc2626"
-          onClick={() => {
-            setActiveView("dashboard");
-            setTimeout(() => {
-              document.getElementById("asset-workload-panel")?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              });
-            }, 80);
-          }}
-        />
-      </section>
+          <section style={dashboardKpiGridStyle}>
+            <QualityKpiCard
+              title="Total Assets"
+              value={totalAssets}
+              accent="#3A9B98"
+              onClick={() => applyAssetKpiFilter({})}
+            />
+            <QualityKpiCard
+              title="Active Assets"
+              value={activeAssets}
+              accent="#16a34a"
+              onClick={() => applyAssetKpiFilter({ status: "Active" })}
+            />
+            <QualityKpiCard
+              title="Under Maintenance"
+              value={underMaintenanceAssets}
+              accent="#d97706"
+              onClick={() => applyAssetKpiFilter({ status: "Under Maintenance" })}
+            />
+            <QualityKpiCard
+              title="Quality Linked"
+              value={qualityLinkedAssets}
+              accent="#2563eb"
+              onClick={() => applyAssetKpiFilter({ qualityLinked: true })}
+            />
+            <QualityKpiCard
+              title="Action Needed"
+              value={overdueInspectionAssets + overdueMaintenanceAssets}
+              accent="#dc2626"
+              onClick={() => {
+                setActiveView("dashboard");
+                setTimeout(() => {
+                  document.getElementById("asset-workload-panel")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
+                }, 80);
+              }}
+            />
+          </section>
 
-      <section style={assetAttentionGridStyle}>
-        <AttentionCard
-          title="Inspection Watch"
-          summary={`${overdueInspectionAssets} overdue`}
-          detail={`${dueSoonInspectionAssets} due in the next 30 days`}
-          tone="red"
-        />
-        <AttentionCard
-          title="Maintenance Watch"
-          summary={`${overdueMaintenanceAssets} overdue`}
-          detail={`${dueSoonMaintenanceAssets} due in the next 30 days`}
-          tone="amber"
-        />
-        <AttentionCard
-          title="Module Coverage"
-          summary={`${assetsWithImages} assets with image references`}
-          detail={`${inactiveAssets} inactive or parked assets`}
-          tone="blue"
-        />
-      </section>
+          <section style={dashboardPanelGridStyle}>
+            <ImsPanel
+              title="Due Watch"
+              subtitle="Inspection and maintenance pressure across the live register."
+            >
+              <div id="asset-workload-panel" style={dashboardMetricGridStyle}>
+                <DashboardMetricCard
+                  label="Inspection Overdue"
+                  value={overdueInspectionAssets}
+                  hint={`${dueSoonInspectionAssets} due soon`}
+                  tone="#991b1b"
+                  bg="#fff1f2"
+                />
+                <DashboardMetricCard
+                  label="Inspection Due Soon"
+                  value={dueSoonInspectionAssets}
+                  hint="Next 30 days"
+                  tone="#92400e"
+                  bg="#fffbeb"
+                />
+                <DashboardMetricCard
+                  label="Maintenance Overdue"
+                  value={overdueMaintenanceAssets}
+                  hint={`${dueSoonMaintenanceAssets} due soon`}
+                  tone="#991b1b"
+                  bg="#fff1f2"
+                />
+                <DashboardMetricCard
+                  label="Maintenance Due Soon"
+                  value={dueSoonMaintenanceAssets}
+                  hint="Next 30 days"
+                  tone="#92400e"
+                  bg="#fffbeb"
+                />
+              </div>
+            </ImsPanel>
+
+            <ImsPanel
+              title="Quality Links"
+              subtitle="How strongly asset records are connected to controlled IMS evidence."
+            >
+              <div style={dashboardMetricGridStyle}>
+                <DashboardMetricCard
+                  label="Linked NCRs"
+                  value={qualitySnapshotData.find((item) => item.name === "NCRs")?.value || 0}
+                  hint="Quality records"
+                  tone="#991b1b"
+                  bg="#fff1f2"
+                />
+                <DashboardMetricCard
+                  label="Linked Actions"
+                  value={qualitySnapshotData.find((item) => item.name === "Actions")?.value || 0}
+                  hint="Central action links"
+                  tone="#1d4ed8"
+                  bg="#eff6ff"
+                />
+                <DashboardMetricCard
+                  label="Calibration Links"
+                  value={qualitySnapshotData.find((item) => item.name === "Calibration")?.value || 0}
+                  hint="Calibration evidence"
+                  tone="#92400e"
+                  bg="#fffbeb"
+                />
+                <DashboardMetricCard
+                  label="Inspection Links"
+                  value={qualitySnapshotData.find((item) => item.name === "Inspection")?.value || 0}
+                  hint="Inspection evidence"
+                  tone="#166534"
+                  bg="#f0fdf4"
+                />
+              </div>
+            </ImsPanel>
+
+            <ImsPanel
+              title="Register Health"
+              subtitle="Master-data coverage and current asset status at a glance."
+            >
+              <div style={dashboardMetricGridStyle}>
+                <DashboardMetricCard
+                  label="With Images"
+                  value={assetsWithImages}
+                  hint="Image/file references"
+                  tone="#0f766e"
+                  bg="#f0fdfa"
+                />
+                <DashboardMetricCard
+                  label="Inactive"
+                  value={inactiveAssets}
+                  hint="Inactive or parked"
+                  tone="#475569"
+                  bg="#f8fafc"
+                />
+                <DashboardMetricCard
+                  label="Active Share"
+                  value={totalAssets > 0 ? Math.round((activeAssets / totalAssets) * 100) : 0}
+                  suffix="%"
+                  hint="Active assets"
+                  tone="#166534"
+                  bg="#f0fdf4"
+                />
+                <DashboardMetricCard
+                  label="Quality Coverage"
+                  value={totalAssets > 0 ? Math.round((qualityLinkedAssets / totalAssets) * 100) : 0}
+                  suffix="%"
+                  hint="Linked assets"
+                  tone="#1d4ed8"
+                  bg="#eff6ff"
+                />
+              </div>
+            </ImsPanel>
+          </section>
         </>
       ) : null}
 
-      {activeView === "create" || activeView === "dashboard" ? (
-      <section style={activeView === "create" ? fullWidthSectionStyle : dashboardPanelsGridStyle}>
-        {activeView === "create" ? (
+      {activeView === "create" ? (
+      <section style={fullWidthSectionStyle}>
         <SectionCard
           title="Add Asset"
           subtitle="Create one asset record directly into the live register without leaving the module workspace."
@@ -2245,119 +2342,32 @@ function AssetsPageContent() {
             </div>
           </form>
         </SectionCard>
-        ) : null}
-
-        {activeView === "dashboard" ? (
-        <SectionCard
-          title="Operational Snapshot"
-          subtitle="Quick cue for linked quality coverage and how the workspace should be used."
-        >
-          <div style={qualityOverviewGridStyle}>
-            <MiniMetricCard
-              label="Linked NCRs"
-              value={qualitySnapshotData.find((item) => item.name === "NCRs")?.value || 0}
-              tone="#991b1b"
-              bg="#fee2e2"
-            />
-            <MiniMetricCard
-              label="Linked Actions"
-              value={qualitySnapshotData.find((item) => item.name === "Actions")?.value || 0}
-              tone="#1d4ed8"
-              bg="#dbeafe"
-            />
-            <MiniMetricCard
-              label="Calibration Links"
-              value={qualitySnapshotData.find((item) => item.name === "Calibration")?.value || 0}
-              tone="#92400e"
-              bg="#fef3c7"
-            />
-            <MiniMetricCard
-              label="Inspection Links"
-              value={qualitySnapshotData.find((item) => item.name === "Inspection")?.value || 0}
-              tone="#166534"
-              bg="#dcfce7"
-            />
-          </div>
-
-          <div style={qualityIntroBoxStyle}>
-            Use the asset detail workspace below to keep <strong>master data</strong>,{" "}
-            <strong>image/files</strong>, and <strong>quality links</strong> clearly separated while
-            still editing everything from one controlled page.
-          </div>
-        </SectionCard>
-        ) : null}
-
-        {activeView === "dashboard" ? (
-        <SectionCard
-          title="Asset Workload"
-          subtitle="Live operational pressure across inspections, maintenance, and asset record coverage."
-          id="asset-workload-panel"
-        >
-          <div style={assetWorkloadGridStyle}>
-            <MiniMetricCard
-              label="Inspection Overdue"
-              value={overdueInspectionAssets}
-              tone="#991b1b"
-              bg="#fee2e2"
-            />
-            <MiniMetricCard
-              label="Inspection Due Soon"
-              value={dueSoonInspectionAssets}
-              tone="#92400e"
-              bg="#fef3c7"
-            />
-            <MiniMetricCard
-              label="Maintenance Overdue"
-              value={overdueMaintenanceAssets}
-              tone="#991b1b"
-              bg="#fee2e2"
-            />
-            <MiniMetricCard
-              label="Maintenance Due Soon"
-              value={dueSoonMaintenanceAssets}
-              tone="#92400e"
-              bg="#fef3c7"
-            />
-          </div>
-
-          <div style={qualityIntroBoxStyle}>
-            Use the Asset Register tab for the live working panel. Create Asset is now separated so the
-            dashboard stays focused on management visibility.
-          </div>
-        </SectionCard>
-        ) : null}
       </section>
       ) : null}
 
       {activeView === "register" ? (
       <section style={fullWidthSectionStyle}>
-        <SectionCard
+        <ImsPanel
           title="Asset Register"
           subtitle="Click any row to open the selected asset workspace underneath, with full-width space for editing, files, links, and history."
         >
-          <div style={toolbarStyle}>
-            <input
-              placeholder="Search asset code, name, category, serial, location, or responsible person"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={toolbarSearchStyle}
-            />
-
-            <button
-              type="button"
-              onClick={() => setShowRegisterFilters((current) => !current)}
-              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
-            >
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-          </div>
-
-          {showRegisterFilters ? (
-            <div style={toolbarFiltersStyle}>
+          <ImsFilterPanel
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search asset code, name, category, serial, location, or responsible person"
+            showFilters={showRegisterFilters}
+            onToggleFilters={() => setShowRegisterFilters((current) => !current)}
+            actions={
+              <ImsButton variant="secondary" onClick={clearFilters}>
+                Clear Filters
+              </ImsButton>
+            }
+          >
+            <Field label="Status">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                style={toolbarSelectStyle}
+                style={imsInputStyle}
               >
                 <option value="">All Status</option>
                 <option value="Active">Active</option>
@@ -2365,11 +2375,13 @@ function AssetsPageContent() {
                 <option value="Quarantine">Quarantine</option>
                 <option value="Under Maintenance">Under Maintenance</option>
               </select>
+            </Field>
 
+            <Field label="Location">
               <select
                 value={locationFilter}
                 onChange={(e) => setLocationFilter(e.target.value)}
-                style={toolbarSelectStyle}
+                style={imsInputStyle}
               >
                 <option value="">All Locations</option>
                 {uniqueLocations.map((location) => (
@@ -2378,11 +2390,13 @@ function AssetsPageContent() {
                   </option>
                 ))}
               </select>
+            </Field>
 
+            <Field label="Responsible Person">
               <select
                 value={ownerFilter}
                 onChange={(e) => setOwnerFilter(e.target.value)}
-                style={toolbarSelectStyle}
+                style={imsInputStyle}
               >
                 <option value="">All Responsible Persons</option>
                 {uniqueOwners.map((owner) => (
@@ -2391,47 +2405,46 @@ function AssetsPageContent() {
                   </option>
                 ))}
               </select>
+            </Field>
+          </ImsFilterPanel>
 
-              <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
-                Clear Filters
-              </button>
-            </div>
-          ) : null}
-
-          <div style={tableInfoRowStyle}>
+          <div style={imsTableInfoRowStyle}>
             <span>
               Showing <strong>{filteredAssets.length}</strong> of <strong>{assets.length}</strong> assets
             </span>
             {selectedAsset ? (
-              <button
-                type="button"
-                style={secondaryButtonStyle}
+              <ImsButton
+                variant="secondary"
                 onClick={() => setIsDetailPanelOpen((current) => !current)}
               >
                 {isDetailPanelOpen ? "Hide Panel" : "Open Panel"}
-              </button>
+              </ImsButton>
             ) : null}
           </div>
 
-          <div style={registerTableWrapStyle}>
-            <div style={registerHeadStyle}>
-              <div>Asset No. / Code</div>
-              <div>Name / Title</div>
-              <div>Category</div>
-              <div>Condition</div>
-              <div>Responsible Person</div>
-              <div>Location</div>
-              <div>Next Due</div>
-            </div>
-
-            <div style={registerBodyStyle}>
+          <div style={compactTableWrapStyle}>
+            <table style={{ ...imsTableStyle, minWidth: 1080 }}>
+              <thead>
+                <tr>
+                  <th style={imsTableHeadStyle}>Asset No. / Code</th>
+                  <th style={imsTableHeadStyle}>Name / Title</th>
+                  <th style={imsTableHeadStyle}>Category</th>
+                  <th style={imsTableHeadStyle}>Condition</th>
+                  <th style={imsTableHeadStyle}>Responsible Person</th>
+                  <th style={imsTableHeadStyle}>Location</th>
+                  <th style={imsTableHeadStyle}>Inspection Due</th>
+                  <th style={imsTableHeadStyle}>Maintenance Due</th>
+                </tr>
+              </thead>
+              <tbody>
               {filteredAssets.length === 0 ? (
-                <div style={emptyRegisterStyle}>No assets match the current filters.</div>
+                <tr>
+                  <td colSpan={8} style={emptyTableCellStyle}>No assets match the current filters.</td>
+                </tr>
               ) : (
                 filteredAssets.map((asset) => (
-                  <button
+                  <tr
                     key={asset.id}
-                    type="button"
                     onClick={() => {
                       setSelectedAssetId(asset.id);
                       setIsDetailPanelOpen(true);
@@ -2443,19 +2456,18 @@ function AssetsPageContent() {
                       }, 80);
                     }}
                     style={{
-                      ...registerRowStyle,
+                      ...registerTableRowStyle,
                       background: selectedAssetId === asset.id ? "#eff6ff" : "#ffffff",
-                      borderLeft:
-                        selectedAssetId === asset.id ? "4px solid #3A9B98" : "4px solid transparent",
+                      boxShadow: selectedAssetId === asset.id ? "inset 4px 0 0 #3A9B98" : "inset 4px 0 0 transparent",
                     }}
                   >
-                    <div style={registerPrimaryStyle}>{asset.asset_code || "-"}</div>
-                    <div>
-                      <div style={registerPrimaryStyle}>{asset.name || "-"}</div>
-                      <div style={registerSubtextStyle}>{asset.description || "No description recorded"}</div>
-                    </div>
-                    <div style={registerCellTextStyle}>{asset.category || "-"}</div>
-                    <div>
+                    <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#2F7F7D" }}>{asset.asset_code || "-"}</td>
+                    <td style={imsTableCellStyle}>
+                      <strong>{asset.name || "-"}</strong>
+                      <div style={tableSubTextStyle}>{asset.description || "No description recorded"}</div>
+                    </td>
+                    <td style={imsTableCellStyle}>{asset.category || "-"}</td>
+                    <td style={imsTableCellStyle}>
                       {asset.condition ? (
                         <span
                           style={{
@@ -2467,23 +2479,20 @@ function AssetsPageContent() {
                           {asset.condition}
                         </span>
                       ) : (
-                        <span style={registerCellTextStyle}>-</span>
+                        <span>-</span>
                       )}
-                    </div>
-                    <div style={registerCellTextStyle}>{asset.owner || "-"}</div>
-                    <div style={registerCellTextStyle}>{asset.location || "-"}</div>
-                    <div>
-                      <div style={dueDateStackStyle}>
-                        <span style={registerDueLabelStyle}>Inspection: {formatDate(asset.inspection_due_date)}</span>
-                        <span style={registerDueLabelStyle}>Maintenance: {formatDate(asset.maintenance_due_date)}</span>
-                      </div>
-                    </div>
-                  </button>
+                    </td>
+                    <td style={imsTableCellStyle}>{asset.owner || "-"}</td>
+                    <td style={imsTableCellStyle}>{asset.location || "-"}</td>
+                    <td style={imsTableCellStyle}>{formatDate(asset.inspection_due_date)}</td>
+                    <td style={imsTableCellStyle}>{formatDate(asset.maintenance_due_date)}</td>
+                  </tr>
                 ))
               )}
-            </div>
+              </tbody>
+            </table>
           </div>
-        </SectionCard>
+        </ImsPanel>
       </section>
       ) : null}
 
@@ -3421,66 +3430,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function StatCard({
-  title,
-  value,
-  accent,
-}: {
-  title: string;
-  value: number;
-  accent: string;
-}) {
-  return (
-    <div
-      style={{
-        background: "white",
-        borderRadius: "16px",
-        padding: "18px 20px",
-        borderLeft: `5px solid ${accent}`,
-        boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-      }}
-    >
-      <div style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>{title}</div>
-      <div style={{ fontSize: "34px", fontWeight: 700, color: "#0f172a", marginTop: "8px" }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function AttentionCard({
-  title,
-  summary,
-  detail,
-  tone,
-}: {
-  title: string;
-  summary: string;
-  detail: string;
-  tone: "red" | "amber" | "blue";
-}) {
-  const tones = {
-    red: { bg: "#fff1f2", border: "#fecdd3", title: "#991b1b", summary: "#7f1d1d" },
-    amber: { bg: "#fffbeb", border: "#fde68a", title: "#92400e", summary: "#78350f" },
-    blue: { bg: "#eff6ff", border: "#bfdbfe", title: "#1d4ed8", summary: "#1e3a8a" },
-  };
-  const colours = tones[tone];
-
-  return (
-    <div
-      style={{
-        ...attentionCardStyle,
-        background: colours.bg,
-        border: `1px solid ${colours.border}`,
-      }}
-    >
-      <div style={{ ...attentionCardTitleStyle, color: colours.title }}>{title}</div>
-      <div style={{ ...attentionCardSummaryStyle, color: colours.summary }}>{summary}</div>
-      <div style={attentionCardDetailStyle}>{detail}</div>
-    </div>
-  );
-}
-
 function SummaryPill({
   label,
   value,
@@ -3545,6 +3494,33 @@ function HeroMetaCard({
     <div style={heroMetaCardStyle}>
       <div style={heroMetaLabelStyle}>{label}</div>
       <div style={compact ? heroMetaCompactValueStyle : heroMetaValueStyle}>{value}</div>
+    </div>
+  );
+}
+
+function DashboardMetricCard({
+  label,
+  value,
+  suffix = "",
+  hint,
+  tone,
+  bg,
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+  hint: string;
+  tone: string;
+  bg: string;
+}) {
+  return (
+    <div style={{ ...dashboardMetricCardStyle, background: bg }}>
+      <div style={{ ...dashboardMetricLabelStyle, color: tone }}>{label}</div>
+      <div style={{ ...dashboardMetricValueStyle, color: tone }}>
+        {value}
+        {suffix}
+      </div>
+      <div style={dashboardMetricHintStyle}>{hint}</div>
     </div>
   );
 }
@@ -3717,25 +3693,55 @@ const heroMetaCompactValueStyle: CSSProperties = {
   lineHeight: 1.35,
 };
 
-const statsGridStyle: CSSProperties = {
+const dashboardKpiGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-  gap: "16px",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "12px",
   marginBottom: "20px",
 };
 
-const assetAttentionGridStyle: CSSProperties = {
+const dashboardPanelGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
   gap: "16px",
+  alignItems: "stretch",
   marginBottom: "20px",
 };
 
-const dashboardPanelsGridStyle: CSSProperties = {
+const dashboardMetricGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "20px",
-  marginBottom: "20px",
+  gap: "10px",
+};
+
+const dashboardMetricCardStyle: CSSProperties = {
+  minHeight: "104px",
+  borderRadius: "14px",
+  padding: "14px",
+  border: "1px solid rgba(148, 163, 184, 0.24)",
+  display: "grid",
+  alignContent: "space-between",
+  gap: "6px",
+};
+
+const dashboardMetricLabelStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const dashboardMetricValueStyle: CSSProperties = {
+  fontSize: "30px",
+  fontWeight: 900,
+  lineHeight: 1,
+};
+
+const dashboardMetricHintStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#64748b",
+  fontWeight: 700,
+  lineHeight: 1.35,
 };
 
 const fullWidthSectionStyle: CSSProperties = {
@@ -3759,33 +3765,6 @@ const panelStyle: CSSProperties = {
   padding: "22px",
   border: "1px solid #dbe7f3",
   boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
-};
-
-const attentionCardStyle: CSSProperties = {
-  borderRadius: "18px",
-  padding: "18px 20px",
-  display: "grid",
-  gap: "8px",
-  boxShadow: "0 10px 22px rgba(15, 23, 42, 0.04)",
-};
-
-const attentionCardTitleStyle: CSSProperties = {
-  fontSize: "13px",
-  fontWeight: 800,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-};
-
-const attentionCardSummaryStyle: CSSProperties = {
-  fontSize: "24px",
-  fontWeight: 800,
-  lineHeight: 1.1,
-};
-
-const attentionCardDetailStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#475569",
-  lineHeight: 1.5,
 };
 
 const sectionHeaderStyle: CSSProperties = {
@@ -3843,17 +3822,6 @@ const readonlyInputStyle: CSSProperties = {
   ...inputStyle,
   background: "#f8fafc",
   color: "#475569",
-};
-
-const toolbarSearchStyle: CSSProperties = {
-  ...inputStyle,
-  maxWidth: "460px",
-  flex: "1 1 320px",
-};
-
-const toolbarSelectStyle: CSSProperties = {
-  ...inputStyle,
-  minWidth: "150px",
 };
 
 const textareaStyle: CSSProperties = {
@@ -3953,20 +3921,6 @@ const reportLinkButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const qualityOverviewGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "12px",
-  marginBottom: "14px",
-};
-
-const assetWorkloadGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "12px",
-  marginBottom: "14px",
-};
-
 const qualityIntroBoxStyle: CSSProperties = {
   background: "#f8fafc",
   border: "1px solid #e2e8f0",
@@ -3992,38 +3946,7 @@ const miniMetricValueStyle: CSSProperties = {
   fontWeight: 800,
 };
 
-const toolbarStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
-  alignItems: "end",
-  marginBottom: "14px",
-  padding: "12px",
-  border: "1px solid #dbe3ef",
-  borderRadius: "16px",
-  background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
-};
-
-const toolbarFiltersStyle: CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-};
-
-const tableInfoRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-start",
-  gap: "4px",
-  flexWrap: "wrap",
-  color: "#475569",
-  fontSize: "13px",
-  fontWeight: 700,
-  margin: "12px 0",
-};
-
-const registerTableWrapStyle: CSSProperties = {
+const compactTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #dbe3ef",
   borderRadius: "16px",
@@ -4031,56 +3954,12 @@ const registerTableWrapStyle: CSSProperties = {
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
-const registerHeadStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1.1fr 1.6fr 1fr 0.9fr 1fr 1fr 1.2fr",
-  gap: "12px",
-  padding: "14px 16px",
-  background: "#f8fafc",
-  borderBottom: "1px solid #e5e7eb",
-  fontSize: "12px",
-  fontWeight: 800,
-  color: "#64748b",
-  textTransform: "uppercase",
-  letterSpacing: 0.25,
-  alignItems: "center",
-};
-
-const registerBodyStyle: CSSProperties = {
-  maxHeight: "980px",
-  overflowY: "auto",
-};
-
-const registerRowStyle: CSSProperties = {
-  width: "100%",
-  textAlign: "left",
-  display: "grid",
-  gridTemplateColumns: "1.1fr 1.6fr 1fr 0.9fr 1fr 1fr 1.2fr",
-  gap: "12px",
-  padding: "14px 16px",
-  border: "none",
-  borderBottom: "1px solid #eef2f7",
-  borderLeft: "4px solid transparent",
+const registerTableRowStyle: CSSProperties = {
   cursor: "pointer",
-  alignItems: "center",
+  transition: "background 160ms ease, box-shadow 160ms ease",
 };
 
-const registerPrimaryStyle: CSSProperties = {
-  fontSize: "14px",
-  fontWeight: 800,
-  color: "#0f172a",
-  lineHeight: 1.35,
-  wordBreak: "break-word",
-};
-
-const registerCellTextStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#475569",
-  lineHeight: 1.45,
-  wordBreak: "break-word",
-};
-
-const registerSubtextStyle: CSSProperties = {
+const tableSubTextStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",
   color: "#64748b",
@@ -4088,27 +3967,17 @@ const registerSubtextStyle: CSSProperties = {
   wordBreak: "break-word",
 };
 
-const dueDateStackStyle: CSSProperties = {
-  display: "grid",
-  gap: "4px",
+const emptyTableCellStyle: CSSProperties = {
+  padding: "24px 14px",
+  color: "#64748b",
+  textAlign: "center",
+  background: "#f8fafc",
 };
 
 const assetSummaryStripStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(3, minmax(220px, 1fr))",
   gap: "12px",
-};
-
-const registerDueLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "#475569",
-  lineHeight: 1.4,
-};
-
-const emptyRegisterStyle: CSSProperties = {
-  padding: "24px 16px",
-  color: "#64748b",
-  textAlign: "center",
 };
 
 const emptyDetailStyle: CSSProperties = {

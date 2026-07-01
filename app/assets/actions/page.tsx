@@ -4,9 +4,16 @@ import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
-import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { ImsButton, ImsFilterPanel, ImsPanel, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import {
+  imsInputStyle,
+  imsTableCellStyle,
+  imsTableHeadStyle,
+  imsTableInfoRowStyle,
+  imsTableStyle,
+} from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -737,67 +744,83 @@ export default function AssetActionsPage() {
       ) : null}
 
       {activeView === "register" ? (
-        <SectionCard title="Asset Action Register" subtitle="Central Action Management records filtered to department Assets.">
-          <div style={toolbarStyle}>
-            <input style={inputStyle} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search Asset Actions..." />
-            <button type="button" style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowRegisterFilters((current) => !current)}>
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-          </div>
-
-          {showRegisterFilters ? (
-          <div style={toolbarStyle}>
-            <select style={inputStyle} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+        <ImsPanel title="Asset Action Register" subtitle="Central Action Management records filtered to department Assets.">
+          <ImsFilterPanel
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search Asset Actions..."
+            showFilters={showRegisterFilters}
+            onToggleFilters={() => setShowRegisterFilters((current) => !current)}
+            actions={
+              <ImsButton
+                variant="secondary"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("");
+                  setOwnerFilter("");
+                  setPriorityFilter("");
+                  setPressureFilter("");
+                }}
+              >
+                Clear Filters
+              </ImsButton>
+            }
+          >
+            <Field label="Status">
+            <select style={imsInputStyle} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="">All Status</option>
               {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
             </select>
-            <select style={inputStyle} value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+            </Field>
+            <Field label="Owner">
+            <select style={imsInputStyle} value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
               <option value="">All Owners</option>
               {ownerOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
             </select>
-            <select style={inputStyle} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
+            </Field>
+            <Field label="Priority">
+            <select style={imsInputStyle} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
               <option value="">All Priority</option>
               {priorityOptions.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
             </select>
-            <button type="button" style={secondaryButtonStyle} onClick={() => { setSearch(""); setStatusFilter(""); setOwnerFilter(""); setPriorityFilter(""); setPressureFilter(""); }}>Clear</button>
-          </div>
-          ) : null}
+            </Field>
+          </ImsFilterPanel>
 
-          <div style={tableInfoStyle}>Showing {filteredActions.length} of {actions.length} Asset Actions</div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={tableStyle}>
+          <div style={imsTableInfoRowStyle}>Showing <strong>{filteredActions.length}</strong> of <strong>{actions.length}</strong> Asset Actions</div>
+          <div style={compactTableWrapStyle}>
+            <table style={{ ...imsTableStyle, minWidth: 980 }}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Action No.</th>
-                  <th style={thStyle}>Title</th>
-                  <th style={thStyle}>Owner</th>
-                  <th style={thStyle}>Source</th>
-                  <th style={thStyle}>Due Date</th>
-                  <th style={thStyle}>Priority</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Action</th>
+                  <th style={imsTableHeadStyle}>Action No.</th>
+                  <th style={imsTableHeadStyle}>Title</th>
+                  <th style={imsTableHeadStyle}>Owner</th>
+                  <th style={imsTableHeadStyle}>Source</th>
+                  <th style={imsTableHeadStyle}>Due Date</th>
+                  <th style={imsTableHeadStyle}>Priority</th>
+                  <th style={imsTableHeadStyle}>Status</th>
+                  <th style={imsTableHeadStyle}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredActions.length ? filteredActions.map((action) => (
-                  <tr key={action.id} style={selectedId === action.id ? selectedRowStyle : trStyle} onClick={() => setSelectedId(action.id)}>
-                    <td style={tdStrongStyle}>{action.action_number || "-"}</td>
-                    <td style={tdStyle}>
+                  <tr key={action.id} style={selectedId === action.id ? selectedTableRowStyle : registerTableRowStyle} onClick={() => setSelectedId(action.id)}>
+                    <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#2F7F7D" }}>{action.action_number || "-"}</td>
+                    <td style={imsTableCellStyle}>
                       <strong>{action.title || "-"}</strong>
                       <div style={mutedTextStyle}>{action.project || "No project"}{action.linked_ainm_number ? ` | AINM ${action.linked_ainm_number}` : ""}</div>
                     </td>
-                    <td style={tdStyle}>{action.owner || "-"}</td>
-                    <td style={tdStyle}>{action.source || "-"}</td>
-                    <td style={tdStyle}>
+                    <td style={imsTableCellStyle}>{action.owner || "-"}</td>
+                    <td style={imsTableCellStyle}>{action.source || "-"}</td>
+                    <td style={imsTableCellStyle}>
                       <strong>{formatDate(action.due_date)}</strong>
                       <div style={{ ...mutedTextStyle, color: isOverdue(action) ? "#b91c1c" : "#64748b" }}>{getDueLabel(action.due_date)}</div>
                     </td>
-                    <td style={tdStyle}>{action.priority || "-"}</td>
-                    <td style={tdStyle}><StatusPill status={action.status || "Open"} /></td>
-                    <td style={tdStyle}><Link href={`/actions?actionId=${encodeURIComponent(action.id)}`} style={smallLinkStyle}>Open Central</Link></td>
+                    <td style={imsTableCellStyle}>{action.priority || "-"}</td>
+                    <td style={imsTableCellStyle}><StatusPill status={action.status || "Open"} /></td>
+                    <td style={imsTableCellStyle}><Link href={`/actions?actionId=${encodeURIComponent(action.id)}`} style={smallLinkStyle}>Open Central</Link></td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={8} style={emptyCellStyle}>No Asset actions match the current filters.</td></tr>
+                  <tr><td colSpan={8} style={emptyTableCellStyle}>No Asset actions match the current filters.</td></tr>
                 )}
               </tbody>
             </table>
@@ -816,7 +839,7 @@ export default function AssetActionsPage() {
               <Link href={`/actions?actionId=${encodeURIComponent(selectedAction.id)}`} style={primaryLinkStyle}>Open / Edit in Central Actions</Link>
             </div>
           ) : null}
-        </SectionCard>
+        </ImsPanel>
       ) : null}
 
       {activeView === "create" ? (
@@ -1002,72 +1025,16 @@ const sectionHeaderStyle: CSSProperties = { background: "#3A9B98", borderRadius:
 const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", color: "white" };
 const sectionSubtitleStyle: CSSProperties = { color: "rgba(255,255,255,0.82)", margin: "4px 0 0", lineHeight: 1.45, fontSize: 13 };
 const emptyTextStyle: CSSProperties = { color: "#64748b", margin: 0, lineHeight: 1.55, fontSize: 13 };
-const toolbarStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
-  alignItems: "end",
-  marginBottom: "14px",
-  padding: "12px",
-  border: "1px solid #dbe3ef",
-  borderRadius: "16px",
-  background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
-};
 const inputStyle: CSSProperties = { width: "100%", minHeight: 42, border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", color: "#0f172a", background: "white" };
 const readOnlyInputStyle: CSSProperties = { ...inputStyle, background: "#f8fafc", color: "#64748b" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: 110, resize: "vertical", lineHeight: 1.45 };
 const secondaryButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "#e2e8f0", color: "#0f172a", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
 const primaryButtonStyle: CSSProperties = { border: "none", background: "#3A9B98", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
-const tableInfoStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-start",
-  gap: "4px",
-  flexWrap: "wrap",
-  color: "#475569",
-  fontSize: "13px",
-  fontWeight: 700,
-  margin: "12px 0",
-};
-const tableStyle: CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-  background: "#ffffff",
-  minWidth: 960,
-  fontSize: "13px",
-};
-const thStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
-  fontSize: "12px",
-  fontWeight: 900,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
-  whiteSpace: "nowrap",
-};
-const tdStyle: CSSProperties = {
-  padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
-  verticalAlign: "middle",
-  fontSize: "13px",
-  lineHeight: 1.45,
-};
-const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#3A9B98" };
-const trStyle: CSSProperties = { cursor: "pointer" };
-const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ecfeff" };
+const compactTableWrapStyle: CSSProperties = { overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: "16px", background: "#ffffff", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)" };
+const registerTableRowStyle: CSSProperties = { cursor: "pointer" };
+const selectedTableRowStyle: CSSProperties = { cursor: "pointer", background: "#eff6ff", boxShadow: "inset 4px 0 0 #3A9B98" };
 const mutedTextStyle: CSSProperties = { color: "#64748b", fontSize: 12, marginTop: 4 };
-const emptyCellStyle: CSSProperties = {
-  padding: "26px 14px",
-  textAlign: "center",
-  color: "#64748b",
-  background: "#f8fafc",
-  borderBottom: "1px dashed #cbd5e1",
-};
+const emptyTableCellStyle: CSSProperties = { padding: "26px 14px", textAlign: "center", color: "#64748b", background: "#f8fafc", borderBottom: "1px dashed #cbd5e1" };
 const detailCardStyle: CSSProperties = {
   marginTop: 18,
   border: "1px solid #dbe3ef",
