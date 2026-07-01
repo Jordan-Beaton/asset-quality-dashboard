@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -222,6 +223,7 @@ async function uploadCertificate(assetId: string | null, file: File) {
 }
 
 function CalibrationPageContent() {
+  const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
   const linkedAsset = searchParams.get("asset")?.trim() || "";
 
@@ -386,8 +388,30 @@ function CalibrationPageContent() {
     setStatusFilter(status);
   }
 
+  function hasCreateAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }
+
+  function hasEditAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }
+
+  function requireCreateAccess(actionLabel: string) {
+    if (hasCreateAccess()) return true;
+    setMessage(`Permission required: create access is needed to ${actionLabel}.`);
+    return false;
+  }
+
+  function requireEditAccess(actionLabel: string) {
+    if (hasEditAccess()) return true;
+    setMessage(`Permission required: edit access is needed to ${actionLabel}.`);
+    return false;
+  }
+
   async function handleAddCalibration(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!requireCreateAccess("create calibration records")) return;
 
     if (!form.calibrationDate || !form.calibrationDueDate) {
       setMessage("Calibration date and due date are required.");
@@ -467,6 +491,8 @@ function CalibrationPageContent() {
   }
 
   async function removeCalibration(row: CalibrationRow) {
+    if (!requireEditAccess("remove calibration records")) return;
+
     const confirmed = window.confirm("Remove this calibration record?");
     if (!confirmed) return;
 
@@ -487,6 +513,31 @@ function CalibrationPageContent() {
     } finally {
       setDeletingId("");
     }
+  }
+
+  function generateActionFromCalibration(row: CalibrationRow) {
+    if (!requireCreateAccess("generate linked Asset actions")) return;
+
+    const subject = buildCalibrationSubject(row);
+    const reference = row.record.certificate_number || row.record.reference || subject.title;
+    const title = `Calibration follow-up - ${reference}`;
+    const descriptionParts = [
+      `Calibration item: ${subject.title}`,
+      row.record.calibration_due_date ? `Due date: ${formatDate(row.record.calibration_due_date)}` : "",
+      row.record.notes ? `Notes: ${row.record.notes}` : "",
+    ].filter(Boolean);
+    const query = new URLSearchParams({
+      prefill_source: "Asset Calibration",
+      prefill_department: "Assets",
+      prefill_title: title,
+      prefill_description: descriptionParts.join("\n\n") || title,
+      prefill_due_date: row.record.calibration_due_date || "",
+      linked_asset_id: row.record.asset_id || "",
+      linked_asset_code: row.asset?.asset_code || "",
+      linked_calibration_id: row.record.id,
+    });
+
+    window.location.href = `/actions?${query.toString()}`;
   }
 
   return (
@@ -951,14 +1002,23 @@ function CalibrationPageContent() {
                         )}
                       </td>
                       <td style={tableCellStyle}>
-                        <button
-                          type="button"
-                          style={dangerButtonStyle}
-                          onClick={() => void removeCalibration(row)}
-                          disabled={deletingId === row.id}
-                        >
-                          {deletingId === row.id ? "Removing..." : "Remove"}
-                        </button>
+                        <div style={rowActionStackStyle}>
+                          <button
+                            type="button"
+                            style={miniButtonStyle}
+                            onClick={() => generateActionFromCalibration(row)}
+                          >
+                            Generate Action
+                          </button>
+                          <button
+                            type="button"
+                            style={dangerButtonStyle}
+                            onClick={() => void removeCalibration(row)}
+                            disabled={deletingId === row.id}
+                          >
+                            {deletingId === row.id ? "Removing..." : "Remove"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1397,6 +1457,13 @@ const miniButtonStyle: CSSProperties = {
   fontWeight: 700,
   fontSize: "12px",
   cursor: "pointer",
+};
+
+const rowActionStackStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+  alignItems: "center",
 };
 
 const dangerButtonStyle: CSSProperties = {

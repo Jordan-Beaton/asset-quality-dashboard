@@ -26,10 +26,12 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Asset Reports now follows the Quality-style saved reports filter pattern with search, Show/Hide Filters, year filter, Clear Filters, and filtered report counts.
 - Asset Dashboard KPI cards now drill into related Asset workspaces, and Asset Dashboard, Calibration, Inspection, Maintenance, and Reports use the shared IMS top meta/status row.
 - Asset Inspection and Maintenance registers now use compact HSE Observation-style tables with shared filter panels, quick search, smaller Show/Hide Filters controls, filtered counts, row-click detail scroll, and linked Action controls preserved.
+- Asset create/edit/delete/upload/action-generation handlers now include page-level permission guards across the main Asset register, Calibration, Inspection, Maintenance, Asset Actions, Asset People, and Asset Reports.
+- Asset Calibration now generates linked central Action Management records through the same `/actions` prefill route used by Asset Inspection and Maintenance.
 
 # In Progress
 
-- Asset Management visual QA, permission hardening, and remaining low-risk primitive migration after the latest standardisation pass.
+- Asset Management Vercel workflow QA, mobile register review, role-based spot checks, and remaining low-risk primitive migration after the latest action-link and permission hardening passes.
 - HSE report parity with Quality Reports.
 - HSE AINM register polish and detail-scroll behavior.
 - HSE inspection PDF output consistency.
@@ -55,7 +57,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - HSE Observation submit state needs verification so it changes to Submitted rather than remaining Submitting.
 - HSE inspection PDFs need consistent header/footer and aligned tables.
 - PTW exists but is parked/work in progress.
-- Asset Management is closer to Quality/HSE after dashboard drill-down, top meta/status, reports filtering cleanup, and Inspection/Maintenance register compaction, but still needs Vercel workflow QA, mobile register review, and button-level permission checks.
+- Asset Management is closer to Quality/HSE after dashboard drill-down, top meta/status, reports filtering cleanup, Inspection/Maintenance register compaction, and page-level permission guards, but still needs Vercel workflow QA, mobile register review, and role-based spot checks.
 - Some pages still use local style constants instead of `ImsPrimitives`.
 - Risk Management exists as shell/functionality but needs review for maturity and consistency.
 
@@ -65,7 +67,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 2. Audit and harden button-level permissions across critical modules: Admin, Documents, Actions, Quality, HSE, and Assets.
 3. Fix Document Control rejection-field persistence and approve/review cleanup behavior.
 4. Review Document Control up-rev behavior to protect revision files, dates, comments, and current-revision archiving.
-5. Verify Asset Management on Vercel with real data: Dashboard drill-downs, Register detail scroll, Calibration, compact Inspection/Maintenance registers, Reports, uploads, PDFs, and central Action links.
+5. Verify Asset Management on Vercel with real data: Dashboard drill-downs, Register detail scroll, Calibration, compact Inspection/Maintenance registers, Reports, uploads, PDFs, central Action links, and role-based permission behavior.
 6. Bring HSE Reports fully in line with Quality Reports, including saved reports behavior and executive summary in PDFs.
 7. Polish AINM register behavior: Show Filters, Classification column, Accident/Incident filter, Select Type default, and detail-panel scroll.
 8. Verify HSE Observation public/mobile submit flow and register linkage to Action Management.
@@ -113,7 +115,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Summary: Asset module routes and records exist, including dashboard, register, calibration, inspection, maintenance, actions, people, reports, field route, and asset document ID support. Asset Dashboard drill-downs, shared top meta/status rows, compact Inspection/Maintenance registers, Inspection/Maintenance detail-scroll behavior, and Asset Reports saved-report filtering now align more closely with Quality/HSE.
 - Outstanding Actions:
   - Verify Asset workflows on Vercel with real data, especially uploads, PDFs, compact Inspection/Maintenance registers, row-to-detail scroll, and dashboard/register drill-downs.
-  - Audit create/edit/delete/upload/action-generation permissions across Asset pages.
+  - Spot-check create/edit/read-only permission behavior across Asset pages after deployment.
   - Continue low-risk migration of remaining local Asset panel/button/table styles toward shared IMS primitives.
   - Review mobile behavior of the compact Inspection/Maintenance registers after real-data testing.
   - Keep asset-specific document numbering compatible with Document Control.

@@ -833,6 +833,7 @@ function ActionsPageContent() {
   const prefillLinkedInspectionNumber = searchParams.get("linked_inspection_number")?.trim() || "";
   const prefillLinkedMaintenanceId = searchParams.get("linked_maintenance_id")?.trim() || "";
   const prefillLinkedMaintenanceNumber = searchParams.get("linked_maintenance_number")?.trim() || "";
+  const prefillLinkedCalibrationId = searchParams.get("linked_calibration_id")?.trim() || "";
   const prefillLinkedNcrId = searchParams.get("linked_ncr_id")?.trim() || "";
   const prefillLinkedNcrNumber = searchParams.get("linked_ncr_number")?.trim() || "";
   const prefillLinkedMocId = searchParams.get("linked_moc_id")?.trim() || "";
@@ -857,6 +858,7 @@ function ActionsPageContent() {
       prefillLinkedInspectionNumber ||
       prefillLinkedMaintenanceId ||
       prefillLinkedMaintenanceNumber ||
+      prefillLinkedCalibrationId ||
       prefillLinkedNcrId ||
       prefillLinkedNcrNumber ||
       prefillLinkedMocId ||
@@ -1312,6 +1314,7 @@ function ActionsPageContent() {
       !prefillLinkedAssetId &&
       !prefillLinkedInspectionId &&
       !prefillLinkedMaintenanceId &&
+      !prefillLinkedCalibrationId &&
       !prefillLinkedNcrId &&
       !prefillLinkedNcrNumber &&
       !prefillLinkedMocId &&
@@ -1352,6 +1355,7 @@ function ActionsPageContent() {
         linked_inspection_number: prefillLinkedInspectionNumber || current.linked_inspection_number,
         linked_maintenance_id: prefillLinkedMaintenanceId || current.linked_maintenance_id,
         linked_maintenance_number: prefillLinkedMaintenanceNumber || current.linked_maintenance_number,
+        linked_calibration_id: prefillLinkedCalibrationId || current.linked_calibration_id,
         linked_ncr_id: prefillLinkedNcrId || current.linked_ncr_id,
         linked_ncr_number: prefillLinkedNcrNumber || current.linked_ncr_number,
         linked_moc_id: prefillLinkedMocId || current.linked_moc_id,
@@ -1383,6 +1387,7 @@ function ActionsPageContent() {
     prefillLinkedAssetId,
     prefillLinkedInspectionId,
     prefillLinkedInspectionNumber,
+    prefillLinkedCalibrationId,
     prefillLinkedMaintenanceId,
     prefillLinkedMaintenanceNumber,
     prefillLinkedMocId,

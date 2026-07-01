@@ -5,6 +5,7 @@ import type { CSSProperties, FormEvent } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ImsButton, ImsFilterPanel, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
 
@@ -352,6 +353,7 @@ function getSnapshotSummary(report: AssetMonthlyReport) {
 }
 
 export default function AssetReportsPage() {
+  const imsPermissions = useImsPermissions();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [calibrationRecords, setCalibrationRecords] = useState<AssetCalibrationRecord[]>([]);
   const [inspectionRecords, setInspectionRecords] = useState<AssetInspectionRecord[]>([]);
@@ -645,7 +647,29 @@ export default function AssetReportsPage() {
     setEditingId(null);
   }
 
+  function hasCreateAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }
+
+  function hasEditAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }
+
+  function requireCreateAccess(actionLabel: string) {
+    if (hasCreateAccess()) return true;
+    setMessage(`Permission required: create access is needed to ${actionLabel}.`);
+    return false;
+  }
+
+  function requireEditAccess(actionLabel: string) {
+    if (hasEditAccess()) return true;
+    setMessage(`Permission required: edit access is needed to ${actionLabel}.`);
+    return false;
+  }
+
   function handleEdit(report: AssetMonthlyReport) {
+    if (!requireEditAccess("edit saved asset reports")) return;
+
     setEditingId(report.id);
     setForm(parseReportFormFromSavedReport(report));
     setMessage(`Editing asset report: ${report.month_label}`);
@@ -653,6 +677,8 @@ export default function AssetReportsPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!requireEditAccess("delete saved asset reports")) return;
+
     const confirmed = window.confirm("Are you sure you want to delete this asset report?");
     if (!confirmed) return;
 
@@ -673,6 +699,12 @@ export default function AssetReportsPage() {
 
   async function saveMonthlyReport(e: FormEvent) {
     e.preventDefault();
+
+    if (editingId) {
+      if (!requireEditAccess("update saved asset reports")) return;
+    } else if (!requireCreateAccess("create saved asset reports")) {
+      return;
+    }
 
     if (!Number.isFinite(selectedYear) || selectedYear < 2000) {
       setMessage("Enter a valid report year.");

@@ -6,7 +6,8 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import QRCode from "qrcode";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
-import { ImsTabs } from "../../src/components/ImsPrimitives";
+import { ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
@@ -425,6 +426,7 @@ async function createSignedFileUrl(path: string) {
 }
 
 function AssetsPageContent() {
+  const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "";
@@ -1126,8 +1128,30 @@ function AssetsPageContent() {
   const uniqueLocations = [...new Set(assets.map((a) => a.location).filter(Boolean))];
   const uniqueOwners = [...new Set(assets.map((a) => a.owner).filter(Boolean))];
 
+  function hasCreateAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }
+
+  function hasEditAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }
+
+  function requireCreateAccess(actionLabel: string) {
+    if (hasCreateAccess()) return true;
+    setMessage(`Permission required: create access is needed to ${actionLabel}.`);
+    return false;
+  }
+
+  function requireEditAccess(actionLabel: string) {
+    if (hasEditAccess()) return true;
+    setMessage(`Permission required: edit access is needed to ${actionLabel}.`);
+    return false;
+  }
+
   async function addAsset(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!requireCreateAccess("create assets")) return;
 
     if (!form.name.trim()) {
       setMessage("Asset name is required.");
@@ -1199,6 +1223,8 @@ function AssetsPageContent() {
       return;
     }
 
+    if (!requireEditAccess("update assets")) return;
+
     if (!detailForm.name.trim()) {
       setMessage("Asset name is required.");
       return;
@@ -1269,6 +1295,8 @@ function AssetsPageContent() {
       setMessage("Select an asset first.");
       return;
     }
+
+    if (!requireEditAccess("delete assets")) return;
 
     const confirmDelete = window.confirm("Delete this asset?");
     if (!confirmDelete) return;
@@ -1346,6 +1374,11 @@ function AssetsPageContent() {
   }
 
   async function handleImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireEditAccess("upload asset images")) {
+      event.target.value = "";
+      return;
+    }
+
     if (!selectedAsset) {
       setMessage("Select an asset first.");
       return;
@@ -1398,6 +1431,8 @@ function AssetsPageContent() {
       return;
     }
 
+    if (!requireEditAccess("remove asset images")) return;
+
     try {
       if (selectedQuality.image_path) {
         await supabase.storage.from(STORAGE_BUCKET).remove([selectedQuality.image_path]);
@@ -1424,6 +1459,7 @@ function AssetsPageContent() {
   }
 
   function addLinkedNcr() {
+    if (!requireEditAccess("change asset quality links")) return;
     if (!qualityDraft.selectedNcrToAdd) return;
 
     setQualityDraft((prev) => {
@@ -1440,6 +1476,7 @@ function AssetsPageContent() {
   }
 
   function addLinkedAction() {
+    if (!requireEditAccess("change asset quality links")) return;
     if (!qualityDraft.selectedActionToAdd) return;
 
     setQualityDraft((prev) => {
@@ -1456,6 +1493,8 @@ function AssetsPageContent() {
   }
 
   function removeLinkedNcr(id: string) {
+    if (!requireEditAccess("change asset quality links")) return;
+
     setQualityDraft((prev) => ({
       ...prev,
       linked_ncrs: prev.linked_ncrs.filter((item) => item !== id),
@@ -1463,6 +1502,8 @@ function AssetsPageContent() {
   }
 
   function removeLinkedAction(id: string) {
+    if (!requireEditAccess("change asset quality links")) return;
+
     setQualityDraft((prev) => ({
       ...prev,
       linked_actions: prev.linked_actions.filter((item) => item !== id),
@@ -1470,6 +1511,8 @@ function AssetsPageContent() {
   }
 
   function addCalibrationRecord() {
+    if (!requireEditAccess("change asset calibration references")) return;
+
     setQualityDraft((prev) => ({
       ...prev,
       calibration_records: [...prev.calibration_records, createEmptyUploadedRecord("cal")],
@@ -1477,6 +1520,8 @@ function AssetsPageContent() {
   }
 
   function addInspectionRecord() {
+    if (!requireEditAccess("change asset inspection references")) return;
+
     setQualityDraft((prev) => ({
       ...prev,
       inspection_records: [...prev.inspection_records, createEmptyUploadedRecord("insp")],
@@ -1502,6 +1547,11 @@ function AssetsPageContent() {
   }
 
   async function handleCalibrationFileUpload(recordId: string, event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireEditAccess("upload calibration files")) {
+      event.target.value = "";
+      return;
+    }
+
     if (!selectedAsset) {
       setMessage("Select an asset first.");
       return;
@@ -1538,6 +1588,11 @@ function AssetsPageContent() {
   }
 
   async function handleInspectionFileUpload(recordId: string, event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireEditAccess("upload inspection files")) {
+      event.target.value = "";
+      return;
+    }
+
     if (!selectedAsset) {
       setMessage("Select an asset first.");
       return;
@@ -1664,6 +1719,8 @@ function AssetsPageContent() {
   }
 
   function removeCalibrationRecord(id: string) {
+    if (!requireEditAccess("change asset calibration references")) return;
+
     setQualityDraft((prev) => ({
       ...prev,
       calibration_records: prev.calibration_records.filter((record) => record.id !== id),
@@ -1671,6 +1728,8 @@ function AssetsPageContent() {
   }
 
   function removeInspectionRecord(id: string) {
+    if (!requireEditAccess("change asset inspection references")) return;
+
     setQualityDraft((prev) => ({
       ...prev,
       inspection_records: prev.inspection_records.filter((record) => record.id !== id),
@@ -1682,6 +1741,8 @@ function AssetsPageContent() {
       setMessage("Select an asset first.");
       return;
     }
+
+    if (!requireEditAccess("save asset quality details")) return;
 
     const asset = selectedAsset;
     setIsSavingQuality(true);
@@ -1940,15 +2001,15 @@ function AssetsPageContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
-        <Link href="/assets/dashboard" style={backLinkStyle}>
-          ← Back to Dashboard
-        </Link>
-
-        <div style={statusBannerStyle}>
-          <strong>Status:</strong> {message}
-        </div>
-      </div>
+      <ImsTopMetaRow
+        backHref="/assets/dashboard"
+        backLabel="Back to Dashboard"
+        status={
+          <>
+            <strong>Status:</strong> {message}
+          </>
+        }
+      />
 
       <ImsTabs<AssetWorkspaceView>
         tabs={[
@@ -3654,34 +3715,6 @@ const heroMetaCompactValueStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 700,
   lineHeight: 1.35,
-};
-
-const topMetaRowStyle: CSSProperties = {
-  marginBottom: 20,
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  flexWrap: "wrap",
-  alignItems: "center",
-  background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
-  borderRadius: "16px",
-  padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-
-const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
-  fontWeight: 700,
-  textDecoration: "none",
-};
-
-const statusBannerStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "12px",
-  padding: "12px 16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
 };
 
 const statsGridStyle: CSSProperties = {

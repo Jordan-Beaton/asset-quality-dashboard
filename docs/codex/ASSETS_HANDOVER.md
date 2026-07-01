@@ -21,10 +21,12 @@ Asset Management exists but its UI layout has lagged behind Quality and HSE. Fut
 - Asset-specific document numbering support exists in Document Control.
 - Asset Reports now has the Quality-style saved reports search, Show/Hide Filters pattern, year filter, Clear Filters action, and filtered report count.
 - Asset Dashboard KPI cards now drill into the relevant Asset workspaces.
-- Asset Dashboard, Calibration, Inspection, Maintenance, and Reports use the shared IMS top meta/status row.
+- Asset Dashboard, Register, Calibration, Inspection, Maintenance, Asset Actions, Asset People, and Reports use the shared IMS top meta/status row.
 - Asset Inspection and Maintenance retain row-click detail-panel scroll and linked central Action generation.
+- Asset Calibration now has linked central Action generation from the calibration register, and `/actions` accepts the calibration link prefill.
 - Asset Inspection and Maintenance registers now use compact HSE Observation-style table layouts with shared IMS filter panels, quick search, filtered counts, smaller Show/Hide Filters controls, and row-click detail behavior.
 - Asset Maintenance debug console output was removed from the save flow.
+- Asset Dashboard/Register, Calibration, Inspection, Maintenance, Asset Actions, Asset People, and Asset Reports now have page-level permission guards around key create/edit/delete/upload/action-generation mutation handlers, supplementing the AppShell click/submit guards.
 
 ## Layout Direction
 
@@ -36,10 +38,10 @@ Asset Management exists but its UI layout has lagged behind Quality and HSE. Fut
 ## Recommended Next Actions
 
 1. Verify Asset Dashboard, Register, Calibration, Inspection, Maintenance, and Reports on Vercel with real data.
-2. Audit Asset button-level permissions for create, edit, delete, upload, and action-generation controls.
-3. Confirm linked Asset Inspection/Maintenance/Calibration action creation opens central Action Management with the correct source fields.
-4. Review mobile Asset Inspection and Maintenance registers after the table conversion, especially horizontal scroll, filter search, and detail-panel scroll.
-5. Continue low-risk migration of remaining local Asset panel/button/table styles toward shared primitives.
+2. Verify linked Asset Inspection/Maintenance/Calibration action creation on Vercel with real records, including source fields and return/search behavior in central Action Management.
+3. Review mobile Asset Inspection and Maintenance registers on device/browser after the table conversion, especially horizontal scroll, filter search, and detail-panel scroll.
+4. Continue low-risk migration of remaining local Asset panel/button/table styles toward shared primitives.
+5. Run a role-based Vercel spot check for Asset create/edit/read-only users after real-data workflow QA.
 
 ## Document Numbering Link
 

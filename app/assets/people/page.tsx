@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
+import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
 
@@ -49,6 +50,7 @@ function statusTone(active: boolean) {
 }
 
 function PeoplePageContent() {
+  const imsPermissions = useImsPermissions();
   const [people, setPeople] = useState<AssetPerson[]>([]);
   const [message, setMessage] = useState("Loading people...");
   const [lastRefreshed, setLastRefreshed] = useState("");
@@ -107,8 +109,30 @@ function PeoplePageContent() {
   const inactiveCount = people.length - activeCount;
   const latestPerson = people[0] || null;
 
+  function hasCreateAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }
+
+  function hasEditAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }
+
+  function requireCreateAccess(actionLabel: string) {
+    if (hasCreateAccess()) return true;
+    setMessage(`Permission required: create access is needed to ${actionLabel}.`);
+    return false;
+  }
+
+  function requireEditAccess(actionLabel: string) {
+    if (hasEditAccess()) return true;
+    setMessage(`Permission required: edit access is needed to ${actionLabel}.`);
+    return false;
+  }
+
   async function createPerson(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!requireCreateAccess("add Asset people")) return;
 
     if (!newPerson.name.trim()) {
       setMessage("Name is required.");
@@ -141,6 +165,7 @@ function PeoplePageContent() {
 
   async function saveDetail() {
     if (!selectedPerson) return;
+    if (!requireEditAccess("update Asset people")) return;
 
     if (!detailForm.name.trim()) {
       setMessage("Name is required.");
@@ -172,6 +197,7 @@ function PeoplePageContent() {
 
   async function toggleSelectedPerson(active: boolean) {
     if (!selectedPerson) return;
+    if (!requireEditAccess("change Asset people status")) return;
 
     try {
       setIsToggling(true);
@@ -203,14 +229,11 @@ function PeoplePageContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
-        <Link href="/assets" style={backLinkStyle}>
-          ← Back to Assets
-        </Link>
-        <div style={statusBannerStyle}>
-          <strong>Status:</strong> {message}
-        </div>
-      </div>
+      <ImsTopMetaRow
+        backHref="/assets"
+        backLabel="Back to Assets"
+        status={<><strong>Status:</strong> {message}</>}
+      />
 
       <section style={stackedGridStyle}>
         <SectionCard
@@ -489,35 +512,6 @@ export default function AssetPeoplePage() {
     </Suspense>
   );
 }
-
-const topMetaRowStyle: CSSProperties = {
-  marginBottom: 20,
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  flexWrap: "wrap",
-  alignItems: "center",
-  background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
-  borderRadius: "16px",
-  padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-
-const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
-  fontWeight: 700,
-  textDecoration: "none",
-};
-
-const statusBannerStyle: CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #dbe7f3",
-  color: "#0f172a",
-  padding: "10px 14px",
-  borderRadius: "14px",
-  fontSize: "14px",
-};
 
 const stackedGridStyle: CSSProperties = {
   display: "grid",

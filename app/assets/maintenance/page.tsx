@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import {
@@ -186,6 +187,7 @@ async function uploadMaintenanceFile(assetId: string, file: File) {
 }
 
 function MaintenancePageContent() {
+  const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
   const linkedAssetParam = searchParams.get("asset")?.trim() || "";
   const isFieldMode = Boolean(linkedAssetParam);
@@ -363,8 +365,30 @@ function MaintenancePageContent() {
     setDueStatusFilter(status);
   }
 
+  function hasCreateAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }
+
+  function hasEditAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }
+
+  function requireCreateAccess(actionLabel: string) {
+    if (hasCreateAccess()) return true;
+    setMessage(`Permission required: create access is needed to ${actionLabel}.`);
+    return false;
+  }
+
+  function requireEditAccess(actionLabel: string) {
+    if (hasEditAccess()) return true;
+    setMessage(`Permission required: edit access is needed to ${actionLabel}.`);
+    return false;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!requireCreateAccess("create maintenance records")) return;
 
     if (
       !newMaintenance.asset_id ||
@@ -448,6 +472,8 @@ function MaintenancePageContent() {
   }
 
   async function removeRecord(record: AssetMaintenanceRecord) {
+    if (!requireEditAccess("remove maintenance records")) return;
+
     const confirmed = window.confirm("Remove this maintenance record?");
     if (!confirmed) return;
 
@@ -469,6 +495,8 @@ function MaintenancePageContent() {
   }
 
   function generateActionFromMaintenance(record: AssetMaintenanceRecord) {
+    if (!requireCreateAccess("generate linked Asset actions")) return;
+
     const asset = assetMap.get(record.asset_id) || null;
     const assetLabel = asset?.asset_code || asset?.name || "Asset maintenance";
     const title = `Maintenance follow-up - ${record.maintenance_number || assetLabel}`;
@@ -487,6 +515,7 @@ function MaintenancePageContent() {
 
   async function saveRecordDetail() {
     if (!selectedRecord) return;
+    if (!requireEditAccess("update maintenance records")) return;
 
     if (!detailForm.asset_id || !detailForm.maintenance_date || !detailForm.carried_out_by.trim() || !detailForm.description.trim()) {
       setMessage("Please complete: Asset, Maintenance Date, Carried Out By, and Work Completed / Description.");

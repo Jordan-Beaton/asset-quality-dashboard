@@ -3,6 +3,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
+import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -222,6 +224,7 @@ function countByOwner(actions: ActionItem[]) {
 }
 
 export default function AssetActionsPage() {
+  const imsPermissions = useImsPermissions();
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
@@ -459,8 +462,20 @@ export default function AssetActionsPage() {
     });
   }, [actions, ownerFilter, pressureFilter, priorityFilter, search, statusFilter]);
 
+  function hasCreateAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }
+
+  function requireCreateAccess(actionLabel: string) {
+    if (hasCreateAccess()) return true;
+    setMessage(`Permission required: create access is needed to ${actionLabel}.`);
+    return false;
+  }
+
   async function createAction(event: React.FormEvent) {
     event.preventDefault();
+    if (!requireCreateAccess("create Asset actions")) return;
+
     if (!form.title.trim()) {
       setMessage("Action title is required.");
       return;
@@ -674,13 +689,12 @@ export default function AssetActionsPage() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
-        <Link href="/assets/dashboard" style={backLinkStyle}>← Back to Dashboard</Link>
-        <div style={topMetaActionsStyle}>
-          <Link href="/actions?department=Assets" style={primaryLinkStyle}>Open Central Actions</Link>
-          <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
-        </div>
-      </div>
+      <ImsTopMetaRow
+        backHref="/assets/dashboard"
+        backLabel="Back to Dashboard"
+        actions={<Link href="/actions?department=Assets" style={primaryLinkStyle}>Open Central Actions</Link>}
+        status={<><strong>Status:</strong> {message}</>}
+      />
 
       <nav style={viewNavStyle}>
         {viewTabs.map((tab) => (
@@ -976,22 +990,6 @@ function MiniFocus({ label, value, tone, onClick }: { label: string; value: numb
   return <button type="button" style={{ ...miniFocusStyle, borderTop: `4px solid ${colours[tone]}` }} onClick={onClick}><span>{label}</span><strong>{value}</strong></button>;
 }
 
-const topMetaRowStyle: CSSProperties = {
-  marginBottom: 20,
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  flexWrap: "wrap",
-  alignItems: "center",
-  background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
-  borderRadius: "16px",
-  padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-const topMetaActionsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
-const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const primaryLinkStyle: CSSProperties = { background: "#3A9B98", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
 const smallLinkStyle: CSSProperties = { ...primaryLinkStyle, padding: "8px 10px", fontSize: 12 };
 const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 };

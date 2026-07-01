@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import {
@@ -191,6 +192,7 @@ async function uploadInspectionFile(assetId: string, file: File) {
 }
 
 function InspectionPageContent() {
+  const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
   const linkedAssetParam = searchParams.get("asset")?.trim() || "";
   const isFieldMode = Boolean(linkedAssetParam);
@@ -371,8 +373,30 @@ function InspectionPageContent() {
     setDueStatusFilter(status);
   }
 
+  function hasCreateAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }
+
+  function hasEditAccess() {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }
+
+  function requireCreateAccess(actionLabel: string) {
+    if (hasCreateAccess()) return true;
+    setMessage(`Permission required: create access is needed to ${actionLabel}.`);
+    return false;
+  }
+
+  function requireEditAccess(actionLabel: string) {
+    if (hasEditAccess()) return true;
+    setMessage(`Permission required: edit access is needed to ${actionLabel}.`);
+    return false;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!requireCreateAccess("create inspection records")) return;
 
     if (!form.assetId || !form.inspectionDate || !form.inspector.trim()) {
       setMessage("Please complete: Asset, Inspection Date, and Carried Out By.");
@@ -453,6 +477,8 @@ function InspectionPageContent() {
   }
 
   async function removeRecord(record: AssetInspectionRecord) {
+    if (!requireEditAccess("remove inspection records")) return;
+
     const confirmed = window.confirm("Remove this inspection record?");
     if (!confirmed) return;
 
@@ -474,6 +500,8 @@ function InspectionPageContent() {
   }
 
   function generateActionFromInspection(record: AssetInspectionRecord) {
+    if (!requireCreateAccess("generate linked Asset actions")) return;
+
     const asset = assetMap.get(record.asset_id) || null;
     const assetLabel = asset?.asset_code || asset?.name || "Asset inspection";
     const title = `Inspection follow-up - ${record.inspection_number || assetLabel}`;
@@ -496,6 +524,8 @@ function InspectionPageContent() {
 
   async function saveRecordDetail() {
     if (!selectedRecord) return;
+    if (!requireEditAccess("update inspection records")) return;
+
     if (!detailForm.assetId || !detailForm.inspectionDate || !detailForm.inspector.trim()) {
       setMessage("Please complete: Asset, Inspection Date, and Carried Out By.");
       return;
