@@ -683,6 +683,7 @@ function AuditsPageContent() {
   const programmeSectionRef = useRef<HTMLDivElement | null>(null);
   const auditDetailPanelRef = useRef<HTMLDivElement | null>(null);
   const openFindingEditPanelRef = useRef<HTMLDivElement | null>(null);
+  const findingSaveTimersRef = useRef<Record<string, number>>({});
 
   const computedAuditNumber = useMemo(
     () => buildNextAuditNumber(form.audit_type, form.audit_date, audits),
@@ -853,6 +854,12 @@ function AuditsPageContent() {
     void (async () => {
       await Promise.all([loadAudits(), loadLinkOptions(), loadPeopleOptions()]);
     })();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      Object.values(findingSaveTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+    };
   }, []);
 
   useEffect(() => {
@@ -1739,7 +1746,7 @@ function AuditsPageContent() {
     setMessage(`${reference} raised against ${selectedAudit.audit_number}.`);
   }
 
-  async function updateFindingField(
+  function updateFindingField(
     findingId: string,
     field: keyof FindingRecord,
     value: string
@@ -1748,29 +1755,50 @@ function AuditsPageContent() {
     if (!current) return;
 
     const payload: Record<string, unknown> = {};
+    const localUpdates: Partial<FindingRecord> = {};
 
     if (field === "status") {
       const nextStatus = value as FindingStatus;
-      payload.status = nextStatus;
-      payload.closure_date =
+      const nextClosureDate =
         nextStatus === "Closed"
           ? current.closure_date || new Date().toISOString().slice(0, 10)
-          : null;
+          : "";
+      payload.status = nextStatus;
+      payload.closure_date = nextClosureDate || null;
+      localUpdates.status = nextStatus;
+      localUpdates.closure_date = nextClosureDate;
     } else if (field === "category") {
-      payload.category = value as FindingSeverity;
+      const nextCategory = value as FindingSeverity;
+      payload.category = nextCategory;
+      localUpdates.category = nextCategory;
     } else {
       payload[field] = value || null;
+      localUpdates[field] = value as never;
     }
 
-    const { error } = await supabase.from("audit_findings").update(payload).eq("id", findingId);
+    setFindings((currentFindings) =>
+      currentFindings.map((finding) =>
+        finding.id === findingId ? { ...finding, ...localUpdates } : finding
+      )
+    );
 
-    if (error) {
-      setMessage(`Finding update failed: ${error.message}`);
-      return;
-    }
+    const timerKey = `${findingId}:${String(field)}`;
+    const existingTimer = findingSaveTimersRef.current[timerKey];
+    if (existingTimer) window.clearTimeout(existingTimer);
 
-    await loadAudits(false);
-    setMessage("Finding updated.");
+    findingSaveTimersRef.current[timerKey] = window.setTimeout(() => {
+      void (async () => {
+        const { error } = await supabase.from("audit_findings").update(payload).eq("id", findingId);
+        delete findingSaveTimersRef.current[timerKey];
+
+        if (error) {
+          setMessage(`Finding update failed: ${error.message}`);
+          return;
+        }
+
+        setMessage("Finding changes saved.");
+      })();
+    }, field === "category" || field === "status" || field === "due_date" || field === "closure_date" ? 150 : 700);
   }
 
   async function saveOpenFindingDetail() {
