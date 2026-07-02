@@ -187,16 +187,18 @@ export function ImsFilterPanel({
         ) : (
           <div />
         )}
-        <ImsButton
-          variant={showFilters ? "secondary" : "primary"}
-          onClick={onToggleFilters}
-          style={{ justifySelf: "end", minWidth: "132px" }}
-        >
-          {showFilters ? "Hide Filters" : "Show Filters"}
-        </ImsButton>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+          {actions}
+          <ImsButton
+            variant={showFilters ? "secondary" : "primary"}
+            onClick={onToggleFilters}
+            style={{ minWidth: "132px" }}
+          >
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </ImsButton>
+        </div>
       </div>
       {showFilters ? <div style={imsFilterGridStyle}>{children}</div> : null}
-      {actions ? <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>{actions}</div> : null}
     </div>
   );
 }
