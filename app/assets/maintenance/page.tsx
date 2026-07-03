@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import QRCode from "qrcode";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
@@ -205,6 +206,7 @@ function MaintenancePageContent() {
   const [registerSearch, setRegisterSearch] = useState("");
   const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAssetParam));
   const [activeView, setActiveView] = useState<MaintenanceWorkspaceView>("dashboard");
+  const [fieldQrDataUrl, setFieldQrDataUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [openingId, setOpeningId] = useState("");
@@ -214,6 +216,21 @@ function MaintenancePageContent() {
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  useEffect(() => {
+    const requestedView = searchParams.get("view");
+    if (requestedView === "create" || requestedView === "register" || requestedView === "dashboard") {
+      setActiveView(requestedView);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = `${window.location.origin}/assets/maintenance/field`;
+    QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#3A9B98", light: "#ffffff" } })
+      .then(setFieldQrDataUrl)
+      .catch(() => setFieldQrDataUrl(""));
   }, []);
 
   useEffect(() => {
@@ -605,6 +622,7 @@ function MaintenancePageContent() {
       />
 
       {activeView === "dashboard" ? (
+      <>
       <section style={attentionGridStyle}>
         <QualityKpiCard
           title="Overdue"
@@ -625,6 +643,42 @@ function MaintenancePageContent() {
           onClick={() => applyMaintenanceKpiFilter("")}
         />
       </section>
+
+      <section style={dashboardPanelGridStyle}>
+        <SectionCard
+          title="Mobile QR Access"
+          subtitle="Scan to open the mobile Asset Maintenance page, choose an asset, and complete the field maintenance entry at point of use."
+        >
+          <div style={qrPanelBodyStyle}>
+            {fieldQrDataUrl ? (
+              <img src={fieldQrDataUrl} alt="Asset maintenance field access QR code" style={qrImageStyle} />
+            ) : (
+              <div style={qrPlaceholderStyle}>Generating QR code...</div>
+            )}
+            <div style={qrCopyStackStyle}>
+              <div style={qrTitleStyle}>Field maintenance entry</div>
+              <div style={helperTextStyle}>
+                The mobile route uses the same Asset Maintenance save flow and keeps the maintenance history against the selected asset.
+              </div>
+              <Link href="/assets/maintenance/field" style={secondaryLinkButtonStyle}>
+                Open mobile maintenance page
+              </Link>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Register Standard"
+          subtitle="Maintenance rows drill into the detail panel, with due status, type, evidence links, and linked action generation kept in the selected record."
+        >
+          <div style={dashboardFeatureGridStyle}>
+            <SummaryTile label="Current Records" value={String(records.length)} />
+            <SummaryTile label="Overdue" value={String(overdueCount)} />
+            <SummaryTile label="Due Soon" value={String(dueSoonCount)} />
+          </div>
+        </SectionCard>
+      </section>
+      </>
       ) : null}
         </>
       )}
@@ -804,17 +858,27 @@ function MaintenancePageContent() {
             showFilters={showRegisterFilters}
             onToggleFilters={() => setShowRegisterFilters((prev) => !prev)}
             actions={
-              <ImsButton
-                variant="secondary"
-                onClick={() => {
-                  setRegisterSearch("");
-                  setAssetFilter("");
-                  setTypeFilter("");
-                  setDueStatusFilter("");
-                }}
-              >
-                Clear Filters
-              </ImsButton>
+              <div style={filterActionRowStyle}>
+                <ImsButton
+                  variant="primary"
+                  onClick={() => {
+                    setActiveView("create");
+                  }}
+                >
+                  Create Maintenance
+                </ImsButton>
+                <ImsButton
+                  variant="secondary"
+                  onClick={() => {
+                    setRegisterSearch("");
+                    setAssetFilter("");
+                    setTypeFilter("");
+                    setDueStatusFilter("");
+                  }}
+                >
+                  Clear Filters
+                </ImsButton>
+              </div>
             }
           >
             <Field label="Asset Filter">
@@ -856,7 +920,7 @@ function MaintenancePageContent() {
           </div>
 
           <div style={compactTableWrapStyle}>
-            <table style={{ ...imsTableStyle, minWidth: 1080 }}>
+            <table style={{ ...imsTableStyle, minWidth: 900 }}>
               <thead>
                 <tr>
                   <th style={imsTableHeadStyle}>Maintenance</th>
@@ -866,13 +930,12 @@ function MaintenancePageContent() {
                   <th style={imsTableHeadStyle}>Type</th>
                   <th style={imsTableHeadStyle}>Next Due</th>
                   <th style={imsTableHeadStyle}>Action</th>
-                  <th style={imsTableHeadStyle}>Controls</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={8} style={emptyTableCellStyle}>
+                    <td colSpan={7} style={emptyTableCellStyle}>
                       No maintenance records match the current filters.
                     </td>
                   </tr>
@@ -928,46 +991,6 @@ function MaintenancePageContent() {
                           </div>
                         </td>
                         <td style={imsTableCellStyle}>{record.action_required ? "Required" : "No"}</td>
-                        <td style={actionTableCellStyle}>
-                          <div style={tableActionRowStyle}>
-                            {record.action_required ? (
-                              <button
-                                type="button"
-                                style={actionLinkButtonStyle}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  generateActionFromMaintenance(record);
-                                }}
-                              >
-                                Generate Action
-                              </button>
-                            ) : null}
-                            {record.file_path ? (
-                              <button
-                                type="button"
-                                style={miniButtonStyle}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void openFile(record);
-                                }}
-                                disabled={openingId === record.id}
-                              >
-                                {openingId === record.id ? "Opening..." : "Open File"}
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              style={dangerButtonStyle}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                void removeRecord(record);
-                              }}
-                              disabled={deletingId === record.id}
-                            >
-                              {deletingId === record.id ? "Removing..." : "Remove"}
-                            </button>
-                          </div>
-                        </td>
                       </tr>
                     );
                   })
@@ -1320,6 +1343,83 @@ const attentionGridStyle: CSSProperties = {
   marginBottom: "20px",
 };
 
+const dashboardPanelGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(300px, 0.95fr) minmax(300px, 1.05fr)",
+  gap: "16px",
+  alignItems: "stretch",
+  marginBottom: "20px",
+};
+
+const qrPanelBodyStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "180px minmax(0, 1fr)",
+  gap: "18px",
+  alignItems: "center",
+};
+
+const qrImageStyle: CSSProperties = {
+  width: "170px",
+  height: "170px",
+  border: "1px solid #dbe3ef",
+  borderRadius: "14px",
+  padding: "8px",
+  background: "#ffffff",
+};
+
+const qrPlaceholderStyle: CSSProperties = {
+  width: "170px",
+  height: "170px",
+  border: "1px dashed #cbd5e1",
+  borderRadius: "14px",
+  background: "#f8fafc",
+  color: "#64748b",
+  display: "grid",
+  placeItems: "center",
+  textAlign: "center",
+  fontSize: "13px",
+  fontWeight: 700,
+};
+
+const qrCopyStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const qrTitleStyle: CSSProperties = {
+  fontSize: "18px",
+  fontWeight: 900,
+  color: "#0f172a",
+};
+
+const secondaryLinkButtonStyle: CSSProperties = {
+  display: "inline-flex",
+  width: "fit-content",
+  minHeight: "42px",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "10px",
+  background: "#e2e8f0",
+  color: "#0f172a",
+  textDecoration: "none",
+  fontSize: "14px",
+  fontWeight: 800,
+  padding: "10px 14px",
+};
+
+const dashboardFeatureGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+  gap: "12px",
+};
+
+const filterActionRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  alignItems: "center",
+};
+
 const fullWidthSectionStyle: CSSProperties = {
   marginBottom: "20px",
 };
@@ -1445,10 +1545,11 @@ const buttonRowStyle: CSSProperties = {
 };
 
 const buttonRowStyleTight: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  display: "flex",
   gap: "10px",
-  alignItems: "stretch",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  flexWrap: "wrap",
 };
 
 const primaryButtonStyle: CSSProperties = {
@@ -1460,6 +1561,8 @@ const primaryButtonStyle: CSSProperties = {
   fontWeight: 800,
   fontSize: "13px",
   cursor: "pointer",
+  minHeight: "40px",
+  whiteSpace: "nowrap",
 };
 
 const secondaryButtonStyle: CSSProperties = {
@@ -1471,6 +1574,8 @@ const secondaryButtonStyle: CSSProperties = {
   fontWeight: 700,
   fontSize: "12px",
   cursor: "pointer",
+  minHeight: "38px",
+  whiteSpace: "nowrap",
 };
 
 const miniButtonStyle: CSSProperties = {
@@ -1482,6 +1587,8 @@ const miniButtonStyle: CSSProperties = {
   fontWeight: 700,
   fontSize: "12px",
   cursor: "pointer",
+  minHeight: "38px",
+  whiteSpace: "nowrap",
 };
 
 const actionLinkButtonStyle: CSSProperties = {
@@ -1493,6 +1600,8 @@ const actionLinkButtonStyle: CSSProperties = {
   fontWeight: 700,
   fontSize: "12px",
   cursor: "pointer",
+  minHeight: "38px",
+  whiteSpace: "nowrap",
 };
 
 const dangerButtonStyle: CSSProperties = {
@@ -1504,6 +1613,8 @@ const dangerButtonStyle: CSSProperties = {
   fontWeight: 700,
   fontSize: "12px",
   cursor: "pointer",
+  minHeight: "38px",
+  whiteSpace: "nowrap",
 };
 
 const attentionCardStyle: CSSProperties = {
@@ -1570,18 +1681,6 @@ const primaryTableCellStyle: CSSProperties = {
   color: imsColours.brandDark,
 };
 
-const actionTableCellStyle: CSSProperties = {
-  ...imsTableCellStyle,
-  minWidth: "250px",
-};
-
-const tableActionRowStyle: CSSProperties = {
-  display: "flex",
-  gap: "8px",
-  flexWrap: "wrap",
-  alignItems: "center",
-};
-
 const tableSubTextStyle: CSSProperties = {
   marginTop: "3px",
   color: imsColours.muted,
@@ -1643,7 +1742,7 @@ const detailFooterBarStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: "12px",
   flexWrap: "wrap",
-  alignItems: "center",
+  alignItems: "flex-end",
   borderTop: "1px solid #e2e8f0",
   paddingTop: "16px",
 };

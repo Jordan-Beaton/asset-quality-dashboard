@@ -257,8 +257,8 @@ function getPermissionTargetFromHref(href: string): PermissionTarget | null {
   if (href === "/assets/dashboard") return { moduleKey: "assets", areaKey: "dashboard" };
   if (href === "/assets") return { moduleKey: "assets", areaKey: "register" };
   if (href === "/assets/calibration") return { moduleKey: "assets", areaKey: "calibration" };
-  if (href === "/assets/inspection") return { moduleKey: "assets", areaKey: "inspection" };
-  if (href === "/assets/maintenance") return { moduleKey: "assets", areaKey: "maintenance" };
+  if (href.startsWith("/assets/inspection")) return { moduleKey: "assets", areaKey: "inspection" };
+  if (href.startsWith("/assets/maintenance")) return { moduleKey: "assets", areaKey: "maintenance" };
   if (href === "/assets/actions") return { moduleKey: "assets", areaKey: "actions" };
   if (href === "/assets/reports") return { moduleKey: "assets", areaKey: "reports" };
 
@@ -660,10 +660,13 @@ export default function AppShell({ children }: AppShellProps) {
   const isActionModule = pathname === "/actions";
   const isAinmFieldMode = pathname === "/hse/ainm/field";
   const isAssetInspectionFieldMode = pathname === "/assets/inspection/field";
+  const isAssetMaintenanceFieldMode = pathname === "/assets/maintenance/field";
   const fieldModeTitle = isAinmFieldMode
     ? "HSE AINM Field Entry"
     : isAssetInspectionFieldMode
       ? "Asset Field Inspection"
+      : isAssetMaintenanceFieldMode
+        ? "Asset Field Maintenance"
       : "HSE Field Inspection";
   const showLogo = !isLoginPage && !isPublicObservationPage;
   const moduleTitle = isHomePage
@@ -750,7 +753,11 @@ export default function AppShell({ children }: AppShellProps) {
         pathname === "/hse/ainm/field" ||
         pathname === "/hse/inspections/field" ||
         pathname === "/assets/inspection/field" ||
+        pathname === "/assets/maintenance/field" ||
         (pathname === "/assets/inspection" &&
+          window.innerWidth <= 720 &&
+          params.get("view") === "create") ||
+        (pathname === "/assets/maintenance" &&
           window.innerWidth <= 720 &&
           params.get("view") === "create") ||
         (pathname === "/hse/inspections" &&
