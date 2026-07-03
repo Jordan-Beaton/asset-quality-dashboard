@@ -592,6 +592,8 @@ function DashboardContent() {
         <QualityKpiCard title="Maintenance Due Soon" value={maintenanceDueSoonCount} accent="#7c3aed" href="/assets/maintenance" />
         <QualityKpiCard title="Assets With Files" value={assetsWithFiles} accent="#3A9B98" href="/assets" />
         <QualityKpiCard title="Recent Asset Activity" value={recentActivityCount} accent="#be185d" href="/assets" />
+        <QualityKpiCard title="Open Asset Actions" value={openAssetActions.length} accent="#f59e0b" href="/assets/actions" />
+        <QualityKpiCard title="Overdue Actions" value={overdueAssetActions.length} accent="#991b1b" href="/assets/actions" />
       </section>
 
       <section style={attentionGridStyle}>

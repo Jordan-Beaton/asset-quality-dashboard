@@ -597,7 +597,6 @@ function CalibrationPageContent() {
     const dueRisk = currentCalibrationRows.filter((row) => row.status === "Overdue" || row.status === "Due Soon").length;
     const certificateCoverage = total ? Math.round((withCertificates / total) * 100) : 0;
     const inDateCoverage = total ? Math.round((heroCounts.inDate / total) * 100) : 0;
-
     return {
       total,
       withCertificates,
@@ -617,16 +616,6 @@ function CalibrationPageContent() {
       })
       .slice(0, 6);
   }, [currentCalibrationRows]);
-  const nextDueRows = useMemo(() => {
-    return [...currentCalibrationRows]
-      .filter((row) => row.status !== "Overdue" && row.record.calibration_due_date)
-      .sort((a, b) => {
-        const aDue = a.record.calibration_due_date ? new Date(a.record.calibration_due_date).getTime() : Number.MAX_SAFE_INTEGER;
-        const bDue = b.record.calibration_due_date ? new Date(b.record.calibration_due_date).getTime() : Number.MAX_SAFE_INTEGER;
-        return aDue - bDue;
-      })
-      .slice(0, 4);
-  }, [currentCalibrationRows]);
   const supplierDashboardRows = useMemo(() => {
     const suppliers = new Map<string, { name: string; total: number; missingCertificates: number }>();
     currentCalibrationRows.forEach((row) => {
@@ -640,6 +629,44 @@ function CalibrationPageContent() {
       .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
       .slice(0, 5);
   }, [currentCalibrationRows]);
+  const dashboardDueBuckets = useMemo(() => {
+    const buckets = [
+      { label: "Overdue", value: 0, tone: "#dc2626", bg: "#fee2e2" },
+      { label: "Next 7 Days", value: 0, tone: "#f59e0b", bg: "#fef3c7" },
+      { label: "8-30 Days", value: 0, tone: "#2563eb", bg: "#dbeafe" },
+      { label: "31+ Days", value: 0, tone: "#16a34a", bg: "#dcfce7" },
+      { label: "Not Set", value: 0, tone: "#64748b", bg: "#f1f5f9" },
+    ];
+
+    currentCalibrationRows.forEach((row) => {
+      if (row.daysRemaining === null) {
+        buckets[4].value += 1;
+      } else if (row.daysRemaining < 0) {
+        buckets[0].value += 1;
+      } else if (row.daysRemaining <= 7) {
+        buckets[1].value += 1;
+      } else if (row.daysRemaining <= 30) {
+        buckets[2].value += 1;
+      } else {
+        buckets[3].value += 1;
+      }
+    });
+
+    return buckets;
+  }, [currentCalibrationRows]);
+  const dashboardStatusSegments = useMemo(
+    () => [
+      { label: "Overdue", value: heroCounts.overdue, color: "#dc2626" },
+      { label: "Due Soon", value: heroCounts.dueSoon, color: "#f59e0b" },
+      { label: "In Date", value: heroCounts.inDate, color: "#16a34a" },
+      {
+        label: "Not Set",
+        value: currentCalibrationRows.filter((row) => row.status === "Not Set").length,
+        color: "#94a3b8",
+      },
+    ],
+    [currentCalibrationRows, heroCounts.dueSoon, heroCounts.inDate, heroCounts.overdue]
+  );
   const activeRegisterFilterLabel = useMemo(() => {
     const labels = [];
     if (assetFilter) {
@@ -1156,66 +1183,49 @@ function CalibrationPageContent() {
 
       {activeView === "dashboard" ? (
       <>
-      <section style={dashboardHeroPanelStyle}>
-        <div>
+      <section style={calibrationCommandGridStyle}>
+        <div style={calibrationCommandPanelStyle}>
           <div style={dashboardEyebrowStyle}>Calibration Control</div>
-          <h2 style={dashboardHeroTitleStyle}>{dashboardMetrics.inDateCoverage}% in date across current items</h2>
+          <h2 style={dashboardHeroTitleStyle}>{dashboardMetrics.inDateCoverage}% in date</h2>
           <p style={dashboardHeroCopyStyle}>
             {dashboardMetrics.dueRisk === 0
               ? "All current calibration items are clear of the 30-day due window."
               : `${dashboardMetrics.dueRisk} current item${dashboardMetrics.dueRisk === 1 ? "" : "s"} need attention now or within 30 days.`}
           </p>
+          <div style={commandMetricGridStyle}>
+            <CommandMetric label="Current" value={dashboardMetrics.total} detail="Latest item records" tone="#1d4ed8" />
+            <CommandMetric label="Certs" value={`${dashboardMetrics.certificateCoverage}%`} detail={`${dashboardMetrics.withCertificates} attached`} tone="#166534" />
+            <CommandMetric label="Overdue" value={heroCounts.overdue} detail="Past due date" tone="#991b1b" />
+            <CommandMetric label="Due Soon" value={heroCounts.dueSoon} detail="Within 30 days" tone="#92400e" />
+          </div>
         </div>
-        <div style={dashboardHeroStatsStyle}>
-          <DashboardMetricTile
-            label="Current Items"
-            value={dashboardMetrics.total}
-            detail="Latest record per calibrated item"
-            tone="blue"
-            onClick={() => applyCalibrationKpiFilter("")}
-          />
-          <DashboardMetricTile
-            label="Certificate Coverage"
-            value={`${dashboardMetrics.certificateCoverage}%`}
-            detail={`${dashboardMetrics.withCertificates} attached / ${dashboardMetrics.missingCertificates} outstanding`}
-            tone="green"
-            onClick={() => {
-              setActiveView("register");
-              setShowRegisterFilters(true);
-              setAssetFilter("");
-              setSearchFilter("");
-              setStatusFilter("");
-            }}
-          />
-          <DashboardMetricTile
-            label="Due Risk"
-            value={dashboardMetrics.dueRisk}
-            detail={`${heroCounts.overdue} overdue, ${heroCounts.dueSoon} due soon`}
-            tone={dashboardMetrics.dueRisk ? "amber" : "green"}
-            onClick={() => applyCalibrationKpiFilter(heroCounts.overdue ? "Overdue" : "Due Soon")}
-          />
+
+        <div style={statusGraphicPanelStyle}>
+          <PanelMiniHeader title="Status Split" subtitle="Current calibration state" />
+          <DashboardDonut segments={dashboardStatusSegments} total={dashboardMetrics.total} centerLabel={`${dashboardMetrics.inDateCoverage}%`} centerSubLabel="In date" />
+        </div>
+
+        <div style={graphicPanelStyle}>
+          <PanelMiniHeader title="Due Windows" subtitle="Deadline pressure by time band" />
+          <div style={barChartStackStyle}>
+            {dashboardDueBuckets.map((bucket) => (
+              <DashboardBarRow
+                key={bucket.label}
+                label={bucket.label}
+                value={bucket.value}
+                max={Math.max(1, dashboardMetrics.total)}
+                color={bucket.tone}
+                bg={bucket.bg}
+              />
+            ))}
+          </div>
         </div>
       </section>
 
       <section style={dashboardKpiGridStyle}>
-        <QualityKpiCard
-          title="Overdue"
-          value={heroCounts.overdue}
-          accent="#dc2626"
-          onClick={() => applyCalibrationKpiFilter("Overdue")}
-        />
-        <QualityKpiCard
-          title="Due Soon"
-          value={heroCounts.dueSoon}
-          accent="#f59e0b"
-          onClick={() => applyCalibrationKpiFilter("Due Soon")}
-        />
-        <QualityKpiCard
-          title="In Date"
-          value={heroCounts.inDate}
-          accent="#16a34a"
-          onClick={() => applyCalibrationKpiFilter("In Date")}
-        />
+        <QualityKpiCard title="Overdue" value={heroCounts.overdue} accent="#dc2626" onClick={() => applyCalibrationKpiFilter("Overdue")} />
+        <QualityKpiCard title="Due Soon" value={heroCounts.dueSoon} accent="#f59e0b" onClick={() => applyCalibrationKpiFilter("Due Soon")} />
+        <QualityKpiCard title="In Date" value={heroCounts.inDate} accent="#16a34a" onClick={() => applyCalibrationKpiFilter("In Date")} />
         <QualityKpiCard
           title="Missing Certs"
           value={dashboardMetrics.missingCertificates}
@@ -1229,77 +1239,57 @@ function CalibrationPageContent() {
           }}
         />
       </section>
-      <section style={dashboardMainGridStyle}>
+
+      <section style={calibrationWorkGridStyle}>
         <ImsPanel title="Due Risk" subtitle="Priority calibration items ordered by due date.">
           {dashboardRiskRows.length === 0 ? (
             <div style={dashboardEmptyStateStyle}>No overdue or due-soon calibration items.</div>
           ) : (
-            <div style={dashboardListStyle}>
+            <div style={denseRiskGridStyle}>
               {dashboardRiskRows.map((row) => (
-                <DashboardRiskItem key={row.id} row={row} onOpen={() => openEditCalibration(row)} />
-              ))}
-            </div>
-          )}
-        </ImsPanel>
-
-        <ImsPanel title="Certificate Health" subtitle="Current records that still need certificate files attached.">
-          <div style={certificateGaugeStyle}>
-            <div style={certificateGaugeHeaderStyle}>
-              <span>Attached</span>
-              <strong>{dashboardMetrics.certificateCoverage}%</strong>
-            </div>
-            <div style={certificateGaugeTrackStyle}>
-              <div style={{ ...certificateGaugeFillStyle, width: `${dashboardMetrics.certificateCoverage}%` }} />
-            </div>
-            <div style={certificateGaugeMetaStyle}>
-              {dashboardMetrics.withCertificates} complete, {dashboardMetrics.missingCertificates} waiting for upload
-            </div>
-          </div>
-
-          <div style={dashboardMiniStatGridStyle}>
-            <div style={dashboardMiniStatStyle}>
-              <span>With Certificate</span>
-              <strong>{dashboardMetrics.withCertificates}</strong>
-            </div>
-            <div style={dashboardMiniStatStyle}>
-              <span>Outstanding</span>
-              <strong>{dashboardMetrics.missingCertificates}</strong>
-            </div>
-          </div>
-        </ImsPanel>
-      </section>
-
-      <section style={dashboardSecondaryGridStyle}>
-        <ImsPanel title="Next Due" subtitle="Upcoming calibration dates beyond overdue items.">
-          {nextDueRows.length === 0 ? (
-            <div style={dashboardEmptyStateStyle}>No upcoming calibration due dates recorded.</div>
-          ) : (
-            <div style={dashboardListStyle}>
-              {nextDueRows.map((row) => (
                 <DashboardRiskItem key={row.id} row={row} onOpen={() => openEditCalibration(row)} compact />
               ))}
             </div>
           )}
         </ImsPanel>
 
-        <ImsPanel title="Supplier Mix" subtitle="Current calibration ownership by supplier or person.">
-          {supplierDashboardRows.length === 0 ? (
-            <div style={dashboardEmptyStateStyle}>No supplier data recorded yet.</div>
-          ) : (
-            <div style={supplierStackStyle}>
-              {supplierDashboardRows.map((supplier) => (
-                <SupplierBar
-                  key={supplier.name}
-                  name={supplier.name}
-                  value={supplier.total}
-                  max={Math.max(...supplierDashboardRows.map((item) => item.total))}
-                  missingCertificates={supplier.missingCertificates}
-                />
-              ))}
+        <div style={sideInsightStackStyle}>
+          <ImsPanel title="Certificate Health" subtitle="Attachment coverage and outstanding uploads.">
+            <div style={certificateGaugeStyle}>
+              <div style={certificateGaugeHeaderStyle}>
+                <span>Attached</span>
+                <strong>{dashboardMetrics.certificateCoverage}%</strong>
+              </div>
+              <div style={certificateGaugeTrackStyle}>
+                <div style={{ ...certificateGaugeFillStyle, width: `${dashboardMetrics.certificateCoverage}%` }} />
+              </div>
+              <div style={certificateGaugeMetaStyle}>
+                {dashboardMetrics.withCertificates} complete, {dashboardMetrics.missingCertificates} waiting for upload
+              </div>
             </div>
-          )}
-        </ImsPanel>
+          </ImsPanel>
+
+          <ImsPanel title="Supplier Mix" subtitle="Current calibration ownership.">
+            {supplierDashboardRows.length === 0 ? (
+              <div style={dashboardEmptyStateStyle}>No supplier data recorded yet.</div>
+            ) : (
+              <div style={supplierStackStyle}>
+                {supplierDashboardRows.map((supplier) => (
+                  <SupplierBar
+                    key={supplier.name}
+                    name={supplier.name}
+                    value={supplier.total}
+                    max={Math.max(...supplierDashboardRows.map((item) => item.total))}
+                    missingCertificates={supplier.missingCertificates}
+                  />
+                ))}
+              </div>
+            )}
+          </ImsPanel>
+
+        </div>
       </section>
+      {dashboardMetrics.total < 0 ? (
       <section style={twoColumnGridStyle}>
         <SectionCard
           title="Overdue Watchlist"
@@ -1339,6 +1329,7 @@ function CalibrationPageContent() {
           )}
         </SectionCard>
       </section>
+      ) : null}
       </>
       ) : null}
 
@@ -2271,6 +2262,109 @@ function DashboardMetricTile({
   );
 }
 
+function CommandMetric({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+  tone: string;
+}) {
+  return (
+    <div style={commandMetricStyle}>
+      <div style={{ ...commandMetricLabelStyle, color: tone }}>{label}</div>
+      <div style={{ ...commandMetricValueStyle, color: tone }}>{value}</div>
+      <div style={commandMetricDetailStyle}>{detail}</div>
+    </div>
+  );
+}
+
+function PanelMiniHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div style={panelMiniHeaderStyle}>
+      <div style={panelMiniTitleStyle}>{title}</div>
+      <div style={panelMiniSubtitleStyle}>{subtitle}</div>
+    </div>
+  );
+}
+
+function DashboardDonut({
+  segments,
+  total,
+  centerLabel,
+  centerSubLabel,
+}: {
+  segments: Array<{ label: string; value: number; color: string }>;
+  total: number;
+  centerLabel: string;
+  centerSubLabel: string;
+}) {
+  let start = 0;
+  const gradient =
+    total > 0
+      ? segments
+          .filter((segment) => segment.value > 0)
+          .map((segment) => {
+            const end = start + (segment.value / total) * 100;
+            const slice = `${segment.color} ${start}% ${end}%`;
+            start = end;
+            return slice;
+          })
+          .join(", ")
+      : "#e2e8f0 0% 100%";
+
+  return (
+    <div style={donutWrapStyle}>
+      <div style={{ ...donutChartStyle, background: `conic-gradient(${gradient})` }}>
+        <div style={donutCenterStyle}>
+          <strong>{centerLabel}</strong>
+          <span>{centerSubLabel}</span>
+        </div>
+      </div>
+      <div style={donutLegendStyle}>
+        {segments.map((segment) => (
+          <div key={segment.label} style={donutLegendItemStyle}>
+            <span style={{ ...donutLegendSwatchStyle, background: segment.color }} />
+            <span>{segment.label}</span>
+            <strong>{segment.value}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DashboardBarRow({
+  label,
+  value,
+  max,
+  color,
+  bg,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  color: string;
+  bg: string;
+}) {
+  const width = max ? Math.max(value > 0 ? 8 : 0, Math.round((value / max) * 100)) : 0;
+
+  return (
+    <div style={barRowStyle}>
+      <div style={barRowHeaderStyle}>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+      <div style={{ ...barTrackStyle, background: bg }}>
+        <div style={{ ...barFillStyle, width: `${width}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
 function DashboardRiskItem({
   row,
   onOpen,
@@ -2443,6 +2537,185 @@ const dashboardHeroCopyStyle: CSSProperties = {
   maxWidth: "620px",
 };
 
+const calibrationCommandGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(360px, 1.1fr) minmax(280px, 0.75fr) minmax(280px, 0.85fr)",
+  gap: "14px",
+  alignItems: "stretch",
+  marginBottom: "16px",
+};
+
+const calibrationCommandPanelStyle: CSSProperties = {
+  border: "1px solid #bfe5e3",
+  borderRadius: "18px",
+  background: "linear-gradient(135deg, #ffffff 0%, #eef8f7 55%, #eff6ff 100%)",
+  padding: "18px",
+  boxShadow: "0 12px 24px rgba(15, 23, 42, 0.07)",
+  minHeight: "222px",
+  display: "grid",
+  alignContent: "space-between",
+  boxSizing: "border-box",
+};
+
+const graphicPanelStyle: CSSProperties = {
+  border: "1px solid #dbe7f3",
+  borderRadius: "18px",
+  background: "#ffffff",
+  padding: "16px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  minHeight: "222px",
+  display: "grid",
+  alignContent: "start",
+  boxSizing: "border-box",
+};
+
+const statusGraphicPanelStyle: CSSProperties = {
+  ...graphicPanelStyle,
+  alignContent: "start",
+  gap: "8px",
+};
+
+const panelMiniHeaderStyle: CSSProperties = {
+  marginBottom: "12px",
+};
+
+const panelMiniTitleStyle: CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 900,
+  color: "#0f172a",
+};
+
+const panelMiniSubtitleStyle: CSSProperties = {
+  marginTop: "3px",
+  fontSize: "12px",
+  color: "#64748b",
+  fontWeight: 700,
+};
+
+const commandMetricGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: "10px",
+  marginTop: "16px",
+  alignItems: "stretch",
+};
+
+const commandMetricStyle: CSSProperties = {
+  border: "1px solid rgba(148, 163, 184, 0.24)",
+  borderRadius: "14px",
+  background: "rgba(255,255,255,0.78)",
+  padding: "10px",
+  display: "grid",
+  gap: "5px",
+  minHeight: "84px",
+  boxSizing: "border-box",
+  minWidth: 0,
+};
+
+const commandMetricLabelStyle: CSSProperties = {
+  fontSize: "10px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.02em",
+  overflowWrap: "anywhere",
+};
+
+const commandMetricValueStyle: CSSProperties = {
+  fontSize: "24px",
+  fontWeight: 900,
+  lineHeight: 1,
+};
+
+const commandMetricDetailStyle: CSSProperties = {
+  color: "#64748b",
+  fontSize: "12px",
+  lineHeight: 1.35,
+  fontWeight: 700,
+  overflowWrap: "anywhere",
+};
+
+const donutWrapStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: "11px",
+  justifyItems: "center",
+  alignItems: "start",
+};
+
+const donutChartStyle: CSSProperties = {
+  width: "156px",
+  height: "156px",
+  borderRadius: "50%",
+  display: "grid",
+  placeItems: "center",
+  boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.08)",
+};
+
+const donutCenterStyle: CSSProperties = {
+  width: "92px",
+  height: "92px",
+  borderRadius: "50%",
+  background: "#ffffff",
+  display: "grid",
+  placeItems: "center",
+  alignContent: "center",
+  color: "#0f172a",
+  boxShadow: "0 1px 5px rgba(15, 23, 42, 0.12)",
+};
+
+const donutLegendStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "7px 10px",
+  width: "100%",
+};
+
+const donutLegendItemStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "10px minmax(0, 1fr) auto",
+  gap: "8px",
+  alignItems: "center",
+  color: "#334155",
+  fontSize: "11px",
+  fontWeight: 800,
+};
+
+const donutLegendSwatchStyle: CSSProperties = {
+  width: "10px",
+  height: "10px",
+  borderRadius: "999px",
+};
+
+const barChartStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "11px",
+};
+
+const barRowStyle: CSSProperties = {
+  display: "grid",
+  gap: "6px",
+};
+
+const barRowHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+  fontSize: "12px",
+  fontWeight: 900,
+  color: "#334155",
+};
+
+const barTrackStyle: CSSProperties = {
+  height: "11px",
+  borderRadius: "999px",
+  overflow: "hidden",
+};
+
+const barFillStyle: CSSProperties = {
+  height: "100%",
+  borderRadius: "999px",
+};
+
 const dashboardHeroStatsStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
@@ -2489,6 +2762,7 @@ const dashboardMainGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
   gap: "16px",
+  alignItems: "start",
   marginBottom: "16px",
 };
 
@@ -2496,7 +2770,29 @@ const dashboardSecondaryGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
   gap: "16px",
+  alignItems: "start",
   marginBottom: "20px",
+};
+
+const calibrationWorkGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1.35fr) minmax(340px, 0.9fr)",
+  gap: "16px",
+  alignItems: "stretch",
+  marginBottom: "16px",
+};
+
+const denseRiskGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: "10px",
+};
+
+const sideInsightStackStyle: CSSProperties = {
+  display: "grid",
+  gap: "16px",
+  gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+  height: "100%",
 };
 
 const dashboardListStyle: CSSProperties = {
@@ -2515,11 +2811,14 @@ const dashboardRiskItemStyle: CSSProperties = {
   display: "grid",
   gap: "8px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  minHeight: "116px",
+  boxSizing: "border-box",
 };
 
 const dashboardRiskItemCompactStyle: CSSProperties = {
   ...dashboardRiskItemStyle,
   padding: "11px 12px",
+  minHeight: "108px",
 };
 
 const dashboardRiskTopLineStyle: CSSProperties = {
