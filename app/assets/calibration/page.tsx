@@ -39,6 +39,8 @@ type AssetPerson = {
 
 type CalibrationType = "Internal" | "External";
 type CalibrationStatus = "Overdue" | "Due Soon" | "In Date" | "Not Set";
+type CalibrationItemStatus = "In Use" | "Not In Use" | "Damaged" | "Missing / Lost" | "Historic";
+type CalibrationItemStatusFilter = "active" | "all" | CalibrationItemStatus;
 type CalibrationWorkspaceView = "dashboard" | "register" | "create" | "bulk";
 
 type AssetCalibrationRecord = {
@@ -56,6 +58,7 @@ type AssetCalibrationRecord = {
   certificate_number: string | null;
   serial_number: string | null;
   frequency_years: number | null;
+  item_status: CalibrationItemStatus | null;
   certificate_file_size: number | null;
   created_at: string | null;
 };
@@ -72,6 +75,7 @@ type CalibrationForm = {
   calibratedBy: string;
   otherCalibrationSupplier: string;
   certificateNumber: string;
+  itemStatus: CalibrationItemStatus;
   notes: string;
 };
 
@@ -84,6 +88,7 @@ type CalibrationEditForm = {
   calibrationDueDate: string;
   frequencyYears: string;
   certificateNumber: string;
+  itemStatus: CalibrationItemStatus;
 };
 
 type CalibrationImportRow = {
@@ -110,6 +115,8 @@ type CalibrationRow = {
 
 const STORAGE_BUCKET = "asset-files";
 const calibrationTypes: CalibrationType[] = ["Internal", "External"];
+const calibrationItemStatuses: CalibrationItemStatus[] = ["In Use", "Not In Use", "Damaged", "Missing / Lost", "Historic"];
+const defaultItemStatusFilter: CalibrationItemStatusFilter = "active";
 const OTHER_SUPPLIER_VALUE = "__OTHER_SUPPLIER__";
 const CUSTOM_SUPPLIERS_STORAGE_KEY = "asset-calibration-custom-suppliers";
 const defaultExternalCalibrationSuppliers = ["PASS Ltd", "Northern Balance"];
@@ -126,6 +133,7 @@ const emptyForm: CalibrationForm = {
   calibratedBy: "",
   otherCalibrationSupplier: "",
   certificateNumber: "",
+  itemStatus: "In Use",
   notes: "",
 };
 
@@ -197,6 +205,21 @@ function getStatusTone(status: CalibrationStatus) {
   return { bg: "#e2e8f0", text: "#334155", border: "#cbd5e1" };
 }
 
+function getItemStatus(value: string | null | undefined): CalibrationItemStatus {
+  if (value === "Missing" || value === "Lost") return "Missing / Lost";
+  return calibrationItemStatuses.includes(value as CalibrationItemStatus)
+    ? (value as CalibrationItemStatus)
+    : "In Use";
+}
+
+function getItemStatusTone(status: CalibrationItemStatus) {
+  if (status === "In Use") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
+  if (status === "Not In Use") return { bg: "#e2e8f0", text: "#334155", border: "#cbd5e1" };
+  if (status === "Damaged") return { bg: "#ffedd5", text: "#9a3412", border: "#fed7aa" };
+  if (status === "Missing / Lost") return { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
+  return { bg: "#ede9fe", text: "#6d28d9", border: "#ddd6fe" };
+}
+
 function buildAssetFilterKey(asset: Asset | null) {
   return (asset?.asset_code || asset?.id || "").trim();
 }
@@ -266,6 +289,7 @@ function buildCalibrationSearchText(row: CalibrationRow) {
     row.record.certificate_number || "",
     row.record.reference || "",
     row.record.calibrated_by || "",
+    getItemStatus(row.record.item_status),
   ]
     .join(" ")
     .toLowerCase();
@@ -378,6 +402,7 @@ function CalibrationPageContent() {
   const [assetFilter, setAssetFilter] = useState(linkedAsset);
   const [searchFilter, setSearchFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | CalibrationStatus>("");
+  const [itemStatusFilter, setItemStatusFilter] = useState<CalibrationItemStatusFilter>(defaultItemStatusFilter);
   const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAsset));
   const [activeView, setActiveView] = useState<CalibrationWorkspaceView>("dashboard");
   const [isSaving, setIsSaving] = useState(false);
@@ -550,9 +575,13 @@ function CalibrationPageContent() {
             ? !row.record.asset_id
             : row.assetFilterKey.toLowerCase() === normalizedAssetFilter);
         const matchesStatus = !statusFilter || row.status === statusFilter;
+        const itemStatus = getItemStatus(row.record.item_status);
+        const matchesItemStatus =
+          itemStatusFilter === "all" ||
+          (itemStatusFilter === "active" ? itemStatus !== "Historic" : itemStatus === itemStatusFilter);
         const matchesSearch =
           !searchFilter.trim() || buildCalibrationSearchText(row).includes(searchFilter.trim().toLowerCase());
-        return matchesAsset && matchesStatus && matchesSearch;
+        return matchesAsset && matchesStatus && matchesItemStatus && matchesSearch;
       })
       .sort((a, b) => {
         const rankDiff = getStatusRank(a.status) - getStatusRank(b.status);
@@ -566,7 +595,7 @@ function CalibrationPageContent() {
         const bName = b.asset?.name || b.asset?.asset_code || "";
         return aName.localeCompare(bName, undefined, { numeric: true, sensitivity: "base" });
       });
-  }, [assetFilter, currentCalibrationRows, searchFilter, statusFilter]);
+  }, [assetFilter, currentCalibrationRows, itemStatusFilter, searchFilter, statusFilter]);
 
   const heroCounts = useMemo(() => {
     const statusRows = currentCalibrationRows.map((row) => row.status);
@@ -577,6 +606,51 @@ function CalibrationPageContent() {
       total: currentCalibrationRows.length,
     };
   }, [currentCalibrationRows]);
+  const calibrationControlRows = useMemo(
+    () => currentCalibrationRows.filter((row) => getItemStatus(row.record.item_status) === "In Use"),
+    [currentCalibrationRows]
+  );
+  const excludedCalibrationRows = useMemo(
+    () => currentCalibrationRows.filter((row) => getItemStatus(row.record.item_status) !== "In Use"),
+    [currentCalibrationRows]
+  );
+  const dashboardCounts = useMemo(() => {
+    const statusRows = calibrationControlRows.map((row) => row.status);
+    return {
+      overdue: statusRows.filter((status) => status === "Overdue").length,
+      dueSoon: statusRows.filter((status) => status === "Due Soon").length,
+      inDate: statusRows.filter((status) => status === "In Date").length,
+      notSet: statusRows.filter((status) => status === "Not Set").length,
+      total: calibrationControlRows.length,
+    };
+  }, [calibrationControlRows]);
+  const availabilityStatusRows = useMemo(() => {
+    const colours: Record<CalibrationItemStatus, { color: string; bg: string }> = {
+      "In Use": { color: "#16a34a", bg: "#dcfce7" },
+      "Not In Use": { color: "#64748b", bg: "#f1f5f9" },
+      Damaged: { color: "#f59e0b", bg: "#fef3c7" },
+      "Missing / Lost": { color: "#dc2626", bg: "#fee2e2" },
+      Historic: { color: "#7c3aed", bg: "#ede9fe" },
+    };
+
+    return calibrationItemStatuses.map((status) => ({
+      label: status,
+      value: currentCalibrationRows.filter((row) => getItemStatus(row.record.item_status) === status).length,
+      tone: colours[status].color,
+      bg: colours[status].bg,
+    }));
+  }, [currentCalibrationRows]);
+  const availabilityMetrics = useMemo(() => {
+    const damaged = availabilityStatusRows.find((row) => row.label === "Damaged")?.value || 0;
+    const missingLost = availabilityStatusRows.find((row) => row.label === "Missing / Lost")?.value || 0;
+    const notInUse = availabilityStatusRows.find((row) => row.label === "Not In Use")?.value || 0;
+    const historic = availabilityStatusRows.find((row) => row.label === "Historic")?.value || 0;
+    return {
+      excluded: excludedCalibrationRows.length,
+      unavailable: damaged + missingLost,
+      parked: notInUse + historic,
+    };
+  }, [availabilityStatusRows, excludedCalibrationRows.length]);
   const latestCalibrationLabel = useMemo(() => {
     const latest = [...records].sort((a, b) => {
       const aTime = new Date(a.calibration_date || a.created_at || 0).getTime();
@@ -591,12 +665,12 @@ function CalibrationPageContent() {
   const overdueRows = calibrationRows.filter((row) => row.status === "Overdue").slice(0, 5);
   const dueSoonRows = calibrationRows.filter((row) => row.status === "Due Soon").slice(0, 5);
   const dashboardMetrics = useMemo(() => {
-    const total = currentCalibrationRows.length;
-    const withCertificates = currentCalibrationRows.filter((row) => Boolean(row.record.file_path)).length;
+    const total = calibrationControlRows.length;
+    const withCertificates = calibrationControlRows.filter((row) => Boolean(row.record.file_path)).length;
     const missingCertificates = total - withCertificates;
-    const dueRisk = currentCalibrationRows.filter((row) => row.status === "Overdue" || row.status === "Due Soon").length;
+    const dueRisk = calibrationControlRows.filter((row) => row.status === "Overdue" || row.status === "Due Soon").length;
     const certificateCoverage = total ? Math.round((withCertificates / total) * 100) : 0;
-    const inDateCoverage = total ? Math.round((heroCounts.inDate / total) * 100) : 0;
+    const inDateCoverage = total ? Math.round((dashboardCounts.inDate / total) * 100) : 0;
     return {
       total,
       withCertificates,
@@ -605,9 +679,9 @@ function CalibrationPageContent() {
       certificateCoverage,
       inDateCoverage,
     };
-  }, [currentCalibrationRows, heroCounts.inDate]);
+  }, [calibrationControlRows, dashboardCounts.inDate]);
   const dashboardRiskRows = useMemo(() => {
-    return [...currentCalibrationRows]
+    return [...calibrationControlRows]
       .filter((row) => row.status === "Overdue" || row.status === "Due Soon")
       .sort((a, b) => {
         const aDue = a.record.calibration_due_date ? new Date(a.record.calibration_due_date).getTime() : Number.MAX_SAFE_INTEGER;
@@ -615,10 +689,10 @@ function CalibrationPageContent() {
         return aDue - bDue;
       })
       .slice(0, 6);
-  }, [currentCalibrationRows]);
+  }, [calibrationControlRows]);
   const supplierDashboardRows = useMemo(() => {
     const suppliers = new Map<string, { name: string; total: number; missingCertificates: number }>();
-    currentCalibrationRows.forEach((row) => {
+    calibrationControlRows.forEach((row) => {
       const name = (row.record.calibrated_by || "Supplier not set").trim();
       const current = suppliers.get(name) || { name, total: 0, missingCertificates: 0 };
       current.total += 1;
@@ -628,7 +702,7 @@ function CalibrationPageContent() {
     return [...suppliers.values()]
       .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
       .slice(0, 5);
-  }, [currentCalibrationRows]);
+  }, [calibrationControlRows]);
   const dashboardDueBuckets = useMemo(() => {
     const buckets = [
       { label: "Overdue", value: 0, tone: "#dc2626", bg: "#fee2e2" },
@@ -638,7 +712,7 @@ function CalibrationPageContent() {
       { label: "Not Set", value: 0, tone: "#64748b", bg: "#f1f5f9" },
     ];
 
-    currentCalibrationRows.forEach((row) => {
+    calibrationControlRows.forEach((row) => {
       if (row.daysRemaining === null) {
         buckets[4].value += 1;
       } else if (row.daysRemaining < 0) {
@@ -653,19 +727,19 @@ function CalibrationPageContent() {
     });
 
     return buckets;
-  }, [currentCalibrationRows]);
+  }, [calibrationControlRows]);
   const dashboardStatusSegments = useMemo(
     () => [
-      { label: "Overdue", value: heroCounts.overdue, color: "#dc2626" },
-      { label: "Due Soon", value: heroCounts.dueSoon, color: "#f59e0b" },
-      { label: "In Date", value: heroCounts.inDate, color: "#16a34a" },
+      { label: "Overdue", value: dashboardCounts.overdue, color: "#dc2626" },
+      { label: "Due Soon", value: dashboardCounts.dueSoon, color: "#f59e0b" },
+      { label: "In Date", value: dashboardCounts.inDate, color: "#16a34a" },
       {
         label: "Not Set",
-        value: currentCalibrationRows.filter((row) => row.status === "Not Set").length,
+        value: dashboardCounts.notSet,
         color: "#94a3b8",
       },
     ],
-    [currentCalibrationRows, heroCounts.dueSoon, heroCounts.inDate, heroCounts.overdue]
+    [dashboardCounts.dueSoon, dashboardCounts.inDate, dashboardCounts.notSet, dashboardCounts.overdue]
   );
   const activeRegisterFilterLabel = useMemo(() => {
     const labels = [];
@@ -679,9 +753,12 @@ function CalibrationPageContent() {
       labels.push(assetLabel);
     }
     if (statusFilter) labels.push(statusFilter);
+    if (itemStatusFilter === "active") labels.push("Active items");
+    if (itemStatusFilter !== "active" && itemStatusFilter !== "all") labels.push(itemStatusFilter);
+    if (itemStatusFilter === "all") labels.push("All item statuses");
     if (searchFilter.trim()) labels.push(`"${searchFilter.trim()}"`);
     return labels.join(" / ");
-  }, [assetFilter, assets, searchFilter, statusFilter]);
+  }, [assetFilter, assets, itemStatusFilter, searchFilter, statusFilter]);
   const selectedCalibrationRow = useMemo(() => {
     if (!editForm) return null;
     return allCalibrationRows.find((row) => row.id === editForm.id) || null;
@@ -706,6 +783,7 @@ function CalibrationPageContent() {
     setAssetFilter("");
     setSearchFilter("");
     setStatusFilter(status);
+    setItemStatusFilter("In Use");
   }
 
   function hasCreateAccess() {
@@ -788,6 +866,7 @@ function CalibrationPageContent() {
           certificate_number: form.certificateNumber.trim() || null,
           serial_number: form.serialNumber.trim() || null,
           frequency_years: Number(form.frequencyYears || "0") || null,
+          item_status: form.itemStatus,
           certificate_file_size: fileSize,
         },
       ]);
@@ -925,6 +1004,7 @@ function CalibrationPageContent() {
         certificate_number: row.certificateNumber || null,
         serial_number: row.serialNumber || null,
         frequency_years: Number(row.frequencyYears || "1") || 1,
+        item_status: "In Use",
         certificate_file_size: null,
       }));
 
@@ -988,6 +1068,7 @@ function CalibrationPageContent() {
       calibrationDueDate: row.record.calibration_due_date || "",
       frequencyYears: String(row.record.frequency_years || 1),
       certificateNumber: row.record.certificate_number || row.record.reference || "",
+      itemStatus: getItemStatus(row.record.item_status),
     });
     setLastSuggestedEditDueDate("");
     setRenewalCertificateFile(null);
@@ -1041,6 +1122,7 @@ function CalibrationPageContent() {
           certificate_number: certificateNumber || null,
           serial_number: editForm.serialNumber || sourceRow.record.serial_number || null,
           frequency_years: Number(editForm.frequencyYears || "0") || null,
+          item_status: editForm.itemStatus,
           notes: buildCalibrationNotes(editForm.itemDescription, editForm.dateIssued, getCalibrationFreeNotes(sourceRow.record)) || null,
           uploaded_at: filePath ? new Date().toISOString() : null,
           certificate_file_size: fileSize,
@@ -1057,6 +1139,29 @@ function CalibrationPageContent() {
     } catch (error) {
       const err = error as Error;
       setMessage(`History save failed: ${err.message}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
+  async function saveSelectedItemStatus() {
+    if (!editForm || !selectedCalibrationRow) return;
+    if (!requireEditAccess("update calibration item status")) return;
+
+    try {
+      setIsUpdating(true);
+      const { error } = await supabase
+        .from("asset_calibration_records")
+        .update({ item_status: editForm.itemStatus })
+        .eq("id", selectedCalibrationRow.id);
+
+      if (error) throw new Error(error.message);
+
+      setMessage(`Item status updated to ${editForm.itemStatus}.`);
+      await loadData();
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Item status update failed: ${err.message}`);
     } finally {
       setIsUpdating(false);
     }
@@ -1186,23 +1291,35 @@ function CalibrationPageContent() {
       <section style={calibrationCommandGridStyle}>
         <div style={calibrationCommandPanelStyle}>
           <div style={dashboardEyebrowStyle}>Calibration Control</div>
-          <h2 style={dashboardHeroTitleStyle}>{dashboardMetrics.inDateCoverage}% in date</h2>
+          <h2 style={dashboardHeroTitleStyle}>
+            {dashboardMetrics.total === 0 ? "No in-use items" : `${dashboardMetrics.inDateCoverage}% in date`}
+          </h2>
           <p style={dashboardHeroCopyStyle}>
-            {dashboardMetrics.dueRisk === 0
-              ? "All current calibration items are clear of the 30-day due window."
-              : `${dashboardMetrics.dueRisk} current item${dashboardMetrics.dueRisk === 1 ? "" : "s"} need attention now or within 30 days.`}
+            {dashboardMetrics.total === 0
+              ? "There are no in-use calibration items included in the compliance score."
+              : dashboardMetrics.dueRisk === 0
+              ? "All in-use calibration items are clear of the 30-day due window."
+              : `${dashboardMetrics.dueRisk} in-use item${dashboardMetrics.dueRisk === 1 ? "" : "s"} need attention now or within 30 days.`}
+            {availabilityMetrics.excluded
+              ? ` ${availabilityMetrics.excluded} item${availabilityMetrics.excluded === 1 ? " is" : "s are"} excluded because not in use.`
+              : ""}
           </p>
           <div style={commandMetricGridStyle}>
-            <CommandMetric label="Current" value={dashboardMetrics.total} detail="Latest item records" tone="#1d4ed8" />
-            <CommandMetric label="Certs" value={`${dashboardMetrics.certificateCoverage}%`} detail={`${dashboardMetrics.withCertificates} attached`} tone="#166534" />
-            <CommandMetric label="Overdue" value={heroCounts.overdue} detail="Past due date" tone="#991b1b" />
-            <CommandMetric label="Due Soon" value={heroCounts.dueSoon} detail="Within 30 days" tone="#92400e" />
+            <CommandMetric label="In Use" value={dashboardMetrics.total} detail="Included in figures" tone="#1d4ed8" />
+            <CommandMetric label="Excluded" value={availabilityMetrics.excluded} detail="Not in calibration score" tone="#7c3aed" />
+            <CommandMetric label="Overdue" value={dashboardCounts.overdue} detail="Past due date" tone="#991b1b" />
+            <CommandMetric label="Due Soon" value={dashboardCounts.dueSoon} detail="Within 30 days" tone="#92400e" />
           </div>
         </div>
 
         <div style={statusGraphicPanelStyle}>
           <PanelMiniHeader title="Status Split" subtitle="Current calibration state" />
-          <DashboardDonut segments={dashboardStatusSegments} total={dashboardMetrics.total} centerLabel={`${dashboardMetrics.inDateCoverage}%`} centerSubLabel="In date" />
+          <DashboardDonut
+            segments={dashboardStatusSegments}
+            total={dashboardMetrics.total}
+            centerLabel={dashboardMetrics.total === 0 ? "-" : `${dashboardMetrics.inDateCoverage}%`}
+            centerSubLabel="In date"
+          />
         </div>
 
         <div style={graphicPanelStyle}>
@@ -1223,12 +1340,12 @@ function CalibrationPageContent() {
       </section>
 
       <section style={dashboardKpiGridStyle}>
-        <QualityKpiCard title="Overdue" value={heroCounts.overdue} accent="#dc2626" onClick={() => applyCalibrationKpiFilter("Overdue")} />
-        <QualityKpiCard title="Due Soon" value={heroCounts.dueSoon} accent="#f59e0b" onClick={() => applyCalibrationKpiFilter("Due Soon")} />
-        <QualityKpiCard title="In Date" value={heroCounts.inDate} accent="#16a34a" onClick={() => applyCalibrationKpiFilter("In Date")} />
+        <QualityKpiCard title="Overdue In Use" value={dashboardCounts.overdue} accent="#dc2626" onClick={() => applyCalibrationKpiFilter("Overdue")} />
+        <QualityKpiCard title="Due Soon In Use" value={dashboardCounts.dueSoon} accent="#f59e0b" onClick={() => applyCalibrationKpiFilter("Due Soon")} />
+        <QualityKpiCard title="In Date In Use" value={dashboardCounts.inDate} accent="#16a34a" onClick={() => applyCalibrationKpiFilter("In Date")} />
         <QualityKpiCard
-          title="Missing Certs"
-          value={dashboardMetrics.missingCertificates}
+          title="Excluded Items"
+          value={availabilityMetrics.excluded}
           accent="#7c3aed"
           onClick={() => {
             setActiveView("register");
@@ -1236,6 +1353,20 @@ function CalibrationPageContent() {
             setAssetFilter("");
             setSearchFilter("");
             setStatusFilter("");
+            setItemStatusFilter("all");
+          }}
+        />
+        <QualityKpiCard
+          title="Missing Certs"
+          value={dashboardMetrics.missingCertificates}
+          accent="#2563eb"
+          onClick={() => {
+            setActiveView("register");
+            setShowRegisterFilters(true);
+            setAssetFilter("");
+            setSearchFilter("");
+            setStatusFilter("");
+            setItemStatusFilter("In Use");
           }}
         />
       </section>
@@ -1254,6 +1385,33 @@ function CalibrationPageContent() {
         </ImsPanel>
 
         <div style={sideInsightStackStyle}>
+          <ImsPanel title="Availability / Exclusions" subtitle="Items not in use are visible here but excluded from calibration compliance figures.">
+            <div style={availabilitySummaryGridStyle}>
+              <div style={availabilitySummaryCardStyle}>
+                <span>Unavailable</span>
+                <strong>{availabilityMetrics.unavailable}</strong>
+                <small>Damaged or missing / lost</small>
+              </div>
+              <div style={availabilitySummaryCardStyle}>
+                <span>Parked</span>
+                <strong>{availabilityMetrics.parked}</strong>
+                <small>Not in use or historic</small>
+              </div>
+            </div>
+            <div style={barChartStackStyle}>
+              {availabilityStatusRows.map((bucket) => (
+                <DashboardBarRow
+                  key={bucket.label}
+                  label={bucket.label}
+                  value={bucket.value}
+                  max={Math.max(1, currentCalibrationRows.length)}
+                  color={bucket.tone}
+                  bg={bucket.bg}
+                />
+              ))}
+            </div>
+          </ImsPanel>
+
           <ImsPanel title="Certificate Health" subtitle="Attachment coverage and outstanding uploads.">
             <div style={certificateGaugeStyle}>
               <div style={certificateGaugeHeaderStyle}>
@@ -1302,7 +1460,7 @@ function CalibrationPageContent() {
               <div key={row.id} style={watchlistItemStyle}>
                 <div style={watchlistItemTitleStyle}>{row.asset?.asset_code || "Unassigned"}</div>
                 <div style={watchlistItemMetaStyle}>
-                  {row.asset?.name || row.record.serial_number || "Unknown item"} • Due{" "}
+                  {row.asset?.name || row.record.serial_number || "Calibration item"} • Due{" "}
                   {formatDate(row.record.calibration_due_date)}
                 </div>
               </div>
@@ -1321,7 +1479,7 @@ function CalibrationPageContent() {
               <div key={row.id} style={watchlistItemStyle}>
                 <div style={watchlistItemTitleStyle}>{row.asset?.asset_code || "Unassigned"}</div>
                 <div style={watchlistItemMetaStyle}>
-                  {row.asset?.name || row.record.serial_number || "Unknown item"} • Due{" "}
+                  {row.asset?.name || row.record.serial_number || "Calibration item"} • Due{" "}
                   {formatDate(row.record.calibration_due_date)}
                 </div>
               </div>
@@ -1405,6 +1563,20 @@ function CalibrationPageContent() {
                   style={inputStyle}
                   placeholder="Serial number or spare item ID"
                 />
+              </Field>
+
+              <Field label="Item Status">
+                <select
+                  value={form.itemStatus}
+                  onChange={(e) => setForm((prev) => ({ ...prev, itemStatus: e.target.value as CalibrationItemStatus }))}
+                  style={inputStyle}
+                >
+                  {calibrationItemStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
               </Field>
 
               <Field label="Frequency">
@@ -1725,7 +1897,7 @@ function CalibrationPageContent() {
                   <div key={row.id} style={watchlistItemStyle}>
                     <div style={watchlistItemTitleStyle}>{row.asset?.asset_code || "-"}</div>
                     <div style={watchlistItemMetaStyle}>
-                      {row.asset?.name || "Unknown asset"} • Due {formatDate(row.record.calibration_due_date)}
+                      {row.asset?.name || "Calibration item"} • Due {formatDate(row.record.calibration_due_date)}
                     </div>
                   </div>
                 ))
@@ -1741,7 +1913,7 @@ function CalibrationPageContent() {
                   <div key={row.id} style={watchlistItemStyle}>
                     <div style={watchlistItemTitleStyle}>{row.asset?.asset_code || "-"}</div>
                     <div style={watchlistItemMetaStyle}>
-                      {row.asset?.name || "Unknown asset"} • Due {formatDate(row.record.calibration_due_date)}
+                      {row.asset?.name || "Calibration item"} • Due {formatDate(row.record.calibration_due_date)}
                     </div>
                   </div>
                 ))
@@ -1762,6 +1934,7 @@ function CalibrationPageContent() {
                   setAssetFilter("");
                   setSearchFilter("");
                   setStatusFilter("");
+                  setItemStatusFilter(defaultItemStatusFilter);
                 }}
               >
                 Clear Filters
@@ -1796,6 +1969,22 @@ function CalibrationPageContent() {
                 <option value="Not Set">Not Set</option>
               </select>
             </Field>
+
+            <Field label="Item Status">
+              <select
+                value={itemStatusFilter}
+                onChange={(e) => setItemStatusFilter(e.target.value as CalibrationItemStatusFilter)}
+                style={imsInputStyle}
+              >
+                <option value="active">Active items (hide Historic)</option>
+                <option value="all">All item statuses</option>
+                {calibrationItemStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </ImsFilterPanel>
 
           <div style={imsTableInfoRowStyle}>
@@ -1806,16 +1995,16 @@ function CalibrationPageContent() {
           </div>
 
         <div style={compactTableWrapStyle}>
-          <table style={{ ...imsTableStyle, minWidth: 1060 }}>
+          <table style={{ ...imsTableStyle, minWidth: 1020 }}>
             <thead>
               <tr>
                 <th style={imsTableHeadStyle}>Status</th>
+                <th style={imsTableHeadStyle}>Item Status</th>
                 <th style={imsTableHeadStyle}>Item / Description</th>
                 <th style={imsTableHeadStyle}>Serial Number</th>
                 <th style={imsTableHeadStyle}>Calibration Date</th>
                 <th style={imsTableHeadStyle}>Date Issued</th>
                 <th style={imsTableHeadStyle}>Due Date</th>
-                <th style={imsTableHeadStyle}>Calibrated By</th>
                 <th style={imsTableHeadStyle}>Certificate</th>
                 <th style={imsTableHeadStyle}>Actions</th>
               </tr>
@@ -1840,6 +2029,9 @@ function CalibrationPageContent() {
                         <StatusBadge value={row.status} />
                       </td>
                       <td style={imsTableCellStyle}>
+                        <ItemStatusBadge value={getItemStatus(row.record.item_status)} />
+                      </td>
+                      <td style={imsTableCellStyle}>
                         <div style={cellTitleStyle}>{subject.title}</div>
                         <div style={cellMetaStyle}>
                           {subject.subtitle}
@@ -1862,10 +2054,6 @@ function CalibrationPageContent() {
                               ? `${Math.abs(row.daysRemaining)} days overdue`
                               : `${row.daysRemaining} days remaining`}
                         </div>
-                      </td>
-                      <td style={imsTableCellStyle}>
-                        <div style={cellTitleStyle}>{row.record.calibrated_by || "-"}</div>
-                        <div style={cellMetaStyle}>{row.record.calibration_type || "External"}</div>
                       </td>
                       <td style={imsTableCellStyle}>
                         <div style={cellTitleStyle}>{row.record.certificate_number || row.record.reference || "-"}</div>
@@ -1904,6 +2092,7 @@ function CalibrationPageContent() {
           {selectedCalibrationRow ? (
             <div style={detailSummaryGridStyle}>
               <SummaryPill label="Status" value={selectedCalibrationRow.status} />
+              <SummaryPill label="Item Status" value={getItemStatus(selectedCalibrationRow.record.item_status)} />
               <SummaryPill label="Asset" value={selectedCalibrationRow.asset?.asset_code || "Unassigned"} />
               <SummaryPill label="Supplier / Person" value={selectedCalibrationRow.record.calibrated_by || "-"} />
               <SummaryPill label="Certificate" value={selectedCalibrationRow.record.certificate_number || selectedCalibrationRow.record.reference || "-"} />
@@ -1961,6 +2150,20 @@ function CalibrationPageContent() {
                   <option value="3">3 years</option>
                   <option value="4">4 years</option>
                   <option value="5">5 years</option>
+                </select>
+              </Field>
+
+              <Field label="Item Status">
+                <select
+                  value={editForm.itemStatus}
+                  onChange={(e) => setEditForm((prev) => (prev ? { ...prev, itemStatus: e.target.value as CalibrationItemStatus } : prev))}
+                  style={inputStyle}
+                >
+                  {calibrationItemStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
                 </select>
               </Field>
 
@@ -2041,6 +2244,11 @@ function CalibrationPageContent() {
                 </button>
               ) : null}
               {selectedCalibrationRow ? (
+                <button type="button" style={secondaryButtonStyle} onClick={() => void saveSelectedItemStatus()} disabled={isUpdating}>
+                  Save Item Status
+                </button>
+              ) : null}
+              {selectedCalibrationRow ? (
                 <button type="button" style={secondaryButtonStyle} onClick={() => generateActionFromCalibration(selectedCalibrationRow)}>
                   Generate Action
                 </button>
@@ -2086,10 +2294,11 @@ function CalibrationPageContent() {
                 </div>
               </div>
               <div style={compactTableWrapStyle}>
-                <table style={{ ...imsTableStyle, minWidth: 920 }}>
+                <table style={{ ...imsTableStyle, minWidth: 1000 }}>
                   <thead>
                     <tr>
                       <th style={imsTableHeadStyle}>Status</th>
+                      <th style={imsTableHeadStyle}>Item Status</th>
                       <th style={imsTableHeadStyle}>Calibration Date</th>
                       <th style={imsTableHeadStyle}>Date Issued</th>
                       <th style={imsTableHeadStyle}>Due Date</th>
@@ -2103,6 +2312,9 @@ function CalibrationPageContent() {
                       <tr key={row.id} style={calibrationTableRowStyle}>
                         <td style={imsTableCellStyle}>
                           <StatusBadge value={row.status} />
+                        </td>
+                        <td style={imsTableCellStyle}>
+                          <ItemStatusBadge value={getItemStatus(row.record.item_status)} />
                         </td>
                         <td style={imsTableCellStyle}>{formatDate(row.record.calibration_date)}</td>
                         <td style={imsTableCellStyle}>{formatDate(getCalibrationDateIssued(row.record))}</td>
@@ -2218,6 +2430,29 @@ function StatusBadge({ value }: { value: CalibrationStatus }) {
         background: tone.bg,
         color: tone.text,
         border: `1px solid ${tone.border}`,
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
+function ItemStatusBadge({ value }: { value: CalibrationItemStatus }) {
+  const tone = getItemStatusTone(value);
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: "999px",
+        padding: "6px 10px",
+        fontSize: "12px",
+        fontWeight: 800,
+        background: tone.bg,
+        color: tone.text,
+        border: `1px solid ${tone.border}`,
+        whiteSpace: "nowrap",
       }}
     >
       {value}
@@ -2791,8 +3026,29 @@ const denseRiskGridStyle: CSSProperties = {
 const sideInsightStackStyle: CSSProperties = {
   display: "grid",
   gap: "16px",
-  gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+  gridTemplateRows: "repeat(3, minmax(0, auto))",
   height: "100%",
+};
+
+const availabilitySummaryGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "10px",
+  marginBottom: "14px",
+};
+
+const availabilitySummaryCardStyle: CSSProperties = {
+  border: "1px solid #dbe7f3",
+  borderRadius: "14px",
+  background: "#f8fafc",
+  padding: "12px",
+  display: "grid",
+  gap: "5px",
+  color: "#475569",
+  fontSize: "11px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.03em",
 };
 
 const dashboardListStyle: CSSProperties = {
@@ -3507,4 +3763,5 @@ const invalidImportBadgeStyle: CSSProperties = {
   color: "#92400e",
   border: "1px solid #fde68a",
 };
+
 
