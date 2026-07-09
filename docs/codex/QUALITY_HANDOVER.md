@@ -26,6 +26,7 @@ Quality Management is the master visual reference for the IMS. Equivalent pages 
 - Supports Excel import.
 - Uses People dropdown for owner selection.
 - Supports linked Action creation.
+- Evidence upload metadata is hardened by `scripts/sql/quality_evidence_files.sql`; run it if NCR/Action evidence uploads fail to appear after storage upload.
 
 ## Audits
 
@@ -48,4 +49,3 @@ Quality Management is the master visual reference for the IMS. Equivalent pages 
 - Keep Quality layouts stable because other modules depend on them as the visual reference.
 - Do not reintroduce visible CAPA language into the NCR UI unless explicitly requested.
 - Preserve linked Action behavior when changing NCR, MOC, or audit flows.
-

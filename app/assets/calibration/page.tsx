@@ -63,6 +63,23 @@ type AssetCalibrationRecord = {
   created_at: string | null;
 };
 
+type CalibrationStatusLog = {
+  id: string;
+  calibration_record_id: string;
+  item_status_from: string | null;
+  item_status_to: string;
+  reason: string | null;
+  created_by: string | null;
+  created_at: string | null;
+};
+
+type CalibrationSupplierReference = {
+  id: string;
+  name: string;
+  active: boolean;
+  created_at: string | null;
+};
+
 type CalibrationForm = {
   itemDescription: string;
   assetId: string;
@@ -394,6 +411,8 @@ function CalibrationPageContent() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [people, setPeople] = useState<AssetPerson[]>([]);
   const [records, setRecords] = useState<AssetCalibrationRecord[]>([]);
+  const [statusLogs, setStatusLogs] = useState<CalibrationStatusLog[]>([]);
+  const [supplierReferences, setSupplierReferences] = useState<CalibrationSupplierReference[]>([]);
   const [message, setMessage] = useState("Loading calibration register...");
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [form, setForm] = useState<CalibrationForm>(emptyForm);
@@ -411,6 +430,7 @@ function CalibrationPageContent() {
   const [deletingId, setDeletingId] = useState<string>("");
   const [lastSuggestedDueDate, setLastSuggestedDueDate] = useState("");
   const [editForm, setEditForm] = useState<CalibrationEditForm | null>(null);
+  const [itemStatusReason, setItemStatusReason] = useState("");
   const [lastSuggestedEditDueDate, setLastSuggestedEditDueDate] = useState("");
   const [customCalibrationSuppliers, setCustomCalibrationSuppliers] = useState<string[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -420,7 +440,7 @@ function CalibrationPageContent() {
   const [attachmentCertificateFile, setAttachmentCertificateFile] = useState<File | null>(null);
 
   async function loadData() {
-    const [assetsRes, calibrationsRes, peopleRes] = await Promise.all([
+    const [assetsRes, calibrationsRes, peopleRes, suppliersRes, statusLogsRes] = await Promise.all([
       supabase.from("assets").select("*").order("name", { ascending: true }),
       supabase
         .from("asset_calibration_records")
@@ -432,6 +452,15 @@ function CalibrationPageContent() {
         .eq("active", true)
         .eq("department", "Assets")
         .order("name", { ascending: true }),
+      supabase
+        .from("asset_calibration_suppliers")
+        .select("id,name,active,created_at")
+        .eq("active", true)
+        .order("name", { ascending: true }),
+      supabase
+        .from("asset_calibration_status_log")
+        .select("*")
+        .order("created_at", { ascending: false }),
     ]);
 
     if (assetsRes.error || calibrationsRes.error || peopleRes.error) {
@@ -444,8 +473,14 @@ function CalibrationPageContent() {
     setAssets((assetsRes.data || []) as Asset[]);
     setRecords((calibrationsRes.data || []) as AssetCalibrationRecord[]);
     setPeople((peopleRes.data || []) as AssetPerson[]);
+    if (!suppliersRes.error) setSupplierReferences((suppliersRes.data || []) as CalibrationSupplierReference[]);
+    if (!statusLogsRes.error) setStatusLogs((statusLogsRes.data || []) as CalibrationStatusLog[]);
     setLastRefreshed(new Date().toLocaleString("en-GB"));
-    setMessage("Calibration register loaded.");
+    const optionalWarnings = [
+      suppliersRes.error ? "Supplier reference table not available yet." : "",
+      statusLogsRes.error ? "Status history table not available yet." : "",
+    ].filter(Boolean);
+    setMessage(optionalWarnings.length ? `Calibration register loaded. ${optionalWarnings.join(" ")}` : "Calibration register loaded.");
   }
 
   useEffect(() => {
@@ -483,6 +518,9 @@ function CalibrationPageContent() {
   const externalSupplierOptions = useMemo(() => {
     const suppliers = new Set<string>();
     defaultExternalCalibrationSuppliers.forEach((supplier) => suppliers.add(supplier));
+    supplierReferences.forEach((supplier) => {
+      if (supplier.active && supplier.name.trim()) suppliers.add(supplier.name.trim());
+    });
     customCalibrationSuppliers.forEach((supplier) => {
       if (supplier.trim()) suppliers.add(supplier.trim());
     });
@@ -492,7 +530,7 @@ function CalibrationPageContent() {
       if (supplier) suppliers.add(supplier);
     });
     return [...suppliers].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  }, [customCalibrationSuppliers, records]);
+  }, [customCalibrationSuppliers, records, supplierReferences]);
 
   useEffect(() => {
     if (!selectedAsset?.serial_number) return;
@@ -774,6 +812,10 @@ function CalibrationPageContent() {
         return bTime - aTime;
       });
   }, [allCalibrationRows, selectedCalibrationRow]);
+  const selectedStatusLogs = useMemo(() => {
+    if (!selectedCalibrationRow) return [];
+    return statusLogs.filter((log) => log.calibration_record_id === selectedCalibrationRow.id);
+  }, [selectedCalibrationRow, statusLogs]);
   const importableRows = useMemo(() => importRows.filter((row) => row.errors.length === 0), [importRows]);
   const skippedImportRows = useMemo(() => importRows.filter((row) => row.errors.length > 0), [importRows]);
 
@@ -784,6 +826,75 @@ function CalibrationPageContent() {
     setSearchFilter("");
     setStatusFilter(status);
     setItemStatusFilter("In Use");
+  }
+
+  function applyItemStatusDrilldown(status: CalibrationItemStatusFilter) {
+    setActiveView("register");
+    setShowRegisterFilters(true);
+    setAssetFilter("");
+    setSearchFilter("");
+    setStatusFilter("");
+    setItemStatusFilter(status);
+  }
+
+  async function rememberExternalSuppliers(suppliers: string[]) {
+    const cleanSuppliers = Array.from(new Set(suppliers.map((supplier) => supplier.trim()).filter(Boolean)));
+    if (cleanSuppliers.length === 0) return;
+
+    const nextSuppliers = Array.from(new Set([...customCalibrationSuppliers, ...cleanSuppliers])).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+    setCustomCalibrationSuppliers(nextSuppliers);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CUSTOM_SUPPLIERS_STORAGE_KEY, JSON.stringify(nextSuppliers));
+    }
+
+    const { error } = await supabase
+      .from("asset_calibration_suppliers")
+      .upsert(
+        cleanSuppliers.map((name) => ({ name, active: true })),
+        { onConflict: "name" }
+      );
+
+    if (!error) {
+      setSupplierReferences((prev) => {
+        const referenceMap = new Map(prev.map((supplier) => [supplier.name.toLowerCase(), supplier]));
+        cleanSuppliers.forEach((name) => {
+          const key = name.toLowerCase();
+          referenceMap.set(key, referenceMap.get(key) || { id: key, name, active: true, created_at: null });
+        });
+        return [...referenceMap.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+      });
+    }
+  }
+
+  function exportCalibrationRegister() {
+    const exportRows = calibrationRows.map((row) => {
+      const subject = buildCalibrationSubject(row);
+      return {
+        "Calibration Status": row.status,
+        "Item Status": getItemStatus(row.record.item_status),
+        "Item / Description": subject.title,
+        "Description Detail": subject.subtitle,
+        "Serial Number": row.record.serial_number || "",
+        "Calibration Date": formatDate(row.record.calibration_date),
+        "Date Issued": formatDate(getCalibrationDateIssued(row.record)),
+        "Due Date": formatDate(row.record.calibration_due_date),
+        "Days Remaining": row.daysRemaining ?? "",
+        "Certificate Number": row.record.certificate_number || row.record.reference || "",
+        "Certificate Attached": row.record.file_path ? "Yes" : "No",
+        "Calibration Type": row.record.calibration_type || "",
+        "Supplier / Person": row.record.calibrated_by || "",
+        "Asset Code": row.asset?.asset_code || "",
+        "Asset Name": row.asset?.name || "",
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Calibration Register");
+    XLSX.writeFile(workbook, `calibration-register-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    setMessage(`Exported ${exportRows.length} calibration row${exportRows.length === 1 ? "" : "s"} from the current register view.`);
   }
 
   function hasCreateAccess() {
@@ -874,13 +985,7 @@ function CalibrationPageContent() {
       if (error) throw new Error(error.message);
 
       if (form.calibrationType === "External" && form.calibratedBy === OTHER_SUPPLIER_VALUE) {
-        const nextSuppliers = Array.from(new Set([...customCalibrationSuppliers, calibratedByValue])).sort((a, b) =>
-          a.localeCompare(b, undefined, { sensitivity: "base" })
-        );
-        setCustomCalibrationSuppliers(nextSuppliers);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(CUSTOM_SUPPLIERS_STORAGE_KEY, JSON.stringify(nextSuppliers));
-        }
+        await rememberExternalSuppliers([calibratedByValue]);
       }
 
       setForm(emptyForm);
@@ -1011,16 +1116,7 @@ function CalibrationPageContent() {
       const { error } = await supabase.from("asset_calibration_records").insert(payload);
       if (error) throw new Error(error.message);
 
-      const nextSuppliers = Array.from(
-        new Set([
-          ...customCalibrationSuppliers,
-          ...importableRows.map((row) => row.supplier.trim()).filter(Boolean),
-        ])
-      ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-      setCustomCalibrationSuppliers(nextSuppliers);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(CUSTOM_SUPPLIERS_STORAGE_KEY, JSON.stringify(nextSuppliers));
-      }
+      await rememberExternalSuppliers(importableRows.map((row) => row.supplier));
 
       setImportRows([]);
       setImportFileName("");
@@ -1071,6 +1167,7 @@ function CalibrationPageContent() {
       itemStatus: getItemStatus(row.record.item_status),
     });
     setLastSuggestedEditDueDate("");
+    setItemStatusReason("");
     setRenewalCertificateFile(null);
     setAttachmentCertificateFile(null);
     setShowHistory(false);
@@ -1148,16 +1245,46 @@ function CalibrationPageContent() {
     if (!editForm || !selectedCalibrationRow) return;
     if (!requireEditAccess("update calibration item status")) return;
 
+    const previousStatus = getItemStatus(selectedCalibrationRow.record.item_status);
+    const nextStatus = editForm.itemStatus;
+    const reason = itemStatusReason.trim();
+
+    if (previousStatus !== nextStatus && !reason) {
+      setMessage("Status reason is required when changing an item's lifecycle status.");
+      return;
+    }
+
+    if (previousStatus === nextStatus) {
+      setMessage(`Item status is already ${nextStatus}.`);
+      return;
+    }
+
     try {
       setIsUpdating(true);
       const { error } = await supabase
         .from("asset_calibration_records")
-        .update({ item_status: editForm.itemStatus })
+        .update({ item_status: nextStatus })
         .eq("id", selectedCalibrationRow.id);
 
       if (error) throw new Error(error.message);
 
-      setMessage(`Item status updated to ${editForm.itemStatus}.`);
+      const { data: userData } = await supabase.auth.getUser();
+      const { error: logError } = await supabase.from("asset_calibration_status_log").insert([
+        {
+          calibration_record_id: selectedCalibrationRow.id,
+          item_status_from: previousStatus,
+          item_status_to: nextStatus,
+          reason,
+          created_by: userData.user?.email || userData.user?.id || null,
+        },
+      ]);
+
+      setItemStatusReason("");
+      setMessage(
+        logError
+          ? `Item status updated to ${nextStatus}, but status history could not be saved: ${logError.message}`
+          : `Item status updated to ${nextStatus} and recorded in the status history.`
+      );
       await loadData();
     } catch (error) {
       const err = error as Error;
@@ -1347,27 +1474,13 @@ function CalibrationPageContent() {
           title="Excluded Items"
           value={availabilityMetrics.excluded}
           accent="#7c3aed"
-          onClick={() => {
-            setActiveView("register");
-            setShowRegisterFilters(true);
-            setAssetFilter("");
-            setSearchFilter("");
-            setStatusFilter("");
-            setItemStatusFilter("all");
-          }}
+          onClick={() => applyItemStatusDrilldown("all")}
         />
         <QualityKpiCard
           title="Missing Certs"
           value={dashboardMetrics.missingCertificates}
           accent="#2563eb"
-          onClick={() => {
-            setActiveView("register");
-            setShowRegisterFilters(true);
-            setAssetFilter("");
-            setSearchFilter("");
-            setStatusFilter("");
-            setItemStatusFilter("In Use");
-          }}
+          onClick={() => applyItemStatusDrilldown("In Use")}
         />
       </section>
 
@@ -1407,6 +1520,7 @@ function CalibrationPageContent() {
                   max={Math.max(1, currentCalibrationRows.length)}
                   color={bucket.tone}
                   bg={bucket.bg}
+                  onClick={() => applyItemStatusDrilldown(bucket.label as CalibrationItemStatus)}
                 />
               ))}
             </div>
@@ -1928,17 +2042,20 @@ function CalibrationPageContent() {
             showFilters={showRegisterFilters}
             onToggleFilters={() => setShowRegisterFilters((prev) => !prev)}
             actions={
-              <ImsButton
-                variant="secondary"
-                onClick={() => {
-                  setAssetFilter("");
-                  setSearchFilter("");
-                  setStatusFilter("");
-                  setItemStatusFilter(defaultItemStatusFilter);
-                }}
-              >
-                Clear Filters
-              </ImsButton>
+              <>
+                <ImsButton onClick={exportCalibrationRegister}>Export Register</ImsButton>
+                <ImsButton
+                  variant="secondary"
+                  onClick={() => {
+                    setAssetFilter("");
+                    setSearchFilter("");
+                    setStatusFilter("");
+                    setItemStatusFilter(defaultItemStatusFilter);
+                  }}
+                >
+                  Clear Filters
+                </ImsButton>
+              </>
             }
           >
             <Field label="Asset">
@@ -2167,6 +2284,21 @@ function CalibrationPageContent() {
                 </select>
               </Field>
 
+              <div style={wideFieldStyle}>
+                <Field label="Lifecycle Reason / Status Notes">
+                  <textarea
+                    value={itemStatusReason}
+                    onChange={(e) => setItemStatusReason(e.target.value)}
+                    rows={3}
+                    style={textareaStyle}
+                    placeholder="Required when changing item status, for example damaged during use, removed from service, recovered, or marked historic"
+                  />
+                  <div style={helperTextStyle}>
+                    Current item status: {selectedCalibrationRow ? getItemStatus(selectedCalibrationRow.record.item_status) : "-"}.
+                  </div>
+                </Field>
+              </div>
+
               <Field label="Calibration Due Date">
                 <input
                   type="date"
@@ -2265,6 +2397,7 @@ function CalibrationPageContent() {
                   setEditForm(null);
                   setShowHistory(false);
                   setAttachmentCertificateFile(null);
+                  setItemStatusReason("");
                 }}
               >
                 Close
@@ -2281,6 +2414,37 @@ function CalibrationPageContent() {
               ) : null}
             </div>
           </form>
+
+          {selectedCalibrationRow ? (
+            <div style={statusLogPanelStyle}>
+              <div style={historyHeaderStyle}>
+                <div>
+                  <div style={historyTitleStyle}>Item Status History</div>
+                  <div style={historySubtitleStyle}>
+                    Retained lifecycle notes for damaged, missing / lost, historic, and service-status changes.
+                  </div>
+                </div>
+              </div>
+              {selectedStatusLogs.length === 0 ? (
+                <div style={statusLogEmptyStyle}>No item status changes have been logged for this calibration item yet.</div>
+              ) : (
+                <div style={statusLogListStyle}>
+                  {selectedStatusLogs.slice(0, 6).map((log) => (
+                    <div key={log.id} style={statusLogItemStyle}>
+                      <div style={statusLogTopLineStyle}>
+                        <span>
+                          {log.item_status_from || "Not set"} to {log.item_status_to}
+                        </span>
+                        <strong>{formatDateTime(log.created_at)}</strong>
+                      </div>
+                      <div style={statusLogReasonStyle}>{log.reason || "No reason recorded"}</div>
+                      {log.created_by ? <div style={cellMetaStyle}>Recorded by {log.created_by}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
 
           {showHistory && selectedCalibrationRow ? (
             <div style={historyPanelStyle}>
@@ -2578,17 +2742,18 @@ function DashboardBarRow({
   max,
   color,
   bg,
+  onClick,
 }: {
   label: string;
   value: number;
   max: number;
   color: string;
   bg: string;
+  onClick?: () => void;
 }) {
   const width = max ? Math.max(value > 0 ? 8 : 0, Math.round((value / max) * 100)) : 0;
-
-  return (
-    <div style={barRowStyle}>
+  const content = (
+    <>
       <div style={barRowHeaderStyle}>
         <span>{label}</span>
         <strong>{value}</strong>
@@ -2596,6 +2761,20 @@ function DashboardBarRow({
       <div style={{ ...barTrackStyle, background: bg }}>
         <div style={{ ...barFillStyle, width: `${width}%`, background: color }} />
       </div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" style={{ ...barRowStyle, ...barRowButtonStyle }} onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div style={barRowStyle}>
+      {content}
     </div>
   );
 }
@@ -2929,6 +3108,15 @@ const barChartStackStyle: CSSProperties = {
 const barRowStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
+};
+
+const barRowButtonStyle: CSSProperties = {
+  width: "100%",
+  border: "none",
+  background: "transparent",
+  padding: 0,
+  textAlign: "left",
+  cursor: "pointer",
 };
 
 const barRowHeaderStyle: CSSProperties = {
@@ -3609,6 +3797,53 @@ const historyPanelStyle: CSSProperties = {
   marginTop: "18px",
   borderTop: "1px solid #e2e8f0",
   paddingTop: "18px",
+};
+
+const statusLogPanelStyle: CSSProperties = {
+  marginTop: "18px",
+  border: "1px solid #dbe7f3",
+  borderRadius: "16px",
+  background: "#f8fafc",
+  padding: "14px",
+};
+
+const statusLogEmptyStyle: CSSProperties = {
+  border: "1px dashed #cbd5e1",
+  borderRadius: "12px",
+  background: "#ffffff",
+  padding: "12px",
+  color: "#64748b",
+  fontSize: "13px",
+  fontWeight: 700,
+};
+
+const statusLogListStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const statusLogItemStyle: CSSProperties = {
+  border: "1px solid #e2e8f0",
+  borderRadius: "12px",
+  background: "#ffffff",
+  padding: "10px 12px",
+};
+
+const statusLogTopLineStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+  flexWrap: "wrap",
+  color: "#0f172a",
+  fontSize: "13px",
+  fontWeight: 900,
+};
+
+const statusLogReasonStyle: CSSProperties = {
+  marginTop: "6px",
+  color: "#334155",
+  fontSize: "13px",
+  lineHeight: 1.45,
 };
 
 const historyHeaderStyle: CSSProperties = {

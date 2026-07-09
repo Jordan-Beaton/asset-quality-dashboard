@@ -1501,6 +1501,7 @@ function NcrCapaPageContent() {
   ) {
     if (!files.length) return { ok: true as const };
 
+    const uploadedPaths: string[] = [];
     const metadataRows: Array<{
       record_type: "NCR" | "CAPA";
       record_id: string;
@@ -1509,6 +1510,7 @@ function NcrCapaPageContent() {
       file_size: number;
       content_type: string;
       notes: string | null;
+      uploaded_at: string;
     }> = [];
 
     for (const file of files) {
@@ -1526,6 +1528,8 @@ function NcrCapaPageContent() {
         return { ok: false as const, message: uploadError.message };
       }
 
+      uploadedPaths.push(filePath);
+
       metadataRows.push({
         record_type: recordType,
         record_id: recordId,
@@ -1534,11 +1538,29 @@ function NcrCapaPageContent() {
         file_size: file.size,
         content_type: file.type || "application/octet-stream",
         notes: notes.trim() || null,
+        uploaded_at: new Date().toISOString(),
       });
     }
 
     const { error: metadataError } = await supabase.from("evidence_files").insert(metadataRows);
-    if (metadataError) return { ok: false as const, message: metadataError.message };
+
+    if (metadataError) {
+      const shouldRetryLegacyInsert =
+        metadataError.code === "PGRST204" ||
+        /content_type|notes|uploaded_at|schema cache/i.test(metadataError.message);
+
+      if (shouldRetryLegacyInsert) {
+        const legacyRows = metadataRows.map(({ content_type, notes, uploaded_at, ...row }) => row);
+        const { error: legacyError } = await supabase.from("evidence_files").insert(legacyRows);
+        if (!legacyError) return { ok: true as const };
+      }
+
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from("quality-evidence").remove(uploadedPaths);
+      }
+
+      return { ok: false as const, message: metadataError.message };
+    }
 
     return { ok: true as const };
   }
