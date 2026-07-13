@@ -37,6 +37,11 @@ Asset Management exists but its UI layout has lagged behind Quality and HSE. Fut
 - Asset Register, Calibration Register, Asset Actions, Asset People, and Asset Reports saved-report registers now use shared IMS register/filter/table primitives aligned to Quality/HSE patterns.
 - Asset Maintenance debug console output was removed from the save flow.
 - Asset Dashboard/Register, Calibration, Inspection, Maintenance, Asset Actions, Asset People, and Asset Reports now have page-level permission guards around key create/edit/delete/upload/action-generation mutation handlers, supplementing the AppShell click/submit guards.
+- Latest Asset spot check aligned visible write controls with those guards:
+  - Asset Actions create tab/submit now disables without create access and shows the IMS permission notice.
+  - Asset Inspection and Maintenance create, linked action generation, remove, and save buttons now disable for restricted users.
+  - Asset People add, activate/deactivate, and save buttons now disable for restricted users.
+  - Asset Calibration create/import/new-history/action-generation, certificate attach, item-status save, and remove buttons now disable for restricted users.
 
 ## Layout Direction
 
@@ -52,7 +57,7 @@ Asset Management exists but its UI layout has lagged behind Quality and HSE. Fut
 2. Verify linked Asset Inspection/Maintenance/Calibration action creation on Vercel with real records, including source fields and return/search behavior in central Action Management.
 3. Review mobile Asset Inspection and Maintenance registers on device/browser after the table conversion, especially horizontal scroll, filter search, and detail-panel scroll.
 4. Continue low-risk migration of remaining local Asset panel/button styles toward shared primitives.
-5. Run a role-based Vercel spot check for Asset create/edit/read-only users after real-data workflow QA.
+5. Run a role-based Vercel spot check for Asset create/edit/read-only users after the local button-state alignment and real-data workflow QA.
 
 ## Document Numbering Link
 

@@ -68,9 +68,11 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 
 ## Known Logic Issue
 
-- Rejection fields need tightening.
-- Reject fields should only persist when Reject is actually clicked.
-- Approving/reviewing should clear rejection fields.
+- Rejection field cleanup has been tightened in the local Document Control page and workflow email API:
+  - Reject fields persist only when the document workflow status is `Rejected`.
+  - Submit/review/send-to-approver/approve paths explicitly clear rejected by/date/reason.
+  - Controlled file upload now follows the same workflow-status rules and clears stale rejection fields on non-rejected paths.
+- Verify the full reject -> resubmit -> review -> approve flow on Vercel with a real document before clearing this item completely.
 
 ## Warnings
 

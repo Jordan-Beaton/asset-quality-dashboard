@@ -61,6 +61,7 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, gree
 - PDF outputs need consistent header/footer and aligned tables.
 - Item evidence upload exists per checklist item.
 - QR mobile flow exists.
+- Create inspection, save/delete inspection, existing and staged evidence upload/delete/remove, and linked HSE Action creation shortcuts now use page-level create/edit permission guards with matching disabled controls.
 
 ## Observations
 
@@ -69,7 +70,8 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, gree
 - Wording changed to `Observation Card` and `Contact Details`.
 - Register has Show Filters, detail panel, delete, and OBS-001 numbering.
 - Observations link to Action Management.
-- Submit button fix needs verification: after submit it should say Submitted, not remain Submitting.
+- Public `/observe` submit handling is hardened so failed network/API paths leave the `Submitting` state; successful submissions show the submitted observation number.
+- Secured HSE Observations review save/delete and central action generation controls now use page-level create/edit permission guards.
 
 ## PTW
 

@@ -48,26 +48,30 @@ export default function PublicObservationPage() {
     setMessage("Submitting observation...");
     setSubmittedNumber("");
 
-    const formData = new FormData(form);
-    formData.set("reporter_type", reporterType);
+    try {
+      const formData = new FormData(form);
+      formData.set("reporter_type", reporterType);
 
-    const response = await fetch("/api/hse-observations", {
-      method: "POST",
-      body: formData,
-    });
-    const result = await response.json().catch(() => ({}));
+      const response = await fetch("/api/hse-observations", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      setMessage(result.error || "Observation could not be submitted. Please try again.");
+      if (!response.ok) {
+        setMessage(result.error || "Observation could not be submitted. Please try again.");
+        return;
+      }
+
+      setSubmittedNumber(result.observationNumber || "");
+      setMessage(`Thank you. Your observation has been logged${result.observationNumber ? ` as ${result.observationNumber}` : ""}.`);
+      form.reset();
+      setShowContact(false);
+    } catch (error) {
+      setMessage(`Observation could not be submitted: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
       setSubmitting(false);
-      return;
     }
-
-    setSubmittedNumber(result.observationNumber || "");
-    setMessage(`Thank you. Your observation has been logged${result.observationNumber ? ` as ${result.observationNumber}` : ""}.`);
-    form.reset();
-    setShowContact(false);
-    setSubmitting(false);
   }
 
   return (

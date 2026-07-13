@@ -1845,7 +1845,7 @@ function CalibrationPageContent() {
             </div>
 
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
+              <button type="submit" style={primaryButtonStyle} disabled={isSaving || !hasCreateAccess()}>
                 {isSaving ? "Saving..." : "Add Calibration Record"}
               </button>
             </div>
@@ -1923,7 +1923,7 @@ function CalibrationPageContent() {
                 type="button"
                 style={primaryButtonStyle}
                 onClick={() => void importCalibrationRows()}
-                disabled={importableRows.length === 0 || isImportingCalibration}
+                disabled={importableRows.length === 0 || isImportingCalibration || !hasCreateAccess()}
               >
                 {isImportingCalibration ? "Importing..." : `Import ${importableRows.length} Records`}
               </button>
@@ -2352,7 +2352,7 @@ function CalibrationPageContent() {
                       type="button"
                       style={secondaryButtonStyle}
                       onClick={() => void attachCertificateToSelectedRecord()}
-                      disabled={!attachmentCertificateFile || isUpdating}
+                      disabled={!attachmentCertificateFile || isUpdating || !hasEditAccess()}
                     >
                       Attach Certificate
                     </button>
@@ -2362,7 +2362,7 @@ function CalibrationPageContent() {
             ) : null}
 
             <div style={detailActionRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={isUpdating}>
+              <button type="submit" style={primaryButtonStyle} disabled={isUpdating || !hasCreateAccess()}>
                 {isUpdating ? "Saving..." : "Save New History Record"}
               </button>
               {selectedCalibrationRow?.record.file_path ? (
@@ -2376,12 +2376,12 @@ function CalibrationPageContent() {
                 </button>
               ) : null}
               {selectedCalibrationRow ? (
-                <button type="button" style={secondaryButtonStyle} onClick={() => void saveSelectedItemStatus()} disabled={isUpdating}>
+                <button type="button" style={secondaryButtonStyle} onClick={() => void saveSelectedItemStatus()} disabled={isUpdating || !hasEditAccess()}>
                   Save Item Status
                 </button>
               ) : null}
               {selectedCalibrationRow ? (
-                <button type="button" style={secondaryButtonStyle} onClick={() => generateActionFromCalibration(selectedCalibrationRow)}>
+                <button type="button" style={secondaryButtonStyle} onClick={() => generateActionFromCalibration(selectedCalibrationRow)} disabled={!hasCreateAccess()}>
                   Generate Action
                 </button>
               ) : null}
@@ -2407,7 +2407,7 @@ function CalibrationPageContent() {
                   type="button"
                   style={dangerButtonStyle}
                   onClick={() => void removeCalibration(selectedCalibrationRow)}
-                  disabled={deletingId === selectedCalibrationRow.id}
+                  disabled={deletingId === selectedCalibrationRow.id || !hasEditAccess()}
                 >
                   {deletingId === selectedCalibrationRow.id ? "Removing..." : "Remove Record"}
                 </button>

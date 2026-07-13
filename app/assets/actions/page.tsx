@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useImsPermissions } from "../../../src/components/ImsPermissions";
+import { ImsPermissionNotice, useImsPermissions } from "../../../src/components/ImsPermissions";
 import { ImsButton, ImsFilterPanel, ImsPanel, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
@@ -686,6 +686,7 @@ export default function AssetActionsPage() {
 
   return (
     <main>
+      <ImsPermissionNotice />
       <QualityPageHero
         label="ASSET MANAGEMENT"
         title="Asset Actions"
@@ -705,7 +706,7 @@ export default function AssetActionsPage() {
 
       <nav style={viewNavStyle}>
         {viewTabs.map((tab) => (
-          <button key={tab.id} type="button" style={activeView === tab.id ? activeViewButtonStyle : viewButtonStyle} onClick={() => setActiveView(tab.id)}>
+          <button key={tab.id} type="button" style={activeView === tab.id ? activeViewButtonStyle : viewButtonStyle} onClick={() => setActiveView(tab.id)} disabled={tab.id === "create" && !hasCreateAccess()}>
             {tab.label}
           </button>
         ))}
@@ -980,7 +981,7 @@ export default function AssetActionsPage() {
               </div>
             </div>
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={saving}>{saving ? "Creating..." : "Create Asset Action"}</button>
+              <button type="submit" style={primaryButtonStyle} disabled={saving || !hasCreateAccess()}>{saving ? "Creating..." : "Create Asset Action"}</button>
               <span style={emptyTextStyle}>This will appear in the central Action Management register automatically.</span>
             </div>
           </form>

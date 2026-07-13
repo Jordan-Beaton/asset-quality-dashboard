@@ -28,7 +28,10 @@ Admin / Settings controls login users, invites, permissions, reference data, and
 - Module cards on Home remain visible but show No Access if the user has no access.
 - `None` module permission now denies module access properly.
 - Fine-grained tab permissions are stored and used for route/page access.
-- Some button-level create/edit/delete enforcement may still need hardening across all modules.
+- Admin / Settings now has direct page-level create/edit permission guards:
+  - Create permission is required to invite new users and add reference departments/projects.
+  - Edit permission is required to change existing user access, send setup/reset links, update role defaults, save company settings, and save tab permissions.
+  - Matching primary write controls are disabled for restricted users.
 
 ## Invite/Login Flow
 
@@ -69,8 +72,4 @@ Admin / Settings controls login users, invites, permissions, reference data, and
   - user creates password
   - permissions apply correctly
 - Continue Admin / Settings polish.
-- Audit button-level permission enforcement:
-  - View should not allow create/edit/delete.
-  - Create should allow new records but not editing existing records unless edit is granted.
-  - Edit should allow modifying existing records.
-
+- Verify Admin / Settings create/edit/read-only behavior on Vercel after the page-level guard pass.

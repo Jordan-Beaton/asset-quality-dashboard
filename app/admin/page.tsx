@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { ImsPermissionNotice, useImsPermissions } from "../../src/components/ImsPermissions";
 import { ImsButton, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
@@ -353,6 +354,7 @@ function StatusPill({ children, tone = "neutral" }: { children: ReactNode; tone?
 }
 
 export default function AdminDashboardPage() {
+  const imsPermissions = useImsPermissions();
   const [activeView, setActiveView] = useState<AdminView>("users");
   const [data, setData] = useState<AdminData | null>(null);
   const [message, setMessage] = useState("Loading Admin / Settings...");
@@ -386,6 +388,20 @@ export default function AdminDashboardPage() {
   const [roleDrafts, setRoleDrafts] = useState<Record<string, Partial<RoleRow>>>({});
   const [tabPermissionDrafts, setTabPermissionDrafts] = useState<Record<string, Record<string, TabPermissionRow>>>({});
   const [inviteTabPermissionDrafts, setInviteTabPermissionDrafts] = useState<Record<string, TabPermissionRow>>({});
+  const canCreateAdmin = imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  const canEditAdmin = imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+
+  function requireCreatePermission(action: string) {
+    if (canCreateAdmin) return true;
+    setMessage(`Read-only access: you do not have permission to ${action}.`);
+    return false;
+  }
+
+  function requireEditPermission(action: string) {
+    if (canEditAdmin) return true;
+    setMessage(`Read-only access: you do not have permission to ${action}.`);
+    return false;
+  }
 
   async function loadAdminData() {
     setIsLoading(true);
@@ -633,6 +649,7 @@ export default function AdminDashboardPage() {
   }
 
   async function inviteUser() {
+    if (!requireCreatePermission("invite Admin users")) return;
     const ok = await postAdminAction(
       "inviteUser",
       { ...inviteForm, tab_permissions: getInviteTabPermissionsPayload() },
@@ -662,6 +679,7 @@ export default function AdminDashboardPage() {
   }
 
   async function updatePersonAccess(person: PersonRow, updates: Partial<PersonRow>) {
+    if (!requireEditPermission("edit Admin user access")) return false;
     const ok = await postAdminAction(
       "updatePersonAccess",
       { ...person, ...updates },
@@ -678,11 +696,13 @@ export default function AdminDashboardPage() {
   }
 
   async function sendExistingInvite(person: PersonRow, authUser: AuthUserRow | null) {
+    if (!requireEditPermission("send setup links")) return;
     const label = authUser ? "Password setup link" : "Invite link";
     await postAdminAction("sendExistingInvite", { id: person.id }, `${label} sent to ${person.email || person.name}.`);
   }
 
   async function copySetupLink(person: PersonRow) {
+    if (!requireEditPermission("copy setup links")) return;
     setIsSaving(true);
     try {
       const response = await fetch("/api/admin-settings", {
@@ -706,7 +726,13 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function sendPasswordReset(person: PersonRow) {
+    if (!requireEditPermission("send password reset emails")) return;
+    await postAdminAction("resetPassword", { email: person.email }, `Password reset email sent to ${person.email}.`);
+  }
+
   async function updateRolePermissions(role: RoleRow) {
+    if (!requireEditPermission("edit Admin roles")) return;
     const draft = getRoleDraft(role);
     const ok = await postAdminAction("updateRole", draft as Record<string, unknown>, `${role.role_name} permissions saved successfully.`);
     if (ok) {
@@ -719,6 +745,7 @@ export default function AdminDashboardPage() {
   }
 
   async function saveTabPermissions(person: PersonRow) {
+    if (!requireEditPermission("edit Admin tab permissions")) return false;
     const permissions = modulePermissionDefinitions.flatMap((definition) => {
       return definition.areas.map(([areaKey]) => getTabPermissionDraft(person, definition.moduleKey, areaKey));
     });
@@ -759,7 +786,7 @@ export default function AdminDashboardPage() {
             <SelectField
               value={isMaster ? "Active" : draft.access_status || "Active"}
               onChange={(value) => setPersonDraft(person, { access_status: value })}
-              disabled={isSaving || isMaster}
+              disabled={isSaving || isMaster || !canEditAdmin}
             >
               {accessStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
             </SelectField>
@@ -799,7 +826,7 @@ export default function AdminDashboardPage() {
                     : {}),
                 });
               }}
-              disabled={isSaving || isMaster}
+              disabled={isSaving || isMaster || !canEditAdmin}
             >
               {permissionOverrideOptions.map((option) => <option key={option} value={option}>{option}</option>)}
             </SelectField>
@@ -831,7 +858,7 @@ export default function AdminDashboardPage() {
                         key={mode}
                         type="button"
                         onClick={() => setModuleAccessMode(person, definition.accessField, definition.moduleKey, mode)}
-                        disabled={isSaving || isMaster}
+                        disabled={isSaving || isMaster || !canEditAdmin}
                         style={{
                           ...permissionModeButtonStyle,
                           ...(moduleAccessValue === mode ? permissionModeButtonActiveStyle : {}),
@@ -862,7 +889,7 @@ export default function AdminDashboardPage() {
                                 type="checkbox"
                                 checked={Boolean(permission.full_access || permission[field])}
                                 onChange={(event) => setTabPermissionDraft(person, definition.moduleKey, areaKey, { [field]: event.target.checked })}
-                                disabled={isSaving || isMaster}
+                                disabled={isSaving || isMaster || !canEditAdmin}
                               />
                             </label>
                           ))}
@@ -882,6 +909,7 @@ export default function AdminDashboardPage() {
             onChange={(event) => setPersonDraft(person, { permissions_notes: event.target.value })}
             style={{ ...imsInputStyle, minHeight: 74 }}
             placeholder="Reason for custom access."
+            disabled={!canEditAdmin}
           />
         </Field>
 
@@ -891,12 +919,12 @@ export default function AdminDashboardPage() {
               const ok = await updatePersonAccess(person, draft);
               if (ok) await saveTabPermissions({ ...person, ...draft });
             }}
-            disabled={isSaving || (!personDrafts[person.id] && !tabPermissionDrafts[person.id])}
+            disabled={isSaving || !canEditAdmin || (!personDrafts[person.id] && !tabPermissionDrafts[person.id])}
           >
             Save Permissions
           </ImsButton>
           {person.email ? (
-            <ImsButton variant="secondary" onClick={() => postAdminAction("resetPassword", { email: person.email }, `Password reset email sent to ${person.email}.`)} disabled={isSaving}>
+            <ImsButton variant="secondary" onClick={() => sendPasswordReset(person)} disabled={isSaving || !canEditAdmin}>
               Send Reset Email
             </ImsButton>
           ) : null}
@@ -906,21 +934,25 @@ export default function AdminDashboardPage() {
   }
 
   async function saveCompany() {
+    if (!requireEditPermission("edit company settings")) return;
     await postAdminAction("updateCompany", companyForm as Record<string, unknown>, "Company settings saved successfully.");
   }
 
   async function addDepartment() {
+    if (!requireCreatePermission("add Admin reference departments")) return;
     const ok = await postAdminAction("addDepartment", newDepartment, `${newDepartment.name} added successfully.`);
     if (ok) setNewDepartment({ name: "", code: "" });
   }
 
   async function addProject() {
+    if (!requireCreatePermission("add Admin reference projects")) return;
     const ok = await postAdminAction("addProject", newProject, `${newProject.name} added successfully.`);
     if (ok) setNewProject({ name: "", type: "Project" });
   }
 
   return (
     <main>
+      <ImsPermissionNotice />
       <QualityPageHero
         label="ADMIN / SETTINGS"
         title="Admin Console"
@@ -974,7 +1006,7 @@ export default function AdminDashboardPage() {
           <ImsPanel title="Invite User" subtitle="Create a login-ready person record, assign permissions, and send the setup invite.">
             <div style={inviteHeaderRowStyle}>
               <p style={paragraphStyle}>Use this only for new system users. Existing People records can be invited from the user list below.</p>
-              <ImsButton variant={showInvitePanel ? "secondary" : "primary"} onClick={() => setShowInvitePanel(!showInvitePanel)}>
+              <ImsButton variant={showInvitePanel ? "secondary" : "primary"} onClick={() => setShowInvitePanel(!showInvitePanel)} disabled={!canCreateAdmin}>
                 {showInvitePanel ? "Hide Invite" : "Invite New User"}
               </ImsButton>
             </div>
@@ -1023,6 +1055,7 @@ export default function AdminDashboardPage() {
                                   key={option}
                                   type="button"
                                   onClick={() => setInviteModuleAccessMode(module, option)}
+                                  disabled={!canCreateAdmin}
                                   style={{
                                     ...invitePermissionOptionStyle,
                                     ...(active ? invitePermissionOptionActiveStyle : {}),
@@ -1056,6 +1089,7 @@ export default function AdminDashboardPage() {
                                             [field]: event.target.checked,
                                             full_access: false,
                                           })}
+                                          disabled={!canCreateAdmin}
                                         />
                                       </label>
                                     ))}
@@ -1078,7 +1112,7 @@ export default function AdminDashboardPage() {
                   />
                 </Field>
                 <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
-                  <ImsButton onClick={inviteUser} disabled={isSaving}>Send Invite Link</ImsButton>
+                  <ImsButton onClick={inviteUser} disabled={isSaving || !canCreateAdmin}>Send Invite Link</ImsButton>
                 </div>
               </div>
             ) : null}
@@ -1154,7 +1188,7 @@ export default function AdminDashboardPage() {
                                   onClick={() => {
                                     void sendExistingInvite(person, authUser);
                                   }}
-                                  disabled={isSaving}
+                                  disabled={isSaving || !canEditAdmin}
                                 >
                                   {authUser ? "Resend Setup" : "Send Invite"}
                                 </ImsButton>
@@ -1165,7 +1199,7 @@ export default function AdminDashboardPage() {
                                   onClick={() => {
                                     void copySetupLink(person);
                                   }}
-                                  disabled={isSaving}
+                                  disabled={isSaving || !canEditAdmin}
                                 >
                                   Copy Setup Link
                                 </ImsButton>
@@ -1210,7 +1244,7 @@ export default function AdminDashboardPage() {
                         <h3 style={roleCardTitleStyle}>{role.role_name}</h3>
                         {isAdminRole ? <StatusPill tone="good">Protected Full Access</StatusPill> : null}
                       </div>
-                      <ImsButton onClick={() => updateRolePermissions(role)} disabled={isSaving || !hasDraft || isAdminRole}>
+                      <ImsButton onClick={() => updateRolePermissions(role)} disabled={isSaving || !canEditAdmin || !hasDraft || isAdminRole}>
                         Save Role
                       </ImsButton>
                     </div>
@@ -1231,7 +1265,7 @@ export default function AdminDashboardPage() {
                           <SelectField
                             value={String((draft as Record<string, unknown>)[key as string] || (key === "document_access" ? "Role Default" : "None"))}
                             onChange={(value) => setRoleDraft(role, { [key as string]: value } as Partial<RoleRow>)}
-                            disabled={isSaving || isAdminRole}
+                            disabled={isSaving || !canEditAdmin || isAdminRole}
                           >
                             {(options as string[]).map((option) => <option key={option} value={option}>{option}</option>)}
                           </SelectField>
@@ -1242,7 +1276,7 @@ export default function AdminDashboardPage() {
                           value={draft.description || ""}
                           onChange={(event) => setRoleDraft(role, { description: event.target.value })}
                           style={{ ...imsInputStyle, minHeight: 72 }}
-                          disabled={isSaving}
+                          disabled={isSaving || !canEditAdmin}
                         />
                       </Field>
                     </div>
@@ -1302,7 +1336,7 @@ export default function AdminDashboardPage() {
                               : {}),
                           });
                         }}
-                        disabled={isSaving || isMaster}
+                        disabled={isSaving || !canEditAdmin || isMaster}
                       >
                         {permissionOverrideOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                       </SelectField>
@@ -1332,7 +1366,7 @@ export default function AdminDashboardPage() {
                                     key={mode}
                                     type="button"
                                     onClick={() => setModuleAccessMode(person, definition.accessField, definition.moduleKey, mode)}
-                                    disabled={isSaving || isMaster}
+                                    disabled={isSaving || !canEditAdmin || isMaster}
                                     style={{
                                       ...permissionModeButtonStyle,
                                       ...(moduleAccessValue === mode ? permissionModeButtonActiveStyle : {}),
@@ -1363,7 +1397,7 @@ export default function AdminDashboardPage() {
                                             type="checkbox"
                                             checked={Boolean(permission.full_access || permission[field])}
                                             onChange={(event) => setTabPermissionDraft(person, definition.moduleKey, areaKey, { [field]: event.target.checked })}
-                                            disabled={isSaving || isMaster}
+                                            disabled={isSaving || !canEditAdmin || isMaster}
                                           />
                                         </label>
                                       ))}
@@ -1382,6 +1416,7 @@ export default function AdminDashboardPage() {
                         onChange={(event) => setPersonDraft(person, { permissions_notes: event.target.value })}
                         style={{ ...imsInputStyle, minHeight: 76 }}
                         placeholder="Reason for any custom access, e.g. Full access due IMS ownership."
+                        disabled={!canEditAdmin}
                       />
                     </Field>
                     <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
@@ -1390,7 +1425,7 @@ export default function AdminDashboardPage() {
                           const ok = await updatePersonAccess(person, draft);
                           if (ok) await saveTabPermissions({ ...person, ...draft });
                         }}
-                        disabled={isSaving || (!personDrafts[person.id] && !tabPermissionDrafts[person.id])}
+                        disabled={isSaving || !canEditAdmin || (!personDrafts[person.id] && !tabPermissionDrafts[person.id])}
                       >
                         Save Permissions
                       </ImsButton>
@@ -1432,7 +1467,7 @@ export default function AdminDashboardPage() {
               <textarea value={companyForm.address || ""} onChange={(event) => setCompanyForm({ ...companyForm, address: event.target.value })} style={{ ...imsInputStyle, minHeight: 90 }} />
             </Field>
             <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
-              <ImsButton onClick={saveCompany} disabled={isSaving}>Save Company Profile</ImsButton>
+              <ImsButton onClick={saveCompany} disabled={isSaving || !canEditAdmin}>Save Company Profile</ImsButton>
             </div>
           </div>
         </ImsPanel>
@@ -1444,7 +1479,7 @@ export default function AdminDashboardPage() {
             <div style={{ ...formGridStyle, gridTemplateColumns: "1fr 140px auto", marginBottom: 16 }}>
               <input value={newDepartment.name} onChange={(event) => setNewDepartment({ ...newDepartment, name: event.target.value })} style={imsInputStyle} placeholder="Department name" />
               <input value={newDepartment.code} onChange={(event) => setNewDepartment({ ...newDepartment, code: event.target.value.toUpperCase() })} style={imsInputStyle} placeholder="Code" />
-              <ImsButton onClick={addDepartment} disabled={isSaving}>Add</ImsButton>
+              <ImsButton onClick={addDepartment} disabled={isSaving || !canCreateAdmin}>Add</ImsButton>
             </div>
             <ReferenceList items={departments.map((department) => ({ id: department.id, label: department.name, meta: department.code || "", active: department.active }))} />
           </ImsPanel>
@@ -1458,7 +1493,7 @@ export default function AdminDashboardPage() {
                 <option value="Site">Site</option>
                 <option value="Client">Client</option>
               </SelectField>
-              <ImsButton onClick={addProject} disabled={isSaving}>Add</ImsButton>
+              <ImsButton onClick={addProject} disabled={isSaving || !canCreateAdmin}>Add</ImsButton>
             </div>
             <ReferenceList items={projects.map((project) => ({ id: project.id, label: project.name, meta: project.type || "Project", active: project.active }))} />
           </ImsPanel>

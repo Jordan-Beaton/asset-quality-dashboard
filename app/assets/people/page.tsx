@@ -273,7 +273,7 @@ function PeoplePageContent() {
             </div>
 
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
+              <button type="submit" style={primaryButtonStyle} disabled={isSaving || !hasCreateAccess()}>
                 {isSaving ? "Saving..." : "Add Person"}
               </button>
             </div>
@@ -430,7 +430,7 @@ function PeoplePageContent() {
                     type="button"
                     style={detailForm.active ? dangerButtonStyle : miniButtonStyle}
                     onClick={() => void toggleSelectedPerson(!detailForm.active)}
-                    disabled={isToggling}
+                    disabled={isToggling || !hasEditAccess()}
                   >
                     {isToggling ? "Updating..." : detailForm.active ? "Deactivate" : "Reactivate"}
                   </button>
@@ -438,7 +438,7 @@ function PeoplePageContent() {
                     type="button"
                     style={primaryButtonStyle}
                     onClick={() => void saveDetail()}
-                    disabled={isSavingDetail}
+                    disabled={isSavingDetail || !hasEditAccess()}
                   >
                     {isSavingDetail ? "Saving..." : "Save Changes"}
                   </button>

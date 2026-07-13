@@ -836,7 +836,7 @@ function InspectionPageContent() {
             </div>
 
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
+              <button type="submit" style={primaryButtonStyle} disabled={isSaving || !hasCreateAccess()}>
                 {isSaving ? "Saving..." : "Save Inspection Record"}
               </button>
             </div>
@@ -864,6 +864,7 @@ function InspectionPageContent() {
                   onClick={() => {
                     setActiveView("create");
                   }}
+                  disabled={!hasCreateAccess()}
                 >
                   Create Inspection
                 </ImsButton>
@@ -1149,6 +1150,7 @@ function InspectionPageContent() {
                       type="button"
                       style={actionLinkButtonStyle}
                       onClick={() => generateActionFromInspection(selectedRecord)}
+                      disabled={!hasCreateAccess()}
                     >
                       Generate Action
                     </button>
@@ -1162,7 +1164,7 @@ function InspectionPageContent() {
                     type="button"
                     style={dangerButtonStyle}
                     onClick={() => void removeRecord(selectedRecord)}
-                    disabled={deletingId === selectedRecord.id}
+                    disabled={deletingId === selectedRecord.id || !hasEditAccess()}
                   >
                     {deletingId === selectedRecord.id ? "Removing..." : "Remove"}
                   </button>
@@ -1170,7 +1172,7 @@ function InspectionPageContent() {
                     type="button"
                     style={primaryButtonStyle}
                     onClick={() => void saveRecordDetail()}
-                    disabled={isSavingDetail}
+                    disabled={isSavingDetail || !hasEditAccess()}
                   >
                     {isSavingDetail ? "Saving..." : "Save Changes"}
                   </button>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
+import { ImsPermissionNotice, useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -948,6 +949,7 @@ async function imageUrlToDataUrl(url: string) {
 }
 
 export default function HseInspectionsPage() {
+  const imsPermissions = useImsPermissions();
   const [records, setRecords] = useState<HseInspectionRecord[]>([]);
   const [evidence, setEvidence] = useState<InspectionEvidence[]>([]);
   const [centralActions, setCentralActions] = useState<CentralAction[]>([]);
@@ -1010,6 +1012,20 @@ export default function HseInspectionsPage() {
   }, [evidence.length, records]);
 
   const latestSummary = records[0] ? `${records[0].inspection_number} - ${records[0].title}` : "No records yet";
+  const canCreateInspection = imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  const canEditInspection = imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+
+  function requireCreatePermission(action: string) {
+    if (canCreateInspection) return true;
+    setMessage(`Read-only access: you do not have permission to ${action}.`);
+    return false;
+  }
+
+  function requireEditPermission(action: string) {
+    if (canEditInspection) return true;
+    setMessage(`Read-only access: you do not have permission to ${action}.`);
+    return false;
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1189,6 +1205,7 @@ export default function HseInspectionsPage() {
   }, [records]);
 
   function startCreate(templateId = defaultTemplateId) {
+    if (!requireCreatePermission("create HSE inspections")) return;
     const template = inspectionTemplates.find((item) => item.id === templateId) || inspectionTemplates.find((item) => item.id === defaultTemplateId)!;
     setSelectedTemplateId(template.id);
     setSelectedId("");
@@ -1231,6 +1248,11 @@ export default function HseInspectionsPage() {
   }
 
   async function saveInspection() {
+    if (selectedId) {
+      if (!requireEditPermission("edit HSE inspections")) return;
+    } else if (!requireCreatePermission("create HSE inspections")) {
+      return;
+    }
     if (!selectedTemplate.enabled) {
       setMessage(`${selectedTemplate.documentNumber} is visible for planning but is not wired for digital completion yet.`);
       return;
@@ -1271,6 +1293,7 @@ export default function HseInspectionsPage() {
   }
 
   async function deleteInspection(record: HseInspectionRecord) {
+    if (!requireEditPermission("delete HSE inspections")) return;
     if (!window.confirm(`Delete ${record.inspection_number}? This will also remove linked evidence records.`)) return;
     const { error } = await supabase.from("hse_inspection_records").delete().eq("id", record.id);
     if (error) {
@@ -1305,6 +1328,10 @@ export default function HseInspectionsPage() {
   }
 
   async function uploadEvidence(event: ChangeEvent<HTMLInputElement>, itemNumber: string) {
+    if (!requireEditPermission("upload HSE inspection evidence")) {
+      event.target.value = "";
+      return;
+    }
     if (!selectedId) {
       setMessage("Save the inspection before uploading evidence.");
       event.target.value = "";
@@ -1321,6 +1348,10 @@ export default function HseInspectionsPage() {
   }
 
   function addPendingEvidence(event: ChangeEvent<HTMLInputElement>, itemNumber: string) {
+    if (!requireCreatePermission("stage HSE inspection evidence")) {
+      event.target.value = "";
+      return;
+    }
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
     setPendingEvidence((current) => [
@@ -1331,6 +1362,7 @@ export default function HseInspectionsPage() {
   }
 
   function removePendingEvidence(id: string) {
+    if (!requireCreatePermission("remove staged HSE inspection evidence")) return;
     setPendingEvidence((current) => current.filter((file) => file.id !== id));
   }
 
@@ -1340,6 +1372,7 @@ export default function HseInspectionsPage() {
   }
 
   async function deleteEvidenceFile(file: InspectionEvidence) {
+    if (!requireEditPermission("delete HSE inspection evidence")) return;
     if (!window.confirm(`Delete evidence file ${file.file_name}?`)) return;
     await supabase.storage.from(evidenceBucket).remove([file.file_path]);
     const { error } = await supabase.from("hse_inspection_evidence").delete().eq("id", file.id);
@@ -1771,6 +1804,7 @@ export default function HseInspectionsPage() {
 
   return (
     <main style={isMobile ? mobileMainStyle : undefined}>
+      {!isFieldCreateMode ? <ImsPermissionNotice /> : null}
       {isMobile && !isFieldCreateMode ? (
         <MobileInspectionHero latestSummary={latestSummary} />
       ) : !isMobile ? (
@@ -1799,6 +1833,7 @@ export default function HseInspectionsPage() {
           qrDataUrl={fieldQrDataUrl}
           onCreate={(templateId) => startCreate(templateId)}
           onFilter={(status) => { setStatusFilter(status); setActiveView("register"); }}
+          canCreateInspection={canCreateInspection}
           isMobile={isMobile}
           onGenerateBlankPdf={(template) => void generateBlankInspectionPdf(template)}
         />
@@ -1835,6 +1870,8 @@ export default function HseInspectionsPage() {
           onGeneratePdf={() => selected ? void generatePdf(draft) : undefined}
           onGeneratePdfForRecord={(record) => void generatePdf(record, evidence.filter((file) => file.inspection_id === record.id))}
           linkedActions={selectedLinkedActions}
+          canCreateInspection={canCreateInspection}
+          canEditInspection={canEditInspection}
           isMobile={isMobile}
           detailPanelRef={selectedDetailRef}
         />
@@ -1858,6 +1895,7 @@ export default function HseInspectionsPage() {
           onUploadItemNumberChange={setUploadItemNumber}
           onRemovePendingEvidence={removePendingEvidence}
           onSave={() => void saveInspection()}
+          canCreateInspection={canCreateInspection}
           isMobile={isMobile}
           isFieldCreateMode={isFieldCreateMode}
         />
@@ -1900,6 +1938,7 @@ function DashboardView({
   qrDataUrl,
   onCreate,
   onFilter,
+  canCreateInspection,
   isMobile,
   onGenerateBlankPdf,
 }: {
@@ -1907,6 +1946,7 @@ function DashboardView({
   qrDataUrl: string;
   onCreate: (templateId?: string) => void;
   onFilter: (status: string) => void;
+  canCreateInspection: boolean;
   isMobile: boolean;
   onGenerateBlankPdf: (template: InspectionTemplate) => void;
 }) {
@@ -1939,7 +1979,7 @@ function DashboardView({
           </p>
           <div style={buttonRowStyle}>
             {inspectionTemplates.map((template) => (
-              <button key={template.id} type="button" onClick={() => onCreate(template.id)} style={primaryButtonStyle}>
+              <button key={template.id} type="button" onClick={() => onCreate(template.id)} style={primaryButtonStyle} disabled={!canCreateInspection}>
                 Create {template.documentNumber.replace("ENS-HSEQ-", "")}
               </button>
             ))}
@@ -2000,6 +2040,8 @@ function RegisterView({
   onGeneratePdf,
   onGeneratePdfForRecord,
   linkedActions,
+  canCreateInspection,
+  canEditInspection,
   isMobile,
   detailPanelRef,
 }: {
@@ -2032,6 +2074,8 @@ function RegisterView({
   onGeneratePdf: () => void;
   onGeneratePdfForRecord: (record: HseInspectionRecord) => void;
   linkedActions: CentralAction[];
+  canCreateInspection: boolean;
+  canEditInspection: boolean;
   isMobile: boolean;
   detailPanelRef: RefObject<HTMLDivElement | null>;
 }) {
@@ -2046,7 +2090,7 @@ function RegisterView({
           <button type="button" onClick={() => setShowFilters((current) => !current)} style={showFilters ? secondaryButtonStyle : primaryButtonStyle}>
             {showFilters ? "Hide Filters" : "Show Filters"}
           </button>
-          <button type="button" onClick={onCreate} style={primaryButtonStyle}>Create Inspection</button>
+          <button type="button" onClick={onCreate} style={primaryButtonStyle} disabled={!canCreateInspection}>Create Inspection</button>
         </div>
         {showFilters ? (
         <div style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
@@ -2159,17 +2203,18 @@ function RegisterView({
               onDraftChange={onDraftChange}
               onPersonSelect={onPersonSelect}
               onChecklistChange={onChecklistChange}
-              canUploadEvidence={Boolean(selectedId)}
+              canUploadEvidence={Boolean(selectedId) && canEditInspection}
               uploading={uploading}
               onUploadEvidenceForItem={onUploadForItem}
               isMobile={isMobile}
             />
-            <LinkedActionsPanel inspection={draft} linkedActions={linkedActions} />
+            <LinkedActionsPanel inspection={draft} linkedActions={linkedActions} canCreateAction={canCreateInspection} />
             <EvidencePanel
               evidence={evidence}
               uploading={uploading}
               uploadItemNumber={uploadItemNumber}
               formId={draft.form_id}
+              canEdit={canEditInspection}
               onUploadItemNumberChange={onUploadItemNumberChange}
               onUpload={onUpload}
               onOpen={onOpenEvidence}
@@ -2177,8 +2222,8 @@ function RegisterView({
             />
             <div style={formActionsStyle}>
               <button type="button" style={secondaryButtonStyle} onClick={onGeneratePdf}>Generate PDF Report</button>
-              <button type="button" style={primaryButtonStyle} onClick={onSave} disabled={saving}>{saving ? "Saving..." : "Save Inspection"}</button>
-              <button type="button" style={dangerButtonStyle} onClick={onDelete}>Delete Inspection</button>
+              <button type="button" style={primaryButtonStyle} onClick={onSave} disabled={saving || !canEditInspection}>{saving ? "Saving..." : "Save Inspection"}</button>
+              <button type="button" style={dangerButtonStyle} onClick={onDelete} disabled={!canEditInspection}>Delete Inspection</button>
             </div>
           </>
         )}
@@ -2204,6 +2249,7 @@ function CreateInspectionView({
   onUploadItemNumberChange,
   onRemovePendingEvidence,
   onSave,
+  canCreateInspection,
   isMobile,
   isFieldCreateMode,
 }: {
@@ -2223,6 +2269,7 @@ function CreateInspectionView({
   onUploadItemNumberChange: (value: string) => void;
   onRemovePendingEvidence: (id: string) => void;
   onSave: () => void;
+  canCreateInspection: boolean;
   isMobile: boolean;
   isFieldCreateMode: boolean;
 }) {
@@ -2274,7 +2321,7 @@ function CreateInspectionView({
             onDraftChange={onDraftChange}
             onPersonSelect={onPersonSelect}
             onChecklistChange={onChecklistChange}
-            canUploadEvidence
+            canUploadEvidence={canCreateInspection}
             uploading={false}
             onUploadEvidenceForItem={onPendingUploadForItem}
             isMobile={isMobile}
@@ -2286,9 +2333,10 @@ function CreateInspectionView({
             onUploadItemNumberChange={onUploadItemNumberChange}
             onUpload={onPendingUpload}
             onRemove={onRemovePendingEvidence}
+            canCreate={canCreateInspection}
           />
           <div style={formActionsStyle}>
-            <button type="button" style={primaryButtonStyle} onClick={onSave} disabled={saving}>{saving ? "Saving..." : "Save Inspection"}</button>
+            <button type="button" style={primaryButtonStyle} onClick={onSave} disabled={saving || !canCreateInspection}>{saving ? "Saving..." : "Save Inspection"}</button>
           </div>
         </>
       ) : (
@@ -2467,7 +2515,15 @@ function InspectionForm({
   );
 }
 
-function LinkedActionsPanel({ inspection, linkedActions }: { inspection: HseInspectionRecord; linkedActions: CentralAction[] }) {
+function LinkedActionsPanel({
+  inspection,
+  linkedActions,
+  canCreateAction,
+}: {
+  inspection: HseInspectionRecord;
+  linkedActions: CentralAction[];
+  canCreateAction: boolean;
+}) {
   const createHref = `/hse/actions?view=create&prefill_source=${encodeURIComponent("HSE Inspection")}` +
     `&prefill_department=HSEQ` +
     `&prefill_project=${encodeURIComponent(inspection.project_work_scope || inspection.vessel_spread || "")}` +
@@ -2479,7 +2535,11 @@ function LinkedActionsPanel({ inspection, linkedActions }: { inspection: HseInsp
   return (
     <InspectionSection title="Linked Actions">
       <div style={buttonRowStyle}>
-        <Link href={createHref} style={primaryLinkStyle}>Create Linked HSE Action</Link>
+        {canCreateAction ? (
+          <Link href={createHref} style={primaryLinkStyle}>Create Linked HSE Action</Link>
+        ) : (
+          <button type="button" style={secondaryButtonStyle} disabled>Create Linked HSE Action</button>
+        )}
         <span style={mutedTextStyle}>Actions are controlled in central Action Management and linked back to this inspection.</span>
       </div>
       <div style={evidenceListStyle}>
@@ -2522,6 +2582,7 @@ function PendingEvidencePanel({
   onUploadItemNumberChange,
   onUpload,
   onRemove,
+  canCreate,
 }: {
   pendingEvidence: PendingEvidence[];
   uploadItemNumber: string;
@@ -2529,14 +2590,15 @@ function PendingEvidencePanel({
   onUploadItemNumberChange: (value: string) => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onRemove: (id: string) => void;
+  canCreate: boolean;
 }) {
   return (
     <InspectionSection title="Evidence Upload">
       <p style={emptyTextStyle}>Upload photos/files while creating the inspection. They will be uploaded when the inspection is saved.</p>
       <EvidenceItemPicker value={uploadItemNumber} formId={formId} onChange={onUploadItemNumberChange} />
-      <label style={uploadButtonStyle}>
+      <label style={{ ...uploadButtonStyle, opacity: canCreate ? 1 : 0.55 }}>
         Upload Photos / Files
-        <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" capture="environment" style={{ display: "none" }} onChange={onUpload} />
+        <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" capture="environment" style={{ display: "none" }} onChange={onUpload} disabled={!canCreate} />
       </label>
       <div style={evidenceListStyle}>
         {pendingEvidence.map((file) => (
@@ -2545,7 +2607,7 @@ function PendingEvidencePanel({
               <strong>{file.file.name}</strong>
               <div style={mutedTextStyle}>{formatFileSize(file.file.size)}{file.item_number ? ` - Item ${file.item_number}` : " - General evidence"}</div>
             </div>
-            <button type="button" style={dangerButtonStyle} onClick={() => onRemove(file.id)}>Remove</button>
+            <button type="button" style={dangerButtonStyle} onClick={() => onRemove(file.id)} disabled={!canCreate}>Remove</button>
           </div>
         ))}
         {!pendingEvidence.length ? <div style={emptyBoxStyle}>No staged evidence yet.</div> : null}
@@ -2559,6 +2621,7 @@ function EvidencePanel({
   uploading,
   uploadItemNumber,
   formId,
+  canEdit,
   onUploadItemNumberChange,
   onUpload,
   onOpen,
@@ -2568,6 +2631,7 @@ function EvidencePanel({
   uploading: boolean;
   uploadItemNumber: string;
   formId: string;
+  canEdit: boolean;
   onUploadItemNumberChange: (value: string) => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onOpen: (file: InspectionEvidence) => void;
@@ -2578,9 +2642,9 @@ function EvidencePanel({
     <InspectionSection title="Evidence Upload">
       <p style={emptyTextStyle}>Upload inspection photos or supporting files. On mobile, choose the camera option to capture evidence at the inspection point.</p>
       <EvidenceItemPicker value={uploadItemNumber} formId={formId} onChange={onUploadItemNumberChange} />
-      <label style={uploadButtonStyle}>
+      <label style={{ ...uploadButtonStyle, opacity: canEdit ? 1 : 0.55 }}>
         {uploading ? "Uploading..." : "Upload Evidence"}
-        <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" capture="environment" style={{ display: "none" }} onChange={onUpload} disabled={uploading} />
+        <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" capture="environment" style={{ display: "none" }} onChange={onUpload} disabled={uploading || !canEdit} />
       </label>
       <div style={evidenceListStyle}>
         {sortedEvidence.map((file) => (
@@ -2594,7 +2658,7 @@ function EvidencePanel({
             </div>
             <div style={buttonRowStyle}>
               <button type="button" style={secondaryButtonStyle} onClick={() => onOpen(file)}>Open / Preview</button>
-              <button type="button" style={dangerButtonStyle} onClick={() => onDelete(file)}>Delete</button>
+              <button type="button" style={dangerButtonStyle} onClick={() => onDelete(file)} disabled={!canEdit}>Delete</button>
             </div>
           </div>
         ))}

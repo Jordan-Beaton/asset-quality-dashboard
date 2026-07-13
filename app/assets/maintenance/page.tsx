@@ -836,7 +836,7 @@ function MaintenancePageContent() {
             </div>
 
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
+              <button type="submit" style={primaryButtonStyle} disabled={isSaving || !hasCreateAccess()}>
                 {isSaving ? "Saving..." : "Save Maintenance Record"}
               </button>
             </div>
@@ -864,6 +864,7 @@ function MaintenancePageContent() {
                   onClick={() => {
                     setActiveView("create");
                   }}
+                  disabled={!hasCreateAccess()}
                 >
                   Create Maintenance
                 </ImsButton>
@@ -1139,6 +1140,7 @@ function MaintenancePageContent() {
                       type="button"
                       style={actionLinkButtonStyle}
                       onClick={() => generateActionFromMaintenance(selectedRecord)}
+                      disabled={!hasCreateAccess()}
                     >
                       Generate Action
                     </button>
@@ -1152,7 +1154,7 @@ function MaintenancePageContent() {
                     type="button"
                     style={dangerButtonStyle}
                     onClick={() => void removeRecord(selectedRecord)}
-                    disabled={deletingId === selectedRecord.id}
+                    disabled={deletingId === selectedRecord.id || !hasEditAccess()}
                   >
                     {deletingId === selectedRecord.id ? "Removing..." : "Remove"}
                   </button>
@@ -1160,7 +1162,7 @@ function MaintenancePageContent() {
                     type="button"
                     style={primaryButtonStyle}
                     onClick={() => void saveRecordDetail()}
-                    disabled={isSavingDetail}
+                    disabled={isSavingDetail || !hasEditAccess()}
                   >
                     {isSavingDetail ? "Saving..." : "Save Changes"}
                   </button>

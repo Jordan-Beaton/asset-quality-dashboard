@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, FormEvent, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { ImsPermissionNotice, useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -328,6 +329,7 @@ function buildRiskPayload(form: RiskForm) {
 }
 
 export default function RiskRegisterPage() {
+  const imsPermissions = useImsPermissions();
   const [risks, setRisks] = useState<RiskRow[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [form, setForm] = useState<RiskForm>(emptyForm);
@@ -461,9 +463,24 @@ export default function RiskRegisterPage() {
   const latestRiskLabel = risks[risks.length - 1]
     ? `${risks[risks.length - 1].risk_number || "Risk"} - ${risks[risks.length - 1].title || "Untitled"}`
     : "No risks loaded";
+  const canCreateRisk = imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  const canEditRisk = imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+
+  function requireCreatePermission(action: string) {
+    if (canCreateRisk) return true;
+    setMessage(`Read-only access: you do not have permission to ${action}.`);
+    return false;
+  }
+
+  function requireEditPermission(action: string) {
+    if (canEditRisk) return true;
+    setMessage(`Read-only access: you do not have permission to ${action}.`);
+    return false;
+  }
 
   async function createRisk(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!requireCreatePermission("create risks")) return;
     if (!form.title.trim()) {
       setMessage("Risk title is required.");
       return;
@@ -488,6 +505,7 @@ export default function RiskRegisterPage() {
 
   async function updateRisk(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!requireEditPermission("edit risks")) return;
     if (!selectedRisk) return;
     if (!editForm.title.trim()) {
       setMessage("Risk title is required.");
@@ -509,6 +527,7 @@ export default function RiskRegisterPage() {
   }
 
   async function deleteRisk() {
+    if (!requireEditPermission("delete risks")) return;
     if (!selectedRisk) return;
     const confirmed = window.confirm(`Delete ${selectedRisk.risk_number || "this risk"}?`);
     if (!confirmed) return;
@@ -724,6 +743,7 @@ export default function RiskRegisterPage() {
 
   return (
     <main>
+      <ImsPermissionNotice />
       <QualityPageHero
         label="RISK MANAGEMENT"
         title="Risk Register"
@@ -758,7 +778,7 @@ export default function RiskRegisterPage() {
 
       <SectionCard title="Risk Register" subtitle="Filter and select a risk. Details open below the register.">
         <div style={registerActionRowStyle}>
-          <button type="button" style={primaryButtonStyle} onClick={() => setShowCreateRisk((current) => !current)}>
+          <button type="button" style={primaryButtonStyle} onClick={() => setShowCreateRisk((current) => !current)} disabled={!canCreateRisk}>
             {showCreateRisk ? "Hide Create Risk" : "Create Risk"}
           </button>
           <button
@@ -889,7 +909,7 @@ export default function RiskRegisterPage() {
             closedByOptions={createClosedByOptions}
             onSubmit={createRisk}
             submitText={isSaving ? "Saving..." : "Create Risk"}
-            disabled={isSaving}
+            disabled={isSaving || !canCreateRisk}
           />
         </SectionCard>
       ) : null}
@@ -911,7 +931,7 @@ export default function RiskRegisterPage() {
                   <div style={riskNumberStyle}>{selectedRisk.risk_number || "-"}</div>
                   <div style={detailTitleStyle}>{selectedRisk.title || "Untitled risk"}</div>
                 </div>
-                <button type="button" style={deleteButtonStyle} onClick={() => void deleteRisk()}>
+                <button type="button" style={deleteButtonStyle} onClick={() => void deleteRisk()} disabled={!canEditRisk}>
                   Delete Risk
                 </button>
               </div>
@@ -922,12 +942,12 @@ export default function RiskRegisterPage() {
                 ownerOptions={editOwnerOptions}
                 closedByOptions={editClosedByOptions}
                 submitText={isSaving ? "Saving..." : "Save Changes"}
-                disabled={isSaving}
+                disabled={isSaving || !canEditRisk}
                 hideFormTag
               />
 
               <div style={formFooterStyle}>
-                <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
+                <button type="submit" style={primaryButtonStyle} disabled={isSaving || !canEditRisk}>
                   {isSaving ? "Saving..." : "Save Changes"}
                 </button>
                 <span style={helperTextStyle}>

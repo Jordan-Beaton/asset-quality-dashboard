@@ -25,6 +25,7 @@ import {
   ImsTopMetaRow,
 } from "../../../src/components/ImsPrimitives";
 import { imsColours, imsInputStyle, imsTableCellStyle, imsTableHeadStyle, imsTableInfoRowStyle, imsTableStyle } from "../../../src/components/imsTheme";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -148,6 +149,7 @@ function buildCounts(records: ObservationRecord[], key: keyof ObservationRecord)
 }
 
 export default function HseObservationsPage() {
+  const imsPermissions = useImsPermissions();
   const [records, setRecords] = useState<ObservationRecord[]>([]);
   const [evidence, setEvidence] = useState<EvidenceRecord[]>([]);
   const [actions, setActions] = useState<LinkedActionRecord[]>([]);
@@ -164,6 +166,26 @@ export default function HseObservationsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [message, setMessage] = useState("Loading observations...");
   const [loading, setLoading] = useState(false);
+
+  const canCreateObservation = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  const canEditObservation = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }, [imsPermissions.canEdit, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  function requireCreatePermission(actionLabel: string) {
+    if (canCreateObservation) return true;
+    setMessage(`${actionLabel} requires Create permission for this IMS area.`);
+    return false;
+  }
+
+  function requireEditPermission(actionLabel: string) {
+    if (canEditObservation) return true;
+    setMessage(`${actionLabel} requires Edit permission for this IMS area.`);
+    return false;
+  }
 
   useEffect(() => {
     if (!records.length) return;
@@ -260,6 +282,8 @@ export default function HseObservationsPage() {
 
   async function updateSelectedRecord(payload: Partial<ObservationRecord>) {
     if (!selectedRecord) return;
+    if (!requireEditPermission("Saving observation reviews")) return;
+
     setLoading(true);
     const { error } = await supabase.from("hse_observations").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", selectedRecord.id);
     if (error) {
@@ -272,6 +296,8 @@ export default function HseObservationsPage() {
   }
 
   async function deleteSelectedRecord(record: ObservationRecord) {
+    if (!requireEditPermission("Deleting observations")) return;
+
     if (!window.confirm(`Delete ${record.observation_number}? This cannot be undone.`)) return;
     setLoading(true);
 
@@ -489,6 +515,9 @@ export default function HseObservationsPage() {
               onUpdate={updateSelectedRecord}
               onDelete={deleteSelectedRecord}
               createActionHref={createActionHref}
+              canCreateAction={canCreateObservation}
+              canEdit={canEditObservation}
+              onCreateActionBlocked={() => requireCreatePermission("Generating central actions")}
             />
             </div>
           ) : null}
@@ -536,6 +565,9 @@ function ObservationDetail({
   onUpdate,
   onDelete,
   createActionHref,
+  canCreateAction,
+  canEdit,
+  onCreateActionBlocked,
 }: {
   record: ObservationRecord | null;
   evidence: EvidenceRecord[];
@@ -545,6 +577,9 @@ function ObservationDetail({
   onUpdate: (payload: Partial<ObservationRecord>) => void;
   onDelete: (record: ObservationRecord) => void;
   createActionHref: string;
+  canCreateAction: boolean;
+  canEdit: boolean;
+  onCreateActionBlocked: () => void;
 }) {
   const [draftStatus, setDraftStatus] = useState(record?.status || "New");
   const [draftAssigned, setDraftAssigned] = useState(record?.assigned_to || "");
@@ -596,9 +631,20 @@ function ObservationDetail({
           </Field>
         </div>
         <div style={buttonRowStyle}>
-          <ImsButton onClick={() => onUpdate({ status: draftStatus, assigned_to: draftAssigned || null, closeout_notes: draftCloseout || null })}>Save Review</ImsButton>
-          <ImsLinkButton href={createActionHref}>Generate Central Action</ImsLinkButton>
-          <ImsButton variant="danger" onClick={() => onDelete(record)}>Delete Observation</ImsButton>
+          <ImsButton
+            onClick={() => onUpdate({ status: draftStatus, assigned_to: draftAssigned || null, closeout_notes: draftCloseout || null })}
+            disabled={!canEdit}
+          >
+            Save Review
+          </ImsButton>
+          {canCreateAction ? (
+            <ImsLinkButton href={createActionHref}>Generate Central Action</ImsLinkButton>
+          ) : (
+            <ImsButton variant="secondary" onClick={onCreateActionBlocked} disabled>
+              Generate Central Action
+            </ImsButton>
+          )}
+          <ImsButton variant="danger" onClick={() => onDelete(record)} disabled={!canEdit}>Delete Observation</ImsButton>
         </div>
       </div>
 
