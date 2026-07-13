@@ -17,6 +17,7 @@ Quality Management is the master visual reference for the IMS. Equivalent pages 
 - Actions wording has been changed to Quality where relevant.
 - NCR is now NCR-only; CAPA was removed from the visible UI.
 - Quality Reports is the visual/reporting master for monthly reports.
+- Quality Actions, Quality Reports, NCR/CAPA, Audits, and MOC now have explicit page-level create/edit permission guards on core write paths, with primary write controls disabled for restricted users.
 
 ## NCR
 
@@ -27,6 +28,7 @@ Quality Management is the master visual reference for the IMS. Equivalent pages 
 - Uses People dropdown for owner selection.
 - Supports linked Action creation.
 - Evidence upload metadata is hardened by `scripts/sql/quality_evidence_files.sql`; run it if NCR/Action evidence uploads fail to appear after storage upload.
+- Create/import paths require Create permission; edits, deletes, evidence upload/delete, and saved NCR PDF generation require Edit permission.
 
 ## Audits
 
@@ -35,6 +37,7 @@ Quality Management is the master visual reference for the IMS. Equivalent pages 
 - Supports evidence upload/open/delete on findings.
 - Supports finding PDF and Word output.
 - Lead Auditor People dropdown applies to Internal audits only.
+- Audit creation/finding creation require Create permission; audit edits/deletes, linked items, finding edits/deletes, report uploads, and finding evidence changes require Edit permission.
 
 ## MOC
 
@@ -43,6 +46,7 @@ Quality Management is the master visual reference for the IMS. Equivalent pages 
 - Section C/D/J/K layouts were improved.
 - Uses People dropdowns where names are required.
 - Supports linked Action generation.
+- MOC creation requires Create permission; save, workflow progression, delete, attachment management, and signature image changes require Edit permission.
 
 ## Warnings
 

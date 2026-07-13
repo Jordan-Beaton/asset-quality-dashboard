@@ -26,6 +26,7 @@ import {
   WidthType,
 } from "docx";
 import * as XLSX from "xlsx";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -564,6 +565,7 @@ function dataUrlToBytes(dataUrl: string) {
 }
 
 export default function HseAinmPage() {
+  const imsPermissions = useImsPermissions();
   const [records, setRecords] = useState<AINMRecord[]>([]);
   const [actions, setActions] = useState<AINMAction[]>([]);
   const [centralActions, setCentralActions] = useState<CentralAction[]>([]);
@@ -617,6 +619,26 @@ export default function HseAinmPage() {
   const [newReviewerName, setNewReviewerName] = useState("");
   const [newReviewerRole, setNewReviewerRole] = useState("");
   const [refreshStamp, setRefreshStamp] = useState("");
+
+  const canCreateAinm = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  const canEditAinm = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }, [imsPermissions.canEdit, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  function requireCreatePermission(actionLabel: string) {
+    if (canCreateAinm) return true;
+    setMessage(`${actionLabel} requires Create permission for this IMS area.`);
+    return false;
+  }
+
+  function requireEditPermission(actionLabel: string) {
+    if (canEditAinm) return true;
+    setMessage(`${actionLabel} requires Edit permission for this IMS area.`);
+    return false;
+  }
 
   const selected = useMemo(() => records.find((record) => record.id === selectedId) || null, [records, selectedId]);
   const selectedExternal = useMemo(
@@ -1238,6 +1260,8 @@ export default function HseAinmPage() {
   }
 
   async function createAINM() {
+    if (!requireCreatePermission("Creating AINMs")) return;
+
     if (!newAinmType) {
       setMessage("Select AINM type before creating the record.");
       return;
@@ -1272,6 +1296,8 @@ export default function HseAinmPage() {
   }
 
   async function createExternalAINM() {
+    if (!requireCreatePermission("Creating external AINMs")) return;
+
     const nextNumber = newExternalRecord.external_ainm_number.trim() || await getNextExternalNumber();
     if (!nextNumber || !newExternalRecord.supplier_name?.trim() || !newExternalRecord.summary?.trim()) {
       setMessage("External AINM number, external party name, and summary are required.");
@@ -1300,6 +1326,8 @@ export default function HseAinmPage() {
 
   async function saveDraft() {
     if (!selectedId) return;
+    if (!requireEditPermission("Saving AINMs")) return;
+
     const draftForSave = buildDraftForSave();
     setSaving(true);
     const { error } = await supabase.from("hse_ainm_records").update(buildPayload(draftForSave)).eq("id", selectedId);
@@ -1320,6 +1348,8 @@ export default function HseAinmPage() {
 
   async function saveExternalAINM() {
     if (!selectedExternalId) return;
+    if (!requireEditPermission("Saving external AINMs")) return;
+
     setSaving(true);
     const { error } = await supabase
       .from("hse_external_ainm_records")
@@ -1337,6 +1367,8 @@ export default function HseAinmPage() {
   }
 
   async function deleteRecord(record: AINMRecord) {
+    if (!requireEditPermission("Deleting AINMs")) return;
+
     if (!window.confirm(`Delete ${record.ainm_number} and all linked AINM action/evidence rows?`)) return;
     const { error } = await supabase.from("hse_ainm_records").delete().eq("id", record.id);
     if (error) {
@@ -1349,6 +1381,8 @@ export default function HseAinmPage() {
   }
 
   async function deleteExternalRecord(record: ExternalAINMRecord) {
+    if (!requireEditPermission("Deleting external AINMs")) return;
+
     if (!window.confirm(`Delete external AINM ${record.external_ainm_number}?`)) return;
     const files = externalEvidence.filter((file) => file.external_ainm_id === record.id);
     if (files.length) await supabase.storage.from(evidenceBucket).remove(files.map((file) => file.file_path));
@@ -1411,6 +1445,11 @@ export default function HseAinmPage() {
   }
 
   async function handleTrackerUpload(event: ChangeEvent<HTMLInputElement>) {
+    if (!requireCreatePermission("Importing AINMs")) {
+      event.target.value = "";
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) return;
     const buffer = await file.arrayBuffer();
@@ -1439,6 +1478,8 @@ export default function HseAinmPage() {
   }
 
   async function importTrackerPreview() {
+    if (!requireCreatePermission("Importing AINMs")) return;
+
     if (!importPreview.length) return;
     setImporting(true);
     const existing = new Set(records.map((record) => record.ainm_number.toLowerCase()));
@@ -1507,6 +1548,11 @@ export default function HseAinmPage() {
   }
 
   async function uploadEvidence(event: ChangeEvent<HTMLInputElement>, stageOverride?: string) {
+    if (!requireEditPermission("Uploading AINM evidence")) {
+      event.target.value = "";
+      return;
+    }
+
     if (!selectedId) return;
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -1539,6 +1585,11 @@ export default function HseAinmPage() {
   }
 
   async function uploadExternalEvidence(event: ChangeEvent<HTMLInputElement>) {
+    if (!requireEditPermission("Uploading external AINM evidence")) {
+      event.target.value = "";
+      return;
+    }
+
     if (!selectedExternalId) return;
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -1600,6 +1651,8 @@ export default function HseAinmPage() {
   }
 
   async function deleteEvidence(file: AINMEvidence) {
+    if (!requireEditPermission("Deleting AINM evidence")) return;
+
     if (!window.confirm(`Delete ${file.file_name}?`)) return;
     await supabase.storage.from(evidenceBucket).remove([file.file_path]);
     const { error } = await supabase.from("hse_ainm_evidence").delete().eq("id", file.id);
@@ -1612,6 +1665,8 @@ export default function HseAinmPage() {
   }
 
   async function deleteExternalEvidence(file: ExternalAINMEvidence) {
+    if (!requireEditPermission("Deleting external AINM evidence")) return;
+
     if (!window.confirm(`Delete ${file.file_name}?`)) return;
     await supabase.storage.from(evidenceBucket).remove([file.file_path]);
     const { error } = await supabase.from("hse_external_ainm_evidence").delete().eq("id", file.id);
@@ -1641,6 +1696,8 @@ export default function HseAinmPage() {
   }
 
   async function addReviewerToPeople() {
+    if (!requireEditPermission("Adding AINM reviewers")) return;
+
     const name = newReviewerName.trim();
     if (!name) {
       setMessage("Reviewer name is required before adding a new person.");
@@ -2333,6 +2390,8 @@ export default function HseAinmPage() {
   }
 
   async function generateCompiledPdf(record: AINMRecord) {
+    if (!requireEditPermission("Generating saved AINM report packs")) return;
+
     setGeneratingStage("compiled-pdf");
     try {
       const logoData = await getLogoDataUrl();
@@ -2646,7 +2705,7 @@ export default function HseAinmPage() {
             </div>
           </div>
           <div style={buttonRowStyle}>
-            <button type="button" style={primaryButtonStyle} onClick={() => void createAINM()} disabled={saving}>{saving ? "Creating..." : "Create AINM"}</button>
+            <button type="button" style={primaryButtonStyle} onClick={() => void createAINM()} disabled={saving || !canCreateAinm}>{saving ? "Creating..." : "Create AINM"}</button>
           </div>
         </SectionCard>
       ) : null}
@@ -2729,7 +2788,7 @@ export default function HseAinmPage() {
               </label>
             </div>
             <div style={buttonRowStyle}>
-              <button type="button" style={primaryButtonStyle} onClick={() => void createExternalAINM()} disabled={saving}>{saving ? "Creating..." : "Create External AINM"}</button>
+              <button type="button" style={primaryButtonStyle} onClick={() => void createExternalAINM()} disabled={saving || !canCreateAinm}>{saving ? "Creating..." : "Create External AINM"}</button>
             </div>
           </SectionCard>
 
@@ -2842,7 +2901,7 @@ export default function HseAinmPage() {
                   </div>
                   <label style={uploadButtonStyle}>
                     {uploading ? "Uploading..." : "Upload External Documentation"}
-                    <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadExternalEvidence(event)} disabled={uploading} />
+                    <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadExternalEvidence(event)} disabled={uploading || !canEditAinm} />
                   </label>
                   <div style={evidenceListStyle}>
                     {selectedExternalEvidence.map((file) => (
@@ -2853,7 +2912,7 @@ export default function HseAinmPage() {
                         </div>
                         <div style={buttonRowStyle}>
                           <button type="button" style={secondaryButtonStyle} onClick={() => void openExternalEvidence(file)}>Open / Preview</button>
-                          <button type="button" style={dangerButtonStyle} onClick={() => void deleteExternalEvidence(file)}>Delete</button>
+                          <button type="button" style={dangerButtonStyle} onClick={() => void deleteExternalEvidence(file)} disabled={!canEditAinm}>Delete</button>
                         </div>
                       </div>
                     ))}
@@ -2862,8 +2921,8 @@ export default function HseAinmPage() {
                 </div>
 
                 <div style={detailFooterStyle}>
-                  <button type="button" style={primaryButtonStyle} onClick={() => void saveExternalAINM()} disabled={saving}>{saving ? "Saving..." : "Save External AINM"}</button>
-                  <button type="button" style={dangerButtonStyle} onClick={() => void deleteExternalRecord(externalDraft)}>Delete External AINM</button>
+                  <button type="button" style={primaryButtonStyle} onClick={() => void saveExternalAINM()} disabled={saving || !canEditAinm}>{saving ? "Saving..." : "Save External AINM"}</button>
+                  <button type="button" style={dangerButtonStyle} onClick={() => void deleteExternalRecord(externalDraft)} disabled={!canEditAinm}>Delete External AINM</button>
                 </div>
               </DetailSection>
             </SectionCard>
@@ -2876,7 +2935,7 @@ export default function HseAinmPage() {
           <div style={importToolbarStyle}>
             <label style={uploadButtonStyle}>
               Upload AINM Action Tracker.xlsx
-              <input type="file" accept=".xlsx" style={{ display: "none" }} onChange={(event) => void handleTrackerUpload(event)} />
+              <input type="file" accept=".xlsx" style={{ display: "none" }} onChange={(event) => void handleTrackerUpload(event)} disabled={!canCreateAinm} />
             </label>
             {importSheets.length ? (
               <Field label="Tracker sheet / year">
@@ -2901,7 +2960,7 @@ export default function HseAinmPage() {
                   </div>
                 ))}
               </div>
-              <button type="button" style={primaryButtonStyle} onClick={() => void importTrackerPreview()} disabled={importing}>{importing ? "Importing..." : "Import Preview"}</button>
+              <button type="button" style={primaryButtonStyle} onClick={() => void importTrackerPreview()} disabled={importing || !canCreateAinm}>{importing ? "Importing..." : "Import Preview"}</button>
             </>
           ) : null}
         </SectionCard>
@@ -3029,7 +3088,7 @@ export default function HseAinmPage() {
                     </div>
                     <label style={uploadButtonStyle}>
                       {uploading ? "Uploading..." : "Upload Notification Evidence"}
-                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event, "Notification")} disabled={uploading} />
+                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event, "Notification")} disabled={uploading || !canEditAinm} />
                     </label>
                     <div style={evidenceListStyle}>
                       {selectedEvidence.filter((file) => file.stage === "Notification").map((file) => (
@@ -3040,7 +3099,7 @@ export default function HseAinmPage() {
                           </div>
                           <div style={buttonRowStyle}>
                             <button type="button" style={secondaryButtonStyle} onClick={() => void openEvidence(file)}>Open / Preview</button>
-                            <button type="button" style={dangerButtonStyle} onClick={() => void deleteEvidence(file)}>Delete</button>
+                            <button type="button" style={dangerButtonStyle} onClick={() => void deleteEvidence(file)} disabled={!canEditAinm}>Delete</button>
                           </div>
                         </div>
                       ))}
@@ -3092,14 +3151,14 @@ export default function HseAinmPage() {
                               onChange={(event) => updateCorrectiveActionRow(index, event.target.value)}
                               rows={Math.max(1, action.split(/\r?\n/).length)}
                             />
-                            <button type="button" style={smallDangerButtonStyle} onClick={() => removeCorrectiveActionRow(index)} disabled={correctiveActionRows.length === 1}>
+                            <button type="button" style={smallDangerButtonStyle} onClick={() => removeCorrectiveActionRow(index)} disabled={correctiveActionRows.length === 1 || !canEditAinm}>
                               Remove
                             </button>
                           </React.Fragment>
                         ))}
                       </div>
                       <div style={buttonRowStyle}>
-                        <button type="button" style={secondaryButtonStyle} onClick={addCorrectiveActionRow}>Add Row</button>
+                        <button type="button" style={secondaryButtonStyle} onClick={addCorrectiveActionRow} disabled={!canEditAinm}>Add Row</button>
                       </div>
                     </div>
                     <div style={{ gridColumn: "1 / -1" }}>
@@ -3148,7 +3207,7 @@ export default function HseAinmPage() {
                       <Field label="New Person Name"><input style={inputStyle} value={newReviewerName} onChange={(event) => setNewReviewerName(event.target.value)} placeholder="Name" /></Field>
                       <Field label="Position / Role"><input style={inputStyle} value={newReviewerRole} onChange={(event) => setNewReviewerRole(event.target.value)} placeholder="Position" /></Field>
                       <div style={buttonRowStyle}>
-                        <button type="button" style={primaryButtonStyle} onClick={() => void addReviewerToPeople()}>Add to People</button>
+                        <button type="button" style={primaryButtonStyle} onClick={() => void addReviewerToPeople()} disabled={!canEditAinm}>Add to People</button>
                         <button type="button" style={secondaryButtonStyle} onClick={() => setShowAddReviewer(false)}>Cancel</button>
                       </div>
                     </div>
@@ -3160,7 +3219,7 @@ export default function HseAinmPage() {
                     </div>
                     <label style={uploadButtonStyle}>
                       {uploading ? "Uploading..." : "Upload Part 1 Evidence"}
-                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event, "Part 1")} disabled={uploading} />
+                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event, "Part 1")} disabled={uploading || !canEditAinm} />
                     </label>
                     <div style={evidenceListStyle}>
                       {selectedEvidence.filter((file) => file.stage === "Part 1").map((file) => (
@@ -3171,7 +3230,7 @@ export default function HseAinmPage() {
                           </div>
                           <div style={buttonRowStyle}>
                             <button type="button" style={secondaryButtonStyle} onClick={() => void openEvidence(file)}>Open / Preview</button>
-                            <button type="button" style={dangerButtonStyle} onClick={() => void deleteEvidence(file)}>Delete</button>
+                            <button type="button" style={dangerButtonStyle} onClick={() => void deleteEvidence(file)} disabled={!canEditAinm}>Delete</button>
                           </div>
                         </div>
                       ))}
@@ -3212,12 +3271,12 @@ export default function HseAinmPage() {
                           <input style={teamCellInputStyle} value={member.company} onChange={(event) => updateInvestigationTeamRow(index, "company", event.target.value)} />
                           <input style={teamCellInputStyle} value={member.position} onChange={(event) => updateInvestigationTeamRow(index, "position", event.target.value)} />
                           <input style={teamCellInputStyle} value={member.role} onChange={(event) => updateInvestigationTeamRow(index, "role", event.target.value)} />
-                          <button type="button" style={smallDangerButtonStyle} onClick={() => removeInvestigationTeamRow(index)} disabled={investigationTeamRows.length === 1}>Remove</button>
+                          <button type="button" style={smallDangerButtonStyle} onClick={() => removeInvestigationTeamRow(index)} disabled={investigationTeamRows.length === 1 || !canEditAinm}>Remove</button>
                         </React.Fragment>
                       ))}
                     </div>
                     <div style={buttonRowStyle}>
-                      <button type="button" style={secondaryButtonStyle} onClick={addInvestigationTeamRow}>Add Team Member</button>
+                      <button type="button" style={secondaryButtonStyle} onClick={addInvestigationTeamRow} disabled={!canEditAinm}>Add Team Member</button>
                     </div>
                   </div>
                   <div style={formGridStyle}>
@@ -3245,12 +3304,12 @@ export default function HseAinmPage() {
                               onChange={(event) => updateReferenceDocumentRow(index, event.target.value)}
                               placeholder="Document title and number"
                             />
-                            <button type="button" style={smallDangerButtonStyle} onClick={() => removeReferenceDocumentRow(index)} disabled={referenceDocumentRows.length === 1}>Remove</button>
+                            <button type="button" style={smallDangerButtonStyle} onClick={() => removeReferenceDocumentRow(index)} disabled={referenceDocumentRows.length === 1 || !canEditAinm}>Remove</button>
                           </React.Fragment>
                         ))}
                       </div>
                       <div style={buttonRowStyle}>
-                        <button type="button" style={secondaryButtonStyle} onClick={addReferenceDocumentRow}>Add Reference Document</button>
+                        <button type="button" style={secondaryButtonStyle} onClick={addReferenceDocumentRow} disabled={!canEditAinm}>Add Reference Document</button>
                       </div>
                     </div>
                     <div style={{ gridColumn: "1 / -1" }}>
@@ -3309,7 +3368,7 @@ export default function HseAinmPage() {
                     </div>
                     <label style={uploadButtonStyle}>
                       {uploading ? "Uploading..." : "Upload Part 2 Evidence"}
-                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event, "Part 2")} disabled={uploading} />
+                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event, "Part 2")} disabled={uploading || !canEditAinm} />
                     </label>
                     <div style={evidenceListStyle}>
                       {selectedEvidence.filter((file) => file.stage === "Part 2").map((file) => (
@@ -3320,7 +3379,7 @@ export default function HseAinmPage() {
                           </div>
                           <div style={buttonRowStyle}>
                             <button type="button" style={secondaryButtonStyle} onClick={() => void openEvidence(file)}>Open / Preview</button>
-                            <button type="button" style={dangerButtonStyle} onClick={() => void deleteEvidence(file)}>Delete</button>
+                            <button type="button" style={dangerButtonStyle} onClick={() => void deleteEvidence(file)} disabled={!canEditAinm}>Delete</button>
                           </div>
                         </div>
                       ))}
@@ -3388,7 +3447,7 @@ export default function HseAinmPage() {
                     </select>
                     <label style={uploadButtonStyle}>
                       {uploading ? "Uploading..." : "Upload Evidence"}
-                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event)} disabled={uploading} />
+                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event)} disabled={uploading || !canEditAinm} />
                     </label>
                   </div>
                   <div style={evidenceListStyle}>
@@ -3400,7 +3459,7 @@ export default function HseAinmPage() {
                         </div>
                         <div style={buttonRowStyle}>
                           <button type="button" style={secondaryButtonStyle} onClick={() => void openEvidence(file)}>Open / Preview</button>
-                          <button type="button" style={dangerButtonStyle} onClick={() => void deleteEvidence(file)}>Delete</button>
+                          <button type="button" style={dangerButtonStyle} onClick={() => void deleteEvidence(file)} disabled={!canEditAinm}>Delete</button>
                         </div>
                       </div>
                     ))}
@@ -3421,7 +3480,7 @@ export default function HseAinmPage() {
                     <button type="button" style={reportButtonStyle} onClick={() => void generateWord("part2", draft)} disabled={Boolean(generatingStage)}>
                       {generatingStage === "part2" ? "Generating..." : "Generate Part 2 Report"}
                     </button>
-                    <button type="button" style={compiledReportButtonStyle} onClick={() => void generateCompiledPdf(draft)} disabled={Boolean(generatingStage)}>
+                    <button type="button" style={compiledReportButtonStyle} onClick={() => void generateCompiledPdf(draft)} disabled={Boolean(generatingStage) || !canEditAinm}>
                       {generatingStage === "compiled-pdf" ? "Generating..." : "Generate Complete AINM PDF"}
                     </button>
                   </div>
@@ -3429,8 +3488,8 @@ export default function HseAinmPage() {
               ) : null}
 
               <div style={detailFooterStyle}>
-                <button type="button" style={primaryButtonStyle} onClick={() => void saveDraft()} disabled={saving}>{saving ? "Saving..." : "Save AINM"}</button>
-                <button type="button" style={dangerButtonStyle} onClick={() => void deleteRecord(draft)}>Delete AINM</button>
+                <button type="button" style={primaryButtonStyle} onClick={() => void saveDraft()} disabled={saving || !canEditAinm}>{saving ? "Saving..." : "Save AINM"}</button>
+                <button type="button" style={dangerButtonStyle} onClick={() => void deleteRecord(draft)} disabled={!canEditAinm}>Delete AINM</button>
               </div>
             </SectionCard>
             </div>

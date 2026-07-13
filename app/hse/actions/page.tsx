@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { supabase } from "../../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -344,6 +345,7 @@ function countByOwner(actions: ActionItem[]) {
 }
 
 export default function HseActionsPage() {
+  const imsPermissions = useImsPermissions();
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
@@ -373,6 +375,10 @@ export default function HseActionsPage() {
   const [importRows, setImportRows] = useState<HseActionImportRow[]>([]);
   const [importFileName, setImportFileName] = useState("");
   const [isImportingActions, setIsImportingActions] = useState(false);
+
+  const canCreateAction = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
 
   useEffect(() => {
     void loadData();
@@ -643,6 +649,12 @@ export default function HseActionsPage() {
   }, [actions, ownerFilter, pressureFilter, priorityFilter, search, statusFilter]);
 
   async function handleImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!canCreateAction) {
+      event.target.value = "";
+      setMessage("Read-only access: you do not have permission to import HSE actions.");
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -785,6 +797,11 @@ export default function HseActionsPage() {
   }
 
   async function importPreviewedActions() {
+    if (!canCreateAction) {
+      setMessage("Read-only access: you do not have permission to import HSE actions.");
+      return;
+    }
+
     if (!importRows.length) {
       setMessage("Select an Excel file before importing HSE/Quality actions.");
       return;
@@ -854,6 +871,11 @@ export default function HseActionsPage() {
 
   async function createAction(event: React.FormEvent) {
     event.preventDefault();
+    if (!canCreateAction) {
+      setMessage("Read-only access: you do not have permission to create HSE actions.");
+      return;
+    }
+
     if (!form.title.trim()) {
       setMessage("Action title is required.");
       return;
@@ -1230,8 +1252,8 @@ export default function HseActionsPage() {
           {showImportPanel ? (
             <div style={importPanelStyle}>
               <div style={importControlRowStyle}>
-                <input type="file" accept=".xlsx" onChange={(event) => void handleImportFileChange(event)} style={fileInputStyle} />
-                <button type="button" style={primaryButtonStyle} disabled={!importableRows.length || isImportingActions} onClick={() => void importPreviewedActions()}>
+                <input type="file" accept=".xlsx" onChange={(event) => void handleImportFileChange(event)} style={fileInputStyle} disabled={!canCreateAction} />
+                <button type="button" style={primaryButtonStyle} disabled={!importableRows.length || isImportingActions || !canCreateAction} onClick={() => void importPreviewedActions()}>
                   {isImportingActions ? "Importing..." : `Import ${importableRows.length} Actions`}
                 </button>
                 <button
@@ -1447,7 +1469,7 @@ export default function HseActionsPage() {
               </div>
             </div>
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={saving}>{saving ? "Creating..." : "Create HSE Action"}</button>
+              <button type="submit" style={primaryButtonStyle} disabled={saving || !canCreateAction}>{saving ? "Creating..." : "Create HSE Action"}</button>
               <span style={emptyTextStyle}>This will appear in the central Action Management register automatically.</span>
             </div>
           </form>

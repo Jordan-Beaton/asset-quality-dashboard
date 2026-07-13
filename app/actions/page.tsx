@@ -26,6 +26,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
 
 type ActionItem = {
@@ -805,6 +806,7 @@ function buildActionFormFromItem(action: ActionItem): ActionForm {
 }
 
 function ActionsPageContent() {
+  const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "";
@@ -912,6 +914,26 @@ function ActionsPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+  const canCreateAction = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  const canEditAction = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }, [imsPermissions.canEdit, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  function requireCreatePermission(actionLabel: string) {
+    if (canCreateAction) return true;
+    setMessage(`Read-only access: you do not have permission to ${actionLabel}.`);
+    return false;
+  }
+
+  function requireEditPermission(actionLabel: string) {
+    if (canEditAction) return true;
+    setMessage(`Read-only access: you do not have permission to ${actionLabel}.`);
+    return false;
+  }
 
   const [form, setForm] = useState<ActionForm>(emptyForm);
   const [createFiles, setCreateFiles] = useState<File[]>([]);
@@ -1938,16 +1960,32 @@ function ActionsPageContent() {
   );
 
   function handleCreateFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!canCreateAction) {
+      event.target.value = "";
+      setMessage("Read-only access: you do not have permission to upload evidence while creating actions.");
+      return;
+    }
     const files = Array.from(event.target.files || []);
     setCreateFiles(files);
   }
 
   function handleSelectedEvidenceFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!canEditAction) {
+      event.target.value = "";
+      setMessage("Read-only access: you do not have permission to upload action evidence.");
+      return;
+    }
     const files = Array.from(event.target.files || []);
     setSelectedEvidenceFiles(files);
   }
 
   async function handleActionImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!canCreateAction) {
+      event.target.value = "";
+      setMessage("Read-only access: you do not have permission to import actions.");
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -2102,6 +2140,8 @@ function ActionsPageContent() {
   }
 
   async function importPreviewedActions() {
+    if (!requireCreatePermission("import actions")) return;
+
     if (!importRows.length) {
       setMessage("Select an Excel file before importing actions.");
       return;
@@ -2575,6 +2615,7 @@ function ActionsPageContent() {
 
   async function addAction(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireCreatePermission("create actions")) return;
 
     if (!form.title.trim()) {
       setMessage("Title is required.");
@@ -2653,6 +2694,8 @@ function ActionsPageContent() {
   }
 
   async function saveEdit(id: string) {
+    if (!requireEditPermission("edit actions")) return;
+
     if (!editForm.title.trim()) {
       setMessage("Title is required.");
       return;
@@ -2711,6 +2754,8 @@ function ActionsPageContent() {
   }
 
   async function deleteAction(id: string) {
+    if (!requireEditPermission("delete actions")) return;
+
     if (!window.confirm("Delete this action? This does not automatically delete evidence files.")) {
       return;
     }
@@ -2733,6 +2778,8 @@ function ActionsPageContent() {
   }
 
   async function uploadEvidenceToSelectedAction() {
+    if (!requireEditPermission("upload action evidence")) return;
+
     if (!selectedEvidenceAction) {
       setMessage("Select an action first.");
       return;
@@ -2778,6 +2825,8 @@ function ActionsPageContent() {
   }
 
   async function deleteEvidence(file: EvidenceFile) {
+    if (!requireEditPermission("delete action evidence")) return;
+
     const confirmed = window.confirm(`Delete evidence file "${file.file_name}"?`);
     if (!confirmed) return;
 
@@ -3592,7 +3641,7 @@ function ActionsPageContent() {
               ) : null}
 
               <Field label="Evidence Files (optional)">
-                <input type="file" multiple onChange={handleCreateFileChange} style={inputStyle} />
+                <input type="file" multiple onChange={handleCreateFileChange} style={inputStyle} disabled={!canCreateAction} />
               </Field>
 
               <Field label="Evidence Notes (optional)">
@@ -3608,7 +3657,7 @@ function ActionsPageContent() {
             <SelectedFilesList files={createFiles} />
 
             <div style={formFooterStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
+              <button type="submit" style={primaryButtonStyle} disabled={isSaving || !canCreateAction}>
                 {isSaving ? "Saving..." : "Add Action"}
               </button>
               <span style={helperTextStyle}>
@@ -3808,11 +3857,11 @@ function ActionsPageContent() {
         >
           <div style={importPanelStyle}>
             <div style={importControlRowStyle}>
-              <input type="file" accept=".xlsx" onChange={(event) => void handleActionImportFileChange(event)} style={fileInputStyle} />
+              <input type="file" accept=".xlsx" onChange={(event) => void handleActionImportFileChange(event)} style={fileInputStyle} disabled={!canCreateAction} />
               <button
                 type="button"
                 style={primaryButtonStyle}
-                disabled={!importableRows.length || isImportingActions}
+                disabled={!importableRows.length || isImportingActions || !canCreateAction}
                 onClick={() => void importPreviewedActions()}
               >
                 {isImportingActions ? "Importing..." : `Import ${importableRows.length} Actions`}
@@ -4193,6 +4242,7 @@ function ActionsPageContent() {
                               deleteAction(action.id);
                             }}
                             style={miniButtonDeleteStyle}
+                            disabled={!canEditAction}
                           >
                             Delete
                           </button>
@@ -4722,7 +4772,7 @@ function ActionsPageContent() {
                   type="button"
                   onClick={() => saveEdit(selectedEvidenceAction.id)}
                   style={primaryButtonStyle}
-                  disabled={isSaving}
+                  disabled={isSaving || !canEditAction}
                 >
                   {isSaving ? "Saving..." : "Save Action"}
                 </button>
@@ -4740,7 +4790,7 @@ function ActionsPageContent() {
 
               <div style={evidenceFieldWrapStyle}>
                 <label style={fieldLabelStyle}>Select files</label>
-                <input type="file" multiple onChange={handleSelectedEvidenceFileChange} style={inputStyle} />
+                <input type="file" multiple onChange={handleSelectedEvidenceFileChange} style={inputStyle} disabled={!canEditAction} />
               </div>
 
               <div style={evidenceFieldWrapStyle}>
@@ -4760,7 +4810,7 @@ function ActionsPageContent() {
                   type="button"
                   onClick={uploadEvidenceToSelectedAction}
                   style={primaryButtonStyle}
-                  disabled={isUploadingEvidence}
+                  disabled={isUploadingEvidence || !canEditAction}
                 >
                   {isUploadingEvidence ? "Uploading..." : "Upload Evidence"}
                 </button>
@@ -4791,6 +4841,7 @@ function ActionsPageContent() {
                           type="button"
                           onClick={() => deleteEvidence(file)}
                           style={miniButtonDeleteStyle}
+                          disabled={!canEditAction}
                         >
                           Delete
                         </button>

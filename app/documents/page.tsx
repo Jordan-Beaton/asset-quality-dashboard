@@ -9,6 +9,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
 
 type DocumentStatus =
@@ -576,6 +577,7 @@ function extractAdditionalNotificationEmails(
 }
 
 function DocumentsPageContent() {
+  const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "";
@@ -628,6 +630,26 @@ function DocumentsPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [nextSequence, setNextSequence] = useState(1);
+
+  const canCreateDocument = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  const canEditDocument = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }, [imsPermissions.canEdit, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  function requireCreatePermission(actionLabel: string) {
+    if (canCreateDocument) return true;
+    setMessage(`Read-only access: you do not have permission to ${actionLabel}.`);
+    return false;
+  }
+
+  function requireEditPermission(actionLabel: string) {
+    if (canEditDocument) return true;
+    setMessage(`Read-only access: you do not have permission to ${actionLabel}.`);
+    return false;
+  }
 
   async function loadDocuments(options: { selectDocumentId?: string } = {}) {
     const [
@@ -1490,6 +1512,7 @@ function DocumentsPageContent() {
 
   async function addDocument(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireCreatePermission("create documents")) return;
 
     if (!form.document_number.trim()) {
       setMessage("Document number is required.");
@@ -1630,6 +1653,8 @@ function DocumentsPageContent() {
   }
 
   async function saveDocumentChanges() {
+    if (!requireEditPermission("edit documents")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -1716,6 +1741,8 @@ function DocumentsPageContent() {
   }
 
   async function submitForReview() {
+    if (!requireEditPermission("submit documents for review")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -1808,6 +1835,8 @@ function DocumentsPageContent() {
   }
 
   async function markReviewed() {
+    if (!requireEditPermission("accept document reviews")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -1874,6 +1903,8 @@ function DocumentsPageContent() {
   }
 
   async function sendToApprover() {
+    if (!requireEditPermission("send documents to approver")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -1948,6 +1979,8 @@ function DocumentsPageContent() {
   }
 
   async function approveDocument() {
+    if (!requireEditPermission("approve documents")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -2040,6 +2073,8 @@ function DocumentsPageContent() {
   }
 
   async function rejectDocument() {
+    if (!requireEditPermission("reject documents")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -2112,6 +2147,8 @@ function DocumentsPageContent() {
   }
 
   async function deleteSelectedDocument() {
+    if (!requireEditPermission("delete documents")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -2154,6 +2191,11 @@ function DocumentsPageContent() {
   }
 
   async function handleControlledFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireEditPermission("upload controlled document files")) {
+      event.target.value = "";
+      return;
+    }
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -2348,6 +2390,8 @@ function DocumentsPageContent() {
   }
 
   async function issueNextRevision() {
+    if (!requireEditPermission("up-rev documents")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -2462,6 +2506,8 @@ function DocumentsPageContent() {
   }
 
   async function removeControlledFile() {
+    if (!requireEditPermission("remove controlled document files")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -2497,6 +2543,9 @@ function DocumentsPageContent() {
   }
 
   async function supersedeAndCreateNew() {
+    if (!requireEditPermission("supersede documents")) return;
+    if (!requireCreatePermission("create replacement documents")) return;
+
     if (!selectedDocument) {
       setMessage("Select a document first.");
       return;
@@ -2975,7 +3024,7 @@ function DocumentsPageContent() {
 
             <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #e2e8f0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                <button type="submit" style={{ ...primaryButtonStyle, padding: "13px 28px", fontSize: "15px" }} disabled={isSaving}>
+                <button type="submit" style={{ ...primaryButtonStyle, padding: "13px 28px", fontSize: "15px" }} disabled={isSaving || !canCreateDocument}>
                   {isSaving ? "Saving..." : "Create Draft Document →"}
                 </button>
                 <button
@@ -3358,7 +3407,7 @@ function DocumentsPageContent() {
                     </Field>
 
                     <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={primaryButtonStyle} onClick={submitForReview}>
+                      <button type="button" style={primaryButtonStyle} onClick={submitForReview} disabled={!canEditDocument}>
                         Send to Reviewer
                       </button>
                     </div>
@@ -3374,7 +3423,7 @@ function DocumentsPageContent() {
                     </div>
 
                     <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={primaryButtonStyle} onClick={markReviewed}>
+                      <button type="button" style={primaryButtonStyle} onClick={markReviewed} disabled={!canEditDocument}>
                         Accept Review
                       </button>
                     </div>
@@ -3405,7 +3454,7 @@ function DocumentsPageContent() {
                     </Field>
 
                     <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={primaryButtonStyle} onClick={sendToApprover}>
+                      <button type="button" style={primaryButtonStyle} onClick={sendToApprover} disabled={!canEditDocument}>
                         Send to Approver
                       </button>
                     </div>
@@ -3421,7 +3470,7 @@ function DocumentsPageContent() {
                     </div>
 
                     <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={approveButtonStyle} onClick={approveDocument}>
+                      <button type="button" style={approveButtonStyle} onClick={approveDocument} disabled={!canEditDocument}>
                         Approve Document
                       </button>
                     </div>
@@ -3461,7 +3510,7 @@ function DocumentsPageContent() {
                     </Field>
 
                     <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={rejectButtonStyle} onClick={rejectDocument}>
+                      <button type="button" style={rejectButtonStyle} onClick={rejectDocument} disabled={!canEditDocument}>
                         Reject
                       </button>
                     </div>
@@ -3470,7 +3519,7 @@ function DocumentsPageContent() {
 
                 {selectedWorkflowStatus === "Approved" ? (
                   <div style={workflowActionButtonWrapStyle}>
-                    <button type="button" style={secondaryButtonStyle} onClick={supersedeAndCreateNew}>
+                    <button type="button" style={secondaryButtonStyle} onClick={supersedeAndCreateNew} disabled={!canEditDocument || !canCreateDocument}>
                       Supersede & Create New
                     </button>
                   </div>
@@ -3501,7 +3550,7 @@ function DocumentsPageContent() {
                       accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
                       onChange={handleControlledFileUpload}
                       style={{ display: "none" }}
-                      disabled={isUploadingFile}
+                      disabled={isUploadingFile || !canEditDocument}
                     />
                   </label>
 
@@ -3515,12 +3564,12 @@ function DocumentsPageContent() {
                     </button>
                   ) : null}
 
-                  <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={issueNextRevision}>
+                  <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={issueNextRevision} disabled={!canEditDocument}>
                     Up-rev to {getNextRevision(selectedDocument.current_revision || "A")}
                   </button>
 
                   {selectedDocument.file_name ? (
-                    <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={removeControlledFile}>
+                    <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={removeControlledFile} disabled={!canEditDocument}>
                       Remove file
                     </button>
                   ) : null}
@@ -3780,7 +3829,7 @@ function DocumentsPageContent() {
                             accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
                             onChange={handleControlledFileUpload}
                             style={{ display: "none" }}
-                            disabled={isUploadingFile}
+                            disabled={isUploadingFile || !canEditDocument}
                           />
                         </label>
 
@@ -3794,12 +3843,12 @@ function DocumentsPageContent() {
                           </button>
                         ) : null}
 
-                        <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={issueNextRevision}>
+                        <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={issueNextRevision} disabled={!canEditDocument}>
                           Up-rev to {getNextRevision(selectedDocument.current_revision || "A")}
                         </button>
 
                         {selectedDocument.file_name ? (
-                          <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={removeControlledFile}>
+                          <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={removeControlledFile} disabled={!canEditDocument}>
                             Remove file
                           </button>
                         ) : null}
@@ -3813,12 +3862,12 @@ function DocumentsPageContent() {
                     type="button"
                     style={primaryButtonStyle}
                     onClick={saveDocumentChanges}
-                    disabled={isSaving}
+                    disabled={isSaving || !canEditDocument}
                   >
                     {isSaving ? "Saving..." : "Save Document Changes"}
                   </button>
 
-                  <button type="button" style={dangerButtonStyle} onClick={deleteSelectedDocument}>
+                  <button type="button" style={dangerButtonStyle} onClick={deleteSelectedDocument} disabled={!canEditDocument}>
                     Delete Document
                   </button>
                 </div>

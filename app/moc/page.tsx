@@ -28,6 +28,7 @@ import {
   WidthType,
 } from "docx";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { supabase } from "../../src/lib/supabase";
@@ -837,6 +838,7 @@ function buildRegisterUpdatedAt(report: MocReport) {
 }
 
 function MOCPageContent() {
+  const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "All";
@@ -901,6 +903,26 @@ function MOCPageContent() {
   const [detailCloseoutRows, setDetailCloseoutRows] = useState<MocSignoffRow[]>(
     createSignoffRows(defaultCloseoutRoles)
   );
+
+  const canCreateMoc = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  const canEditMoc = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }, [imsPermissions.canEdit, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  function requireCreatePermission(actionLabel: string) {
+    if (canCreateMoc) return true;
+    showMessage(`${actionLabel} requires Create permission for this IMS area.`, "warning");
+    return false;
+  }
+
+  function requireEditPermission(actionLabel: string) {
+    if (canEditMoc) return true;
+    showMessage(`${actionLabel} requires Edit permission for this IMS area.`, "warning");
+    return false;
+  }
 
   const nextMocNumber = useMemo(
     () => buildNextMocNumber(reports.map((item) => item.moc_report_no).filter(Boolean)),
@@ -982,16 +1004,16 @@ function MOCPageContent() {
     return reports.filter((report) => isRecentMoc(report)).length;
   }, [reports]);
   const nextWorkflowStatus = getNextWorkflowStatus(detailReport.status);
-  const canEditCoreFields = detailReport.status === "Draft" || detailReport.status === "In Review";
+  const canEditCoreFields = canEditMoc && (detailReport.status === "Draft" || detailReport.status === "In Review");
   const canEditImplementationFields =
-    detailReport.status === "Draft" || detailReport.status === "In Review" || detailReport.status === "Approved";
-  const canEditStructural = detailReport.status === "Draft";
-  const canEditImplementationStructure = detailReport.status === "Draft";
-  const canEditReviewSections = detailReport.status === "Draft" || detailReport.status === "In Review";
-  const canEditCloseout = detailReport.status !== "Closed";
-  const canEditCloseoutStructure = detailReport.status === "Draft" || detailReport.status === "Approved";
-  const canManageAttachments = detailReport.status !== "Closed";
-  const canSaveDetail = Boolean(selectedReportId) && detailReport.status !== "Closed";
+    canEditMoc && (detailReport.status === "Draft" || detailReport.status === "In Review" || detailReport.status === "Approved");
+  const canEditStructural = canEditMoc && detailReport.status === "Draft";
+  const canEditImplementationStructure = canEditMoc && detailReport.status === "Draft";
+  const canEditReviewSections = canEditMoc && (detailReport.status === "Draft" || detailReport.status === "In Review");
+  const canEditCloseout = canEditMoc && detailReport.status !== "Closed";
+  const canEditCloseoutStructure = canEditMoc && (detailReport.status === "Draft" || detailReport.status === "Approved");
+  const canManageAttachments = canEditMoc && detailReport.status !== "Closed";
+  const canSaveDetail = Boolean(selectedReportId) && canEditMoc && detailReport.status !== "Closed";
   const detailWorkflowMessage =
     detailReport.status === "Draft"
       ? "Draft records are fully editable. Status progression is manual until routed workflow approvals are enabled."
@@ -1025,6 +1047,7 @@ function MOCPageContent() {
     file: File | null,
     apply: (value: string) => void
   ) {
+    if (!requireEditPermission("Attaching MOC signatures")) return;
     if (!file) return;
     try {
       const dataUrl = await toDataUrl(file);
@@ -1447,6 +1470,8 @@ function MOCPageContent() {
   }
 
   async function createMoc() {
+    if (!requireCreatePermission("Creating MOCs")) return;
+
     setSaving(true);
     try {
       const nextNumber = nextMocNumber;
@@ -1513,6 +1538,7 @@ function MOCPageContent() {
 
   async function saveSelectedMoc() {
     if (!selectedReportId) return;
+    if (!requireEditPermission("Saving MOCs")) return;
     if (detailReport.status === "Closed") {
       showMessage("Closed MOCs are locked and cannot be edited.", "warning");
       return;
@@ -1565,6 +1591,7 @@ function MOCPageContent() {
 
   async function progressSelectedMoc(nextStatus: MocStatus) {
     if (!selectedReportId) return;
+    if (!requireEditPermission("Progressing MOC workflow")) return;
 
     const allowedNext = getNextWorkflowStatus(detailReport.status);
     if (allowedNext !== nextStatus) {
@@ -1625,6 +1652,7 @@ function MOCPageContent() {
 
   async function deleteSelectedMoc() {
     if (!selectedReportId) return;
+    if (!requireEditPermission("Deleting MOCs")) return;
     if (!window.confirm(`Delete ${detailReport.moc_report_no}?`)) return;
 
     setSaving(true);
@@ -1822,6 +1850,11 @@ function MOCPageContent() {
   }
 
   async function handleAttachmentUpload(event: ChangeEvent<HTMLInputElement>) {
+    if (!requireEditPermission("Uploading MOC attachments")) {
+      event.currentTarget.value = "";
+      return;
+    }
+
     if (!selectedReportId) {
       showMessage("Select an MOC first.", "warning");
       return;
@@ -1925,6 +1958,8 @@ function MOCPageContent() {
   }
 
   async function removeAttachment(file: MocAttachment) {
+    if (!requireEditPermission("Removing MOC attachments")) return;
+
     if (!canManageAttachments) {
       showMessage("Closed MOCs are locked and attachments cannot be removed.", "warning");
       return;
@@ -3477,7 +3512,12 @@ function MOCPageContent() {
             </div>
 
             <div style={buttonRowStyle}>
-              <button type="button" style={primaryButtonStyle} onClick={() => void createMoc()} disabled={saving}>
+              <button
+                type="button"
+                style={primaryButtonStyle}
+                onClick={() => void createMoc()}
+                disabled={saving || !canCreateMoc}
+              >
                 {saving ? "Creating..." : "Create MOC"}
               </button>
               <button type="button" style={secondaryButtonStyle} onClick={() => setStarterForm(createStarterForm())}>
@@ -3661,7 +3701,7 @@ function MOCPageContent() {
                     type="button"
                     style={workflowButtonStyle}
                     onClick={() => void progressSelectedMoc(nextWorkflowStatus)}
-                    disabled={saving}
+                    disabled={saving || !canEditMoc}
                   >
                     {getWorkflowButtonLabel(detailReport.status)}
                   </button>
@@ -4459,7 +4499,12 @@ function MOCPageContent() {
               >
                 Generate Linked Action
               </Link>
-              <button type="button" style={dangerButtonStyle} onClick={() => void deleteSelectedMoc()} disabled={saving}>
+              <button
+                type="button"
+                style={dangerButtonStyle}
+                onClick={() => void deleteSelectedMoc()}
+                disabled={saving || !canEditMoc}
+              >
                 Delete
               </button>
             </div>

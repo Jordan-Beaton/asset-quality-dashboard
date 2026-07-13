@@ -22,6 +22,7 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, gree
 - Incidents, Risk Assessments, and Environmental tabs were removed from nav earlier.
 - HSE Dashboard has graphics and a year filter.
 - HSE Actions are HSE-specific and link to central Action Management.
+- HSE Actions and HSE Reports now include explicit create/edit permission guards on direct write paths, with primary write controls disabled for restricted users.
 
 ## AINM
 
@@ -32,6 +33,7 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, gree
 - Report outputs are stored and history is visible.
 - AINM actions link to central actions.
 - Dashboard graphs were recently tidied.
+- Internal and external AINM create/import/save/delete, evidence upload/delete, reviewer creation, and saved compiled PDF generation now have explicit page-level create/edit permission guards with matching disabled controls.
 
 ## AINM Known Work
 
@@ -40,6 +42,7 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, gree
 - Register should show Classification.
 - Register should filter by Accident/Incident.
 - Clicking a register item should scroll directly to the detail panel.
+- Above register/filter/detail polish appears implemented in `app/hse/ainm/page.tsx`; verify on Vercel with real data before clearing this section completely.
 
 ## HSE Reports
 
@@ -47,6 +50,7 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, gree
 - Monthly report structure should use live HSE data.
 - Saved reports should work like Quality Reports.
 - Executive summary must appear in PDF output.
+- Creating saved reports requires Create permission; editing/deleting saved reports requires Edit permission.
 
 ## Inspections
 
@@ -73,4 +77,3 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, gree
 - Word/PDF output styling was being iterated.
 - Section 1/3 checkbox layouts were under refinement.
 - Do not spend more time on PTW unless asked.
-

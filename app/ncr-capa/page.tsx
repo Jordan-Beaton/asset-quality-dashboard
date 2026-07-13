@@ -26,6 +26,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import * as XLSX from "xlsx";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
@@ -779,6 +780,7 @@ async function tryLoadNcrOptions(): Promise<LinkedOption[]> {
 }
 
 function NcrCapaPageContent() {
+  const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "All";
@@ -894,6 +896,26 @@ function NcrCapaPageContent() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingWord, setGeneratingWord] = useState(false);
   const [generatingFilteredNcrReport, setGeneratingFilteredNcrReport] = useState(false);
+
+  const canCreateNcr = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  const canEditNcr = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }, [imsPermissions.canEdit, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  function requireCreatePermission(actionLabel: string) {
+    if (canCreateNcr) return true;
+    setMessage(`${actionLabel} requires Create permission for this IMS area.`);
+    return false;
+  }
+
+  function requireEditPermission(actionLabel: string) {
+    if (canEditNcr) return true;
+    setMessage(`${actionLabel} requires Edit permission for this IMS area.`);
+    return false;
+  }
 
   async function loadData() {
     setLoading(true);
@@ -1482,14 +1504,26 @@ function NcrCapaPageContent() {
   }, [editRow]);
 
   function handleCreateNcrFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireCreatePermission("Adding NCR evidence")) {
+      event.target.value = "";
+      return;
+    }
     setCreateNcrFiles(Array.from(event.target.files || []));
   }
 
   function handleCreateCapaFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireCreatePermission("Adding CAPA evidence")) {
+      event.target.value = "";
+      return;
+    }
     setCreateCapaFiles(Array.from(event.target.files || []));
   }
 
   function handleSelectedEvidenceFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireEditPermission("Adding evidence")) {
+      event.target.value = "";
+      return;
+    }
     setSelectedEvidenceFiles(Array.from(event.target.files || []));
   }
 
@@ -1638,6 +1672,8 @@ function NcrCapaPageContent() {
   }
 
   async function createNcr() {
+    if (!requireCreatePermission("Creating NCRs")) return;
+
     if (!newNcr.title.trim()) {
       alert("Please enter an NCR title.");
       return;
@@ -1718,6 +1754,8 @@ function NcrCapaPageContent() {
   }
 
   async function createCapa() {
+    if (!requireCreatePermission("Creating CAPAs")) return;
+
     if (!newCapa.title.trim()) {
       alert("Please enter a CAPA title.");
       return;
@@ -1813,6 +1851,7 @@ function NcrCapaPageContent() {
 
   async function saveEdit() {
     if (!editRow) return;
+    if (!requireEditPermission("Saving NCR/CAPA changes")) return;
 
     setSaving(true);
 
@@ -1898,6 +1937,7 @@ function NcrCapaPageContent() {
 
   async function deleteSelected() {
     if (!selectedRow) return;
+    if (!requireEditPermission("Deleting NCR/CAPA records")) return;
 
     const confirmed = window.confirm(
       `Delete ${selectedRow.number}? This does not automatically delete evidence files.`
@@ -1924,6 +1964,8 @@ function NcrCapaPageContent() {
   }
 
   async function uploadEvidenceToSelected() {
+    if (!requireEditPermission("Uploading evidence")) return;
+
     if (!selectedRow) {
       setMessage("Select a record first.");
       return;
@@ -1981,6 +2023,8 @@ function NcrCapaPageContent() {
   }
 
   async function deleteEvidence(file: EvidenceFile) {
+    if (!requireEditPermission("Deleting evidence")) return;
+
     const confirmed = window.confirm(`Delete evidence file "${file.file_name}"?`);
     if (!confirmed) return;
 
@@ -2021,6 +2065,8 @@ function NcrCapaPageContent() {
   }
 
   async function generateNcrPdf() {
+    if (!requireEditPermission("Generating saved NCR PDFs")) return;
+
     if (!selectedRow || selectedRow.type !== "NCR") {
       setMessage("Select an NCR first.");
       return;
@@ -2890,6 +2936,11 @@ function NcrCapaPageContent() {
   }
 
   async function handleNcrImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireCreatePermission("Importing NCRs")) {
+      event.target.value = "";
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -2998,6 +3049,8 @@ function NcrCapaPageContent() {
   }
 
   async function importPreviewedNcrs() {
+    if (!requireCreatePermission("Importing NCRs")) return;
+
     if (!importRows.length) {
       setMessage("Select an Excel file before importing.");
       return;
@@ -3145,6 +3198,7 @@ function NcrCapaPageContent() {
                 accept=".xlsx"
                 style={inputStyle}
                 onChange={(event) => void handleNcrImportFileChange(event)}
+                disabled={!canCreateNcr}
               />
               <div style={mutedTextStyle}>
                 First worksheet only. Evidence file references are preserved as text under Imported Evidence Reference.
@@ -3156,7 +3210,7 @@ function NcrCapaPageContent() {
                 type="button"
                 style={primaryButton}
                 onClick={() => void importPreviewedNcrs()}
-                disabled={!importRows.length || importHasErrors || importingNcrs}
+                disabled={!canCreateNcr || !importRows.length || importHasErrors || importingNcrs}
               >
                 {importingNcrs ? "Importing NCRs..." : `Import ${importValidRows.length} NCRs`}
               </button>
@@ -3419,7 +3473,13 @@ function NcrCapaPageContent() {
 
                   <div>
                     <label style={labelStyle}>Evidence Files (optional)</label>
-                    <input type="file" multiple style={inputStyle} onChange={handleCreateNcrFileChange} />
+                    <input
+                      type="file"
+                      multiple
+                      style={inputStyle}
+                      onChange={handleCreateNcrFileChange}
+                      disabled={!canCreateNcr}
+                    />
                   </div>
 
                   <div style={{ gridColumn: "1 / -1" }}>
@@ -3436,7 +3496,12 @@ function NcrCapaPageContent() {
                 <SelectedFilesList files={createNcrFiles} />
 
                 <div style={buttonRowStyle}>
-                  <button type="button" style={primaryButton} onClick={() => void createNcr()} disabled={saving}>
+                  <button
+                    type="button"
+                    style={primaryButton}
+                    onClick={() => void createNcr()}
+                    disabled={saving || !canCreateNcr}
+                  >
                     {saving ? "Saving..." : "Create NCR"}
                   </button>
                   <button
@@ -3677,7 +3742,13 @@ function NcrCapaPageContent() {
 
                   <div>
                     <label style={labelStyle}>Evidence Files (optional)</label>
-                    <input type="file" multiple style={inputStyle} onChange={handleCreateCapaFileChange} />
+                    <input
+                      type="file"
+                      multiple
+                      style={inputStyle}
+                      onChange={handleCreateCapaFileChange}
+                      disabled={!canCreateNcr}
+                    />
                   </div>
 
                   <div style={{ gridColumn: "1 / -1" }}>
@@ -3698,7 +3769,7 @@ function NcrCapaPageContent() {
                     type="button"
                     style={{ ...primaryButton, background: "#7c3aed" }}
                     onClick={() => void createCapa()}
-                    disabled={saving}
+                    disabled={saving || !canCreateNcr}
                   >
                     {saving ? "Saving..." : "Create CAPA"}
                   </button>
@@ -4530,7 +4601,7 @@ function NcrCapaPageContent() {
                         type="button"
                         style={{ ...secondaryButton, border: "1px solid #BFE5E3", color: "#3A9B98" }}
                         onClick={() => void generateNcrPdf()}
-                        disabled={generatingPdf}
+                        disabled={generatingPdf || !canEditNcr}
                       >
                         {generatingPdf
                           ? "Generating PDF..."
@@ -4606,7 +4677,12 @@ function NcrCapaPageContent() {
                 ) : null}
 
                 <div style={buttonRowStyle}>
-                  <button type="button" style={primaryButton} onClick={() => void saveEdit()} disabled={saving}>
+                  <button
+                    type="button"
+                    style={primaryButton}
+                    onClick={() => void saveEdit()}
+                    disabled={saving || !canEditNcr}
+                  >
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
                   {editRow.type === "NCR" ? (
@@ -4636,7 +4712,7 @@ function NcrCapaPageContent() {
                       background: "#fff5f5",
                     }}
                     onClick={() => void deleteSelected()}
-                    disabled={saving}
+                    disabled={saving || !canEditNcr}
                   >
                     Delete
                   </button>
@@ -4666,7 +4742,13 @@ function NcrCapaPageContent() {
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <label style={labelStyle}>Select Files</label>
-                    <input type="file" multiple style={inputStyle} onChange={handleSelectedEvidenceFileChange} />
+                    <input
+                      type="file"
+                      multiple
+                      style={inputStyle}
+                      onChange={handleSelectedEvidenceFileChange}
+                      disabled={!canEditNcr}
+                    />
                   </div>
 
                   <div style={{ gridColumn: "1 / -1" }}>
@@ -4687,7 +4769,7 @@ function NcrCapaPageContent() {
                     type="button"
                     style={{ ...primaryButton, background: "#7c3aed" }}
                     onClick={() => void uploadEvidenceToSelected()}
-                    disabled={uploadingEvidence}
+                    disabled={uploadingEvidence || !canEditNcr}
                   >
                     {uploadingEvidence ? "Uploading..." : "Upload Evidence"}
                   </button>
@@ -4721,6 +4803,7 @@ function NcrCapaPageContent() {
                               background: "#fff5f5",
                             }}
                             onClick={() => void deleteEvidence(file)}
+                            disabled={!canEditNcr}
                           >
                             Delete
                           </button>

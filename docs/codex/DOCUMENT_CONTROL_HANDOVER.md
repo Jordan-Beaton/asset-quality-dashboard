@@ -25,6 +25,11 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 
 - Document Control has asset-specific document numbering support.
 - `document_id_code` exists on assets.
+- Document Control now has explicit page-level permission guards using `useImsPermissions`:
+  - Create permission is required to create draft documents.
+  - Edit permission is required for save, submit for review, review acceptance, send to approver, approval, rejection, delete, controlled file upload/remove, and up-rev actions.
+  - Supersede & Create New requires both edit permission on the existing document and create permission for the replacement document.
+  - Main workflow/file/save/delete buttons are disabled when the current tab permission does not allow the action.
 - Big migration from Z drive was performed:
   - Current files uploaded.
   - Revisions/history attempted.
@@ -72,4 +77,3 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 - Do not assume Supabase columns without checking.
 - Do not change numbering, revision, storage, or workflow behavior casually.
 - Controlled files are intended to be view/download only in-system.
-

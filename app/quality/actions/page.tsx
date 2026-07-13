@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { supabase } from "../../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -223,6 +224,7 @@ function countByOwner(actions: ActionItem[]) {
 }
 
 function QualityActionsPageContent() {
+  const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const directActionId = searchParams.get("actionId")?.trim() || "";
@@ -250,6 +252,10 @@ function QualityActionsPageContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState("");
+
+  const canCreateAction = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
 
   async function loadData() {
     setLoading(true);
@@ -480,6 +486,11 @@ function QualityActionsPageContent() {
 
   async function createAction(event: React.FormEvent) {
     event.preventDefault();
+    if (!canCreateAction) {
+      setMessage("Read-only access: you do not have permission to create Quality actions.");
+      return;
+    }
+
     if (!form.title.trim()) {
       setMessage("Action title is required.");
       return;
@@ -962,7 +973,7 @@ function QualityActionsPageContent() {
               </div>
             </div>
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={saving}>{saving ? "Creating..." : "Create Quality Action"}</button>
+              <button type="submit" style={primaryButtonStyle} disabled={saving || !canCreateAction}>{saving ? "Creating..." : "Create Quality Action"}</button>
               <span style={emptyTextStyle}>This will appear in the central Action Management register automatically.</span>
             </div>
           </form>

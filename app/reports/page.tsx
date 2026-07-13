@@ -5,6 +5,7 @@ import Link from "next/link";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
 
 type Ncr = {
@@ -398,6 +399,7 @@ function buildPdfMetricTable(
 }
 
 export default function ReportsPage() {
+  const imsPermissions = useImsPermissions();
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
@@ -416,6 +418,14 @@ export default function ReportsPage() {
   const [savedReportSearch, setSavedReportSearch] = useState("");
   const [savedReportYearFilter, setSavedReportYearFilter] = useState("All Years");
   const [showSavedReportFilters, setShowSavedReportFilters] = useState(false);
+
+  const canCreateReport = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  const canEditReport = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }, [imsPermissions.canEdit, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
 
   async function loadData() {
     const [ncrsRes, capasRes, actionsRes, auditsRes, findingsRes, mocsRes, documentsRes, reportsRes] = await Promise.all([
@@ -715,6 +725,11 @@ export default function ReportsPage() {
   }
 
   function handleEdit(report: MonthlyReport) {
+    if (!canEditReport) {
+      setMessage("Read-only access: you do not have permission to edit monthly reports.");
+      return;
+    }
+
     setEditingId(report.id);
     setForm(parseReportFormFromSavedReport(report));
     setMessage(`Editing report: ${report.month_label}`);
@@ -722,6 +737,11 @@ export default function ReportsPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!canEditReport) {
+      setMessage("Read-only access: you do not have permission to delete monthly reports.");
+      return;
+    }
+
     const confirmed = window.confirm("Are you sure you want to delete this report?");
     if (!confirmed) return;
 
@@ -742,6 +762,14 @@ export default function ReportsPage() {
 
   async function saveMonthlyReport(e: React.FormEvent) {
     e.preventDefault();
+    if (editingId && !canEditReport) {
+      setMessage("Read-only access: you do not have permission to update monthly reports.");
+      return;
+    }
+    if (!editingId && !canCreateReport) {
+      setMessage("Read-only access: you do not have permission to create monthly reports.");
+      return;
+    }
 
     if (!Number.isFinite(selectedYear) || selectedYear < 2000) {
       setMessage("Enter a valid report year.");
@@ -1164,7 +1192,7 @@ export default function ReportsPage() {
             </div>
 
             <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle}>
+              <button type="submit" style={primaryButtonStyle} disabled={editingId ? !canEditReport : !canCreateReport}>
                 {editingId ? "Update Monthly Report" : "Save Monthly Report"}
               </button>
 
@@ -1285,10 +1313,10 @@ export default function ReportsPage() {
                         <button type="button" style={miniButtonStyle} onClick={() => void generatePdfReport(report)}>
                           PDF
                         </button>
-                        <button type="button" style={miniButtonStyle} onClick={() => handleEdit(report)}>
+                        <button type="button" style={miniButtonStyle} onClick={() => handleEdit(report)} disabled={!canEditReport}>
                           Edit
                         </button>
-                        <button type="button" style={miniButtonDeleteStyle} onClick={() => void handleDelete(report.id)}>
+                        <button type="button" style={miniButtonDeleteStyle} onClick={() => void handleDelete(report.id)} disabled={!canEditReport}>
                           Delete
                         </button>
                       </div>

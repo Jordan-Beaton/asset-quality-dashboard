@@ -27,6 +27,7 @@ import {
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
 
 type AuditType = "Internal" | "External" | "Supplier";
@@ -605,6 +606,7 @@ function MultiSelectStandards({
 }
 
 function AuditsPageContent() {
+  const imsPermissions = useImsPermissions();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -689,6 +691,26 @@ function AuditsPageContent() {
     () => buildNextAuditNumber(form.audit_type, form.audit_date, audits),
     [form.audit_type, form.audit_date, audits]
   );
+
+  const canCreateAudit = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
+  }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  const canEditAudit = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }, [imsPermissions.canEdit, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  function requireCreatePermission(actionLabel: string) {
+    if (canCreateAudit) return true;
+    setMessage(`${actionLabel} requires Create permission for this IMS area.`);
+    return false;
+  }
+
+  function requireEditPermission(actionLabel: string) {
+    if (canEditAudit) return true;
+    setMessage(`${actionLabel} requires Edit permission for this IMS area.`);
+    return false;
+  }
 
   async function loadLinkOptions() {
     const [loadedNcrs, loadedActions] = await Promise.all([tryLoadNcrOptions(), tryLoadActionOptions()]);
@@ -1028,10 +1050,21 @@ function AuditsPageContent() {
 
   const findingAuditTitleOptions = useMemo(() => {
     const sourceRows = isClosedFindingsView ? closedFindings : openFindings;
-    return Array.from(new Set(sourceRows.map((finding) => finding.audit_title).filter(Boolean))).sort((a, b) =>
+    const typeScopedRows =
+      openFindingTypeFilter === "All"
+        ? sourceRows
+        : sourceRows.filter((finding) => finding.audit_type === openFindingTypeFilter);
+
+    return Array.from(new Set(typeScopedRows.map((finding) => finding.audit_title).filter(Boolean))).sort((a, b) =>
       a.localeCompare(b)
     );
-  }, [closedFindings, isClosedFindingsView, openFindings]);
+  }, [closedFindings, isClosedFindingsView, openFindingTypeFilter, openFindings]);
+
+  useEffect(() => {
+    if (openFindingAuditTitleFilter === "All") return;
+    if (findingAuditTitleOptions.includes(openFindingAuditTitleFilter)) return;
+    setOpenFindingAuditTitleFilter("All");
+  }, [findingAuditTitleOptions, openFindingAuditTitleFilter]);
 
   const findingStatusByAuditType = useMemo(() => {
     return (["Internal", "External", "Supplier"] as AuditType[]).map((auditType) => {
@@ -1481,6 +1514,7 @@ function AuditsPageContent() {
 
   async function createAudit(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireCreatePermission("Creating audits")) return;
 
     const validationError = validateAuditForm(form);
     if (validationError) {
@@ -1541,6 +1575,8 @@ function AuditsPageContent() {
   }
 
   async function saveAuditChanges() {
+    if (!requireEditPermission("Saving audit changes")) return;
+
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
@@ -1585,6 +1621,8 @@ function AuditsPageContent() {
   }
 
   async function saveLinkedItems(nextNcrs: string[], nextActions: string[]) {
+    if (!requireEditPermission("Updating linked audit items")) return;
+
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
@@ -1654,6 +1692,8 @@ function AuditsPageContent() {
   }
 
   async function deleteSelectedAudit() {
+    if (!requireEditPermission("Deleting audits")) return;
+
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
@@ -1681,6 +1721,11 @@ function AuditsPageContent() {
   }
 
   function openRaiseFinding() {
+    if (!canCreateAudit) {
+      setMessage("Raising audit findings requires Create permission for this IMS area.");
+      return;
+    }
+
     if (!selectedAudit) {
       setMessage("Select an audit before raising a finding.");
       return;
@@ -1696,6 +1741,7 @@ function AuditsPageContent() {
 
   async function createFinding(e: React.FormEvent) {
     e.preventDefault();
+    if (!requireCreatePermission("Creating audit findings")) return;
 
     if (!selectedAudit) {
       setMessage("Select an audit before raising a finding.");
@@ -1751,6 +1797,8 @@ function AuditsPageContent() {
     field: keyof FindingRecord,
     value: string
   ) {
+    if (!requireEditPermission("Updating audit findings")) return;
+
     const current = findings.find((finding) => finding.id === findingId);
     if (!current) return;
 
@@ -1803,6 +1851,7 @@ function AuditsPageContent() {
 
   async function saveOpenFindingDetail() {
     if (!openFindingForm) return;
+    if (!requireEditPermission("Saving audit findings")) return;
 
     const payload: Record<string, unknown> = {
       category: openFindingForm.category,
@@ -1832,6 +1881,8 @@ function AuditsPageContent() {
   }
 
   async function deleteFinding(finding: FindingRecord) {
+    if (!requireEditPermission("Deleting audit findings")) return;
+
     const confirmed = window.confirm("This will permanently delete this finding. Continue?");
     if (!confirmed) return;
 
@@ -1872,6 +1923,11 @@ function AuditsPageContent() {
     finding: FindingRecord,
     event: React.ChangeEvent<HTMLInputElement>
   ) {
+    if (!requireEditPermission("Uploading finding evidence")) {
+      event.target.value = "";
+      return;
+    }
+
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
 
@@ -1912,6 +1968,11 @@ function AuditsPageContent() {
   }
 
   async function handleReportUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireEditPermission("Uploading audit documents")) {
+      event.target.value = "";
+      return;
+    }
+
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
@@ -1951,6 +2012,8 @@ function AuditsPageContent() {
   }
 
   async function removeAuditFile(file: AuditFileRow) {
+    if (!requireEditPermission("Removing audit documents")) return;
+
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
@@ -2008,6 +2071,8 @@ function AuditsPageContent() {
   }
 
   async function removeFindingEvidenceFile(file: AuditFileRow, finding: FindingRecord) {
+    if (!requireEditPermission("Deleting finding evidence")) return;
+
     const confirmed = window.confirm(
       `Delete evidence file "${getFindingEvidenceDisplayName(file, finding)}" from ${finding.reference}?`
     );
@@ -2059,6 +2124,7 @@ function AuditsPageContent() {
                 type="button"
                 style={secondaryButtonStyle}
                 onClick={() => void removeFindingEvidenceFile(file, finding)}
+                disabled={!canEditAudit}
               >
                 Delete Evidence
               </button>
@@ -3625,7 +3691,12 @@ function AuditsPageContent() {
                   </div>
 
                   <div style={detailButtonRowStyle}>
-                    <button type="button" style={primaryButtonStyle} onClick={() => void saveOpenFindingDetail()}>
+                    <button
+                      type="button"
+                      style={primaryButtonStyle}
+                      onClick={() => void saveOpenFindingDetail()}
+                      disabled={!canEditAudit}
+                    >
                       Save Finding
                     </button>
                     <button
@@ -3657,7 +3728,7 @@ function AuditsPageContent() {
                         type="file"
                         multiple
                         style={{ display: "none" }}
-                        disabled={Boolean(uploadingFindingEvidenceId)}
+                        disabled={Boolean(uploadingFindingEvidenceId) || !canEditAudit}
                         onChange={(event) => void handleFindingEvidenceUpload(openFindingForm, event)}
                       />
                     </label>
@@ -3668,6 +3739,7 @@ function AuditsPageContent() {
                       type="button"
                       style={dangerButtonStyle}
                       onClick={() => void deleteFinding(openFindingForm)}
+                      disabled={!canEditAudit}
                     >
                       Delete Finding
                     </button>
@@ -3824,7 +3896,7 @@ function AuditsPageContent() {
                 <div style={createAuditHintStyle}>
                   Internal = standards + procedure. Supplier = ISO only. External = certification audit.
                 </div>
-                <button type="submit" style={primaryButtonStyle}>
+                <button type="submit" style={primaryButtonStyle} disabled={!canCreateAudit}>
                   Create Audit
                 </button>
               </div>
@@ -4039,6 +4111,7 @@ function AuditsPageContent() {
                       accept=".pdf,.doc,.docx,.xlsx,.xls,.png,.jpg,.jpeg"
                       onChange={handleReportUpload}
                       style={{ display: "none" }}
+                      disabled={isUploadingReport || !canEditAudit}
                     />
                   </label>
 
@@ -4069,6 +4142,7 @@ function AuditsPageContent() {
                           type="button"
                           style={secondaryButtonStyle}
                           onClick={() => void removeAuditFile(file)}
+                          disabled={!canEditAudit}
                         >
                           Remove
                         </button>
@@ -4219,16 +4293,16 @@ function AuditsPageContent() {
                 </div>
 
                 <div style={detailButtonRowStyle}>
-                  <button type="button" style={primaryButtonStyle} onClick={saveAuditChanges}>
+                  <button type="button" style={primaryButtonStyle} onClick={saveAuditChanges} disabled={!canEditAudit}>
                     Save Audit Changes
                   </button>
                   <button type="button" style={secondaryButtonStyle} onClick={generateAuditPdf}>
                     Generate PDF Report
                   </button>
-                  <button type="button" style={secondaryButtonStyle} onClick={openRaiseFinding}>
+                  <button type="button" style={secondaryButtonStyle} onClick={openRaiseFinding} disabled={!canCreateAudit}>
                     Raise Finding
                   </button>
-                  <button type="button" style={dangerButtonStyle} onClick={deleteSelectedAudit}>
+                  <button type="button" style={dangerButtonStyle} onClick={deleteSelectedAudit} disabled={!canEditAudit}>
                     Delete Audit
                   </button>
                 </div>
@@ -4256,7 +4330,7 @@ function AuditsPageContent() {
                         type="button"
                         style={secondaryButtonStyle}
                         onClick={() => void addLinkedNcr()}
-                        disabled={isSavingLinks}
+                        disabled={isSavingLinks || !canEditAudit}
                       >
                         + Add
                       </button>
@@ -4281,7 +4355,7 @@ function AuditsPageContent() {
                         type="button"
                         style={secondaryButtonStyle}
                         onClick={() => void addLinkedAction()}
-                        disabled={isSavingLinks}
+                        disabled={isSavingLinks || !canEditAudit}
                       >
                         + Add
                       </button>
@@ -4432,7 +4506,7 @@ function AuditsPageContent() {
                     </div>
 
                     <div style={detailButtonRowStyle}>
-                      <button type="submit" style={primaryButtonStyle}>
+                      <button type="submit" style={primaryButtonStyle} disabled={!canCreateAudit}>
                         Save Finding
                       </button>
                       <button type="button" style={secondaryButtonStyle} onClick={() => setShowFindingForm(false)}>
@@ -4612,7 +4686,7 @@ function AuditsPageContent() {
                                 type="file"
                                 multiple
                                 style={{ display: "none" }}
-                                disabled={Boolean(uploadingFindingEvidenceId)}
+                                disabled={Boolean(uploadingFindingEvidenceId) || !canEditAudit}
                                 onChange={(event) => void handleFindingEvidenceUpload(finding, event)}
                               />
                             </label>
@@ -4620,6 +4694,7 @@ function AuditsPageContent() {
                               type="button"
                               style={dangerButtonStyle}
                               onClick={() => void deleteFinding(finding)}
+                              disabled={!canEditAudit}
                             >
                               Delete Finding
                             </button>
