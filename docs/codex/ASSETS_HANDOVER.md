@@ -21,6 +21,7 @@ Asset Management exists but its UI layout has lagged behind Quality and HSE. Fut
 - Asset-specific document numbering support exists in Document Control.
 - Asset Reports now has the Quality-style saved reports search, Show/Hide Filters pattern, year filter, Clear Filters action, and filtered report count.
 - Asset Dashboard KPI cards now drill into the relevant Asset workspaces.
+- Asset Management Dashboard now mirrors the Quality Dashboard structure in a condensed layout: hero/meta row, two-column command deck, KPI strip, health strip, chart/story grid, full-width attention board, and aligned bottom watchlists.
 - Asset Register Dashboard tab now has a cleaner shared-panel layout with an even KPI strip, Due Watch, Quality Links, and Register Health panels.
 - Asset Dashboard, Register, Calibration, Inspection, Maintenance, Asset Actions, Asset People, and Reports use the shared IMS top meta/status row.
 - Asset Inspection and Maintenance retain row-click detail-panel scroll and linked central Action generation.
@@ -47,7 +48,7 @@ Asset Management exists but its UI layout has lagged behind Quality and HSE. Fut
 
 - Assets, Calibration, Inspection, and Maintenance now have internal tabs where suitable, such as Dashboard, Register, Create, and Reports.
 - Continue using standard KPI cards, shared register filter panels, shared table styles, and clickable drill-downs.
-- Keep Asset dashboard content in compact shared panels rather than separate attention-card strips and explanatory text blocks. Calibration dashboard should preserve the current in-use compliance plus availability/exclusions story; do not re-include damaged, missing/lost, not-in-use, or historic items in compliance figures.
+- Keep Asset dashboard content in the current condensed Quality-style sequence: two-column command deck, KPI strip, health strip, chart/story grid, full-width attention board, then bottom watchlists. Calibration dashboard should preserve the current in-use compliance plus availability/exclusions story; do not re-include damaged, missing/lost, not-in-use, or historic items in compliance figures.
 - Clicking Asset, Inspection, and Maintenance register rows should continue to scroll to the detail panel. Asset, Inspection, Maintenance, Calibration, Actions, People, and saved Report registers now use compact shared table styling rather than bulky card/history layouts.
 - Asset Reports should continue to mirror Quality Reports, not Documents layout. Saved report filtering and top meta/status row are now aligned; remaining report-page cleanup should focus on panel primitive migration only where it is low risk.
 

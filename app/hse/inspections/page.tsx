@@ -1384,7 +1384,11 @@ export default function HseInspectionsPage() {
     setMessage("Evidence deleted.");
   }
 
+  const pdfTableMargin = { left: 12, right: 12, top: 38, bottom: 18 };
+
   function pdfHeader(doc: jsPDF, record: HseInspectionRecord, logoData: string) {
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, doc.internal.pageSize.getWidth(), 34, "F");
     if (logoData) {
       try {
         doc.addImage(logoData, "PNG", 12, 10, 38, 15);
@@ -1400,6 +1404,27 @@ export default function HseInspectionsPage() {
     doc.setDrawColor(15, 118, 110);
     doc.setLineWidth(0.4);
     doc.line(12, 30, 198, 30);
+  }
+
+  function pdfFooter(doc: jsPDF, label: string, page: number, pageCount: number) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, pageHeight - 14, pageWidth, 14, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.text(label, 12, pageHeight - 10);
+    doc.text(`Page ${page} of ${pageCount}`, pageWidth - 12, pageHeight - 10, { align: "right" });
+  }
+
+  function applyPdfChrome(doc: jsPDF, record: HseInspectionRecord, logoData: string, footerLabel: string) {
+    const pageCount = doc.getNumberOfPages();
+    for (let page = 1; page <= pageCount; page += 1) {
+      doc.setPage(page);
+      pdfHeader(doc, record, logoData);
+      pdfFooter(doc, footerLabel, page, pageCount);
+    }
   }
 
   function pdfSection(doc: jsPDF, title: string, y: number) {
@@ -1429,7 +1454,7 @@ export default function HseInspectionsPage() {
     autoTable(doc, {
       startY: y,
       theme: "grid",
-      margin: { left: 12, right: 12 },
+      margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
       headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -1457,7 +1482,7 @@ export default function HseInspectionsPage() {
       autoTable(doc, {
         startY: y,
         theme: "grid",
-        margin: { left: 12, right: 12 },
+        margin: pdfTableMargin,
         tableWidth: 186,
         styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.6, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42], overflow: "linebreak" },
         headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
@@ -1498,7 +1523,7 @@ export default function HseInspectionsPage() {
     autoTable(doc, {
       startY: y,
       theme: "grid",
-      margin: { left: 12, right: 12 },
+      margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
       body: [[record.additional_comments || ""]],
@@ -1514,7 +1539,7 @@ export default function HseInspectionsPage() {
     autoTable(doc, {
       startY: y,
       theme: "grid",
-      margin: { left: 12, right: 12 },
+      margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2, overflow: "linebreak" },
       headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -1530,7 +1555,7 @@ export default function HseInspectionsPage() {
     autoTable(doc, {
       startY: y,
       theme: "grid",
-      margin: { left: 12, right: 12 },
+      margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
       headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -1556,7 +1581,7 @@ export default function HseInspectionsPage() {
       autoTable(doc, {
         startY: y,
         theme: "grid",
-        margin: { left: 12, right: 12 },
+        margin: pdfTableMargin,
         tableWidth: 186,
         styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
         headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -1590,7 +1615,7 @@ export default function HseInspectionsPage() {
       );
 
       if (imageEvidence.length) {
-        if (y > 238) {
+        if (y > 218) {
           doc.addPage();
           pdfHeader(doc, record, logoData);
           y = 36;
@@ -1601,7 +1626,7 @@ export default function HseInspectionsPage() {
           try {
             const dataUrl = await imageUrlToDataUrl(item.url);
             const x = column === 0 ? 12 : 106;
-            if (y > 230) {
+            if (y > 214) {
               doc.addPage();
               pdfHeader(doc, record, logoData);
               y = 36;
@@ -1625,14 +1650,7 @@ export default function HseInspectionsPage() {
       }
     }
 
-    const pageCount = doc.getNumberOfPages();
-    for (let page = 1; page <= pageCount; page += 1) {
-      doc.setPage(page);
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text(`${record.form_number}${record.form_revision ? ` Rev ${record.form_revision}` : ""}`, 12, 287);
-      doc.text(`Page ${page} of ${pageCount}`, 198, 287, { align: "right" });
-    }
+    applyPdfChrome(doc, record, logoData, `${record.form_number}${record.form_revision ? ` Rev ${record.form_revision}` : ""}`);
 
       const fileName = `${record.inspection_number}-${sanitizeFileName(record.form_title)}.pdf`;
       const url = doc.output("bloburl");
@@ -1667,7 +1685,7 @@ export default function HseInspectionsPage() {
     autoTable(doc, {
       startY: y,
       theme: "grid",
-      margin: { left: 12, right: 12 },
+      margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
       headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -1697,7 +1715,7 @@ export default function HseInspectionsPage() {
         autoTable(doc, {
           startY: y,
           theme: "grid",
-          margin: { left: 12, right: 12 },
+          margin: pdfTableMargin,
           tableWidth: 186,
           styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.8, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42], overflow: "linebreak" },
           headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
@@ -1725,7 +1743,7 @@ export default function HseInspectionsPage() {
         autoTable(doc, {
           startY: y,
           theme: "grid",
-          margin: { left: 12, right: 12 },
+          margin: pdfTableMargin,
           tableWidth: 186,
           styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
           headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
@@ -1753,7 +1771,7 @@ export default function HseInspectionsPage() {
     autoTable(doc, {
       startY: y,
       theme: "grid",
-      margin: { left: 12, right: 12 },
+      margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
       body: [[""]],
@@ -1765,7 +1783,7 @@ export default function HseInspectionsPage() {
     autoTable(doc, {
       startY: y,
       theme: "grid",
-      margin: { left: 12, right: 12 },
+      margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
       headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -1779,7 +1797,7 @@ export default function HseInspectionsPage() {
     autoTable(doc, {
       startY: y,
       theme: "grid",
-      margin: { left: 12, right: 12 },
+      margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
       headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -1788,14 +1806,7 @@ export default function HseInspectionsPage() {
       columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 42 }, 2: { cellWidth: 36 }, 3: { cellWidth: 28 }, 4: { cellWidth: 40 } },
     });
 
-    const pageCount = doc.getNumberOfPages();
-    for (let page = 1; page <= pageCount; page += 1) {
-      doc.setPage(page);
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text(`${template.documentNumber}${template.revision ? ` Rev ${template.revision}` : ""}`, 12, 287);
-      doc.text(`Page ${page} of ${pageCount}`, 198, 287, { align: "right" });
-    }
+    applyPdfChrome(doc, blankRecord, logoData, `${template.documentNumber}${template.revision ? ` Rev ${template.revision}` : ""}`);
 
     const url = doc.output("bloburl");
     window.open(url, "_blank", "noopener,noreferrer");

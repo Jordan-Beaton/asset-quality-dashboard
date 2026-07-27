@@ -653,6 +653,7 @@ function AuditsPageContent() {
       linkedFindingCategory !== "All"
   );
   const [generatingOpenFindingsReport, setGeneratingOpenFindingsReport] = useState(false);
+  const [generatingAuditPdf, setGeneratingAuditPdf] = useState(false);
   const [activeView, setActiveView] = useState<AuditWorkspaceView>(() => {
     if (linkedView === "open-findings" || linkedView === "closed-findings" || directFindingId) return "findings";
     if (
@@ -2696,45 +2697,61 @@ function AuditsPageContent() {
     }
   }
 
-  function generateAuditPdf() {
+  async function generateAuditPdf() {
     if (!selectedAudit) {
       setMessage("Select an audit first.");
       return;
     }
 
-    const scopedFindings = findings.filter((finding) => finding.audit_id === selectedAudit.id);
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 14;
-    const reportCode = getAuditDocumentNumber(selectedAudit.audit_type);
-    const generatedAt = new Date().toISOString();
+    setGeneratingAuditPdf(true);
 
-    doc.setFillColor(15, 118, 110);
-    doc.rect(0, 0, pageWidth, 24, "F");
+    try {
+      const scopedFindings = findings.filter((finding) => finding.audit_id === selectedAudit.id);
+      const evidenceByFinding = new Map(
+        await Promise.all(
+          scopedFindings.map(async (finding) => {
+            const evidenceWithUrls = await Promise.all(
+              getFindingEvidenceFiles(finding).map(async (file) => ({
+                file,
+                url: file.file_path ? await createSignedFileUrl(file.file_path) : "",
+              }))
+            );
+            return [finding.id, evidenceWithUrls] as const;
+          })
+        )
+      );
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+      const reportCode = getAuditDocumentNumber(selectedAudit.audit_type);
+      const generatedAt = new Date().toISOString();
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
-    doc.text("ENSHORE SUBSEA", margin, 11.5);
-    doc.setFontSize(10);
-    doc.text("Audit Report", margin, 18);
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, pageWidth, 24, "F");
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(15, 23, 42);
-    doc.text(selectedAudit.title, margin, 34);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text("ENSHORE SUBSEA", margin, 11.5);
+      doc.setFontSize(10);
+      doc.text("Audit Report", margin, 18);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(71, 85, 105);
-    doc.text(`Audit Number: ${selectedAudit.audit_number}`, margin, 41);
-    doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 41, { align: "right" });
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(15, 23, 42);
+      doc.text(selectedAudit.title, margin, 34);
 
-    autoTable(doc, {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Audit Number: ${selectedAudit.audit_number}`, margin, 41);
+      doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 41, { align: "right" });
+
+      autoTable(doc, {
       startY: 47,
       theme: "grid",
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, bottom: 18 },
       styles: {
         fontSize: 9.5,
         cellPadding: 3,
@@ -2757,20 +2774,20 @@ function AuditsPageContent() {
         2: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 30 },
         3: { cellWidth: 51 },
       },
-    });
+      });
 
-    let y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 47;
-    y += 10;
+      let y = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 47;
+      y += 10;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(15, 23, 42);
     doc.text("Findings Summary", margin, y);
 
-    autoTable(doc, {
+      autoTable(doc, {
       startY: y + 4,
       theme: "grid",
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, bottom: 18 },
       head: [["Ref", "Clause", "Category", "Description", "Owner", "Status", "Due", "Closed"]],
       body: scopedFindings.length
         ? scopedFindings.map((finding) => [
@@ -2810,11 +2827,11 @@ function AuditsPageContent() {
         6: { cellWidth: 17 },
         7: { cellWidth: 16 },
       },
-    });
+      });
 
-    let nextY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
+      let nextY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
 
-    scopedFindings.forEach((finding) => {
+      scopedFindings.forEach((finding) => {
       if (nextY > pageHeight - 70) {
         doc.addPage();
         nextY = 18;
@@ -2826,10 +2843,10 @@ function AuditsPageContent() {
       doc.setTextColor(15, 23, 42);
       doc.text(`${finding.reference} Action Detail`, margin, nextY);
 
-      autoTable(doc, {
+        autoTable(doc, {
         startY: nextY + 4,
         theme: "grid",
-        margin: { left: margin, right: margin },
+        margin: { left: margin, right: margin, bottom: 18 },
         body: [
           ["Root Cause", finding.root_cause || "-"],
           ["Containment Action", finding.containment_action || "-"],
@@ -2846,28 +2863,77 @@ function AuditsPageContent() {
           0: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 38 },
           1: { cellWidth: pageWidth - margin * 2 - 38 },
         },
+        });
+
+        nextY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY;
+
+        const evidenceWithUrls = evidenceByFinding.get(finding.id) || [];
+        autoTable(doc, {
+          startY: nextY + 4,
+          theme: "grid",
+          margin: { left: margin, right: margin, bottom: 18 },
+          head: [["Attached Evidence", "Size", "Uploaded", "Evidence Link"]],
+          body: evidenceWithUrls.length
+            ? evidenceWithUrls.map(({ file, url }) => [
+                getFindingEvidenceDisplayName(file, finding),
+                exportFileSize(file.file_size),
+                exportDateTime(file.uploaded_at),
+                url ? "Open evidence" : "Unavailable",
+              ])
+            : [["No evidence files uploaded against this finding.", "-", "-", "-"]],
+          headStyles: {
+            fillColor: [15, 118, 110],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+          },
+          styles: {
+            fontSize: 8.3,
+            cellPadding: 2.5,
+            textColor: [15, 23, 42],
+            lineColor: [226, 232, 240],
+            lineWidth: 0.2,
+            overflow: "linebreak",
+          },
+          columnStyles: {
+            0: { cellWidth: 72 },
+            1: { cellWidth: 22 },
+            2: { cellWidth: 42 },
+            3: { cellWidth: 46, textColor: [29, 78, 216], fontStyle: "bold" },
+          },
+          didDrawCell: (data) => {
+            if (data.section !== "body" || data.column.index !== 3) return;
+            const row = evidenceWithUrls[data.row.index];
+            if (!row?.url) return;
+            doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: row.url });
+          },
+        });
+
+        nextY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY;
       });
 
-      nextY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY;
-    });
+      const pageCount = doc.getNumberOfPages();
 
-    const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(margin, pageHeight - 14, pageWidth - margin, pageHeight - 14);
 
-    for (let page = 1; page <= pageCount; page += 1) {
-      doc.setPage(page);
-      doc.setDrawColor(226, 232, 240);
-      doc.line(margin, pageHeight - 14, pageWidth - margin, pageHeight - 14);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Enshore Subsea | ${selectedAudit.audit_number}`, margin, pageHeight - 8.5);
+        doc.text(reportCode, pageWidth / 2, pageHeight - 8.5, { align: "center" });
+        doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8.5, { align: "right" });
+      }
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Enshore Subsea | ${selectedAudit.audit_number}`, margin, pageHeight - 8.5);
-      doc.text(reportCode, pageWidth / 2, pageHeight - 8.5, { align: "center" });
-      doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8.5, { align: "right" });
+      doc.save(`${selectedAudit.audit_number}-audit-report.pdf`);
+      setMessage(`${selectedAudit.audit_number} PDF generated with finding evidence.`);
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Audit PDF generation failed: ${err.message}`);
+    } finally {
+      setGeneratingAuditPdf(false);
     }
-
-    doc.save(`${selectedAudit.audit_number}-audit-report.pdf`);
-    setMessage(`${selectedAudit.audit_number} PDF generated.`);
   }
 
   function generateOpenAuditNcrReport(auditTypeOverride?: AuditType) {
@@ -4296,8 +4362,8 @@ function AuditsPageContent() {
                   <button type="button" style={primaryButtonStyle} onClick={saveAuditChanges} disabled={!canEditAudit}>
                     Save Audit Changes
                   </button>
-                  <button type="button" style={secondaryButtonStyle} onClick={generateAuditPdf}>
-                    Generate PDF Report
+                  <button type="button" style={secondaryButtonStyle} onClick={() => void generateAuditPdf()} disabled={generatingAuditPdf}>
+                    {generatingAuditPdf ? "Generating PDF..." : "Generate PDF Report"}
                   </button>
                   <button type="button" style={secondaryButtonStyle} onClick={openRaiseFinding} disabled={!canCreateAudit}>
                     Raise Finding

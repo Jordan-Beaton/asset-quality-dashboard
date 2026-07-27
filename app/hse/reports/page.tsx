@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { supabase } from "../../../src/lib/supabase";
 
@@ -168,6 +169,21 @@ function getYearFromLabel(monthLabel: string) {
   return match ? match[1] : String(currentDate.getFullYear());
 }
 
+function getReportPeriodFromSavedReport(report: HseMonthlyReport) {
+  const snapshot = report.snapshot_json || {};
+  const snapshotMonth =
+    typeof snapshot.report_month === "number" && snapshot.report_month >= 1 && snapshot.report_month <= 12
+      ? snapshot.report_month - 1
+      : null;
+  const snapshotYear =
+    typeof snapshot.report_year === "number" && snapshot.report_year >= 2000 ? String(snapshot.report_year) : null;
+
+  return {
+    monthIndex: snapshotMonth ?? getMonthIndexFromLabel(report.month_label),
+    year: snapshotYear ?? getYearFromLabel(report.month_label),
+  };
+}
+
 function getSnapshotSummary(report: HseMonthlyReport) {
   return [
     `${snapshotValue(report.snapshot_json, "ainm_raised")} AINMs`,
@@ -232,6 +248,7 @@ export default function HseReportsPage() {
   const [isDraftingSummary, setIsDraftingSummary] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [savedReportSearch, setSavedReportSearch] = useState("");
+  const [savedReportYearFilter, setSavedReportYearFilter] = useState("All Years");
   const [showSavedReportFilters, setShowSavedReportFilters] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [message, setMessage] = useState("Loading HSE monthly management reporting workspace...");
@@ -376,14 +393,36 @@ export default function HseReportsPage() {
     compiled_ainm_packs: metrics.compiledPacks,
   }), [metrics, monthIndex, selectedYear]);
 
+  const latestReportLabel = useMemo(() => {
+    const latest = reports[0];
+    return latest ? latest.month_label : "No saved reports";
+  }, [reports]);
+
+  const savedReportYearOptions = useMemo(() => {
+    const years = reports
+      .map((report) => {
+        const snapshotYear = report.snapshot_json?.report_year;
+        if (typeof snapshotYear === "number" && snapshotYear >= 2000) return String(snapshotYear);
+        return (report.month_label || "").match(/\b(20\d{2})\b/)?.[1] || "";
+      })
+      .filter(Boolean);
+    return ["All Years", ...Array.from(new Set(years)).sort((a, b) => Number(b) - Number(a))];
+  }, [reports]);
+
   const filteredReports = useMemo(() => {
     const query = savedReportSearch.trim().toLowerCase();
-    if (!query) return reports;
     return reports.filter((report) => {
       const haystack = [report.month_label, report.summary, report.next_steps, formatSavedDate(report.created_at)].join(" ").toLowerCase();
-      return haystack.includes(query);
+      const matchesSearch = !query || haystack.includes(query);
+      const snapshotYear = report.snapshot_json?.report_year;
+      const year =
+        typeof snapshotYear === "number" && snapshotYear >= 2000
+          ? String(snapshotYear)
+          : (report.month_label || "").match(/\b(20\d{2})\b/)?.[1] || "";
+      const matchesYear = savedReportYearFilter === "All Years" || year === savedReportYearFilter;
+      return matchesSearch && matchesYear;
     });
-  }, [reports, savedReportSearch]);
+  }, [reports, savedReportSearch, savedReportYearFilter]);
 
   function resetForm() {
     setMonthIndex(currentDate.getMonth());
@@ -399,9 +438,10 @@ export default function HseReportsPage() {
       return;
     }
 
+    const period = getReportPeriodFromSavedReport(report);
     setEditingId(report.id);
-    setMonthIndex(getMonthIndexFromLabel(report.month_label));
-    setYear(getYearFromLabel(report.month_label));
+    setMonthIndex(period.monthIndex);
+    setYear(period.year);
     setExecutiveSummary(report.summary || "");
     setNextMonthFocus(report.next_steps || "");
     setMessage(`Editing HSE monthly report for ${report.month_label}.`);
@@ -705,9 +745,20 @@ export default function HseReportsPage() {
 
   return (
     <main>
-      <section style={heroStyle}>
-        <h1 style={heroTitleStyle}>Reports</h1>
-      </section>
+      <QualityPageHero
+        label="HSE MANAGEMENT REPORTING"
+        title="Reports"
+        description="Generate concise monthly HSE management summaries from live AINM, inspection, observation, action, and report data."
+        contextCards={[
+          {
+            label: "Last Refreshed",
+            value: lastRefreshed
+              ? lastRefreshed.toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+              : "-",
+          },
+          { label: "Latest Report", value: latestReportLabel },
+        ]}
+      />
 
       <div style={topMetaRowStyle}>
         <Link href="/hse" style={backLinkStyle}>
@@ -856,8 +907,26 @@ export default function HseReportsPage() {
             </button>
           </div>
           {showSavedReportFilters ? (
-            <div style={buttonRowStyle}>
-              <button type="button" style={secondaryButtonStyle} onClick={() => setSavedReportSearch("")}>
+            <div style={toolbarFiltersStyle}>
+              <select
+                value={savedReportYearFilter}
+                onChange={(event) => setSavedReportYearFilter(event.target.value)}
+                style={inputStyle}
+              >
+                {savedReportYearOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => {
+                  setSavedReportSearch("");
+                  setSavedReportYearFilter("All Years");
+                }}
+              >
                 Clear Filters
               </button>
             </div>
@@ -880,7 +949,7 @@ export default function HseReportsPage() {
               <tbody>
                 {filteredReports.map((report) => (
                   <tr key={report.id}>
-                  <td style={tableCellStyle}>{report.month_label}</td>
+                    <td style={tableCellStyle}>{report.month_label}</td>
                     <td style={tableCellStyle}>{getSnapshotSummary(report)}</td>
                     <td style={tableCellStyle}>{formatSavedDate(report.created_at)}</td>
                     <td style={tableCellStyle}>
@@ -906,26 +975,6 @@ export default function HseReportsPage() {
     </main>
   );
 }
-
-const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
-  color: "white",
-  borderRadius: "20px",
-  padding: "28px 30px",
-  marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
-  minHeight: "76px",
-  width: "100%",
-  boxSizing: "border-box",
-  display: "flex",
-  alignItems: "center",
-};
-
-const heroTitleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "22px",
-  lineHeight: 1.08,
-};
 
 const backLinkStyle: CSSProperties = {
   color: "#3A9B98",
@@ -1016,6 +1065,13 @@ const filterPanelStyle: CSSProperties = {
 const filterActionRowStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(220px, 1fr) minmax(160px, 220px)",
+  gap: "10px",
+  alignItems: "center",
+};
+
+const toolbarFiltersStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "10px",
   alignItems: "center",
 };

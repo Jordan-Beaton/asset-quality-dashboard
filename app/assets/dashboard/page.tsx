@@ -675,14 +675,49 @@ function DashboardContent() {
     },
   ];
 
+  const healthData = [
+    {
+      name: "Control Currency",
+      value: inDatePercent,
+      fill: "#16a34a",
+      detail: `${inDateControlItems} in-date controls`,
+      href: "/assets/dashboard",
+    },
+    {
+      name: "File Coverage",
+      value: fileCoveragePercent,
+      fill: "#3A9B98",
+      detail: `${assetsWithFiles} assets with files`,
+      href: "/assets",
+    },
+    {
+      name: "Certificate Evidence",
+      value: coverageData[2].value,
+      fill: "#2563eb",
+      detail: coverageData[2].detail,
+      href: "/assets/calibration",
+    },
+    {
+      name: "Action Health",
+      value: percentage(Math.max(openAssetActions.length - overdueAssetActions.length, 0), Math.max(openAssetActions.length, 1)),
+      fill: "#7c3aed",
+      detail: `${overdueAssetActions.length} overdue linked actions`,
+      href: "/assets/actions",
+    },
+  ];
+
   return (
     <main>
       <style>{`
         @media (max-width: 1120px) {
           .asset-command-deck,
-          .asset-story-grid,
+          .asset-status-split,
+          .asset-chart-grid,
           .asset-bottom-grid {
             grid-template-columns: 1fr !important;
+          }
+          .asset-health-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           }
           .asset-kpi-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -691,7 +726,10 @@ function DashboardContent() {
         @media (max-width: 720px) {
           .asset-kpi-grid,
           .asset-metric-grid,
-          .asset-mini-grid {
+          .asset-mini-grid,
+          .asset-health-grid,
+          .asset-status-bars,
+          .asset-attention-grid {
             grid-template-columns: 1fr !important;
           }
           .asset-command-score {
@@ -731,11 +769,12 @@ function DashboardContent() {
             <p style={commandTextStyle}>
               Weighted from overdue controls, due-soon pressure, linked actions, and asset file coverage.
             </p>
-            <div className="asset-mini-grid" style={miniGridStyle}>
-              <MiniMetric label="Current Assets" value={assets.length} />
-              <MiniMetric label="Due Risk" value={dueWatchCount} tone={dueWatchCount ? "#dc2626" : "#16a34a"} />
-              <MiniMetric label="Open Actions" value={openAssetActions.length} tone="#f59e0b" />
-            </div>
+          </div>
+          <div className="asset-mini-grid" style={miniGridStyle}>
+            <MiniMetric label="Assets" value={assets.length} />
+            <MiniMetric label="Due Risk" value={dueWatchCount} tone={dueWatchCount ? "#fecaca" : "#bbf7d0"} />
+            <MiniMetric label="Actions" value={openAssetActions.length} tone="#fde68a" />
+            <MiniMetric label="Files" value={fileCoveragePercent} suffix="%" />
           </div>
           <Link
             href="/management-review"
@@ -752,9 +791,16 @@ function DashboardContent() {
           </Link>
         </div>
 
-        <SectionCard title="Operational Pressure" subtitle="Click a row to open the source register.">
-          <BarList rows={pressureData} maxValue={Math.max(...pressureData.map((item) => item.value), 1)} />
-        </SectionCard>
+        <div style={pressurePanelStyle}>
+          <div style={pressureHeaderStyle}>
+            <div>
+              <h2 style={pressureTitleStyle}>Operational Pressure</h2>
+              <p style={pressureSubtitleStyle}>Click any row to open the live source register.</p>
+            </div>
+            <span style={livePillStyle}>Live data</span>
+          </div>
+          <PressureList rows={pressureData} maxValue={Math.max(...pressureData.map((item) => item.value), 1)} />
+        </div>
       </section>
 
       <section className="asset-kpi-grid" style={statsGridStyle}>
@@ -766,9 +812,15 @@ function DashboardContent() {
         <QualityKpiCard title="Control Records" value={allControlItems} accent="#7c3aed" href="/assets/dashboard" />
       </section>
 
-      <section className="asset-story-grid" style={storyGridStyle}>
+      <section className="asset-health-grid" style={healthGridStyle}>
+        {healthData.map((item) => (
+          <HealthCard key={item.name} {...item} />
+        ))}
+      </section>
+
+      <section className="asset-chart-grid" style={chartGridStyle}>
         <SectionCard title="Asset Status Split" subtitle="Current register status profile.">
-          <DonutSummary items={assetStatusData} total={assets.length} centreValue={assets.length} centreLabel="assets" />
+          <AssetStatusSplit items={assetStatusData} total={assets.length} />
         </SectionCard>
 
         <SectionCard title="Due Date Control" subtitle="Calibration, inspection, and maintenance currency.">
@@ -787,7 +839,9 @@ function DashboardContent() {
         <SectionCard title="Ownership Mix" subtitle="Asset ownership or responsible area split.">
           <BarList rows={ownerData.map((item) => ({ ...item, detail: `${item.percent}% of assets`, colour: "#2563eb" }))} maxValue={assets.length || 1} />
         </SectionCard>
+      </section>
 
+      <section style={attentionBoardSectionStyle}>
         <SectionCard
           title="Asset Attention Board"
           subtitle="The items that need management attention first."
@@ -800,7 +854,7 @@ function DashboardContent() {
           {overdueAttentionItems.length === 0 ? (
             <EmptyState message="No overdue asset-linked items are currently on the attention board." />
           ) : (
-            <CompactAttentionList items={overdueAttentionItems.slice(0, 8)} />
+            <CompactAttentionList items={overdueAttentionItems.slice(0, 12)} />
           )}
         </SectionCard>
       </section>
@@ -920,11 +974,21 @@ function SectionCard({
   );
 }
 
-function MiniMetric({ label, value, tone = "#ffffff" }: { label: string; value: number; tone?: string }) {
+function MiniMetric({
+  label,
+  value,
+  tone = "#ffffff",
+  suffix = "",
+}: {
+  label: string;
+  value: number;
+  tone?: string;
+  suffix?: string;
+}) {
   return (
     <div style={miniMetricStyle}>
       <span style={miniMetricLabelStyle}>{label}</span>
-      <strong style={{ ...miniMetricValueStyle, color: tone }}>{value}</strong>
+      <strong style={{ ...miniMetricValueStyle, color: tone }}>{value}{suffix}</strong>
     </div>
   );
 }
@@ -945,6 +1009,70 @@ function ControlMetric({
       <span style={controlMetricTitleStyle}>{title}</span>
       <strong style={controlMetricValueStyle}>{value}</strong>
       <small style={controlMetricDetailStyle}>{detail}</small>
+    </div>
+  );
+}
+
+function HealthCard({
+  name,
+  value,
+  fill,
+  detail,
+  href,
+}: {
+  name: string;
+  value: number;
+  fill: string;
+  detail: string;
+  href: string;
+}) {
+  return (
+    <Link href={href} style={healthCardStyle}>
+      <div>
+        <div style={healthLabelStyle}>{name}</div>
+        <div style={healthHintStyle}>{detail}</div>
+      </div>
+      <div style={healthGaugeStyle}>
+        <span>{value}%</span>
+        <div style={healthGaugeTrackStyle}>
+          <div style={{ ...healthGaugeFillStyle, width: `${value}%`, background: fill }} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function PressureList({
+  rows,
+  maxValue,
+}: {
+  rows: { label: string; value: number; detail?: string; colour?: string; href?: string }[];
+  maxValue: number;
+}) {
+  return (
+    <div style={pressureListStyle}>
+      {rows.map((row) => {
+        const width = maxValue ? Math.max(row.value > 0 ? 7 : 0, Math.min(100, (row.value / maxValue) * 100)) : 0;
+        const content = (
+          <>
+            <div style={pressureRowHeaderStyle}>
+              <span>{row.label}</span>
+              <strong>{row.value}</strong>
+            </div>
+            <div style={pressureTrackStyle}>
+              <div style={{ ...pressureFillStyle, width: `${width}%`, background: row.colour || "#3A9B98" }} />
+            </div>
+            {row.detail ? <small style={pressureDetailStyle}>{row.detail}</small> : null}
+          </>
+        );
+
+        if (!row.href) return <div key={row.label} style={pressureRowStyle}>{content}</div>;
+        return (
+          <Link key={row.label} href={row.href} style={{ ...pressureRowStyle, textDecoration: "none" }}>
+            {content}
+          </Link>
+        );
+      })}
     </div>
   );
 }
@@ -988,65 +1116,74 @@ function BarList({
   );
 }
 
-function DonutSummary({
+function AssetStatusSplit({
   items,
   total,
-  centreValue,
-  centreLabel,
 }: {
   items: { label: string; value: number; colour: string; href?: string }[];
   total: number;
-  centreValue: number;
-  centreLabel: string;
 }) {
-  let cursor = 0;
-  const gradientStops = items.length
-    ? items
-        .map((item) => {
-          const start = cursor;
-          const span = total ? (item.value / total) * 360 : 0;
-          cursor += span;
-          return `${item.colour} ${start}deg ${cursor}deg`;
-        })
-        .join(", ")
-    : "#e2e8f0 0deg 360deg";
+  if (items.length === 0) return <EmptyState message="No asset statuses have been set yet." />;
+
+  const gradient = items.reduce(
+    (state, item) => {
+      const start = state.cursor;
+      const span = total ? (item.value / total) * 360 : 0;
+      const end = start + span;
+      return {
+        cursor: end,
+        stops: [...state.stops, `${item.colour} ${start}deg ${end}deg`],
+      };
+    },
+    { cursor: 0, stops: [] as string[] }
+  );
+  const gradientStops = gradient.stops.join(", ");
+  const leadingStatus = items[0];
 
   return (
-    <div style={donutLayoutStyle}>
-      <div style={{ ...donutStyle, background: `conic-gradient(${gradientStops})` }}>
-        <div style={donutInnerStyle}>
-          <strong>{centreValue}</strong>
-          <small>{centreLabel}</small>
+    <div className="asset-status-split" style={statusSplitLayoutStyle}>
+      <div style={statusHeroStyle}>
+        <div style={{ ...donutStyle, background: `conic-gradient(${gradientStops})` }}>
+          <div style={donutInnerStyle}>
+            <strong>{total}</strong>
+            <small>assets</small>
+          </div>
+        </div>
+        <div style={statusHeroCopyStyle}>
+          <span style={statusHeroLabelStyle}>Largest status group</span>
+          <strong style={statusHeroValueStyle}>{leadingStatus.label}</strong>
+          <span style={statusHeroDetailStyle}>
+            {leadingStatus.value} of {total} assets
+          </span>
         </div>
       </div>
-      <div style={donutLegendStyle}>
-        {items.length === 0 ? (
-          <EmptyState message="No asset statuses have been set yet." />
-        ) : (
-          items.map((item) => {
-            const content = (
-              <>
-                <span style={{ ...legendDotStyle, background: item.colour }} />
-                <span style={legendLabelStyle}>{item.label}</span>
-                <strong style={legendValueStyle}>{item.value}</strong>
-              </>
-            );
+      <div className="asset-status-bars" style={statusBarGridStyle}>
+        {items.map((item) => {
+          const percent = percentage(item.value, total);
+          const width = total ? Math.max(6, Math.min(100, percent)) : 0;
+          const content = (
+            <div style={statusBarRowStyle}>
+              <div style={statusBarHeaderStyle}>
+                <span style={statusBarLabelStyle}>
+                  <span style={{ ...legendDotStyle, background: item.colour }} />
+                  {item.label}
+                </span>
+                <strong style={statusBarValueStyle}>{item.value}</strong>
+              </div>
+              <div style={barTrackStyle}>
+                <div style={{ ...barFillStyle, width: `${width}%`, background: item.colour }} />
+              </div>
+              <small style={statusBarDetailStyle}>{percent}% of asset register</small>
+            </div>
+          );
 
-            if (!item.href) {
-              return (
-                <div key={item.label} style={legendRowStyle}>
-                  {content}
-                </div>
-              );
-            }
-
-            return (
-              <Link key={item.label} href={item.href} style={{ ...legendRowStyle, textDecoration: "none" }}>
-                {content}
-              </Link>
-            );
-          })
-        )}
+          if (!item.href) return <div key={item.label}>{content}</div>;
+          return (
+            <Link key={item.label} href={item.href} style={barLinkStyle}>
+              {content}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
@@ -1054,7 +1191,7 @@ function DonutSummary({
 
 function CompactAttentionList({ items }: { items: AttentionBoardItem[] }) {
   return (
-    <ListWrap>
+    <div className="asset-attention-grid" style={attentionGridStyle}>
       {items.map((item) => {
         const tone = getBoardTypeTone(item.type);
         return (
@@ -1066,12 +1203,14 @@ function CompactAttentionList({ items }: { items: AttentionBoardItem[] }) {
               <strong style={attentionDateStyle}>{formatDate(item.dueDate)}</strong>
             </div>
             <div style={itemTitleStyle}>{item.assetLabel}</div>
-            <div style={itemMetaStyle}>{item.reference}</div>
-            <div style={itemMetaStyle}>{item.description}</div>
+            <div style={attentionMetaRowStyle}>
+              <span>{item.reference}</span>
+              <span>{item.description}</span>
+            </div>
           </Link>
         );
       })}
-    </ListWrap>
+    </div>
   );
 }
 
@@ -1118,25 +1257,25 @@ export default function AssetDashboardPage() {
 const statsGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-  gap: "16px",
-  marginBottom: "20px",
+  gap: "10px",
+  marginBottom: "14px",
 };
 
 const commandDeckStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1.15fr) minmax(360px, 0.85fr)",
-  gap: "18px",
-  marginBottom: "20px",
-  alignItems: "start",
+  gridTemplateColumns: "minmax(360px, 1.15fr) minmax(340px, 0.85fr)",
+  gap: "14px",
+  marginBottom: "14px",
+  alignItems: "stretch",
 };
 
 const commandScorePanelStyle: CSSProperties = {
-  minHeight: "188px",
-  borderRadius: "20px",
-  padding: "22px",
+  minHeight: "166px",
+  borderRadius: "18px",
+  padding: "16px",
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) 142px",
-  gap: "18px",
+  gridTemplateColumns: "minmax(190px, 0.95fr) minmax(210px, 1fr) auto",
+  gap: "14px",
   alignItems: "center",
   color: "#ffffff",
   background: "linear-gradient(135deg, #3A9B98 0%, #1f6769 58%, #174b56 100%)",
@@ -1145,7 +1284,7 @@ const commandScorePanelStyle: CSSProperties = {
 
 const commandCopyStyle: CSSProperties = {
   display: "grid",
-  gap: "10px",
+  gap: "7px",
 };
 
 const commandEyebrowStyle: CSSProperties = {
@@ -1158,7 +1297,7 @@ const commandEyebrowStyle: CSSProperties = {
 
 const commandTitleStyle: CSSProperties = {
   margin: 0,
-  fontSize: "24px",
+  fontSize: "21px",
   lineHeight: 1.08,
   color: "#ffffff",
 };
@@ -1171,8 +1310,8 @@ const commandTextStyle: CSSProperties = {
 };
 
 const scoreOrbStyle: CSSProperties = {
-  width: "132px",
-  height: "132px",
+  width: "124px",
+  height: "124px",
   borderRadius: "999px",
   display: "grid",
   placeItems: "center",
@@ -1182,8 +1321,8 @@ const scoreOrbStyle: CSSProperties = {
 };
 
 const scoreOrbInnerStyle: CSSProperties = {
-  width: "92px",
-  height: "92px",
+  width: "88px",
+  height: "88px",
   borderRadius: "999px",
   display: "grid",
   placeItems: "center",
@@ -1208,16 +1347,15 @@ const scoreSubLabelStyle: CSSProperties = {
 
 const miniGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: "10px",
-  marginTop: "4px",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "8px",
 };
 
 const miniMetricStyle: CSSProperties = {
-  borderRadius: "14px",
+  borderRadius: "12px",
   border: "1px solid rgba(255,255,255,0.18)",
   background: "rgba(255,255,255,0.1)",
-  padding: "9px",
+  padding: "9px 10px",
   minWidth: 0,
 };
 
@@ -1232,32 +1370,174 @@ const miniMetricLabelStyle: CSSProperties = {
 
 const miniMetricValueStyle: CSSProperties = {
   display: "block",
-  marginTop: "6px",
-  fontSize: "22px",
+  marginTop: "5px",
+  fontSize: "20px",
   lineHeight: 1,
 };
 
 const storyGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "20px",
-  marginBottom: "20px",
-  alignItems: "start",
+  gap: "14px",
+  marginBottom: "14px",
+  alignItems: "stretch",
+};
+
+const pressurePanelStyle: CSSProperties = {
+  borderRadius: "18px",
+  padding: "16px",
+  color: "#ffffff",
+  background: "linear-gradient(135deg, #10202f 0%, #1f6f70 100%)",
+  boxShadow: "0 22px 42px rgba(15, 23, 42, 0.16)",
+  display: "grid",
+  gap: "10px",
+  minHeight: "188px",
+};
+
+const pressureHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  alignItems: "flex-start",
+};
+
+const pressureTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: "18px",
+  lineHeight: 1.15,
+};
+
+const pressureSubtitleStyle: CSSProperties = {
+  margin: "5px 0 0",
+  color: "rgba(255,255,255,0.74)",
+  fontSize: "12px",
+};
+
+const livePillStyle: CSSProperties = {
+  borderRadius: "999px",
+  padding: "6px 9px",
+  background: "rgba(220,252,231,0.14)",
+  border: "1px solid rgba(187,247,208,0.28)",
+  color: "#dcfce7",
+  fontSize: "11px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  whiteSpace: "nowrap",
+};
+
+const pressureListStyle: CSSProperties = {
+  display: "grid",
+  gap: "8px",
+};
+
+const pressureRowStyle: CSSProperties = {
+  display: "grid",
+  gap: "6px",
+  borderRadius: "12px",
+  background: "rgba(255,255,255,0.1)",
+  border: "1px solid rgba(255,255,255,0.12)",
+  padding: "8px 10px",
+  color: "#ffffff",
+};
+
+const pressureRowHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+  fontSize: "12px",
+  fontWeight: 900,
+};
+
+const pressureTrackStyle: CSSProperties = {
+  height: "9px",
+  borderRadius: "999px",
+  background: "rgba(255,255,255,0.2)",
+  overflow: "hidden",
+};
+
+const pressureFillStyle: CSSProperties = {
+  height: "100%",
+  borderRadius: "999px",
+};
+
+const pressureDetailStyle: CSSProperties = {
+  color: "rgba(255,255,255,0.72)",
+  fontSize: "11px",
+};
+
+const healthGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: "10px",
+  marginBottom: "14px",
+};
+
+const healthCardStyle: CSSProperties = {
+  textDecoration: "none",
+  color: "#0f172a",
+  background: "#ffffff",
+  borderRadius: "14px",
+  padding: "12px",
+  border: "1px solid #e2e8f0",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  display: "grid",
+  gap: "10px",
+};
+
+const healthLabelStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 900,
+  color: "#0f172a",
+};
+
+const healthHintStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "12px",
+  color: "#64748b",
+  lineHeight: 1.35,
+};
+
+const healthGaugeStyle: CSSProperties = {
+  display: "grid",
+  gap: "7px",
+  fontSize: "22px",
+  fontWeight: 900,
+};
+
+const healthGaugeTrackStyle: CSSProperties = {
+  height: "10px",
+  borderRadius: "999px",
+  background: "#e2e8f0",
+  overflow: "hidden",
+};
+
+const healthGaugeFillStyle: CSSProperties = {
+  height: "100%",
+  borderRadius: "999px",
+};
+
+const chartGridStyle: CSSProperties = {
+  ...storyGridStyle,
+};
+
+const attentionBoardSectionStyle: CSSProperties = {
+  marginBottom: "14px",
 };
 
 const metricGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: "10px",
-  marginBottom: "14px",
+  gap: "8px",
+  marginBottom: "10px",
 };
 
 const controlMetricStyle: CSSProperties = {
   border: "1px solid #dbe7f3",
   borderTop: "4px solid #3A9B98",
-  borderRadius: "14px",
+  borderRadius: "12px",
   background: "#f8fafc",
-  padding: "12px",
+  padding: "10px",
 };
 
 const controlMetricTitleStyle: CSSProperties = {
@@ -1271,8 +1551,8 @@ const controlMetricTitleStyle: CSSProperties = {
 
 const controlMetricValueStyle: CSSProperties = {
   display: "block",
-  marginTop: "8px",
-  fontSize: "26px",
+  marginTop: "6px",
+  fontSize: "22px",
   lineHeight: 1,
   color: "#0f172a",
 };
@@ -1286,21 +1566,25 @@ const controlMetricDetailStyle: CSSProperties = {
 
 const panelGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: "20px",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: "14px",
+  marginBottom: "14px",
+  alignItems: "stretch",
 };
 
 const panelStyle: CSSProperties = {
   background: "#ffffff",
-  borderRadius: "18px",
+  borderRadius: "14px",
   border: "1px solid #dbe7f3",
-  boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
-  padding: "22px",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  padding: "16px",
+  height: "100%",
+  boxSizing: "border-box",
 };
 
 const barListStyle: CSSProperties = {
   display: "grid",
-  gap: "12px",
+  gap: "8px",
 };
 
 const barLinkStyle: CSSProperties = {
@@ -1310,10 +1594,10 @@ const barLinkStyle: CSSProperties = {
 };
 
 const barRowStyle: CSSProperties = {
-  borderRadius: "14px",
+  borderRadius: "12px",
   border: "1px solid #e2e8f0",
   background: "#f8fafc",
-  padding: "12px",
+  padding: "9px 10px",
 };
 
 const barRowHeaderStyle: CSSProperties = {
@@ -1321,7 +1605,7 @@ const barRowHeaderStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: "12px",
   alignItems: "center",
-  marginBottom: "8px",
+  marginBottom: "6px",
 };
 
 const barLabelStyle: CSSProperties = {
@@ -1336,7 +1620,7 @@ const barValueStyle: CSSProperties = {
 };
 
 const barTrackStyle: CSSProperties = {
-  height: "10px",
+  height: "8px",
   borderRadius: "999px",
   background: "#e2e8f0",
   overflow: "hidden",
@@ -1349,30 +1633,24 @@ const barFillStyle: CSSProperties = {
 
 const barDetailStyle: CSSProperties = {
   display: "block",
-  marginTop: "7px",
+  marginTop: "5px",
   fontSize: "12px",
   color: "#64748b",
 };
 
-const donutLayoutStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "150px minmax(0, 1fr)",
-  gap: "16px",
-  alignItems: "center",
-};
-
 const donutStyle: CSSProperties = {
-  width: "138px",
-  height: "138px",
+  width: "174px",
+  height: "174px",
   borderRadius: "999px",
   display: "grid",
   placeItems: "center",
   boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.05)",
+  flex: "0 0 auto",
 };
 
 const donutInnerStyle: CSSProperties = {
-  width: "82px",
-  height: "82px",
+  width: "100px",
+  height: "100px",
   borderRadius: "999px",
   background: "#ffffff",
   display: "grid",
@@ -1383,50 +1661,116 @@ const donutInnerStyle: CSSProperties = {
   boxShadow: "0 6px 18px rgba(15,23,42,0.08)",
 };
 
-const donutLegendStyle: CSSProperties = {
-  display: "grid",
-  gap: "8px",
-};
-
-const legendRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "10px minmax(0, 1fr) auto",
-  gap: "9px",
-  alignItems: "center",
-  borderRadius: "12px",
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
-  padding: "9px 10px",
-  color: "#0f172a",
-};
-
 const legendDotStyle: CSSProperties = {
   width: "10px",
   height: "10px",
   borderRadius: "999px",
 };
 
-const legendLabelStyle: CSSProperties = {
-  minWidth: 0,
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "normal",
+const statusSplitLayoutStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(190px, 0.78fr) minmax(230px, 1fr)",
+  gap: "18px",
+  alignItems: "stretch",
+  minHeight: "260px",
+};
+
+const statusHeroStyle: CSSProperties = {
+  borderRadius: "16px",
+  background: "linear-gradient(180deg, #f8fafc 0%, #eef8f7 100%)",
+  border: "1px solid #dbe7f3",
+  padding: "16px",
+  display: "grid",
+  justifyItems: "center",
+  alignContent: "center",
+  gap: "14px",
+  minHeight: 0,
+};
+
+const statusHeroCopyStyle: CSSProperties = {
+  display: "grid",
+  gap: "4px",
+  textAlign: "center",
+};
+
+const statusHeroLabelStyle: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 900,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "#64748b",
+};
+
+const statusHeroValueStyle: CSSProperties = {
+  fontSize: "18px",
+  lineHeight: 1.15,
+  color: "#0f172a",
+};
+
+const statusHeroDetailStyle: CSSProperties = {
   fontSize: "12px",
-  fontWeight: 800,
+  color: "#475569",
+};
+
+const statusBarGridStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+  alignContent: "stretch",
+};
+
+const statusBarRowStyle: CSSProperties = {
+  borderRadius: "12px",
+  border: "1px solid #e2e8f0",
+  background: "#f8fafc",
+  padding: "12px",
+  display: "grid",
+  alignContent: "center",
+};
+
+const statusBarHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "10px",
+  alignItems: "center",
+  marginBottom: "8px",
+};
+
+const statusBarLabelStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+  minWidth: 0,
+  color: "#0f172a",
+  fontSize: "12px",
+  fontWeight: 900,
   lineHeight: 1.25,
 };
 
-const legendValueStyle: CSSProperties = {
+const statusBarValueStyle: CSSProperties = {
+  color: "#0f172a",
+  fontSize: "16px",
+};
+
+const statusBarDetailStyle: CSSProperties = {
+  display: "block",
+  marginTop: "7px",
+  color: "#64748b",
   fontSize: "12px",
+};
+
+const attentionGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "10px",
 };
 
 const attentionLinkItemStyle: CSSProperties = {
   display: "grid",
-  gap: "6px",
-  borderRadius: "14px",
+  gap: "5px",
+  borderRadius: "12px",
   border: "1px solid #e2e8f0",
   background: "#f8fafc",
-  padding: "13px 14px",
+  padding: "10px 12px",
   color: "#0f172a",
   textDecoration: "none",
 };
@@ -1443,26 +1787,35 @@ const attentionDateStyle: CSSProperties = {
   color: "#334155",
 };
 
+const attentionMetaRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(120px, 0.8fr) minmax(0, 1.2fr)",
+  gap: "10px",
+  color: "#64748b",
+  fontSize: "12px",
+  lineHeight: 1.35,
+};
+
 const sectionHeaderRowStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   gap: "12px",
   alignItems: "flex-start",
-  marginBottom: "18px",
+  marginBottom: "12px",
   flexWrap: "wrap",
 };
 
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
-  fontSize: "20px",
+  fontSize: "18px",
   color: "#0f172a",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
   color: "#64748b",
-  fontSize: "14px",
-  lineHeight: 1.55,
+  fontSize: "13px",
+  lineHeight: 1.4,
 };
 
 const panelLinkStyle: CSSProperties = {
@@ -1474,7 +1827,7 @@ const panelLinkStyle: CSSProperties = {
 
 const listWrapStyle: CSSProperties = {
   display: "grid",
-  gap: "12px",
+  gap: "8px",
 };
 
 const listItemStyle: CSSProperties = {
@@ -1482,8 +1835,8 @@ const listItemStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: "12px",
   alignItems: "flex-start",
-  padding: "14px 16px",
-  borderRadius: "14px",
+  padding: "10px 12px",
+  borderRadius: "12px",
   border: "1px solid #e2e8f0",
   background: "#f8fafc",
 };
@@ -1520,10 +1873,10 @@ const activityBadgeStyle: CSSProperties = {
 };
 
 const emptyStateStyle: CSSProperties = {
-  borderRadius: "14px",
+  borderRadius: "12px",
   border: "1px dashed #cbd5e1",
   background: "#f8fafc",
   color: "#64748b",
-  padding: "18px",
-  fontSize: "14px",
+  padding: "12px",
+  fontSize: "13px",
 };

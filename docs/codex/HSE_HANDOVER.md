@@ -46,11 +46,11 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, gree
 
 ## HSE Reports
 
-- Should replicate the Quality Reports layout exactly.
-- Monthly report structure should use live HSE data.
-- Saved reports should work like Quality Reports.
-- Executive summary must appear in PDF output.
+- HSE Reports now use the shared Quality-style hero/context cards, live monthly HSE data, executive summary and next-month focus fields, saved reports table, search, Show/Hide Filters, year filter, Clear Filters, and row-level PDF/Edit/Delete actions.
+- Saved report editing reads the stored report month/year snapshot when available, matching Quality Reports behavior for older saved periods.
+- Executive summary and next-month focus appear in PDF output.
 - Creating saved reports requires Create permission; editing/deleting saved reports requires Edit permission.
+- Verify on Vercel with real saved HSE reports after deployment.
 
 ## Inspections
 
@@ -58,7 +58,8 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, gree
 - ENS-HSEQ-FRM-044 Base and Site are completed well.
 - ENS-HSEQ-FRM-041 Office is mostly done.
 - FRM-046 Vessel Pre-Sail, FRM-042 Offshore, FRM-043 Mobilisation, and FRM-045 Dropped Objects were started/completed in one pass.
-- PDF outputs need consistent header/footer and aligned tables.
+- PDF outputs now reserve header/footer space for generated tables and stamp the Enshore header, revision reference, and page numbers across completed and blank inspection PDFs.
+- Verify generated PDFs on Vercel with longer checklist forms and evidence photos after deployment.
 - Item evidence upload exists per checklist item.
 - QR mobile flow exists.
 - Create inspection, save/delete inspection, existing and staged evidence upload/delete/remove, and linked HSE Action creation shortcuts now use page-level create/edit permission guards with matching disabled controls.
