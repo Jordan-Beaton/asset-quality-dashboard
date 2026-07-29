@@ -1115,7 +1115,7 @@ export default function ReportsPage() {
         <Link href="/reports" style={activeReportWorkspaceTabStyle}>
           Monthly Reports
         </Link>
-        <Link href="/reports/project" style={reportWorkspaceTabStyle}>
+        <Link href="/projects/wadden-sea/reports" style={reportWorkspaceTabStyle}>
           Project Reports
         </Link>
       </nav>

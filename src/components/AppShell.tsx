@@ -71,7 +71,7 @@ type PeopleAccessRecord = {
   admin_access?: string | null;
 };
 
-type AccessArea = "public" | "login" | "home" | "people" | "quality" | "documents" | "hse" | "assets" | "risk" | "actions" | "management-review" | "admin";
+type AccessArea = "public" | "login" | "home" | "people" | "quality" | "documents" | "hse" | "assets" | "risk" | "actions" | "management-review" | "projects" | "admin";
 
 type NavIconKey =
   | "home"
@@ -98,6 +98,12 @@ type NavIconKey =
   | "system"
   | "ainm"
   | "observations";
+
+const projectNavItems: NavItem[] = [
+  { href: "/home", label: "Home", icon: "home" },
+  { href: "/projects", label: "Projects", icon: "dashboard" },
+  { href: "/projects/wadden-sea", label: "Wadden Sea", icon: "assets" },
+];
 
 const qualityNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
@@ -196,6 +202,7 @@ function getAccessAreaFromHref(href: string): AccessArea {
   if (href === "/people") return "people";
   if (href === "/management-review") return "management-review";
   if (href.startsWith("/admin")) return "admin";
+  if (href.startsWith("/projects")) return "projects";
   if (href.startsWith("/hse")) return "hse";
   if (href.startsWith("/assets")) return "assets";
   if (href.startsWith("/risk")) return "risk";
@@ -234,6 +241,7 @@ function getModuleAccessValue(moduleKey: string, moduleAccess: ModuleAccess) {
 }
 
 function getPermissionTargetFromHref(href: string): PermissionTarget | null {
+  if (href.startsWith("/projects")) return { moduleKey: "quality", areaKey: "reports" };
   if (href === "/quality") return { moduleKey: "quality", areaKey: "dashboard" };
   if (href === "/quality/calendar") return { moduleKey: "quality", areaKey: "calendar" };
   if (href === "/moc") return { moduleKey: "quality", areaKey: "moc" };
@@ -499,6 +507,7 @@ function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleA
   if (area === "risk") return !isExplicitNone(moduleAccess.risk) && (hasExplicitAccess(moduleAccess.risk) || role === "Admin" || role === "Manager" || role === "Viewer");
   if (area === "actions") return !isExplicitNone(moduleAccess.actions) && (hasExplicitAccess(moduleAccess.actions) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer");
   if (area === "management-review") return !isExplicitNone(moduleAccess.managementReview) && (hasExplicitAccess(moduleAccess.managementReview) || role === "Admin" || role === "Manager" || role === "Viewer");
+  if (area === "projects") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
   if (area === "admin") return !isExplicitNone(moduleAccess.admin) && (hasExplicitAccess(moduleAccess.admin) || role === "Admin");
   return false;
 }
@@ -658,6 +667,7 @@ export default function AppShell({ children }: AppShellProps) {
   const isAdminModule = pathname.startsWith("/admin");
   const isPeopleModule = pathname.startsWith("/people");
   const isActionModule = pathname === "/actions";
+  const isProjectModule = pathname.startsWith("/projects");
   const isAinmFieldMode = pathname === "/hse/ainm/field";
   const isAssetInspectionFieldMode = pathname === "/assets/inspection/field";
   const isAssetMaintenanceFieldMode = pathname === "/assets/maintenance/field";
@@ -673,6 +683,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? "Enshore Management System"
     : isActionModule
     ? "Action Management"
+    : isProjectModule
+    ? "Project Management"
     : isDocumentModule
     ? "Document Control"
     : isAssetModule
@@ -690,6 +702,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? ""
     : isActionModule
     ? "Central action register and follow-up control"
+    : isProjectModule
+    ? "Project registers, controls, documents, and reporting"
     : isDocumentModule
     ? "Controlled documents, certification, reviews, approvals, and revision history"
     : isAssetModule
@@ -717,6 +731,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? peopleNavItems
     : isActionModule
     ? actionNavItems
+    : isProjectModule
+    ? projectNavItems
     : qualityNavItems;
   const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess, signedInTabPermissions);
   const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldInspectionMode;

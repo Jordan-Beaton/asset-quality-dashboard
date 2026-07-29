@@ -1085,13 +1085,13 @@ export default function ProjectReportsPage() {
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/quality" style={backLinkStyle}>← Back to Dashboard</Link>
+        <Link href="/projects/wadden-sea" style={backLinkStyle}>← Back to Wadden Sea</Link>
         <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
       </div>
 
       <nav style={reportWorkspaceTabsStyle} aria-label="Report workspace">
-        <Link href="/reports" style={reportWorkspaceTabStyle}>Monthly Reports</Link>
-        <Link href="/reports/project" style={activeReportWorkspaceTabStyle}>Project Reports</Link>
+        <Link href="/projects/wadden-sea" style={reportWorkspaceTabStyle}>Project Workspace</Link>
+        <Link href="/projects/wadden-sea/reports" style={activeReportWorkspaceTabStyle}>Project Reports</Link>
       </nav>
 
       <section style={panelStyle}>

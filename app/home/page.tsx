@@ -6,6 +6,17 @@ import { useImsPermissions } from "../../src/components/ImsPermissions";
 
 const moduleCards = [
   {
+    title: "Project Management",
+    short: "Projects",
+    icon: "projects",
+    description: "Project workspaces for ITP control, delivery registers, quality annexes, and reporting.",
+    href: "/projects",
+    moduleKey: "quality",
+    status: "Live",
+    group: "Projects",
+    cta: "Enter",
+  },
+  {
     title: "Quality Management",
     short: "Quality",
     icon: "quality",
@@ -123,6 +134,15 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
       <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
         <path {...common} d="M8 4h8l1 3h2v13H5V7h2z" />
         <path {...common} d="m8.5 13 2.2 2.2 4.8-5" />
+      </svg>
+    );
+  }
+
+  if (icon === "projects") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
+        <path {...common} d="M3 7h7l2 2h9v11H3z" />
+        <path {...common} d="M3 7V4h7l2 3M8 14h8M12 11v6" />
       </svg>
     );
   }
