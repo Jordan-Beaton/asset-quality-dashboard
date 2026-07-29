@@ -1111,6 +1111,15 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <nav style={reportWorkspaceTabsStyle} aria-label="Report workspace">
+        <Link href="/reports" style={activeReportWorkspaceTabStyle}>
+          Monthly Reports
+        </Link>
+        <Link href="/reports/project" style={reportWorkspaceTabStyle}>
+          Project Reports
+        </Link>
+      </nav>
+
       <section style={twoColumnGridStyle}>
         <div style={panelStyle}>
           <div style={sectionHeaderRowStyle}>
@@ -1417,6 +1426,32 @@ const topMetaRowStyle: React.CSSProperties = {
   borderRadius: "16px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+};
+
+const reportWorkspaceTabsStyle: React.CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  padding: "6px",
+  marginBottom: "20px",
+  background: "#ffffff",
+  border: "1px solid #dbe3ef",
+  borderRadius: "14px",
+  width: "fit-content",
+};
+
+const reportWorkspaceTabStyle: React.CSSProperties = {
+  padding: "9px 14px",
+  borderRadius: "10px",
+  color: "#475569",
+  textDecoration: "none",
+  fontWeight: 800,
+  fontSize: "13px",
+};
+
+const activeReportWorkspaceTabStyle: React.CSSProperties = {
+  ...reportWorkspaceTabStyle,
+  background: "#3A9B98",
+  color: "#ffffff",
 };
 
 const statusBannerStyle: React.CSSProperties = {

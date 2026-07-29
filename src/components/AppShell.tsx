@@ -240,7 +240,7 @@ function getPermissionTargetFromHref(href: string): PermissionTarget | null {
   if (href === "/ncr-capa") return { moduleKey: "quality", areaKey: "ncr" };
   if (href === "/audits") return { moduleKey: "quality", areaKey: "audits" };
   if (href === "/quality/actions") return { moduleKey: "quality", areaKey: "actions" };
-  if (href === "/reports") return { moduleKey: "quality", areaKey: "reports" };
+  if (href === "/reports" || href.startsWith("/reports/")) return { moduleKey: "quality", areaKey: "reports" };
 
   if (href === "/documents") return { moduleKey: "documents", areaKey: "document-control" };
   if (href === "/certification") return { moduleKey: "documents", areaKey: "certification" };

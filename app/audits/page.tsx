@@ -13,6 +13,7 @@ import {
   ExternalHyperlink,
   Footer,
   Packer,
+  PageOrientation,
   Paragraph,
   ShadingType,
   SimpleField,
@@ -36,6 +37,7 @@ type FindingSeverity = "Major" | "Minor" | "OFI" | "OBS";
 type FindingStatus = "Open" | "In Progress" | "Closed";
 type SortKey = "audit_month" | "audit_number" | "title" | "audit_type" | "lead_auditor" | "findings";
 type AuditWorkspaceView = "dashboard" | "programme" | "create" | "findings" | "reports";
+type ProgrammeSnapshotScope = "All" | "Completed" | "Upcoming";
 
 type AuditRecord = {
   id: string;
@@ -653,8 +655,26 @@ function AuditsPageContent() {
       linkedFindingCategory !== "All"
   );
   const [generatingOpenFindingsReport, setGeneratingOpenFindingsReport] = useState(false);
+  const [generatingCustomWordReport, setGeneratingCustomWordReport] = useState(false);
+  const [showCustomReportBuilder, setShowCustomReportBuilder] = useState(false);
+  const [showProgrammeSnapshot, setShowProgrammeSnapshot] = useState(false);
+  const [programmeSnapshotSearch, setProgrammeSnapshotSearch] = useState("");
+  const [programmeSnapshotScope, setProgrammeSnapshotScope] = useState<ProgrammeSnapshotScope>("All");
+  const [programmeSnapshotType, setProgrammeSnapshotType] = useState<AuditType | "All">("All");
+  const [programmeSnapshotMonth, setProgrammeSnapshotMonth] = useState("All");
+  const [programmeSnapshotAuditIds, setProgrammeSnapshotAuditIds] = useState<string[]>([]);
+  const [programmeSnapshotSnipMode, setProgrammeSnapshotSnipMode] = useState(false);
+  const [generatingProgrammeSnapshotOutput, setGeneratingProgrammeSnapshotOutput] = useState<"" | "word" | "pdf">("");
+  const [customReportAuditIds, setCustomReportAuditIds] = useState<string[]>([]);
+  const [customReportSearch, setCustomReportSearch] = useState("");
+  const [customReportTypeFilter, setCustomReportTypeFilter] = useState<AuditType | "All">("All");
+  const [customReportStatusFilter, setCustomReportStatusFilter] = useState<AuditStatus | "All">("All");
+  const [customReportMonthFilter, setCustomReportMonthFilter] = useState("All");
+  const [customReportFindingStatus, setCustomReportFindingStatus] = useState<FindingStatus | "All">("All");
+  const [customReportCategoryFilter, setCustomReportCategoryFilter] = useState<FindingSeverity | "All">("All");
   const [generatingAuditPdf, setGeneratingAuditPdf] = useState(false);
   const [activeView, setActiveView] = useState<AuditWorkspaceView>(() => {
+    if (linkedView === "reports") return "reports";
     if (linkedView === "open-findings" || linkedView === "closed-findings" || directFindingId) return "findings";
     if (
       linkedSearch ||
@@ -886,10 +906,14 @@ function AuditsPageContent() {
   }, []);
 
   useEffect(() => {
+    if (linkedView === "reports") {
+      setActiveView("reports");
+      return;
+    }
     if (isOpenFindingsView || isClosedFindingsView) {
       setActiveView("findings");
     }
-  }, [isOpenFindingsView, isClosedFindingsView]);
+  }, [isOpenFindingsView, isClosedFindingsView, linkedView]);
 
   const monthOptions = useMemo(() => {
     return Array.from(new Set(audits.map((audit) => audit.audit_month))).sort();
@@ -1100,6 +1124,103 @@ function AuditsPageContent() {
       { Internal: [], External: [], Supplier: [] }
     );
   }, [openFindings, openFindingAuditTitleFilter, openFindingCategoryFilter]);
+
+  const customReportAudits = useMemo(() => {
+    const needle = customReportSearch.trim().toLowerCase();
+    return audits.filter((audit) => {
+      const matchesSearch =
+        !needle ||
+        audit.audit_number.toLowerCase().includes(needle) ||
+        audit.title.toLowerCase().includes(needle) ||
+        audit.auditee.toLowerCase().includes(needle) ||
+        audit.location.toLowerCase().includes(needle);
+      const matchesType = customReportTypeFilter === "All" || audit.audit_type === customReportTypeFilter;
+      const matchesStatus = customReportStatusFilter === "All" || audit.status === customReportStatusFilter;
+      const matchesMonth = customReportMonthFilter === "All" || audit.audit_month === customReportMonthFilter;
+      return matchesSearch && matchesType && matchesStatus && matchesMonth;
+    });
+  }, [
+    audits,
+    customReportMonthFilter,
+    customReportSearch,
+    customReportStatusFilter,
+    customReportTypeFilter,
+  ]);
+
+  const customReportRows = useMemo<OpenFindingRow[]>(() => {
+    const selectedIds = new Set(customReportAuditIds);
+    return findings
+      .filter((finding) => {
+        const matchesAudit = selectedIds.has(finding.audit_id);
+        const matchesStatus =
+          customReportFindingStatus === "All" || finding.status === customReportFindingStatus;
+        const matchesCategory =
+          customReportCategoryFilter === "All" || finding.category === customReportCategoryFilter;
+        return matchesAudit && matchesStatus && matchesCategory;
+      })
+      .map((finding) => {
+        const audit = audits.find((item) => item.id === finding.audit_id);
+        return {
+          ...finding,
+          audit_number: audit?.audit_number || "-",
+          audit_title: audit?.title || "Untitled Audit",
+          audit_type: audit?.audit_type || "Internal",
+        };
+      })
+      .sort((a, b) => compareText(a.audit_number, b.audit_number) || compareText(a.reference, b.reference));
+  }, [
+    audits,
+    customReportAuditIds,
+    customReportCategoryFilter,
+    customReportFindingStatus,
+    findings,
+  ]);
+
+  const programmeSnapshotRows = useMemo(() => {
+    const needle = programmeSnapshotSearch.trim().toLowerCase();
+    return audits
+      .filter((audit) => {
+        const effectiveStatus = getEffectiveAuditStatus(audit);
+        const matchesSearch =
+          !needle ||
+          audit.audit_number.toLowerCase().includes(needle) ||
+          audit.title.toLowerCase().includes(needle) ||
+          audit.auditee.toLowerCase().includes(needle) ||
+          audit.lead_auditor.toLowerCase().includes(needle);
+        const matchesScope =
+          programmeSnapshotScope === "All" ||
+          (programmeSnapshotScope === "Completed"
+            ? effectiveStatus === "Completed"
+            : effectiveStatus !== "Completed" && effectiveStatus !== "Cancelled");
+        const matchesType = programmeSnapshotType === "All" || audit.audit_type === programmeSnapshotType;
+        const matchesMonth = programmeSnapshotMonth === "All" || audit.audit_month === programmeSnapshotMonth;
+        return matchesSearch && matchesScope && matchesType && matchesMonth;
+      })
+      .sort((a, b) => {
+        const aDate = new Date(a.audit_date || `${a.audit_month}-01`).getTime();
+        const bDate = new Date(b.audit_date || `${b.audit_month}-01`).getTime();
+        return aDate - bDate || compareText(a.audit_number, b.audit_number);
+      });
+  }, [
+    audits,
+    programmeSnapshotMonth,
+    programmeSnapshotScope,
+    programmeSnapshotSearch,
+    programmeSnapshotType,
+  ]);
+
+  const programmeSnapshotDisplayRows = useMemo(
+    () =>
+      programmeSnapshotSnipMode
+        ? programmeSnapshotRows.filter((audit) => programmeSnapshotAuditIds.includes(audit.id))
+        : programmeSnapshotRows,
+    [programmeSnapshotAuditIds, programmeSnapshotRows, programmeSnapshotSnipMode]
+  );
+
+  const programmeSnapshotSelectedRows = useMemo(
+    () => programmeSnapshotRows.filter((audit) => programmeSnapshotAuditIds.includes(audit.id)),
+    [programmeSnapshotAuditIds, programmeSnapshotRows]
+  );
 
   const activeFindingsWorkspaceRows = directFindingId
     ? [...filteredOpenFindings, ...filteredClosedFindings]
@@ -3253,6 +3374,523 @@ function AuditsPageContent() {
     }
   }
 
+  function toggleCustomReportAudit(auditId: string) {
+    setCustomReportAuditIds((current) =>
+      current.includes(auditId) ? current.filter((id) => id !== auditId) : [...current, auditId]
+    );
+  }
+
+  function generateCustomAuditNcrReport() {
+    if (customReportAuditIds.length === 0) {
+      setMessage("Select at least one audit for the custom report.");
+      return;
+    }
+
+    if (customReportRows.length === 0) {
+      setMessage("The selected audits have no findings matching the custom finding filters.");
+      return;
+    }
+
+    try {
+      setGeneratingOpenFindingsReport(true);
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const selectedAudits = audits.filter((audit) => customReportAuditIds.includes(audit.id));
+
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, pageWidth, 24, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text("ENSHORE SUBSEA", margin, 11.5);
+      doc.setFontSize(10);
+      doc.text("Custom Audit NCR Report", margin, 18);
+
+      doc.setFontSize(16);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Custom Audit NCR Report", margin, 34);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Generated: ${formatDateTime(new Date().toISOString())}`, pageWidth - margin, 34, { align: "right" });
+      doc.text(
+        `Selected audits: ${selectedAudits.length} | Finding status: ${customReportFindingStatus} | Category: ${customReportCategoryFilter}`,
+        margin,
+        41
+      );
+      doc.text(`Findings: ${customReportRows.length}`, pageWidth - margin, 41, { align: "right" });
+
+      autoTable(doc, {
+        startY: 47,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 16 },
+        head: [[
+          "Finding Ref",
+          "Audit Number",
+          "Audit Title",
+          "Audit Type",
+          "Category",
+          "Finding Status",
+          "Description",
+          "Owner",
+          "Due Date",
+          "Closure Date",
+          "Root Cause",
+          "Corrective Action",
+        ]],
+        body: customReportRows.map((finding) => [
+          finding.reference,
+          finding.audit_number,
+          finding.audit_title,
+          finding.audit_type,
+          finding.category,
+          finding.status,
+          finding.description || "-",
+          finding.owner || "-",
+          formatDate(finding.due_date),
+          finding.closure_date ? formatDate(finding.closure_date) : "-",
+          finding.root_cause || "-",
+          finding.corrective_action || "-",
+        ]),
+        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: {
+          fontSize: 7,
+          cellPadding: 1.6,
+          textColor: [15, 23, 42],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.2,
+          overflow: "linebreak",
+          valign: "top",
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { cellWidth: 14 },
+          1: { cellWidth: 18 },
+          2: { cellWidth: 27 },
+          3: { cellWidth: 15 },
+          4: { cellWidth: 13 },
+          5: { cellWidth: 17 },
+          6: { cellWidth: 34 },
+          7: { cellWidth: 16 },
+          8: { cellWidth: 16 },
+          9: { cellWidth: 17 },
+          10: { cellWidth: 32 },
+          11: { cellWidth: 38 },
+        },
+      });
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Enshore Subsea | Custom Audit Findings", margin, pageHeight - 6.5);
+        doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6.5, { align: "right" });
+      }
+
+      doc.save(`custom-audit-ncr-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setMessage(`Custom Audit NCR Report generated from ${selectedAudits.length} selected audits.`);
+    } catch (error) {
+      console.error(error);
+      setMessage("Custom Audit NCR Report generation failed.");
+    } finally {
+      setGeneratingOpenFindingsReport(false);
+    }
+  }
+
+  async function generateCustomAuditWordReport() {
+    if (customReportAuditIds.length === 0) {
+      setMessage("Select at least one audit for the custom Word report.");
+      return;
+    }
+
+    if (customReportRows.length === 0) {
+      setMessage("The selected audits have no findings matching the custom finding filters.");
+      return;
+    }
+
+    setGeneratingCustomWordReport(true);
+
+    try {
+      const selectedAudits = audits
+        .filter((audit) => customReportAuditIds.includes(audit.id))
+        .sort((a, b) => compareText(a.audit_number, b.audit_number));
+      const findingWidths = [900, 1100, 760, 880, 980, 900, 1840, 2000];
+
+      const selectedAuditTable = wordTable(
+        ["Audit Number", "Audit Title", "Client / Auditee", "Type", "Audit Status", "Month"],
+        selectedAudits.map((audit) => [
+          audit.audit_number,
+          audit.title,
+          audit.auditee || "-",
+          audit.audit_type,
+          audit.status,
+          formatMonth(audit.audit_month),
+        ]),
+        [1300, 2460, 2000, 1000, 1300, 1300]
+      );
+
+      const findingsTable = wordTable(
+        ["Ref", "Audit", "Category", "Status", "Owner", "Due Date", "Description", "Corrective Action"],
+        customReportRows.map((finding) => [
+          finding.reference,
+          finding.audit_number,
+          finding.category,
+          finding.status,
+          finding.owner || "-",
+          exportDate(finding.due_date) || "-",
+          finding.description || "-",
+          finding.corrective_action || "-",
+        ]),
+        findingWidths
+      );
+
+      const document = new WordDocument({
+        styles: {
+          default: {
+            document: { run: { font: "Calibri", size: 19, color: "0F172A" } },
+          },
+        },
+        sections: [
+          {
+            properties: {
+              page: { margin: { top: 720, right: 720, bottom: 900, left: 720, footer: 360 } },
+            },
+            footers: { default: wordFooter("Custom Audit NCR Report") },
+            children: [
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                layout: TableLayoutType.FIXED,
+                columnWidths: [wordBodyWidth],
+                borders: {
+                  top: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+                        margins: { top: 180, bottom: 180, left: 180, right: 180 },
+                        children: [
+                          new Paragraph({
+                            children: [wordRun("ENSHORE SUBSEA", { bold: true, color: "FFFFFF", size: 36 })],
+                          }),
+                          new Paragraph({
+                            children: [wordRun("Custom Audit NCR Report", { bold: true, color: "FFFFFF", size: 20 })],
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new Paragraph({ spacing: { after: 160 }, children: [wordRun("", { size: 1 })] }),
+              new Paragraph({
+                children: [wordRun("Custom Audit NCR Report", { bold: true, size: 36 })],
+              }),
+              new Paragraph({
+                spacing: { after: 70 },
+                children: [
+                  wordRun(
+                    `${selectedAudits.length} selected audit${selectedAudits.length === 1 ? "" : "s"} | ` +
+                      `${customReportRows.length} finding${customReportRows.length === 1 ? "" : "s"}`,
+                    { color: "475569", size: 20 }
+                  ),
+                ],
+              }),
+              new Paragraph({
+                spacing: { after: 180 },
+                children: [
+                  wordRun(
+                    `Generated: ${exportDateTime(new Date().toISOString())} | ` +
+                      `Finding status: ${customReportFindingStatus} | Category: ${customReportCategoryFilter}`,
+                    { color: "475569", size: 18 }
+                  ),
+                ],
+              }),
+              wordSectionTitle("Selected Audits"),
+              new Paragraph({ spacing: { after: 70 }, children: [wordRun("", { size: 1 })] }),
+              selectedAuditTable,
+              new Paragraph({
+                spacing: { before: 220, after: 70 },
+                children: [wordRun("Audit Findings", { bold: true, size: 26 })],
+              }),
+              findingsTable,
+            ],
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(document);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = `custom-audit-ncr-report-${new Date().toISOString().slice(0, 10)}.docx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage(`Custom Word report generated from ${selectedAudits.length} selected audits.`);
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Custom Word report generation failed: ${err.message}`);
+    } finally {
+      setGeneratingCustomWordReport(false);
+    }
+  }
+
+  function getSelectedProgrammeSnapshotAudits() {
+    return programmeSnapshotSelectedRows
+      .slice()
+      .sort((a, b) => {
+        const aDate = new Date(a.audit_date || `${a.audit_month}-01`).getTime();
+        const bDate = new Date(b.audit_date || `${b.audit_month}-01`).getTime();
+        return aDate - bDate || compareText(a.audit_number, b.audit_number);
+      });
+  }
+
+  async function generateProgrammeSnapshotWord() {
+    const selectedAudits = getSelectedProgrammeSnapshotAudits();
+    if (selectedAudits.length === 0) {
+      setMessage("Select at least one audit for the programme Word report.");
+      return;
+    }
+
+    setGeneratingProgrammeSnapshotOutput("word");
+    try {
+      const widths = [1050, 2300, 900, 1050, 1050, 1250, 650, 650, 750, 700, 1050, 1000];
+      const document = new WordDocument({
+        styles: {
+          default: {
+            document: { run: { font: "Calibri", size: 17, color: "0F172A" } },
+          },
+        },
+        sections: [
+          {
+            properties: {
+              page: {
+                size: { orientation: PageOrientation.LANDSCAPE },
+                margin: { top: 540, right: 540, bottom: 720, left: 540, footer: 300 },
+              },
+            },
+            footers: {
+              default: new Footer({
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [
+                      wordRun("Enshore Subsea | Audit Programme | Page ", { size: 15, color: "64748B" }),
+                      new SimpleField("PAGE"),
+                      wordRun(" of ", { size: 15, color: "64748B" }),
+                      new SimpleField("NUMPAGES"),
+                    ],
+                  }),
+                ],
+              }),
+            },
+            children: [
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                layout: TableLayoutType.FIXED,
+                columnWidths: [14400],
+                borders: {
+                  top: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+                        margins: { top: 170, bottom: 170, left: 180, right: 180 },
+                        children: [
+                          new Paragraph({
+                            children: [wordRun("ENSHORE SUBSEA", { bold: true, color: "FFFFFF", size: 34 })],
+                          }),
+                          new Paragraph({
+                            children: [wordRun("Audit Programme", { bold: true, color: "FFFFFF", size: 20 })],
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new Paragraph({
+                spacing: { before: 180, after: 60 },
+                children: [wordRun("Audit Programme Snapshot", { bold: true, size: 32 })],
+              }),
+              new Paragraph({
+                spacing: { after: 170 },
+                children: [
+                  wordRun(
+                    `${selectedAudits.length} selected audit${selectedAudits.length === 1 ? "" : "s"} | Generated ${exportDateTime(new Date().toISOString())}`,
+                    { color: "475569", size: 18 }
+                  ),
+                ],
+              }),
+              wordTable(
+                ["Audit No.", "Title / Function", "Type", "Scheduled", "Audit Date", "Lead Auditor", "Major", "Minor", "OFI/OBS", "Risk", "Frequency", "Status"],
+                selectedAudits.map((audit) => [
+                  audit.audit_number,
+                  audit.title,
+                  audit.audit_type,
+                  formatMonth(audit.audit_month),
+                  exportDate(audit.audit_date),
+                  audit.lead_auditor || "-",
+                  String(audit.findings.major),
+                  String(audit.findings.minor),
+                  String(audit.findings.ofi + audit.findings.obs),
+                  String(auditRiskById[audit.id]?.riskScore ?? 1),
+                  auditRiskById[audit.id]?.frequency || "Maintain",
+                  getEffectiveAuditStatus(audit),
+                ]),
+                widths
+              ),
+            ],
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(document);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = `audit-programme-snapshot-${new Date().toISOString().slice(0, 10)}.docx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage(`Audit Programme Word report generated with ${selectedAudits.length} selected audits.`);
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Audit Programme Word generation failed: ${err.message}`);
+    } finally {
+      setGeneratingProgrammeSnapshotOutput("");
+    }
+  }
+
+  function generateProgrammeSnapshotPdf() {
+    const selectedAudits = getSelectedProgrammeSnapshotAudits();
+    if (selectedAudits.length === 0) {
+      setMessage("Select at least one audit for the programme PDF report.");
+      return;
+    }
+
+    setGeneratingProgrammeSnapshotOutput("pdf");
+    try {
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 10;
+
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, pageWidth, 24, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text("ENSHORE SUBSEA", margin, 11);
+      doc.setFontSize(10);
+      doc.text("Audit Programme Snapshot", margin, 18);
+      doc.setFontSize(15);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Audit Programme", margin, 34);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`${selectedAudits.length} selected audits`, margin, 41);
+      doc.text(`Generated: ${formatDateTime(new Date().toISOString())}`, pageWidth - margin, 41, { align: "right" });
+
+      autoTable(doc, {
+        startY: 47,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 15 },
+        head: [[
+          "Audit No.",
+          "Title / Function",
+          "Type",
+          "Scheduled",
+          "Audit Date",
+          "Lead Auditor",
+          "Major",
+          "Minor",
+          "OFI/OBS",
+          "Risk",
+          "Frequency",
+          "Status",
+        ]],
+        body: selectedAudits.map((audit) => [
+          audit.audit_number,
+          audit.title,
+          audit.audit_type,
+          formatMonth(audit.audit_month),
+          formatDate(audit.audit_date),
+          audit.lead_auditor || "-",
+          audit.findings.major,
+          audit.findings.minor,
+          audit.findings.ofi + audit.findings.obs,
+          auditRiskById[audit.id]?.riskScore ?? 1,
+          auditRiskById[audit.id]?.frequency || "Maintain",
+          getEffectiveAuditStatus(audit),
+        ]),
+        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: {
+          fontSize: 7.5,
+          cellPadding: 2,
+          textColor: [15, 23, 42],
+          lineColor: [226, 232, 240],
+          lineWidth: 0.2,
+          valign: "middle",
+          overflow: "linebreak",
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { cellWidth: 18 },
+          1: { cellWidth: 39 },
+          2: { cellWidth: 16 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 19 },
+          5: { cellWidth: 24 },
+          6: { cellWidth: 12, halign: "center" },
+          7: { cellWidth: 12, halign: "center" },
+          8: { cellWidth: 14, halign: "center" },
+          9: { cellWidth: 12, halign: "center" },
+          10: { cellWidth: 20 },
+          11: { cellWidth: 20 },
+        },
+      });
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(margin, pageHeight - 11, pageWidth - margin, pageHeight - 11);
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Enshore Subsea | Audit Programme", margin, pageHeight - 6);
+        doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6, { align: "right" });
+      }
+
+      doc.save(`audit-programme-snapshot-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setMessage(`Audit Programme PDF generated with ${selectedAudits.length} selected audits.`);
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Audit Programme PDF generation failed: ${err.message}`);
+    } finally {
+      setGeneratingProgrammeSnapshotOutput("");
+    }
+  }
+
   return (
     <main>
       <QualityPageHero
@@ -4819,7 +5457,469 @@ function AuditsPageContent() {
                 <strong style={reportActionValueStyle}>{filteredClosedFindings.length}</strong>
                 <span style={reportActionHintStyle}>Closed findings using the current audit type and category filters.</span>
               </button>
+
+              <button
+                type="button"
+                style={{
+                  ...reportActionCardStyle,
+                  borderColor: showCustomReportBuilder ? "#3A9B98" : "#dbe4ef",
+                  background: showCustomReportBuilder ? "#f0fdfa" : "#f8fafc",
+                }}
+                onClick={() => setShowCustomReportBuilder((current) => !current)}
+              >
+                <span style={reportActionLabelStyle}>Custom Audit Report</span>
+                <strong style={reportActionValueStyle}>{customReportAuditIds.length}</strong>
+                <span style={reportActionHintStyle}>
+                  Choose any combination of audits and include open, closed, or all matching findings.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  ...reportActionCardStyle,
+                  borderColor: showProgrammeSnapshot ? "#3A9B98" : "#dbe4ef",
+                  background: showProgrammeSnapshot ? "#f0fdfa" : "#f8fafc",
+                }}
+                onClick={() => setShowProgrammeSnapshot((current) => !current)}
+              >
+                <span style={reportActionLabelStyle}>Audit Programme Snapshot</span>
+                <strong style={reportActionValueStyle}>{programmeSnapshotRows.length}</strong>
+                <span style={reportActionHintStyle}>
+                  A clean, filterable view of completed and upcoming audits, ready to snip into a client report.
+                </span>
+              </button>
             </div>
+
+            {showProgrammeSnapshot ? (
+              <div style={programmeSnapshotBuilderStyle}>
+                <div style={customReportBuilderHeaderStyle}>
+                  <div>
+                    <h3 style={customReportBuilderTitleStyle}>Audit Programme Snapshot</h3>
+                    <p style={customReportBuilderHintStyle}>
+                      Filter this client-ready view, then use your normal snipping tool to paste it into the monthly report.
+                    </p>
+                  </div>
+                  <div style={programmeSnapshotTotalsStyle}>
+                    <span>
+                      {programmeSnapshotDisplayRows.filter((audit) => getEffectiveAuditStatus(audit) === "Completed").length} completed
+                    </span>
+                    <span>
+                      {programmeSnapshotDisplayRows.filter((audit) => {
+                        const status = getEffectiveAuditStatus(audit);
+                        return status !== "Completed" && status !== "Cancelled";
+                      }).length} upcoming
+                    </span>
+                  </div>
+                </div>
+
+                <div style={customReportFiltersStyle}>
+                  <input
+                    type="search"
+                    value={programmeSnapshotSearch}
+                    onChange={(event) => setProgrammeSnapshotSearch(event.target.value)}
+                    placeholder="Search client, audit, title or auditor"
+                    style={{ ...inputStyle, minWidth: "270px" }}
+                  />
+                  <select
+                    value={programmeSnapshotScope}
+                    onChange={(event) => setProgrammeSnapshotScope(event.target.value as ProgrammeSnapshotScope)}
+                    style={toolbarSelectStyle}
+                  >
+                    <option value="All">Completed and upcoming</option>
+                    <option value="Completed">Completed only</option>
+                    <option value="Upcoming">Upcoming only</option>
+                  </select>
+                  <select
+                    value={programmeSnapshotType}
+                    onChange={(event) => setProgrammeSnapshotType(event.target.value as AuditType | "All")}
+                    style={toolbarSelectStyle}
+                  >
+                    <option value="All">All audit types</option>
+                    <option value="Internal">Internal</option>
+                    <option value="External">External</option>
+                    <option value="Supplier">Supplier</option>
+                  </select>
+                  <select
+                    value={programmeSnapshotMonth}
+                    onChange={(event) => setProgrammeSnapshotMonth(event.target.value)}
+                    style={toolbarSelectStyle}
+                  >
+                    <option value="All">All months</option>
+                    {monthOptions.map((month) => (
+                      <option key={month} value={month}>{formatMonth(month)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={customReportBulkActionsStyle}>
+                  {!programmeSnapshotSnipMode ? (
+                    <>
+                      <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={() =>
+                          setProgrammeSnapshotAuditIds((current) =>
+                            Array.from(new Set([...current, ...programmeSnapshotRows.map((audit) => audit.id)]))
+                          )
+                        }
+                        disabled={programmeSnapshotRows.length === 0}
+                      >
+                        Select all filtered ({programmeSnapshotRows.length})
+                      </button>
+                      <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={() => {
+                          const visibleIds = new Set(programmeSnapshotRows.map((audit) => audit.id));
+                          setProgrammeSnapshotAuditIds((current) => current.filter((id) => !visibleIds.has(id)));
+                        }}
+                        disabled={programmeSnapshotRows.length === 0}
+                      >
+                        Clear filtered
+                      </button>
+                      <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={() => setProgrammeSnapshotAuditIds([])}
+                        disabled={programmeSnapshotAuditIds.length === 0}
+                      >
+                        Clear all
+                      </button>
+                      <button
+                        type="button"
+                        style={primaryButtonStyle}
+                        onClick={() => setProgrammeSnapshotSnipMode(true)}
+                        disabled={programmeSnapshotSelectedRows.length === 0}
+                      >
+                        Prepare snip ({programmeSnapshotSelectedRows.length} selected)
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      style={secondaryButtonStyle}
+                      onClick={() => setProgrammeSnapshotSnipMode(false)}
+                    >
+                      Edit audit selection
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    style={secondaryButtonStyle}
+                    onClick={() => void generateProgrammeSnapshotWord()}
+                    disabled={
+                      programmeSnapshotSelectedRows.length === 0 || Boolean(generatingProgrammeSnapshotOutput)
+                    }
+                  >
+                    {generatingProgrammeSnapshotOutput === "word" ? "Generating Word..." : "Generate Word"}
+                  </button>
+                  <button
+                    type="button"
+                    style={secondaryButtonStyle}
+                    onClick={generateProgrammeSnapshotPdf}
+                    disabled={
+                      programmeSnapshotSelectedRows.length === 0 || Boolean(generatingProgrammeSnapshotOutput)
+                    }
+                  >
+                    {generatingProgrammeSnapshotOutput === "pdf" ? "Generating PDF..." : "Generate PDF"}
+                  </button>
+                </div>
+
+                <div style={programmeSnapshotFrameStyle}>
+                  <div style={programmeSnapshotTitleBarStyle}>
+                    <strong>Audit Programme</strong>
+                    <span>
+                      {programmeSnapshotSnipMode
+                        ? `${programmeSnapshotDisplayRows.length} selected audit${programmeSnapshotDisplayRows.length === 1 ? "" : "s"}`
+                        : `${programmeSnapshotSelectedRows.length} selected in current filter | tick applicable audits`}
+                    </span>
+                  </div>
+                  <div style={programmeSnapshotTableWrapStyle}>
+                    <div
+                      style={{
+                        ...programmeSnapshotHeadStyle,
+                        gridTemplateColumns: programmeSnapshotSnipMode
+                          ? programmeSnapshotColumns
+                          : programmeSnapshotSelectionColumns,
+                      }}
+                    >
+                      {!programmeSnapshotSnipMode ? <div>Include</div> : null}
+                      <div>Audit No.</div>
+                      <div>Title / Function</div>
+                      <div>Type</div>
+                      <div>Scheduled</div>
+                      <div>Audit Date</div>
+                      <div>Lead Auditor</div>
+                      <div>Major</div>
+                      <div>Minor</div>
+                      <div>OFI/OBS</div>
+                      <div>Risk</div>
+                      <div>Frequency</div>
+                      <div>Status</div>
+                    </div>
+                    {programmeSnapshotDisplayRows.length === 0 ? (
+                      <p style={{ ...emptyTextStyle, padding: "20px" }}>No audits match the snapshot filters.</p>
+                    ) : (
+                      programmeSnapshotDisplayRows.map((audit) => {
+                        const effectiveStatus = getEffectiveAuditStatus(audit);
+                        const checked = programmeSnapshotAuditIds.includes(audit.id);
+                        return (
+                          <div
+                            key={audit.id}
+                            style={{
+                              ...programmeSnapshotRowStyle,
+                              gridTemplateColumns: programmeSnapshotSnipMode
+                                ? programmeSnapshotColumns
+                                : programmeSnapshotSelectionColumns,
+                              background: !programmeSnapshotSnipMode && checked ? "#f0fdfa" : "#ffffff",
+                            }}
+                          >
+                            {!programmeSnapshotSnipMode ? (
+                              <div>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() =>
+                                    setProgrammeSnapshotAuditIds((current) =>
+                                      current.includes(audit.id)
+                                        ? current.filter((id) => id !== audit.id)
+                                        : [...current, audit.id]
+                                    )
+                                  }
+                                  aria-label={`Include ${audit.audit_number} in programme snapshot`}
+                                  style={customReportCheckboxStyle}
+                                />
+                              </div>
+                            ) : null}
+                            <div style={programmePrimaryStyle}>{audit.audit_number}</div>
+                            <div style={programmeTitleStyle}>{audit.title}</div>
+                            <div style={programmeTypeCellStyle}>{audit.audit_type}</div>
+                            <div style={programmeCellMutedStyle}>{formatMonth(audit.audit_month)}</div>
+                            <div style={programmeCellMutedStyle}>{formatDate(audit.audit_date)}</div>
+                            <div style={programmeLeadCellStyle}>{audit.lead_auditor || "-"}</div>
+                            <div style={programmeFindingsStyle}>{audit.findings.major}</div>
+                            <div style={programmeFindingsStyle}>{audit.findings.minor}</div>
+                            <div style={programmeFindingsStyle}>{audit.findings.ofi + audit.findings.obs}</div>
+                            <div style={programmeRiskCellStyle}>{auditRiskById[audit.id]?.riskScore ?? 1}</div>
+                            <div>
+                              <span style={getFrequencyBadgeStyle(auditRiskById[audit.id]?.frequency || "Maintain")}>
+                                {auditRiskById[audit.id]?.frequency || "Maintain"}
+                              </span>
+                            </div>
+                            <div>
+                              <span
+                                style={{
+                                  ...badgeStyle,
+                                  background: getStatusTone(effectiveStatus).bg,
+                                  color: getStatusTone(effectiveStatus).color,
+                                }}
+                              >
+                                {effectiveStatus}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {showCustomReportBuilder ? (
+              <div style={customReportBuilderStyle}>
+                <div style={customReportBuilderHeaderStyle}>
+                  <div>
+                    <h3 style={customReportBuilderTitleStyle}>Build a custom audit report</h3>
+                    <p style={customReportBuilderHintStyle}>
+                      Filter the audit list, tick the audits required for the client pack, then choose which findings to include.
+                      Selections remain ticked when you change a filter.
+                    </p>
+                  </div>
+                  <div style={customReportSelectionCountStyle}>
+                    {customReportAuditIds.length} audit{customReportAuditIds.length === 1 ? "" : "s"} selected
+                  </div>
+                </div>
+
+                <div style={customReportFiltersStyle}>
+                  <input
+                    type="search"
+                    value={customReportSearch}
+                    onChange={(event) => setCustomReportSearch(event.target.value)}
+                    placeholder="Search audit no., title, client or location"
+                    style={{ ...inputStyle, minWidth: "260px" }}
+                  />
+                  <select
+                    value={customReportTypeFilter}
+                    onChange={(event) => setCustomReportTypeFilter(event.target.value as AuditType | "All")}
+                    style={toolbarSelectStyle}
+                  >
+                    <option value="All">All audit types</option>
+                    <option value="Internal">Internal</option>
+                    <option value="External">External</option>
+                    <option value="Supplier">Supplier</option>
+                  </select>
+                  <select
+                    value={customReportStatusFilter}
+                    onChange={(event) => setCustomReportStatusFilter(event.target.value as AuditStatus | "All")}
+                    style={toolbarSelectStyle}
+                  >
+                    <option value="All">All audit statuses</option>
+                    <option value="Planned">Planned</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Overdue">Overdue</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                  <select
+                    value={customReportMonthFilter}
+                    onChange={(event) => setCustomReportMonthFilter(event.target.value)}
+                    style={toolbarSelectStyle}
+                  >
+                    <option value="All">All months</option>
+                    {monthOptions.map((month) => (
+                      <option key={month} value={month}>{formatMonth(month)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={customReportBulkActionsStyle}>
+                  <button
+                    type="button"
+                    style={secondaryButtonStyle}
+                    onClick={() =>
+                      setCustomReportAuditIds((current) =>
+                        Array.from(new Set([...current, ...customReportAudits.map((audit) => audit.id)]))
+                      )
+                    }
+                    disabled={customReportAudits.length === 0}
+                  >
+                    Select all filtered ({customReportAudits.length})
+                  </button>
+                  <button
+                    type="button"
+                    style={secondaryButtonStyle}
+                    onClick={() => {
+                      const visibleIds = new Set(customReportAudits.map((audit) => audit.id));
+                      setCustomReportAuditIds((current) => current.filter((id) => !visibleIds.has(id)));
+                    }}
+                    disabled={customReportAudits.length === 0}
+                  >
+                    Clear filtered
+                  </button>
+                  <button
+                    type="button"
+                    style={secondaryButtonStyle}
+                    onClick={() => setCustomReportAuditIds([])}
+                    disabled={customReportAuditIds.length === 0}
+                  >
+                    Clear all
+                  </button>
+                </div>
+
+                <div style={customReportAuditListStyle}>
+                  {customReportAudits.length === 0 ? (
+                    <p style={emptyTextStyle}>No audits match these filters.</p>
+                  ) : (
+                    customReportAudits.map((audit) => {
+                      const auditFindingRows = findings.filter((finding) => finding.audit_id === audit.id);
+                      const openCount = auditFindingRows.filter((finding) => finding.status !== "Closed").length;
+                      const closedCount = auditFindingRows.filter((finding) => finding.status === "Closed").length;
+                      const checked = customReportAuditIds.includes(audit.id);
+                      return (
+                        <label
+                          key={audit.id}
+                          style={{
+                            ...customReportAuditRowStyle,
+                            borderColor: checked ? "#3A9B98" : "#e2e8f0",
+                            background: checked ? "#f0fdfa" : "#ffffff",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleCustomReportAudit(audit.id)}
+                            style={customReportCheckboxStyle}
+                          />
+                          <span style={customReportAuditIdentityStyle}>
+                            <strong>{audit.audit_number}</strong>
+                            <span>{audit.title}</span>
+                            <small>{audit.auditee || "No client / auditee"} · {formatMonth(audit.audit_month)}</small>
+                          </span>
+                          <span style={customReportAuditMetaStyle}>{audit.audit_type}</span>
+                          <span style={customReportAuditMetaStyle}>{audit.status}</span>
+                          <span style={customReportFindingCountsStyle}>
+                            <span>{openCount} open</span>
+                            <span>{closedCount} closed</span>
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div style={customReportOutputBarStyle}>
+                  <div style={customReportFiltersStyle}>
+                    <select
+                      value={customReportFindingStatus}
+                      onChange={(event) =>
+                        setCustomReportFindingStatus(event.target.value as FindingStatus | "All")
+                      }
+                      style={toolbarSelectStyle}
+                    >
+                      <option value="All">Open and closed findings</option>
+                      <option value="Open">Open findings only</option>
+                      <option value="In Progress">In-progress findings only</option>
+                      <option value="Closed">Closed findings only</option>
+                    </select>
+                    <select
+                      value={customReportCategoryFilter}
+                      onChange={(event) =>
+                        setCustomReportCategoryFilter(event.target.value as FindingSeverity | "All")
+                      }
+                      style={toolbarSelectStyle}
+                    >
+                      <option value="All">All finding categories</option>
+                      <option value="Major">Major</option>
+                      <option value="Minor">Minor</option>
+                      <option value="OFI">OFI</option>
+                      <option value="OBS">OBS</option>
+                    </select>
+                  </div>
+                  <div style={customReportGenerateActionsStyle}>
+                    <button
+                      type="button"
+                      style={secondaryButtonStyle}
+                      onClick={() => void generateCustomAuditWordReport()}
+                      disabled={
+                        generatingOpenFindingsReport ||
+                        generatingCustomWordReport ||
+                        customReportAuditIds.length === 0
+                      }
+                    >
+                      {generatingCustomWordReport
+                        ? "Generating Word..."
+                        : `Generate Word Report (${customReportRows.length} findings)`}
+                    </button>
+                    <button
+                      type="button"
+                      style={primaryButtonStyle}
+                      onClick={generateCustomAuditNcrReport}
+                      disabled={
+                        generatingOpenFindingsReport ||
+                        generatingCustomWordReport ||
+                        customReportAuditIds.length === 0
+                      }
+                    >
+                      {generatingOpenFindingsReport
+                        ? "Generating PDF..."
+                        : `Generate PDF Report (${customReportRows.length} findings)`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </SectionCard>
         </section>
       ) : null}
@@ -5459,6 +6559,188 @@ const reportActionHintStyle: CSSProperties = {
   color: "#64748b",
   fontSize: "13px",
   lineHeight: 1.45,
+};
+
+const customReportBuilderStyle: CSSProperties = {
+  display: "grid",
+  gap: "16px",
+  marginTop: "18px",
+  paddingTop: "18px",
+  borderTop: "1px solid #e2e8f0",
+};
+
+const programmeSnapshotBuilderStyle: CSSProperties = {
+  ...customReportBuilderStyle,
+  marginTop: "18px",
+};
+
+const programmeSnapshotTotalsStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+  color: "#115e59",
+  fontSize: "13px",
+  fontWeight: 800,
+};
+
+const programmeSnapshotFrameStyle: CSSProperties = {
+  overflowX: "auto",
+  border: "1px solid #dbe4ef",
+  borderRadius: "14px",
+  background: "#ffffff",
+  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+};
+
+const programmeSnapshotTitleBarStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: "12px",
+  padding: "12px 16px",
+  background: "#3A9B98",
+  color: "#ffffff",
+  fontSize: "13px",
+  minWidth: "1120px",
+};
+
+const programmeSnapshotTableWrapStyle: CSSProperties = {
+  minWidth: "1120px",
+};
+
+const programmeSnapshotColumns =
+  "82px minmax(170px, 1.45fr) 76px 82px 82px 92px 50px 50px 58px 50px 86px 86px";
+const programmeSnapshotSelectionColumns = `54px ${programmeSnapshotColumns}`;
+
+const programmeSnapshotHeadStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: programmeSnapshotColumns,
+  gap: "8px",
+  alignItems: "center",
+  padding: "9px 14px",
+  background: "#f8fafc",
+  borderBottom: "1px solid #dbe4ef",
+  color: "#475569",
+  fontSize: "10px",
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.03em",
+};
+
+const programmeSnapshotRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: programmeSnapshotColumns,
+  gap: "8px",
+  alignItems: "center",
+  padding: "11px 14px",
+  borderBottom: "1px solid #e2e8f0",
+  color: "#0f172a",
+  fontSize: "12px",
+};
+
+const customReportBuilderHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "16px",
+  flexWrap: "wrap",
+};
+
+const customReportBuilderTitleStyle: CSSProperties = {
+  margin: 0,
+  color: "#0f172a",
+  fontSize: "18px",
+};
+
+const customReportBuilderHintStyle: CSSProperties = {
+  margin: "5px 0 0",
+  color: "#64748b",
+  fontSize: "13px",
+  lineHeight: 1.5,
+  maxWidth: "760px",
+};
+
+const customReportSelectionCountStyle: CSSProperties = {
+  padding: "8px 12px",
+  borderRadius: "999px",
+  background: "#ccfbf1",
+  color: "#115e59",
+  fontSize: "13px",
+  fontWeight: 800,
+};
+
+const customReportFiltersStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+const customReportBulkActionsStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+};
+
+const customReportAuditListStyle: CSSProperties = {
+  display: "grid",
+  gap: "8px",
+  maxHeight: "460px",
+  overflowY: "auto",
+  paddingRight: "4px",
+};
+
+const customReportAuditRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "24px minmax(220px, 1fr) minmax(90px, auto) minmax(100px, auto) minmax(140px, auto)",
+  gap: "12px",
+  alignItems: "center",
+  padding: "12px",
+  border: "1px solid #e2e8f0",
+  borderRadius: "12px",
+  cursor: "pointer",
+};
+
+const customReportCheckboxStyle: CSSProperties = {
+  width: "18px",
+  height: "18px",
+  accentColor: "#3A9B98",
+};
+
+const customReportAuditIdentityStyle: CSSProperties = {
+  display: "grid",
+  gap: "2px",
+  color: "#334155",
+  fontSize: "13px",
+};
+
+const customReportAuditMetaStyle: CSSProperties = {
+  color: "#475569",
+  fontSize: "12px",
+  fontWeight: 700,
+};
+
+const customReportFindingCountsStyle: CSSProperties = {
+  display: "flex",
+  gap: "8px",
+  justifyContent: "flex-end",
+  color: "#475569",
+  fontSize: "12px",
+  fontWeight: 700,
+};
+
+const customReportOutputBarStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
+  paddingTop: "4px",
+};
+
+const customReportGenerateActionsStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  alignItems: "center",
+  flexWrap: "wrap",
 };
 
 const createAuditGridStyle: CSSProperties = {
