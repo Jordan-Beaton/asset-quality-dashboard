@@ -4,12 +4,13 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { imsActiveTabButtonStyle, imsTabButtonStyle, imsTabListStyle } from "./imsTheme";
 
-type WaddenSeaView = "dashboard" | "itp" | "noi" | "reports";
+type WaddenSeaView = "dashboard" | "itp" | "noi" | "noi-creator" | "reports";
 
 const tabs: Array<{ view: WaddenSeaView; href: string; label: string }> = [
   { view: "dashboard", href: "/projects/wadden-sea", label: "Dashboard" },
   { view: "itp", href: "/projects/wadden-sea/itp", label: "ITP Tracker" },
   { view: "noi", href: "/projects/wadden-sea/noi", label: "NOI Tracker" },
+  { view: "noi-creator", href: "/projects/wadden-sea/noi/create", label: "NOI Creator" },
   { view: "reports", href: "/projects/wadden-sea/reports", label: "Project Reports" },
 ];
 

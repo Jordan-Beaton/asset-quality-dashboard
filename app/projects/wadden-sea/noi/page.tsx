@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
+import Link from "next/link";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ImsTopMetaRow } from "../../../../src/components/ImsPrimitives";
@@ -376,11 +377,11 @@ export default function NoiTrackerPage() {
         <datalist id="noi-intervention-codes"><option value="W" /><option value="H" /><option value="W/H" /><option value="R/W" /><option value="M/W" /><option value="H/R" /></datalist>
         <div style={filterGrid}>
           <input style={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search section, activity, NOI or notes…" />
-          <select style={input} value={itpNumberFilter} onChange={(event) => setItpNumberFilter(event.target.value)}><option>All</option>{[...new Set(itps.map((itp) => itp.document_number))].sort().map((value) => <option key={value}>{value}</option>)}</select>
-          <select style={input} value={itpTitleFilter} onChange={(event) => setItpTitleFilter(event.target.value)}><option>All</option>{[...new Set(itps.map((itp) => itp.title))].sort().map((value) => <option key={value}>{value}</option>)}</select>
-          <select style={input} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option>All</option>{[...new Set(itps.map((itp) => itp.supplier || "No supplier"))].sort().map((value) => <option key={value}>{value}</option>)}</select>
-          <select style={input} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All</option>{[...new Set(points.map((point) => point.intervention_type))].sort().map((type) => <option key={type}>{type}</option>)}</select>
-          <select style={input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
+          <select aria-label="Filter by ITP number" style={input} value={itpNumberFilter} onChange={(event) => setItpNumberFilter(event.target.value)}><option value="All">All ITP numbers</option>{[...new Set(itps.map((itp) => itp.document_number))].sort().map((value) => <option key={value}>{value}</option>)}</select>
+          <select aria-label="Filter by ITP title" style={input} value={itpTitleFilter} onChange={(event) => setItpTitleFilter(event.target.value)}><option value="All">All ITP titles</option>{[...new Set(itps.map((itp) => itp.title))].sort().map((value) => <option key={value}>{value}</option>)}</select>
+          <select aria-label="Filter by supplier" style={input} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option value="All">All suppliers</option>{[...new Set(itps.map((itp) => itp.supplier || "No supplier"))].sort().map((value) => <option key={value}>{value}</option>)}</select>
+          <select aria-label="Filter by point type" style={input} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="All">All point types</option>{[...new Set(points.map((point) => point.intervention_type))].sort().map((type) => <option key={type}>{type}</option>)}</select>
+          <select aria-label="Filter by status" style={input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="All">All statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
         </div>
         <div style={tableWrap}><table style={table}><thead><tr>{["ITP / supplier", "Section", "Activity", "Point", "Planned date", "NOI number", "Status", "Notes", ""].map((heading) => <th key={heading} style={th}>{heading}</th>)}</tr></thead><tbody>
           {pointRows.map(({ point, itp }) => <tr key={point.id}>
@@ -396,7 +397,7 @@ export default function NoiTrackerPage() {
             <td style={td}><input style={compactInput} value={point.noi_number || ""} placeholder="TBC" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, noi_number: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { noi_number: event.target.value || null })} /></td>
             <td style={td}><select style={compactInput} value={point.status} onChange={(event) => void updatePoint(point, { status: event.target.value })}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></td>
             <td style={td}><input style={wideInput} value={point.notes || ""} placeholder="Notes" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, notes: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { notes: event.target.value || null })} /></td>
-            <td style={td}><button style={deleteButton} disabled={savingId === point.id} onClick={() => void deletePoint(point)}>{savingId === point.id ? "…" : "Delete"}</button></td>
+            <td style={td}><div style={rowActions}>{point.noi_number ? <Link style={noiButton} href={`/projects/wadden-sea/noi/create?noi=${encodeURIComponent(point.noi_number)}`}>NOI</Link> : null}<button style={deleteButton} disabled={savingId === point.id} onClick={() => void deletePoint(point)}>{savingId === point.id ? "…" : "Delete"}</button></div></td>
           </tr>)}
           {pointRows.length === 0 && <tr><td colSpan={9} style={empty}>No NOI points match the current filters.</td></tr>}
         </tbody></table></div>
@@ -434,4 +435,6 @@ const td: CSSProperties = { borderBottom: "1px solid #e4eaf0", padding: "7px", v
 const teal: CSSProperties = { color: "#237d7a", display: "block" };
 const small: CSSProperties = { display: "block", color: "#718096", marginTop: 3, lineHeight: 1.25 };
 const deleteButton: CSSProperties = { border: "1px solid #fecaca", borderRadius: 6, background: "#fff1f2", color: "#b42318", padding: "5px 7px", fontWeight: 900, fontSize: 9, cursor: "pointer" };
+const rowActions: CSSProperties = { display: "flex", gap: 5, alignItems: "center" };
+const noiButton: CSSProperties = { borderRadius: 6, background: "#dff3f1", color: "#176b68", padding: "6px 8px", fontWeight: 900, fontSize: 10, textDecoration: "none" };
 const empty: CSSProperties = { padding: 30, textAlign: "center", color: "#64748b" };

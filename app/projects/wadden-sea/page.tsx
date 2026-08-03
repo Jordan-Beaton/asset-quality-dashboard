@@ -108,6 +108,7 @@ export default function WaddenSeaPage() {
         <QualityKpiCard title="NOI Outstanding" value={noiOutstanding} accent="#f59e0b" href="/projects/wadden-sea/noi" />
         <QualityKpiCard title="Overdue Inspections" value={overdue.length} accent="#dc2626" href="/projects/wadden-sea/noi" />
         <QualityKpiCard title="NOI Requirements" value={noiPoints.length} accent="#0891b2" href="/projects/wadden-sea/noi" />
+        <QualityKpiCard title="NOI Creator" value="Create" accent="#16a34a" href="/projects/wadden-sea/noi/create" />
       </section>
 
       <section style={dashboardGrid}>
@@ -160,7 +161,7 @@ export default function WaddenSeaPage() {
 }
 
 const page: CSSProperties = { display: "grid", gap: 0 };
-const metrics: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", gap: 16, marginBottom: 20 };
+const metrics: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 16, marginBottom: 20 };
 const dashboardGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 16, marginBottom: 20 };
 const panel: CSSProperties = { background: "#fff", border: "1px solid #dbe4ef", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,.07)" };
 const panelHeader: CSSProperties = { padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, borderBottom: "1px solid #e5ebf1" };
