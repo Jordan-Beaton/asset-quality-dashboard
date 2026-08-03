@@ -30,7 +30,7 @@ export default function PublicObservationPage() {
   const hasSelectedReporterType = reporterType.length > 0;
   const headerText = useMemo(() => {
     if (submittedNumber) return "Observation submitted";
-    return "Observation Card";
+    return "Your observation starts here.";
   }, [submittedNumber]);
 
   function chooseReporterType(type: string) {
@@ -81,24 +81,34 @@ export default function PublicObservationPage() {
           {`
             @media (max-width: 520px) {
               .observe-header {
-                grid-template-columns: 1fr !important;
+                grid-template-columns: minmax(0, 1fr) auto !important;
                 justify-items: start !important;
                 padding: 16px !important;
               }
 
               .observe-logo {
-                width: 150px !important;
+                width: 142px !important;
+              }
+
+              .observe-three-rs-logo {
+                width: 108px !important;
+                justify-self: end !important;
+              }
+
+              .observe-header-copy {
+                grid-column: 1 / -1 !important;
               }
             }
           `}
         </style>
         <header className="observe-header" style={headerStyle}>
-          <Image className="observe-logo" src="/enshore-header-logo.png" alt="Enshore" width={210} height={54} priority style={{ width: "170px", height: "auto" }} />
-          <div style={headerCopyStyle}>
-            <span style={eyebrowStyle}>HSE MANAGEMENT</span>
+          <Image className="observe-logo" src="/enshore-primary-strapline-green-rgb.jpg" alt="Enshore — From Onshore to Offshore" width={3028} height={1593} priority style={{ width: "170px", height: "auto" }} />
+          <div className="observe-header-copy" style={headerCopyStyle}>
+            <span style={eyebrowStyle}>HSE Management</span>
             <h1 style={titleStyle}>{headerText}</h1>
-            <p style={subtitleStyle}>Use this QR form to submit a site observation without accessing the full IMS.</p>
+            <p style={subtitleStyle}>Every observation helps make Enshore a safer place to work.</p>
           </div>
+          <Image className="observe-three-rs-logo" src="/enshore-3rs-primary-rgb.jpg" alt="Recognise, Report, Resolve" width={1889} height={712} priority style={{ width: "145px", height: "auto" }} />
         </header>
 
         {message ? (
@@ -262,7 +272,7 @@ const shellStyle: CSSProperties = {
 
 const headerStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "auto minmax(0, 1fr)",
+  gridTemplateColumns: "auto minmax(0, 1fr) auto",
   gap: "16px",
   alignItems: "center",
   padding: "18px",
@@ -273,16 +283,14 @@ const headerStyle: CSSProperties = {
 };
 
 const headerCopyStyle: CSSProperties = { minWidth: 0 };
-const eyebrowStyle: CSSProperties = { color: imsColours.brandDark, fontSize: "12px", fontWeight: 900, letterSpacing: "0.12em" };
+const eyebrowStyle: CSSProperties = { color: "#78C57E", fontSize: "12px", fontWeight: 900, letterSpacing: "0.08em" };
 const titleStyle: CSSProperties = {
   margin: "4px 0",
-  fontSize: "clamp(22px, 4.4vw, 34px)",
+  fontSize: "clamp(18px, 3.2vw, 28px)",
   color: imsColours.ink,
   lineHeight: 1.05,
   fontWeight: 800,
   whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
 };
 const subtitleStyle: CSSProperties = { margin: 0, color: imsColours.slate, lineHeight: 1.45, fontSize: "14px" };
 const formStyle: CSSProperties = { display: "grid", gap: "14px" };

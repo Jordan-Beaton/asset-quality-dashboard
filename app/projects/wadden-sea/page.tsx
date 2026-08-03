@@ -1,37 +1,180 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
+import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import { WaddenSeaWorkspaceNav } from "../../../src/components/WaddenSeaWorkspaceNav";
+import { supabase } from "../../../src/lib/supabase";
 
-const tools = [
-  { href: "/projects/wadden-sea/itp", title: "ITP Tracker", tag: "Document control", copy: "Upload ITPs, extract core metadata, control revisions, retain every physical file, and manage the Enshore review workflow." },
-  { href: "/projects/wadden-sea/noi", title: "NOI Tracker", tag: "Inspection intelligence", copy: "Scan current ITP revisions for Client, Enshore, or Contractor witness and hold points, review the extracted activities, and maintain the project NOI register." },
-  { href: "/projects/wadden-sea/reports", title: "Project Reports", tag: "Monthly annexes", copy: "Build Audit NCR, Audit Programme, and 8-week inspection lookahead annexes from one project reporting screen." },
-] as const;
+type ItpRow = {
+  id: string;
+  document_number: string;
+  title: string;
+  supplier: string | null;
+  overall_stage: string;
+  overall_status: string;
+  next_action: string | null;
+  due_date: string | null;
+};
+
+type NoiRow = {
+  id: string;
+  itp_id: string;
+  section_number: string;
+  activity_description: string;
+  intervention_type: string;
+  planned_date: string | null;
+  noi_number: string | null;
+  status: string;
+};
+
+function dateOnly(value: string | null) {
+  return value ? new Date(`${value}T00:00:00`) : null;
+}
+
+function formatDate(value: string | null) {
+  const date = dateOnly(value);
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+    : "Date TBC";
+}
 
 export default function WaddenSeaPage() {
+  const [itps, setItps] = useState<ItpRow[]>([]);
+  const [noiPoints, setNoiPoints] = useState<NoiRow[]>([]);
+  const [message, setMessage] = useState("Loading Wadden Sea project controls…");
+
+  useEffect(() => {
+    void (async () => {
+      const [itpResult, noiResult] = await Promise.all([
+        supabase
+          .from("project_itps")
+          .select("id,document_number,title,supplier,overall_stage,overall_status,next_action,due_date")
+          .eq("project_key", "wadden-sea")
+          .order("updated_at", { ascending: false }),
+        supabase
+          .from("project_noi_points")
+          .select("id,itp_id,section_number,activity_description,intervention_type,planned_date,noi_number,status")
+          .eq("project_key", "wadden-sea")
+          .order("planned_date", { ascending: true }),
+      ]);
+      if (itpResult.error || noiResult.error) {
+        setMessage(`Project dashboard failed to load: ${itpResult.error?.message || noiResult.error?.message}`);
+        return;
+      }
+      setItps((itpResult.data || []) as ItpRow[]);
+      setNoiPoints((noiResult.data || []) as NoiRow[]);
+      setMessage("Wadden Sea dashboard ready.");
+    })();
+  }, []);
+
+  const today = useMemo(() => {
+    const value = new Date();
+    value.setHours(0, 0, 0, 0);
+    return value;
+  }, []);
+  const horizon = useMemo(() => new Date(today.getTime() + 56 * 86400000), [today]);
+  const itpById = useMemo(() => new Map(itps.map((itp) => [itp.id, itp])), [itps]);
+  const upcoming = useMemo(() => noiPoints.filter((point) => {
+    const date = dateOnly(point.planned_date);
+    return date && date >= today && date <= horizon && !/completed|cancelled/i.test(point.status);
+  }).sort((left, right) => String(left.planned_date).localeCompare(String(right.planned_date))), [horizon, noiPoints, today]);
+  const overdue = useMemo(() => noiPoints.filter((point) => {
+    const date = dateOnly(point.planned_date);
+    return date && date < today && !/completed|cancelled/i.test(point.status);
+  }), [noiPoints, today]);
+  const itpAttention = useMemo(() => itps.filter((itp) =>
+    /review|comment|reject|draft/i.test(`${itp.overall_stage} ${itp.overall_status}`)
+    || Boolean(itp.next_action)
+  ), [itps]);
+  const noiOutstanding = upcoming.filter((point) => !point.noi_number).length;
+  const currentItps = itps.filter((itp) => itp.overall_stage !== "Closed").length;
+
   return (
     <main style={page}>
-      <QualityPageHero label="Project workspace · WSP" title="Wadden Sea Project" description="The controlled home for project-specific registers, quality documentation, and monthly reporting annexes." />
-      <section style={grid}>
-        {tools.map((tool) => (
-          <Link key={tool.href} href={tool.href} style={card}>
-            <span style={tag}>{tool.tag}</span>
-            <h2 style={title}>{tool.title}</h2>
-            <p style={copy}>{tool.copy}</p>
-            <span style={cta}>Open workspace →</span>
-          </Link>
-        ))}
+      <QualityPageHero label="Project workspace · WSP" title="Wadden Sea" description="Live project controls, upcoming inspections, document reviews, and monthly reporting in one workspace." />
+
+      <ImsTopMetaRow backHref="/projects" backLabel="Back to Project Management" status={<><strong>Status:</strong> {message}</>} />
+
+      <WaddenSeaWorkspaceNav active="dashboard" />
+
+      <section className="quality-kpi-grid" style={metrics}>
+        <QualityKpiCard title="Current ITPs" value={currentItps} accent="#2563eb" href="/projects/wadden-sea/itp" />
+        <QualityKpiCard title="ITPs Requiring Attention" value={itpAttention.length} accent="#7c3aed" href="/projects/wadden-sea/itp" />
+        <QualityKpiCard title="Upcoming Inspections" value={upcoming.length} accent="#3A9B98" href="/projects/wadden-sea/reports" />
+        <QualityKpiCard title="NOI Outstanding" value={noiOutstanding} accent="#f59e0b" href="/projects/wadden-sea/noi" />
+        <QualityKpiCard title="Overdue Inspections" value={overdue.length} accent="#dc2626" href="/projects/wadden-sea/noi" />
+        <QualityKpiCard title="NOI Requirements" value={noiPoints.length} accent="#0891b2" href="/projects/wadden-sea/noi" />
+      </section>
+
+      <section style={dashboardGrid}>
+        <div style={panel}>
+          <div style={panelHeader}>
+            <div><span style={kicker}>Next 8 weeks</span><h2 style={heading}>Upcoming inspections</h2></div>
+            <Link href="/projects/wadden-sea/reports" style={actionLink}>Open lookahead →</Link>
+          </div>
+          <div style={list}>
+            {upcoming.length ? upcoming.slice(0, 10).map((point) => {
+              const itp = itpById.get(point.itp_id);
+              return (
+                <div key={point.id} style={row}>
+                  <span style={point.intervention_type.includes("H") ? hold : witness}>{point.intervention_type}</span>
+                  <span style={identity}><strong>{itp?.supplier || "Supplier TBC"} · {point.section_number}</strong><small>{point.activity_description}</small></span>
+                  <span style={dateBlock}><strong>{formatDate(point.planned_date)}</strong><small>{point.noi_number ? `NOI ${point.noi_number}` : "NOI required"}</small></span>
+                </div>
+              );
+            }) : <div style={empty}>No inspections are currently planned within the next eight weeks.</div>}
+          </div>
+        </div>
+
+        <div style={panel}>
+          <div style={panelHeader}>
+            <div><span style={kicker}>Action required</span><h2 style={heading}>ITP review priorities</h2></div>
+            <Link href="/projects/wadden-sea/itp" style={actionLink}>Open ITP tracker →</Link>
+          </div>
+          <div style={list}>
+            {itpAttention.length ? itpAttention.slice(0, 10).map((itp) => (
+              <div key={itp.id} style={row}>
+                <span style={reviewBadge}>{itp.overall_status}</span>
+                <span style={identity}><strong>{itp.document_number} · {itp.supplier || "Supplier TBC"}</strong><small>{itp.title}</small></span>
+                <span style={dateBlock}><strong>{itp.due_date ? formatDate(itp.due_date) : "No due date"}</strong><small>{itp.next_action || itp.overall_stage}</small></span>
+              </div>
+            )) : <div style={empty}>No ITP review actions currently require attention.</div>}
+          </div>
+        </div>
+      </section>
+
+      <section style={quickPanel}>
+        <div><span style={kicker}>Quick access</span><h2 style={heading}>Project controls</h2></div>
+        <div style={quickGrid}>
+          <Link href="/projects/wadden-sea/itp" style={quickLink}><strong>Upload or review an ITP</strong><span>Manage metadata, revisions and Enshore decisions.</span></Link>
+          <Link href="/projects/wadden-sea/noi" style={quickLink}><strong>Maintain NOI requirements</strong><span>Update inspection dates, numbers and status.</span></Link>
+          <Link href="/projects/wadden-sea/reports" style={quickLink}><strong>Prepare monthly annexes</strong><span>Generate audit and eight-week lookahead outputs.</span></Link>
+        </div>
       </section>
     </main>
   );
 }
 
-const page: CSSProperties = { display: "grid", gap: 20 };
-const grid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(310px,1fr))", gap: 18 };
-const card: CSSProperties = { textDecoration: "none", color: "inherit", background: "#fff", border: "1px solid #d5e0ea", borderRadius: 20, padding: 25, minHeight: 210, boxShadow: "0 12px 30px rgba(15,23,42,.07)", display: "flex", flexDirection: "column" };
-const tag: CSSProperties = { alignSelf: "flex-start", background: "#e7f5f4", color: "#2f7f7d", borderRadius: 999, padding: "6px 10px", fontWeight: 900, fontSize: 12, textTransform: "uppercase", letterSpacing: ".06em" };
-const title: CSSProperties = { color: "#13253a", margin: "19px 0 7px", fontSize: 25 };
-const copy: CSSProperties = { color: "#536579", lineHeight: 1.6, flex: 1 };
-const cta: CSSProperties = { color: "#2f7f7d", fontWeight: 900 };
+const page: CSSProperties = { display: "grid", gap: 0 };
+const metrics: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", gap: 16, marginBottom: 20 };
+const dashboardGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 16, marginBottom: 20 };
+const panel: CSSProperties = { background: "#fff", border: "1px solid #dbe4ef", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,.07)" };
+const panelHeader: CSSProperties = { padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, borderBottom: "1px solid #e5ebf1" };
+const kicker: CSSProperties = { color: "#2f7f7d", fontSize: 10, fontWeight: 900, letterSpacing: ".1em", textTransform: "uppercase" };
+const heading: CSSProperties = { margin: "3px 0 0", fontSize: 19, color: "#14263a" };
+const actionLink: CSSProperties = { color: "#2f7f7d", fontSize: 12, fontWeight: 900, textDecoration: "none" };
+const list: CSSProperties = { display: "grid" };
+const row: CSSProperties = { display: "grid", gridTemplateColumns: "70px minmax(200px,1fr) 145px", gap: 12, alignItems: "center", padding: "11px 14px", borderBottom: "1px solid #edf1f5", minHeight: 54 };
+const identity: CSSProperties = { display: "grid", gap: 3, color: "#25384b", fontSize: 12, minWidth: 0 };
+const dateBlock: CSSProperties = { display: "grid", gap: 3, color: "#475569", fontSize: 11, textAlign: "right" };
+const hold: CSSProperties = { padding: "5px 8px", borderRadius: 999, background: "#fee2e2", color: "#991b1b", fontWeight: 900, textAlign: "center", fontSize: 11 };
+const witness: CSSProperties = { ...hold, background: "#fef3c7", color: "#92400e" };
+const reviewBadge: CSSProperties = { ...hold, background: "#ede9fe", color: "#5b21b6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+const empty: CSSProperties = { padding: 30, color: "#64748b", textAlign: "center", fontSize: 13 };
+const quickPanel: CSSProperties = { ...panel, padding: 18, display: "grid", gap: 14 };
+const quickGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12 };
+const quickLink: CSSProperties = { display: "grid", gap: 5, padding: 14, borderRadius: 12, border: "1px solid #dbe4ef", background: "#f8fafc", color: "#334155", textDecoration: "none", fontSize: 12 };

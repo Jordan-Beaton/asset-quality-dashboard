@@ -1,11 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { ImsTopMetaRow } from "../../../../src/components/ImsPrimitives";
+import { QualityKpiCard } from "../../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../../src/components/QualityPageHero";
+import { WaddenSeaWorkspaceNav } from "../../../../src/components/WaddenSeaWorkspaceNav";
 import { supabase } from "../../../../src/lib/supabase";
 
 const PROJECT_KEY = "wadden-sea";
@@ -22,6 +24,17 @@ type NoiPoint = {
 };
 
 const statuses = ["Planned", "NOI Required", "NOI Issued", "Completed", "Cancelled"];
+const emptyManualPoint = {
+  sectionNumber: "",
+  activityDescription: "",
+  interventionType: "W",
+  partyHeading: "Enshore / Contractor",
+  sourceReference: "",
+  plannedDate: "",
+  noiNumber: "",
+  status: "Planned",
+  notes: "",
+};
 
 function currentRevision(itp: Itp) {
   return (itp.project_itp_revisions || []).find((revision) => revision.is_current)
@@ -53,6 +66,8 @@ export default function NoiTrackerPage() {
   const [itpTitleFilter, setItpTitleFilter] = useState("All");
   const [supplierFilter, setSupplierFilter] = useState("All");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualPoint, setManualPoint] = useState(emptyManualPoint);
 
   const load = useCallback(async () => {
     const [itpResult, pointResult] = await Promise.all([
@@ -166,6 +181,60 @@ export default function NoiTrackerPage() {
     setBusy(false);
   }
 
+  async function saveManualPoint(event: React.FormEvent) {
+    event.preventDefault();
+    if (!selectedItp) return;
+    const revision = currentRevision(selectedItp);
+    const sectionNumber = manualPoint.sectionNumber.trim();
+    const activityDescription = manualPoint.activityDescription.trim();
+    const interventionType = manualPoint.interventionType.toUpperCase().replace(/\s+/g, "");
+    if (!revision) {
+      setMessage("The selected ITP has no current revision.");
+      return;
+    }
+    if (!sectionNumber || !activityDescription) {
+      setMessage("Enter the section/item number and activity description.");
+      return;
+    }
+    if (!validIntervention(interventionType)) {
+      setMessage("Manual intervention codes must contain W or H, for example W, H, R/W, M/W, or W/H.");
+      return;
+    }
+    setBusy(true);
+    const { data: auth } = await supabase.auth.getUser();
+    const sourceReference = manualPoint.sourceReference.trim();
+    const payload = {
+      project_key: PROJECT_KEY,
+      itp_id: selectedItp.id,
+      revision_id: revision.id,
+      section_number: sectionNumber,
+      activity_description: activityDescription,
+      intervention_type: interventionType,
+      party_heading: manualPoint.partyHeading.trim() || "Enshore / Contractor",
+      extraction_confidence: "Manual",
+      source_location: sourceReference ? `Manual entry · ${sourceReference}` : "Manual entry",
+      status: manualPoint.status,
+      planned_date: manualPoint.plannedDate || null,
+      noi_number: manualPoint.noiNumber.trim() || null,
+      notes: manualPoint.notes.trim() || null,
+      manually_confirmed: true,
+      created_by: auth.user?.id,
+      updated_at: new Date().toISOString(),
+    };
+    const result = await supabase.from("project_noi_points").upsert(payload, {
+      onConflict: "revision_id,section_number,intervention_type,activity_description",
+      ignoreDuplicates: true,
+    });
+    if (result.error) setMessage(result.error.message);
+    else {
+      setMessage(`Manual ${interventionType} point ${sectionNumber} added to ${selectedItp.document_number}.`);
+      setManualPoint(emptyManualPoint);
+      setShowManualEntry(false);
+      await load();
+    }
+    setBusy(false);
+  }
+
   async function updatePoint(point: NoiPoint, changes: Partial<NoiPoint>) {
     setSavingId(point.id);
     setPoints((current) => current.map((item) => item.id === point.id ? { ...item, ...changes } : item));
@@ -252,12 +321,15 @@ export default function NoiTrackerPage() {
   return (
     <main style={page}>
       <QualityPageHero label="Wadden Sea · Inspection intelligence" title="NOI Tracker" description="Controlled witness and hold-point register extracted from current Supplier ITP revisions." />
-      <div style={breadcrumb}><Link href="/projects/wadden-sea" style={back}>← Wadden Sea</Link><span>Only Client, Enshore, or Contractor W/H involvement is captured.</span></div>
+      <ImsTopMetaRow backHref="/projects/wadden-sea" backLabel="Back to Wadden Sea" status={<><strong>Status:</strong> {message || "Client, Enshore and Contractor W/H requirements loaded."}</>} />
+      <WaddenSeaWorkspaceNav active="noi" />
 
-      <section style={metricsGrid}>
-        {[["Total points", metrics.total, "#2f7f7d"], ["Contains W", metrics.witness, "#1e40af"], ["Contains H", metrics.hold, "#991b1b"], ["Composite codes", metrics.combined, "#5b21b6"], ["Outstanding", metrics.outstanding, "#a15c00"]].map(([label, value, color]) => (
-          <div key={String(label)} style={metric}><span>{label}</span><strong style={{ color: String(color), fontSize: 25 }}>{value}</strong></div>
-        ))}
+      <section className="quality-kpi-grid" style={metricsGrid}>
+        <QualityKpiCard title="Total Points" value={metrics.total} accent="#3A9B98" />
+        <QualityKpiCard title="Contains W" value={metrics.witness} accent="#2563eb" />
+        <QualityKpiCard title="Contains H" value={metrics.hold} accent="#dc2626" />
+        <QualityKpiCard title="Composite Codes" value={metrics.combined} accent="#7c3aed" />
+        <QualityKpiCard title="Outstanding" value={metrics.outstanding} accent="#f59e0b" />
       </section>
 
       <section style={surface}>
@@ -268,8 +340,24 @@ export default function NoiTrackerPage() {
             return <option key={itp.id} value={itp.id}>{itp.document_number} · Rev {revision?.revision || "—"} · {itp.supplier || "No supplier"}</option>;
           })}</select></label>
           <button style={primaryButton} disabled={busy || !selectedItp} onClick={() => void scanSelectedItp()}>{busy ? "Scanning…" : "Scan current revision"}</button>
+          <button style={secondaryButton} disabled={busy || !selectedItp} onClick={() => setShowManualEntry((current) => !current)}>{showManualEntry ? "Close manual entry" : "Add manual point"}</button>
         </div>
         {message && <div style={notice}>{message}</div>}
+        {showManualEntry && <form style={manualPanel} onSubmit={(event) => void saveManualPoint(event)}>
+          <div style={candidateHeader}><strong>Add manual NOI point</strong><span>Saved against the selected current ITP revision and labelled as a manual entry.</span></div>
+          <div style={manualGrid}>
+            <label style={field}><span>Section / item *</span><input style={input} value={manualPoint.sectionNumber} onChange={(event) => setManualPoint((current) => ({ ...current, sectionNumber: event.target.value }))} placeholder="e.g. 4.5" /></label>
+            <label style={{ ...field, gridColumn: "span 2" }}><span>Activity description *</span><input style={input} value={manualPoint.activityDescription} onChange={(event) => setManualPoint((current) => ({ ...current, activityDescription: event.target.value }))} placeholder="Inspection or test activity" /></label>
+            <label style={field}><span>W/H code *</span><input list="noi-intervention-codes" style={input} value={manualPoint.interventionType} onChange={(event) => setManualPoint((current) => ({ ...current, interventionType: event.target.value.toUpperCase() }))} /></label>
+            <label style={field}><span>Relevant party</span><input style={input} value={manualPoint.partyHeading} onChange={(event) => setManualPoint((current) => ({ ...current, partyHeading: event.target.value }))} /></label>
+            <label style={field}><span>Source page / reference</span><input style={input} value={manualPoint.sourceReference} onChange={(event) => setManualPoint((current) => ({ ...current, sourceReference: event.target.value }))} placeholder="e.g. Page 6" /></label>
+            <label style={field}><span>Planned date</span><input style={input} type="date" value={manualPoint.plannedDate} onChange={(event) => setManualPoint((current) => ({ ...current, plannedDate: event.target.value }))} /></label>
+            <label style={field}><span>NOI number</span><input style={input} value={manualPoint.noiNumber} onChange={(event) => setManualPoint((current) => ({ ...current, noiNumber: event.target.value }))} placeholder="TBC" /></label>
+            <label style={field}><span>Status</span><select style={input} value={manualPoint.status} onChange={(event) => setManualPoint((current) => ({ ...current, status: event.target.value }))}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label>
+            <label style={{ ...field, gridColumn: "span 2" }}><span>Notes</span><input style={input} value={manualPoint.notes} onChange={(event) => setManualPoint((current) => ({ ...current, notes: event.target.value }))} placeholder="Reason for manual entry or supporting note" /></label>
+          </div>
+          <div style={candidateActions}><button type="button" style={secondaryButton} onClick={() => { setManualPoint(emptyManualPoint); setShowManualEntry(false); }}>Cancel</button><button type="submit" style={primaryButton} disabled={busy}>{busy ? "Saving…" : "Add point to register"}</button></div>
+        </form>}
         {candidates.length > 0 && <div style={candidatePanel}>
           <div style={candidateHeader}><strong>Review extracted points</strong><span>Untick anything that is not applicable and edit the description if needed.</span></div>
           {candidates.map((candidate, index) => <div key={`${candidate.sectionNumber}-${index}`} style={candidateRow}>
@@ -318,21 +406,20 @@ export default function NoiTrackerPage() {
 }
 
 const page: CSSProperties = { display: "grid", gap: 16 };
-const breadcrumb: CSSProperties = { display: "flex", justifyContent: "space-between", color: "#64748b", fontSize: 12 };
-const back: CSSProperties = { color: "#2f7f7d", fontWeight: 900, textDecoration: "none" };
-const metricsGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 9 };
-const metric: CSSProperties = { background: "#fff", border: "1px solid #dbe5ee", borderRadius: 12, padding: "11px 15px", display: "flex", justifyContent: "space-between", alignItems: "center", color: "#637487", fontWeight: 800, fontSize: 12 };
+const metricsGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 16, marginBottom: 4 };
 const surface: CSSProperties = { background: "#fff", border: "1px solid #d8e2eb", borderRadius: 18, overflow: "hidden" };
 const sectionHeader: CSSProperties = { padding: "16px 18px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 };
 const kicker: CSSProperties = { color: "#2f7f7d", fontWeight: 900, fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase" };
 const title: CSSProperties = { margin: "3px 0 0", color: "#14263a", fontSize: 20 };
-const scanner: CSSProperties = { padding: "4px 18px 14px", display: "grid", gridTemplateColumns: "1fr auto", alignItems: "end", gap: 10 };
+const scanner: CSSProperties = { padding: "4px 18px 14px", display: "grid", gridTemplateColumns: "1fr auto auto", alignItems: "end", gap: 10 };
 const field: CSSProperties = { display: "grid", gap: 5, color: "#526477", fontWeight: 800, fontSize: 11 };
 const input: CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #cad7e3", borderRadius: 9, background: "#fff", padding: "9px 10px", color: "#26384b", font: "inherit" };
 const primaryButton: CSSProperties = { border: 0, borderRadius: 9, background: "#2f7f7d", color: "#fff", padding: "10px 14px", fontWeight: 900, cursor: "pointer" };
 const secondaryButton: CSSProperties = { ...primaryButton, background: "#e8eef3", color: "#3b4c5f" };
 const notice: CSSProperties = { margin: "0 18px 14px", padding: "10px 12px", borderRadius: 9, background: "#fff7d6", color: "#774b00", fontSize: 12 };
 const candidatePanel: CSSProperties = { borderTop: "1px solid #e2e8f0", background: "#f7fafc", padding: 16, display: "grid", gap: 7 };
+const manualPanel: CSSProperties = { ...candidatePanel, background: "#f0f8f7" };
+const manualGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(130px,1fr))", gap: 9 };
 const candidateHeader: CSSProperties = { display: "flex", justifyContent: "space-between", color: "#5d6e80", fontSize: 11, marginBottom: 3 };
 const candidateRow: CSSProperties = { display: "grid", gridTemplateColumns: "22px 75px 1fr 60px 190px", gap: 7, alignItems: "center", background: "#fff", border: "1px solid #dbe5ee", borderRadius: 8, padding: 7 };
 const compactInput: CSSProperties = { ...input, padding: "6px 7px", borderRadius: 6, fontSize: 10 };

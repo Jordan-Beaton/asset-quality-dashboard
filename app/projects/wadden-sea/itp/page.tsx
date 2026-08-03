@@ -1,10 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ChangeEvent } from "react";
 import * as XLSX from "xlsx";
+import { ImsTopMetaRow } from "../../../../src/components/ImsPrimitives";
+import { QualityKpiCard } from "../../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../../src/components/QualityPageHero";
+import { WaddenSeaWorkspaceNav } from "../../../../src/components/WaddenSeaWorkspaceNav";
 import { supabase } from "../../../../src/lib/supabase";
 
 const PROJECT_KEY = "wadden-sea";
@@ -51,6 +53,13 @@ type Itp = {
   due_date: string | null;
   updated_at: string;
   project_itp_revisions?: Revision[];
+};
+
+type PersonOption = {
+  id: string;
+  name: string;
+  role: string | null;
+  department: string | null;
 };
 
 type UploadDraft = {
@@ -246,19 +255,28 @@ export default function WaddenSeaItpPage() {
   const [busy, setBusy] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [peopleOptions, setPeopleOptions] = useState<PersonOption[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("project_itps")
-      .select("*, project_itp_revisions(*)")
-      .eq("project_key", PROJECT_KEY)
-      .order("updated_at", { ascending: false });
+    const [{ data, error }, peopleResult] = await Promise.all([
+      supabase
+        .from("project_itps")
+        .select("*, project_itp_revisions(*)")
+        .eq("project_key", PROJECT_KEY)
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("people")
+        .select("id,name,role,department")
+        .eq("active", true)
+        .order("name", { ascending: true }),
+    ]);
     if (error) setMessage(error.message.includes("project_itps") ? "The ITP database setup is not live yet. Apply scripts/sql/project_itp_tracker.sql in Supabase." : error.message);
     else {
       setRows((data || []) as Itp[]);
       setMessage("");
     }
+    if (!peopleResult.error) setPeopleOptions((peopleResult.data || []) as PersonOption[]);
     setLoading(false);
   }, []);
 
@@ -554,16 +572,15 @@ export default function WaddenSeaItpPage() {
     <main style={page}>
       <QualityPageHero label="Wadden Sea · Document intelligence" title="ITP Tracker" description="One controlled record per ITP, automatic metadata capture, complete revision history, and live Enshore workflow visibility." />
 
-      <div style={breadcrumb}><Link href="/projects/wadden-sea" style={back}>← Wadden Sea</Link><span>Latest approved or active revision is shown in the register.</span></div>
+      <ImsTopMetaRow backHref="/projects/wadden-sea" backLabel="Back to Wadden Sea" status={<><strong>Status:</strong> {message || "Latest active ITP revisions loaded."}</>} />
+      <WaddenSeaWorkspaceNav active="itp" />
 
-      <section style={metricsGrid}>
-        {[
-          ["Total ITPs", metrics.total, "#3b82f6"],
-          ["Closed", metrics.closed, "#16804b"],
-          ["Enshore review", metrics.enshore, "#a15c00"],
-          ["Enshore approved", metrics.approved, "#16804b"],
-          ["Comments / rejected", metrics.comments, "#b52a14"],
-        ].map(([label, value, color]) => <div key={String(label)} style={metric}><span style={{ ...metricBar, background: String(color) }} /><span style={metricLabel}>{label}</span><strong style={{ ...metricValue, color: String(color) }}>{value}</strong></div>)}
+      <section className="quality-kpi-grid" style={metricsGrid}>
+        <QualityKpiCard title="Total ITPs" value={metrics.total} accent="#2563eb" />
+        <QualityKpiCard title="Closed" value={metrics.closed} accent="#16a34a" />
+        <QualityKpiCard title="Enshore Review" value={metrics.enshore} accent="#f59e0b" />
+        <QualityKpiCard title="Enshore Approved" value={metrics.approved} accent="#3A9B98" />
+        <QualityKpiCard title="Comments / Rejected" value={metrics.comments} accent="#dc2626" />
       </section>
 
       <section style={surface}>
@@ -608,7 +625,11 @@ export default function WaddenSeaItpPage() {
                     <td style={td}><select aria-label={`Scope for ${row.document_number}`} style={{ ...cellSelect, ...scopeTone }} value={row.scope || ""} onChange={(event) => void updateMaster(row, { scope: event.target.value || null })}><option value="">Select</option><option>Trencher</option><option>Barge</option></select></td>
                     <td style={td}><strong style={docNo}>{row.document_number}</strong><span style={compactTitle} title={row.title}>{row.title}</span></td>
                     <td style={td}><strong>{revision?.revision || "—"}</strong><span style={secondary}>{revision?.revision_date ? new Date(`${revision.revision_date}T00:00:00`).toLocaleDateString("en-GB") : ""}</span></td>
-                    <td style={td}><input aria-label={`Reviewer for ${row.document_number}`} style={cellInput} value={row.enshore_reviewer || ""} placeholder="Assign" onChange={(event) => setRows((current) => current.map((item) => item.id === row.id ? { ...item, enshore_reviewer: event.target.value } : item))} onBlur={(event) => void updateMaster(row, { enshore_reviewer: event.target.value || null })} /></td>
+                    <td style={td}><select aria-label={`Reviewer for ${row.document_number}`} style={cellSelect} value={row.enshore_reviewer || ""} onChange={(event) => void updateMaster(row, { enshore_reviewer: event.target.value || null })}>
+                      <option value="">Assign</option>
+                      {row.enshore_reviewer && !peopleOptions.some((person) => person.name === row.enshore_reviewer) && <option value={row.enshore_reviewer}>{row.enshore_reviewer}</option>}
+                      {peopleOptions.map((person) => <option key={person.id} value={person.name}>{person.name}{person.role ? ` — ${person.role}` : ""}</option>)}
+                    </select></td>
                     <td style={td}><input aria-label={`Review date for ${row.document_number}`} style={cellInput} type="date" value={revision?.enshore_reviewed_at || ""} onChange={(event) => void updateRevision(row, revision, { enshore_reviewed_at: event.target.value || null })} /></td>
                     <td style={td}><select aria-label={`Decision for ${row.document_number}`} style={{ ...cellSelect, ...statusTone(revision?.enshore_decision || "Pending Review") }} value={revision?.enshore_decision || "Pending Review"} onChange={(event) => {
                       const decision = event.target.value;
@@ -692,13 +713,7 @@ function SelectField({ label, value, set, options }: { label: string; value: str
 }
 
 const page: CSSProperties = { display: "grid", gap: 18 };
-const breadcrumb: CSSProperties = { display: "flex", justifyContent: "space-between", color: "#64748b", fontSize: 13 };
-const back: CSSProperties = { color: "#2f7f7d", fontWeight: 900, textDecoration: "none" };
-const metricsGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 8 };
-const metric: CSSProperties = { position: "relative", overflow: "hidden", background: "#fff", border: "1px solid #dce5ee", borderRadius: 12, padding: "11px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 };
-const metricBar: CSSProperties = { position: "absolute", left: 0, top: 0, bottom: 0, width: 5 };
-const metricLabel: CSSProperties = { color: "#64748b", fontWeight: 800, fontSize: 12 };
-const metricValue: CSSProperties = { fontSize: 22 };
+const metricsGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 16, marginBottom: 2 };
 const surface: CSSProperties = { background: "#fff", border: "1px solid #d8e2eb", borderRadius: 20, overflow: "hidden" };
 const toolbar: CSSProperties = { padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 };
 const viewTabs: CSSProperties = { display: "flex", gap: 6, padding: "0 18px 13px" };

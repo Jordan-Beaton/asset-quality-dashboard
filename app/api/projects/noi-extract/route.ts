@@ -27,6 +27,10 @@ function isTargetHeading(value: string) {
     || /\b(client|enshore|contractor|customer\s*(?:evaluation|inspection|involvement)?|purchaser|buyer)\b/i.test(heading);
 }
 
+function isCoordinateTargetHeading(value: string) {
+  return /^(?:client|enshore(?:\s+subsea(?:\s+limited)?)?|contractor|customer(?:\s+(?:evaluation|inspection|involvement))?|purchaser|buyer|contr\.?)\s*:?\s*$/i.test(clean(value));
+}
+
 function isExcludedAuthorityHeading(value: string, supplierName = "") {
   const heading = clean(value);
   const supplier = clean(supplierName);
@@ -143,7 +147,10 @@ async function extractDocxCandidates(buffer: Buffer, supplierName = "") {
     for (let index = 0; index < tables.length; index += 1) {
       const rows = tables[index];
       const width = Math.max(0, ...rows.map((row) => row.length));
-      if (width < 4 || rows.some((row) => row.some((cell) => isTargetHeading(clean(cell))))) continue;
+      const openingRowsContainAuthorityHeader = rows
+        .slice(0, 3)
+        .some((row) => row.some((cell) => isTargetHeading(clean(cell))));
+      if (width < 4 || openingRowsContainAuthorityHeader) continue;
       const syntheticHeader = Array.from({ length: width }, () => "");
       syntheticHeader[0] = "Section";
       syntheticHeader[1] = "Process / operation description";
@@ -208,26 +215,48 @@ async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "")
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const document = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
   const candidates: Candidate[] = [];
+  let carriedTargetHeaders: Array<{ text: string; x: number; y: number; width: number }> = [];
+  let carriedPageSignature = "";
   try {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 1 });
       const content = await page.getTextContent();
       const items = content.items.flatMap((raw) => {
         if (!("str" in raw) || !clean(raw.str)) return [];
+        // Normalise every page into its displayed orientation. Some supplier ITPs
+        // store landscape tables as rotated portrait pages; raw PDF coordinates
+        // otherwise make adjacent authority columns look like separate rows.
+        const displayTransform = pdfjs.Util.transform(viewport.transform, raw.transform);
         return [{
           text: clean(raw.str),
-          x: raw.transform[4],
-          y: raw.transform[5],
+          x: displayTransform[4],
+          y: -displayTransform[5],
           width: raw.width,
         }];
       });
-      const targetHeaders = items.filter((item) =>
-        isTargetHeading(item.text) && !isExcludedAuthorityHeading(item.text, supplierName)
+      const detectedTargetHeaders = items.filter((item) =>
+        isCoordinateTargetHeading(item.text) && !isExcludedAuthorityHeading(item.text, supplierName)
       );
+      const pageSignature = `${page.rotate}:${Math.round(viewport.width)}:${Math.round(viewport.height)}`;
+      const targetHeaders = detectedTargetHeaders.length
+        ? detectedTargetHeaders
+        : pageSignature === carriedPageSignature ? carriedTargetHeaders : [];
+      if (detectedTargetHeaders.length) {
+        carriedTargetHeaders = detectedTargetHeaders;
+        carriedPageSignature = pageSignature;
+      } else if (pageSignature !== carriedPageSignature) {
+        carriedTargetHeaders = [];
+        carriedPageSignature = "";
+      }
       const sections = items
         .map((item) => ({ ...item, section: validSectionNumber(item.text) }))
         .filter((item) => item.section);
-      const componentHeader = items.find((item) => /\bcomponent\s*\/?\s*assembly\b/i.test(item.text));
+      const componentHeader = items.find((item) =>
+        /\bcomponent\s*\/?\s*assembly\b/i.test(item.text)
+        || /\binspection\s*\/?\s*test\s*description\b/i.test(item.text)
+        || /\bprocess\s*\/?\s*operation\s*description\b/i.test(item.text)
+      );
       const phaseHeader = items.find((item) => /\bphase\b.*\bactivity\b/i.test(item.text));
 
       for (const header of targetHeaders) {

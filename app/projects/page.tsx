@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 
 export default function ProjectsPage() {
@@ -12,6 +13,7 @@ export default function ProjectsPage() {
         title="Project Management"
         description="Project-specific quality controls, document registers, reporting annexes, and delivery intelligence in one workspace."
       />
+      <ImsTopMetaRow backHref="/home" backLabel="Back to Home" status={<><strong>Status:</strong> Project Management ready.</>} />
       <section style={section}>
         <div>
           <div style={kicker}>Active projects</div>

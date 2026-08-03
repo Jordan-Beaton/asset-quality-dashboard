@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ChangeEvent, Dispatch, SetStateAction } from "react";
 import jsPDF from "jspdf";
@@ -24,7 +23,10 @@ import {
   VerticalAlign,
   WidthType,
 } from "docx";
+import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
+import { WaddenSeaWorkspaceNav } from "../../../src/components/WaddenSeaWorkspaceNav";
 import { supabase } from "../../../src/lib/supabase";
 
 type RawCell = string | number | boolean | Date | null | undefined;
@@ -45,6 +47,8 @@ type NoiRecord = {
   startDate: Date | null;
   endDate: Date | null;
   dateConfidence: "Exact" | "Week" | "Range" | "Unresolved";
+  source: "IMS NOI" | "Excel";
+  status: string;
 };
 
 type WorkbookSummary = {
@@ -330,6 +334,8 @@ function buildNoiRecords(rows: RawCell[][], reportingYear: number) {
       noiReceived: cleanCell(row[indexes.noiReceived]),
       location: inherited.location,
       witnessHours: cleanCell(row[indexes.witnessHours]),
+      source: "Excel",
+      status: "",
       ...parsed,
     });
   });
@@ -374,7 +380,9 @@ function downloadBlob(blob: Blob, fileName: string) {
 export default function ProjectReportsPage() {
   const today = useMemo(() => new Date(), []);
   const [reportingDate, setReportingDate] = useState(formatInputDate(today));
-  const [records, setRecords] = useState<NoiRecord[]>([]);
+  const [imsRecords, setImsRecords] = useState<NoiRecord[]>([]);
+  const [uploadedRecords, setUploadedRecords] = useState<NoiRecord[]>([]);
+  const [noiLoading, setNoiLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [workbookSummary, setWorkbookSummary] = useState<WorkbookSummary | null>(null);
   const [message, setMessage] = useState("Upload the current NOI tracker to build the Wadden Sea annex.");
@@ -442,6 +450,70 @@ export default function ProjectReportsPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    void (async () => {
+      setNoiLoading(true);
+      const [pointResult, itpResult] = await Promise.all([
+        supabase
+          .from("project_noi_points")
+          .select("id,itp_id,section_number,activity_description,intervention_type,planned_date,noi_number,status")
+          .eq("project_key", "wadden-sea")
+          .order("planned_date", { ascending: true }),
+        supabase
+          .from("project_itps")
+          .select("id,document_number,title,supplier,scope,package_name")
+          .eq("project_key", "wadden-sea"),
+      ]);
+      if (pointResult.error || itpResult.error) {
+        setMessage(`NOI lookahead data failed to load: ${pointResult.error?.message || itpResult.error?.message}`);
+        setNoiLoading(false);
+        return;
+      }
+      const itps = new Map((itpResult.data || []).map((itp) => [String(itp.id), itp]));
+      const liveRecords = (pointResult.data || []).map((point): NoiRecord => {
+        const itp = itps.get(String(point.itp_id));
+        const startDate = point.planned_date ? new Date(`${point.planned_date}T00:00:00`) : null;
+        return {
+          id: `ims-noi-${point.id}`,
+          sourceRow: 0,
+          packageName: String(itp?.package_name || ""),
+          supplier: String(itp?.supplier || ""),
+          scope: String(itp?.scope || ""),
+          itpReference: String(itp?.document_number || ""),
+          activity: `${point.section_number ? `${point.section_number} · ` : ""}${point.activity_description || "Inspection activity"}`,
+          inspectionType: String(point.intervention_type || ""),
+          inspectionDateRaw: String(point.planned_date || ""),
+          noiReceived: String(point.noi_number || ""),
+          location: "",
+          witnessHours: "",
+          startDate,
+          endDate: startDate,
+          dateConfidence: startDate ? "Exact" : "Unresolved",
+          source: "IMS NOI",
+          status: String(point.status || "Planned"),
+        };
+      });
+      setImsRecords(liveRecords);
+      setSelectedIds((current) => Array.from(new Set([
+        ...current,
+        ...liveRecords.filter((record) => record.startDate).map((record) => record.id),
+      ])));
+      setMessage(`Live NOI register loaded: ${liveRecords.length} inspection requirements available.`);
+      setNoiLoading(false);
+    })();
+  }, []);
+
+  const records = useMemo(() => {
+    const key = (record: NoiRecord) => [
+      record.supplier,
+      record.activity.replace(/^\S+\s*·\s*/, ""),
+      record.startDate ? formatInputDate(record.startDate) : record.inspectionDateRaw,
+      record.inspectionType,
+    ].map((value) => value.trim().toLowerCase()).join("|");
+    const liveKeys = new Set(imsRecords.map(key));
+    return [...imsRecords, ...uploadedRecords.filter((record) => !liveKeys.has(key(record)))];
+  }, [imsRecords, uploadedRecords]);
+
   const reportDate = useMemo(() => {
     const parsed = new Date(`${reportingDate}T00:00:00`);
     return Number.isNaN(parsed.getTime()) ? today : parsed;
@@ -501,6 +573,22 @@ export default function ProjectReportsPage() {
     () => lookaheadRecords.filter((record) => selectedIds.includes(record.id)),
     [lookaheadRecords, selectedIds]
   );
+  const sourceReady = !noiLoading || Boolean(workbookSummary);
+  const lookaheadMetrics = useMemo(() => ({
+    total: lookaheadRecords.length,
+    hold: lookaheadRecords.filter((record) => record.inspectionType.split("/").includes("H")).length,
+    witness: lookaheadRecords.filter((record) => record.inspectionType.split("/").includes("W")).length,
+    noiOutstanding: lookaheadRecords.filter((record) => !record.noiReceived && !/completed|cancelled/i.test(record.status)).length,
+  }), [lookaheadRecords]);
+  const calendarWeeks = useMemo(() => weekStarts.map((weekStart) => ({
+    weekStart,
+    records: lookaheadRecords
+      .filter((record) => isInWeek(record, weekStart))
+      .sort((left, right) =>
+        (left.startDate?.getTime() || 0) - (right.startDate?.getTime() || 0)
+        || left.supplier.localeCompare(right.supplier)
+      ),
+  })), [lookaheadRecords, weekStarts]);
 
   const filteredProjectAudits = useMemo(() => {
     const needle = auditSearch.trim().toLowerCase();
@@ -718,8 +806,8 @@ export default function ProjectReportsPage() {
       const dated = imported.filter((record) => record.startDate);
       const importedLookahead = dated.filter((record) => overlapsRange(record, horizonStart, horizonEnd));
 
-      setRecords(imported);
-      setSelectedIds(importedLookahead.map((record) => record.id));
+      setUploadedRecords(imported);
+      setSelectedIds((current) => Array.from(new Set([...current, ...importedLookahead.map((record) => record.id)])));
       setWorkbookSummary({
         fileName: file.name,
         sheetName,
@@ -914,7 +1002,7 @@ export default function ProjectReportsPage() {
                 spacing: { after: 160 },
                 children: [
                   new TextRun({
-                    text: `${formatDate(horizonStart)} to ${formatDate(horizonEnd)} | ${selected.length} selected activities | Source: ${workbookSummary?.fileName || "NOI tracker"}`,
+                    text: `${formatDate(horizonStart)} to ${formatDate(horizonEnd)} | ${selected.length} selected activities | Source: Live IMS NOI register${workbookSummary ? ` + ${workbookSummary.fileName}` : ""}`,
                     font: "Arial",
                     size: 17,
                     color: "475569",
@@ -984,7 +1072,7 @@ export default function ProjectReportsPage() {
       doc.setFontSize(9);
       doc.setTextColor(71, 85, 105);
       doc.text(`${formatDate(horizonStart)} to ${formatDate(horizonEnd)} | ${selected.length} selected activities`, margin, 41);
-      doc.text(`Source: ${workbookSummary?.fileName || "NOI tracker"}`, pageWidth - margin, 41, { align: "right" });
+      doc.text(`Source: Live IMS NOI register${workbookSummary ? ` + ${workbookSummary.fileName}` : ""}`, pageWidth - margin, 41, { align: "right" });
 
       autoTable(doc, {
         startY: 47,
@@ -1084,54 +1172,34 @@ export default function ProjectReportsPage() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
-        <Link href="/projects/wadden-sea" style={backLinkStyle}>← Back to Wadden Sea</Link>
-        <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
-      </div>
+      <ImsTopMetaRow backHref="/projects/wadden-sea" backLabel="Back to Wadden Sea" status={<><strong>Status:</strong> {message}</>} />
 
-      <nav style={reportWorkspaceTabsStyle} aria-label="Report workspace">
-        <Link href="/projects/wadden-sea" style={reportWorkspaceTabStyle}>Project Workspace</Link>
-        <Link href="/projects/wadden-sea/reports" style={activeReportWorkspaceTabStyle}>Project Reports</Link>
+      <WaddenSeaWorkspaceNav active="reports" />
+
+      <nav style={reportWorkspaceTabsStyle} aria-label="Project report annexes">
+        {[
+          ["audit-ncr", "Audit NCR Report"],
+          ["audit-programme", "Audit Programme"],
+          ["lookahead", "8-Week Lookahead"],
+        ].map(([view, label]) => (
+          <button
+            key={view}
+            type="button"
+            onClick={() => setActiveAnnex(view as ProjectAnnex)}
+            style={activeAnnex === view ? activeReportWorkspaceTabStyle : reportWorkspaceButtonStyle}
+          >
+            {label}
+          </button>
+        ))}
       </nav>
 
-      <section style={panelStyle}>
-        <div style={sectionHeaderStyle}>
-          <div>
-            <h2 style={sectionTitleStyle}>Wadden Sea Monthly Report Annexes</h2>
-            <p style={sectionSubtitleStyle}>
-              Prepare the supporting annexes used in the monthly client report.
-            </p>
-          </div>
-        </div>
-        <div style={annexCardsStyle}>
-          <button
-            type="button"
-            onClick={() => setActiveAnnex("audit-ncr")}
-            style={{ ...annexCardStyle, ...(activeAnnex === "audit-ncr" ? activeAnnexCardStyle : {}) }}
-          >
-            <span style={annexEyebrowStyle}>ANNEX</span>
-            <strong>Audit NCR Report</strong>
-            <span>Filter and select applicable open and closed audit findings here.</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveAnnex("audit-programme")}
-            style={{ ...annexCardStyle, ...(activeAnnex === "audit-programme" ? activeAnnexCardStyle : {}) }}
-          >
-            <span style={annexEyebrowStyle}>ANNEX</span>
-            <strong>Audit Programme</strong>
-            <span>Filter and select applicable completed and upcoming audits here.</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveAnnex("lookahead")}
-            style={{ ...annexCardStyle, ...(activeAnnex === "lookahead" ? activeAnnexCardStyle : {}) }}
-          >
-            <span style={annexEyebrowStyle}>ANNEX</span>
-            <strong>Eight-Week Inspection Lookahead</strong>
-            <span>Upload the NOI tracker and generate a controlled forward schedule.</span>
-          </button>
-        </div>
+      <section className="quality-kpi-grid" style={reportStatsGridStyle}>
+        <QualityKpiCard title="Programme Audits" value={projectAudits.length} accent="#2563eb" onClick={() => setActiveAnnex("audit-programme")} active={activeAnnex === "audit-programme"} />
+        <QualityKpiCard title="Audit Findings" value={projectAuditFindings.length} accent="#7c3aed" onClick={() => setActiveAnnex("audit-ncr")} active={activeAnnex === "audit-ncr"} />
+        <QualityKpiCard title="NOI Requirements" value={imsRecords.length} accent="#3A9B98" href="/projects/wadden-sea/noi" />
+        <QualityKpiCard title="In Eight Weeks" value={lookaheadMetrics.total} accent="#f59e0b" onClick={() => setActiveAnnex("lookahead")} active={activeAnnex === "lookahead"} />
+        <QualityKpiCard title="Hold Points" value={lookaheadMetrics.hold} accent="#dc2626" onClick={() => setActiveAnnex("lookahead")} />
+        <QualityKpiCard title="NOI Outstanding" value={lookaheadMetrics.noiOutstanding} accent="#ea580c" onClick={() => setActiveAnnex("lookahead")} />
       </section>
 
       {activeAnnex === "audit-ncr" || activeAnnex === "audit-programme" ? (
@@ -1314,11 +1382,11 @@ export default function ProjectReportsPage() {
           <div>
             <h2 style={sectionTitleStyle}>Eight-Week Inspection Lookahead</h2>
             <p style={sectionSubtitleStyle}>
-              The uploaded NOI tracker remains the master. The IMS reads it and derives this annex.
+              The live Project NOI register is the master. Excel upload remains available as a secondary source for additional activities.
             </p>
           </div>
           <label style={uploadButtonStyle}>
-            Upload NOI Tracker
+            Add Excel Tracker
             <input type="file" accept=".xlsx,.xls" onChange={handleWorkbookUpload} style={{ display: "none" }} />
           </label>
         </div>
@@ -1338,26 +1406,66 @@ export default function ProjectReportsPage() {
           </div>
         </div>
 
-        {workbookSummary ? (
+        {sourceReady ? (
           <div style={validationGridStyle}>
-            <div style={validationCardStyle}><span>Source file</span><strong>{workbookSummary.fileName}</strong><small>{workbookSummary.sheetName} · {workbookSummary.uploadedAt}</small></div>
-            <div style={validationCardStyle}><span>Activities read</span><strong>{workbookSummary.activities}</strong><small>{workbookSummary.sourceRows} source rows</small></div>
-            <div style={validationCardStyle}><span>In eight weeks</span><strong>{lookaheadRecords.length}</strong><small>{selectedLookaheadRecords.length} selected</small></div>
+            <div style={validationCardStyle}><span>Primary source</span><strong>Live NOI register</strong><small>{imsRecords.length} controlled requirements</small></div>
+            <div style={validationCardStyle}><span>Excel additions</span><strong>{workbookSummary ? workbookSummary.activities : 0}</strong><small>{workbookSummary ? `${workbookSummary.fileName} · ${workbookSummary.uploadedAt}` : "No workbook added"}</small></div>
+            <div style={validationCardStyle}><span>In eight weeks</span><strong>{lookaheadMetrics.total}</strong><small>{selectedLookaheadRecords.length} selected for annex</small></div>
             <button type="button" style={warningCardStyle} onClick={() => setShowUnresolved((current) => !current)}>
-              <span>Unresolved dates</span><strong>{workbookSummary.unresolvedActivities}</strong><small>{showUnresolved ? "Show lookahead" : "Review rows"}</small>
+              <span>Unresolved dates</span><strong>{unresolvedRecords.length}</strong><small>{showUnresolved ? "Show lookahead" : "Review rows"}</small>
             </button>
           </div>
         ) : (
           <div style={emptyStateStyle}>
-            <strong>Upload the current Wadden Sea NOI tracker</strong>
-            <span>The importer will identify the NOI worksheet, carry grouped supplier details down, parse dates and show the eight-week window.</span>
+            <strong>Loading the live Wadden Sea NOI register…</strong>
+            <span>Upcoming inspection dates will appear automatically.</span>
           </div>
         )}
       </section>
       ) : null}
 
-      {activeAnnex === "lookahead" && workbookSummary ? (
+      {activeAnnex === "lookahead" && sourceReady ? (
         <>
+          {!showUnresolved ? (
+            <section style={panelStyle}>
+              <div style={sectionHeaderStyle}>
+                <div>
+                  <h2 style={sectionTitleStyle}>Upcoming Inspection Calendar</h2>
+                  <p style={sectionSubtitleStyle}>A week-by-week operational view of every dated W/H point in the reporting window.</p>
+                </div>
+              </div>
+              <div style={inspectionMetricGridStyle}>
+                <div style={inspectionMetricStyle}><span>Upcoming</span><strong>{lookaheadMetrics.total}</strong><small>dated inspections</small></div>
+                <div style={{ ...inspectionMetricStyle, borderColor: "#fecaca", background: "#fff7f7" }}><span>Hold points</span><strong>{lookaheadMetrics.hold}</strong><small>H or combined H</small></div>
+                <div style={{ ...inspectionMetricStyle, borderColor: "#fde68a", background: "#fffbeb" }}><span>Witness points</span><strong>{lookaheadMetrics.witness}</strong><small>W or combined W</small></div>
+                <div style={{ ...inspectionMetricStyle, borderColor: lookaheadMetrics.noiOutstanding ? "#fdba74" : "#bbf7d0", background: lookaheadMetrics.noiOutstanding ? "#fff7ed" : "#f0fdf4" }}><span>NOI outstanding</span><strong>{lookaheadMetrics.noiOutstanding}</strong><small>number not yet recorded</small></div>
+              </div>
+              <div style={inspectionCalendarStyle}>
+                {calendarWeeks.map(({ weekStart, records: weekRecords }, index) => (
+                  <div key={formatInputDate(weekStart)} style={inspectionWeekStyle}>
+                    <div style={inspectionWeekHeaderStyle}>
+                      <span>Week {index + 1}</span>
+                      <strong>W/C {formatDate(weekStart)}</strong>
+                      <small>{weekRecords.length} inspection{weekRecords.length === 1 ? "" : "s"}</small>
+                    </div>
+                    <div style={inspectionWeekBodyStyle}>
+                      {weekRecords.length ? weekRecords.map((record) => (
+                        <div key={`${formatInputDate(weekStart)}-${record.id}`} style={inspectionCardStyle}>
+                          <div style={inspectionCardTopStyle}>
+                            <span style={record.inspectionType.includes("H") ? holdPointStyle : witnessPointStyle}>{record.inspectionType}</span>
+                            <small>{record.startDate ? formatDate(record.startDate) : ""}</small>
+                          </div>
+                          <strong>{record.supplier || "Supplier TBC"}</strong>
+                          <span>{record.activity}</span>
+                          <small>{record.noiReceived ? `NOI ${record.noiReceived}` : "NOI number outstanding"} · {record.status || "Planned"}</small>
+                        </div>
+                      )) : <span style={emptyWeekStyle}>No inspections</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <section style={panelStyle}>
             <div style={sectionHeaderStyle}>
               <div>
@@ -1469,12 +1577,11 @@ export default function ProjectReportsPage() {
   );
 }
 
-const topMetaRowStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "18px" };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 800, textDecoration: "none" };
-const statusBannerStyle: CSSProperties = { padding: "11px 14px", borderRadius: "12px", border: "1px solid #dbe4ef", background: "#ffffff", color: "#475569", fontSize: "13px" };
-const reportWorkspaceTabsStyle: CSSProperties = { display: "flex", gap: "8px", padding: "6px", marginBottom: "20px", background: "#ffffff", border: "1px solid #dbe3ef", borderRadius: "14px", width: "fit-content" };
-const reportWorkspaceTabStyle: CSSProperties = { padding: "9px 14px", borderRadius: "10px", color: "#475569", textDecoration: "none", fontWeight: 800, fontSize: "13px" };
-const activeReportWorkspaceTabStyle: CSSProperties = { ...reportWorkspaceTabStyle, background: "#3A9B98", color: "#ffffff" };
+const reportWorkspaceTabsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "20px" };
+const reportWorkspaceTabStyle: CSSProperties = { minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: "10px", border: "none", background: "#e2e8f0", color: "#0f172a", textDecoration: "none", fontWeight: 800, fontSize: "13px", boxSizing: "border-box" };
+const reportWorkspaceButtonStyle: CSSProperties = { ...reportWorkspaceTabStyle, fontFamily: "inherit", cursor: "pointer" };
+const activeReportWorkspaceTabStyle: CSSProperties = { ...reportWorkspaceButtonStyle, background: "#3A9B98", color: "#ffffff" };
+const reportStatsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelStyle: CSSProperties = { background: "#ffffff", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15,23,42,0.08)", marginBottom: "20px" };
 const sectionHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "14px", flexWrap: "wrap", marginBottom: "16px" };
 const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "20px", color: "#0f172a" };
@@ -1492,6 +1599,17 @@ const validationGridStyle: CSSProperties = { display: "grid", gridTemplateColumn
 const validationCardStyle: CSSProperties = { display: "grid", gap: "4px", padding: "13px", borderRadius: "12px", border: "1px solid #dbe4ef", background: "#f8fafc", textAlign: "left", color: "#334155" };
 const warningCardStyle: CSSProperties = { ...validationCardStyle, cursor: "pointer", borderColor: "#fde68a", background: "#fffbeb" };
 const emptyStateStyle: CSSProperties = { display: "grid", gap: "6px", marginTop: "16px", padding: "22px", border: "1px dashed #94a3b8", borderRadius: "14px", background: "#f8fafc", color: "#475569", textAlign: "center" };
+const inspectionMetricGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px", marginBottom: "16px" };
+const inspectionMetricStyle: CSSProperties = { display: "grid", gap: "3px", padding: "13px", border: "1px solid #bae6fd", borderRadius: "12px", background: "#f0f9ff", color: "#334155" };
+const inspectionCalendarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(8, minmax(185px, 1fr))", gap: "10px", overflowX: "auto", paddingBottom: "6px" };
+const inspectionWeekStyle: CSSProperties = { minWidth: "185px", border: "1px solid #dbe4ef", borderRadius: "12px", overflow: "hidden", background: "#f8fafc" };
+const inspectionWeekHeaderStyle: CSSProperties = { display: "grid", gap: "2px", padding: "10px", background: "#0f766e", color: "#ffffff", fontSize: "11px" };
+const inspectionWeekBodyStyle: CSSProperties = { display: "grid", alignContent: "start", gap: "7px", padding: "8px", minHeight: "145px" };
+const inspectionCardStyle: CSSProperties = { display: "grid", gap: "5px", padding: "9px", border: "1px solid #dbe4ef", borderRadius: "9px", background: "#ffffff", color: "#334155", fontSize: "11px", lineHeight: 1.35 };
+const inspectionCardTopStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" };
+const holdPointStyle: CSSProperties = { padding: "3px 6px", borderRadius: "999px", background: "#fee2e2", color: "#991b1b", fontWeight: 900 };
+const witnessPointStyle: CSSProperties = { padding: "3px 6px", borderRadius: "999px", background: "#fef3c7", color: "#92400e", fontWeight: 900 };
+const emptyWeekStyle: CSSProperties = { color: "#94a3b8", fontSize: "11px", textAlign: "center", padding: "22px 4px" };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: "9px", flexWrap: "wrap", alignItems: "center" };
 const primaryButtonStyle: CSSProperties = { padding: "10px 15px", border: 0, borderRadius: "10px", background: "#3A9B98", color: "#ffffff", fontWeight: 800, cursor: "pointer" };
 const secondaryButtonStyle: CSSProperties = { ...primaryButtonStyle, background: "#e2e8f0", color: "#0f172a" };
