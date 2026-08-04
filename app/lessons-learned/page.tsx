@@ -91,6 +91,7 @@ export default function LessonsLearnedPage() {
   const [yearFilter, setYearFilter] = useState(""); const [importRows, setImportRows] = useState<ImportRow[]>([]);
   const [importName, setImportName] = useState(""); const [importing, setImporting] = useState(false); const [files, setFiles] = useState<File[]>([]);
   const [evidenceNotes, setEvidenceNotes] = useState(""); const detailRef = useRef<HTMLElement | null>(null);
+  const [learningIndex, setLearningIndex] = useState(0); const [learningPaused, setLearningPaused] = useState(false);
   const [referenceProjects, setReferenceProjects] = useState<ProjectOption[]>([]);
   const [peopleOptions, setPeopleOptions] = useState<PersonOption[]>([]); const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]);
   const [showNewProject, setShowNewProject] = useState(false); const [newProjectCode, setNewProjectCode] = useState(""); const [newProjectName, setNewProjectName] = useState("");
@@ -158,7 +159,6 @@ export default function LessonsLearnedPage() {
   useEffect(() => { void loadData(); }, []);
 
   const departments = useMemo(() => [...new Set(lessons.map((item) => item.department).filter(Boolean) as string[])].sort(), [lessons]);
-  const projects = useMemo(() => [...new Set(lessons.map((item) => item.project_name).filter(Boolean))].sort(), [lessons]);
   const years = useMemo(() => [...new Set(lessons.map((item) => item.report_date?.slice(0, 4)).filter(Boolean) as string[])].sort().reverse(), [lessons]);
   const evidenceCounts = useMemo(() => { const map = new Map<string, number>(); evidence.forEach((item) => map.set(item.record_id, (map.get(item.record_id) || 0) + 1)); return map; }, [evidence]);
   const repeatedGroups = useMemo(() => {
@@ -168,6 +168,19 @@ export default function LessonsLearnedPage() {
   const repeatedLessonIds = useMemo(() => new Set(repeatedGroups.flatMap(([, rows]) => rows.map((item) => item.id))), [repeatedGroups]);
   const crossProjectGroups = useMemo(() => repeatedGroups.filter(([, rows]) => new Set(rows.map((item) => item.project_name)).size > 1), [repeatedGroups]);
   const crossProjectLessonIds = useMemo(() => new Set(crossProjectGroups.flatMap(([, rows]) => rows.map((item) => item.id))), [crossProjectGroups]);
+  const availableProjects = useMemo(() => [...new Set(lessons.filter((item) => {
+    const haystack = [item.lesson_number, item.project_code, item.project_name, item.department, item.subject, item.issue_description, item.root_cause, item.lesson_learned, item.recommended_action, item.keywords?.join(" ")].join(" ").toLowerCase();
+    const matchesAnalysis = analysisFilter === "all" ||
+      (analysisFilter === "open-actions" && lessonHasOpenAction(item)) ||
+      (analysisFilter === "high-critical" && ["High", "Critical"].includes(item.criticality)) ||
+      (analysisFilter === "repeat-lessons" && repeatedLessonIds.has(item.id)) ||
+      (analysisFilter === "cross-project-repeats" && crossProjectLessonIds.has(item.id)) ||
+      (analysisFilter === "unowned-actions" && lessonHasOpenAction(item) && !clean(item.action_owner)) ||
+      (analysisFilter === "with-evidence" && (evidenceCounts.get(item.id) || 0) > 0) ||
+      (analysisFilter === "missing-root-cause" && !clean(item.root_cause));
+    return (!search || haystack.includes(search.toLowerCase())) && (!departmentFilter || (departmentFilter === "Unassigned" ? !clean(item.department) : item.department === departmentFilter)) && (!statusFilter || item.status === statusFilter) && (!criticalityFilter || item.criticality === criticalityFilter) && (!outcomeFilter || item.outcome_type === outcomeFilter) && (!yearFilter || item.report_date?.startsWith(yearFilter)) && (!repeatGroupFilter || clean(item.repeat_group).toLowerCase() === repeatGroupFilter.toLowerCase()) && matchesAnalysis;
+  }).map((item) => item.project_name).filter(Boolean))].sort(), [lessons, search, departmentFilter, statusFilter, criticalityFilter, outcomeFilter, yearFilter, repeatGroupFilter, analysisFilter, repeatedLessonIds, crossProjectLessonIds, evidenceCounts]);
+  useEffect(() => { if (projectFilter && !availableProjects.includes(projectFilter)) setProjectFilter(""); }, [availableProjects, projectFilter]);
   const filtered = useMemo(() => lessons.filter((item) => {
     const haystack = [item.lesson_number, item.project_code, item.project_name, item.department, item.subject, item.issue_description, item.root_cause, item.lesson_learned, item.recommended_action, item.keywords?.join(" ")].join(" ").toLowerCase();
     const matchesAnalysis = analysisFilter === "all" ||
@@ -214,35 +227,41 @@ export default function LessonsLearnedPage() {
       const repeatCount = item.repeat_group ? (repeatedGroups.find(([key]) => key === clean(item.repeat_group).toLowerCase())?.[1].length || 1) : 1;
       const score = (["Critical", "High"].includes(item.criticality) ? 3 : 0) + (meaningfulText(item.root_cause) ? 2 : 0) + (meaningfulText(item.recommended_action) ? 2 : 0) + (repeatCount > 1 ? Math.min(4, repeatCount) : 0) + (lessonHasAction(item) ? 1 : 0);
       return { item, repeatCount, score };
-    }).sort((a, b) => b.score - a.score || b.repeatCount - a.repeatCount).filter((entry, index, rows) => rows.findIndex((other) => clean(other.item.lesson_learned).toLowerCase() === clean(entry.item.lesson_learned).toLowerCase()) === index).slice(0, 8), [lessons, repeatedGroups]);
+    }).sort((a, b) => b.score - a.score || b.repeatCount - a.repeatCount).filter((entry, index, rows) => rows.findIndex((other) => clean(other.item.lesson_learned).toLowerCase() === clean(entry.item.lesson_learned).toLowerCase()) === index).slice(0, 15), [lessons, repeatedGroups]);
+  useEffect(() => { if (learningIndex >= learnedFindings.length) setLearningIndex(0); }, [learnedFindings.length, learningIndex]);
+  useEffect(() => {
+    if (learningPaused || learnedFindings.length < 2) return;
+    const timer = window.setInterval(() => setLearningIndex((current) => (current + 1) % learnedFindings.length), 5000);
+    return () => window.clearInterval(timer);
+  }, [learnedFindings.length, learningPaused]);
 
   function clearAllFilters() {
     setSearch(""); setProjectFilter(""); setDepartmentFilter(""); setStatusFilter(""); setCriticalityFilter("");
     setOutcomeFilter(""); setYearFilter(""); setRepeatGroupFilter(""); setAnalysisFilter("all"); setAnalysisLabel("All lessons");
   }
   function openAnalysis(filter: AnalysisFilter, label: string) {
-    clearAllFilters(); setAnalysisFilter(filter); setAnalysisLabel(label); setView("register");
+    setAnalysisFilter(filter); setAnalysisLabel((current) => current === "All lessons" ? label : `${current} · ${label}`); setView("register");
   }
   function selectDepartment(selection: ChartSelection) {
-    const value = clean(selection?.activeLabel); if (!value) return; clearAllFilters(); setDepartmentFilter(value); setAnalysisLabel(`Department: ${value}`); setView("register");
+    const value = clean(selection?.activeLabel); if (!value) return; setDepartmentFilter(value); setAnalysisLabel((current) => current === "All lessons" ? `Department: ${value}` : `${current} · Department: ${value}`); setView("register");
   }
   function selectProject(selection: ChartSelection) {
-    const value = clean(selection?.activeLabel); if (!value) return; clearAllFilters(); setProjectFilter(value); setAnalysisLabel(`Project: ${value}`); setView("register");
+    const value = clean(selection?.activeLabel); if (!value) return; setProjectFilter(value); setAnalysisLabel((current) => current === "All lessons" ? `Project: ${value}` : `${current} · Project: ${value}`); setView("register");
   }
   function selectYear(selection: ChartSelection) {
-    const value = clean(selection?.activeLabel); if (!value) return; clearAllFilters(); setYearFilter(value); setAnalysisLabel(`Report year: ${value}`); setView("register");
+    const value = clean(selection?.activeLabel); if (!value) return; setYearFilter(value); setAnalysisLabel((current) => current === "All lessons" ? `Report year: ${value}` : `${current} · Report year: ${value}`); setView("register");
   }
   function selectStatus(selection: ChartSelection) {
-    const value = clean(selection?.activeLabel); if (!value) return; clearAllFilters(); setStatusFilter(value); setAnalysisLabel(`Action status: ${value}`); setView("register");
+    const value = clean(selection?.activeLabel); if (!value) return; setStatusFilter(value); setAnalysisLabel((current) => current === "All lessons" ? `Action status: ${value}` : `${current} · Action status: ${value}`); setView("register");
   }
   function selectCriticality(selection: ChartSelection) {
-    const value = clean(selection?.activeLabel); if (!value) return; clearAllFilters(); setCriticalityFilter(value); setAnalysisLabel(`Criticality: ${value}`); setView("register");
+    const value = clean(selection?.activeLabel); if (!value) return; setCriticalityFilter(value); setAnalysisLabel((current) => current === "All lessons" ? `Criticality: ${value}` : `${current} · Criticality: ${value}`); setView("register");
   }
   function selectOutcome(selection: ChartSelection) {
-    const value = clean(selection?.activeLabel); if (!value) return; clearAllFilters(); setOutcomeFilter(value); setAnalysisLabel(`Outcome: ${value}`); setView("register");
+    const value = clean(selection?.activeLabel); if (!value) return; setOutcomeFilter(value); setAnalysisLabel((current) => current === "All lessons" ? `Outcome: ${value}` : `${current} · Outcome: ${value}`); setView("register");
   }
   function selectTheme(selection: ChartSelection | string) {
-    const value = typeof selection === "string" ? selection : clean(selection?.activeLabel); if (!value) return; clearAllFilters(); setRepeatGroupFilter(value); setAnalysisLabel(`Repeat theme: ${value}`); setView("register");
+    const value = typeof selection === "string" ? selection : clean(selection?.activeLabel); if (!value) return; setRepeatGroupFilter(value); setAnalysisLabel((current) => current === "All lessons" ? `Repeat theme: ${value}` : `${current} · Repeat theme: ${value}`); setView("register");
   }
 
   function requireCreate(action: string) { if (permission.canCreate || permission.fullAccess || permission.isMasterAdmin) return true; setMessage(`Read-only access: you cannot ${action}.`); return false; }
@@ -358,7 +377,7 @@ export default function LessonsLearnedPage() {
     <ImsTopMetaRow backHref="/home" backLabel="Back to IMS Home" actions={<ImsButton variant="secondary" onClick={() => void loadData()}>Refresh</ImsButton>} status={<><strong>Status:</strong> {message}</>} />
     <ImsTabs tabs={tabs} active={view} onChange={(next) => { setView(next); if (next === "create") { setSelected(null); setForm(emptyForm); } }} ariaLabel="Lessons Learned views" />
     <section style={kpiGrid}>
-      <QualityKpiCard title="Total Lessons" value={kpis.total} accent={imsColours.brand} active={analysisFilter === "all" && analysisLabel === "All lessons"} onClick={() => openAnalysis("all", "All lessons")} />
+      <QualityKpiCard title="Total Lessons" value={kpis.total} accent={imsColours.brand} active={analysisFilter === "all" && analysisLabel === "All lessons"} onClick={() => { clearAllFilters(); setView("register"); }} />
       <QualityKpiCard title="Open Actions" value={kpis.open} accent={imsColours.warning} active={analysisFilter === "open-actions"} onClick={() => openAnalysis("open-actions", "Open actions requiring follow-up")} />
       <QualityKpiCard title="High / Critical" value={kpis.high} accent={imsColours.danger} active={analysisFilter === "high-critical"} onClick={() => openAnalysis("high-critical", "High and critical lessons")} />
       <QualityKpiCard title="Repeated Lessons" value={kpis.repeats} accent={imsColours.purple} active={analysisFilter === "repeat-lessons"} onClick={() => openAnalysis("repeat-lessons", "Lessons in repeated themes")} />
@@ -368,14 +387,8 @@ export default function LessonsLearnedPage() {
 
     {view === "dashboard" && <div style={twoColumn}>
       <ImsPanel title="What We’ve Learned" subtitle="Clear, reusable takeaways from sufficiently complete failure records. Weak and duplicated historic wording is excluded." style={{ gridColumn: "1 / -1" }}>
-        <div style={learningGrid}>{learnedFindings.map(({ item, repeatCount }) => <button type="button" key={item.id} style={learningCard} onClick={() => repeatCount > 1 && item.repeat_group ? selectTheme(item.repeat_group) : openLesson(item)}><span style={learningEyebrow}>{item.project_code || item.project_name} · {item.department || "Unassigned"}</span><strong>{item.subject}</strong><p>{item.lesson_learned}</p><small>{item.criticality} criticality{repeatCount > 1 ? ` · linked to ${repeatCount} repeat records · open linked dataset` : " · open source record"}</small></button>)}{!learnedFindings.length && <p style={muted}>No failure records currently meet the quality threshold. Complete the Lesson Learned field with a clear, reusable takeaway to populate this panel.</p>}</div>
+        {learnedFindings.length ? (() => { const { item, repeatCount } = learnedFindings[learningIndex] || learnedFindings[0]; return <div style={learningSpotlightWrap} onMouseEnter={() => setLearningPaused(true)} onMouseLeave={() => setLearningPaused(false)}><button type="button" style={learningSpotlightCard} onClick={() => repeatCount > 1 && item.repeat_group ? selectTheme(item.repeat_group) : openLesson(item)}><span style={learningEyebrow}>{item.project_code || item.project_name} · {item.department || "Unassigned"}</span><strong style={learningTitleStyle}>{item.subject}</strong><p style={learningTextStyle}>{item.lesson_learned}</p><small>{item.criticality} criticality{repeatCount > 1 ? ` · linked to ${repeatCount} repeat records · open linked dataset` : " · open source record"}</small></button><div style={learningControlsStyle}><button type="button" style={learningControlButtonStyle} aria-label="Previous learning" onClick={() => setLearningIndex((current) => (current - 1 + learnedFindings.length) % learnedFindings.length)}>‹</button><span>{learningIndex + 1} of {learnedFindings.length}{learningPaused ? " · Paused" : " · Rotates every 5 seconds"}</span><button type="button" style={learningControlButtonStyle} aria-label="Next learning" onClick={() => setLearningIndex((current) => (current + 1) % learnedFindings.length)}>›</button></div></div>; })() : <p style={muted}>No failure records currently meet the quality threshold. Complete the Lesson Learned field with a clear, reusable takeaway to populate this panel.</p>}
       </ImsPanel>
-      <ImsPanel title="Prevention Readiness" subtitle="Click any control gap to open the affected lessons."><div style={storyGrid}>
-        <Story title="Root-cause coverage" value={`${Math.round(((lessons.length - kpis.missingRootCause) / Math.max(1, lessons.length)) * 100)}%`} text={`${kpis.missingRootCause.toLocaleString()} lessons still need causal analysis`} onClick={() => openAnalysis("missing-root-cause", "Lessons missing root-cause analysis")} />
-        <Story title="Action ownership" value={`${Math.round(((kpis.open - kpis.unowned) / Math.max(1, kpis.open)) * 100)}%`} text={`${kpis.unowned.toLocaleString()} open actions have no owner`} onClick={() => openAnalysis("unowned-actions", "Open actions without an owner")} />
-        <Story title="Cross-project exposure" value={crossProjectGroups.length} text={`${kpis.crossProject.toLocaleString()} lessons recur across projects`} onClick={() => openAnalysis("cross-project-repeats", "Repeat lessons affecting multiple projects")} />
-        <Story title="Evidence coverage" value={`${Math.round((kpis.evidence / Math.max(1, lessons.length)) * 100)}%`} text={`${kpis.evidence.toLocaleString()} lessons include evidence`} onClick={() => openAnalysis("with-evidence", "Lessons with supporting evidence")} />
-      </div></ImsPanel>
       <ImsPanel title="Failure Concentration by Department" subtitle="Where failures are recorded most often. Click a bar to inspect that department."><ChartFrame><BarChart data={departmentTrend} layout="vertical" margin={{ left: 24, right: 12 }} onClick={(state) => selectDepartment(state as ChartSelection)} style={{ cursor: "pointer" }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 11 }} /><Tooltip {...chartTooltip} /><Bar dataKey="count" name="Failures" fill={imsColours.brand} radius={[0, 6, 6, 0]} /></BarChart></ChartFrame></ImsPanel>
       <ImsPanel title="High-Risk Mix by Department" subtitle="Criticality concentration shows where controls need strengthening. Click a department to drill down."><ChartFrame height={340}><BarChart data={departmentRisk} margin={{ left: 4, right: 12, bottom: 70 }} onClick={(state) => selectDepartment(state as ChartSelection)} style={{ cursor: "pointer" }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" angle={-35} textAnchor="end" interval={0} height={90} tick={{ fontSize: 10 }} /><YAxis /><Tooltip {...chartTooltip} /><Legend /><Bar dataKey="Critical" stackId="risk" fill={imsColours.danger} /><Bar dataKey="High" stackId="risk" fill={imsColours.warning} /><Bar dataKey="Medium" stackId="risk" fill={imsColours.blue} /><Bar dataKey="Low" stackId="risk" fill={imsColours.brand} /></BarChart></ChartFrame></ImsPanel>
       <ImsPanel title="Failure Concentration by Project" subtitle="Projects with the greatest volume of recorded failures. Click a bar to inspect the project."><ChartFrame><BarChart data={projectTrend} layout="vertical" margin={{ left: 40, right: 12 }} onClick={(state) => selectProject(state as ChartSelection)} style={{ cursor: "pointer" }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis dataKey="name" type="category" width={145} tick={{ fontSize: 10 }} /><Tooltip {...chartTooltip} /><Bar dataKey="count" name="Failures" fill={imsColours.dangerBright} radius={[0, 6, 6, 0]} /></BarChart></ChartFrame></ImsPanel>
@@ -396,7 +409,7 @@ export default function LessonsLearnedPage() {
       <ImsPanel title="Lessons Learned Register" subtitle="Search the full knowledge base by project, department, subject, issue, lesson, root cause, owner, or keyword.">
         <div style={activeAnalysisStyle}><span><strong>Active dataset:</strong> {analysisLabel}</span><span>{filtered.length.toLocaleString()} matching lessons</span><ImsButton variant="ghost" onClick={clearAllFilters}>Reset Dataset</ImsButton></div>
         <ImsFilterPanel search={search} onSearchChange={setSearch} searchPlaceholder="Search within the active dataset" showFilters={showFilters} onToggleFilters={() => setShowFilters((x) => !x)} actions={<ImsButton variant="secondary" onClick={clearAllFilters}>Clear Filters</ImsButton>}>
-          <Select label="Project" value={projectFilter} onChange={setProjectFilter} options={projects} /><Select label="Department" value={departmentFilter} onChange={setDepartmentFilter} options={["Unassigned", ...departments]} />
+          <Select label="Project" value={projectFilter} onChange={setProjectFilter} options={availableProjects} /><Select label="Department" value={departmentFilter} onChange={setDepartmentFilter} options={["Unassigned", ...departments]} />
           <Select label="Status" value={statusFilter} onChange={setStatusFilter} options={["Open", "In Progress", "Implemented", "Shared", "Closed"]} /><Select label="Criticality" value={criticalityFilter} onChange={setCriticalityFilter} options={["Low", "Medium", "High", "Critical"]} />
           <Select label="Outcome" value={outcomeFilter} onChange={setOutcomeFilter} options={["Failure", "Success", "Opportunity"]} /><Select label="Year" value={yearFilter} onChange={setYearFilter} options={years} />
         </ImsFilterPanel>
@@ -426,7 +439,6 @@ function ControlledSelect({ value, onChange, placeholder, options }: { value: st
 }
 function Textarea({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder?: string }) { return <textarea value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} style={{ ...imsInputStyle, minHeight: 104, resize: "vertical" }} />; }
 function Pill({ text, colour }: { text: string; colour: string }) { return <span style={{ background: `${colour}18`, color: colour, border: `1px solid ${colour}44`, borderRadius: 999, padding: "4px 8px", fontSize: 11, fontWeight: 800 }}>{text}</span>; }
-function Story({ title, value, text, onClick }: { title: string; value: string | number; text: string; onClick: () => void }) { return <button type="button" style={storyCard} onClick={onClick}><span>{title}</span><strong>{value}</strong><small>{text}</small></button>; }
 function ChartFrame({ children, height = 300 }: { children: React.ReactNode; height?: number }) { return <div style={{ width: "100%", minWidth: 0, height }}><ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>{children}</ResponsiveContainer></div>; }
 function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNotes, setEvidenceNotes, saving, onSave, onDelete, onClose, evidence, onOpenEvidence }: { title: string; subtitle: string; form: typeof emptyForm; update: (name: keyof typeof emptyForm, value: string) => void; files: File[]; setFiles: (files: File[]) => void; evidenceNotes: string; setEvidenceNotes: (value: string) => void; saving: boolean; onSave: () => void; onDelete?: () => void; onClose?: () => void; evidence: Evidence[]; onOpenEvidence: (item: Evidence) => void }) {
   const references = useContext(ReferenceContext);
@@ -434,7 +446,7 @@ function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNo
   const { projects, people, assets, onSelectProject, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject } = references;
   const selectedProjectId = projects.find((item) => item.code === form.project_code && item.name === form.project_name)?.id || "";
   return <ImsPanel title={title} subtitle={subtitle}><div style={formGrid}>
-    <Field label="Project Code"><select value={selectedProjectId} onChange={(e) => onSelectProject(e.target.value)} style={imsInputStyle}><option value="">Select project code</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.code || "No code"}{item.source === "historic" ? " · Historic" : ""}</option>)}<option value="__add_new__">+ Add New Project</option></select></Field><Field label="Project Name"><select value={selectedProjectId} onChange={(e) => onSelectProject(e.target.value)} style={imsInputStyle}><option value="">Select project name</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}{item.source === "historic" ? " · Historic" : ""}</option>)}<option value="__add_new__">+ Add New Project</option></select></Field>
+    <Field label="Project Code"><select value={selectedProjectId} onChange={(e) => onSelectProject(e.target.value)} style={imsInputStyle}><option value="">Select project code</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.code || "No code"}</option>)}<option value="__add_new__">+ Add New Project</option></select></Field><Field label="Project Name"><select value={selectedProjectId} onChange={(e) => onSelectProject(e.target.value)} style={imsInputStyle}><option value="">Select project name</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}<option value="__add_new__">+ Add New Project</option></select></Field>
     {showNewProject && <div style={newProjectPanel}><Field label="New Project Code"><Input value={newProjectCode} onChange={setNewProjectCode} placeholder="e.g. ENS26-001" /></Field><Field label="New Project Name"><Input value={newProjectName} onChange={setNewProjectName} placeholder="Official project name" /></Field><div style={actionRow}><ImsButton onClick={() => void onAddProject()}>Add Project</ImsButton><ImsButton variant="secondary" onClick={() => setShowNewProject(false)}>Cancel</ImsButton></div></div>}
     <Field label="Report Date"><Input type="date" value={form.report_date} onChange={(x) => update("report_date", x)} /></Field><Field label="Date of Incident"><Input type="date" value={form.incident_date} onChange={(x) => update("incident_date", x)} /></Field>
     <Field label="Vessel / Office"><Input value={form.vessel_office} onChange={(x) => update("vessel_office", x)} /></Field><Field label="Asset"><ControlledSelect value={form.assets} onChange={(x) => update("assets", x)} placeholder="Select asset" options={assets.map((item) => ({ value: item.name, label: item.code ? `${item.code} · ${item.name}` : item.name }))} /></Field>
@@ -461,13 +473,15 @@ function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNo
 
 const kpiGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 };
 const twoColumn: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 18 };
-const storyGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 };
-const storyCard: CSSProperties = { width: "100%", display: "grid", gap: 7, padding: 15, borderRadius: 14, background: imsColours.panelAlt, border: `1px solid ${imsColours.borderSoft}`, color: imsColours.ink, textAlign: "left", font: "inherit", cursor: "pointer" };
 const repeatGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 };
 const repeatCard: CSSProperties = { display: "grid", gap: 7, textAlign: "left", padding: 14, borderRadius: 14, border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft, color: imsColours.ink, cursor: "pointer" };
-const learningGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 };
-const learningCard: CSSProperties = { display: "grid", alignContent: "start", gap: 8, minHeight: 190, padding: 16, borderRadius: 14, border: `1px solid ${imsColours.brandBorder}`, background: "linear-gradient(145deg, #ffffff 0%, #effaf8 100%)", color: imsColours.ink, textAlign: "left", font: "inherit", cursor: "pointer" };
+const learningSpotlightWrap: CSSProperties = { display: "grid", gap: 10 };
+const learningSpotlightCard: CSSProperties = { width: "100%", display: "grid", alignContent: "center", gap: 10, minHeight: 220, padding: "24px clamp(20px, 4vw, 48px)", borderRadius: 16, border: `1px solid ${imsColours.brandBorder}`, background: "linear-gradient(135deg, #ffffff 0%, #effaf8 58%, #e0f4f1 100%)", color: imsColours.ink, textAlign: "left", font: "inherit", cursor: "pointer" };
 const learningEyebrow: CSSProperties = { color: imsColours.brandDark, fontSize: 11, fontWeight: 900, letterSpacing: ".05em", textTransform: "uppercase" };
+const learningTitleStyle: CSSProperties = { fontSize: 22, lineHeight: 1.2 };
+const learningTextStyle: CSSProperties = { maxWidth: 980, margin: 0, fontSize: 16, lineHeight: 1.65 };
+const learningControlsStyle: CSSProperties = { display: "flex", justifyContent: "center", alignItems: "center", gap: 12, color: imsColours.slate, fontSize: 12, fontWeight: 800 };
+const learningControlButtonStyle: CSSProperties = { width: 34, height: 34, borderRadius: 999, border: `1px solid ${imsColours.brandBorder}`, background: "#ffffff", color: imsColours.brandDark, fontSize: 22, lineHeight: 1, cursor: "pointer" };
 const newProjectPanel: CSSProperties = { gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, padding: 14, borderRadius: 12, border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft };
 const watchList: CSSProperties = { display: "grid", gap: 8 };
 const watchRow: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "11px 12px", borderRadius: 12, border: `1px solid ${imsColours.borderSoft}`, background: imsColours.panelAlt, textAlign: "left", cursor: "pointer" };

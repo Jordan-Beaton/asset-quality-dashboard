@@ -154,6 +154,9 @@ type OpenFindingRow = FindingRecord & {
   audit_type: AuditType;
 };
 
+type FindingImportFields = Pick<FindingRecord, "owner" | "status" | "due_date" | "closure_date" | "root_cause" | "containment_action" | "corrective_action">;
+type FindingImportPreview = { findingId: string; file: File; fields: FindingImportFields };
+
 
 const STORAGE_BUCKET = "audit-evidence";
 
@@ -641,6 +644,9 @@ function AuditsPageContent() {
   const [uploadingFindingEvidenceId, setUploadingFindingEvidenceId] = useState("");
   const [generatingFindingPdfId, setGeneratingFindingPdfId] = useState("");
   const [generatingFindingWordId, setGeneratingFindingWordId] = useState("");
+  const [importingFindingWordId, setImportingFindingWordId] = useState("");
+  const [findingImportPreview, setFindingImportPreview] = useState<FindingImportPreview | null>(null);
+  const [applyingFindingImport, setApplyingFindingImport] = useState(false);
   const [isSavingLinks, setIsSavingLinks] = useState(false);
   const [selectedOpenFindingId, setSelectedOpenFindingId] = useState("");
   const [openFindingCategoryFilter, setOpenFindingCategoryFilter] = useState<
@@ -2089,6 +2095,39 @@ function AuditsPageContent() {
     }
   }
 
+  async function handleCompletedFindingUpload(finding: FindingRecord, event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireEditPermission("Importing completed audit findings")) { event.target.value = ""; return; }
+    const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
+    setImportingFindingWordId(finding.id); setFindingImportPreview(null);
+    try {
+      const body = new FormData(); body.append("file", file); body.append("expectedReference", finding.reference); body.append("expectedFindingId", finding.id);
+      const response = await fetch("/api/audit-finding-import", { method: "POST", body });
+      const result = await response.json() as { error?: string; fields?: FindingImportFields };
+      if (!response.ok || !result.fields) throw new Error(result.error || "The completed finding could not be read.");
+      setFindingImportPreview({ findingId: finding.id, file, fields: result.fields });
+      setMessage(`${finding.reference} extracted. Review the proposed changes before applying them.`);
+    } catch (error) {
+      setMessage(`Completed finding import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally { setImportingFindingWordId(""); }
+  }
+
+  async function applyCompletedFindingImport(finding: FindingRecord) {
+    const preview = findingImportPreview; if (!preview || preview.findingId !== finding.id) return;
+    if (!requireEditPermission("Applying completed audit findings")) return;
+    if (preview.fields.status === "Closed" && !preview.fields.closure_date) { setMessage("A closure date is required before a returned finding can be closed."); return; }
+    setApplyingFindingImport(true);
+    try {
+      const payload: Record<string, string | null> = {};
+      (Object.keys(preview.fields) as Array<keyof FindingImportFields>).forEach((field) => { const value = String(preview.fields[field] || "").trim(); if (value && value !== String(finding[field] || "").trim()) payload[field] = value; });
+      if (Object.keys(payload).length) { const { error } = await supabase.from("audit_findings").update(payload).eq("id", finding.id); if (error) throw new Error(error.message); }
+      const path = await uploadFileToStorage(finding.audit_id, preview.file, `findings/${sanitizeFileName(finding.reference)}/returned`);
+      const { error: fileError } = await supabase.from("audit_files").insert({ audit_id: finding.audit_id, file_name: `${finding.reference} completed response - ${preview.file.name}`, file_path: path, file_size: preview.file.size, uploaded_at: new Date().toISOString() });
+      if (fileError) throw new Error(fileError.message);
+      setFindingImportPreview(null); await loadAudits(false); setMessage(`${finding.reference} updated from the returned Word document and the source file was retained as evidence.`);
+    } catch (error) { setMessage(`Finding update failed: ${error instanceof Error ? error.message : "Unknown error"}`); }
+    finally { setApplyingFindingImport(false); }
+  }
+
   async function handleReportUpload(event: React.ChangeEvent<HTMLInputElement>) {
     if (!requireEditPermission("Uploading audit documents")) {
       event.target.value = "";
@@ -2255,6 +2294,24 @@ function AuditsPageContent() {
         ))}
       </div>
     );
+  }
+
+  function renderFindingImportPreview(finding: FindingRecord) {
+    const preview = findingImportPreview?.findingId === finding.id ? findingImportPreview : null;
+    if (!preview) return null;
+    const labels: Record<keyof FindingImportFields, string> = { owner: "Owner", status: "Status", due_date: "Due Date", closure_date: "Closure Date", root_cause: "Root Cause", containment_action: "Containment Action", corrective_action: "Corrective Action" };
+    const changes = (Object.keys(labels) as Array<keyof FindingImportFields>).filter((field) => String(preview.fields[field] || "").trim() && String(preview.fields[field] || "").trim() !== String(finding[field] || "").trim());
+    return <div style={importPreviewStyle}><div style={importPreviewHeadStyle}><div><strong>Returned finding review</strong><span>{preview.file.name}</span></div><button type="button" style={reportLinkButtonStyle} onClick={() => setFindingImportPreview(null)}>Discard</button></div>{changes.length ? <div style={importComparisonStyle}>{changes.map((field) => <div key={field} style={importComparisonRowStyle}><strong>{labels[field]}</strong><div><span>Current IMS</span><p>{String(finding[field] || "Not recorded")}</p></div><div><span>Returned Word</span><p>{String(preview.fields[field])}</p></div></div>)}</div> : <p style={emptyTextStyle}>No populated fields differ from the current IMS record.</p>}<div style={findingEvidenceButtonRowStyle}><button type="button" style={primaryButtonStyle} disabled={!changes.length || applyingFindingImport} onClick={() => void applyCompletedFindingImport(finding)}>{applyingFindingImport ? "Applying..." : "Approve Updates"}</button></div></div>;
+  }
+
+  function renderFindingOptions(finding: FindingRecord) {
+    return <details style={optionsMenuStyle}><summary style={optionsSummaryStyle}>More options ···</summary><div style={optionsMenuPanelStyle}>
+      <button type="button" style={optionsMenuItemStyle} onClick={() => void generateFindingPdf(finding)} disabled={Boolean(generatingFindingPdfId)}>{generatingFindingPdfId === finding.id ? "Generating PDF..." : "Generate PDF report"}</button>
+      <button type="button" style={optionsMenuItemStyle} onClick={() => void generateFindingWord(finding)} disabled={Boolean(generatingFindingWordId)}>{generatingFindingWordId === finding.id ? "Generating Word..." : "Generate Word report"}</button>
+      <label style={optionsMenuItemStyle}>{importingFindingWordId === finding.id ? "Reading completed Word..." : "Upload completed Word"}<input type="file" accept=".docx" style={{ display: "none" }} disabled={Boolean(importingFindingWordId) || !canEditAudit} onChange={(event) => void handleCompletedFindingUpload(finding, event)} /></label>
+      <label style={optionsMenuItemStyle}>{uploadingFindingEvidenceId === finding.id ? "Uploading evidence..." : "Upload evidence"}<input type="file" multiple style={{ display: "none" }} disabled={Boolean(uploadingFindingEvidenceId) || !canEditAudit} onChange={(event) => void handleFindingEvidenceUpload(finding, event)} /></label>
+      <button type="button" style={{ ...optionsMenuItemStyle, color: "#b91c1c" }} onClick={() => void deleteFinding(finding)} disabled={!canEditAudit}>Delete finding</button>
+    </div></details>;
   }
 
   function exportText(value: string | null | undefined) {
@@ -2583,6 +2640,8 @@ function AuditsPageContent() {
               new Paragraph({ children: [wordRun(finding.reference || "Audit Finding", { bold: true, size: 36 })] }),
               new Paragraph({ spacing: { after: 180 }, children: [wordRun(`${audit.audit_number} - ${audit.title}`, { color: "475569", size: 20 })] }),
               new Paragraph({ spacing: { after: 180 }, children: [wordRun(`Generated: ${exportDateTime(new Date().toISOString())}`, { color: "475569", size: 18 })] }),
+              new Paragraph({ children: [wordRun("IMS Record ID", { color: "94A3B8", size: 14 })] }),
+              new Paragraph({ spacing: { after: 120 }, children: [wordRun(finding.id, { color: "94A3B8", size: 14 })] }),
               wordTable(
                 ["Field", "Details", "Field", "Details"],
                 [
@@ -4403,51 +4462,13 @@ function AuditsPageContent() {
                     >
                       Save Finding
                     </button>
-                    <button
-                      type="button"
-                      style={secondaryButtonStyle}
-                      onClick={() => void generateFindingPdf(openFindingForm)}
-                      disabled={Boolean(generatingFindingPdfId)}
-                    >
-                      {generatingFindingPdfId === openFindingForm.id ? "Generating PDF..." : "Generate PDF Report"}
-                    </button>
-                    <button
-                      type="button"
-                      style={secondaryButtonStyle}
-                      onClick={() => void generateFindingWord(openFindingForm)}
-                      disabled={Boolean(generatingFindingWordId)}
-                    >
-                      {generatingFindingWordId === openFindingForm.id ? "Generating Word..." : "Generate Word Report"}
-                    </button>
                     {renderFindingEvidenceActions(openFindingForm)}
-                    <label
-                      style={{
-                        ...uploadButtonStyle,
-                        opacity: uploadingFindingEvidenceId === openFindingForm.id ? 0.7 : 1,
-                        cursor: uploadingFindingEvidenceId === openFindingForm.id ? "wait" : "pointer",
-                      }}
-                    >
-                      {uploadingFindingEvidenceId === openFindingForm.id ? "Uploading Evidence..." : "Evidence Upload"}
-                      <input
-                        type="file"
-                        multiple
-                        style={{ display: "none" }}
-                        disabled={Boolean(uploadingFindingEvidenceId) || !canEditAudit}
-                        onChange={(event) => void handleFindingEvidenceUpload(openFindingForm, event)}
-                      />
-                    </label>
                     <button type="button" style={secondaryButtonStyle} onClick={hideOpenFindingPanel}>
                       Hide Panel
                     </button>
-                    <button
-                      type="button"
-                      style={dangerButtonStyle}
-                      onClick={() => void deleteFinding(openFindingForm)}
-                      disabled={!canEditAudit}
-                    >
-                      Delete Finding
-                    </button>
+                    {renderFindingOptions(openFindingForm)}
                   </div>
+                  {renderFindingImportPreview(openFindingForm)}
                 </div>
               ) : null}
             </SectionCard>
@@ -5362,47 +5383,9 @@ function AuditsPageContent() {
 
                           <div style={findingCardActionsStyle}>
                             {renderFindingEvidenceActions(finding)}
-                            <button
-                              type="button"
-                              style={secondaryButtonStyle}
-                              onClick={() => void generateFindingPdf(finding)}
-                              disabled={Boolean(generatingFindingPdfId)}
-                            >
-                              {generatingFindingPdfId === finding.id ? "Generating PDF..." : "Generate PDF Report"}
-                            </button>
-                            <button
-                              type="button"
-                              style={secondaryButtonStyle}
-                              onClick={() => void generateFindingWord(finding)}
-                              disabled={Boolean(generatingFindingWordId)}
-                            >
-                              {generatingFindingWordId === finding.id ? "Generating Word..." : "Generate Word Report"}
-                            </button>
-                            <label
-                              style={{
-                                ...uploadButtonStyle,
-                                opacity: uploadingFindingEvidenceId === finding.id ? 0.7 : 1,
-                                cursor: uploadingFindingEvidenceId === finding.id ? "wait" : "pointer",
-                              }}
-                            >
-                              {uploadingFindingEvidenceId === finding.id ? "Uploading Evidence..." : "Evidence Upload"}
-                              <input
-                                type="file"
-                                multiple
-                                style={{ display: "none" }}
-                                disabled={Boolean(uploadingFindingEvidenceId) || !canEditAudit}
-                                onChange={(event) => void handleFindingEvidenceUpload(finding, event)}
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              style={dangerButtonStyle}
-                              onClick={() => void deleteFinding(finding)}
-                              disabled={!canEditAudit}
-                            >
-                              Delete Finding
-                            </button>
+                            {renderFindingOptions(finding)}
                           </div>
+                          {renderFindingImportPreview(finding)}
                         </div>
                       );
                     })}
@@ -7337,6 +7320,15 @@ const findingCardActionsStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
 };
+
+const optionsMenuStyle: CSSProperties = { position: "relative", marginLeft: "auto" };
+const optionsSummaryStyle: CSSProperties = { listStyle: "none", cursor: "pointer", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", background: "#e8eef7", color: "#0f172a", fontSize: "13px", fontWeight: 800, userSelect: "none" };
+const optionsMenuPanelStyle: CSSProperties = { position: "absolute", zIndex: 40, right: 0, bottom: "calc(100% + 8px)", width: "220px", display: "grid", padding: "6px", borderRadius: "12px", border: "1px solid #cbd5e1", background: "#ffffff", boxShadow: "0 16px 35px rgba(15,23,42,.18)" };
+const optionsMenuItemStyle: CSSProperties = { display: "block", width: "100%", boxSizing: "border-box", border: 0, borderRadius: "8px", background: "transparent", padding: "10px 11px", color: "#0f172a", textAlign: "left", font: "inherit", fontSize: "13px", fontWeight: 700, cursor: "pointer" };
+const importPreviewStyle: CSSProperties = { marginTop: "14px", padding: "16px", borderRadius: "14px", border: "1px solid #99d7d3", background: "#f0fdfa", display: "grid", gap: "14px" };
+const importPreviewHeadStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" };
+const importComparisonStyle: CSSProperties = { display: "grid", gap: "10px" };
+const importComparisonRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "140px minmax(0, 1fr) minmax(0, 1fr)", gap: "10px", alignItems: "start", padding: "10px", borderRadius: "10px", background: "#ffffff", border: "1px solid #ccfbf1" };
 
 const findingEvidenceActionsStyle: CSSProperties = {
   display: "grid",
