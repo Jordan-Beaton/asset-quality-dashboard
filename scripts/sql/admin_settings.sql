@@ -24,6 +24,30 @@ create index if not exists people_system_role_idx
 create index if not exists people_access_status_idx
   on public.people(access_status);
 
+create table if not exists public.ims_access_requests (
+  id uuid primary key default gen_random_uuid(),
+  first_name text not null,
+  last_name text not null,
+  email text not null,
+  department text not null,
+  reason text not null,
+  requested_modules text[] not null default '{}',
+  status text not null default 'Pending' check (status in ('Pending', 'Approved', 'Rejected', 'Cancelled')),
+  submitted_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  reviewed_by text,
+  review_notes text
+);
+
+create unique index if not exists ims_access_requests_pending_email_unique
+  on public.ims_access_requests (lower(trim(email)))
+  where status = 'Pending';
+
+create index if not exists ims_access_requests_status_submitted_idx
+  on public.ims_access_requests (status, submitted_at desc);
+
+alter table public.ims_access_requests enable row level security;
+
 update public.people
 set
   system_role = 'Admin',

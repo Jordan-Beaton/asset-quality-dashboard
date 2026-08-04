@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 
 const moduleCards = [
@@ -11,7 +12,7 @@ const moduleCards = [
     icon: "projects",
     description: "Project workspaces for ITP control, delivery registers, quality annexes, and reporting.",
     href: "/projects",
-    moduleKey: "quality",
+    moduleKey: "projects",
     status: "Live",
     group: "Projects",
     cta: "Enter",
@@ -22,7 +23,7 @@ const moduleCards = [
     icon: "quality",
     description: "NCR, audits, MOC, reporting, and HSEQ workflow control.",
     href: "/quality",
-    moduleKey: "quality",
+    moduleKey: "lessons",
     status: "Live",
     group: "Core IMS",
     cta: "Enter",
@@ -240,6 +241,8 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
 
 export default function HomePage() {
   const permissions = useImsPermissions();
+  const [pendingRequests, setPendingRequests] = useState<Array<{ id: string; first_name: string; last_name: string; email: string; department: string; requested_modules: string[]; submitted_at: string }>>([]);
+  useEffect(() => { if (!permissions.loaded || !permissions.isMasterAdmin) return; void fetch("/api/admin-settings", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((json) => setPendingRequests((json?.accessRequests || []).filter((request: { status: string }) => request.status === "Pending"))).catch(() => undefined); }, [permissions.isMasterAdmin, permissions.loaded]);
   const isModuleAccessible = (moduleKey: (typeof moduleCards)[number]["moduleKey"]) => {
     if (!permissions.loaded) return true;
     return permissions.canAccessModule(moduleKey);
@@ -311,6 +314,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {permissions.isMasterAdmin && pendingRequests.length ? <section style={adminRequestPanel}><div><div style={surfaceEyebrowStyle}>ADMIN ATTENTION</div><h2 style={adminRequestTitle}>{pendingRequests.length} access request{pendingRequests.length === 1 ? "" : "s"} awaiting review</h2><p style={surfaceHintStyle}>{pendingRequests.slice(0, 3).map((request) => `${request.first_name} ${request.last_name} · ${request.department}`).join(" | ")}</p></div><Link href="/admin" style={adminRequestLink}>Review Requests</Link></section> : null}
 
       <section style={commandSurfaceStyle} aria-label="Management modules">
         <div style={surfaceHeaderStyle}>
@@ -750,3 +755,7 @@ const ctaStyle: CSSProperties = {
   fontWeight: 900,
   whiteSpace: "nowrap",
 };
+
+const adminRequestPanel: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, margin: "0 auto 20px", maxWidth: 1320, padding: "16px 18px", border: "1px solid #fdba74", borderRadius: 16, background: "#fff7ed", boxShadow: "0 8px 20px rgba(154,52,18,.08)" };
+const adminRequestTitle: CSSProperties = { margin: "3px 0 5px", color: "#9a3412", fontSize: 19 };
+const adminRequestLink: CSSProperties = { flex: "0 0 auto", display: "inline-flex", alignItems: "center", minHeight: 42, padding: "10px 14px", borderRadius: 10, background: "#0f766e", color: "#ffffff", textDecoration: "none", fontSize: 14, fontWeight: 900 };

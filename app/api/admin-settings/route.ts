@@ -18,7 +18,8 @@ type AdminAction =
   | "updateDepartment"
   | "addProject"
   | "updateProject"
-  | "addAuditLog";
+  | "addAuditLog"
+  | "reviewAccessRequest";
 
 function getServiceClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -149,7 +150,7 @@ export async function GET() {
     }
 
     const service = access.service;
-    const [authUsersResult, peopleResult, companyResult, departmentsResult, projectsResult, rolesResult, auditLogResult, tabPermissionsResult] =
+    const [authUsersResult, peopleResult, companyResult, departmentsResult, projectsResult, rolesResult, auditLogResult, tabPermissionsResult, accessRequestsResult] =
       await Promise.all([
         service.auth.admin.listUsers({ page: 1, perPage: 1000 }),
         service.from("people").select("*").order("name", { ascending: true }),
@@ -159,6 +160,7 @@ export async function GET() {
         service.from("ims_roles").select("*").order("role_name", { ascending: true }),
         service.from("ims_audit_log").select("*").order("created_at", { ascending: false }).limit(80),
         service.from("ims_tab_permissions").select("*").order("module_key", { ascending: true }).order("area_key", { ascending: true }),
+        service.from("ims_access_requests").select("*").order("submitted_at", { ascending: false }).limit(500),
       ]);
 
     if (peopleResult.error) throw peopleResult.error;
@@ -182,6 +184,7 @@ export async function GET() {
       roles: rolesResult.data || [],
       auditLog: auditLogResult.data || [],
       tabPermissions: tabPermissionsResult.data || [],
+      accessRequests: accessRequestsResult.data || [],
       warnings: [
         companyResult.error ? `Company settings: ${companyResult.error.message}` : "",
         departmentsResult.error ? `Departments: ${departmentsResult.error.message}` : "",
@@ -189,6 +192,7 @@ export async function GET() {
         rolesResult.error ? `Roles: ${rolesResult.error.message}` : "",
         auditLogResult.error ? `Audit log: ${auditLogResult.error.message}` : "",
         tabPermissionsResult.error ? `Tab permissions: ${tabPermissionsResult.error.message}` : "",
+        accessRequestsResult.error ? `Access requests: ${accessRequestsResult.error.message}` : "",
       ].filter(Boolean),
     });
   } catch (error) {
@@ -218,6 +222,7 @@ export async function POST(request: Request) {
       const role = cleanText(payload.system_role) || "Viewer";
       const department = cleanText(payload.department);
       const permissionOverride = cleanText(payload.permission_override) || "Role Default";
+      const requestId = cleanText(payload.request_id);
       const moduleAccessPayload = {
         quality_access: cleanText(payload.quality_access) || null,
         hse_access: cleanText(payload.hse_access) || null,
@@ -319,6 +324,10 @@ export async function POST(request: Request) {
         }
       }
 
+      if (requestId) {
+        await service.from("ims_access_requests").update({ status: "Approved", reviewed_at: new Date().toISOString(), reviewed_by: actorEmail, review_notes: "Approved through Users & Access." }).eq("id", requestId).eq("status", "Pending");
+      }
+
       const origin = getInviteOrigin(request);
       const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const authUser = authUsers.data.users.find((user: User) => (user.email || "").toLowerCase() === email);
@@ -348,6 +357,17 @@ export async function POST(request: Request) {
 
       await writeAuditLog(service, actorEmail, "Invite User", "Person", email, `Invited ${name} as ${role}.`);
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "reviewAccessRequest") {
+      const id = cleanText(payload.id); const status = cleanText(payload.status); const notes = cleanText(payload.notes);
+      if (!id || !["Rejected", "Cancelled"].includes(status)) return NextResponse.json({ error: "A valid request and review outcome are required." }, { status: 400 });
+      const { data: previous, error: previousError } = await service.from("ims_access_requests").select("*").eq("id", id).maybeSingle();
+      if (previousError || !previous) return NextResponse.json({ error: previousError?.message || "Access request was not found." }, { status: 404 });
+      const { error } = await service.from("ims_access_requests").update({ status, reviewed_at: new Date().toISOString(), reviewed_by: actorEmail, review_notes: notes || null }).eq("id", id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      await writeAuditLog(service, actorEmail, `${status} Access Request`, "Access Request", previous.email, `${status} access request from ${previous.email}.`, previous, { ...previous, status, review_notes: notes || null });
+      return NextResponse.json({ ok: true, message: `Access request ${status.toLowerCase()}.` });
     }
 
     if (action === "sendExistingInvite") {

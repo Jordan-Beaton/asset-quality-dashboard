@@ -59,7 +59,10 @@ The workspace follows the Quality Management visual structure: hero, top meta/st
 - Outputs include Word and/or PDF where required for insertion into the client monthly report.
 - Open Points database migration: `scripts/sql/project_open_points.sql`.
 - Open Points UI: `src/components/WaddenSeaOpenPoints.tsx`, mounted as the `Open Points` Project Reports tab.
-- It provides a dashboard, combined-filter register, create/edit workflow, controlled project settings, People/ITP/NOI/Risk/NCR links, evidence, CDE tracking, deadline automation, closure controls and Excel/Word/PDF outputs.
+- It provides a dashboard, shared IMS filter/register pattern, simplified create/edit workflow, controlled project settings, People-linked Raised By/Owner fields, NCR linkage, evidence, client-document tracking, deadline automation, closure controls and aligned Excel/Word/PDF outputs.
+- NOI, ITP and Risk links were deliberately removed from Open Points because they complicated normal use without a reliable operational relationship. Historic database columns remain available for traceability.
+- Project phases are controlled dropdown values with Add New support; phase/settings changes are retained in `project_open_point_settings_history`.
+- Excel, Word and PDF register outputs share the same controlled eight-column structure and Wadden Sea/IMS report identity.
 - The compliance and acceptance map is in `docs/codex/WADDEN_SEA_OPEN_POINTS_COMPLIANCE.md`.
 - The Employer source identifies the activity as `CA_Act_1699`; do not relabel it `CA_ACT_1669` without a revised controlled source.
 - CDE upload and Employer decisions remain human-controlled steps. The IMS tracks due dates, references and evidence but does not integrate directly with the Employer CDE.
@@ -72,6 +75,7 @@ The workspace follows the Quality Management visual structure: hero, top meta/st
 4. Reopen the NOI from the tracker in a separate authenticated session, edit it, and confirm stored files are replaced.
 5. Delete the latest trial NOI and confirm linked points return to Planned and the next number recalculates correctly.
 6. Verify dashboard and Creator layouts on mobile.
+7. Verify Open Points create/edit, People dropdowns, Add New Phase history, NCR linking, evidence, cumulative filters and all three register outputs.
 
 ## Guardrails
 

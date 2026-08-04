@@ -7,6 +7,7 @@ import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { ImsPermissionNotice, ImsPermissionProvider, type ImsPermissionValue } from "./ImsPermissions";
 import { supabase } from "../lib/supabase";
+import { getPermissionTargetFromPath } from "../lib/imsPermissionRegistry";
 
 type AppShellProps = {
   children: ReactNode;
@@ -248,6 +249,8 @@ function getModuleAccessValue(moduleKey: string, moduleAccess: ModuleAccess) {
 }
 
 function getPermissionTargetFromHref(href: string): PermissionTarget | null {
+  const registered = getPermissionTargetFromPath(href);
+  if (registered) return { moduleKey: registered.moduleKey, areaKey: registered.areaKey };
   if (href.startsWith("/lessons-learned")) return { moduleKey: "quality", areaKey: "lessons" };
   if (href.startsWith("/projects")) return { moduleKey: "quality", areaKey: "reports" };
   if (href === "/quality") return { moduleKey: "quality", areaKey: "dashboard" };
@@ -334,7 +337,7 @@ function getActivePermissionValue({
   const canAccessModule = (moduleKey: string) => {
     if (moduleKey === "home") return true;
     if (isMasterAdmin) return true;
-    const moduleAccessValue = getModuleAccessValue(moduleKey, moduleAccess);
+    const moduleAccessValue = getEffectiveModuleAccess(moduleKey, moduleAccess, tabPermissions);
     if (isExplicitNone(moduleAccessValue)) return false;
     if (isPartAccess(moduleAccessValue)) return hasAnyModuleTabPermission(tabPermissions, moduleKey);
     if (hasExplicitAccess(moduleAccessValue)) return true;
@@ -369,7 +372,7 @@ function getActivePermissionValue({
     };
   }
 
-  const moduleAccessValue = getModuleAccessValue(target.moduleKey, moduleAccess);
+  const moduleAccessValue = getEffectiveModuleAccess(target.moduleKey, moduleAccess, tabPermissions);
   if (isPartAccess(moduleAccessValue)) {
     const tabPermission = getTabPermission(tabPermissions, target.moduleKey, target.areaKey);
     const fullAccess = Boolean(tabPermission?.full_access);
@@ -493,11 +496,22 @@ function getTabPermission(tabPermissions: TabPermissionRecord[], moduleKey: stri
   });
 }
 
+function getEffectiveModuleAccess(moduleKey: string, moduleAccess: ModuleAccess, tabPermissions: TabPermissionRecord[]) {
+  const rows = tabPermissions.filter((permission) => (permission.module_key || "").trim() === moduleKey);
+  if (rows.length) {
+    if (rows.every((permission) => permission.full_access)) return "Full";
+    if (rows.some((permission) => permission.full_access || permission.can_view || permission.can_create || permission.can_edit)) return "Part Access";
+    return "None";
+  }
+  if (moduleKey === "lessons" || moduleKey === "projects") return moduleAccess.quality;
+  return getModuleAccessValue(moduleKey, moduleAccess);
+}
+
 function filterNavItemsForRole(items: NavItem[], role: SystemRole, moduleAccess: ModuleAccess, tabPermissions: TabPermissionRecord[]) {
   return items.filter((item) => {
     if (item.href === "/home" || item.href === "/") return true;
     const target = getPermissionTargetFromHref(item.href);
-    if (target && isPartAccess(getModuleAccessValue(target.moduleKey, moduleAccess))) {
+    if (target && isPartAccess(getEffectiveModuleAccess(target.moduleKey, moduleAccess, tabPermissions))) {
       return hasTabPermission(tabPermissions, target.moduleKey, target.areaKey);
     }
     return isAreaAllowed(getAccessAreaFromHref(item.href), role, moduleAccess);
@@ -782,9 +796,7 @@ export default function AppShell({ children }: AppShellProps) {
     isLoginPage ||
     isPublicObservationPage ||
     !permissionsLoaded ||
-    (currentPermissionTarget && isPartAccess(getModuleAccessValue(currentPermissionTarget.moduleKey, signedInModuleAccess))
-      ? hasTabPermission(signedInTabPermissions, currentPermissionTarget.moduleKey, currentPermissionTarget.areaKey)
-      : isAreaAllowed(currentAccessArea, signedInRole, signedInModuleAccess));
+    (currentPermissionTarget ? activePermission.canView : isAreaAllowed(currentAccessArea, signedInRole, signedInModuleAccess));
 
   useEffect(() => {
     if (typeof window === "undefined") return;

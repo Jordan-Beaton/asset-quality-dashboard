@@ -6,6 +6,7 @@ import { ImsPermissionNotice, useImsPermissions } from "../../src/components/Ims
 import { ImsButton, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { IMS_PERMISSION_REGISTRY } from "../../src/lib/imsPermissionRegistry";
 import {
   imsColours,
   imsInputStyle,
@@ -114,6 +115,7 @@ type TabPermissionRow = {
   can_edit: boolean;
   full_access: boolean;
 };
+type AccessRequestRow = { id: string; first_name: string; last_name: string; email: string; department: string; reason: string; requested_modules: string[]; status: string; submitted_at: string; reviewed_at?: string | null; reviewed_by?: string | null; review_notes?: string | null };
 
 type AdminData = {
   currentUserEmail: string;
@@ -125,6 +127,7 @@ type AdminData = {
   roles: RoleRow[];
   auditLog: AuditLogRow[];
   tabPermissions: TabPermissionRow[];
+  accessRequests: AccessRequestRow[];
   warnings: string[];
 };
 
@@ -150,7 +153,7 @@ const permissionOverrideOptions = ["Role Default", "Custom", "Full System Access
 const moduleAccessOptions = ["Role Default", "None", "Part Access", "Read", "Edit", "Approve", "Documents", "Observe", "Full"];
 const roleAccessOptions = ["None", "Read", "Edit", "Approve", "Documents", "Observe", "Full"];
 
-const modulePermissionDefinitions = [
+export const legacyModulePermissionDefinitions = [
   {
     moduleKey: "quality",
     label: "Quality Management",
@@ -263,7 +266,8 @@ const modulePermissionDefinitions = [
   },
 ] as const;
 
-type ModulePermissionDefinition = (typeof modulePermissionDefinitions)[number];
+const modulePermissionDefinitions = IMS_PERMISSION_REGISTRY.map((module) => ({ ...module, accessField: module.legacyAccessField || "" , areas: module.areas.map((area) => [area.key, area.label] as const) }));
+type ModulePermissionDefinition = { moduleKey: string; label: string; accessField: string; areas: ReadonlyArray<readonly [string, string]> };
 
 const initialCompany: CompanySettings = {
   company_name: "Enshore Subsea",
@@ -363,6 +367,7 @@ export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [inviteForm, setInviteForm] = useState({
+    request_id: "",
     name: "",
     email: "",
     job_role: "",
@@ -464,6 +469,15 @@ export default function AdminDashboardPage() {
     if (!selectedOverridePersonId) return null;
     return people.find((person) => person.id === selectedOverridePersonId) || null;
   }, [people, selectedOverridePersonId]);
+  const pendingAccessRequests = useMemo(() => (data?.accessRequests || []).filter((request) => request.status === "Pending"), [data?.accessRequests]);
+
+  function prepareAccessRequest(request: AccessRequestRow) {
+    const requested = new Set(request.requested_modules || []); const drafts: Record<string, TabPermissionRow> = {};
+    modulePermissionDefinitions.forEach((module) => module.areas.forEach(([areaKey]) => { const allowed = requested.has(module.moduleKey); drafts[tabPermissionKey(module.moduleKey, areaKey)] = { email: request.email, module_key: module.moduleKey, area_key: areaKey, can_view: allowed, can_create: false, can_edit: false, full_access: false }; }));
+    setInviteTabPermissionDrafts(drafts); setInviteForm((current) => ({ ...current, request_id: request.id, name: `${request.first_name} ${request.last_name}`, email: request.email, department: request.department, permissions_notes: `Access requested: ${request.reason}` })); setShowInvitePanel(true); setMessage(`Prepared ${request.first_name} ${request.last_name}'s request with view-only access to the requested modules. Review before sending.`); window.setTimeout(() => document.getElementById("admin-invite-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  async function rejectAccessRequest(request: AccessRequestRow) { const notes = window.prompt("Reason for rejecting this request (optional)") || ""; await postAdminAction("reviewAccessRequest", { id: request.id, status: "Rejected", notes }, `${request.email} access request rejected.`); }
 
   function getPersonDraft(person: PersonRow) {
     return { ...person, ...(personDrafts[person.id] || {}) };
@@ -512,12 +526,7 @@ export default function AdminDashboardPage() {
   }
 
   function setInviteModuleAccessMode(definition: ModulePermissionDefinition, mode: "Full" | "Part Access" | "None") {
-    setInviteForm({
-      ...inviteForm,
-      permission_override: "Custom",
-      [definition.accessField]: mode,
-      system_role: mode === "Full" && definition.accessField === "admin_access" ? "Admin" : inviteForm.system_role,
-    });
+    setInviteForm({ ...inviteForm, permission_override: "Custom", ...(definition.accessField ? { [definition.accessField]: mode } : {}), system_role: mode === "Full" && definition.accessField === "admin_access" ? "Admin" : inviteForm.system_role });
     definition.areas.forEach(([areaKey]) => {
       const full = mode === "Full";
       const none = mode === "None";
@@ -548,6 +557,26 @@ export default function AdminDashboardPage() {
         area_key: areaKey,
       }));
     });
+  }
+
+  function permissionRowsMode(rows: TabPermissionRow[]) {
+    if (!rows.length) return "";
+    if (rows.every((permission) => permission.full_access)) return "Full";
+    if (rows.some((permission) => permission.full_access || permission.can_view || permission.can_create || permission.can_edit)) return "Part Access";
+    return "None";
+  }
+
+  function getInviteModuleMode(definition: ModulePermissionDefinition) {
+    const rows = definition.areas.filter(([areaKey]) => Boolean(inviteTabPermissionDrafts[tabPermissionKey(definition.moduleKey, areaKey)])).map(([areaKey]) => getInviteTabPermissionDraft(definition.moduleKey, areaKey));
+    return permissionRowsMode(rows) || String((definition.accessField ? (inviteForm as Record<string, string>)[definition.accessField] : "") || "None");
+  }
+
+  function getPersonModuleMode(person: PersonRow, definition: ModulePermissionDefinition, draft: PersonRow) {
+    const draftKeys = tabPermissionDrafts[person.id] || {};
+    const savedRows = (data?.tabPermissions || []).filter((permission) => permission.person_id === person.id && permission.module_key === definition.moduleKey);
+    const hasDrafts = definition.areas.some(([areaKey]) => Boolean(draftKeys[tabPermissionKey(definition.moduleKey, areaKey)]));
+    const rows = hasDrafts ? definition.areas.map(([areaKey]) => getTabPermissionDraft(person, definition.moduleKey, areaKey)) : savedRows;
+    return permissionRowsMode(rows) || String((definition.accessField ? (draft as Record<string, unknown>)[definition.accessField] : "") || "Role Default");
   }
 
   function getTabPermissionDraft(person: PersonRow, moduleKey: string, areaKey: string): TabPermissionRow {
@@ -589,7 +618,7 @@ export default function AdminDashboardPage() {
   }
 
   function setModuleAccessMode(person: PersonRow, accessField: string, moduleKey: string, mode: "Full" | "Part Access" | "None") {
-    setPersonDraft(person, { permission_override: "Custom", [accessField]: mode } as Partial<PersonRow>);
+    setPersonDraft(person, { permission_override: "Custom", ...(accessField ? { [accessField]: mode } : {}) } as Partial<PersonRow>);
     const definition = modulePermissionDefinitions.find((item) => item.moduleKey === moduleKey);
     if (!definition) return;
     definition.areas.forEach(([areaKey]) => {
@@ -659,6 +688,7 @@ export default function AdminDashboardPage() {
     );
     if (ok) {
       setInviteForm({
+        request_id: "",
         name: "",
         email: "",
         job_role: "",
@@ -837,7 +867,7 @@ export default function AdminDashboardPage() {
 
         <div style={modulePermissionStackStyle}>
           {modulePermissionDefinitions.map((definition) => {
-            const moduleAccessValue = isMaster ? "Full" : String((draft as Record<string, unknown>)[definition.accessField] || "Role Default");
+            const moduleAccessValue = isMaster ? "Full" : getPersonModuleMode(person, definition, draft);
             const partAccess = moduleAccessValue === "Part Access";
             return (
               <section key={definition.moduleKey} style={compactModuleCardStyle}>
@@ -1005,7 +1035,9 @@ export default function AdminDashboardPage() {
 
       {activeView === "users" ? (
         <section style={{ display: "grid", gap: "18px" }}>
-          <ImsPanel title="Invite User" subtitle="Create a login-ready person record, assign permissions, and send the setup invite.">
+          {pendingAccessRequests.length ? <ImsPanel title={`Pending Access Requests (${pendingAccessRequests.length})`} subtitle="Review requested modules before creating an account or issuing a setup link."><div style={requestQueue}>{pendingAccessRequests.map((request) => <article key={request.id} style={requestCard}><div><strong>{request.first_name} {request.last_name}</strong><small style={requestMeta}>{request.email} · {request.department} · {formatDateTime(request.submitted_at)}</small><p style={paragraphStyle}>{request.reason}</p><small style={requestMeta}>Requested: {(request.requested_modules || []).map((key) => IMS_PERMISSION_REGISTRY.find((module) => module.moduleKey === key)?.label || key).join(", ")}</small></div><div style={requestActions}><ImsButton onClick={() => prepareAccessRequest(request)} disabled={!canCreateAdmin}>Review & Prepare</ImsButton><ImsButton variant="danger" onClick={() => void rejectAccessRequest(request)} disabled={!canEditAdmin}>Reject</ImsButton></div></article>)}</div></ImsPanel> : null}
+          <ImsPanel title="Invite User" subtitle="Create a login-ready person record, assign permissions, and send the setup invite." style={{ scrollMarginTop: 90 }}>
+            <div id="admin-invite-panel" />
             <div style={inviteHeaderRowStyle}>
               <p style={paragraphStyle}>Use this only for new system users. Existing People records can be invited from the user list below.</p>
               <ImsButton variant={showInvitePanel ? "secondary" : "primary"} onClick={() => setShowInvitePanel(!showInvitePanel)} disabled={!canCreateAdmin}>
@@ -1038,10 +1070,10 @@ export default function AdminDashboardPage() {
                   </div>
                   <div style={invitePermissionRowsStyle}>
                     {modulePermissionDefinitions.map((module) => {
-                      const currentValue = String((inviteForm as Record<string, string>)[module.accessField] || "None");
+                      const currentValue = getInviteModuleMode(module);
                       const partAccess = currentValue === "Part Access";
                       return (
-                        <div key={module.accessField} style={invitePermissionRowStyle}>
+                        <div key={module.moduleKey} style={invitePermissionRowStyle}>
                           <div style={invitePermissionRowHeaderStyle}>
                             <div>
                               <h4 style={invitePermissionModuleTitleStyle}>{module.label}</h4>
@@ -1345,7 +1377,7 @@ export default function AdminDashboardPage() {
                     </Field>
                     <div style={{ gridColumn: "1 / -1", display: "grid", gap: 12 }}>
                       {modulePermissionDefinitions.map((definition) => {
-                        const moduleAccessValue = isMaster ? "Full" : String((draft as Record<string, unknown>)[definition.accessField] || "Role Default");
+                        const moduleAccessValue = isMaster ? "Full" : getPersonModuleMode(person, definition, draft);
                         const partAccess = moduleAccessValue === "Part Access";
                         return (
                           <section key={definition.moduleKey} style={modulePermissionCardStyle}>
@@ -1699,6 +1731,10 @@ const invitePermissionOptionActiveStyle: CSSProperties = {
   borderColor: imsColours.brand,
   color: "#ffffff",
 };
+const requestQueue: CSSProperties = { display: "grid", gap: 10 };
+const requestCard: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "start", gap: 16, padding: 14, border: "1px solid #dbe7f3", borderRadius: 12, background: "#f8fafc" };
+const requestMeta: CSSProperties = { display: "block", marginTop: 4, color: "#64748b", fontSize: 12, lineHeight: 1.4 };
+const requestActions: CSSProperties = { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 };
 
 const userSearchRowStyle: CSSProperties = {
   display: "grid",

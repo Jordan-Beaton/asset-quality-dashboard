@@ -49,6 +49,10 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - The Project NOI register supports structured/OCR extraction of Client, Enshore, Contractor and equivalent W/H points across varied supplier ITP layouts, manual point entry, supplier/ITP/title/type/status filtering, planned dates, assigned people, and filtered PDF output.
 - NOI Creator generates multi-point controlled ENS-HSEQ-FRM-074 Word and matching one-page PDF outputs, assigns sequential NOI numbers, stores editable form data and generated files, synchronises inspection dates with tracker planned dates, and supports reopen/edit/download/delete workflows.
 - Wadden Sea Project Reports consolidate Audit NCR, Audit Programme, and eight-week lookahead outputs, with the NOI register retained as the primary lookahead data source and Excel upload retained as a fallback.
+- Lessons Learned is live as a central searchable knowledge repository with controlled Project/People/Asset references, repeat-theme linkage, interactive analytics, cumulative filters, evidence, large-register support and a rotating “What We’ve Learned” insight.
+- Wadden Sea Project Reports now include a dedicated Open Points dashboard/register aligned to `CA_Act_1699`, with simplified entry, People-linked raiser/owner fields, controlled phase creation/history, NCR linkage, evidence, client-copy tracking, deadline/closure controls and aligned Excel/Word/PDF outputs.
+- Admin permission definitions and route enforcement now share `src/lib/imsPermissionRegistry.ts`. Lessons Learned and Project Management are independent generic permission modules, and future registered modules/tabs automatically appear in Users & Access without new per-module database columns.
+- Login now supports controlled self-service access requests without self-registration. Requests are limited to Enshore email addresses, use Admin reference departments and the permission registry, appear on Master Admin Home and in Users & Access, and remain Pending until Admin prepares/rejects them.
 
 # In Progress
 
@@ -58,10 +62,14 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Document Control workflow verification and revision handling, especially reject/resubmit/approve cleanup and up-rev history behavior.
 - Button-level create/edit/delete permission enforcement across remaining edge routes after the Central Actions, Document Control, Quality, HSE Actions/Reports, HSE AINM, HSE Observations, HSE Inspections, Admin / Settings, Risk Register, and Asset spot-check hardening passes.
 - Admin/Settings detail panel polish and Vercel invite-flow verification.
+- Admin permission-registry production QA: verify legacy fallback, explicit Full/Part/None saves, new-user defaults, and route denial for Lessons Learned and each Project Management area.
+- Access-request production QA after applying the latest `admin_settings.sql`: public validation, duplicate prevention, Home notification, view-only permission preparation, approval/rejection status, audit history and invite/setup-link fallback.
 - Report page migration from local style constants toward shared IMS primitives.
 - Mobile responsiveness beyond the best-developed HSE inspection flow.
 - Risk Management shell and workflows.
 - Project Management production QA for saved NOI reopen/edit/delete, controlled document storage, sequential numbering, planned-date synchronisation, and mobile responsiveness.
+- Lessons Learned production QA for the 2,990-row import, uncapped KPI totals, cumulative filters, controlled dropdowns and repeat-record drill-downs.
+- Open Points production QA and confirmation that `scripts/sql/project_open_points.sql` has been applied to the live Supabase project.
 
 # Known Issues
 
@@ -82,20 +90,23 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Some pages still use local style constants instead of `ImsPrimitives`.
 - Risk Management exists as shell/functionality but needs review for maturity and consistency.
 - NOIs created before editable NOI storage was introduced retain their linked tracker points but cannot recover manual form values that were never persisted; saving them once establishes the editable stored record.
+- Historic Lessons Learned narrative quality is inconsistent; automated trend statements must remain proportionate to the evidence.
+- Open Points phase history and People-linked Raised By require the latest `project_open_points.sql` migration in the live database.
 
 # Next Priorities
 
-1. Verify Admin invite/setup flow on Vercel end to end: create user, set permissions, use Copy Setup Link, set password, confirm module/tab access.
-2. Continue button-level permission audit only on remaining edge routes or newly touched pages not covered by the Central Actions / Document Control / Quality / HSE / Admin / Risk Register / Asset hardening passes.
-3. Verify Document Control rejection-field cleanup on Vercel: reject, resubmit, review, approve, and confirm stale rejection fields are cleared.
-4. Review Document Control up-rev behavior to protect revision files, dates, comments, and current-revision archiving.
-5. Verify Asset Management on Vercel with real data: Dashboard drill-downs, Register detail scroll, Calibration item status/exclusion behavior, lifecycle history, supplier dropdown persistence, register export, compact Inspection/Maintenance registers, Reports, uploads, PDFs, central Action links, and role-based permission behavior.
-6. Verify HSE Reports on Vercel after the Quality-parity pass: saved reports behavior, year filters, snapshot-period editing, permissions, and executive summary in PDFs.
-7. Polish AINM register behavior: Show Filters, Classification column, Accident/Incident filter, Select Type default, and detail-panel scroll.
-8. Verify HSE Observation public/mobile submit flow and register linkage to Action Management.
-9. Align old local style blocks with shared IMS primitives when touching each page.
-10. Review Risk Management pages for route completeness, visual consistency, and demo readiness.
-11. Verify the complete Wadden Sea Project Management workflow on Vercel: ITP upload/revision history, W/H extraction, manual NOI points, NOI creation, saved Word/PDF reopen, editing, deletion, numbering recalculation, tracker-date synchronisation, and eight-week lookahead/report outputs.
+1. Apply the latest `scripts/sql/admin_settings.sql`, then verify public access request -> Admin Home notification -> Users & Access review -> permission adjustment -> invite/setup link -> password creation -> effective module/tab permissions.
+2. Verify Admin create/edit/read-only behavior across representative permission profiles, polish Users & Access detail presentation, and expand sensitive-change Audit Log coverage.
+3. Continue button-level permission audit only on remaining edge routes or newly touched pages not covered by the Central Actions / Document Control / Quality / HSE / Admin / Risk Register / Asset hardening passes.
+4. Verify Document Control rejection-field cleanup on Vercel: reject, resubmit, review, approve, and confirm stale rejection fields are cleared.
+5. Review Document Control up-rev behavior to protect revision files, dates, comments, and current-revision archiving.
+6. Verify Asset Management on Vercel with real data: Dashboard drill-downs, Register detail scroll, Calibration item status/exclusion behavior, lifecycle history, supplier dropdown persistence, register export, compact Inspection/Maintenance registers, Reports, uploads, PDFs, central Action links, and role-based permission behavior.
+7. Verify HSE Reports on Vercel after the Quality-parity pass: saved reports behavior, year filters, snapshot-period editing, permissions, and executive summary in PDFs.
+8. Polish AINM register behavior: Show Filters, Classification column, Accident/Incident filter, Select Type default, and detail-panel scroll.
+9. Verify HSE Observation public/mobile submit flow and register linkage to Action Management.
+10. Align old local style blocks with shared IMS primitives when touching each page.
+11. Review Risk Management pages for route completeness, visual consistency, and demo readiness.
+12. Verify Lessons Learned and the complete Wadden Sea workflow on Vercel, including Open Points database migration, phase history, NCR linking, evidence and register outputs.
 
 # Future Enhancements
 
@@ -185,8 +196,20 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
   - Verify invite/setup flow on Vercel.
   - Continue Users & Access detail panel polish.
   - Verify create/edit/read-only behavior on Vercel after the page-level Admin guard pass.
+  - Verify registry-driven Lessons Learned and Project Management permissions for existing and newly invited users.
   - Never expose or print Supabase, Resend, OpenAI, or service-role secrets.
   - Keep `NEXT_PUBLIC_SITE_URL` aligned to deployed site where possible.
+
+## Lessons Learned
+
+- Status: In Progress
+- Summary: The central repository, import, analytics, repeat-theme linking, controlled dropdowns, evidence and interactive register behavior are implemented. Historic data quality and production-scale reconciliation remain the main risks.
+- Outstanding Actions:
+  - Reconcile the 2,990-row source workbook against imported, rejected and duplicate totals.
+  - Verify uncapped KPI counts and cumulative filter option behavior on Vercel.
+  - Test repeated-record drill-downs and all KPI/chart interactions.
+  - Preserve fixed register columns and the five-second rotating learning insight.
+  - Improve classifications progressively without overstating conclusions from poor historic narratives.
 
 ## Management Review
 
@@ -219,3 +242,5 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
   - Verify mobile layouts for the Wadden Sea dashboard, NOI register, and NOI Creator.
   - Continue improving varied supplier ITP extraction only against evidenced layout failures; preserve party-column targeting so supplier columns are not mistaken for Enshore/Client/Contractor columns.
   - Keep the NOI register as the primary eight-week-lookahead source while retaining Excel upload as a fallback.
+  - Apply and verify the latest Open Points SQL migration, including People-linked raiser and phase-settings history.
+  - Verify Open Points filters, fixed register, phase creation, NCR dropdown, evidence, deadline/closure workflow and aligned Excel/Word/PDF outputs.

@@ -24,6 +24,11 @@ Admin / Settings controls login users, invites, permissions, reference data, and
 
 ## Permissions
 
+- Central permission registry: `src/lib/imsPermissionRegistry.ts`.
+- Users & Access and application route enforcement both read the same registry. New modules/tabs must be added there once; do not create another hard-coded Admin permission list.
+- Generic `ims_tab_permissions` rows now determine Full, Part Access or None when rows exist, so new modules do not require a new `people` access column.
+- Legacy module access columns remain fallback values for existing users who do not yet have rows for a newly registered module.
+- Lessons Learned and Project Management are registered as independent permission modules. Project areas cover Projects, Wadden Sea, Supplier ITP, NOI and Project Reports/Open Points.
 - People Management and Management Review have been added to permission controls.
 - Module cards on Home remain visible but show No Access if the user has no access.
 - `None` module permission now denies module access properly.
@@ -35,6 +40,12 @@ Admin / Settings controls login users, invites, permissions, reference data, and
 
 ## Invite/Login Flow
 
+- Login now includes a public `Request access` workflow for first name, last name, Enshore email, controlled department, reason and requested modules.
+- Public API: `app/api/access-requests/route.ts`. It accepts only `@enshoresubsea.com`, validates active departments/modules and blocks duplicate Pending requests.
+- Database queue: `ims_access_requests`, created by `scripts/sql/admin_settings.sql`. No anonymous table policy is exposed; the server route writes through the service role after validation.
+- A request does not create an account. Master Admin sees a Pending Access Requests notice on IMS Home and the review queue in Users & Access.
+- `Review & Prepare` pre-fills the Invite User workflow and gives requested modules view-only access initially. Admin must review/adjust permissions before sending.
+- Successful account preparation marks the request Approved. Rejections are recorded and written to the Admin audit log.
 - Login page handles Supabase invite/reset links.
 - It exchanges invite/recovery code/token into a Supabase session before updating password.
 - Confirm password was added.
@@ -65,11 +76,22 @@ Admin / Settings controls login users, invites, permissions, reference data, and
 
 ## Recommended Next Work
 
+- Treat Admin / Settings as the next active IMS hardening phase.
 - Verify Admin invite flow on Vercel:
+  - submit a public access request
+  - confirm the Admin-only Home notification and Users & Access queue
+  - prepare the request and verify requested modules default to view-only
+  - adjust permissions, send the invite, and confirm the request becomes Approved
+  - reject a test request and confirm the audit entry
   - create user
   - set permissions
   - use Copy Setup Link
   - user creates password
   - permissions apply correctly
-- Continue Admin / Settings polish.
-- Verify Admin / Settings create/edit/read-only behavior on Vercel after the page-level guard pass.
+- Test invite-email success, rate-limit/failure messaging, and the Copy Setup Link fallback separately.
+- Verify create/edit/read-only behavior for Master Admin, full-access, create-only, edit-only and read-only users.
+- Polish the Users & Access detail panel using shared IMS panels, compact filters and predictable action grouping.
+- Confirm Reference Data changes feed controlled dropdowns without duplicating People Management.
+- Expand Audit Log coverage for user access, permission, setup-link and sensitive reference-data changes.
+- Add future permission areas through `IMS_PERMISSION_REGISTRY`; saving Users & Access will automatically persist the corresponding generic rows.
+- Keep the three-tab scope; do not restore Roles, Company or Notifications as cluttered top-level tabs without a proven operational need.

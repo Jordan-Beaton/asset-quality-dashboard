@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "../../src/lib/supabase";
 
 const REDIRECT_STORAGE_KEY = "asset-quality-login-redirect";
-type LoginMode = "login" | "forgot" | "reset";
+type LoginMode = "login" | "forgot" | "reset" | "request";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
@@ -16,6 +16,8 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false);
   const [authLinkLoading, setAuthLinkLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [requestForm, setRequestForm] = useState({ first_name: "", last_name: "", email: "", department: "", reason: "", requested_modules: [] as string[] });
+  const [requestOptions, setRequestOptions] = useState<{ departments: string[]; modules: Array<{ key: string; label: string }> }>({ departments: [], modules: [] });
   const redirectTarget = searchParams.get("redirect") || "/";
   const safeRedirectTarget =
     redirectTarget.startsWith("/") && !redirectTarget.startsWith("//")
@@ -85,6 +87,8 @@ function LoginPageContent() {
     hydrateAuthLinkSession();
   }, [searchParams]);
 
+  useEffect(() => { if (mode !== "request" || requestOptions.departments.length) return; void fetch("/api/access-requests").then((response) => response.json()).then((json) => { if (json.error) setMessage(json.error); else setRequestOptions({ departments: json.departments || [], modules: json.modules || [] }); }).catch(() => setMessage("Access request options could not be loaded.")); }, [mode, requestOptions.departments.length]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -109,6 +113,11 @@ function LoginPageContent() {
           ? finalRedirectTarget
           : "/";
       return;
+    }
+
+    if (mode === "request") {
+      const response = await fetch("/api/access-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestForm) }); const json = await response.json();
+      setMessage(json.error || json.message || "Access request submitted."); setLoading(false); if (response.ok) setRequestForm({ first_name: "", last_name: "", email: "", department: "", reason: "", requested_modules: [] }); return;
     }
 
     if (mode === "forgot") {
@@ -178,10 +187,12 @@ function LoginPageContent() {
     >
       <div style={{ marginBottom: "20px" }}>
         <h1 style={{ margin: 0, fontSize: "28px", color: "#0f172a" }}>
-          {mode === "login" ? "Sign in" : mode === "forgot" ? "Reset password" : "Set new password"}
+          {mode === "login" ? "Sign in" : mode === "forgot" ? "Reset password" : mode === "request" ? "Request IMS access" : "Set new password"}
         </h1>
         <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: "14px" }}>
-          {mode === "forgot"
+          {mode === "request"
+            ? "Submit your details for review by an IMS Administrator."
+            : mode === "forgot"
             ? "Enter your email and we will send a secure reset link."
             : mode === "reset"
               ? "Choose a new password for your IMS account."
@@ -190,6 +201,13 @@ function LoginPageContent() {
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: "14px" }}>
+        {mode === "request" ? <>
+          <div style={requestNameGrid}><div><label style={labelStyle}>First Name</label><input required style={inputStyle} value={requestForm.first_name} onChange={(e) => setRequestForm((current) => ({ ...current, first_name: e.target.value }))} /></div><div><label style={labelStyle}>Last Name</label><input required style={inputStyle} value={requestForm.last_name} onChange={(e) => setRequestForm((current) => ({ ...current, last_name: e.target.value }))} /></div></div>
+          <div><label style={labelStyle}>Enshore Email Address</label><input required type="email" pattern="[^@\\s]+@enshoresubsea\\.com" placeholder="name@enshoresubsea.com" style={inputStyle} value={requestForm.email} onChange={(e) => setRequestForm((current) => ({ ...current, email: e.target.value }))} /></div>
+          <div><label style={labelStyle}>Department</label><select required style={inputStyle} value={requestForm.department} onChange={(e) => setRequestForm((current) => ({ ...current, department: e.target.value }))}><option value="">Select department</option>{requestOptions.departments.map((department) => <option key={department}>{department}</option>)}</select></div>
+          <div><label style={labelStyle}>Reason Access Is Required</label><textarea required style={{ ...inputStyle, minHeight: 88, resize: "vertical" }} value={requestForm.reason} onChange={(e) => setRequestForm((current) => ({ ...current, reason: e.target.value }))} /></div>
+          <fieldset style={moduleFieldset}><legend style={labelStyle}>Requested Modules</legend><div style={moduleRequestGrid}>{requestOptions.modules.map((module) => <label key={module.key} style={moduleRequestOption}><input type="checkbox" checked={requestForm.requested_modules.includes(module.key)} onChange={(e) => setRequestForm((current) => ({ ...current, requested_modules: e.target.checked ? [...current.requested_modules, module.key] : current.requested_modules.filter((key) => key !== module.key) }))} />{module.label}</label>)}</div></fieldset>
+        </> : <>
         <div>
           <label htmlFor="email" style={labelStyle}>Email</label>
           <input
@@ -229,7 +247,7 @@ function LoginPageContent() {
               style={inputStyle}
             />
           </div>
-        ) : null}
+        ) : null}</>}
 
         <button
           type="submit"
@@ -245,7 +263,7 @@ function LoginPageContent() {
             opacity: loading ? 0.7 : 1,
           }}
         >
-          {loading || authLinkLoading ? "Please wait..." : mode === "login" ? "Sign in" : mode === "forgot" ? "Send reset email" : "Update password"}
+          {loading || authLinkLoading ? "Please wait..." : mode === "login" ? "Sign in" : mode === "forgot" ? "Send reset email" : mode === "request" ? "Submit Access Request" : "Update password"}
         </button>
       </form>
 
@@ -268,7 +286,7 @@ function LoginPageContent() {
       <div style={{ marginTop: "18px", fontSize: "14px", color: "#475569" }}>
         {mode === "login" ? (
           <>
-            Need access? Ask an IMS Admin for an invite link.
+            <InlineButton onClick={() => { setMode("request"); setMessage(null); }}>Request access</InlineButton>
             <span style={{ margin: "0 8px", color: "#cbd5e1" }}>{" | "}</span>
             <InlineButton
               onClick={() => {
@@ -334,6 +352,10 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
   boxSizing: "border-box",
 };
+const requestNameGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 };
+const moduleFieldset: React.CSSProperties = { margin: 0, padding: 12, border: "1px solid #dbe7f3", borderRadius: 12 };
+const moduleRequestGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 };
+const moduleRequestOption: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, color: "#334155", fontSize: 13, fontWeight: 700 };
 
 export default function LoginPage() {
   return (
