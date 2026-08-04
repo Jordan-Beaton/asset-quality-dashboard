@@ -28,6 +28,17 @@ const moduleCards = [
     cta: "Enter",
   },
   {
+    title: "Lessons Learned",
+    short: "Lessons",
+    icon: "lessons",
+    description: "Searchable project knowledge, repeat-failure links, photo evidence, action ownership, and trend analysis.",
+    href: "/lessons-learned",
+    moduleKey: "quality",
+    status: "Live",
+    group: "Core IMS",
+    cta: "Explore",
+  },
+  {
     title: "HSE Management",
     short: "HSE",
     icon: "hse",
@@ -143,6 +154,15 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
       <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
         <path {...common} d="M3 7h7l2 2h9v11H3z" />
         <path {...common} d="M3 7V4h7l2 3M8 14h8M12 11v6" />
+      </svg>
+    );
+  }
+
+  if (icon === "lessons") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
+        <path {...common} d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" />
+        <path {...common} d="M8 4v16M11 9h5M11 13h5" />
       </svg>
     );
   }

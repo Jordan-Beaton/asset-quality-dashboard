@@ -83,6 +83,7 @@ If unsure, stop and ask which Quality Management tab should be used as the maste
 - Actions
 - Reports
 - Documents
+- Project Management
 
 ## Key files
 - app/page.tsx
@@ -92,6 +93,12 @@ If unsure, stop and ask which Quality Management tab should be used as the maste
 - app/actions/page.tsx
 - app/reports/page.tsx
 - app/documents/page.tsx
+- app/projects/wadden-sea/page.tsx
+- app/projects/wadden-sea/itp/page.tsx
+- app/projects/wadden-sea/noi/page.tsx
+- app/projects/wadden-sea/noi/create/page.tsx
+- app/projects/wadden-sea/reports/page.tsx
+- app/api/projects/noi-create/route.ts
 - src/components/AppShell.tsx
 - app/api/document-notifications/route.ts
 
@@ -159,6 +166,7 @@ If unsure, stop and ask which Quality Management tab should be used as the maste
 - audit-evidence
 - quality-evidence
 - document-files
+- project-documents
 
 ## Vercel / Next.js gotchas already discovered
 - Some pages needed dynamic rendering / suspense handling for Vercel prerendering

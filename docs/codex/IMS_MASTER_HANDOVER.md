@@ -35,6 +35,7 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - Admin / Settings: `ADMIN_SETTINGS_HANDOVER.md`
 - People Management: `PEOPLE_MANAGEMENT_HANDOVER.md`
 - Action Management: `ACTION_MANAGEMENT_HANDOVER.md`
+- Project Management: `PROJECT_MANAGEMENT_HANDOVER.md`
 
 ## Current IMS Modules
 
@@ -46,5 +47,5 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - People Management
 - Management Review
 - Risk Management shell/functionality
+- Project Management with Wadden Sea workspace
 - Admin / Settings
-

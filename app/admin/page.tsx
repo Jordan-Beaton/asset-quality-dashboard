@@ -71,6 +71,7 @@ type ReferenceDepartment = {
 
 type ReferenceProject = {
   id: string;
+  code?: string | null;
   name: string;
   type?: string | null;
   active: boolean;
@@ -162,6 +163,7 @@ const modulePermissionDefinitions = [
       ["audits", "Audits"],
       ["actions", "Actions"],
       ["reports", "Reports"],
+      ["lessons", "Lessons Learned"],
     ],
   },
   {
@@ -380,7 +382,7 @@ export default function AdminDashboardPage() {
   });
   const [companyForm, setCompanyForm] = useState<CompanySettings>(initialCompany);
   const [newDepartment, setNewDepartment] = useState({ name: "", code: "" });
-  const [newProject, setNewProject] = useState({ name: "", type: "Project" });
+  const [newProject, setNewProject] = useState({ code: "", name: "", type: "Project" });
   const [personDrafts, setPersonDrafts] = useState<Record<string, Partial<PersonRow>>>({});
   const [userSearch, setUserSearch] = useState("");
   const [showInvitePanel, setShowInvitePanel] = useState(false);
@@ -947,7 +949,7 @@ export default function AdminDashboardPage() {
   async function addProject() {
     if (!requireCreatePermission("add Admin reference projects")) return;
     const ok = await postAdminAction("addProject", newProject, `${newProject.name} added successfully.`);
-    if (ok) setNewProject({ name: "", type: "Project" });
+    if (ok) setNewProject({ code: "", name: "", type: "Project" });
   }
 
   return (
@@ -1485,7 +1487,8 @@ export default function AdminDashboardPage() {
           </ImsPanel>
 
           <ImsPanel title="Projects / Vessels / Sites" subtitle="Foundation list for project and site dropdowns.">
-            <div style={{ ...formGridStyle, gridTemplateColumns: "1fr 160px auto", marginBottom: 16 }}>
+            <div style={{ ...formGridStyle, gridTemplateColumns: "150px 1fr 160px auto", marginBottom: 16 }}>
+              <input value={newProject.code} onChange={(event) => setNewProject({ ...newProject, code: event.target.value.toUpperCase() })} style={imsInputStyle} placeholder="Project code" />
               <input value={newProject.name} onChange={(event) => setNewProject({ ...newProject, name: event.target.value })} style={imsInputStyle} placeholder="Project / vessel / site name" />
               <SelectField value={newProject.type} onChange={(value) => setNewProject({ ...newProject, type: value })}>
                 <option value="Project">Project</option>
@@ -1495,7 +1498,7 @@ export default function AdminDashboardPage() {
               </SelectField>
               <ImsButton onClick={addProject} disabled={isSaving || !canCreateAdmin}>Add</ImsButton>
             </div>
-            <ReferenceList items={projects.map((project) => ({ id: project.id, label: project.name, meta: project.type || "Project", active: project.active }))} />
+            <ReferenceList items={projects.map((project) => ({ id: project.id, label: project.name, meta: [project.code, project.type || "Project"].filter(Boolean).join(" · "), active: project.active }))} />
           </ImsPanel>
         </section>
       ) : null}

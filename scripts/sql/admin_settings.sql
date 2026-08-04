@@ -76,6 +76,13 @@ create table if not exists public.ims_reference_projects (
   created_at timestamptz not null default now()
 );
 
+alter table public.ims_reference_projects
+add column if not exists code text;
+
+create unique index if not exists ims_reference_projects_code_unique_idx
+  on public.ims_reference_projects (lower(code))
+  where code is not null and btrim(code) <> '';
+
 create table if not exists public.ims_roles (
   id uuid primary key default gen_random_uuid(),
   role_name text not null unique,

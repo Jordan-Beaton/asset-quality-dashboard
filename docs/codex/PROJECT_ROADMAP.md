@@ -44,6 +44,11 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Admin / Settings now has explicit page-level create/edit permission guards for user invites, existing user access changes, setup/reset links, role defaults, company settings, and reference data creation.
 - Risk Register now has explicit page-level create/edit permission guards for risk creation, edits, and deletes, with register PDF generation left available as read-only output.
 - Asset spot-check pass aligned remaining visible write controls with existing page-level guards across Asset Actions, People, Inspection, Maintenance, and Calibration.
+- Project Management now includes a standardised Wadden Sea workspace with Dashboard, ITP Tracker, NOI Tracker, NOI Creator, and Project Reports tabs.
+- The Wadden Sea ITP Tracker retains controlled current revisions and archived revision history, stores source documents, supports compact editable registers, and extracts document metadata.
+- The Project NOI register supports structured/OCR extraction of Client, Enshore, Contractor and equivalent W/H points across varied supplier ITP layouts, manual point entry, supplier/ITP/title/type/status filtering, planned dates, assigned people, and filtered PDF output.
+- NOI Creator generates multi-point controlled ENS-HSEQ-FRM-074 Word and matching one-page PDF outputs, assigns sequential NOI numbers, stores editable form data and generated files, synchronises inspection dates with tracker planned dates, and supports reopen/edit/download/delete workflows.
+- Wadden Sea Project Reports consolidate Audit NCR, Audit Programme, and eight-week lookahead outputs, with the NOI register retained as the primary lookahead data source and Excel upload retained as a fallback.
 
 # In Progress
 
@@ -56,6 +61,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Report page migration from local style constants toward shared IMS primitives.
 - Mobile responsiveness beyond the best-developed HSE inspection flow.
 - Risk Management shell and workflows.
+- Project Management production QA for saved NOI reopen/edit/delete, controlled document storage, sequential numbering, planned-date synchronisation, and mobile responsiveness.
 
 # Known Issues
 
@@ -75,6 +81,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Asset Management is closer to Quality/HSE after dashboard drill-down, calibration item availability/status controls, dashboard exclusion logic, top meta/status, reports filtering cleanup, Inspection/Maintenance register compaction, and page-level permission guards, but still needs Vercel workflow QA, mobile register review, and role-based spot checks.
 - Some pages still use local style constants instead of `ImsPrimitives`.
 - Risk Management exists as shell/functionality but needs review for maturity and consistency.
+- NOIs created before editable NOI storage was introduced retain their linked tracker points but cannot recover manual form values that were never persisted; saving them once establishes the editable stored record.
 
 # Next Priorities
 
@@ -88,6 +95,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 8. Verify HSE Observation public/mobile submit flow and register linkage to Action Management.
 9. Align old local style blocks with shared IMS primitives when touching each page.
 10. Review Risk Management pages for route completeness, visual consistency, and demo readiness.
+11. Verify the complete Wadden Sea Project Management workflow on Vercel: ITP upload/revision history, W/H extraction, manual NOI points, NOI creation, saved Word/PDF reopen, editing, deletion, numbering recalculation, tracker-date synchronisation, and eight-week lookahead/report outputs.
 
 # Future Enhancements
 
@@ -199,3 +207,15 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
   - Align Risk register, reviews, controls, opportunities, and reports with UI standards.
   - Verify Risk Register create/edit/read-only behavior on Vercel after the page-level guard pass.
   - Confirm route/page/tab permissions are complete across the remaining Risk shell pages.
+
+## Project Management
+
+- Status: In Progress
+- Summary: Project Management has a Wadden Sea workspace aligned to the Quality Management layout standard. It includes a dashboard, controlled Supplier ITP programme, Project NOI requirements register, controlled NOI Creator, project report annexes, and eight-week inspection lookahead. NOI generation supports multiple inspection points, controlled Word/PDF output, shared project storage, editable saved records, tracker date synchronisation, sequential numbering, and self-service deletion of trial or cancelled NOIs.
+- Outstanding Actions:
+  - Verify the complete workflow on Vercel with authenticated users and real supplier records.
+  - Confirm saved NOI Word, PDF, and JSON records can be reopened across different user sessions.
+  - Confirm deleting the latest NOI returns linked points to Planned and makes the deleted latest sequence number available again without reusing numbers that remain issued.
+  - Verify mobile layouts for the Wadden Sea dashboard, NOI register, and NOI Creator.
+  - Continue improving varied supplier ITP extraction only against evidenced layout failures; preserve party-column targeting so supplier columns are not mistaken for Enshore/Client/Contractor columns.
+  - Keep the NOI register as the primary eight-week-lookahead source while retaining Excel upload as a fallback.

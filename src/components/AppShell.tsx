@@ -71,7 +71,7 @@ type PeopleAccessRecord = {
   admin_access?: string | null;
 };
 
-type AccessArea = "public" | "login" | "home" | "people" | "quality" | "documents" | "hse" | "assets" | "risk" | "actions" | "management-review" | "projects" | "admin";
+type AccessArea = "public" | "login" | "home" | "people" | "quality" | "lessons" | "documents" | "hse" | "assets" | "risk" | "actions" | "management-review" | "projects" | "admin";
 
 type NavIconKey =
   | "home"
@@ -97,7 +97,8 @@ type NavIconKey =
   | "departments"
   | "system"
   | "ainm"
-  | "observations";
+  | "observations"
+  | "lessons";
 
 const projectNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
@@ -114,6 +115,11 @@ const qualityNavItems: NavItem[] = [
   { href: "/audits", label: "Audits", icon: "audits" },
   { href: "/quality/actions", label: "Actions", icon: "actions" },
   { href: "/reports", label: "Reports", icon: "reports" },
+];
+
+const lessonsNavItems: NavItem[] = [
+  { href: "/home", label: "Home", icon: "home" },
+  { href: "/lessons-learned", label: "Lessons Learned", icon: "lessons" },
 ];
 
 const documentNavItems: NavItem[] = [
@@ -203,6 +209,7 @@ function getAccessAreaFromHref(href: string): AccessArea {
   if (href === "/management-review") return "management-review";
   if (href.startsWith("/admin")) return "admin";
   if (href.startsWith("/projects")) return "projects";
+  if (href.startsWith("/lessons-learned")) return "lessons";
   if (href.startsWith("/hse")) return "hse";
   if (href.startsWith("/assets")) return "assets";
   if (href.startsWith("/risk")) return "risk";
@@ -241,6 +248,7 @@ function getModuleAccessValue(moduleKey: string, moduleAccess: ModuleAccess) {
 }
 
 function getPermissionTargetFromHref(href: string): PermissionTarget | null {
+  if (href.startsWith("/lessons-learned")) return { moduleKey: "quality", areaKey: "lessons" };
   if (href.startsWith("/projects")) return { moduleKey: "quality", areaKey: "reports" };
   if (href === "/quality") return { moduleKey: "quality", areaKey: "dashboard" };
   if (href === "/quality/calendar") return { moduleKey: "quality", areaKey: "calendar" };
@@ -501,6 +509,7 @@ function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleA
   if (area === "home") return true;
   if (area === "people") return !isExplicitNone(moduleAccess.people) && (hasExplicitAccess(moduleAccess.people) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer");
   if (area === "quality") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
+  if (area === "lessons") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
   if (area === "documents") return !isExplicitNone(moduleAccess.documents) && (hasExplicitAccess(moduleAccess.documents) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer");
   if (area === "hse") return !isExplicitNone(moduleAccess.hse) && (hasExplicitAccess(moduleAccess.hse) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Viewer");
   if (area === "assets") return !isExplicitNone(moduleAccess.assets) && (hasExplicitAccess(moduleAccess.assets) || role === "Admin" || role === "Manager" || role === "Asset Manager" || role === "Viewer");
@@ -601,6 +610,15 @@ function RailIcon({ icon }: { icon: NavIconKey }) {
     );
   }
 
+  if (icon === "lessons") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 19, height: 19 }}>
+        <path {...common} d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" />
+        <path {...common} d="M8 4v16M11 9h5M11 13h5" />
+      </svg>
+    );
+  }
+
   if (icon === "ptw") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 19, height: 19 }}>
@@ -668,6 +686,7 @@ export default function AppShell({ children }: AppShellProps) {
   const isPeopleModule = pathname.startsWith("/people");
   const isActionModule = pathname === "/actions";
   const isProjectModule = pathname.startsWith("/projects");
+  const isLessonsModule = pathname.startsWith("/lessons-learned");
   const isAinmFieldMode = pathname === "/hse/ainm/field";
   const isAssetInspectionFieldMode = pathname === "/assets/inspection/field";
   const isAssetMaintenanceFieldMode = pathname === "/assets/maintenance/field";
@@ -683,6 +702,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? "Enshore Management System"
     : isActionModule
     ? "Action Management"
+    : isLessonsModule
+    ? "Lessons Learned"
     : isProjectModule
     ? "Project Management"
     : isDocumentModule
@@ -702,6 +723,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? ""
     : isActionModule
     ? "Central action register and follow-up control"
+    : isLessonsModule
+    ? "Central project knowledge, repeat-failure prevention, and operational learning"
     : isProjectModule
     ? "Project registers, controls, documents, and reporting"
     : isDocumentModule
@@ -733,6 +756,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? actionNavItems
     : isProjectModule
     ? projectNavItems
+    : isLessonsModule
+    ? lessonsNavItems
     : qualityNavItems;
   const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess, signedInTabPermissions);
   const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldInspectionMode;

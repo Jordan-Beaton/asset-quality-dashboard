@@ -720,7 +720,7 @@ export async function POST(request: Request) {
       const insertPayload =
         action === "addDepartment"
           ? { name, code: cleanText(payload.code) || null, active: true }
-          : { name, type: cleanText(payload.type) || "Project", active: true };
+          : { name, code: cleanText(payload.code) || null, type: cleanText(payload.type) || "Project", active: true };
 
       const { error } = await service.from(table).insert(insertPayload);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -737,7 +737,7 @@ export async function POST(request: Request) {
       const updatePayload =
         action === "updateDepartment"
           ? { name: cleanText(payload.name), code: cleanText(payload.code) || null, active: Boolean(payload.active) }
-          : { name: cleanText(payload.name), type: cleanText(payload.type) || "Project", active: Boolean(payload.active) };
+          : { name: cleanText(payload.name), code: cleanText(payload.code) || null, type: cleanText(payload.type) || "Project", active: Boolean(payload.active) };
 
       const { error } = await service.from(table).update(updatePayload).eq("id", id);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
