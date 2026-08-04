@@ -50,13 +50,19 @@ The workspace follows the Quality Management visual structure: hero, top meta/st
 - Delete NOI removes saved files/details, clears the NOI number, returns linked points to `Planned`, preserves their planned dates, and recalculates the next sequence.
 - Legacy NOIs created before editable storage cannot recover form values that were never saved; complete and save them once to establish the stored record.
 
-## Project Reports and Lookahead
+## Project Reports, Open Points and Lookahead
 
-- Project Reports consolidates the Wadden Sea monthly annex workflows for Audit NCRs, Audit Programme, and eight-week inspection lookahead.
+- Project Reports consolidates the Wadden Sea monthly annex workflows for Audit NCRs, Audit Programme, Open Points, and eight-week inspection lookahead.
 - Audit selections can be filtered and selected without leaving the current report screen.
 - The NOI register is the preferred master source for the eight-week lookahead.
 - Existing Excel upload remains available as a fallback during transition.
 - Outputs include Word and/or PDF where required for insertion into the client monthly report.
+- Open Points database migration: `scripts/sql/project_open_points.sql`.
+- Open Points UI: `src/components/WaddenSeaOpenPoints.tsx`, mounted as the `Open Points` Project Reports tab.
+- It provides a dashboard, combined-filter register, create/edit workflow, controlled project settings, People/ITP/NOI/Risk/NCR links, evidence, CDE tracking, deadline automation, closure controls and Excel/Word/PDF outputs.
+- The compliance and acceptance map is in `docs/codex/WADDEN_SEA_OPEN_POINTS_COMPLIANCE.md`.
+- The Employer source identifies the activity as `CA_Act_1699`; do not relabel it `CA_ACT_1669` without a revised controlled source.
+- CDE upload and Employer decisions remain human-controlled steps. The IMS tracks due dates, references and evidence but does not integrate directly with the Employer CDE.
 
 ## Validation Priorities
 

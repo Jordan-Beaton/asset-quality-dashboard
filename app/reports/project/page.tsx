@@ -26,6 +26,7 @@ import {
 import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
+import { WaddenSeaOpenPoints } from "../../../src/components/WaddenSeaOpenPoints";
 import { WaddenSeaWorkspaceNav } from "../../../src/components/WaddenSeaWorkspaceNav";
 import { supabase } from "../../../src/lib/supabase";
 
@@ -88,7 +89,7 @@ type ProjectAuditFinding = {
   corrective_action: string;
 };
 
-type ProjectAnnex = "audit-ncr" | "audit-programme" | "lookahead";
+type ProjectAnnex = "audit-ncr" | "audit-programme" | "lookahead" | "open-points";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -1181,6 +1182,7 @@ export default function ProjectReportsPage() {
           ["audit-ncr", "Audit NCR Report"],
           ["audit-programme", "Audit Programme"],
           ["lookahead", "8-Week Lookahead"],
+          ["open-points", "Open Points"],
         ].map(([view, label]) => (
           <button
             key={view}
@@ -1201,6 +1203,8 @@ export default function ProjectReportsPage() {
         <QualityKpiCard title="Hold Points" value={lookaheadMetrics.hold} accent="#dc2626" onClick={() => setActiveAnnex("lookahead")} />
         <QualityKpiCard title="NOI Outstanding" value={lookaheadMetrics.noiOutstanding} accent="#ea580c" onClick={() => setActiveAnnex("lookahead")} />
       </section>
+
+      {activeAnnex === "open-points" ? <WaddenSeaOpenPoints /> : null}
 
       {activeAnnex === "audit-ncr" || activeAnnex === "audit-programme" ? (
         <section style={panelStyle}>
