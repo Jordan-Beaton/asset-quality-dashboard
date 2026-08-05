@@ -102,13 +102,13 @@ export default function WaddenSeaPage() {
       <WaddenSeaWorkspaceNav active="dashboard" />
 
       <section className="quality-kpi-grid" style={metrics}>
-        <QualityKpiCard title="Current ITPs" value={currentItps} accent="#2563eb" href="/projects/wadden-sea/itp" />
-        <QualityKpiCard title="ITPs Requiring Attention" value={itpAttention.length} accent="#7c3aed" href="/projects/wadden-sea/itp" />
-        <QualityKpiCard title="Upcoming Inspections" value={upcoming.length} accent="#3A9B98" href="/projects/wadden-sea/reports" />
-        <QualityKpiCard title="NOI Outstanding" value={noiOutstanding} accent="#f59e0b" href="/projects/wadden-sea/noi" />
-        <QualityKpiCard title="Overdue Inspections" value={overdue.length} accent="#dc2626" href="/projects/wadden-sea/noi" />
-        <QualityKpiCard title="NOI Requirements" value={noiPoints.length} accent="#0891b2" href="/projects/wadden-sea/noi" />
-        <QualityKpiCard title="NOI Creator" value="Create" accent="#16a34a" href="/projects/wadden-sea/noi/create" />
+        <QualityKpiCard title="Current ITPs" value={currentItps} accent="#63B1BC" href="/projects/wadden-sea/itp" />
+        <QualityKpiCard title="ITPs Requiring Attention" value={itpAttention.length} accent="#53565A" href="/projects/wadden-sea/itp" />
+        <QualityKpiCard title="Upcoming Inspections" value={upcoming.length} accent="#005670" href="/projects/wadden-sea/reports" />
+        <QualityKpiCard title="NOI Outstanding" value={noiOutstanding} accent="#FFAD00" href="/projects/wadden-sea/noi" />
+        <QualityKpiCard title="Overdue Inspections" value={overdue.length} accent="#F93822" href="/projects/wadden-sea/noi" />
+        <QualityKpiCard title="NOI Requirements" value={noiPoints.length} accent="#005670" href="/projects/wadden-sea/noi" />
+        <QualityKpiCard title="NOI Creator" value="Create" accent="#005670" href="/projects/wadden-sea/noi/create" />
       </section>
 
       <section style={dashboardGrid}>
@@ -165,14 +165,14 @@ const metrics: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(7
 const dashboardGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 16, marginBottom: 20 };
 const panel: CSSProperties = { background: "#fff", border: "1px solid #dbe4ef", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,.07)" };
 const panelHeader: CSSProperties = { padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, borderBottom: "1px solid #e5ebf1" };
-const kicker: CSSProperties = { color: "#2f7f7d", fontSize: 10, fontWeight: 900, letterSpacing: ".1em", textTransform: "uppercase" };
+const kicker: CSSProperties = { color: "#005670", fontSize: 10, fontWeight: 900, letterSpacing: ".1em", textTransform: "uppercase" };
 const heading: CSSProperties = { margin: "3px 0 0", fontSize: 19, color: "#14263a" };
-const actionLink: CSSProperties = { color: "#2f7f7d", fontSize: 12, fontWeight: 900, textDecoration: "none" };
+const actionLink: CSSProperties = { color: "#005670", fontSize: 12, fontWeight: 900, textDecoration: "none" };
 const list: CSSProperties = { display: "grid" };
 const row: CSSProperties = { display: "grid", gridTemplateColumns: "70px minmax(200px,1fr) 145px", gap: 12, alignItems: "center", padding: "11px 14px", borderBottom: "1px solid #edf1f5", minHeight: 54 };
 const identity: CSSProperties = { display: "grid", gap: 3, color: "#25384b", fontSize: 12, minWidth: 0 };
 const dateBlock: CSSProperties = { display: "grid", gap: 3, color: "#475569", fontSize: 11, textAlign: "right" };
-const hold: CSSProperties = { padding: "5px 8px", borderRadius: 999, background: "#fee2e2", color: "#991b1b", fontWeight: 900, textAlign: "center", fontSize: 11 };
+const hold: CSSProperties = { padding: "5px 8px", borderRadius: 999, background: "#fee2e2", color: "#F93822", fontWeight: 900, textAlign: "center", fontSize: 11 };
 const witness: CSSProperties = { ...hold, background: "#fef3c7", color: "#92400e" };
 const reviewBadge: CSSProperties = { ...hold, background: "#ede9fe", color: "#5b21b6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 const empty: CSSProperties = { padding: 30, color: "#64748b", textAlign: "center", fontSize: 13 };

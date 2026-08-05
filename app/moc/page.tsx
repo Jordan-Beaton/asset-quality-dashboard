@@ -482,7 +482,7 @@ function getActionPlanStatusTone(status: string) {
   if (value === "Complete") return { background: "#dcfce7", color: "#166534" };
   if (value === "Ongoing") return { background: "#dbeafe", color: "#1d4ed8" };
   if (value === "Hold") return { background: "#fef3c7", color: "#92400e" };
-  return { background: "#fee2e2", color: "#991b1b" };
+  return { background: "#fee2e2", color: "#F93822" };
 }
 
 function getChangeTypeTone(value: ChangeType) {
@@ -721,9 +721,9 @@ function formatFileSize(value: number | null | undefined) {
 }
 
 function getNoticeColours(tone: NoticeTone) {
-  if (tone === "success") return { bg: "#EEF8F7", border: "#a7f3d0", text: "#166534" };
+  if (tone === "success") return { bg: "#ECECE7", border: "#ECECE7", text: "#166534" };
   if (tone === "warning") return { bg: "#fffbeb", border: "#fde68a", text: "#92400e" };
-  if (tone === "error") return { bg: "#fef2f2", border: "#fecaca", text: "#b91c1c" };
+  if (tone === "error") return { bg: "#fef2f2", border: "#fecaca", text: "#F93822" };
   return { bg: "#ffffff", border: "#e2e8f0", text: "#0f172a" };
 }
 
@@ -797,7 +797,7 @@ function getTemporaryValidityLabel(report: MocReport) {
 }
 
 function getTemporaryValidityTone(report: MocReport) {
-  if (isExpiredTemporary(report)) return { color: "#b91c1c" };
+  if (isExpiredTemporary(report)) return { color: "#F93822" };
   if (isNearingTemporaryExpiry(report)) return { color: "#b45309" };
   return { color: "#475569" };
 }
@@ -2032,7 +2032,7 @@ function MOCPageContent() {
   }
 
   function drawSectionHeading(doc: jsPDF, y: number, heading: string) {
-    doc.setFillColor(15, 118, 110);
+    doc.setFillColor(0, 86, 112);
     doc.roundedRect(12, y, 186, 8, 1.5, 1.5, "F");
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
@@ -2117,7 +2117,7 @@ function MOCPageContent() {
         minCellHeight: config.minCellHeight ?? 8,
       },
       headStyles: {
-        fillColor: [15, 118, 110],
+        fillColor: [0, 86, 112],
         textColor: [255, 255, 255],
         fontStyle: "bold",
       },
@@ -2619,7 +2619,7 @@ function MOCPageContent() {
         new TableRow({
           children: [
             new TableCell({
-              shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+              shading: { type: ShadingType.CLEAR, fill: "005670", color: "auto" },
               margins: { top: 110, bottom: 110, left: 150, right: 150 },
               children: [
                 new Paragraph({
@@ -2654,7 +2654,7 @@ function MOCPageContent() {
       width: options?.width ? { size: options.width, type: WidthType.DXA } : undefined,
       verticalAlign: VerticalAlign.CENTER,
       shading: header
-        ? { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" }
+        ? { type: ShadingType.CLEAR, fill: "005670", color: "auto" }
         : options?.shaded
           ? { type: ShadingType.CLEAR, fill: "F8FAFC", color: "auto" }
           : undefined,
@@ -3364,25 +3364,25 @@ function MOCPageContent() {
         <QualityKpiCard
           title="Active MOCs"
           value={openCount}
-          accent="#f59e0b"
+          accent="#FFAD00"
           onClick={() => applyMocDashboardFilter({ status: "Active" })}
         />
         <QualityKpiCard
           title="Temporary MOCs"
           value={temporaryCount}
-          accent="#2563eb"
+          accent="#63B1BC"
           onClick={() => applyMocDashboardFilter({ changeType: "Temporary" })}
         />
         <QualityKpiCard
           title="In Review"
           value={inReviewCount}
-          accent="#7c3aed"
+          accent="#53565A"
           onClick={() => applyMocDashboardFilter({ status: "In Review" })}
         />
         <QualityKpiCard
           title="Approved MOCs"
           value={approvedCount}
-          accent="#dc2626"
+          accent="#F93822"
           onClick={() => applyMocDashboardFilter({ status: "Approved" })}
         />
         <QualityKpiCard
@@ -3394,7 +3394,7 @@ function MOCPageContent() {
         <QualityKpiCard
           title="Recently Created"
           value={recentCount}
-          accent="#16a34a"
+          accent="#005670"
           onClick={() => applyMocDashboardFilter({ view: "Recent" })}
         />
       </section>
@@ -3498,7 +3498,7 @@ function MOCPageContent() {
                         style={{
                           ...segmentedButtonStyle,
                           ...segmentedButtonFillStyle,
-                          background: starterForm.change_type === option ? "#3A9B98" : "transparent",
+                          background: starterForm.change_type === option ? "#005670" : "transparent",
                           color: starterForm.change_type === option ? "#ffffff" : "#0f172a",
                         }}
                         onClick={() => setStarterForm((prev) => ({ ...prev, change_type: option }))}
@@ -3627,7 +3627,7 @@ function MOCPageContent() {
                       style={{
                         ...mocRegisterRowStyle,
                         background: active ? "#eff6ff" : "#ffffff",
-                        borderLeft: active ? "4px solid #3A9B98" : "4px solid transparent",
+                        borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                       }}
                       onClick={() => openBundle(report.id)}
                     >
@@ -3809,7 +3809,7 @@ function MOCPageContent() {
                             style={{
                               ...segmentedButtonStyle,
                               ...segmentedButtonFillStyle,
-                              background: detailReport.change_type === option ? "#3A9B98" : "transparent",
+                              background: detailReport.change_type === option ? "#005670" : "transparent",
                               color: detailReport.change_type === option ? "#ffffff" : "#0f172a",
                               opacity: canEditStructural ? 1 : 0.65,
                             }}
@@ -4495,7 +4495,7 @@ function MOCPageContent() {
               </button>
               <Link
                 href={buildMocLinkedActionHref(detailReport)}
-                style={{ ...secondaryButtonStyle, border: "1px solid #BFE5E3", color: "#3A9B98", textDecoration: "none" }}
+                style={{ ...secondaryButtonStyle, border: "1px solid #D0D0CE", color: "#005670", textDecoration: "none" }}
               >
                 Generate Linked Action
               </Link>
@@ -4621,12 +4621,12 @@ function ImpactToggle({ label, checked, onToggle }: { label: string; checked: bo
       type="button"
       style={{
         ...impactToggleStyle,
-        background: checked ? "#ecfeff" : "#ffffff",
-        borderColor: checked ? "#3A9B98" : "#cbd5e1",
+        background: checked ? "#ECECE7" : "#ffffff",
+        borderColor: checked ? "#005670" : "#cbd5e1",
       }}
       onClick={onToggle}
     >
-      <span style={{ ...impactCheckboxStyle, background: checked ? "#3A9B98" : "#ffffff", color: checked ? "#ffffff" : "#0f172a" }}>
+      <span style={{ ...impactCheckboxStyle, background: checked ? "#005670" : "#ffffff", color: checked ? "#ffffff" : "#0f172a" }}>
         {checked ? "x" : ""}
       </span>
       <span>{label}</span>
@@ -4907,7 +4907,7 @@ const viewButtonStyle: CSSProperties = {
 
 const activeViewButtonStyle: CSSProperties = {
   ...viewButtonStyle,
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
 };
 
@@ -5260,8 +5260,8 @@ const detailHeaderActionsStyle: CSSProperties = {
 const workflowButtonStyle: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
-  border: "1px solid #3A9B98",
-  background: "#3A9B98",
+  border: "1px solid #005670",
+  background: "#005670",
   color: "#ffffff",
   cursor: "pointer",
   fontWeight: 700,
@@ -5291,7 +5291,7 @@ const detailSectionStyle: CSSProperties = {
 const detailSectionTitleStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 900,
-  color: "#2F7F7D",
+  color: "#005670",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   marginBottom: "12px",
@@ -5375,8 +5375,8 @@ const actionPlanIntroStyle: CSSProperties = {
   marginBottom: "12px",
   padding: "12px 14px",
   borderRadius: "14px",
-  border: "1px solid #BFE5E3",
-  background: "#f0fdfa",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   color: "#0f172a",
 };
 
@@ -5384,7 +5384,7 @@ const actionPlanIntroTitleStyle: CSSProperties = {
   display: "block",
   fontSize: "13px",
   fontWeight: 900,
-  color: "#3A9B98",
+  color: "#005670",
   marginBottom: "4px",
 };
 
@@ -5433,9 +5433,9 @@ const centralActionLinkStyle: CSSProperties = {
   minHeight: "38px",
   padding: "9px 12px",
   borderRadius: "10px",
-  border: "1px solid #BFE5E3",
-  background: "#EEF8F7",
-  color: "#3A9B98",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
+  color: "#005670",
   fontSize: "13px",
   fontWeight: 800,
   textDecoration: "none",
@@ -5638,9 +5638,9 @@ const signatureFieldActionsStyle: CSSProperties = {
 const signatureButtonStyle: CSSProperties = {
   padding: "9px 11px",
   borderRadius: 8,
-  border: "1px solid #BFE5E3",
-  background: "#EEF8F7",
-  color: "#3A9B98",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
+  color: "#005670",
   fontWeight: 700,
   cursor: "pointer",
   fontSize: "12px",
@@ -5655,8 +5655,8 @@ const signaturePreviewStyle: CSSProperties = {
   minHeight: "38px",
   padding: "8px 10px",
   borderRadius: "10px",
-  border: "1px solid #BFE5E3",
-  background: "#f0fdfa",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
 };
 
 const signatureImageThumbStyle: CSSProperties = {
@@ -5695,7 +5695,7 @@ const removeRowButtonStyle: CSSProperties = {
   borderRadius: 10,
   border: "1px solid #fecaca",
   background: "#fff5f5",
-  color: "#b91c1c",
+  color: "#F93822",
   fontWeight: 700,
   cursor: "pointer",
 };
@@ -5726,7 +5726,7 @@ const impactCheckboxStyle: CSSProperties = {
   width: "20px",
   height: "20px",
   borderRadius: "6px",
-  border: "1px solid #3A9B98",
+  border: "1px solid #005670",
   fontSize: "12px",
   fontWeight: 800,
 };
@@ -5755,7 +5755,7 @@ const primaryButtonStyle: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
   border: "none",
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   fontWeight: 700,
   cursor: "pointer",
@@ -5786,7 +5786,7 @@ const dangerButtonStyle: CSSProperties = {
   borderRadius: 10,
   border: "1px solid #fecaca",
   background: "#fff5f5",
-  color: "#b91c1c",
+  color: "#F93822",
   fontWeight: 700,
   cursor: "pointer",
 };

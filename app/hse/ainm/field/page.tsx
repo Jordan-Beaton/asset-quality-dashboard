@@ -500,15 +500,15 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-const brand = "#3A9B98";
-const brandDark = "#2F7F7D";
+const brand = "#005670";
+const brandDark = "#005670";
 
 const pageWrapStyle: CSSProperties = {
   width: "100%",
   padding: "14px 12px 96px",
   display: "flex",
   justifyContent: "center",
-  background: "linear-gradient(180deg, #eef8f7 0%, #f8fafc 100%)",
+  background: "linear-gradient(180deg, #ECECE7 0%, #f8fafc 100%)",
 };
 
 const shellStyle: CSSProperties = {
@@ -527,7 +527,7 @@ const brandBarStyle: CSSProperties = {
   fontWeight: 900,
   letterSpacing: "0.05em",
   textTransform: "uppercase",
-  boxShadow: "0 14px 26px rgba(58, 155, 152, 0.18)",
+  boxShadow: "0 14px 26px rgba(0, 86, 112, 0.18)",
 };
 
 const summaryCardStyle: CSSProperties = {

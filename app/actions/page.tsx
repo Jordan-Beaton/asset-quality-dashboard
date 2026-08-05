@@ -344,7 +344,7 @@ const departmentOptions = [
   "HSEQ",
 ] as const;
 
-const chartColours = ["#3A9B98", "#2563eb", "#7c3aed", "#f59e0b", "#dc2626", "#64748b", "#16a34a"];
+const chartColours = ["#005670", "#63B1BC", "#53565A", "#FFAD00", "#F93822", "#64748b", "#005670"];
 
 const actionViews: Array<{ id: ActionView; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
@@ -2920,7 +2920,7 @@ function ActionsPageContent() {
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 17, { align: "right" });
       doc.text(`Actions: ${filteredActions.length}`, pageWidth - margin, 23, { align: "right" });
 
-      doc.setDrawColor(15, 118, 110);
+      doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 31, pageWidth - margin, 31);
 
@@ -3153,37 +3153,37 @@ function ActionsPageContent() {
             <QualityKpiCard
               title="Open Actions"
               value={openActions}
-              accent="#2563eb"
+              accent="#63B1BC"
               onClick={() => openRegisterDrilldown({ openOnly: true })}
             />
             <QualityKpiCard
               title="Closed / Complete"
               value={closedActions}
-              accent="#16a34a"
+              accent="#005670"
               onClick={() => openRegisterDrilldown({ closedOnly: true })}
             />
             <QualityKpiCard
               title="Overdue Actions"
               value={overdueActions}
-              accent="#dc2626"
+              accent="#F93822"
               onClick={() => openRegisterDrilldown({ overdue: true, quickFilter: "overdue" })}
             />
             <QualityKpiCard
               title="Evidence Files"
               value={linkedEvidenceFiles.length}
-              accent="#7c3aed"
+              accent="#53565A"
               onClick={() => openRegisterDrilldown({ evidenceOnly: true })}
             />
             <QualityKpiCard
               title="My Open Actions"
               value={myOpenActions}
-              accent="#3A9B98"
+              accent="#005670"
               onClick={() => openRegisterDrilldown({ openOnly: true, quickFilter: "my" })}
             />
             <QualityKpiCard
               title="Linked Record Issues"
               value={linkedRecordIssues}
-              accent="#f59e0b"
+              accent="#FFAD00"
               onClick={() => openRegisterDrilldown({ linkedIssuesOnly: true })}
             />
           </section>
@@ -3202,7 +3202,7 @@ function ActionsPageContent() {
                     <Tooltip />
                     <Bar
                       dataKey="value"
-                      fill="#3A9B98"
+                      fill="#005670"
                       radius={[6, 6, 0, 0]}
                       onClick={(entry) => handleStatusDrilldown(String((entry as ChartDatum).name || ""))}
                       cursor="pointer"
@@ -3220,7 +3220,7 @@ function ActionsPageContent() {
                     <Tooltip />
                     <Bar
                       dataKey="value"
-                      fill="#2563eb"
+                      fill="#63B1BC"
                       radius={[0, 6, 6, 0]}
                       onClick={(entry) =>
                         openRegisterDrilldown({ source: String((entry as ChartDatum).filterValue || "") })
@@ -3240,7 +3240,7 @@ function ActionsPageContent() {
                     <Tooltip />
                     <Bar
                       dataKey="value"
-                      fill="#7c3aed"
+                      fill="#53565A"
                       radius={[0, 6, 6, 0]}
                       onClick={(entry) => openRegisterDrilldown({ owner: String((entry as ChartDatum).name || "") })}
                       cursor="pointer"
@@ -3307,7 +3307,7 @@ function ActionsPageContent() {
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="closed" stroke="#16a34a" strokeWidth={3} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="closed" stroke="#005670" strokeWidth={3} dot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </ChartPanel>
@@ -3723,11 +3723,11 @@ function ActionsPageContent() {
           </div>
 
           <section style={statsGridStyle}>
-            <QualityKpiCard title="My Total Actions" value={myActionList.length} accent="#3A9B98" onClick={() => setMyActionFilter("all")} />
-            <QualityKpiCard title="My Open Actions" value={myOpenActions} accent="#2563eb" onClick={() => setMyActionFilter("open")} />
-            <QualityKpiCard title="My Closed Actions" value={myClosedActions.length} accent="#16a34a" onClick={() => setMyActionFilter("closed")} />
-            <QualityKpiCard title="My Overdue" value={myOverdueActions.length} accent="#dc2626" onClick={() => setMyActionFilter("overdue")} />
-            <QualityKpiCard title="My Due This Week" value={myDueThisWeekActions.length} accent="#f59e0b" onClick={() => setMyActionFilter("dueWeek")} />
+            <QualityKpiCard title="My Total Actions" value={myActionList.length} accent="#005670" onClick={() => setMyActionFilter("all")} />
+            <QualityKpiCard title="My Open Actions" value={myOpenActions} accent="#63B1BC" onClick={() => setMyActionFilter("open")} />
+            <QualityKpiCard title="My Closed Actions" value={myClosedActions.length} accent="#005670" onClick={() => setMyActionFilter("closed")} />
+            <QualityKpiCard title="My Overdue" value={myOverdueActions.length} accent="#F93822" onClick={() => setMyActionFilter("overdue")} />
+            <QualityKpiCard title="My Due This Week" value={myDueThisWeekActions.length} accent="#FFAD00" onClick={() => setMyActionFilter("dueWeek")} />
           </section>
 
           {currentPersonName ? (
@@ -3819,7 +3819,7 @@ function ActionsPageContent() {
                             <td style={tableCellStyle}><span style={badgeStyle}>{action.priority || "-"}</span></td>
                             <td style={tableCellStyle}>
                               <div style={primaryCellTextStyle}>{formatDate(action.due_date)}</div>
-                              <div style={{ ...secondaryCellTextStyle, color: overdue ? "#b91c1c" : "#64748b", fontWeight: overdue ? 700 : 500 }}>
+                              <div style={{ ...secondaryCellTextStyle, color: overdue ? "#F93822" : "#64748b", fontWeight: overdue ? 700 : 500 }}>
                                 {getDueLabel(action.due_date)}
                               </div>
                             </td>
@@ -4213,7 +4213,7 @@ function ActionsPageContent() {
                         <div
                           style={{
                             ...secondaryCellTextStyle,
-                            color: overdue ? "#b91c1c" : "#64748b",
+                            color: overdue ? "#F93822" : "#64748b",
                             fontWeight: overdue ? 700 : 500,
                           }}
                         >
@@ -4978,7 +4978,7 @@ function MiniListCard({
               onClick={onItemClick ? () => onItemClick(item.id) : undefined}
               style={{
                 ...miniListItemStyle,
-                borderLeft: item.tone === "red" ? "4px solid #dc2626" : "4px solid #f59e0b",
+                borderLeft: item.tone === "red" ? "4px solid #F93822" : "4px solid #FFAD00",
                 background: item.tone === "red" ? "#fef2f2" : "#fffbeb",
                 cursor: onItemClick ? "pointer" : "default",
               }}
@@ -5020,9 +5020,9 @@ function QuickFilterButton({
       onClick={onClick}
       style={{
         ...quickFilterButtonStyle,
-        background: active ? "#3A9B98" : "#f8fafc",
+        background: active ? "#005670" : "#f8fafc",
         color: active ? "#ffffff" : "#0f172a",
-        borderColor: active ? "#3A9B98" : "#cbd5e1",
+        borderColor: active ? "#005670" : "#cbd5e1",
         opacity: disabled ? 0.55 : 1,
         cursor: disabled ? "not-allowed" : "pointer",
       }}
@@ -5096,7 +5096,7 @@ function PriorityBadge({ value }: { value: string }) {
 
   const styles =
     lower === "high"
-      ? { background: "#fee2e2", color: "#991b1b" }
+      ? { background: "#fee2e2", color: "#F93822" }
       : lower === "medium"
       ? { background: "#fef3c7", color: "#92400e" }
       : lower === "low"
@@ -5107,12 +5107,12 @@ function PriorityBadge({ value }: { value: string }) {
 }
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   color: "white",
   borderRadius: "22px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
+  boxShadow: "0 10px 30px rgba(0, 86, 112, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -5202,7 +5202,7 @@ const heroMetaValueStyleSmall: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -5253,7 +5253,7 @@ const viewTabButtonStyle: CSSProperties = {
 };
 
 const viewTabButtonActiveStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
 };
 
@@ -5440,7 +5440,7 @@ const helperTextStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "11px 16px",
@@ -5460,7 +5460,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "8px 12px",
@@ -5480,7 +5480,7 @@ const miniButtonGreyStyle: CSSProperties = {
 };
 
 const miniButtonPurpleStyle: CSSProperties = {
-  background: "#7c3aed",
+  background: "#53565A",
   color: "white",
   border: "none",
   padding: "8px 12px",
@@ -5490,7 +5490,7 @@ const miniButtonPurpleStyle: CSSProperties = {
 };
 
 const miniButtonDeleteStyle: CSSProperties = {
-  background: "#dc2626",
+  background: "#F93822",
   color: "white",
   border: "none",
   padding: "8px 12px",
@@ -5574,7 +5574,7 @@ const reportSummaryLabelStyle: CSSProperties = {
 const reportSummaryValueStyle: CSSProperties = {
   fontSize: "28px",
   fontWeight: 800,
-  color: "#3A9B98",
+  color: "#005670",
 };
 
 const reportSummaryTextStyle: CSSProperties = {
@@ -5682,11 +5682,11 @@ const linkedChipStyle: CSSProperties = {
 };
 
 const linkedChipToneStyles: Record<LinkedRecordChip["tone"], CSSProperties> = {
-  teal: { background: "#D7EFEE", color: "#2F7F7D", borderColor: "#BFE5E3" },
+  teal: { background: "#D0D0CE", color: "#005670", borderColor: "#D0D0CE" },
   blue: { background: "#dbeafe", color: "#1d4ed8", borderColor: "#bfdbfe" },
   purple: { background: "#ede9fe", color: "#6d28d9", borderColor: "#ddd6fe" },
   amber: { background: "#fef3c7", color: "#92400e", borderColor: "#fde68a" },
-  red: { background: "#fee2e2", color: "#991b1b", borderColor: "#fecaca" },
+  red: { background: "#fee2e2", color: "#F93822", borderColor: "#fecaca" },
   slate: { background: "#e2e8f0", color: "#334155", borderColor: "#cbd5e1" },
 };
 
@@ -5748,7 +5748,7 @@ const secondaryCellTextStyle: CSSProperties = {
 
 const actionNumberCellStyle: CSSProperties = {
   fontWeight: 800,
-  color: "#3A9B98",
+  color: "#005670",
   whiteSpace: "nowrap",
 };
 
@@ -5953,7 +5953,7 @@ const detailActionNumberStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#3A9B98",
+  color: "#005670",
 };
 
 const detailActionTitleStyle: CSSProperties = {

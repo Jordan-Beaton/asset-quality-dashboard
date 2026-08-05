@@ -64,7 +64,7 @@ function buildActionButtons(buttons: WorkflowButton[]) {
     <div style="margin: 24px 0; display: flex; gap: 12px; flex-wrap: wrap;">
       ${buttons
         .map((button) => {
-          const background = button.tone === "danger" ? "#b91c1c" : "#3A9B98";
+          const background = button.tone === "danger" ? "#F93822" : "#005670";
           return `
             <a href="${escapeHtml(button.url)}"
                style="display: inline-block; background: ${background}; color: #ffffff; text-decoration: none; border-radius: 10px; padding: 12px 18px; font-weight: 700;">

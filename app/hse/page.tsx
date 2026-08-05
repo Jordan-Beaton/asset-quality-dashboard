@@ -444,7 +444,7 @@ export default function HseDashboardPage() {
         .hse-section-card:hover {
           transform: translateY(-3px);
           box-shadow: 0 18px 34px rgba(15, 23, 42, 0.11);
-          border-color: #BFE5E3;
+          border-color: #D0D0CE;
         }
         .hse-live-pill {
           animation: hseLiveGlow 1.8s ease-in-out infinite alternate;
@@ -767,7 +767,7 @@ const commandEyebrowStyle: CSSProperties = {
   fontWeight: 900,
   letterSpacing: "0.12em",
   textTransform: "uppercase",
-  color: "#dff7f5",
+  color: "#ECECE7",
 };
 
 const commandTitleStyle: CSSProperties = {
@@ -781,7 +781,7 @@ const commandTitleStyle: CSSProperties = {
 const commandTextStyle: CSSProperties = {
   margin: "12px 0 0",
   maxWidth: "430px",
-  color: "#effdfc",
+  color: "#ECECE7",
   lineHeight: 1.5,
   fontSize: "13px",
   fontWeight: 700,

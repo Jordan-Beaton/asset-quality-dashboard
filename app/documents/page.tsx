@@ -375,9 +375,9 @@ function normalizeWorkflowStatus(
 
 function getWorkflowTone(status: WorkflowStatus) {
   if (status === "Approved") return { bg: "#dcfce7", color: "#166534" };
-  if (status === "Pending Approval") return { bg: "#e0f2fe", color: "#075985" };
+  if (status === "Pending Approval") return { bg: "#ECECE7", color: "#005670" };
   if (status === "Pending Review" || status === "Reviewed") return { bg: "#fef3c7", color: "#92400e" };
-  if (status === "Rejected") return { bg: "#fee2e2", color: "#991b1b" };
+  if (status === "Rejected") return { bg: "#fee2e2", color: "#F93822" };
   if (status === "Superseded" || status === "Archived") return { bg: "#e2e8f0", color: "#334155" };
   return { bg: "#dbeafe", color: "#1d4ed8" };
 }
@@ -405,7 +405,7 @@ function getStatusTone(status: string) {
   if (value.includes("approved")) return { bg: "#dcfce7", color: "#166534" };
   if (value.includes("draft")) return { bg: "#dbeafe", color: "#1d4ed8" };
   if (value.includes("review")) return { bg: "#fef3c7", color: "#92400e" };
-  if (value.includes("superseded")) return { bg: "#fee2e2", color: "#991b1b" };
+  if (value.includes("superseded")) return { bg: "#fee2e2", color: "#F93822" };
   if (value.includes("obsolete")) return { bg: "#e5e7eb", color: "#374151" };
   if (value.includes("archived")) return { bg: "#ede9fe", color: "#6d28d9" };
 
@@ -418,7 +418,7 @@ function getReviewApprovalTone(status: string) {
   if (value.includes("approved")) return { bg: "#dcfce7", color: "#166534" };
   if (value.includes("reviewed")) return { bg: "#dbeafe", color: "#1d4ed8" };
   if (value.includes("pending")) return { bg: "#fef3c7", color: "#92400e" };
-  if (value.includes("rejected")) return { bg: "#fee2e2", color: "#991b1b" };
+  if (value.includes("rejected")) return { bg: "#fee2e2", color: "#F93822" };
   return { bg: "#e2e8f0", color: "#334155" };
 }
 
@@ -435,7 +435,7 @@ function getReviewTone(nextReviewDate: string | null | undefined) {
 
   const diffDays = Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) return { label: "Overdue", bg: "#fee2e2", color: "#991b1b" };
+  if (diffDays < 0) return { label: "Overdue", bg: "#fee2e2", color: "#F93822" };
   if (diffDays <= 30) return { label: "Due soon", bg: "#fef3c7", color: "#92400e" };
   return { label: "In date", bg: "#dcfce7", color: "#166534" };
 }
@@ -1395,7 +1395,7 @@ function DocumentsPageContent() {
       const generatedAt = new Date().toLocaleString("en-GB");
       const fileName = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "document-report"}.pdf`;
 
-      pdf.setFillColor(15, 118, 110);
+      pdf.setFillColor(0, 86, 112);
       pdf.rect(0, 0, pageWidth, 24, "F");
       pdf.setTextColor(255, 255, 255);
       pdf.setFont("helvetica", "bold");
@@ -1452,7 +1452,7 @@ function DocumentsPageContent() {
           lineWidth: 0.1,
         },
         headStyles: {
-          fillColor: [15, 118, 110],
+          fillColor: [0, 86, 112],
           textColor: [255, 255, 255],
           fontStyle: "bold",
           halign: "left",
@@ -2747,19 +2747,19 @@ function DocumentsPageContent() {
         <QualityKpiCard
           title="Total Documents"
           value={totalDocuments}
-          accent="#3A9B98"
+          accent="#005670"
           onClick={() => applySnapshotFilter({})}
         />
         <QualityKpiCard
           title="Live Documents"
           value={liveDocuments}
-          accent="#16a34a"
+          accent="#005670"
           onClick={() => applySnapshotFilter({ status: "Live" })}
         />
         <QualityKpiCard
           title="Draft Documents"
           value={draftDocuments}
-          accent="#2563eb"
+          accent="#63B1BC"
           onClick={() => applySnapshotFilter({ status: "Draft" })}
         />
         <QualityKpiCard
@@ -2777,7 +2777,7 @@ function DocumentsPageContent() {
         <QualityKpiCard
           title="Review Overdue"
           value={overdueReviews}
-          accent="#dc2626"
+          accent="#F93822"
           onClick={() => applySnapshotFilter({ review: "Overdue" })}
         />
         <QualityKpiCard
@@ -3186,7 +3186,7 @@ function DocumentsPageContent() {
                         ...registerRowStyle,
                         background: selectedDocumentId === doc.id ? "#eff6ff" : "#ffffff",
                         borderLeft:
-                          selectedDocumentId === doc.id ? "4px solid #3A9B98" : "4px solid transparent",
+                          selectedDocumentId === doc.id ? "4px solid #005670" : "4px solid transparent",
                       }}
                     >
                       <div style={registerPrimaryStyle}>{doc.document_number}</div>
@@ -4110,7 +4110,7 @@ function PeopleSelector({
                 ...peopleSuggestionButtonStyle,
                 background:
                   normalizePersonName(person.name) === normalizePersonName(selectedName)
-                    ? "#f0fdfa"
+                    ? "#ECECE7"
                     : "#ffffff",
               }}
               onMouseDown={(event) => {
@@ -4236,7 +4236,7 @@ const topMetaRowStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -4274,7 +4274,7 @@ const viewButtonStyle: CSSProperties = {
 
 const activeViewButtonStyle: CSSProperties = {
   ...viewButtonStyle,
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
 };
 
@@ -4688,7 +4688,7 @@ const formSectionStyle: CSSProperties = {
 const formSectionTitleStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#3A9B98",
+  color: "#005670",
   letterSpacing: "0.05em",
   textTransform: "uppercase",
 };
@@ -4715,7 +4715,7 @@ const helperTextStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -4756,7 +4756,7 @@ const approveButtonStyle: CSSProperties = {
 
 const rejectButtonStyle: CSSProperties = {
   background: "#fee2e2",
-  color: "#991b1b",
+  color: "#F93822",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -4765,7 +4765,7 @@ const rejectButtonStyle: CSSProperties = {
 };
 
 const dangerButtonStyle: CSSProperties = {
-  background: "#dc2626",
+  background: "#F93822",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -4778,7 +4778,7 @@ const uploadButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   borderRadius: "10px",
   padding: "10px 16px",
@@ -4817,7 +4817,7 @@ const fileActionButtonStyle: CSSProperties = {
 };
 
 const reportButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   padding: "10px 14px",
@@ -5083,8 +5083,8 @@ const fileStripStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr)",
   gap: "14px",
-  border: "1px solid #cfe8e5",
-  background: "linear-gradient(180deg, #f7fffd 0%, #eefbf8 100%)",
+  border: "1px solid #ECECE7",
+  background: "linear-gradient(180deg, #ECECE7 0%, #ECECE7 100%)",
   borderRadius: "16px",
   padding: "16px",
   alignItems: "stretch",
@@ -5136,7 +5136,7 @@ const detailSectionStyle: CSSProperties = {
 const detailSectionTitleStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 900,
-  color: "#2F7F7D",
+  color: "#005670",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   marginBottom: "12px",

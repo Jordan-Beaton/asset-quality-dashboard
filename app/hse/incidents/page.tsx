@@ -11,10 +11,10 @@ export default function HseIncidentsPage() {
       latestLabel="Latest Incident"
       status="Incidents / Near Misses shell ready. No incident database functionality has been configured yet."
       kpis={[
-        { title: "Open Incidents", value: "-", accent: "#dc2626" },
-        { title: "Near Misses", value: "-", accent: "#f59e0b" },
-        { title: "Investigations Due", value: "-", accent: "#2563eb" },
-        { title: "Lessons Learned", value: "-", accent: "#16a34a" },
+        { title: "Open Incidents", value: "-", accent: "#F93822" },
+        { title: "Near Misses", value: "-", accent: "#FFAD00" },
+        { title: "Investigations Due", value: "-", accent: "#63B1BC" },
+        { title: "Lessons Learned", value: "-", accent: "#005670" },
       ]}
       panels={[
         {
@@ -105,7 +105,7 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

@@ -82,7 +82,7 @@ function formatDateTime(value: string | null | undefined) {
 function statusTone(active: boolean) {
   return active
     ? { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" }
-    : { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
+    : { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
 }
 
 function normalizeImportHeader(value: string) {
@@ -599,7 +599,7 @@ function PeoplePageContent() {
                           <td
                             style={{
                               ...peopleRegisterCellStyle,
-                              color: row.errors.length ? "#b91c1c" : row.skipped ? "#92400e" : "#166534",
+                              color: row.errors.length ? "#F93822" : row.skipped ? "#92400e" : "#166534",
                               fontWeight: 800,
                             }}
                           >
@@ -1056,7 +1056,7 @@ const buttonRowStyleTight: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1078,7 +1078,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1090,7 +1090,7 @@ const miniButtonStyle: CSSProperties = {
 
 const dangerButtonStyle: CSSProperties = {
   background: "#fee2e2",
-  color: "#991b1b",
+  color: "#F93822",
   border: "1px solid #fecaca",
   borderRadius: "10px",
   padding: "9px 12px",
@@ -1100,9 +1100,9 @@ const dangerButtonStyle: CSSProperties = {
 };
 
 const deleteButtonStyle: CSSProperties = {
-  background: "#dc2626",
+  background: "#F93822",
   color: "#ffffff",
-  border: "1px solid #b91c1c",
+  border: "1px solid #F93822",
   borderRadius: "10px",
   padding: "9px 12px",
   fontWeight: 700,

@@ -1,24 +1,25 @@
 import type { CSSProperties } from "react";
 
 export const imsColours = {
-  brand: "#3A9B98",
-  brandDark: "#2F7F7D",
-  brandSoft: "#EEF8F7",
-  brandBorder: "#BFE5E3",
-  ink: "#0f172a",
-  muted: "#64748b",
-  slate: "#475569",
-  page: "#f1f5f9",
+  brand: "#005670",
+  brandDark: "#005670",
+  brandAccent: "#63B1BC",
+  brandSoft: "#ECECE7",
+  brandBorder: "#D0D0CE",
+  ink: "#000000",
+  muted: "#53565A",
+  slate: "#53565A",
+  page: "#ECECE7",
   panel: "#ffffff",
-  panelAlt: "#f8fafc",
-  border: "#dbe7f3",
-  borderSoft: "#e2e8f0",
-  danger: "#991b1b",
-  dangerBright: "#dc2626",
-  warning: "#f59e0b",
-  success: "#16a34a",
-  purple: "#7c3aed",
-  blue: "#2563eb",
+  panelAlt: "#ECECE7",
+  border: "#D0D0CE",
+  borderSoft: "#D0D0CE",
+  danger: "#F93822",
+  dangerBright: "#F93822",
+  warning: "#FFAD00",
+  success: "#005670",
+  purple: "#53565A",
+  blue: "#63B1BC",
 } as const;
 
 export const imsRadii = {
@@ -30,7 +31,7 @@ export const imsRadii = {
 } as const;
 
 export const imsShadows = {
-  hero: "0 24px 44px rgba(58, 155, 152, 0.18)",
+  hero: "0 24px 44px rgba(0, 86, 112, 0.18)",
   panel: "0 1px 3px rgba(15, 23, 42, 0.08)",
   card: "0 1px 3px rgba(15, 23, 42, 0.08)",
   lift: "0 14px 28px rgba(15, 23, 42, 0.075)",
@@ -41,7 +42,7 @@ export const imsHeroStyle: CSSProperties = {
   marginBottom: "20px",
   padding: "0 28px",
   borderRadius: imsRadii.hero,
-  background: `linear-gradient(135deg, ${imsColours.brand} 0%, ${imsColours.brandDark} 100%)`,
+  background: `linear-gradient(135deg, ${imsColours.brand} 0%, ${imsColours.brand} 64%, ${imsColours.brandAccent} 160%)`,
   color: "#ffffff",
   display: "flex",
   flexDirection: "row",

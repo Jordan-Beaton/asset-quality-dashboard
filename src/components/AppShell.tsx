@@ -1107,8 +1107,8 @@ export default function AppShell({ children }: AppShellProps) {
                 onClick={handleLogout}
                 style={{
                   background: "#ffffff",
-                  color: "#2F7F7D",
-                  border: "1px solid #BFE5E3",
+                  color: "#005670",
+                  border: "1px solid #D0D0CE",
                   borderRadius: "8px",
                   padding: "8px 12px",
                   fontWeight: 700,
@@ -1145,9 +1145,9 @@ export default function AppShell({ children }: AppShellProps) {
                       width: "28px",
                       height: "28px",
                       borderRadius: "999px",
-                      background: "#EEF8F7",
-                      color: "#2F7F7D",
-                      border: "1px solid #BFE5E3",
+                      background: "#ECECE7",
+                      color: "#005670",
+                      border: "1px solid #D0D0CE",
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -1225,8 +1225,8 @@ export default function AppShell({ children }: AppShellProps) {
               marginBottom: "10px",
               borderRadius: "11px",
               border: "1px solid #dbe3ef",
-              background: isRailPinned ? "#EEF8F7" : "#ffffff",
-              color: isRailPinned ? "#2F7F7D" : "#475569",
+              background: isRailPinned ? "#ECECE7" : "#ffffff",
+              color: isRailPinned ? "#005670" : "#475569",
               cursor: "pointer",
               display: "grid",
               gridTemplateColumns: "42px minmax(0, 1fr)",
@@ -1247,7 +1247,7 @@ export default function AppShell({ children }: AppShellProps) {
                 alignItems: "center",
                 justifyContent: "center",
                 justifySelf: "center",
-                background: isRailPinned ? "#D7EFEE" : "#eef4f6",
+                background: isRailPinned ? "#D0D0CE" : "#eef4f6",
                 fontSize: "12px",
                 lineHeight: 1,
               }}
@@ -1299,9 +1299,9 @@ export default function AppShell({ children }: AppShellProps) {
                     padding: "4px",
                     boxSizing: "border-box",
                     textDecoration: "none",
-                    background: isActive ? "#3A9B98" : "transparent",
+                    background: isActive ? "#005670" : "transparent",
                     color: isActive ? "#ffffff" : "#0f172a",
-                    border: isActive ? "1px solid #3A9B98" : "1px solid transparent",
+                    border: isActive ? "1px solid #005670" : "1px solid transparent",
                     transition: "background 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
                   }}
                 >
@@ -1314,7 +1314,7 @@ export default function AppShell({ children }: AppShellProps) {
                       bottom: "9px",
                       width: "4px",
                       borderRadius: "999px",
-                      background: "#3A9B98",
+                      background: "#005670",
                       opacity: isActive ? 1 : 0,
                       transform: isActive ? "scaleY(1)" : "scaleY(0.4)",
                       transition: "opacity 160ms ease, transform 160ms ease",
@@ -1330,7 +1330,7 @@ export default function AppShell({ children }: AppShellProps) {
                       alignItems: "center",
                       justifyContent: "center",
                       background: isActive ? "rgba(255,255,255,0.18)" : "#eef4f6",
-                      color: isActive ? "#ffffff" : "#2F7F7D",
+                      color: isActive ? "#ffffff" : "#005670",
                       fontSize: "11px",
                       fontWeight: 900,
                       letterSpacing: "0.02em",
@@ -1395,7 +1395,7 @@ export default function AppShell({ children }: AppShellProps) {
             >
               <div
                 style={{
-                  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+                  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
                   color: "#ffffff",
                   borderRadius: "14px",
                   padding: "18px 20px",
@@ -1413,7 +1413,7 @@ export default function AppShell({ children }: AppShellProps) {
                 <Link
                   href="/home"
                   style={{
-                    background: "#3A9B98",
+                    background: "#005670",
                     color: "#ffffff",
                     textDecoration: "none",
                     borderRadius: "10px",

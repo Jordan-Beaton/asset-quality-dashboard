@@ -235,7 +235,7 @@ function isOverdueReview(risk: RiskRow) {
 }
 
 function getRatingBadgeStyle(rating: RiskRating | null | undefined): CSSProperties {
-  if (rating === "Critical") return { ...badgeStyle, background: "#fee2e2", color: "#991b1b" };
+  if (rating === "Critical") return { ...badgeStyle, background: "#fee2e2", color: "#F93822" };
   if (rating === "High") return { ...badgeStyle, background: "#ffedd5", color: "#9a3412" };
   if (rating === "Medium") return { ...badgeStyle, background: "#fef3c7", color: "#92400e" };
   return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
@@ -244,7 +244,7 @@ function getRatingBadgeStyle(rating: RiskRating | null | undefined): CSSProperti
 function getStatusBadgeStyle(status: string | null | undefined): CSSProperties {
   const normalised = (status || "").trim().toLowerCase();
   if (normalised === "closed" || normalised === "accepted") return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
-  if (normalised === "treatment required") return { ...badgeStyle, background: "#fee2e2", color: "#991b1b" };
+  if (normalised === "treatment required") return { ...badgeStyle, background: "#fee2e2", color: "#F93822" };
   if (normalised === "under review") return { ...badgeStyle, background: "#ede9fe", color: "#6d28d9" };
   if (normalised === "archived") return { ...badgeStyle, background: "#e2e8f0", color: "#475569" };
   return { ...badgeStyle, background: "#dbeafe", color: "#1d4ed8" };
@@ -604,7 +604,7 @@ export default function RiskRegisterPage() {
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 16, { align: "right" });
       doc.text(`Risks exported: ${filteredRisks.length}`, pageWidth - margin, 22, { align: "right" });
 
-      doc.setDrawColor(15, 118, 110);
+      doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 30, pageWidth - margin, 30);
 
@@ -770,10 +770,10 @@ export default function RiskRegisterPage() {
       </div>
 
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Total Risks" value={risks.length} accent="#3A9B98" />
-        <QualityKpiCard title="Open Risks" value={openRisks} accent="#2563eb" />
-        <QualityKpiCard title="High / Critical" value={highCriticalRisks} accent="#dc2626" />
-        <QualityKpiCard title="Overdue Reviews" value={overdueReviews} accent="#f59e0b" />
+        <QualityKpiCard title="Total Risks" value={risks.length} accent="#005670" />
+        <QualityKpiCard title="Open Risks" value={openRisks} accent="#63B1BC" />
+        <QualityKpiCard title="High / Critical" value={highCriticalRisks} accent="#F93822" />
+        <QualityKpiCard title="Overdue Reviews" value={overdueReviews} accent="#FFAD00" />
       </section>
 
       <SectionCard title="Risk Register" subtitle="Filter and select a risk. Details open below the register.">
@@ -1250,7 +1250,7 @@ const topMetaRowStyle: CSSProperties = {
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 const topMetaActionsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: "20px" };
@@ -1272,9 +1272,9 @@ const scoreValueStyle: CSSProperties = { color: "#0f172a", fontSize: "24px", lin
 const checkboxCardStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "10px", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px 14px", background: "#f8fafc", color: "#334155", fontWeight: 700 };
 const formFooterStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginTop: "16px" };
 const helperTextStyle: CSSProperties = { color: "#64748b", fontSize: "13px" };
-const primaryButtonStyle: CSSProperties = { background: "#3A9B98", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
+const primaryButtonStyle: CSSProperties = { background: "#005670", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
 const secondaryButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
-const deleteButtonStyle: CSSProperties = { background: "#dc2626", color: "white", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
+const deleteButtonStyle: CSSProperties = { background: "#F93822", color: "white", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
 const filterGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -1343,7 +1343,7 @@ const emptyTableCellStyle: CSSProperties = {
   background: "#f8fafc",
   borderBottom: "1px dashed #cbd5e1",
 };
-const riskNumberStyle: CSSProperties = { fontSize: "12px", fontWeight: 800, color: "#3A9B98", whiteSpace: "nowrap" };
+const riskNumberStyle: CSSProperties = { fontSize: "12px", fontWeight: 800, color: "#005670", whiteSpace: "nowrap" };
 const primaryCellTextStyle: CSSProperties = { fontWeight: 700, color: "#0f172a" };
 const secondaryCellTextStyle: CSSProperties = { fontSize: "12px", color: "#64748b", marginTop: "4px" };
 const badgeStyle: CSSProperties = { padding: "5px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 800, display: "inline-block", whiteSpace: "nowrap" };

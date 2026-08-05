@@ -75,13 +75,13 @@ create table if not exists public.ims_company_settings (
   primary_contact_name text,
   primary_contact_email text,
   report_logo_path text,
-  primary_brand_colour text not null default '#3A9B98',
+  primary_brand_colour text not null default '#005670',
   financial_year_start_month integer not null default 1,
   updated_at timestamptz not null default now()
 );
 
 insert into public.ims_company_settings (company_name, trading_name, primary_brand_colour)
-select 'Enshore Subsea', 'Enshore', '#3A9B98'
+select 'Enshore Subsea', 'Enshore', '#005670'
 where not exists (select 1 from public.ims_company_settings);
 
 create table if not exists public.ims_reference_departments (

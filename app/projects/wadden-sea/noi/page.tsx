@@ -44,7 +44,7 @@ function currentRevision(itp: Itp) {
 
 function typeTone(type: InterventionType) {
   if (type.includes("/")) return { background: "#ede9fe", color: "#5b21b6" };
-  if (type === "H") return { background: "#fee2e2", color: "#991b1b" };
+  if (type === "H") return { background: "#fee2e2", color: "#F93822" };
   return { background: "#dbeafe", color: "#1e40af" };
 }
 
@@ -301,7 +301,7 @@ export default function NoiTrackerPage() {
       }),
       theme: "grid",
       styles: { font: "helvetica", fontSize: 6.5, cellPadding: 1.8, valign: "top", lineColor: [205, 216, 226], lineWidth: 0.15 },
-      headStyles: { fillColor: [47, 127, 125], textColor: 255, fontStyle: "bold", fontSize: 6.5 },
+      headStyles: { fillColor: [0, 86, 112], textColor: 255, fontStyle: "bold", fontSize: 6.5 },
       columnStyles: {
         0: { cellWidth: 27 }, 1: { cellWidth: 31 }, 2: { cellWidth: 25 }, 3: { cellWidth: 14 },
         4: { cellWidth: 52 }, 5: { cellWidth: 12 }, 6: { cellWidth: 35 }, 7: { cellWidth: 18 },
@@ -326,11 +326,11 @@ export default function NoiTrackerPage() {
       <WaddenSeaWorkspaceNav active="noi" />
 
       <section className="quality-kpi-grid" style={metricsGrid}>
-        <QualityKpiCard title="Total Points" value={metrics.total} accent="#3A9B98" />
-        <QualityKpiCard title="Contains W" value={metrics.witness} accent="#2563eb" />
-        <QualityKpiCard title="Contains H" value={metrics.hold} accent="#dc2626" />
-        <QualityKpiCard title="Composite Codes" value={metrics.combined} accent="#7c3aed" />
-        <QualityKpiCard title="Outstanding" value={metrics.outstanding} accent="#f59e0b" />
+        <QualityKpiCard title="Total Points" value={metrics.total} accent="#005670" />
+        <QualityKpiCard title="Contains W" value={metrics.witness} accent="#63B1BC" />
+        <QualityKpiCard title="Contains H" value={metrics.hold} accent="#F93822" />
+        <QualityKpiCard title="Composite Codes" value={metrics.combined} accent="#53565A" />
+        <QualityKpiCard title="Outstanding" value={metrics.outstanding} accent="#FFAD00" />
       </section>
 
       <section style={surface}>
@@ -410,16 +410,16 @@ const page: CSSProperties = { display: "grid", gap: 16 };
 const metricsGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 16, marginBottom: 4 };
 const surface: CSSProperties = { background: "#fff", border: "1px solid #d8e2eb", borderRadius: 18, overflow: "hidden" };
 const sectionHeader: CSSProperties = { padding: "16px 18px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 };
-const kicker: CSSProperties = { color: "#2f7f7d", fontWeight: 900, fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase" };
+const kicker: CSSProperties = { color: "#005670", fontWeight: 900, fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase" };
 const title: CSSProperties = { margin: "3px 0 0", color: "#14263a", fontSize: 20 };
 const scanner: CSSProperties = { padding: "4px 18px 14px", display: "grid", gridTemplateColumns: "1fr auto auto", alignItems: "end", gap: 10 };
 const field: CSSProperties = { display: "grid", gap: 5, color: "#526477", fontWeight: 800, fontSize: 11 };
 const input: CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #cad7e3", borderRadius: 9, background: "#fff", padding: "9px 10px", color: "#26384b", font: "inherit" };
-const primaryButton: CSSProperties = { border: 0, borderRadius: 9, background: "#2f7f7d", color: "#fff", padding: "10px 14px", fontWeight: 900, cursor: "pointer" };
+const primaryButton: CSSProperties = { border: 0, borderRadius: 9, background: "#005670", color: "#fff", padding: "10px 14px", fontWeight: 900, cursor: "pointer" };
 const secondaryButton: CSSProperties = { ...primaryButton, background: "#e8eef3", color: "#3b4c5f" };
 const notice: CSSProperties = { margin: "0 18px 14px", padding: "10px 12px", borderRadius: 9, background: "#fff7d6", color: "#774b00", fontSize: 12 };
 const candidatePanel: CSSProperties = { borderTop: "1px solid #e2e8f0", background: "#f7fafc", padding: 16, display: "grid", gap: 7 };
-const manualPanel: CSSProperties = { ...candidatePanel, background: "#f0f8f7" };
+const manualPanel: CSSProperties = { ...candidatePanel, background: "#ECECE7" };
 const manualGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(130px,1fr))", gap: 9 };
 const candidateHeader: CSSProperties = { display: "flex", justifyContent: "space-between", color: "#5d6e80", fontSize: 11, marginBottom: 3 };
 const candidateRow: CSSProperties = { display: "grid", gridTemplateColumns: "22px 75px 1fr 60px 190px", gap: 7, alignItems: "center", background: "#fff", border: "1px solid #dbe5ee", borderRadius: 8, padding: 7 };
@@ -432,9 +432,9 @@ const tableWrap: CSSProperties = { width: "100%", overflowX: "auto", borderTop: 
 const table: CSSProperties = { width: "100%", minWidth: 1200, borderCollapse: "collapse", tableLayout: "fixed", fontSize: 10 };
 const th: CSSProperties = { textAlign: "left", background: "#1f3043", color: "#fff", padding: "9px 7px", fontSize: 9, textTransform: "uppercase" };
 const td: CSSProperties = { borderBottom: "1px solid #e4eaf0", padding: "7px", verticalAlign: "top", color: "#2b3c4f" };
-const teal: CSSProperties = { color: "#237d7a", display: "block" };
+const teal: CSSProperties = { color: "#005670", display: "block" };
 const small: CSSProperties = { display: "block", color: "#718096", marginTop: 3, lineHeight: 1.25 };
 const deleteButton: CSSProperties = { border: "1px solid #fecaca", borderRadius: 6, background: "#fff1f2", color: "#b42318", padding: "5px 7px", fontWeight: 900, fontSize: 9, cursor: "pointer" };
 const rowActions: CSSProperties = { display: "flex", gap: 5, alignItems: "center" };
-const noiButton: CSSProperties = { borderRadius: 6, background: "#dff3f1", color: "#176b68", padding: "6px 8px", fontWeight: 900, fontSize: 10, textDecoration: "none" };
+const noiButton: CSSProperties = { borderRadius: 6, background: "#ECECE7", color: "#005670", padding: "6px 8px", fontWeight: 900, fontSize: 10, textDecoration: "none" };
 const empty: CSSProperties = { padding: 30, textAlign: "center", color: "#64748b" };

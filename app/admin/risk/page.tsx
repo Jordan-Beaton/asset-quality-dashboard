@@ -11,10 +11,10 @@ export default function AdminRiskSettingsPage() {
       latestLabel="Latest Risk Setting"
       status="Risk Settings shell ready. Existing Risk Register scoring and records are unchanged."
       kpis={[
-        { title: "Risk Categories", value: "Pending", accent: "#7c3aed" },
-        { title: "Scoring Matrix", value: "Current", accent: "#3A9B98" },
-        { title: "Review Rules", value: "Future", accent: "#f59e0b" },
-        { title: "Response Strategies", value: "Pending", accent: "#2563eb" },
+        { title: "Risk Categories", value: "Pending", accent: "#53565A" },
+        { title: "Scoring Matrix", value: "Current", accent: "#005670" },
+        { title: "Review Rules", value: "Future", accent: "#FFAD00" },
+        { title: "Response Strategies", value: "Pending", accent: "#63B1BC" },
       ]}
       panels={[
         { title: "Future Editable Settings", text: "Risk categories, probability and impact labels, scoring thresholds, response strategies, and review frequency rules." },
@@ -43,7 +43,7 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

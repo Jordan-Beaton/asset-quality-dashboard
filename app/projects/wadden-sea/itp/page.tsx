@@ -576,11 +576,11 @@ export default function WaddenSeaItpPage() {
       <WaddenSeaWorkspaceNav active="itp" />
 
       <section className="quality-kpi-grid" style={metricsGrid}>
-        <QualityKpiCard title="Total ITPs" value={metrics.total} accent="#2563eb" />
-        <QualityKpiCard title="Closed" value={metrics.closed} accent="#16a34a" />
-        <QualityKpiCard title="Enshore Review" value={metrics.enshore} accent="#f59e0b" />
-        <QualityKpiCard title="Enshore Approved" value={metrics.approved} accent="#3A9B98" />
-        <QualityKpiCard title="Comments / Rejected" value={metrics.comments} accent="#dc2626" />
+        <QualityKpiCard title="Total ITPs" value={metrics.total} accent="#63B1BC" />
+        <QualityKpiCard title="Closed" value={metrics.closed} accent="#005670" />
+        <QualityKpiCard title="Enshore Review" value={metrics.enshore} accent="#FFAD00" />
+        <QualityKpiCard title="Enshore Approved" value={metrics.approved} accent="#005670" />
+        <QualityKpiCard title="Comments / Rejected" value={metrics.comments} accent="#F93822" />
       </section>
 
       <section style={surface}>
@@ -718,13 +718,13 @@ const surface: CSSProperties = { background: "#fff", border: "1px solid #d8e2eb"
 const toolbar: CSSProperties = { padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 };
 const viewTabs: CSSProperties = { display: "flex", gap: 6, padding: "0 18px 13px" };
 const viewTab: CSSProperties = { border: "1px solid #d5e0e8", borderRadius: 9, background: "#f6f8fa", color: "#526477", padding: "7px 11px", fontWeight: 800, fontSize: 11, cursor: "pointer" };
-const activeViewTab: CSSProperties = { ...viewTab, background: "#2f7f7d", color: "#fff", borderColor: "#2f7f7d" };
-const sectionKicker: CSSProperties = { color: "#2f7f7d", fontWeight: 900, fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase" };
+const activeViewTab: CSSProperties = { ...viewTab, background: "#005670", color: "#fff", borderColor: "#005670" };
+const sectionKicker: CSSProperties = { color: "#005670", fontWeight: 900, fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase" };
 const sectionTitle: CSSProperties = { margin: "3px 0 0", color: "#14263a", fontSize: 20 };
 const filters: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(260px,1fr) 150px 165px", gap: 8, padding: "0 18px 13px" };
 const input: CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #cbd8e5", borderRadius: 10, padding: "10px 12px", background: "#fff", color: "#17263a", font: "inherit" };
 const select: CSSProperties = { ...input };
-const primaryButton: CSSProperties = { border: 0, borderRadius: 10, padding: "11px 16px", background: "#2f7f7d", color: "#fff", fontWeight: 900, cursor: "pointer" };
+const primaryButton: CSSProperties = { border: 0, borderRadius: 10, padding: "11px 16px", background: "#005670", color: "#fff", fontWeight: 900, cursor: "pointer" };
 const secondaryButton: CSSProperties = { ...primaryButton, background: "#eef3f7", color: "#334155" };
 const notice: CSSProperties = { margin: "0 22px 16px", padding: "11px 13px", borderRadius: 10, background: "#fff7d6", color: "#774b00", fontSize: 13 };
 const tableWrap: CSSProperties = { width: "100%", borderTop: "1px solid #e2e8f0" };
@@ -737,11 +737,11 @@ const compactTitle: CSSProperties = { ...secondary, whiteSpace: "nowrap", overfl
 const cellInput: CSSProperties = { width: "100%", minWidth: 0, boxSizing: "border-box", border: "1px solid #d5dee8", borderRadius: 6, background: "#fff", color: "#26384b", padding: "6px 5px", fontSize: 10 };
 const cellSelect: CSSProperties = { ...cellInput, fontWeight: 800, paddingRight: 2 };
 const pill: CSSProperties = { display: "inline-block", padding: "5px 9px", borderRadius: 999, fontWeight: 900, fontSize: 11, whiteSpace: "nowrap" };
-const linkButton: CSSProperties = { border: 0, background: "transparent", color: "#237d7a", fontWeight: 900, cursor: "pointer", padding: 4 };
+const linkButton: CSSProperties = { border: 0, background: "transparent", color: "#005670", fontWeight: 900, cursor: "pointer", padding: 4 };
 const rowActions: CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 3 };
-const editButton: CSSProperties = { border: "1px solid #9accca", borderRadius: 6, background: "#eef9f8", color: "#237d7a", padding: "4px 6px", fontSize: 9, fontWeight: 900, cursor: "pointer" };
+const editButton: CSSProperties = { border: "1px solid #9accca", borderRadius: 6, background: "#eef9f8", color: "#005670", padding: "4px 6px", fontSize: 9, fontWeight: 900, cursor: "pointer" };
 const deleteButton: CSSProperties = { ...editButton, borderColor: "#fecaca", background: "#fff1f2", color: "#b42318" };
-const historyButton: CSSProperties = { border: 0, width: 27, height: 27, borderRadius: 999, background: "#e7f5f4", color: "#237d7a", fontWeight: 900, cursor: "pointer" };
+const historyButton: CSSProperties = { border: 0, width: 27, height: 27, borderRadius: 999, background: "#e7f5f4", color: "#005670", fontWeight: 900, cursor: "pointer" };
 const empty: CSSProperties = { padding: 35, textAlign: "center", color: "#64748b" };
 const archive: CSSProperties = { borderTop: "1px solid #e2e8f0", padding: 16, display: "grid", gap: 8 };
 const archiveIntro: CSSProperties = { display: "flex", justifyContent: "space-between", color: "#64748b", fontSize: 12, padding: "0 2px 7px" };

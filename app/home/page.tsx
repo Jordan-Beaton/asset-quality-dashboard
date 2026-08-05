@@ -269,7 +269,7 @@ export default function HomePage() {
           .home-module-card:hover {
             transform: translateY(-6px) scale(1.025);
             box-shadow: 0 22px 38px rgba(15, 23, 42, 0.13);
-            border-color: #BFE5E3;
+            border-color: #D0D0CE;
           }
 
         `}
@@ -359,8 +359,8 @@ export default function HomePage() {
                       color: hasAccess
                         ? card.status === "Shell"
                           ? "#475569"
-                          : "#2F7F7D"
-                        : "#991b1b",
+                          : "#005670"
+                        : "#F93822",
                     }}
                   >
                     {status}
@@ -379,14 +379,14 @@ export default function HomePage() {
                   <span
                     style={{
                       ...cardShortStyle,
-                      color: hasAccess ? "#2F7F7D" : "#64748b",
+                      color: hasAccess ? "#005670" : "#64748b",
                     }}
                   >
                     <span
                       style={{
                         ...connectorDotStyle,
-                        background: hasAccess ? "#3A9B98" : "#94a3b8",
-                        boxShadow: hasAccess ? "0 0 0 5px rgba(58,155,152,0.12)" : "none",
+                        background: hasAccess ? "#005670" : "#94a3b8",
+                        boxShadow: hasAccess ? "0 0 0 5px rgba(0,86,112,0.12)" : "none",
                       }}
                     />
                     {card.short}
@@ -394,8 +394,8 @@ export default function HomePage() {
                   <span
                     style={{
                       ...ctaStyle,
-                      background: hasAccess ? "#EEF8F7" : "#eef2f6",
-                      color: hasAccess ? "#2F7F7D" : "#64748b",
+                      background: hasAccess ? "#ECECE7" : "#eef2f6",
+                      color: hasAccess ? "#005670" : "#64748b",
                     }}
                   >
                     {hasAccess ? card.cta : "Restricted"}
@@ -446,7 +446,7 @@ const heroStyle: CSSProperties = {
   gap: "28px",
   alignItems: "center",
   background:
-    "radial-gradient(circle at 82% 42%, rgba(255,255,255,0.23), transparent 0 15%, transparent 34%), linear-gradient(135deg, #3A9B98 0%, #2F7F7D 48%, #111827 128%)",
+    "radial-gradient(circle at 82% 42%, rgba(255,255,255,0.23), transparent 0 15%, transparent 34%), linear-gradient(135deg, #005670 0%, #005670 48%, #111827 128%)",
   color: "#ffffff",
   boxShadow: "0 22px 44px rgba(15, 23, 42, 0.14)",
 };
@@ -573,7 +573,7 @@ const commandSurfaceStyle: CSSProperties = {
   borderRadius: "24px",
   border: "1px solid #dbe7f3",
   background:
-    "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,251,252,0.98) 100%), linear-gradient(90deg, rgba(58,155,152,0.08) 1px, transparent 1px)",
+    "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,251,252,0.98) 100%), linear-gradient(90deg, rgba(0,86,112,0.08) 1px, transparent 1px)",
   backgroundSize: "auto, 36px 36px",
   padding: "20px",
   boxShadow: "0 16px 34px rgba(15, 23, 42, 0.08)",
@@ -590,7 +590,7 @@ const surfaceHeaderStyle: CSSProperties = {
 };
 
 const surfaceEyebrowStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontSize: "12px",
   fontWeight: 900,
   letterSpacing: "0.12em",
@@ -647,7 +647,7 @@ const cardGlowStyle: CSSProperties = {
   width: "110px",
   height: "110px",
   borderRadius: "999px",
-  background: "radial-gradient(circle, rgba(58,155,152,0.18), transparent 66%)",
+  background: "radial-gradient(circle, rgba(0,86,112,0.18), transparent 66%)",
   pointerEvents: "none",
 };
 
@@ -665,9 +665,9 @@ const moduleIconStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#EEF8F7",
-  border: "1px solid #BFE5E3",
-  color: "#2F7F7D",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
+  color: "#005670",
 };
 
 const iconSvgStyle: CSSProperties = {
@@ -726,7 +726,7 @@ const cardFooterStyle: CSSProperties = {
 };
 
 const cardShortStyle: CSSProperties = {
-  color: "#2F7F7D",
+  color: "#005670",
   fontSize: "13px",
   fontWeight: 900,
   display: "inline-flex",
@@ -738,8 +738,8 @@ const connectorDotStyle: CSSProperties = {
   width: "9px",
   height: "9px",
   borderRadius: "999px",
-  background: "#3A9B98",
-  boxShadow: "0 0 0 5px rgba(58,155,152,0.12)",
+  background: "#005670",
+  boxShadow: "0 0 0 5px rgba(0,86,112,0.12)",
 };
 
 const ctaStyle: CSSProperties = {
@@ -749,8 +749,8 @@ const ctaStyle: CSSProperties = {
   minHeight: "34px",
   borderRadius: "10px",
   padding: "8px 12px",
-  background: "#EEF8F7",
-  color: "#2F7F7D",
+  background: "#ECECE7",
+  color: "#005670",
   fontSize: "12px",
   fontWeight: 900,
   whiteSpace: "nowrap",
@@ -758,4 +758,4 @@ const ctaStyle: CSSProperties = {
 
 const adminRequestPanel: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, margin: "0 auto 20px", maxWidth: 1320, padding: "16px 18px", border: "1px solid #fdba74", borderRadius: 16, background: "#fff7ed", boxShadow: "0 8px 20px rgba(154,52,18,.08)" };
 const adminRequestTitle: CSSProperties = { margin: "3px 0 5px", color: "#9a3412", fontSize: 19 };
-const adminRequestLink: CSSProperties = { flex: "0 0 auto", display: "inline-flex", alignItems: "center", minHeight: 42, padding: "10px 14px", borderRadius: 10, background: "#0f766e", color: "#ffffff", textDecoration: "none", fontSize: 14, fontWeight: 900 };
+const adminRequestLink: CSSProperties = { flex: "0 0 auto", display: "inline-flex", alignItems: "center", minHeight: 42, padding: "10px 14px", borderRadius: 10, background: "#005670", color: "#ffffff", textDecoration: "none", fontSize: 14, fontWeight: 900 };

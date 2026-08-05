@@ -22,7 +22,7 @@ function getStatusTone(value: string | null | undefined) {
   const normal = (value || "").trim().toLowerCase();
   if (normal === "active") return { bg: "#dcfce7", color: "#166534" };
   if (normal.includes("maintenance")) return { bg: "#fef3c7", color: "#92400e" };
-  if (normal === "quarantine") return { bg: "#fee2e2", color: "#991b1b" };
+  if (normal === "quarantine") return { bg: "#fee2e2", color: "#F93822" };
   return { bg: "#e2e8f0", color: "#334155" };
 }
 
@@ -159,7 +159,7 @@ const shellStyle: CSSProperties = {
 };
 
 const brandBarStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   color: "#ffffff",
   borderRadius: "18px",
   padding: "14px 18px",
@@ -167,7 +167,7 @@ const brandBarStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  boxShadow: "0 16px 28px rgba(58, 155, 152, 0.18)",
+  boxShadow: "0 16px 28px rgba(0, 86, 112, 0.18)",
 };
 
 const messageCardStyle: CSSProperties = {
@@ -194,7 +194,7 @@ const summaryCardStyle: CSSProperties = {
 const eyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#3A9B98",
+  color: "#005670",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
 };
@@ -241,13 +241,13 @@ const primaryActionLinkStyle: CSSProperties = {
   justifyContent: "center",
   minHeight: "56px",
   borderRadius: "16px",
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   textDecoration: "none",
   fontWeight: 800,
   fontSize: "16px",
   padding: "14px 18px",
-  boxShadow: "0 16px 28px rgba(58, 155, 152, 0.18)",
+  boxShadow: "0 16px 28px rgba(0, 86, 112, 0.18)",
 };
 
 const backLinkWrapStyle: CSSProperties = {
@@ -256,7 +256,7 @@ const backLinkWrapStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   textDecoration: "none",
   fontSize: "13px",
   fontWeight: 700,

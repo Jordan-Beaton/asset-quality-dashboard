@@ -137,10 +137,10 @@ export default function RiskDashboardPage() {
       </div>
 
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Open Risks" value={openRisks} accent="#3A9B98" />
-        <QualityKpiCard title="High / Critical" value={highCriticalRisks} accent="#dc2626" />
-        <QualityKpiCard title="Overdue Reviews" value={overdueReviews} accent="#f59e0b" />
-        <QualityKpiCard title="Linked Actions" value={openActionsPlaceholder} accent="#7c3aed" />
+        <QualityKpiCard title="Open Risks" value={openRisks} accent="#005670" />
+        <QualityKpiCard title="High / Critical" value={highCriticalRisks} accent="#F93822" />
+        <QualityKpiCard title="Overdue Reviews" value={overdueReviews} accent="#FFAD00" />
+        <QualityKpiCard title="Linked Actions" value={openActionsPlaceholder} accent="#53565A" />
       </section>
 
       <section style={dashboardGridStyle}>
@@ -289,6 +289,6 @@ const placeholderChartStyle: CSSProperties = { display: "grid", gap: "12px" };
 const barRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "120px 1fr 28px", alignItems: "center", gap: "12px" };
 const barLabelStyle: CSSProperties = { color: "#334155", fontSize: "13px", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 const barTrackStyle: CSSProperties = { height: "12px", borderRadius: "999px", background: "#e2e8f0", overflow: "hidden" };
-const barFillStyle: CSSProperties = { height: "100%", borderRadius: "999px", background: "#3A9B98", opacity: 0.62 };
+const barFillStyle: CSSProperties = { height: "100%", borderRadius: "999px", background: "#005670", opacity: 0.62 };
 const barValueStyle: CSSProperties = { color: "#0f172a", fontSize: "14px", textAlign: "right" };
 const emptyStateStyle: CSSProperties = { minHeight: "150px", borderRadius: "14px", border: "1px dashed #cbd5e1", background: "#f8fafc", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 };

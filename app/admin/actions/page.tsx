@@ -11,10 +11,10 @@ export default function AdminActionSettingsPage() {
       latestLabel="Latest Action Setting"
       status="Action Settings shell ready. Existing central Action Management behaviour is unchanged."
       kpis={[
-        { title: "Priority Values", value: "Current", accent: "#dc2626" },
-        { title: "Status Values", value: "Current", accent: "#2563eb" },
-        { title: "Source Labels", value: "Pending", accent: "#7c3aed" },
-        { title: "Escalations", value: "Future", accent: "#f59e0b" },
+        { title: "Priority Values", value: "Current", accent: "#F93822" },
+        { title: "Status Values", value: "Current", accent: "#63B1BC" },
+        { title: "Source Labels", value: "Pending", accent: "#53565A" },
+        { title: "Escalations", value: "Future", accent: "#FFAD00" },
       ]}
       panels={[
         { title: "Future Editable Settings", text: "Priority values, status values, source/module labels, overdue escalation rules, and action reporting defaults." },
@@ -43,7 +43,7 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

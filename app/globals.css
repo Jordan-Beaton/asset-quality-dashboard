@@ -38,7 +38,7 @@ body {
 
 .quality-kpi-card--clickable:focus-visible,
 .quality-kpi-card--clickable:focus-within {
-  outline: 2px solid rgba(58, 155, 152, 0.45);
+  outline: 2px solid rgba(0, 86, 112, 0.45);
   outline-offset: 3px;
 }
 
@@ -48,9 +48,9 @@ body {
 
 .ims-rail-link:hover,
 .ims-rail-link:focus-visible {
-  background: #eef8f7 !important;
+  background: #ECECE7 !important;
   color: #0f172a !important;
-  border-color: #bfe5e3 !important;
+  border-color: #D0D0CE !important;
   transform: translateX(3px);
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
   outline: none;
@@ -58,16 +58,16 @@ body {
 
 .ims-rail-link:hover .ims-rail-icon,
 .ims-rail-link:focus-visible .ims-rail-icon {
-  background: #d7efee !important;
-  color: #2f7f7d !important;
+  background: #D0D0CE !important;
+  color: #005670 !important;
   transform: scale(1.04);
 }
 
 .ims-rail-link--active:hover,
 .ims-rail-link--active:focus-visible {
-  background: #3a9b98 !important;
+  background: #005670 !important;
   color: #ffffff !important;
-  border-color: #3a9b98 !important;
+  border-color: #005670 !important;
 }
 
 .ims-rail-link--active:hover .ims-rail-icon,

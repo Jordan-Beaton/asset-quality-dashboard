@@ -279,7 +279,7 @@ function dueState(date: string | null | undefined) {
 
 function getStatusTone(status: string) {
   const value = (status || "").toLowerCase();
-  if (value.includes("open")) return { bg: "#fee2e2", color: "#991b1b" };
+  if (value.includes("open")) return { bg: "#fee2e2", color: "#F93822" };
   if (value.includes("progress")) return { bg: "#fef3c7", color: "#92400e" };
   if (value.includes("hold")) return { bg: "#ede9fe", color: "#5b21b6" };
   if (value.includes("closed")) return { bg: "#dcfce7", color: "#166534" };
@@ -290,7 +290,7 @@ function getStatusTone(status: string) {
 function getSeverityTone(severity: string) {
   const value = (severity || "").toLowerCase();
   if (value.includes("high") || value.includes("major") || value.includes("critical")) {
-    return { bg: "#fee2e2", color: "#991b1b" };
+    return { bg: "#fee2e2", color: "#F93822" };
   }
   if (value.includes("medium")) return { bg: "#fef3c7", color: "#92400e" };
   if (value.includes("low") || value.includes("minor")) return { bg: "#dcfce7", color: "#166534" };
@@ -466,10 +466,10 @@ function wordKeyValueTable(rows: Array<[string, string, string, string]>) {
       new TableRow({
         tableHeader: true,
         children: [
-          wordCell("Field", { fill: "0F766E", color: "FFFFFF", bold: true, width: widths[0] }),
-          wordCell("Value", { fill: "0F766E", color: "FFFFFF", bold: true, width: widths[1] }),
-          wordCell("Field", { fill: "0F766E", color: "FFFFFF", bold: true, width: widths[2] }),
-          wordCell("Value", { fill: "0F766E", color: "FFFFFF", bold: true, width: widths[3] }),
+          wordCell("Field", { fill: "005670", color: "FFFFFF", bold: true, width: widths[0] }),
+          wordCell("Value", { fill: "005670", color: "FFFFFF", bold: true, width: widths[1] }),
+          wordCell("Field", { fill: "005670", color: "FFFFFF", bold: true, width: widths[2] }),
+          wordCell("Value", { fill: "005670", color: "FFFFFF", bold: true, width: widths[3] }),
         ],
       }),
       ...rows.map(
@@ -539,7 +539,7 @@ function wordReportFooter(reference: string) {
   return new Footer({
     children: [
       new Paragraph({
-        border: { top: { style: BorderStyle.SINGLE, color: "0F766E", size: 4 } },
+        border: { top: { style: BorderStyle.SINGLE, color: "005670", size: 4 } },
         spacing: { before: 80 },
         children: [new TextRun({ text: "", size: 1 })],
       }),
@@ -1398,7 +1398,7 @@ function NcrCapaPageContent() {
       statusOptions.map((status) => ({
         label: status,
         value: yearScopedNcrRows.filter((row) => row.status === status).length,
-        color: status === "Closed" ? "#16a34a" : status === "In Progress" ? "#7c3aed" : "#f59e0b",
+        color: status === "Closed" ? "#005670" : status === "In Progress" ? "#53565A" : "#FFAD00",
       })),
     [statusOptions, yearScopedNcrRows]
   );
@@ -1408,7 +1408,7 @@ function NcrCapaPageContent() {
       severityOptions.map((severity) => ({
         label: severity,
         value: yearScopedNcrRows.filter((row) => row.severity === severity).length,
-        color: severity === "High" ? "#dc2626" : severity === "Medium" ? "#f59e0b" : "#16a34a",
+        color: severity === "High" ? "#F93822" : severity === "Medium" ? "#FFAD00" : "#005670",
       })),
     [severityOptions, yearScopedNcrRows]
   );
@@ -1418,7 +1418,7 @@ function NcrCapaPageContent() {
       sourceOptions.map((source) => ({
         label: source,
         value: yearScopedNcrRows.filter((row) => row.source_type === source).length,
-        color: source === "Supplier" ? "#2563eb" : source === "External" ? "#7c3aed" : "#3A9B98",
+        color: source === "Supplier" ? "#63B1BC" : source === "External" ? "#53565A" : "#005670",
       })),
     [sourceOptions, yearScopedNcrRows]
   );
@@ -1428,17 +1428,17 @@ function NcrCapaPageContent() {
       {
         label: "Overdue",
         value: yearScopedNcrRows.filter((row) => dueState(row.due_date) === "overdue").length,
-        color: "#dc2626",
+        color: "#F93822",
       },
       {
         label: "Due 7 Days",
         value: yearScopedNcrRows.filter((row) => dueState(row.due_date) === "soon").length,
-        color: "#f59e0b",
+        color: "#FFAD00",
       },
       {
         label: "In Date",
         value: yearScopedNcrRows.filter((row) => dueState(row.due_date) === "ok").length,
-        color: "#16a34a",
+        color: "#005670",
       },
       {
         label: "No Due Date",
@@ -2110,7 +2110,7 @@ function NcrCapaPageContent() {
         align: "right",
       });
 
-      doc.setDrawColor(15, 118, 110);
+      doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 37, pageWidth - margin, 37);
 
@@ -2135,7 +2135,7 @@ function NcrCapaPageContent() {
           overflow: "linebreak",
         },
         headStyles: {
-          fillColor: [15, 118, 110],
+          fillColor: [0, 86, 112],
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
@@ -2505,7 +2505,7 @@ function NcrCapaPageContent() {
           ],
         }),
         new Paragraph({
-          border: { bottom: { style: BorderStyle.SINGLE, color: "0F766E", size: 8 } },
+          border: { bottom: { style: BorderStyle.SINGLE, color: "005670", size: 8 } },
           spacing: { before: 70, after: 240 },
           children: [new TextRun({ text: "", size: 1 })],
         }),
@@ -2767,7 +2767,7 @@ function NcrCapaPageContent() {
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 17, { align: "right" });
       doc.text(`Filtered NCRs: ${filteredNcrRows.length}`, pageWidth - margin, 23, { align: "right" });
 
-      doc.setDrawColor(15, 118, 110);
+      doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 31, pageWidth - margin, 31);
 
@@ -3142,9 +3142,9 @@ function NcrCapaPageContent() {
       {activeWorkspaceView === "dashboard" ? (
         <>
           <section style={statsGridStyle}>
-            <QualityKpiCard title="Open Items" value={kpis.openItems} accent="#f59e0b" onClick={() => applyKpiFilter("Open")} active={ncrQuickFilter === "Open"} />
-            <QualityKpiCard title="In Progress" value={kpis.inProgress} accent="#7c3aed" onClick={() => applyKpiFilter("In Progress")} active={ncrQuickFilter === "In Progress"} />
-            <QualityKpiCard title="Closed NCRs" value={kpis.closed} accent="#16a34a" onClick={() => applyKpiFilter("Closed")} active={ncrQuickFilter === "Closed"} />
+            <QualityKpiCard title="Open Items" value={kpis.openItems} accent="#FFAD00" onClick={() => applyKpiFilter("Open")} active={ncrQuickFilter === "Open"} />
+            <QualityKpiCard title="In Progress" value={kpis.inProgress} accent="#53565A" onClick={() => applyKpiFilter("In Progress")} active={ncrQuickFilter === "In Progress"} />
+            <QualityKpiCard title="Closed NCRs" value={kpis.closed} accent="#005670" onClick={() => applyKpiFilter("Closed")} active={ncrQuickFilter === "Closed"} />
             <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#ef4444" onClick={() => applyKpiFilter("Overdue")} active={ncrQuickFilter === "Overdue"} />
             <QualityKpiCard title="Due in 7 Days" value={kpis.dueSoon} accent="#22c55e" onClick={() => applyKpiFilter("DueSoon")} active={ncrQuickFilter === "DueSoon"} />
             <QualityKpiCard title="Total NCRs" value={kpis.totalNcrs} accent="#60a5fa" onClick={() => applyKpiFilter("All")} active={ncrQuickFilter === "All"} />
@@ -3241,7 +3241,7 @@ function NcrCapaPageContent() {
                 ) : null}
                 .{" "}
                 {importHasErrors ? (
-                  <span style={{ color: "#b91c1c", fontWeight: 800 }}>Resolve row errors before import.</span>
+                  <span style={{ color: "#F93822", fontWeight: 800 }}>Resolve row errors before import.</span>
                 ) : (
                   <span style={{ color: "#166534", fontWeight: 800 }}>Ready to import.</span>
                 )}
@@ -3767,7 +3767,7 @@ function NcrCapaPageContent() {
                 <div style={buttonRowStyle}>
                   <button
                     type="button"
-                    style={{ ...primaryButton, background: "#7c3aed" }}
+                    style={{ ...primaryButton, background: "#53565A" }}
                     onClick={() => void createCapa()}
                     disabled={saving || !canCreateNcr}
                   >
@@ -3877,7 +3877,7 @@ function NcrCapaPageContent() {
                   const state = dueState(item.due_date);
                   const dueBadgeStyle =
                     state === "overdue"
-                      ? { background: "#fee2e2", color: "#991b1b" }
+                      ? { background: "#fee2e2", color: "#F93822" }
                       : state === "soon"
                       ? { background: "#fef3c7", color: "#92400e" }
                       : { background: "#dcfce7", color: "#166534" };
@@ -4082,7 +4082,7 @@ function NcrCapaPageContent() {
                       style={{
                         ...registerRowStyle,
                         background: active ? "#eff6ff" : "#ffffff",
-                        borderLeft: active ? "4px solid #3A9B98" : "4px solid transparent",
+                        borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                       }}
                     >
                       <div style={registerSimpleTextStyle}>{row.number}</div>
@@ -4122,7 +4122,7 @@ function NcrCapaPageContent() {
                             ...registerSimpleTextStyle,
                             color:
                               dueTone === "overdue"
-                                ? "#b91c1c"
+                                ? "#F93822"
                                 : dueTone === "soon"
                                 ? "#a16207"
                                 : "#0f172a",
@@ -4138,7 +4138,7 @@ function NcrCapaPageContent() {
                             ...registerSimpleTextStyle,
                             color:
                               dueTone === "overdue"
-                                ? "#b91c1c"
+                                ? "#F93822"
                                 : dueTone === "soon"
                                 ? "#a16207"
                                 : "#0f172a",
@@ -4599,7 +4599,7 @@ function NcrCapaPageContent() {
                     <div style={buttonRowStyle}>
                       <button
                         type="button"
-                        style={{ ...secondaryButton, border: "1px solid #BFE5E3", color: "#3A9B98" }}
+                        style={{ ...secondaryButton, border: "1px solid #D0D0CE", color: "#005670" }}
                         onClick={() => void generateNcrPdf()}
                         disabled={generatingPdf || !canEditNcr}
                       >
@@ -4688,7 +4688,7 @@ function NcrCapaPageContent() {
                   {editRow.type === "NCR" ? (
                     <Link
                       href={buildNcrLinkedActionHref(editRow)}
-                      style={{ ...secondaryButton, border: "1px solid #BFE5E3", color: "#3A9B98", textDecoration: "none" }}
+                      style={{ ...secondaryButton, border: "1px solid #D0D0CE", color: "#005670", textDecoration: "none" }}
                     >
                       Generate Linked Action
                     </Link>
@@ -4708,7 +4708,7 @@ function NcrCapaPageContent() {
                     style={{
                       ...secondaryButton,
                       border: "1px solid #fecaca",
-                      color: "#b91c1c",
+                      color: "#F93822",
                       background: "#fff5f5",
                     }}
                     onClick={() => void deleteSelected()}
@@ -4767,7 +4767,7 @@ function NcrCapaPageContent() {
                 <div style={buttonRowStyle}>
                   <button
                     type="button"
-                    style={{ ...primaryButton, background: "#7c3aed" }}
+                    style={{ ...primaryButton, background: "#53565A" }}
                     onClick={() => void uploadEvidenceToSelected()}
                     disabled={uploadingEvidence || !canEditNcr}
                   >
@@ -4799,7 +4799,7 @@ function NcrCapaPageContent() {
                             style={{
                               ...secondaryButtonSmall,
                               border: "1px solid #fecaca",
-                              color: "#b91c1c",
+                              color: "#F93822",
                               background: "#fff5f5",
                             }}
                             onClick={() => void deleteEvidence(file)}
@@ -5062,12 +5062,12 @@ function SelectedFilesList({ files }: { files: File[] }) {
 }
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   color: "white",
   borderRadius: "20px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
+  boxShadow: "0 10px 30px rgba(0, 86, 112, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -5178,7 +5178,7 @@ const topMetaActionsStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -5223,7 +5223,7 @@ const workspaceNavButtonStyle: CSSProperties = {
 
 const activeWorkspaceNavButtonStyle: CSSProperties = {
   ...workspaceNavButtonStyle,
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
 };
 
@@ -5409,7 +5409,7 @@ const reportActionHintStyle: CSSProperties = {
 };
 
 const reportActionValueStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontSize: "22px",
   fontWeight: 900,
 };
@@ -5514,7 +5514,7 @@ const primaryButton: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
   border: "none",
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   fontWeight: 700,
   cursor: "pointer",
@@ -5734,7 +5734,7 @@ const importTableRowStyle: CSSProperties = {
 };
 
 const importErrorTextStyle: CSSProperties = {
-  color: "#b91c1c",
+  color: "#F93822",
   fontWeight: 700,
 };
 

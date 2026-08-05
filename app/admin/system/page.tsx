@@ -11,9 +11,9 @@ export default function AdminSystemSettingsPage() {
       latestLabel="Latest System Setting"
       status="System Settings shell ready. No system configuration is editable in this pass."
       kpis={[
-        { title: "Organisation Profile", value: "Future", accent: "#3A9B98" },
-        { title: "Branding", value: "Current", accent: "#2563eb" },
-        { title: "Email Defaults", value: "Pending IT", accent: "#f59e0b" },
+        { title: "Organisation Profile", value: "Future", accent: "#005670" },
+        { title: "Branding", value: "Current", accent: "#63B1BC" },
+        { title: "Email Defaults", value: "Pending IT", accent: "#FFAD00" },
         { title: "Governance", value: "Future", accent: "#64748b" },
       ]}
       panels={[
@@ -43,7 +43,7 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

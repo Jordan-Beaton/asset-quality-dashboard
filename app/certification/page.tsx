@@ -569,7 +569,7 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
 function getExpiryBadgeStyle(state: string): CSSProperties {
   const palette =
     state === "Expired"
-      ? { background: "#fee2e2", color: "#991b1b" }
+      ? { background: "#fee2e2", color: "#F93822" }
       : state === "Due Soon"
         ? { background: "#fef3c7", color: "#92400e" }
         : state === "Archived"
@@ -695,7 +695,7 @@ const emptyCellStyle: CSSProperties = {
 };
 
 const selectedRowStyle: CSSProperties = {
-  background: "#EEF8F7",
+  background: "#ECECE7",
 };
 
 const mutedTextStyle: CSSProperties = {

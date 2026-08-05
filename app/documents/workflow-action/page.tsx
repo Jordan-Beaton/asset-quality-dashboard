@@ -168,7 +168,7 @@ function WorkflowActionContent() {
               type="button"
               style={{
                 ...buttonStyle,
-                background: requiresReason ? "#b91c1c" : "#3A9B98",
+                background: requiresReason ? "#F93822" : "#005670",
                 opacity: isSubmitting || isComplete ? 0.65 : 1,
               }}
               onClick={submitAction}
@@ -221,7 +221,7 @@ const headerStyle: CSSProperties = {
 const eyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#3A9B98",
+  color: "#005670",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
 };

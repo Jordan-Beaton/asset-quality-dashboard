@@ -523,7 +523,7 @@ export default function ManagementReviewPage() {
       doc.setFontSize(9.5);
       doc.setTextColor(71, 85, 105);
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 24, { align: "right" });
-      doc.setDrawColor(58, 155, 152);
+      doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 31, pageWidth - margin, 31);
 
@@ -533,7 +533,7 @@ export default function ManagementReviewPage() {
         body: executiveSignals.map((item) => [item.label, item.value, item.detail]),
         theme: "grid",
         styles: { fontSize: 8.5, cellPadding: 2.4, lineColor: [226, 232, 240], valign: "middle" },
-        headStyles: { fillColor: [58, 155, 152], textColor: 255, fontStyle: "bold" },
+        headStyles: { fillColor: [0, 86, 112], textColor: 255, fontStyle: "bold" },
         alternateRowStyles: { fillColor: [248, 250, 252] },
         columnStyles: {
           0: { cellWidth: 56, fontStyle: "bold" },
@@ -632,12 +632,12 @@ export default function ManagementReviewPage() {
 
       const addTitle = (slide: ReturnType<typeof pptx.addSlide>, title: string, subtitle?: string) => {
         slide.background = { color: "F8FAFC" };
-        slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.333, h: 0.16, fill: { color: "3A9B98" }, line: { color: "3A9B98" } });
+        slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.333, h: 0.16, fill: { color: "005670" }, line: { color: "005670" } });
         slide.addText(title, { x: 0.55, y: 0.45, w: 8.7, h: 0.38, fontFace: "Calibri", fontSize: 23, bold: true, color: "0F172A", margin: 0 });
         if (subtitle) {
           slide.addText(subtitle, { x: 0.55, y: 0.86, w: 9.8, h: 0.26, fontFace: "Calibri", fontSize: 10.5, color: "475569", margin: 0 });
         }
-        slide.addText("ENSHORE IMS", { x: 10.7, y: 0.48, w: 1.9, h: 0.25, fontFace: "Calibri", fontSize: 10, bold: true, color: "3A9B98", align: "right", margin: 0 });
+        slide.addText("ENSHORE IMS", { x: 10.7, y: 0.48, w: 1.9, h: 0.25, fontFace: "Calibri", fontSize: 10, bold: true, color: "005670", align: "right", margin: 0 });
         slide.addText(lastRefreshed || new Date().toLocaleString("en-GB"), { x: 10.4, y: 0.78, w: 2.2, h: 0.24, fontFace: "Calibri", fontSize: 8.5, color: "64748B", align: "right", margin: 0 });
       };
 
@@ -650,14 +650,14 @@ export default function ManagementReviewPage() {
 
       const titleSlide = pptx.addSlide();
       titleSlide.background = { color: "F8FAFC" };
-      titleSlide.addShape(pptx.ShapeType.roundRect, { x: 0.5, y: 0.55, w: 12.35, h: 5.75, rectRadius: 0.16, fill: { color: "18474C" }, line: { color: "18474C" } });
-      titleSlide.addText("MANAGEMENT REVIEW", { x: 0.95, y: 1.05, w: 4.6, h: 0.28, fontFace: "Calibri", fontSize: 11, bold: true, color: "BFE5E3", margin: 0 });
+      titleSlide.addShape(pptx.ShapeType.roundRect, { x: 0.5, y: 0.55, w: 12.35, h: 5.75, rectRadius: 0.16, fill: { color: "005670" }, line: { color: "005670" } });
+      titleSlide.addText("MANAGEMENT REVIEW", { x: 0.95, y: 1.05, w: 4.6, h: 0.28, fontFace: "Calibri", fontSize: 11, bold: true, color: "D0D0CE", margin: 0 });
       titleSlide.addText("CEO Business Health Pack", { x: 0.95, y: 1.48, w: 6.7, h: 0.55, fontFace: "Calibri", fontSize: 30, bold: true, color: "FFFFFF", margin: 0 });
-      titleSlide.addText("Live read-only view across Quality, HSE, and Document Control.", { x: 0.95, y: 2.15, w: 6.9, h: 0.35, fontFace: "Calibri", fontSize: 13, color: "E2F5F4", margin: 0 });
-      titleSlide.addShape(pptx.ShapeType.ellipse, { x: 8.65, y: 1.1, w: 2.4, h: 2.4, fill: { color: "FFFFFF", transparency: 100 }, line: { color: "3A9B98", width: 4, transparency: 10 } });
+      titleSlide.addText("Live read-only view across Quality, HSE, and Document Control.", { x: 0.95, y: 2.15, w: 6.9, h: 0.35, fontFace: "Calibri", fontSize: 13, color: "ECECE7", margin: 0 });
+      titleSlide.addShape(pptx.ShapeType.ellipse, { x: 8.65, y: 1.1, w: 2.4, h: 2.4, fill: { color: "FFFFFF", transparency: 100 }, line: { color: "005670", width: 4, transparency: 10 } });
       titleSlide.addText(businessScore === null ? "N/A" : `${businessScore}%`, { x: 8.7, y: 1.72, w: 2.3, h: 0.55, fontFace: "Calibri", fontSize: 30, bold: true, color: "FFFFFF", align: "center", margin: 0 });
-      titleSlide.addText("BUSINESS CONTROL", { x: 8.65, y: 2.32, w: 2.4, h: 0.24, fontFace: "Calibri", fontSize: 8.5, bold: true, color: "BFE5E3", align: "center", margin: 0 });
-      titleSlide.addText(`Generated ${new Date().toLocaleString("en-GB")}`, { x: 0.95, y: 5.65, w: 4.5, h: 0.24, fontFace: "Calibri", fontSize: 9, color: "BFE5E3", margin: 0 });
+      titleSlide.addText("BUSINESS CONTROL", { x: 8.65, y: 2.32, w: 2.4, h: 0.24, fontFace: "Calibri", fontSize: 8.5, bold: true, color: "D0D0CE", align: "center", margin: 0 });
+      titleSlide.addText(`Generated ${new Date().toLocaleString("en-GB")}`, { x: 0.95, y: 5.65, w: 4.5, h: 0.24, fontFace: "Calibri", fontSize: 9, color: "D0D0CE", margin: 0 });
 
       const execSlide = pptx.addSlide();
       addTitle(execSlide, "Executive Signals", "What the CEO should see first.");
@@ -704,7 +704,7 @@ export default function ManagementReviewPage() {
         "Confirm HSE action and calendar overdue items are visible to accountable managers.",
         "Use the live IMS module links for drill-down rather than editing source data from this pack.",
       ].forEach((text, index) => {
-        closeSlide.addShape(pptx.ShapeType.roundRect, { x: 0.75, y: 1.35 + index * 0.8, w: 11.7, h: 0.52, rectRadius: 0.06, fill: { color: index % 2 ? "FFFFFF" : "EEF8F7" }, line: { color: "BFE5E3" } });
+        closeSlide.addShape(pptx.ShapeType.roundRect, { x: 0.75, y: 1.35 + index * 0.8, w: 11.7, h: 0.52, rectRadius: 0.06, fill: { color: index % 2 ? "FFFFFF" : "ECECE7" }, line: { color: "D0D0CE" } });
         closeSlide.addText(text, { x: 1, y: 1.52 + index * 0.8, w: 10.9, h: 0.18, fontSize: 10.5, color: "0F172A", margin: 0 });
       });
 
@@ -740,7 +740,7 @@ export default function ManagementReviewPage() {
         .mr-focus-link:hover {
           transform: translateY(-3px);
           box-shadow: 0 18px 34px rgba(15, 23, 42, 0.11);
-          border-color: #BFE5E3;
+          border-color: #D0D0CE;
         }
         .mr-live {
           animation: mrLiveGlow 1.9s ease-in-out infinite alternate;
@@ -986,14 +986,14 @@ const businessScorePanelStyle: CSSProperties = {
   alignItems: "center",
   gap: "20px",
   color: "#ffffff",
-  background: `linear-gradient(135deg, ${imsColours.brand} 0%, #18474c 100%)`,
+  background: `linear-gradient(135deg, ${imsColours.brand} 0%, #005670 100%)`,
   boxShadow: imsShadows.hero,
 };
 
 const eyebrowStyle: CSSProperties = {
   display: "block",
   marginBottom: "10px",
-  color: "#dff7f5",
+  color: "#ECECE7",
   fontSize: "12px",
   fontWeight: 900,
   letterSpacing: "0.12em",
@@ -1011,7 +1011,7 @@ const businessTitleStyle: CSSProperties = {
 const businessCopyStyle: CSSProperties = {
   margin: "14px 0 0",
   maxWidth: "610px",
-  color: "#effdfc",
+  color: "#ECECE7",
   lineHeight: 1.55,
   fontSize: "14px",
   fontWeight: 700,

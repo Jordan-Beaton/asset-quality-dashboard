@@ -131,7 +131,7 @@ function buildHtml({
           ? `<div style="margin: 24px 0; display: flex; gap: 12px; flex-wrap: wrap;">
               ${actionLinks
                 .map((link) => {
-                  const background = link.tone === "danger" ? "#b91c1c" : "#3A9B98";
+                  const background = link.tone === "danger" ? "#F93822" : "#005670";
                   return `<a href="${escapeHtml(link.url)}" style="display: inline-block; background: ${background}; color: #ffffff; text-decoration: none; border-radius: 10px; padding: 12px 18px; font-weight: 700;">${escapeHtml(link.label)}</a>`;
                 })
                 .join("")}

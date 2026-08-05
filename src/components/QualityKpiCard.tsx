@@ -61,7 +61,7 @@ export function QualityKpiCard({
     ...cardBaseStyle,
     border: active ? `1px solid ${imsColours.brand}` : cardBaseStyle.border,
     borderTop: `4px solid ${accent}`,
-    boxShadow: active ? "0 0 0 2px rgba(58, 155, 152, 0.16)" : cardBaseStyle.boxShadow,
+    boxShadow: active ? "0 0 0 2px rgba(0, 86, 112, 0.16)" : cardBaseStyle.boxShadow,
     cursor: href || onClick ? "pointer" : "default",
   };
 

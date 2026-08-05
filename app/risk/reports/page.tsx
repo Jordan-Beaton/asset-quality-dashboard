@@ -11,10 +11,10 @@ export default function RiskReportsPage() {
       latestLabel="Latest Report"
       status="Risk Reports shell ready. Report persistence and PDF generation have not been configured yet."
       kpis={[
-        { title: "Monthly Reports", value: "-", accent: "#3A9B98" },
-        { title: "Open High Risks", value: "-", accent: "#dc2626" },
-        { title: "Controls Due", value: "-", accent: "#f59e0b" },
-        { title: "Linked Actions", value: "-", accent: "#7c3aed" },
+        { title: "Monthly Reports", value: "-", accent: "#005670" },
+        { title: "Open High Risks", value: "-", accent: "#F93822" },
+        { title: "Controls Due", value: "-", accent: "#FFAD00" },
+        { title: "Linked Actions", value: "-", accent: "#53565A" },
       ]}
       panels={[
         {
@@ -119,7 +119,7 @@ const topMetaRowStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };

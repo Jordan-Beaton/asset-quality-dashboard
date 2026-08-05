@@ -322,7 +322,7 @@ function formatFileSize(value: number | null) {
 function getStatusTone(status: string) {
   const value = status.toLowerCase();
 
-  if (value.includes("overdue")) return { bg: "#fee2e2", color: "#991b1b" };
+  if (value.includes("overdue")) return { bg: "#fee2e2", color: "#F93822" };
   if (value.includes("progress")) return { bg: "#fef3c7", color: "#92400e" };
   if (value.includes("planned")) return { bg: "#dbeafe", color: "#1d4ed8" };
   if (value.includes("completed") || value.includes("closed")) return { bg: "#dcfce7", color: "#166534" };
@@ -332,7 +332,7 @@ function getStatusTone(status: string) {
 }
 
 function getFindingTone(category: FindingSeverity) {
-  if (category === "Major") return { bg: "#fee2e2", color: "#991b1b" };
+  if (category === "Major") return { bg: "#fee2e2", color: "#F93822" };
   if (category === "Minor") return { bg: "#fef3c7", color: "#92400e" };
   if (category === "OBS") return { bg: "#dbeafe", color: "#1d4ed8" };
   return { bg: "#dcfce7", color: "#166534" };
@@ -340,7 +340,7 @@ function getFindingTone(category: FindingSeverity) {
 
 function getFrequencyBadgeStyle(frequency: "Reduce" | "Maintain" | "Increase"): CSSProperties {
   if (frequency === "Increase") {
-    return { ...badgeStyle, background: "#fee2e2", color: "#991b1b" };
+    return { ...badgeStyle, background: "#fee2e2", color: "#F93822" };
   }
   if (frequency === "Reduce") {
     return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
@@ -597,9 +597,9 @@ function MultiSelectStandards({
             onClick={() => onToggle(option)}
             style={{
               ...chipButtonStyle,
-              background: active ? "#3A9B98" : "#f8fafc",
+              background: active ? "#005670" : "#f8fafc",
               color: active ? "#ffffff" : "#334155",
-              borderColor: active ? "#3A9B98" : "#cbd5e1",
+              borderColor: active ? "#005670" : "#cbd5e1",
             }}
           >
             {option}
@@ -2310,7 +2310,7 @@ function AuditsPageContent() {
       <button type="button" style={optionsMenuItemStyle} onClick={() => void generateFindingWord(finding)} disabled={Boolean(generatingFindingWordId)}>{generatingFindingWordId === finding.id ? "Generating Word..." : "Generate Word report"}</button>
       <label style={optionsMenuItemStyle}>{importingFindingWordId === finding.id ? "Reading completed Word..." : "Upload completed Word"}<input type="file" accept=".docx" style={{ display: "none" }} disabled={Boolean(importingFindingWordId) || !canEditAudit} onChange={(event) => void handleCompletedFindingUpload(finding, event)} /></label>
       <label style={optionsMenuItemStyle}>{uploadingFindingEvidenceId === finding.id ? "Uploading evidence..." : "Upload evidence"}<input type="file" multiple style={{ display: "none" }} disabled={Boolean(uploadingFindingEvidenceId) || !canEditAudit} onChange={(event) => void handleFindingEvidenceUpload(finding, event)} /></label>
-      <button type="button" style={{ ...optionsMenuItemStyle, color: "#b91c1c" }} onClick={() => void deleteFinding(finding)} disabled={!canEditAudit}>Delete finding</button>
+      <button type="button" style={{ ...optionsMenuItemStyle, color: "#F93822" }} onClick={() => void deleteFinding(finding)} disabled={!canEditAudit}>Delete finding</button>
     </div></details>;
   }
 
@@ -2411,7 +2411,7 @@ function AuditsPageContent() {
         new TableRow({
           tableHeader: true,
           children: headers.map((header, index) =>
-            wordCell(header, { width: widths[index], fill: "0F766E", color: "FFFFFF", bold: true, size: 18 })
+            wordCell(header, { width: widths[index], fill: "005670", color: "FFFFFF", bold: true, size: 18 })
           ),
         }),
         ...tableRows.map((row, rowIndex) =>
@@ -2441,7 +2441,7 @@ function AuditsPageContent() {
         new TableRow({
           children: [
             new TableCell({
-              shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+              shading: { type: ShadingType.CLEAR, fill: "005670", color: "auto" },
               margins: { top: 110, bottom: 110, left: 140, right: 140 },
               children: [new Paragraph({ children: [wordRun(title, { bold: true, color: "FFFFFF", size: 20 })] })],
             }),
@@ -2487,7 +2487,7 @@ function AuditsPageContent() {
     return new Footer({
       children: [
         new Paragraph({
-          border: { top: { style: BorderStyle.SINGLE, color: "0F766E", size: 4 } },
+          border: { top: { style: BorderStyle.SINGLE, color: "005670", size: 4 } },
           spacing: { before: 80 },
           children: [wordRun("", { size: 1 })],
         }),
@@ -2560,7 +2560,7 @@ function AuditsPageContent() {
           new TableRow({
             tableHeader: true,
             children: ["File", "Size", "Uploaded", "Evidence Link"].map((header, index) =>
-              wordCell(header, { width: [4200, 1100, 2300, 1760][index], fill: "0F766E", color: "FFFFFF", bold: true, size: 18 })
+              wordCell(header, { width: [4200, 1100, 2300, 1760][index], fill: "005670", color: "FFFFFF", bold: true, size: 18 })
             ),
           }),
           ...evidenceTableRows.map((row, rowIndex) =>
@@ -2614,18 +2614,18 @@ function AuditsPageContent() {
                 layout: TableLayoutType.FIXED,
                 columnWidths: [wordBodyWidth],
                 borders: {
-                  top: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  bottom: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  left: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  right: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  top: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "005670" },
                 },
                 rows: [
                   new TableRow({
                     children: [
                       new TableCell({
-                        shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+                        shading: { type: ShadingType.CLEAR, fill: "005670", color: "auto" },
                         margins: { top: 180, bottom: 180, left: 180, right: 180 },
                         children: [
                           new Paragraph({ children: [wordRun("ENSHORE SUBSEA", { bold: true, color: "FFFFFF", size: 36 })] }),
@@ -2709,7 +2709,7 @@ function AuditsPageContent() {
       const margin = 14;
       const generatedAt = new Date().toISOString();
 
-      doc.setFillColor(15, 118, 110);
+      doc.setFillColor(0, 86, 112);
       doc.rect(0, 0, pageWidth, 24, "F");
 
       doc.setFont("helvetica", "bold");
@@ -2820,7 +2820,7 @@ function AuditsPageContent() {
             url ? "Open evidence" : "Unavailable",
           ]),
           headStyles: {
-            fillColor: [15, 118, 110],
+            fillColor: [0, 86, 112],
             textColor: [255, 255, 255],
             fontStyle: "bold",
           },
@@ -2858,7 +2858,7 @@ function AuditsPageContent() {
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
-        doc.setDrawColor(15, 118, 110);
+        doc.setDrawColor(0, 86, 112);
         doc.line(margin, pageHeight - 13, pageWidth - margin, pageHeight - 13);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
@@ -2907,7 +2907,7 @@ function AuditsPageContent() {
       const reportCode = getAuditDocumentNumber(selectedAudit.audit_type);
       const generatedAt = new Date().toISOString();
 
-      doc.setFillColor(15, 118, 110);
+      doc.setFillColor(0, 86, 112);
       doc.rect(0, 0, pageWidth, 24, "F");
 
       doc.setFont("helvetica", "bold");
@@ -2982,7 +2982,7 @@ function AuditsPageContent() {
           ])
         : [["-", "-", "-", "No findings raised against this audit.", "-", "-", "-", "-"]],
       headStyles: {
-        fillColor: [15, 118, 110],
+        fillColor: [0, 86, 112],
         textColor: [255, 255, 255],
         fontStyle: "bold",
       },
@@ -3062,7 +3062,7 @@ function AuditsPageContent() {
               ])
             : [["No evidence files uploaded against this finding.", "-", "-", "-"]],
           headStyles: {
-            fillColor: [15, 118, 110],
+            fillColor: [0, 86, 112],
             textColor: [255, 255, 255],
             fontStyle: "bold",
           },
@@ -3137,7 +3137,7 @@ function AuditsPageContent() {
       const categorySummary =
         openFindingCategoryFilter === "All" ? "All finding categories" : openFindingCategoryFilter;
 
-      doc.setFillColor(15, 118, 110);
+      doc.setFillColor(0, 86, 112);
       doc.rect(0, 0, pageWidth, 24, "F");
 
       doc.setFont("helvetica", "bold");
@@ -3192,7 +3192,7 @@ function AuditsPageContent() {
           finding.corrective_action || "-",
         ]),
         headStyles: {
-          fillColor: [15, 118, 110],
+          fillColor: [0, 86, 112],
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
@@ -3238,7 +3238,7 @@ function AuditsPageContent() {
                     ? [219, 234, 254]
                     : [220, 252, 231];
             const textColor: [number, number, number] =
-              tone.color === "#991b1b"
+              tone.color === "#F93822"
                 ? [153, 27, 27]
                 : tone.color === "#92400e"
                   ? [146, 64, 14]
@@ -3302,7 +3302,7 @@ function AuditsPageContent() {
       const categorySummary =
         openFindingCategoryFilter === "All" ? "All finding categories" : openFindingCategoryFilter;
 
-      doc.setFillColor(15, 118, 110);
+      doc.setFillColor(0, 86, 112);
       doc.rect(0, 0, pageWidth, 24, "F");
 
       doc.setFont("helvetica", "bold");
@@ -3353,7 +3353,7 @@ function AuditsPageContent() {
           finding.corrective_action || "-",
         ]),
         headStyles: {
-          fillColor: [15, 118, 110],
+          fillColor: [0, 86, 112],
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
@@ -3397,7 +3397,7 @@ function AuditsPageContent() {
                     ? [219, 234, 254]
                     : [220, 252, 231];
             const textColor: [number, number, number] =
-              tone.color === "#991b1b"
+              tone.color === "#F93822"
                 ? [153, 27, 27]
                 : tone.color === "#92400e"
                   ? [146, 64, 14]
@@ -3458,7 +3458,7 @@ function AuditsPageContent() {
       const margin = 12;
       const selectedAudits = audits.filter((audit) => customReportAuditIds.includes(audit.id));
 
-      doc.setFillColor(15, 118, 110);
+      doc.setFillColor(0, 86, 112);
       doc.rect(0, 0, pageWidth, 24, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
@@ -3513,7 +3513,7 @@ function AuditsPageContent() {
           finding.root_cause || "-",
           finding.corrective_action || "-",
         ]),
-        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+        headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
         styles: {
           fontSize: 7,
           cellPadding: 1.6,
@@ -3627,18 +3627,18 @@ function AuditsPageContent() {
                 layout: TableLayoutType.FIXED,
                 columnWidths: [wordBodyWidth],
                 borders: {
-                  top: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  bottom: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  left: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  right: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  top: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "005670" },
                 },
                 rows: [
                   new TableRow({
                     children: [
                       new TableCell({
-                        shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+                        shading: { type: ShadingType.CLEAR, fill: "005670", color: "auto" },
                         margins: { top: 180, bottom: 180, left: 180, right: 180 },
                         children: [
                           new Paragraph({
@@ -3761,18 +3761,18 @@ function AuditsPageContent() {
                 layout: TableLayoutType.FIXED,
                 columnWidths: [14400],
                 borders: {
-                  top: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  bottom: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  left: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  right: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  top: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "005670" },
                 },
                 rows: [
                   new TableRow({
                     children: [
                       new TableCell({
-                        shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+                        shading: { type: ShadingType.CLEAR, fill: "005670", color: "auto" },
                         margins: { top: 170, bottom: 170, left: 180, right: 180 },
                         children: [
                           new Paragraph({
@@ -3853,7 +3853,7 @@ function AuditsPageContent() {
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 10;
 
-      doc.setFillColor(15, 118, 110);
+      doc.setFillColor(0, 86, 112);
       doc.rect(0, 0, pageWidth, 24, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
@@ -3902,7 +3902,7 @@ function AuditsPageContent() {
           auditRiskById[audit.id]?.frequency || "Maintain",
           getEffectiveAuditStatus(audit),
         ]),
-        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+        headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
         styles: {
           fontSize: 7.5,
           cellPadding: 2,
@@ -4003,49 +4003,49 @@ function AuditsPageContent() {
           <QualityKpiCard
             title="Remaining Audits"
             value={kpis.planned}
-            accent="#2563eb"
+            accent="#63B1BC"
             onClick={() => applyAuditStatusKpiFilter("Planned")}
             active={!isOpenFindingsView && !isClosedFindingsView && statusFilter === "Planned"}
           />
           <QualityKpiCard
             title="In Progress"
             value={kpis.inProgress}
-            accent="#7c3aed"
+            accent="#53565A"
             onClick={() => applyAuditStatusKpiFilter("In Progress")}
             active={!isOpenFindingsView && !isClosedFindingsView && statusFilter === "In Progress"}
           />
           <QualityKpiCard
             title="Overdue"
             value={kpis.overdue}
-            accent="#dc2626"
+            accent="#F93822"
             onClick={() => applyAuditStatusKpiFilter("Overdue")}
             active={!isOpenFindingsView && !isClosedFindingsView && statusFilter === "Overdue"}
           />
           <QualityKpiCard
             title="Completed"
             value={kpis.completed}
-            accent="#16a34a"
+            accent="#005670"
             onClick={() => applyAuditStatusKpiFilter("Completed")}
             active={!isOpenFindingsView && !isClosedFindingsView && statusFilter === "Completed"}
           />
           <QualityKpiCard
             title="Open Findings"
             value={kpis.openFindings}
-            accent="#f59e0b"
+            accent="#FFAD00"
             onClick={() => setAuditView("open-findings")}
             active={isOpenFindingsView}
           />
           <QualityKpiCard
             title="Closed Findings"
             value={kpis.closedFindings}
-            accent="#3A9B98"
+            accent="#005670"
             onClick={() => setAuditView("closed-findings")}
             active={isClosedFindingsView}
           />
           <QualityKpiCard
             title="Major Findings"
             value={kpis.totalMajor}
-            accent="#b91c1c"
+            accent="#F93822"
             onClick={applyMajorFindingsFilter}
             active={!isOpenFindingsView && !isClosedFindingsView && auditQuickFilter === "Major"}
           />
@@ -4088,7 +4088,7 @@ function AuditsPageContent() {
                           ...findingTypeBarSegmentStyle,
                           width: `${closedWidth}%`,
                           minWidth: item.closed > 0 ? "36px" : 0,
-                          background: "#3A9B98",
+                          background: "#005670",
                         }}
                         onClick={() => openFindingStatusByType(item.auditType, "closed")}
                         disabled={item.closed === 0}
@@ -4103,7 +4103,7 @@ function AuditsPageContent() {
             </div>
             <div style={findingTypeLegendStyle}>
               <span><i style={{ ...findingTypeLegendDotStyle, background: "#f97316" }} />Open</span>
-              <span><i style={{ ...findingTypeLegendDotStyle, background: "#3A9B98" }} />Closed</span>
+              <span><i style={{ ...findingTypeLegendDotStyle, background: "#005670" }} />Closed</span>
             </div>
           </SectionCard>
 
@@ -4268,7 +4268,7 @@ function AuditsPageContent() {
                           style={{
                             ...openFindingsRowStyle,
                             background: active ? "#eff6ff" : "#ffffff",
-                            borderLeft: active ? "4px solid #3A9B98" : "4px solid transparent",
+                            borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                           }}
                         >
                           <div style={openFindingsPrimaryCellStyle}>{finding.reference}</div>
@@ -4741,8 +4741,8 @@ function AuditsPageContent() {
                     onClick={() => selectAuditAndScroll(audit.id)}
                     style={{
                       ...programmeRowStyle,
-                      background: active ? "#eff6ff" : linkedMatch ? "#ecfeff" : "#ffffff",
-                      borderLeft: active ? "4px solid #3A9B98" : "4px solid transparent",
+                      background: active ? "#eff6ff" : linkedMatch ? "#ECECE7" : "#ffffff",
+                      borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                     }}
                   >
                     <div style={programmePrimaryStyle}>
@@ -4882,7 +4882,7 @@ function AuditsPageContent() {
               </div>
 
               <div style={miniKpiGridStyle}>
-                <MiniStat label="Major" value={selectedAudit.findings.major} tone="#991b1b" bg="#fee2e2" />
+                <MiniStat label="Major" value={selectedAudit.findings.major} tone="#F93822" bg="#fee2e2" />
                 <MiniStat label="Minor" value={selectedAudit.findings.minor} tone="#92400e" bg="#fef3c7" />
                 <MiniStat label="OFI" value={selectedAudit.findings.ofi} tone="#166534" bg="#dcfce7" />
                 <MiniStat label="OBS" value={selectedAudit.findings.obs} tone="#1d4ed8" bg="#dbeafe" />
@@ -5445,8 +5445,8 @@ function AuditsPageContent() {
                 type="button"
                 style={{
                   ...reportActionCardStyle,
-                  borderColor: showCustomReportBuilder ? "#3A9B98" : "#dbe4ef",
-                  background: showCustomReportBuilder ? "#f0fdfa" : "#f8fafc",
+                  borderColor: showCustomReportBuilder ? "#005670" : "#dbe4ef",
+                  background: showCustomReportBuilder ? "#ECECE7" : "#f8fafc",
                 }}
                 onClick={() => setShowCustomReportBuilder((current) => !current)}
               >
@@ -5461,8 +5461,8 @@ function AuditsPageContent() {
                 type="button"
                 style={{
                   ...reportActionCardStyle,
-                  borderColor: showProgrammeSnapshot ? "#3A9B98" : "#dbe4ef",
-                  background: showProgrammeSnapshot ? "#f0fdfa" : "#f8fafc",
+                  borderColor: showProgrammeSnapshot ? "#005670" : "#dbe4ef",
+                  background: showProgrammeSnapshot ? "#ECECE7" : "#f8fafc",
                 }}
                 onClick={() => setShowProgrammeSnapshot((current) => !current)}
               >
@@ -5655,7 +5655,7 @@ function AuditsPageContent() {
                               gridTemplateColumns: programmeSnapshotSnipMode
                                 ? programmeSnapshotColumns
                                 : programmeSnapshotSelectionColumns,
-                              background: !programmeSnapshotSnipMode && checked ? "#f0fdfa" : "#ffffff",
+                              background: !programmeSnapshotSnipMode && checked ? "#ECECE7" : "#ffffff",
                             }}
                           >
                             {!programmeSnapshotSnipMode ? (
@@ -5815,8 +5815,8 @@ function AuditsPageContent() {
                           key={audit.id}
                           style={{
                             ...customReportAuditRowStyle,
-                            borderColor: checked ? "#3A9B98" : "#e2e8f0",
-                            background: checked ? "#f0fdfa" : "#ffffff",
+                            borderColor: checked ? "#005670" : "#e2e8f0",
+                            background: checked ? "#ECECE7" : "#ffffff",
                           }}
                         >
                           <input
@@ -6050,9 +6050,9 @@ function SortChip({
       onClick={onClick}
       style={{
         ...sortChipStyle,
-        background: active ? "#3A9B98" : "#f8fafc",
+        background: active ? "#005670" : "#f8fafc",
         color: active ? "#ffffff" : "#334155",
-        borderColor: active ? "#3A9B98" : "#cbd5e1",
+        borderColor: active ? "#005670" : "#cbd5e1",
       }}
     >
       {label} {active ? (asc ? "↑" : "↓") : ""}
@@ -6061,11 +6061,11 @@ function SortChip({
 }
 
 const linkedSearchBannerStyle: CSSProperties = {
-  background: "#ecfeff",
-  border: "1px solid #a5f3fc",
+  background: "#ECECE7",
+  border: "1px solid #ECECE7",
   borderRadius: "12px",
   padding: "12px 16px",
-  color: "#155e75",
+  color: "#005670",
   marginBottom: "20px",
 };
 
@@ -6074,8 +6074,8 @@ const linkedMatchTagStyle: CSSProperties = {
   marginTop: "6px",
   padding: "4px 8px",
   borderRadius: "999px",
-  background: "#D7EFEE",
-  color: "#2F7F7D",
+  background: "#D0D0CE",
+  color: "#005670",
   fontWeight: 800,
   fontSize: "11px",
 };
@@ -6114,12 +6114,12 @@ const pickerRowStyle: CSSProperties = {
 };
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   color: "white",
   borderRadius: "22px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
+  boxShadow: "0 10px 30px rgba(0, 86, 112, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -6223,7 +6223,7 @@ const topMetaRowStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -6268,7 +6268,7 @@ const viewButtonStyle: CSSProperties = {
 
 const activeViewButtonStyle: CSSProperties = {
   ...viewButtonStyle,
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
 };
 
@@ -6561,7 +6561,7 @@ const programmeSnapshotTotalsStyle: CSSProperties = {
   display: "flex",
   gap: "8px",
   flexWrap: "wrap",
-  color: "#115e59",
+  color: "#005670",
   fontSize: "13px",
   fontWeight: 800,
 };
@@ -6579,7 +6579,7 @@ const programmeSnapshotTitleBarStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: "12px",
   padding: "12px 16px",
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   fontSize: "13px",
   minWidth: "1120px",
@@ -6644,8 +6644,8 @@ const customReportBuilderHintStyle: CSSProperties = {
 const customReportSelectionCountStyle: CSSProperties = {
   padding: "8px 12px",
   borderRadius: "999px",
-  background: "#ccfbf1",
-  color: "#115e59",
+  background: "#ECECE7",
+  color: "#005670",
   fontSize: "13px",
   fontWeight: 800,
 };
@@ -6685,7 +6685,7 @@ const customReportAuditRowStyle: CSSProperties = {
 const customReportCheckboxStyle: CSSProperties = {
   width: "18px",
   height: "18px",
-  accentColor: "#3A9B98",
+  accentColor: "#005670",
 };
 
 const customReportAuditIdentityStyle: CSSProperties = {
@@ -6796,7 +6796,7 @@ const createAuditHintStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "11px 16px",
@@ -6816,7 +6816,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const dangerButtonStyle: CSSProperties = {
-  background: "#991b1b",
+  background: "#F93822",
   color: "#ffffff",
   border: "none",
   padding: "11px 16px",
@@ -6829,7 +6829,7 @@ const uploadButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   borderRadius: "10px",
   padding: "11px 16px",
@@ -6884,8 +6884,8 @@ const compactProblemRankStyle: CSSProperties = {
   width: "34px",
   height: "34px",
   borderRadius: "999px",
-  background: "#e0f2fe",
-  color: "#0369a1",
+  background: "#ECECE7",
+  color: "#005670",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -7019,7 +7019,7 @@ const programmeRowStyle: CSSProperties = {
 const programmePrimaryStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#3A9B98",
+  color: "#005670",
   lineHeight: 1.45,
   wordBreak: "break-word",
 };
@@ -7114,8 +7114,8 @@ const topUploadStripStyle: CSSProperties = {
   gridTemplateColumns: "1fr auto",
   gap: "14px",
   alignItems: "center",
-  border: "1px solid #cfe8e5",
-  background: "linear-gradient(180deg, #f7fffd 0%, #eefbf8 100%)",
+  border: "1px solid #ECECE7",
+  background: "linear-gradient(180deg, #ECECE7 0%, #ECECE7 100%)",
   borderRadius: "16px",
   padding: "16px",
 };
@@ -7259,7 +7259,7 @@ const detailTagGroupStyle: CSSProperties = {
 const detailSectionLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 900,
-  color: "#2F7F7D",
+  color: "#005670",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
@@ -7325,10 +7325,10 @@ const optionsMenuStyle: CSSProperties = { position: "relative", marginLeft: "aut
 const optionsSummaryStyle: CSSProperties = { listStyle: "none", cursor: "pointer", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", background: "#e8eef7", color: "#0f172a", fontSize: "13px", fontWeight: 800, userSelect: "none" };
 const optionsMenuPanelStyle: CSSProperties = { position: "absolute", zIndex: 40, right: 0, bottom: "calc(100% + 8px)", width: "220px", display: "grid", padding: "6px", borderRadius: "12px", border: "1px solid #cbd5e1", background: "#ffffff", boxShadow: "0 16px 35px rgba(15,23,42,.18)" };
 const optionsMenuItemStyle: CSSProperties = { display: "block", width: "100%", boxSizing: "border-box", border: 0, borderRadius: "8px", background: "transparent", padding: "10px 11px", color: "#0f172a", textAlign: "left", font: "inherit", fontSize: "13px", fontWeight: 700, cursor: "pointer" };
-const importPreviewStyle: CSSProperties = { marginTop: "14px", padding: "16px", borderRadius: "14px", border: "1px solid #99d7d3", background: "#f0fdfa", display: "grid", gap: "14px" };
+const importPreviewStyle: CSSProperties = { marginTop: "14px", padding: "16px", borderRadius: "14px", border: "1px solid #D0D0CE", background: "#ECECE7", display: "grid", gap: "14px" };
 const importPreviewHeadStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" };
 const importComparisonStyle: CSSProperties = { display: "grid", gap: "10px" };
-const importComparisonRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "140px minmax(0, 1fr) minmax(0, 1fr)", gap: "10px", alignItems: "start", padding: "10px", borderRadius: "10px", background: "#ffffff", border: "1px solid #ccfbf1" };
+const importComparisonRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "140px minmax(0, 1fr) minmax(0, 1fr)", gap: "10px", alignItems: "start", padding: "10px", borderRadius: "10px", background: "#ffffff", border: "1px solid #ECECE7" };
 
 const findingEvidenceActionsStyle: CSSProperties = {
   display: "grid",

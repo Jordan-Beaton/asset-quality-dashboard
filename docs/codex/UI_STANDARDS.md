@@ -45,23 +45,25 @@ Shared primitives to prefer:
 
 Shared theme values:
 
-- Brand: `#3A9B98`
-- Brand dark: `#2F7F7D`
-- Brand soft: `#EEF8F7`
-- Brand border: `#BFE5E3`
-- Ink: `#0f172a`
-- Slate: `#475569`
-- Muted: `#64748b`
-- Page: `#f1f5f9`
+- Brand primary / Pantone 7708c: `#005670`
+- Brand accent / Pantone 7709c: `#63B1BC`
+- Brand soft / Pantone P 134-9 C: `#ECECE7`
+- Brand border / Pantone cool gray 2: `#D0D0CE`
+- Ink / Black: `#000000`
+- Slate and muted / Pantone cool gray 11: `#53565A`
+- Page: `#ECECE7`
 - Panel: `#ffffff`
-- Panel alternate: `#f8fafc`
-- Border: `#dbe7f3`
-- Soft border: `#e2e8f0`
-- Danger: `#991b1b` or `#dc2626`
-- Warning/accent: `#f59e0b`
-- Success: `#16a34a`
-- Blue: `#2563eb`
-- Purple: `#7c3aed`
+- Panel alternate: `#ECECE7`
+- Border and soft border: `#D0D0CE`
+- Danger / Pantone bright red: `#F93822`
+- Warning / Pantone 2010c: `#FFAD00`
+- Success: `#005670`
+
+Restricted colours:
+
+- `#78C57E` is reserved for HSE campaigns displayed alongside the approved 3Rs logo. It is not a general IMS success colour.
+- `#503488` is reserved for RapidScan and must not be used as a general IMS chart or module accent.
+- Do not introduce substitute blues, teals, greens, purples, oranges, or reds when an approved semantic token exists.
 
 Shared radii:
 
@@ -73,7 +75,7 @@ Shared radii:
 
 Shared shadows:
 
-- Hero: `0 24px 44px rgba(58, 155, 152, 0.18)`
+- Hero: `0 24px 44px rgba(0, 86, 112, 0.18)`
 - Panel/card: `0 1px 3px rgba(15, 23, 42, 0.08)`
 - Lift: `0 14px 28px rgba(15, 23, 42, 0.075)`
 
@@ -103,7 +105,7 @@ Standard page container:
 Standard hero:
 
 - Use `QualityPageHero`.
-- Background is a brand gradient from `#3A9B98` to `#2F7F7D`.
+- Background is predominantly `#005670`, with `#63B1BC` used only as a supporting gradient accent away from white text.
 - Color is white.
 - Border radius is `24px`.
 - Height is compact: `76px` in the current shared component.
@@ -121,7 +123,7 @@ Hero content rules:
 
 Do:
 
-- Keep the green hero consistent across modules.
+- Keep the dark-blue Enshore hero consistent across modules.
 - Use the same hero placement at the top of the page.
 
 Do Not:
@@ -136,7 +138,7 @@ Use `ImsTopMetaRow` for the row beneath the hero.
 
 Standard behavior:
 
-- Left side: back link, normally brand teal and bold.
+- Left side: back link, normally Enshore dark blue and bold.
 - Right side: action buttons and a status banner.
 - Background: white with slight transparency.
 - Border: `1px solid #dbe3ef`.
@@ -201,7 +203,7 @@ Standard tab row:
 Standard tab button:
 
 - Inactive background: `#e2e8f0`.
-- Active background: `#3A9B98`.
+- Active background: `#005670`.
 - Active text: white.
 - Border radius: `10px`.
 - Padding: `10px 14px`.
@@ -242,7 +244,7 @@ Panel standard:
 
 Module section header:
 
-- Green brand background.
+- Enshore dark-blue brand background.
 - White text.
 - Border radius: `12px`.
 - Padding: `10px 14px`.
@@ -409,8 +411,8 @@ Side rail:
 - Border right: `1px solid #dbe3ef`.
 - Shadow: `10px 0 28px rgba(15, 23, 42, 0.08)`.
 - Nav item height: about `44px`.
-- Active item background: `#3A9B98`; text white.
-- Hover item background: `#EEF8F7`; icon background `#D7EFEE`; slight `translateX(3px)`.
+- Active item background: `#005670`; text white.
+- Hover item background: `#ECECE7`; icon background `#D0D0CE`; slight `translateX(3px)`.
 
 Module navigation sets:
 
@@ -445,7 +447,7 @@ Standard buttons:
 - Minimum height: `42px`.
 - Font size: `14px`.
 - Font weight: `800`.
-- Primary: brand teal background, white text.
+- Primary: Enshore dark-blue background, white text.
 - Secondary: `#e2e8f0` background, ink text.
 - Danger: danger red background, white text.
 - Ghost: white background, brand dark text, brand border.
@@ -541,7 +543,10 @@ Rules:
 
 Use the IMS palette consistently:
 
-- Teal/green brand for primary actions, active tabs, heroes, and key section headers.
+- Enshore dark blue for primary actions, active tabs, heroes, and key section headers.
+- Enshore aqua for supporting accents, charts, and decorative highlights; do not place normal-sized white text directly on aqua.
+- Enshore amber for warnings and attention states, and Enshore bright red for danger, overdue, and destructive states.
+- Enshore off-white and cool greys for page backgrounds, secondary surfaces, borders, and muted text.
 - White panels on light slate page background.
 - Slate and muted text for secondary information.
 - Blue for open/in-progress states where established.
@@ -589,4 +594,3 @@ Before implementing a page:
 - Complex mobile behavior is implemented well in HSE inspections but is not uniformly applied across all registers.
 
 When touching these areas, prefer moving toward the standards above without risky rewrites.
-

@@ -233,7 +233,7 @@ export default function PublicObservationPage() {
             style={{
               ...submitButtonStyle,
               opacity: submitting ? 0.7 : 1,
-              background: submittedNumber ? "#16a34a" : submitButtonStyle.background,
+              background: submittedNumber ? "#005670" : submitButtonStyle.background,
               cursor: submitting || submittedNumber ? "default" : "pointer",
             }}
           >
@@ -259,7 +259,7 @@ const pageStyle: CSSProperties = {
   minHeight: "100vh",
   margin: "-28px -24px -36px",
   padding: "16px",
-  background: "linear-gradient(180deg, #eef8f7 0%, #f8fafc 48%, #eef2f5 100%)",
+  background: "linear-gradient(180deg, #ECECE7 0%, #f8fafc 48%, #eef2f5 100%)",
   boxSizing: "border-box",
 };
 
@@ -283,7 +283,7 @@ const headerStyle: CSSProperties = {
 };
 
 const headerCopyStyle: CSSProperties = { minWidth: 0 };
-const eyebrowStyle: CSSProperties = { color: "#78C57E", fontSize: "12px", fontWeight: 900, letterSpacing: "0.08em" };
+const eyebrowStyle: CSSProperties = { color: "#63B1BC", fontSize: "12px", fontWeight: 900, letterSpacing: "0.08em" };
 const titleStyle: CSSProperties = {
   margin: "4px 0",
   fontSize: "clamp(18px, 3.2vw, 28px)",
@@ -309,6 +309,6 @@ const helperTextStyle: CSSProperties = { margin: 0, color: imsColours.slate, fon
 const ghostButtonStyle: CSSProperties = { border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft, color: imsColours.brandDark, minHeight: "44px", borderRadius: "12px", fontWeight: 900, cursor: "pointer" };
 const formHeaderRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" };
 const smallGhostButtonStyle: CSSProperties = { ...ghostButtonStyle, minHeight: "36px", padding: "8px 12px" };
-const submitButtonStyle: CSSProperties = { border: "none", borderRadius: "14px", minHeight: "56px", background: imsColours.brand, color: "#ffffff", fontSize: "17px", fontWeight: 900, cursor: "pointer", boxShadow: "0 16px 30px rgba(58,155,152,0.24)" };
+const submitButtonStyle: CSSProperties = { border: "none", borderRadius: "14px", minHeight: "56px", background: imsColours.brand, color: "#ffffff", fontSize: "17px", fontWeight: 900, cursor: "pointer", boxShadow: "0 16px 30px rgba(0,86,112,0.24)" };
 const statusStyle: CSSProperties = { borderRadius: "14px", background: "#ffffff", border: "1px solid #dbe7f3", padding: "13px 14px", color: imsColours.ink, boxShadow: "0 1px 3px rgba(15,23,42,0.08)" };
 const successStyle: CSSProperties = { ...statusStyle, background: "#ecfdf5", borderColor: "#bbf7d0", color: "#14532d" };

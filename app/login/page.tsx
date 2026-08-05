@@ -253,7 +253,7 @@ function LoginPageContent() {
           type="submit"
           disabled={loading || authLinkLoading}
           style={{
-            background: "#3A9B98",
+            background: "#005670",
             color: "white",
             border: "none",
             borderRadius: "10px",
@@ -326,7 +326,7 @@ function InlineButton({ children, onClick }: { children: React.ReactNode; onClic
         background: "none",
         border: "none",
         padding: 0,
-        color: "#3A9B98",
+        color: "#005670",
         fontWeight: 700,
         cursor: "pointer",
       }}

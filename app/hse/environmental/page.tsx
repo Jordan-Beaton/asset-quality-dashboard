@@ -17,10 +17,10 @@ export default function HseEnvironmentalPage() {
       />
       <TopRow status="Environmental / Waste shell ready. Environmental source data has not been configured yet." />
       <section style={statsGridStyle}>
-        <QualityKpiCard title="Open Items" value="-" accent="#3A9B98" />
-        <QualityKpiCard title="Waste Records" value="-" accent="#2563eb" />
-        <QualityKpiCard title="Spill Events" value="-" accent="#dc2626" />
-        <QualityKpiCard title="Reports Due" value="-" accent="#f59e0b" />
+        <QualityKpiCard title="Open Items" value="-" accent="#005670" />
+        <QualityKpiCard title="Waste Records" value="-" accent="#63B1BC" />
+        <QualityKpiCard title="Spill Events" value="-" accent="#F93822" />
+        <QualityKpiCard title="Reports Due" value="-" accent="#FFAD00" />
       </section>
       <section style={panelGridStyle}>
         <SectionCard title="Environmental Register">Future records can show event type, location, controls, waste stream, disposal route, and close-out status.</SectionCard>
@@ -51,7 +51,7 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

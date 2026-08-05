@@ -1367,7 +1367,7 @@ const activeFilterChipStyle: CSSProperties = {
   padding: "5px 9px",
   background: imsColours.brandSoft,
   color: imsColours.brandDark,
-  border: "1px solid #bfe5e3",
+  border: "1px solid #D0D0CE",
   fontSize: "12px",
   fontWeight: 900,
 };
@@ -1417,8 +1417,8 @@ const noticeStyle: CSSProperties = {
 
 const teamChipStyle: CSSProperties = {
   margin: "4px 4px 0 6px",
-  border: "1px solid #bfe5e3",
-  background: "#eef8f7",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   color: imsColours.brandDark,
   borderRadius: "999px",
   padding: "6px 10px",
@@ -1504,7 +1504,7 @@ const calendarDayRowStyle: CSSProperties = {
 const calendarDayButtonStyle: CSSProperties = {
   border: "none",
   borderRadius: "999px",
-  background: "#eef8f7",
+  background: "#ECECE7",
   color: imsColours.brandDark,
   width: "30px",
   height: "30px",
@@ -1516,7 +1516,7 @@ const calendarDayButtonStyle: CSSProperties = {
 };
 
 const calendarAddButtonStyle: CSSProperties = {
-  border: "1px solid #bfe5e3",
+  border: "1px solid #D0D0CE",
   borderRadius: "999px",
   background: "#ffffff",
   color: imsColours.brandDark,

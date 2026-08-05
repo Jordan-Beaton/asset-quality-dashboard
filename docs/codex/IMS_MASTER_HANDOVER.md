@@ -22,7 +22,8 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 
 - Reuse the shared IMS layout, theme, and primitives.
 - New modules and pages should match the established Quality/HSE structure.
-- Green hero bars, back/status rows, internal tabs, KPI cards, filters, detail panels, and report layouts should stay consistent.
+- Enshore dark-blue hero bars, back/status rows, internal tabs, KPI cards, filters, detail panels, and report layouts should stay consistent.
+- The approved 2026 Enshore palette and restricted-colour rules are defined in `UI_STANDARDS.md`; do not reintroduce the legacy teal palette.
 - Do not create one-off local styles unless absolutely necessary.
 - If a matching pattern exists in Quality Management, copy the structure first and change only wording/data.
 

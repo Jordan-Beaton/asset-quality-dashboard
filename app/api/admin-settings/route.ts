@@ -674,7 +674,7 @@ export async function POST(request: Request) {
         address: cleanText(payload.address) || null,
         primary_contact_name: cleanText(payload.primary_contact_name) || null,
         primary_contact_email: cleanText(payload.primary_contact_email) || null,
-        primary_brand_colour: cleanText(payload.primary_brand_colour) || "#3A9B98",
+        primary_brand_colour: cleanText(payload.primary_brand_colour) || "#005670",
         financial_year_start_month: Number(payload.financial_year_start_month) || 1,
         updated_at: new Date().toISOString(),
       };

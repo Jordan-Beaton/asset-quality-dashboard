@@ -156,7 +156,7 @@ type AttachmentWithUrl = {
 };
 
 const evidenceBucket = "quality-evidence";
-const pdfBrand: [number, number, number] = [58, 155, 152];
+const pdfBrand: [number, number, number] = [0, 86, 112];
 const pdfPale: [number, number, number] = [241, 245, 249];
 const pdfLine: [number, number, number] = [203, 213, 225];
 const pdfInk: [number, number, number] = [15, 23, 42];
@@ -1077,7 +1077,7 @@ export default function HsePermitToWorkPage() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.text(new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), 178, 25, { align: "right" });
-    doc.setDrawColor(58, 155, 152);
+    doc.setDrawColor(0, 86, 112);
     doc.setLineWidth(0.7);
     doc.line(14, 33, 196, 33);
 
@@ -1152,7 +1152,7 @@ export default function HsePermitToWorkPage() {
         new Paragraph({
           alignment: options.align,
           spacing: { before: 0, after: 0 },
-          children: [wordRun(text || "", { bold: options.bold, color: options.color, size: options.fill === "3A9B98" ? 22 : 19 })],
+          children: [wordRun(text || "", { bold: options.bold, color: options.color, size: options.fill === "005670" ? 22 : 19 })],
         }),
       ],
     });
@@ -1217,7 +1217,7 @@ export default function HsePermitToWorkPage() {
             new TableCell({
               width: { size: WORD_TABLE_WIDTH, type: WidthType.DXA },
               columnSpan: 3,
-              shading: { fill: "3A9B98" },
+              shading: { fill: "005670" },
               margins: { top: 0, bottom: 0, left: 0, right: 0 },
               borders: {
                 top: { style: BorderStyle.NONE },
@@ -1225,7 +1225,7 @@ export default function HsePermitToWorkPage() {
                 left: { style: BorderStyle.NONE },
                 right: { style: BorderStyle.NONE },
               },
-              children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [wordRun(" ", { color: "3A9B98", size: 1 })] })],
+              children: [new Paragraph({ spacing: { before: 0, after: 0 }, children: [wordRun(" ", { color: "005670", size: 1 })] })],
             }),
           ],
         }),
@@ -1240,7 +1240,7 @@ export default function HsePermitToWorkPage() {
         layout: TableLayoutType.FIXED,
         rows: [
           new TableRow({
-            children: [wordCell(title, { bold: true, fill: "3A9B98", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 2 })],
+            children: [wordCell(title, { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 2 })],
           }),
           new TableRow({
             children: [
@@ -1276,7 +1276,7 @@ export default function HsePermitToWorkPage() {
         width: { size: WORD_TABLE_WIDTH, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
         rows: [
-          new TableRow({ children: [wordCell("Attachments and Distribution", { bold: true, fill: "3A9B98", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 3 })] }),
+          new TableRow({ children: [wordCell("Attachments and Distribution", { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 3 })] }),
           new TableRow({
             children: [
               wordCell("Attachment / Distribution", { bold: true, fill: "F1F5F9", width: 2800 }),
@@ -1331,7 +1331,7 @@ export default function HsePermitToWorkPage() {
         layout: TableLayoutType.FIXED,
         rows: [
           new TableRow({
-            children: [wordCell(title, { bold: true, fill: "3A9B98", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: columns * 2 })],
+            children: [wordCell(title, { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: columns * 2 })],
           }),
           ...chunkItems(values, columns).map((row) => {
             const cells = [...row];
@@ -1356,7 +1356,7 @@ export default function HsePermitToWorkPage() {
     const checkboxWidth = 520;
     const labelWidth = 2960;
     const rows: TableRow[] = [
-      new TableRow({ children: [wordCell("Section 3 - Preparation and Precautions to be Undertaken", { bold: true, fill: "3A9B98", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 6 })] }),
+      new TableRow({ children: [wordCell("Section 3 - Preparation and Precautions to be Undertaken", { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 6 })] }),
       new TableRow({
         children: [
           wordCell("Risk Assessment", { bold: true, fill: "F1F5F9", width: 3000, columnSpan: 2 }),
@@ -1442,7 +1442,7 @@ export default function HsePermitToWorkPage() {
         width: { size: WORD_TABLE_WIDTH, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
         rows: [
-          new TableRow({ children: [wordCell("Section 4 - Permit to Work Issue / Acceptance (maximum 12 hours or to shift change)", { bold: true, fill: "3A9B98", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 5 })] }),
+          new TableRow({ children: [wordCell("Section 4 - Permit to Work Issue / Acceptance (maximum 12 hours or to shift change)", { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 5 })] }),
           new TableRow({
             children: [
               wordCell("Start Time / Date", { bold: true, fill: "F1F5F9", width: 2200 }),
@@ -1490,7 +1490,7 @@ export default function HsePermitToWorkPage() {
         width: { size: WORD_TABLE_WIDTH, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
         rows: [
-          new TableRow({ children: [wordCell(`Section ${extension.label} - Permit Extension (only if conditions of PTW have not changed)`, { bold: true, fill: "3A9B98", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 5 })] }),
+          new TableRow({ children: [wordCell(`Section ${extension.label} - Permit Extension (only if conditions of PTW have not changed)`, { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 5 })] }),
           new TableRow({
             children: [
               wordCell("PTW Extended To", { bold: true, fill: "F1F5F9", width: 2200 }),
@@ -1536,7 +1536,7 @@ export default function HsePermitToWorkPage() {
         width: { size: WORD_TABLE_WIDTH, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
         rows: [
-          new TableRow({ children: [wordCell("Section 5E - Permit Closure by Site Manager / Designate", { bold: true, fill: "3A9B98", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 5 })] }),
+          new TableRow({ children: [wordCell("Section 5E - Permit Closure by Site Manager / Designate", { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 5 })] }),
           new TableRow({
             children: [
               wordCell("Closure Confirmation", { bold: true, fill: "F1F5F9", width: 2400 }),
@@ -1579,7 +1579,7 @@ export default function HsePermitToWorkPage() {
   function wordFooter() {
     return new Footer({
       children: [
-        new Paragraph({ border: { top: { style: BorderStyle.SINGLE, color: "3A9B98", size: 4 } }, spacing: { before: 80 } }),
+        new Paragraph({ border: { top: { style: BorderStyle.SINGLE, color: "005670", size: 4 } }, spacing: { before: 80 } }),
         new Table({
           width: { size: WORD_TABLE_WIDTH, type: WidthType.DXA },
           layout: TableLayoutType.FIXED,
@@ -1757,7 +1757,7 @@ export default function HsePermitToWorkPage() {
                 </thead>
                 <tbody>
                   {filteredRecords.map((record) => (
-                    <tr key={record.id} onClick={() => selectRecord(record)} style={{ cursor: "pointer", background: record.id === selectedId ? "#ecfeff" : "#ffffff" }}>
+                    <tr key={record.id} onClick={() => selectRecord(record)} style={{ cursor: "pointer", background: record.id === selectedId ? "#ECECE7" : "#ffffff" }}>
                       <td style={{ ...imsTableCellStyle, fontWeight: 900, color: imsColours.brandDark }}>{record.ptw_number}</td>
                       <td style={imsTableCellStyle}>{record.status || "-"}</td>
                       <td style={imsTableCellStyle}>{record.work_types?.join(", ") || "-"}</td>
@@ -2154,6 +2154,6 @@ const attachmentUploadButtonStyle: CSSProperties = { border: `1px solid ${imsCol
 const attachmentHintStyle: CSSProperties = { margin: "4px 0 0", color: imsColours.slate, fontSize: "12px", lineHeight: 1.35, fontWeight: 700 };
 const attachmentEmptyStyle: CSSProperties = { margin: 0, color: imsColours.slate, fontSize: "12px", lineHeight: 1.35 };
 const attachmentFileRowStyle: CSSProperties = { border: "1px solid #e2e8f0", borderRadius: "10px", background: "#f8fafc", padding: "8px 10px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", alignItems: "center", gap: "10px", color: imsColours.ink, fontSize: "12px", fontWeight: 800, lineHeight: 1.35 };
-const attachmentRemoveButtonStyle: CSSProperties = { border: "1px solid #fecaca", borderRadius: "8px", background: "#fff1f2", color: "#991b1b", minHeight: "28px", padding: "5px 8px", fontSize: "11px", fontWeight: 900, cursor: "pointer" };
+const attachmentRemoveButtonStyle: CSSProperties = { border: "1px solid #fecaca", borderRadius: "8px", background: "#fff1f2", color: "#F93822", minHeight: "28px", padding: "5px 8px", fontSize: "11px", fontWeight: 900, cursor: "pointer" };
 const mobileSummaryStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "14px", padding: "14px", background: "#ffffff", color: imsColours.ink };
 const tableWrapStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "14px", overflowX: "auto", background: "#ffffff" };

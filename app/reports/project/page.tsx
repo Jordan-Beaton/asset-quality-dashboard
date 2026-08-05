@@ -349,7 +349,7 @@ function makeWordCell(text: string, width: number, options?: { header?: boolean;
     width: { size: width, type: WidthType.DXA },
     verticalAlign: VerticalAlign.CENTER,
     shading: options?.header || options?.fill
-      ? { type: ShadingType.CLEAR, fill: options.fill || "0F766E", color: "auto" }
+      ? { type: ShadingType.CLEAR, fill: options.fill || "005670", color: "auto" }
       : undefined,
     margins: { top: 90, bottom: 90, left: 90, right: 90 },
     children: [
@@ -709,7 +709,7 @@ export default function ProjectReportsPage() {
           properties: { page: { size: { orientation: PageOrientation.LANDSCAPE }, margin: { top: 540, right: 540, bottom: 720, left: 540, footer: 300 } } },
           footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Wadden Sea | ${title} | Page `, font: "Arial", size: 15, color: "64748B" }), new SimpleField("PAGE"), new TextRun({ text: " of ", font: "Arial", size: 15, color: "64748B" }), new SimpleField("NUMPAGES")] })] }) },
           children: [
-            new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Arial", bold: true, size: 32, color: "0F766E" })] }),
+            new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Arial", bold: true, size: 32, color: "005670" })] }),
             new Paragraph({ spacing: { after: 70 }, children: [new TextRun({ text: title, font: "Arial", bold: true, size: 26 })] }),
             new Paragraph({ spacing: { after: 170 }, children: [new TextRun({ text: `${auditsToExport.length} selected audits${kind === "ncr" ? ` | ${selectedNcrFindings.length} findings` : ""} | Generated ${new Date().toLocaleString("en-GB")}`, font: "Arial", size: 16, color: "64748B" })] }),
             table,
@@ -742,7 +742,7 @@ export default function ProjectReportsPage() {
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      doc.setFillColor(15, 118, 110);
+      doc.setFillColor(0, 86, 112);
       doc.rect(0, 0, pageWidth, 24, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(17);
@@ -765,7 +765,7 @@ export default function ProjectReportsPage() {
         margin: { left: 10, right: 10, bottom: 15 },
         head,
         body,
-        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+        headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
         styles: { fontSize: kind === "ncr" ? 7 : 8, cellPadding: 2, textColor: [15, 23, 42], lineColor: [226, 232, 240], lineWidth: 0.2, valign: "middle", overflow: "linebreak" },
         alternateRowStyles: { fillColor: [248, 250, 252] },
       });
@@ -969,18 +969,18 @@ export default function ProjectReportsPage() {
                 layout: TableLayoutType.FIXED,
                 columnWidths: [14000],
                 borders: {
-                  top: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  bottom: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  left: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  right: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
-                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "0F766E" },
+                  top: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  bottom: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "005670" },
+                  insideVertical: { style: BorderStyle.NONE, size: 0, color: "005670" },
                 },
                 rows: [
                   new TableRow({
                     children: [
                       new TableCell({
-                        shading: { type: ShadingType.CLEAR, fill: "0F766E", color: "auto" },
+                        shading: { type: ShadingType.CLEAR, fill: "005670", color: "auto" },
                         margins: { top: 170, bottom: 170, left: 180, right: 180 },
                         children: [
                           new Paragraph({
@@ -1058,7 +1058,7 @@ export default function ProjectReportsPage() {
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 10;
 
-      doc.setFillColor(15, 118, 110);
+      doc.setFillColor(0, 86, 112);
       doc.rect(0, 0, pageWidth, 24, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
@@ -1091,7 +1091,7 @@ export default function ProjectReportsPage() {
           record.location || "-",
           record.witnessHours || "-",
         ]),
-        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+        headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
         styles: { fontSize: 7.2, cellPadding: 1.8, textColor: [15, 23, 42], lineColor: [226, 232, 240], lineWidth: 0.2, valign: "middle" },
         alternateRowStyles: { fillColor: [248, 250, 252] },
         columnStyles: {
@@ -1108,7 +1108,7 @@ export default function ProjectReportsPage() {
       });
 
       doc.addPage();
-      doc.setFillColor(15, 118, 110);
+      doc.setFillColor(0, 86, 112);
       doc.rect(0, 0, pageWidth, 20, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(14);
@@ -1127,7 +1127,7 @@ export default function ProjectReportsPage() {
           `${record.supplier} - ${record.activity}`,
           ...weekStarts.map((week) => (isInWeek(record, week) ? "INSPECTION" : "")),
         ]),
-        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
+        headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
         styles: { fontSize: 7.2, cellPadding: 2, textColor: [15, 23, 42], lineColor: [203, 213, 225], lineWidth: 0.2, valign: "middle", halign: "center" },
         columnStyles: { 0: { cellWidth: 72, halign: "left" } },
         didParseCell: (data) => {
@@ -1196,11 +1196,11 @@ export default function ProjectReportsPage() {
       </nav>
 
       <section className="quality-kpi-grid" style={reportStatsGridStyle}>
-        <QualityKpiCard title="Programme Audits" value={projectAudits.length} accent="#2563eb" onClick={() => setActiveAnnex("audit-programme")} active={activeAnnex === "audit-programme"} />
-        <QualityKpiCard title="Audit Findings" value={projectAuditFindings.length} accent="#7c3aed" onClick={() => setActiveAnnex("audit-ncr")} active={activeAnnex === "audit-ncr"} />
-        <QualityKpiCard title="NOI Requirements" value={imsRecords.length} accent="#3A9B98" href="/projects/wadden-sea/noi" />
-        <QualityKpiCard title="In Eight Weeks" value={lookaheadMetrics.total} accent="#f59e0b" onClick={() => setActiveAnnex("lookahead")} active={activeAnnex === "lookahead"} />
-        <QualityKpiCard title="Hold Points" value={lookaheadMetrics.hold} accent="#dc2626" onClick={() => setActiveAnnex("lookahead")} />
+        <QualityKpiCard title="Programme Audits" value={projectAudits.length} accent="#63B1BC" onClick={() => setActiveAnnex("audit-programme")} active={activeAnnex === "audit-programme"} />
+        <QualityKpiCard title="Audit Findings" value={projectAuditFindings.length} accent="#53565A" onClick={() => setActiveAnnex("audit-ncr")} active={activeAnnex === "audit-ncr"} />
+        <QualityKpiCard title="NOI Requirements" value={imsRecords.length} accent="#005670" href="/projects/wadden-sea/noi" />
+        <QualityKpiCard title="In Eight Weeks" value={lookaheadMetrics.total} accent="#FFAD00" onClick={() => setActiveAnnex("lookahead")} active={activeAnnex === "lookahead"} />
+        <QualityKpiCard title="Hold Points" value={lookaheadMetrics.hold} accent="#F93822" onClick={() => setActiveAnnex("lookahead")} />
         <QualityKpiCard title="NOI Outstanding" value={lookaheadMetrics.noiOutstanding} accent="#ea580c" onClick={() => setActiveAnnex("lookahead")} />
       </section>
 
@@ -1348,8 +1348,8 @@ export default function ProjectReportsPage() {
                       key={audit.id}
                       style={{
                         ...embeddedAuditRowStyle,
-                        background: selected ? "#f0fdfa" : "#ffffff",
-                        borderColor: selected ? "#3A9B98" : "#e2e8f0",
+                        background: selected ? "#ECECE7" : "#ffffff",
+                        borderColor: selected ? "#005670" : "#e2e8f0",
                       }}
                     >
                       <input
@@ -1520,7 +1520,7 @@ export default function ProjectReportsPage() {
                 filteredRecords.map((record) => {
                   const selected = selectedIds.includes(record.id);
                   return (
-                    <label key={record.id} style={{ ...activityRowStyle, background: selected ? "#f0fdfa" : "#ffffff", borderColor: selected ? "#3A9B98" : "#e2e8f0" }}>
+                    <label key={record.id} style={{ ...activityRowStyle, background: selected ? "#ECECE7" : "#ffffff", borderColor: selected ? "#005670" : "#e2e8f0" }}>
                       {!showUnresolved ? <input type="checkbox" checked={selected} onChange={() => toggleRecord(record.id)} style={checkboxStyle} /> : <span style={warningDotStyle}>!</span>}
                       <span style={activityIdentityStyle}>
                         <strong>{record.supplier || "Unknown supplier"} · {record.activity}</strong>
@@ -1584,7 +1584,7 @@ export default function ProjectReportsPage() {
 const reportWorkspaceTabsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "20px" };
 const reportWorkspaceTabStyle: CSSProperties = { minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: "10px", border: "none", background: "#e2e8f0", color: "#0f172a", textDecoration: "none", fontWeight: 800, fontSize: "13px", boxSizing: "border-box" };
 const reportWorkspaceButtonStyle: CSSProperties = { ...reportWorkspaceTabStyle, fontFamily: "inherit", cursor: "pointer" };
-const activeReportWorkspaceTabStyle: CSSProperties = { ...reportWorkspaceButtonStyle, background: "#3A9B98", color: "#ffffff" };
+const activeReportWorkspaceTabStyle: CSSProperties = { ...reportWorkspaceButtonStyle, background: "#005670", color: "#ffffff" };
 const reportStatsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelStyle: CSSProperties = { background: "#ffffff", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15,23,42,0.08)", marginBottom: "20px" };
 const sectionHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "14px", flexWrap: "wrap", marginBottom: "16px" };
@@ -1592,49 +1592,49 @@ const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "20px", color: "
 const sectionSubtitleStyle: CSSProperties = { margin: "6px 0 0", color: "#64748b", fontSize: "14px", maxWidth: "760px", lineHeight: 1.5 };
 const annexCardsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "12px" };
 const annexCardStyle: CSSProperties = { display: "grid", gap: "8px", padding: "16px", minHeight: "125px", border: "1px solid #dbe4ef", borderRadius: "14px", background: "#f8fafc", color: "#334155", textDecoration: "none", fontSize: "13px", lineHeight: 1.45, textAlign: "left", cursor: "pointer", fontFamily: "inherit" };
-const activeAnnexCardStyle: CSSProperties = { borderColor: "#3A9B98", background: "#f0fdfa", boxShadow: "0 0 0 2px rgba(58,155,152,0.08)" };
-const annexEyebrowStyle: CSSProperties = { color: "#0f766e", fontSize: "11px", fontWeight: 900, letterSpacing: "0.05em" };
-const uploadButtonStyle: CSSProperties = { ...annexEyebrowStyle, display: "inline-flex", padding: "11px 16px", borderRadius: "10px", background: "#3A9B98", color: "#ffffff", cursor: "pointer", letterSpacing: 0 };
+const activeAnnexCardStyle: CSSProperties = { borderColor: "#005670", background: "#ECECE7", boxShadow: "0 0 0 2px rgba(0,86,112,0.08)" };
+const annexEyebrowStyle: CSSProperties = { color: "#005670", fontSize: "11px", fontWeight: 900, letterSpacing: "0.05em" };
+const uploadButtonStyle: CSSProperties = { ...annexEyebrowStyle, display: "inline-flex", padding: "11px 16px", borderRadius: "10px", background: "#005670", color: "#ffffff", cursor: "pointer", letterSpacing: 0 };
 const controlGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px, 1fr) repeat(2, minmax(180px, 0.7fr))", gap: "12px" };
 const fieldStyle: CSSProperties = { display: "grid", gap: "6px", color: "#475569", fontSize: "13px", fontWeight: 800 };
 const inputStyle: CSSProperties = { padding: "10px 12px", borderRadius: "10px", border: "1px solid #cbd5e1", background: "#ffffff", color: "#0f172a", minHeight: "40px", boxSizing: "border-box" };
-const dateWindowCardStyle: CSSProperties = { display: "grid", gap: "5px", padding: "11px 14px", borderRadius: "12px", background: "#f0fdfa", border: "1px solid #99f6e4", color: "#115e59", fontSize: "12px" };
+const dateWindowCardStyle: CSSProperties = { display: "grid", gap: "5px", padding: "11px 14px", borderRadius: "12px", background: "#ECECE7", border: "1px solid #ECECE7", color: "#005670", fontSize: "12px" };
 const validationGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginTop: "16px" };
 const validationCardStyle: CSSProperties = { display: "grid", gap: "4px", padding: "13px", borderRadius: "12px", border: "1px solid #dbe4ef", background: "#f8fafc", textAlign: "left", color: "#334155" };
 const warningCardStyle: CSSProperties = { ...validationCardStyle, cursor: "pointer", borderColor: "#fde68a", background: "#fffbeb" };
 const emptyStateStyle: CSSProperties = { display: "grid", gap: "6px", marginTop: "16px", padding: "22px", border: "1px dashed #94a3b8", borderRadius: "14px", background: "#f8fafc", color: "#475569", textAlign: "center" };
 const inspectionMetricGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px", marginBottom: "16px" };
-const inspectionMetricStyle: CSSProperties = { display: "grid", gap: "3px", padding: "13px", border: "1px solid #bae6fd", borderRadius: "12px", background: "#f0f9ff", color: "#334155" };
+const inspectionMetricStyle: CSSProperties = { display: "grid", gap: "3px", padding: "13px", border: "1px solid #ECECE7", borderRadius: "12px", background: "#ECECE7", color: "#334155" };
 const inspectionCalendarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(8, minmax(185px, 1fr))", gap: "10px", overflowX: "auto", paddingBottom: "6px" };
 const inspectionWeekStyle: CSSProperties = { minWidth: "185px", border: "1px solid #dbe4ef", borderRadius: "12px", overflow: "hidden", background: "#f8fafc" };
-const inspectionWeekHeaderStyle: CSSProperties = { display: "grid", gap: "2px", padding: "10px", background: "#0f766e", color: "#ffffff", fontSize: "11px" };
+const inspectionWeekHeaderStyle: CSSProperties = { display: "grid", gap: "2px", padding: "10px", background: "#005670", color: "#ffffff", fontSize: "11px" };
 const inspectionWeekBodyStyle: CSSProperties = { display: "grid", alignContent: "start", gap: "7px", padding: "8px", minHeight: "145px" };
 const inspectionCardStyle: CSSProperties = { display: "grid", gap: "5px", padding: "9px", border: "1px solid #dbe4ef", borderRadius: "9px", background: "#ffffff", color: "#334155", fontSize: "11px", lineHeight: 1.35 };
 const inspectionCardTopStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" };
-const holdPointStyle: CSSProperties = { padding: "3px 6px", borderRadius: "999px", background: "#fee2e2", color: "#991b1b", fontWeight: 900 };
+const holdPointStyle: CSSProperties = { padding: "3px 6px", borderRadius: "999px", background: "#fee2e2", color: "#F93822", fontWeight: 900 };
 const witnessPointStyle: CSSProperties = { padding: "3px 6px", borderRadius: "999px", background: "#fef3c7", color: "#92400e", fontWeight: 900 };
 const emptyWeekStyle: CSSProperties = { color: "#94a3b8", fontSize: "11px", textAlign: "center", padding: "22px 4px" };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: "9px", flexWrap: "wrap", alignItems: "center" };
-const primaryButtonStyle: CSSProperties = { padding: "10px 15px", border: 0, borderRadius: "10px", background: "#3A9B98", color: "#ffffff", fontWeight: 800, cursor: "pointer" };
+const primaryButtonStyle: CSSProperties = { padding: "10px 15px", border: 0, borderRadius: "10px", background: "#005670", color: "#ffffff", fontWeight: 800, cursor: "pointer" };
 const secondaryButtonStyle: CSSProperties = { ...primaryButtonStyle, background: "#e2e8f0", color: "#0f172a" };
 const filterRowStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "14px" };
 const activityListStyle: CSSProperties = { display: "grid", gap: "8px", maxHeight: "520px", overflowY: "auto" };
 const activityRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "24px minmax(260px, 1.5fr) minmax(120px, 0.5fr) minmax(180px, 0.7fr) 76px", gap: "12px", alignItems: "center", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "12px", cursor: "pointer" };
-const checkboxStyle: CSSProperties = { width: "18px", height: "18px", accentColor: "#3A9B98" };
+const checkboxStyle: CSSProperties = { width: "18px", height: "18px", accentColor: "#005670" };
 const warningDotStyle: CSSProperties = { display: "grid", placeItems: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#fef3c7", color: "#92400e", fontWeight: 900 };
 const activityIdentityStyle: CSSProperties = { display: "grid", gap: "3px", color: "#0f172a", fontSize: "13px" };
 const activityMetaStyle: CSSProperties = { color: "#475569", fontSize: "12px", lineHeight: 1.4 };
-const noiBadgeStyle: CSSProperties = { padding: "5px 8px", borderRadius: "999px", background: "#e0f2fe", color: "#075985", fontSize: "11px", fontWeight: 900, textAlign: "center" };
+const noiBadgeStyle: CSSProperties = { padding: "5px 8px", borderRadius: "999px", background: "#ECECE7", color: "#005670", fontSize: "11px", fontWeight: 900, textAlign: "center" };
 const emptyTextStyle: CSSProperties = { margin: 0, color: "#64748b", padding: "14px" };
-const selectionSummaryStyle: CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 11px", borderRadius: "999px", background: "#ccfbf1", color: "#115e59", fontSize: "12px", fontWeight: 900 };
+const selectionSummaryStyle: CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 11px", borderRadius: "999px", background: "#ECECE7", color: "#005670", fontSize: "12px", fontWeight: 900 };
 const embeddedAuditListStyle: CSSProperties = { display: "grid", gap: "8px", maxHeight: "560px", overflowY: "auto", marginTop: "14px" };
 const embeddedAuditRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "24px minmax(280px, 1.4fr) 90px 120px 135px 95px", gap: "12px", alignItems: "center", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "12px", cursor: "pointer" };
 const auditFindingSummaryStyle: CSSProperties = { color: "#475569", fontSize: "12px", fontWeight: 800 };
 const auditStatusBadgeStyle: CSSProperties = { padding: "5px 8px", borderRadius: "999px", background: "#dcfce7", color: "#166534", fontSize: "11px", fontWeight: 900, textAlign: "center" };
 const timelineWrapStyle: CSSProperties = { width: "100%", overflowX: "auto", border: "1px solid #dbe4ef", borderRadius: "14px" };
 const timelineColumns = "minmax(300px, 2fr) repeat(8, minmax(100px, 1fr))";
-const timelineHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: timelineColumns, minWidth: "1120px", background: "#0f766e", color: "#ffffff", fontSize: "11px", fontWeight: 800 };
+const timelineHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: timelineColumns, minWidth: "1120px", background: "#005670", color: "#ffffff", fontSize: "11px", fontWeight: 800 };
 const timelineRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: timelineColumns, minWidth: "1120px", minHeight: "58px", borderBottom: "1px solid #e2e8f0" };
 const timelineTaskStyle: CSSProperties = { display: "grid", gap: "3px", padding: "10px 12px", borderRight: "1px solid #e2e8f0", color: "#334155", fontSize: "12px" };
 const timelineCellStyle: CSSProperties = { display: "grid", placeItems: "center", padding: "6px", borderRight: "1px solid #e2e8f0", background: "#f8fafc" };
-const timelineBarStyle: CSSProperties = { display: "block", width: "100%", padding: "7px 4px", borderRadius: "6px", background: "#f59e0b", color: "#78350f", textAlign: "center", fontSize: "9px", fontWeight: 900 };
+const timelineBarStyle: CSSProperties = { display: "block", width: "100%", padding: "7px 4px", borderRadius: "6px", background: "#FFAD00", color: "#78350f", textAlign: "center", fontSize: "9px", fontWeight: 900 };

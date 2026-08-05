@@ -11,10 +11,10 @@ export default function RiskReviewsPage() {
       latestLabel="Latest Review"
       status="Risk Reviews shell ready. Review workflow data has not been configured yet."
       kpis={[
-        { title: "Reviews Due", value: "-", accent: "#f59e0b" },
-        { title: "Overdue Reviews", value: "-", accent: "#dc2626" },
-        { title: "Completed This Month", value: "-", accent: "#16a34a" },
-        { title: "Escalations", value: "-", accent: "#7c3aed" },
+        { title: "Reviews Due", value: "-", accent: "#FFAD00" },
+        { title: "Overdue Reviews", value: "-", accent: "#F93822" },
+        { title: "Completed This Month", value: "-", accent: "#005670" },
+        { title: "Escalations", value: "-", accent: "#53565A" },
       ]}
       panels={[
         {
@@ -119,7 +119,7 @@ const topMetaRowStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };

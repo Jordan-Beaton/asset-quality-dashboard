@@ -53,7 +53,7 @@ function formatDateTime(value: string | null | undefined) {
 function statusTone(active: boolean) {
   return active
     ? { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" }
-    : { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
+    : { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
 }
 
 function PeoplePageContent() {
@@ -350,7 +350,7 @@ function PeoplePageContent() {
                           });
                         }}
                       >
-                        <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#2F7F7D" }}>{person.name}</td>
+                        <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#005670" }}>{person.name}</td>
                         <td style={imsTableCellStyle}>{person.role || "No role set"}</td>
                         <td style={imsTableCellStyle}>
                           <span style={{ ...pillStyle, background: tone.bg, color: tone.text, border: `1px solid ${tone.border}` }}>
@@ -587,7 +587,7 @@ const buttonRowStyleTight: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -609,7 +609,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -621,7 +621,7 @@ const miniButtonStyle: CSSProperties = {
 
 const dangerButtonStyle: CSSProperties = {
   background: "#fee2e2",
-  color: "#991b1b",
+  color: "#F93822",
   border: "1px solid #fecaca",
   borderRadius: "10px",
   padding: "9px 12px",
@@ -645,7 +645,7 @@ const registerTableRowStyle: CSSProperties = {
 const selectedTableRowStyle: CSSProperties = {
   cursor: "pointer",
   background: "#eff6ff",
-  boxShadow: "inset 4px 0 0 #3A9B98",
+  boxShadow: "inset 4px 0 0 #005670",
 };
 
 const emptyTableCellStyle: CSSProperties = {

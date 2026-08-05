@@ -275,7 +275,7 @@ const initialCompany: CompanySettings = {
   address: "",
   primary_contact_name: "",
   primary_contact_email: "",
-  primary_brand_colour: "#3A9B98",
+  primary_brand_colour: "#005670",
   financial_year_start_month: 1,
 };
 
@@ -350,7 +350,7 @@ function StatusPill({ children, tone = "neutral" }: { children: ReactNode; tone?
   const colour =
     tone === "good" ? "#dcfce7" : tone === "warn" ? "#fef3c7" : tone === "danger" ? "#fee2e2" : "#e2e8f0";
   const text =
-    tone === "good" ? "#166534" : tone === "warn" ? "#92400e" : tone === "danger" ? "#991b1b" : "#334155";
+    tone === "good" ? "#166534" : tone === "warn" ? "#92400e" : tone === "danger" ? "#F93822" : "#334155";
 
   return (
     <span style={{ display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", background: colour, color: text, fontSize: "12px", fontWeight: 900 }}>
@@ -1188,7 +1188,7 @@ export default function AdminDashboardPage() {
                           onClick={() => setSelectedOverridePersonId(isSelected ? "" : person.id)}
                           style={{
                             cursor: "pointer",
-                            background: isSelected ? "rgba(58, 155, 152, 0.08)" : "#ffffff",
+                            background: isSelected ? "rgba(0, 86, 112, 0.08)" : "#ffffff",
                             borderLeft: isSelected ? `4px solid ${imsColours.brand}` : "4px solid transparent",
                           }}
                         >
@@ -1488,7 +1488,7 @@ export default function AdminDashboardPage() {
               <input value={companyForm.primary_contact_email || ""} onChange={(event) => setCompanyForm({ ...companyForm, primary_contact_email: event.target.value })} style={imsInputStyle} />
             </Field>
             <Field label="Brand Colour">
-              <input value={companyForm.primary_brand_colour || "#3A9B98"} onChange={(event) => setCompanyForm({ ...companyForm, primary_brand_colour: event.target.value })} style={imsInputStyle} />
+              <input value={companyForm.primary_brand_colour || "#005670"} onChange={(event) => setCompanyForm({ ...companyForm, primary_brand_colour: event.target.value })} style={imsInputStyle} />
             </Field>
             <Field label="Financial Year Start">
               <SelectField value={String(companyForm.financial_year_start_month || 1)} onChange={(value) => setCompanyForm({ ...companyForm, financial_year_start_month: Number(value) })}>

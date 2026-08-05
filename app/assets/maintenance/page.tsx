@@ -127,7 +127,7 @@ function getDueStatus(value: string | null | undefined): DueStatus {
 }
 
 function getStatusTone(status: DueStatus) {
-  if (status === "Overdue") return { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
+  if (status === "Overdue") return { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
   if (status === "Due Soon") return { bg: "#fef3c7", text: "#92400e", border: "#fde68a" };
   if (status === "In Date") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
   return { bg: "#e2e8f0", text: "#334155", border: "#cbd5e1" };
@@ -142,7 +142,7 @@ function getStatusRank(status: DueStatus) {
 
 function getTypeTone(type: string | null | undefined) {
   const value = (type || "").toLowerCase();
-  if (value === "corrective") return { bg: "#fee2e2", text: "#991b1b" };
+  if (value === "corrective") return { bg: "#fee2e2", text: "#F93822" };
   if (value === "preventative") return { bg: "#dbeafe", text: "#1d4ed8" };
   return { bg: "#e2e8f0", text: "#334155" };
 }
@@ -228,7 +228,7 @@ function MaintenancePageContent() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = `${window.location.origin}/assets/maintenance/field`;
-    QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#3A9B98", light: "#ffffff" } })
+    QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#005670", light: "#ffffff" } })
       .then(setFieldQrDataUrl)
       .catch(() => setFieldQrDataUrl(""));
   }, []);
@@ -627,19 +627,19 @@ function MaintenancePageContent() {
         <QualityKpiCard
           title="Overdue"
           value={overdueCount}
-          accent="#dc2626"
+          accent="#F93822"
           onClick={() => applyMaintenanceKpiFilter("Overdue")}
         />
         <QualityKpiCard
           title="Due Soon"
           value={dueSoonCount}
-          accent="#f59e0b"
+          accent="#FFAD00"
           onClick={() => applyMaintenanceKpiFilter("Due Soon")}
         />
         <QualityKpiCard
           title="Coverage"
           value={records.length}
-          accent="#2563eb"
+          accent="#63B1BC"
           onClick={() => applyMaintenanceKpiFilter("")}
         />
       </section>
@@ -1221,7 +1221,7 @@ function AttentionCard({
   tone: "red" | "amber" | "blue";
 }) {
   const tones = {
-    red: { bg: "#fff1f2", border: "#fecdd3", title: "#991b1b", summary: "#7f1d1d" },
+    red: { bg: "#fff1f2", border: "#fecdd3", title: "#F93822", summary: "#7f1d1d" },
     amber: { bg: "#fffbeb", border: "#fde68a", title: "#92400e", summary: "#78350f" },
     blue: { bg: "#eff6ff", border: "#bfdbfe", title: "#1d4ed8", summary: "#1e3a8a" },
   };
@@ -1290,7 +1290,7 @@ const fieldModeEyebrowStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  color: "#3A9B98",
+  color: "#005670",
 };
 
 const fieldModeTitleStyle: CSSProperties = {
@@ -1316,7 +1316,7 @@ const topMetaRowStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -1555,7 +1555,7 @@ const buttonRowStyleTight: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1581,7 +1581,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1594,7 +1594,7 @@ const miniButtonStyle: CSSProperties = {
 };
 
 const actionLinkButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -1608,7 +1608,7 @@ const actionLinkButtonStyle: CSSProperties = {
 
 const dangerButtonStyle: CSSProperties = {
   background: "#fee2e2",
-  color: "#991b1b",
+  color: "#F93822",
   border: "1px solid #fecaca",
   borderRadius: "10px",
   padding: "9px 12px",

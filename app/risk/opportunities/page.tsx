@@ -11,10 +11,10 @@ export default function RiskOpportunitiesPage() {
       latestLabel="Latest Opportunity"
       status="Opportunities shell ready. Opportunity data storage has not been configured yet."
       kpis={[
-        { title: "Open Opportunities", value: "-", accent: "#3A9B98" },
-        { title: "Under Review", value: "-", accent: "#2563eb" },
-        { title: "Accepted", value: "-", accent: "#16a34a" },
-        { title: "Linked Actions", value: "-", accent: "#7c3aed" },
+        { title: "Open Opportunities", value: "-", accent: "#005670" },
+        { title: "Under Review", value: "-", accent: "#63B1BC" },
+        { title: "Accepted", value: "-", accent: "#005670" },
+        { title: "Linked Actions", value: "-", accent: "#53565A" },
       ]}
       panels={[
         {
@@ -119,7 +119,7 @@ const topMetaRowStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };

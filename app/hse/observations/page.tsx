@@ -722,7 +722,7 @@ function StatusPill({ status }: { status: string }) {
     : normalise(status) === "new"
     ? { background: "#dbeafe", color: "#1d4ed8" }
     : normalise(status) === "action required"
-    ? { background: "#fee2e2", color: "#991b1b" }
+    ? { background: "#fee2e2", color: "#F93822" }
     : { background: "#fef3c7", color: "#92400e" };
   return <span style={{ ...pillStyle, ...colour }}>{status || "New"}</span>;
 }
@@ -744,7 +744,7 @@ const chartGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "r
 const registerGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "20px", alignItems: "start" };
 const fieldStyle: CSSProperties = { display: "grid", gap: "6px" };
 const labelStyle: CSSProperties = { color: "#334155", fontSize: "12px", fontWeight: 900 };
-const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ecfeff" };
+const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ECECE7" };
 const rowStyle: CSSProperties = { cursor: "pointer" };
 const emptyCellStyle: CSSProperties = { padding: "28px 14px", textAlign: "center", color: imsColours.slate, background: "#f8fafc" };
 const emptyStateStyle: CSSProperties = { border: "1px dashed #cbd5e1", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: "#f8fafc", lineHeight: 1.45 };

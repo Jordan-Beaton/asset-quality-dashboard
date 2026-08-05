@@ -11,10 +11,10 @@ export default function AdminAssetSettingsPage() {
       latestLabel="Latest Asset Setting"
       status="Asset Settings shell ready. Existing Asset Management data and forms are unchanged."
       kpis={[
-        { title: "Asset Categories", value: "Pending", accent: "#2563eb" },
-        { title: "Status Values", value: "Pending", accent: "#3A9B98" },
-        { title: "Inspection Rules", value: "Future", accent: "#f59e0b" },
-        { title: "Document ID Codes", value: "Controlled", accent: "#7c3aed" },
+        { title: "Asset Categories", value: "Pending", accent: "#63B1BC" },
+        { title: "Status Values", value: "Pending", accent: "#005670" },
+        { title: "Inspection Rules", value: "Future", accent: "#FFAD00" },
+        { title: "Document ID Codes", value: "Controlled", accent: "#53565A" },
       ]}
       panels={[
         { title: "Future Editable Settings", text: "Asset categories, status values, calibration frequencies, inspection intervals, maintenance intervals, and controlled Document ID Code rules." },
@@ -43,7 +43,7 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

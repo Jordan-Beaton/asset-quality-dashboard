@@ -297,7 +297,7 @@ function getStatusTone(status: string) {
 
   if (value === "active") return { bg: "#dcfce7", color: "#166534" };
   if (value === "inactive") return { bg: "#e5e7eb", color: "#374151" };
-  if (value.includes("quarantine")) return { bg: "#fee2e2", color: "#991b1b" };
+  if (value.includes("quarantine")) return { bg: "#fee2e2", color: "#F93822" };
   if (value.includes("maintenance")) return { bg: "#fef3c7", color: "#92400e" };
 
   return { bg: "#e2e8f0", color: "#334155" };
@@ -2036,13 +2036,13 @@ function AssetsPageContent() {
             <QualityKpiCard
               title="Total Assets"
               value={totalAssets}
-              accent="#3A9B98"
+              accent="#005670"
               onClick={() => applyAssetKpiFilter({})}
             />
             <QualityKpiCard
               title="Active Assets"
               value={activeAssets}
-              accent="#16a34a"
+              accent="#005670"
               onClick={() => applyAssetKpiFilter({ status: "Active" })}
             />
             <QualityKpiCard
@@ -2054,13 +2054,13 @@ function AssetsPageContent() {
             <QualityKpiCard
               title="Quality Linked"
               value={qualityLinkedAssets}
-              accent="#2563eb"
+              accent="#63B1BC"
               onClick={() => applyAssetKpiFilter({ qualityLinked: true })}
             />
             <QualityKpiCard
               title="Action Needed"
               value={overdueInspectionAssets + overdueMaintenanceAssets}
-              accent="#dc2626"
+              accent="#F93822"
               onClick={() => {
                 setActiveView("dashboard");
                 setTimeout(() => {
@@ -2083,7 +2083,7 @@ function AssetsPageContent() {
                   label="Inspection Overdue"
                   value={overdueInspectionAssets}
                   hint={`${dueSoonInspectionAssets} due soon`}
-                  tone="#991b1b"
+                  tone="#F93822"
                   bg="#fff1f2"
                 />
                 <DashboardMetricCard
@@ -2097,7 +2097,7 @@ function AssetsPageContent() {
                   label="Maintenance Overdue"
                   value={overdueMaintenanceAssets}
                   hint={`${dueSoonMaintenanceAssets} due soon`}
-                  tone="#991b1b"
+                  tone="#F93822"
                   bg="#fff1f2"
                 />
                 <DashboardMetricCard
@@ -2119,7 +2119,7 @@ function AssetsPageContent() {
                   label="Linked NCRs"
                   value={qualitySnapshotData.find((item) => item.name === "NCRs")?.value || 0}
                   hint="Quality records"
-                  tone="#991b1b"
+                  tone="#F93822"
                   bg="#fff1f2"
                 />
                 <DashboardMetricCard
@@ -2155,8 +2155,8 @@ function AssetsPageContent() {
                   label="With Images"
                   value={assetsWithImages}
                   hint="Image/file references"
-                  tone="#0f766e"
-                  bg="#f0fdfa"
+                  tone="#005670"
+                  bg="#ECECE7"
                 />
                 <DashboardMetricCard
                   label="Inactive"
@@ -2458,10 +2458,10 @@ function AssetsPageContent() {
                     style={{
                       ...registerTableRowStyle,
                       background: selectedAssetId === asset.id ? "#eff6ff" : "#ffffff",
-                      boxShadow: selectedAssetId === asset.id ? "inset 4px 0 0 #3A9B98" : "inset 4px 0 0 transparent",
+                      boxShadow: selectedAssetId === asset.id ? "inset 4px 0 0 #005670" : "inset 4px 0 0 transparent",
                     }}
                   >
-                    <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#2F7F7D" }}>{asset.asset_code || "-"}</td>
+                    <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#005670" }}>{asset.asset_code || "-"}</td>
                     <td style={imsTableCellStyle}>
                       <strong>{asset.name || "-"}</strong>
                       <div style={tableSubTextStyle}>{asset.description || "No description recorded"}</div>
@@ -3059,7 +3059,7 @@ function AssetsPageContent() {
                 <ModuleSectionHeader title="Quality Links" />
 
                 <div style={qualityMiniGridStyle}>
-                  <MiniMetricCard label="NCRs" value={qualityDraft.linked_ncrs.length} tone="#991b1b" bg="#fee2e2" />
+                  <MiniMetricCard label="NCRs" value={qualityDraft.linked_ncrs.length} tone="#F93822" bg="#fee2e2" />
                   <MiniMetricCard label="Actions" value={qualityDraft.linked_actions.length} tone="#1d4ed8" bg="#dbeafe" />
                   <MiniMetricCard
                     label="Calibration"
@@ -3361,13 +3361,13 @@ function AssetsPageContent() {
               <MiniMetricCard
                 label="Assets in Register"
                 value={totalAssets}
-                tone="#0f766e"
-                bg="#ecfeff"
+                tone="#005670"
+                bg="#ECECE7"
               />
               <MiniMetricCard
                 label="Inspection Watch"
                 value={overdueInspectionAssets + dueSoonInspectionAssets}
-                tone="#991b1b"
+                tone="#F93822"
                 bg="#fee2e2"
               />
               <MiniMetricCard
@@ -3599,12 +3599,12 @@ function EditableLinkGroup({
 }
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   color: "white",
   borderRadius: "20px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
+  boxShadow: "0 10px 30px rgba(0, 86, 112, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -3854,7 +3854,7 @@ const quickActionRowStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -3874,7 +3874,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const dangerButtonStyle: CSSProperties = {
-  background: "#dc2626",
+  background: "#F93822",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -3884,7 +3884,7 @@ const dangerButtonStyle: CSSProperties = {
 };
 
 const dangerMiniButtonStyle: CSSProperties = {
-  background: "#991b1b",
+  background: "#F93822",
   color: "#ffffff",
   border: "none",
   padding: "8px 12px",
@@ -3897,7 +3897,7 @@ const uploadButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   borderRadius: "10px",
   padding: "10px 16px",
@@ -4029,8 +4029,8 @@ const imageStripStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "180px minmax(0, 1fr)",
   gap: "18px",
-  border: "1px solid #cfe8e5",
-  background: "linear-gradient(180deg, #f7fffd 0%, #eefbf8 100%)",
+  border: "1px solid #ECECE7",
+  background: "linear-gradient(180deg, #ECECE7 0%, #ECECE7 100%)",
   borderRadius: "16px",
   padding: "16px",
   alignItems: "center",
@@ -4209,7 +4209,7 @@ const summaryPillValueStyle: CSSProperties = {
 const detailSectionTitleStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 900,
-  color: "#2F7F7D",
+  color: "#005670",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   marginBottom: "12px",
@@ -4519,7 +4519,7 @@ function getConditionTone(condition: string | null) {
     return { bg: "#fef3c7", color: "#92400e" };
   }
   if (value.includes("poor") || value.includes("damage") || value.includes("fail")) {
-    return { bg: "#fee2e2", color: "#991b1b" };
+    return { bg: "#fee2e2", color: "#F93822" };
   }
 
   return { bg: "#dbeafe", color: "#1d4ed8" };
@@ -4529,7 +4529,7 @@ function getInspectionResultTone(result: string) {
   const value = result.toLowerCase();
 
   if (value === "pass") return { bg: "#dcfce7", color: "#166534" };
-  if (value === "fail") return { bg: "#fee2e2", color: "#991b1b" };
+  if (value === "fail") return { bg: "#fee2e2", color: "#F93822" };
   if (value.includes("observation")) return { bg: "#fef3c7", color: "#92400e" };
 
   return { bg: "#e2e8f0", color: "#334155" };
@@ -4540,13 +4540,13 @@ function getTimelineTypeTone(type: AssetTimelineEntry["type"]) {
   if (type === "Calibration") return { bg: "#fef3c7", color: "#92400e" };
   if (type === "Inspection") return { bg: "#dcfce7", color: "#166534" };
   if (type === "Maintenance") return { bg: "#ede9fe", color: "#6d28d9" };
-  return { bg: "#fee2e2", color: "#991b1b" };
+  return { bg: "#fee2e2", color: "#F93822" };
 }
 
 function getMaintenanceTypeTone(type: string) {
   const value = type.toLowerCase();
 
-  if (value === "corrective") return { bg: "#fee2e2", color: "#991b1b" };
+  if (value === "corrective") return { bg: "#fee2e2", color: "#F93822" };
   if (value === "preventative") return { bg: "#dbeafe", color: "#1d4ed8" };
 
   return { bg: "#e2e8f0", color: "#334155" };
@@ -4554,7 +4554,7 @@ function getMaintenanceTypeTone(type: string) {
 
 function getDueWindowTone(days: number | null) {
   if (days === null) return { bg: "#e2e8f0", color: "#334155" };
-  if (days < 0) return { bg: "#fee2e2", color: "#991b1b" };
+  if (days < 0) return { bg: "#fee2e2", color: "#F93822" };
   if (days <= 30) return { bg: "#fef3c7", color: "#92400e" };
   return { bg: "#dcfce7", color: "#166534" };
 }

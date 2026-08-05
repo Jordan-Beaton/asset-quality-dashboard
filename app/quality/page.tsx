@@ -470,12 +470,12 @@ export default function Home() {
       {
         name: "Open",
         value: yearNcrs.filter((item) => !isClosedLikeStatus(item.status)).length,
-        fill: "#dc2626",
+        fill: "#F93822",
       },
       {
         name: "Closed",
         value: yearNcrs.filter((item) => isClosedLikeStatus(item.status)).length,
-        fill: "#16a34a",
+        fill: "#005670",
       },
     ],
     [yearNcrs]
@@ -629,9 +629,9 @@ export default function Home() {
     const noDueDate = open.filter((action) => !action.due_date).length;
 
     return [
-      { name: "Overdue", value: overdue, fill: "#dc2626" },
-      { name: "Due 7 Days", value: due7, fill: "#f59e0b" },
-      { name: "Due 30 Days", value: due30, fill: "#2563eb" },
+      { name: "Overdue", value: overdue, fill: "#F93822" },
+      { name: "Due 7 Days", value: due7, fill: "#FFAD00" },
+      { name: "Due 30 Days", value: due30, fill: "#63B1BC" },
       { name: "No Due Date", value: noDueDate, fill: "#64748b" },
     ];
   }, [qualityActions]);
@@ -670,20 +670,20 @@ export default function Home() {
     const closedMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "closed").length;
 
     return [
-      { name: "NCR Closure", value: percentage(closedNcrs, totalNcrs), fill: "#3A9B98", href: "/ncr-capa" },
+      { name: "NCR Closure", value: percentage(closedNcrs, totalNcrs), fill: "#005670", href: "/ncr-capa" },
       {
         name: "Finding Closure",
         value: percentage(closedFindings, totalFindings),
-        fill: "#7c3aed",
+        fill: "#53565A",
         href: buildHref("/audits", { view: "findings" }),
       },
       {
         name: "Docs In Date",
         value: percentage(docsInDate, totalDocs),
-        fill: "#2563eb",
+        fill: "#63B1BC",
         href: buildHref("/documents", { view: "dashboard" }),
       },
-      { name: "MOC Closure", value: percentage(closedMocs, totalMocs), fill: "#16a34a", href: "/moc" },
+      { name: "MOC Closure", value: percentage(closedMocs, totalMocs), fill: "#005670", href: "/moc" },
     ];
   }, [documents, yearAuditFindings, yearMocs, yearNcrs]);
 
@@ -736,11 +736,11 @@ export default function Home() {
 
   const operationalPressureData = useMemo(
     () => [
-      { name: "NCRs", value: openNcrs, fill: "#dc2626", href: buildHref("/ncr-capa", { view: "register", status: "Open" }) },
-      { name: "Findings", value: openAuditFindings, fill: "#7c3aed", href: buildHref("/audits", { view: "findings", findingStatus: "Open" }) },
-      { name: "MOCs", value: openMocs, fill: "#3A9B98", href: buildHref("/moc", { attention: "open" }) },
-      { name: "Actions", value: openQualityActions, fill: "#2563eb", href: buildHref("/actions", { view: "register", department: "Quality", status: "Open" }) },
-      { name: "Docs", value: overdueDocuments, fill: "#f59e0b", href: buildHref("/documents", { review: "Overdue" }) },
+      { name: "NCRs", value: openNcrs, fill: "#F93822", href: buildHref("/ncr-capa", { view: "register", status: "Open" }) },
+      { name: "Findings", value: openAuditFindings, fill: "#53565A", href: buildHref("/audits", { view: "findings", findingStatus: "Open" }) },
+      { name: "MOCs", value: openMocs, fill: "#005670", href: buildHref("/moc", { attention: "open" }) },
+      { name: "Actions", value: openQualityActions, fill: "#63B1BC", href: buildHref("/actions", { view: "register", department: "Quality", status: "Open" }) },
+      { name: "Docs", value: overdueDocuments, fill: "#FFAD00", href: buildHref("/documents", { review: "Overdue" }) },
     ],
     [openAuditFindings, openQualityActions, openMocs, openNcrs, overdueDocuments],
   );
@@ -967,28 +967,28 @@ export default function Home() {
         value: qualityPulse.criticalItems,
         detail: "Overdue NCRs, actions, documents, and expired temporary MOCs",
         href: qualityPulse.criticalItems ? buildHref("/management-review") : buildHref("/quality"),
-        accent: "#dc2626",
+        accent: "#F93822",
       },
       {
         label: "Open workload",
         value: qualityPulse.openWorkload,
         detail: "Open NCRs, findings, MOCs, and Quality actions",
         href: buildHref("/actions", { view: "register", department: "Quality" }),
-        accent: "#2563eb",
+        accent: "#63B1BC",
       },
       {
         label: "This month audits",
         value: currentMonthAudits.length,
         detail: `${currentMonthOutstandingAudits} outstanding / ${currentMonthCompletedAudits} complete`,
         href: buildHref("/audits", { month: currentMonthAuditKey }),
-        accent: "#7c3aed",
+        accent: "#53565A",
       },
       {
         label: "Reviews overdue",
         value: overdueDocuments,
         detail: "Document control items past next review date",
         href: buildHref("/documents", { review: "Overdue" }),
-        accent: "#3A9B98",
+        accent: "#005670",
       },
     ],
     [
@@ -1006,49 +1006,49 @@ export default function Home() {
     {
       label: "Open NCRs",
       value: openNcrs,
-      accent: "#dc2626",
+      accent: "#F93822",
       href: buildHref("/ncr-capa", { view: "register", status: "Open" }),
     },
     {
       label: "Quality Open Actions",
       value: openQualityActions,
-      accent: "#2563eb",
+      accent: "#63B1BC",
       href: buildHref("/actions", { view: "register", department: "Quality", status: "Open" }),
     },
     {
       label: "Open Audit Findings",
       value: openAuditFindings,
-      accent: "#7c3aed",
+      accent: "#53565A",
       href: buildHref("/audits", { view: "findings", findingStatus: "Open" }),
     },
     {
       label: "Open MOCs",
       value: openMocs,
-      accent: "#3A9B98",
+      accent: "#005670",
       href: buildHref("/moc", { attention: "open" }),
     },
     {
       label: "Temporary MOCs",
       value: temporaryMocs,
-      accent: "#2563eb",
+      accent: "#63B1BC",
       href: buildHref("/moc", { change_type: "Temporary" }),
     },
     {
       label: "MOCs In Review",
       value: inReviewMocs,
-      accent: "#7c3aed",
+      accent: "#53565A",
       href: buildHref("/moc", { status: "In Review" }),
     },
     {
       label: "Quality Overdue Actions",
       value: overdueQualityActions,
-      accent: "#b91c1c",
+      accent: "#F93822",
       href: buildHref("/actions", { view: "register", department: "Quality", overdue: 1 }),
     },
     {
       label: "Overdue Documents",
       value: overdueDocuments,
-      accent: "#3A9B98",
+      accent: "#005670",
       href: buildHref("/documents", { review: "Overdue" }),
     },
   ];
@@ -1102,7 +1102,7 @@ export default function Home() {
         .quality-work-item:hover {
           transform: translateY(-3px);
           box-shadow: 0 18px 34px rgba(15, 23, 42, 0.11);
-          border-color: #BFE5E3;
+          border-color: #D0D0CE;
         }
         .quality-live-pill {
           animation: qualityLiveGlow 1.8s ease-in-out infinite alternate;
@@ -1198,7 +1198,7 @@ export default function Home() {
             className="quality-score-orb"
             style={{
               ...scoreOrbStyle,
-              background: `conic-gradient(${qualityPulse.score >= 75 ? "#16a34a" : qualityPulse.score >= 50 ? "#f59e0b" : "#dc2626"} ${qualityPulse.score * 3.6}deg, rgba(255,255,255,0.16) 0deg)`,
+              background: `conic-gradient(${qualityPulse.score >= 75 ? "#005670" : qualityPulse.score >= 50 ? "#FFAD00" : "#F93822"} ${qualityPulse.score * 3.6}deg, rgba(255,255,255,0.16) 0deg)`,
             }}
           >
             <span style={scoreOrbInnerStyle}>
@@ -1231,9 +1231,9 @@ export default function Home() {
               <BarChart data={operationalPressureData} layout="vertical" margin={{ left: 0, right: 22, top: 6, bottom: 6 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.16)" />
                 <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#e2f5f4", fontSize: 12, fontWeight: 800 }} />
+                <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#ECECE7", fontSize: 12, fontWeight: 800 }} />
                 <Tooltip
-                  contentStyle={{ borderRadius: 12, border: "1px solid #BFE5E3" }}
+                  contentStyle={{ borderRadius: 12, border: "1px solid #D0D0CE" }}
                   cursor={{ fill: "rgba(255,255,255,0.08)" }}
                 />
                 <Bar
@@ -1365,7 +1365,7 @@ export default function Home() {
                   <Line
                     type="monotone"
                     dataKey="Raised"
-                    stroke="#dc2626"
+                    stroke="#F93822"
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     activeDot={{ r: 5, cursor: "pointer" }}
@@ -1387,7 +1387,7 @@ export default function Home() {
                   <Line
                     type="monotone"
                     dataKey="Closed"
-                    stroke="#16a34a"
+                    stroke="#005670"
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     activeDot={{ r: 5, cursor: "pointer" }}
@@ -1437,12 +1437,12 @@ export default function Home() {
                         key={entry.name}
                         fill={
                           entry.name === "Completed"
-                            ? "#16a34a"
+                            ? "#005670"
                             : entry.name === "Overdue"
-                              ? "#dc2626"
+                              ? "#F93822"
                               : entry.name === "In Progress"
-                                ? "#7c3aed"
-                                : "#2563eb"
+                                ? "#53565A"
+                                : "#63B1BC"
                         }
                       />
                     ))}
@@ -1507,12 +1507,12 @@ export default function Home() {
                         key={entry.name}
                         fill={
                           entry.name === "Overdue"
-                            ? "#dc2626"
+                            ? "#F93822"
                             : entry.name === "Draft"
                               ? "#64748b"
                               : entry.name === "Under Review"
-                                ? "#f59e0b"
-                                : "#16a34a"
+                                ? "#FFAD00"
+                                : "#005670"
                         }
                       />
                     ))}
@@ -1537,7 +1537,7 @@ export default function Home() {
                   <Tooltip />
                   <Bar
                     dataKey="value"
-                    fill="#3A9B98"
+                    fill="#005670"
                     radius={[6, 6, 0, 0]}
                     cursor="pointer"
                     onClick={(data: { name?: string }) => openMocStatusBucket(data?.name || "")}
@@ -1569,7 +1569,7 @@ export default function Home() {
                     }
                   >
                     {mocChangeTypeData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.name === "Temporary" ? "#f59e0b" : "#2563eb"} />
+                      <Cell key={entry.name} fill={entry.name === "Temporary" ? "#FFAD00" : "#63B1BC"} />
                     ))}
                   </Pie>
                   <Legend />
@@ -1594,7 +1594,7 @@ export default function Home() {
                   <Line
                     type="monotone"
                     dataKey="Opened"
-                    stroke="#2563eb"
+                    stroke="#63B1BC"
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     onClick={() => router.push(buildHref("/actions", { view: "register", department: "Quality" }))}
@@ -1602,7 +1602,7 @@ export default function Home() {
                   <Line
                     type="monotone"
                     dataKey="Closed"
-                    stroke="#16a34a"
+                    stroke="#005670"
                     strokeWidth={3}
                     dot={{ r: 4, cursor: "pointer" }}
                     onClick={() =>
@@ -1933,10 +1933,10 @@ function MetaChip({ label, value }: { label: string; value: string }) {
 }
 
 function getFindingCategoryColour(name: string) {
-  if (name === "Major") return "#dc2626";
-  if (name === "Minor") return "#f59e0b";
-  if (name === "OFI") return "#16a34a";
-  return "#2563eb";
+  if (name === "Major") return "#F93822";
+  if (name === "Minor") return "#FFAD00";
+  if (name === "OFI") return "#005670";
+  return "#63B1BC";
 }
 
 function StatusBadge({ value }: { value: string }) {
@@ -1954,7 +1954,7 @@ function StatusBadge({ value }: { value: string }) {
       : lower === "planned"
       ? { background: "#dbeafe", color: "#1d4ed8" }
       : lower === "overdue"
-      ? { background: "#fee2e2", color: "#991b1b" }
+      ? { background: "#fee2e2", color: "#F93822" }
       : { background: "#e5e7eb", color: "#374151" };
 
   return (
@@ -1976,7 +1976,7 @@ function StatusBadge({ value }: { value: string }) {
 
 function getFrequencyBadgeStyle(frequency: "Reduce" | "Maintain" | "Increase"): CSSProperties {
   if (frequency === "Increase") {
-    return { ...badgeStyle, background: "#fee2e2", color: "#991b1b" };
+    return { ...badgeStyle, background: "#fee2e2", color: "#F93822" };
   }
   if (frequency === "Reduce") {
     return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
@@ -1985,12 +1985,12 @@ function getFrequencyBadgeStyle(frequency: "Reduce" | "Maintain" | "Increase"): 
 }
 
 const heroStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   color: "white",
   borderRadius: "20px",
   padding: "22px 24px",
   marginBottom: "18px",
-  boxShadow: "0 10px 24px rgba(58, 155, 152, 0.14)",
+  boxShadow: "0 10px 24px rgba(0, 86, 112, 0.14)",
   display: "grid",
   gap: "16px",
 };
@@ -2053,7 +2053,7 @@ const metaChipValueStyle: CSSProperties = {
 
 const errorBannerStyle: CSSProperties = {
   background: "#fef2f2",
-  color: "#991b1b",
+  color: "#F93822",
   border: "1px solid #fecaca",
   borderRadius: "14px",
   padding: "14px 16px",
@@ -2075,7 +2075,7 @@ const commandScorePanelStyle: CSSProperties = {
   padding: "22px",
   minHeight: "226px",
   color: "#ffffff",
-  background: "linear-gradient(135deg, #3A9B98 0%, #174b56 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   boxShadow: "0 22px 42px rgba(15, 23, 42, 0.16)",
   display: "grid",
   gridTemplateColumns: "1fr auto",
@@ -2160,7 +2160,7 @@ const signalCardStyle: CSSProperties = {
   color: imsColours.ink,
   background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
   border: `1px solid ${imsColours.border}`,
-  borderTop: "4px solid #3A9B98",
+  borderTop: "4px solid #005670",
   borderRadius: "18px",
   boxShadow: imsShadows.card,
   padding: "14px 15px",
@@ -2355,7 +2355,7 @@ const sectionSubtitleStyle: CSSProperties = {
 
 const sectionLinkStyle: CSSProperties = {
   textDecoration: "none",
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   fontSize: "14px",
 };

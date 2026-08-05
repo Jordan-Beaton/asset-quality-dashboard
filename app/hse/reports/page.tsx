@@ -217,7 +217,7 @@ function buildPdfMetricTable(
       lineWidth: 0.2,
     },
     headStyles: {
-      fillColor: [15, 118, 110],
+      fillColor: [0, 86, 112],
       textColor: [255, 255, 255],
       fontStyle: "bold",
     },
@@ -578,7 +578,7 @@ export default function HseReportsPage() {
       doc.text(monthLabel, pageWidth - margin, 25, { align: "right" });
       doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`, pageWidth - margin, 31, { align: "right" });
 
-      doc.setDrawColor(15, 118, 110);
+      doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 37, pageWidth - margin, 37);
 
@@ -977,7 +977,7 @@ export default function HseReportsPage() {
 }
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -1115,7 +1115,7 @@ const textareaStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1135,7 +1135,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const pdfButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1260,7 +1260,7 @@ const actionButtonsWrapStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "8px 12px",
@@ -1271,5 +1271,5 @@ const miniButtonStyle: CSSProperties = {
 
 const miniButtonDeleteStyle: CSSProperties = {
   ...miniButtonStyle,
-  background: "#dc2626",
+  background: "#F93822",
 };

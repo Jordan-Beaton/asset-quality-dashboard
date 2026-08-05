@@ -715,23 +715,23 @@ export default function AssetActionsPage() {
       {activeView === "dashboard" ? (
         <>
           <section style={statsGridStyle}>
-            <QualityKpiCard title="Asset Actions" value={kpis.total} accent="#3A9B98" onClick={() => openRegister()} />
-            <QualityKpiCard title="Open Actions" value={kpis.open} accent="#2563eb" onClick={() => openRegister("Open")} />
-            <QualityKpiCard title="Overdue Actions" value={kpis.overdue} accent="#dc2626" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("overdue"); setActiveView("register"); }} />
-            <QualityKpiCard title="Due This Week" value={kpis.dueWeek} accent="#f59e0b" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("dueWeek"); setActiveView("register"); }} />
-            <QualityKpiCard title="High Priority Open" value={kpis.high} accent="#7c3aed" onClick={() => { setPriorityFilter("High"); setStatusFilter(""); setPressureFilter(""); setActiveView("register"); }} />
-            <QualityKpiCard title="Completed Actions" value={kpis.closed} accent="#16a34a" onClick={() => openRegister("Closed")} />
+            <QualityKpiCard title="Asset Actions" value={kpis.total} accent="#005670" onClick={() => openRegister()} />
+            <QualityKpiCard title="Open Actions" value={kpis.open} accent="#63B1BC" onClick={() => openRegister("Open")} />
+            <QualityKpiCard title="Overdue Actions" value={kpis.overdue} accent="#F93822" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("overdue"); setActiveView("register"); }} />
+            <QualityKpiCard title="Due This Week" value={kpis.dueWeek} accent="#FFAD00" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("dueWeek"); setActiveView("register"); }} />
+            <QualityKpiCard title="High Priority Open" value={kpis.high} accent="#53565A" onClick={() => { setPriorityFilter("High"); setStatusFilter(""); setPressureFilter(""); setActiveView("register"); }} />
+            <QualityKpiCard title="Completed Actions" value={kpis.closed} accent="#005670" onClick={() => openRegister("Closed")} />
           </section>
 
           <section style={dashboardGridStyle}>
             <SectionCard title="Open Actions by Person" subtitle="Who is carrying the current Asset action load.">
-              <BarList rows={ownerRows} total={Math.max(1, kpis.open)} accent="#2563eb" onClick={(owner) => { setOwnerFilter(owner === "Unassigned" ? "" : owner); setActiveView("register"); }} />
+              <BarList rows={ownerRows} total={Math.max(1, kpis.open)} accent="#63B1BC" onClick={(owner) => { setOwnerFilter(owner === "Unassigned" ? "" : owner); setActiveView("register"); }} />
             </SectionCard>
             <SectionCard title="Asset Action Status" subtitle="Open, in progress, and closed position.">
-              <BarList rows={statusRows} total={Math.max(1, actions.length)} accent="#3A9B98" onClick={(status) => openRegister(status)} />
+              <BarList rows={statusRows} total={Math.max(1, actions.length)} accent="#005670" onClick={(status) => openRegister(status)} />
             </SectionCard>
             <SectionCard title="Source Split" subtitle="Where Asset actions are being generated from.">
-              <BarList rows={sourceRows} total={Math.max(1, actions.length)} accent="#7c3aed" />
+              <BarList rows={sourceRows} total={Math.max(1, actions.length)} accent="#53565A" />
             </SectionCard>
             <SectionCard title="Manager Focus" subtitle="Immediate Asset action pressure requiring management attention.">
               <div style={focusGridStyle}>
@@ -805,7 +805,7 @@ export default function AssetActionsPage() {
               <tbody>
                 {filteredActions.length ? filteredActions.map((action) => (
                   <tr key={action.id} style={selectedId === action.id ? selectedTableRowStyle : registerTableRowStyle} onClick={() => setSelectedId(action.id)}>
-                    <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#2F7F7D" }}>{action.action_number || "-"}</td>
+                    <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#005670" }}>{action.action_number || "-"}</td>
                     <td style={imsTableCellStyle}>
                       <strong>{action.title || "-"}</strong>
                       <div style={mutedTextStyle}>{action.project || "No project"}{action.linked_ainm_number ? ` | AINM ${action.linked_ainm_number}` : ""}</div>
@@ -814,7 +814,7 @@ export default function AssetActionsPage() {
                     <td style={imsTableCellStyle}>{action.source || "-"}</td>
                     <td style={imsTableCellStyle}>
                       <strong>{formatDate(action.due_date)}</strong>
-                      <div style={{ ...mutedTextStyle, color: isOverdue(action) ? "#b91c1c" : "#64748b" }}>{getDueLabel(action.due_date)}</div>
+                      <div style={{ ...mutedTextStyle, color: isOverdue(action) ? "#F93822" : "#64748b" }}>{getDueLabel(action.due_date)}</div>
                     </td>
                     <td style={imsTableCellStyle}>{action.priority || "-"}</td>
                     <td style={imsTableCellStyle}><StatusPill status={action.status || "Open"} /></td>
@@ -1010,19 +1010,19 @@ function BarList({ rows, total, accent, onClick }: { rows: { label: string; valu
 }
 
 function MiniFocus({ label, value, tone, onClick }: { label: string; value: number; tone: "red" | "amber" | "purple"; onClick?: () => void }) {
-  const colours = { red: "#dc2626", amber: "#f59e0b", purple: "#7c3aed" };
+  const colours = { red: "#F93822", amber: "#FFAD00", purple: "#53565A" };
   return <button type="button" style={{ ...miniFocusStyle, borderTop: `4px solid ${colours[tone]}` }} onClick={onClick}><span>{label}</span><strong>{value}</strong></button>;
 }
 
-const primaryLinkStyle: CSSProperties = { background: "#3A9B98", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
+const primaryLinkStyle: CSSProperties = { background: "#005670", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
 const smallLinkStyle: CSSProperties = { ...primaryLinkStyle, padding: "8px 10px", fontSize: 12 };
 const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 };
 const viewButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
-const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#3A9B98", color: "white" };
+const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#005670", color: "white" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: 20 };
-const sectionHeaderStyle: CSSProperties = { background: "#3A9B98", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
+const sectionHeaderStyle: CSSProperties = { background: "#005670", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
 const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", color: "white" };
 const sectionSubtitleStyle: CSSProperties = { color: "rgba(255,255,255,0.82)", margin: "4px 0 0", lineHeight: 1.45, fontSize: 13 };
 const emptyTextStyle: CSSProperties = { color: "#64748b", margin: 0, lineHeight: 1.55, fontSize: 13 };
@@ -1030,10 +1030,10 @@ const inputStyle: CSSProperties = { width: "100%", minHeight: 42, border: "1px s
 const readOnlyInputStyle: CSSProperties = { ...inputStyle, background: "#f8fafc", color: "#64748b" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: 110, resize: "vertical", lineHeight: 1.45 };
 const secondaryButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "#e2e8f0", color: "#0f172a", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
-const primaryButtonStyle: CSSProperties = { border: "none", background: "#3A9B98", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
+const primaryButtonStyle: CSSProperties = { border: "none", background: "#005670", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
 const compactTableWrapStyle: CSSProperties = { overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: "16px", background: "#ffffff", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)" };
 const registerTableRowStyle: CSSProperties = { cursor: "pointer" };
-const selectedTableRowStyle: CSSProperties = { cursor: "pointer", background: "#eff6ff", boxShadow: "inset 4px 0 0 #3A9B98" };
+const selectedTableRowStyle: CSSProperties = { cursor: "pointer", background: "#eff6ff", boxShadow: "inset 4px 0 0 #005670" };
 const mutedTextStyle: CSSProperties = { color: "#64748b", fontSize: 12, marginTop: 4 };
 const emptyTableCellStyle: CSSProperties = { padding: "26px 14px", textAlign: "center", color: "#64748b", background: "#f8fafc", borderBottom: "1px dashed #cbd5e1" };
 const detailCardStyle: CSSProperties = {

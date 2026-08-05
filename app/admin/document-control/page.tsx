@@ -11,10 +11,10 @@ export default function AdminDocumentControlPage() {
       latestLabel="Latest Document Setting"
       status="Document Control Settings shell ready. Existing document numbering logic is untouched."
       kpis={[
-        { title: "Document Types", value: "Pending", accent: "#3A9B98" },
-        { title: "Numbering Rules", value: "Locked", accent: "#dc2626" },
-        { title: "Review Cycles", value: "Pending", accent: "#2563eb" },
-        { title: "Notifications", value: "Future", accent: "#7c3aed" },
+        { title: "Document Types", value: "Pending", accent: "#005670" },
+        { title: "Numbering Rules", value: "Locked", accent: "#F93822" },
+        { title: "Review Cycles", value: "Pending", accent: "#63B1BC" },
+        { title: "Notifications", value: "Future", accent: "#53565A" },
       ]}
       panels={[
         { title: "Future Editable Settings", text: "Document types, type codes, department codes, review cycles, notification defaults, and controlled numbering rules." },
@@ -43,7 +43,7 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

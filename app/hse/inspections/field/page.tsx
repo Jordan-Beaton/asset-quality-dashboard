@@ -62,7 +62,7 @@ const shellStyle: CSSProperties = {
 };
 
 const brandBarStyle: CSSProperties = {
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   color: "#ffffff",
   borderRadius: "18px",
   padding: "14px 18px",
@@ -70,7 +70,7 @@ const brandBarStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  boxShadow: "0 16px 28px rgba(58, 155, 152, 0.18)",
+  boxShadow: "0 16px 28px rgba(0, 86, 112, 0.18)",
 };
 
 const summaryCardStyle: CSSProperties = {
@@ -86,7 +86,7 @@ const summaryCardStyle: CSSProperties = {
 const eyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#3A9B98",
+  color: "#005670",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
 };
@@ -124,7 +124,7 @@ const templateCardStyle: CSSProperties = {
 };
 
 const docNumberStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 900,
   fontSize: "12px",
   letterSpacing: "0.04em",
@@ -151,7 +151,7 @@ const queuedPillStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 800,
   textDecoration: "none",
   textAlign: "center",

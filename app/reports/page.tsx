@@ -383,7 +383,7 @@ function buildPdfMetricTable(
       lineWidth: 0.2,
     },
     headStyles: {
-      fillColor: [15, 118, 110],
+      fillColor: [0, 86, 112],
       textColor: [255, 255, 255],
       fontStyle: "bold",
     },
@@ -949,7 +949,7 @@ export default function ReportsPage() {
       doc.text(pdfMetrics.monthLabel, pageWidth - margin, 25, { align: "right" });
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 31, { align: "right" });
 
-      doc.setDrawColor(15, 118, 110);
+      doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 37, pageWidth - margin, 37);
 
@@ -1342,12 +1342,12 @@ export default function ReportsPage() {
 }
 
 const heroStyle: React.CSSProperties = {
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   color: "white",
   borderRadius: "20px",
   padding: "28px 30px",
   marginBottom: "24px",
-  boxShadow: "0 10px 30px rgba(58, 155, 152, 0.14)",
+  boxShadow: "0 10px 30px rgba(0, 86, 112, 0.14)",
   display: "flex",
   justifyContent: "space-between",
   gap: "24px",
@@ -1409,7 +1409,7 @@ const heroMetaValueStyle: React.CSSProperties = {
 };
 
 const backLinkStyle: React.CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -1450,7 +1450,7 @@ const reportWorkspaceTabStyle: React.CSSProperties = {
 
 const activeReportWorkspaceTabStyle: React.CSSProperties = {
   ...reportWorkspaceTabStyle,
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
 };
 
@@ -1566,7 +1566,7 @@ const textareaStyle: React.CSSProperties = {
 };
 
 const primaryButtonStyle: React.CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1586,7 +1586,7 @@ const secondaryButtonStyle: React.CSSProperties = {
 };
 
 const pdfButtonStyle: React.CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1707,7 +1707,7 @@ const actionButtonsWrapStyle: React.CSSProperties = {
 };
 
 const miniButtonStyle: React.CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "8px 12px",
@@ -1717,7 +1717,7 @@ const miniButtonStyle: React.CSSProperties = {
 };
 
 const miniButtonDeleteStyle: React.CSSProperties = {
-  background: "#dc2626",
+  background: "#F93822",
   color: "white",
   border: "none",
   padding: "8px 12px",

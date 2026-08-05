@@ -231,7 +231,7 @@ function buildPdfMetricTable(doc: jsPDF, startY: number, title: string, rows: Ar
       lineWidth: 0.2,
     },
     headStyles: {
-      fillColor: [15, 118, 110],
+      fillColor: [0, 86, 112],
       textColor: [255, 255, 255],
       fontStyle: "bold",
     },
@@ -527,7 +527,7 @@ export default function AssetReportsPage() {
     () => [
       {
         title: "A. Assets",
-        accent: "#2563eb",
+        accent: "#63B1BC",
         rows: [
           ["Total assets", metrics.assetsSummary.totalAssets],
           ["Active assets", metrics.assetsSummary.activeAssets],
@@ -536,7 +536,7 @@ export default function AssetReportsPage() {
       },
       {
         title: "B. Calibration",
-        accent: "#dc2626",
+        accent: "#F93822",
         rows: [
           ["Due this month", metrics.calibrationSummary.dueThisMonth],
           ["Overdue calibration", metrics.calibrationSummary.overdue],
@@ -545,7 +545,7 @@ export default function AssetReportsPage() {
       },
       {
         title: "C. Inspection",
-        accent: "#f59e0b",
+        accent: "#FFAD00",
         rows: [
           ["Completed this month", metrics.inspectionSummary.completedThisMonth],
           ["Overdue inspections", metrics.inspectionSummary.overdue],
@@ -555,7 +555,7 @@ export default function AssetReportsPage() {
       },
       {
         title: "D. Maintenance",
-        accent: "#7c3aed",
+        accent: "#53565A",
         rows: [
           ["Completed this month", metrics.maintenanceSummary.completedThisMonth],
           ["Overdue maintenance", metrics.maintenanceSummary.overdue],
@@ -565,7 +565,7 @@ export default function AssetReportsPage() {
       },
       {
         title: "E. Linked Actions",
-        accent: "#3A9B98",
+        accent: "#005670",
         rows: [
           ["Open linked asset actions", metrics.actionsSummary.openLinkedAssetActions],
           ["Overdue linked asset actions", metrics.actionsSummary.overdueLinkedAssetActions],
@@ -820,7 +820,7 @@ export default function AssetReportsPage() {
       doc.text(pdfMetrics.monthLabel, pageWidth - margin, 25, { align: "right" });
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 31, { align: "right" });
 
-      doc.setDrawColor(15, 118, 110);
+      doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 37, pageWidth - margin, 37);
 
@@ -999,7 +999,7 @@ export default function AssetReportsPage() {
             overflow: "linebreak",
           },
           headStyles: {
-            fillColor: [15, 118, 110],
+            fillColor: [0, 86, 112],
             textColor: [255, 255, 255],
             fontStyle: "bold",
           },
@@ -1236,7 +1236,7 @@ export default function AssetReportsPage() {
               <tbody>
                 {filteredReports.map((report) => (
                   <tr key={report.id}>
-                    <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#2F7F7D" }}>{report.month_label}</td>
+                    <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#005670" }}>{report.month_label}</td>
                     <td style={imsTableCellStyle}>{getSnapshotSummary(report)}</td>
                     <td style={imsTableCellStyle}>{formatDateTime(report.created_at)}</td>
                     <td style={imsTableCellStyle}>
@@ -1335,7 +1335,7 @@ const textareaStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1355,7 +1355,7 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const pdfButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "10px 16px",
@@ -1448,7 +1448,7 @@ const actionButtonsWrapStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "white",
   border: "none",
   padding: "8px 12px",
@@ -1458,7 +1458,7 @@ const miniButtonStyle: CSSProperties = {
 };
 
 const miniButtonDeleteStyle: CSSProperties = {
-  background: "#dc2626",
+  background: "#F93822",
   color: "white",
   border: "none",
   padding: "8px 12px",

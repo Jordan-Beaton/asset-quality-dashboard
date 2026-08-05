@@ -216,7 +216,7 @@ function getStatusRank(status: CalibrationStatus) {
 }
 
 function getStatusTone(status: CalibrationStatus) {
-  if (status === "Overdue") return { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
+  if (status === "Overdue") return { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
   if (status === "Due Soon") return { bg: "#fef3c7", text: "#92400e", border: "#fde68a" };
   if (status === "In Date") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
   return { bg: "#e2e8f0", text: "#334155", border: "#cbd5e1" };
@@ -233,7 +233,7 @@ function getItemStatusTone(status: CalibrationItemStatus) {
   if (status === "In Use") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
   if (status === "Not In Use") return { bg: "#e2e8f0", text: "#334155", border: "#cbd5e1" };
   if (status === "Damaged") return { bg: "#ffedd5", text: "#9a3412", border: "#fed7aa" };
-  if (status === "Missing / Lost") return { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
+  if (status === "Missing / Lost") return { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
   return { bg: "#ede9fe", text: "#6d28d9", border: "#ddd6fe" };
 }
 
@@ -664,11 +664,11 @@ function CalibrationPageContent() {
   }, [calibrationControlRows]);
   const availabilityStatusRows = useMemo(() => {
     const colours: Record<CalibrationItemStatus, { color: string; bg: string }> = {
-      "In Use": { color: "#16a34a", bg: "#dcfce7" },
+      "In Use": { color: "#005670", bg: "#dcfce7" },
       "Not In Use": { color: "#64748b", bg: "#f1f5f9" },
-      Damaged: { color: "#f59e0b", bg: "#fef3c7" },
-      "Missing / Lost": { color: "#dc2626", bg: "#fee2e2" },
-      Historic: { color: "#7c3aed", bg: "#ede9fe" },
+      Damaged: { color: "#FFAD00", bg: "#fef3c7" },
+      "Missing / Lost": { color: "#F93822", bg: "#fee2e2" },
+      Historic: { color: "#53565A", bg: "#ede9fe" },
     };
 
     return calibrationItemStatuses.map((status) => ({
@@ -743,10 +743,10 @@ function CalibrationPageContent() {
   }, [calibrationControlRows]);
   const dashboardDueBuckets = useMemo(() => {
     const buckets = [
-      { label: "Overdue", value: 0, tone: "#dc2626", bg: "#fee2e2" },
-      { label: "Next 7 Days", value: 0, tone: "#f59e0b", bg: "#fef3c7" },
-      { label: "8-30 Days", value: 0, tone: "#2563eb", bg: "#dbeafe" },
-      { label: "31+ Days", value: 0, tone: "#16a34a", bg: "#dcfce7" },
+      { label: "Overdue", value: 0, tone: "#F93822", bg: "#fee2e2" },
+      { label: "Next 7 Days", value: 0, tone: "#FFAD00", bg: "#fef3c7" },
+      { label: "8-30 Days", value: 0, tone: "#63B1BC", bg: "#dbeafe" },
+      { label: "31+ Days", value: 0, tone: "#005670", bg: "#dcfce7" },
       { label: "Not Set", value: 0, tone: "#64748b", bg: "#f1f5f9" },
     ];
 
@@ -768,9 +768,9 @@ function CalibrationPageContent() {
   }, [calibrationControlRows]);
   const dashboardStatusSegments = useMemo(
     () => [
-      { label: "Overdue", value: dashboardCounts.overdue, color: "#dc2626" },
-      { label: "Due Soon", value: dashboardCounts.dueSoon, color: "#f59e0b" },
-      { label: "In Date", value: dashboardCounts.inDate, color: "#16a34a" },
+      { label: "Overdue", value: dashboardCounts.overdue, color: "#F93822" },
+      { label: "Due Soon", value: dashboardCounts.dueSoon, color: "#FFAD00" },
+      { label: "In Date", value: dashboardCounts.inDate, color: "#005670" },
       {
         label: "Not Set",
         value: dashboardCounts.notSet,
@@ -1433,8 +1433,8 @@ function CalibrationPageContent() {
           </p>
           <div style={commandMetricGridStyle}>
             <CommandMetric label="In Use" value={dashboardMetrics.total} detail="Included in figures" tone="#1d4ed8" />
-            <CommandMetric label="Excluded" value={availabilityMetrics.excluded} detail="Not in calibration score" tone="#7c3aed" />
-            <CommandMetric label="Overdue" value={dashboardCounts.overdue} detail="Past due date" tone="#991b1b" />
+            <CommandMetric label="Excluded" value={availabilityMetrics.excluded} detail="Not in calibration score" tone="#53565A" />
+            <CommandMetric label="Overdue" value={dashboardCounts.overdue} detail="Past due date" tone="#F93822" />
             <CommandMetric label="Due Soon" value={dashboardCounts.dueSoon} detail="Within 30 days" tone="#92400e" />
           </div>
         </div>
@@ -1467,19 +1467,19 @@ function CalibrationPageContent() {
       </section>
 
       <section style={dashboardKpiGridStyle}>
-        <QualityKpiCard title="Overdue In Use" value={dashboardCounts.overdue} accent="#dc2626" onClick={() => applyCalibrationKpiFilter("Overdue")} />
-        <QualityKpiCard title="Due Soon In Use" value={dashboardCounts.dueSoon} accent="#f59e0b" onClick={() => applyCalibrationKpiFilter("Due Soon")} />
-        <QualityKpiCard title="In Date In Use" value={dashboardCounts.inDate} accent="#16a34a" onClick={() => applyCalibrationKpiFilter("In Date")} />
+        <QualityKpiCard title="Overdue In Use" value={dashboardCounts.overdue} accent="#F93822" onClick={() => applyCalibrationKpiFilter("Overdue")} />
+        <QualityKpiCard title="Due Soon In Use" value={dashboardCounts.dueSoon} accent="#FFAD00" onClick={() => applyCalibrationKpiFilter("Due Soon")} />
+        <QualityKpiCard title="In Date In Use" value={dashboardCounts.inDate} accent="#005670" onClick={() => applyCalibrationKpiFilter("In Date")} />
         <QualityKpiCard
           title="Excluded Items"
           value={availabilityMetrics.excluded}
-          accent="#7c3aed"
+          accent="#53565A"
           onClick={() => applyItemStatusDrilldown("all")}
         />
         <QualityKpiCard
           title="Missing Certs"
           value={dashboardMetrics.missingCertificates}
-          accent="#2563eb"
+          accent="#63B1BC"
           onClick={() => applyItemStatusDrilldown("In Use")}
         />
       </section>
@@ -1995,7 +1995,7 @@ function CalibrationPageContent() {
         subtitle="Search and maintain calibration records by item, serial number, certificate, supplier, status, and due date."
       >
           <div style={registerSummaryGridStyle}>
-            <CalibrationSummaryCard label="Overdue" value={heroCounts.overdue} tone="#991b1b" bg="#fff1f2" />
+            <CalibrationSummaryCard label="Overdue" value={heroCounts.overdue} tone="#F93822" bg="#fff1f2" />
             <CalibrationSummaryCard label="Due Soon" value={heroCounts.dueSoon} tone="#92400e" bg="#fffbeb" />
             <CalibrationSummaryCard label="In Date" value={heroCounts.inDate} tone="#166534" bg="#f0fdf4" />
             <CalibrationSummaryCard label="Total Records" value={heroCounts.total} tone="#1d4ed8" bg="#eff6ff" />
@@ -2856,7 +2856,7 @@ function AttentionCard({
   tone: "red" | "amber" | "blue";
 }) {
   const tones = {
-    red: { bg: "#fff1f2", border: "#fecdd3", title: "#991b1b", summary: "#7f1d1d" },
+    red: { bg: "#fff1f2", border: "#fecdd3", title: "#F93822", summary: "#7f1d1d" },
     amber: { bg: "#fffbeb", border: "#fde68a", title: "#92400e", summary: "#78350f" },
     blue: { bg: "#eff6ff", border: "#bfdbfe", title: "#1d4ed8", summary: "#1e3a8a" },
   };
@@ -2900,7 +2900,7 @@ const topMetaRowStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
 };
@@ -2919,15 +2919,15 @@ const dashboardHeroPanelStyle: CSSProperties = {
   gap: "18px",
   alignItems: "stretch",
   borderRadius: "22px",
-  border: "1px solid #bfe5e3",
-  background: "linear-gradient(135deg, #ffffff 0%, #eef8f7 48%, #eff6ff 100%)",
+  border: "1px solid #D0D0CE",
+  background: "linear-gradient(135deg, #ffffff 0%, #ECECE7 48%, #eff6ff 100%)",
   padding: "22px",
   boxShadow: "0 18px 34px rgba(15, 23, 42, 0.08)",
   marginBottom: "16px",
 };
 
 const dashboardEyebrowStyle: CSSProperties = {
-  color: "#2f7f7d",
+  color: "#005670",
   fontSize: "12px",
   fontWeight: 900,
   letterSpacing: "0.04em",
@@ -2960,9 +2960,9 @@ const calibrationCommandGridStyle: CSSProperties = {
 };
 
 const calibrationCommandPanelStyle: CSSProperties = {
-  border: "1px solid #bfe5e3",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
-  background: "linear-gradient(135deg, #ffffff 0%, #eef8f7 55%, #eff6ff 100%)",
+  background: "linear-gradient(135deg, #ffffff 0%, #ECECE7 55%, #eff6ff 100%)",
   padding: "18px",
   boxShadow: "0 12px 24px rgba(15, 23, 42, 0.07)",
   minHeight: "222px",
@@ -3341,7 +3341,7 @@ const certificateGaugeTrackStyle: CSSProperties = {
 const certificateGaugeFillStyle: CSSProperties = {
   height: "100%",
   borderRadius: "999px",
-  background: "linear-gradient(90deg, #3A9B98 0%, #2563eb 100%)",
+  background: "linear-gradient(90deg, #005670 0%, #63B1BC 100%)",
 };
 
 const certificateGaugeMetaStyle: CSSProperties = {
@@ -3397,7 +3397,7 @@ const supplierBarTrackStyle: CSSProperties = {
 const supplierBarFillStyle: CSSProperties = {
   height: "100%",
   borderRadius: "999px",
-  background: "#3A9B98",
+  background: "#005670",
 };
 
 const supplierBarMetaStyle: CSSProperties = {
@@ -3464,9 +3464,9 @@ const importHeaderListStyle: CSSProperties = {
 const importHeaderPillStyle: CSSProperties = {
   display: "inline-flex",
   borderRadius: "999px",
-  background: "#eef8f7",
-  border: "1px solid #bfe5e3",
-  color: "#2f7f7d",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
+  color: "#005670",
   padding: "6px 10px",
   fontSize: "12px",
   fontWeight: 800,
@@ -3596,9 +3596,9 @@ const activeFilterChipStyle: CSSProperties = {
   marginLeft: "8px",
   borderRadius: "999px",
   padding: "5px 9px",
-  background: "#eef8f7",
-  color: "#2f7f7d",
-  border: "1px solid #bfe5e3",
+  background: "#ECECE7",
+  color: "#005670",
+  border: "1px solid #D0D0CE",
   fontSize: "12px",
   fontWeight: 900,
 };
@@ -3691,7 +3691,7 @@ const uploadButtonStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   borderRadius: "10px",
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   padding: "10px 14px",
   fontWeight: 700,
@@ -3718,7 +3718,7 @@ const detailActionRowStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   borderRadius: "12px",
@@ -3756,7 +3756,7 @@ const calibrationTableRowStyle: CSSProperties = {
 const selectedCalibrationTableRowStyle: CSSProperties = {
   ...calibrationTableRowStyle,
   background: "#eff6ff",
-  boxShadow: "inset 4px 0 0 #3A9B98",
+  boxShadow: "inset 4px 0 0 #005670",
 };
 
 const editPanelStyle: CSSProperties = {
@@ -3946,7 +3946,7 @@ const dueDateMetaStyle: CSSProperties = {
 };
 
 const miniButtonStyle: CSSProperties = {
-  background: "#3A9B98",
+  background: "#005670",
   color: "#ffffff",
   border: "none",
   borderRadius: "10px",
@@ -3972,7 +3972,7 @@ const rowActionInlineStyle: CSSProperties = {
 
 const dangerButtonStyle: CSSProperties = {
   background: "#fee2e2",
-  color: "#991b1b",
+  color: "#F93822",
   border: "1px solid #fecaca",
   borderRadius: "10px",
   padding: "8px 12px",

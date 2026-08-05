@@ -1067,7 +1067,7 @@ export default function HseInspectionsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = `${window.location.origin}/hse/inspections/field`;
-    QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#3A9B98", light: "#ffffff" } })
+    QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: "#005670", light: "#ffffff" } })
       .then(setFieldQrDataUrl)
       .catch(() => setFieldQrDataUrl(""));
   }, []);
@@ -1401,7 +1401,7 @@ export default function HseInspectionsPage() {
     doc.setTextColor(100, 116, 139);
     doc.text(record.inspection_number || "", 195, 16, { align: "right" });
     doc.text(displayDate(record.inspection_date), 195, 22, { align: "right" });
-    doc.setDrawColor(15, 118, 110);
+    doc.setDrawColor(0, 86, 112);
     doc.setLineWidth(0.4);
     doc.line(12, 30, 198, 30);
   }
@@ -1428,7 +1428,7 @@ export default function HseInspectionsPage() {
   }
 
   function pdfSection(doc: jsPDF, title: string, y: number) {
-    doc.setFillColor(15, 118, 110);
+    doc.setFillColor(0, 86, 112);
     doc.roundedRect(12, y, 186, 8, 1.5, 1.5, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
@@ -1457,7 +1457,7 @@ export default function HseInspectionsPage() {
       margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
-      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Field", "Details", "Field", "Details"]],
       body: [
         ["Form No.", record.form_number, "Revision", record.form_revision || ""],
@@ -1542,7 +1542,7 @@ export default function HseInspectionsPage() {
       margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2, overflow: "linebreak" },
-      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Action No.", "Title", "Owner", "Status", "Due Date"]],
       body: linkedActions.length
         ? linkedActions.map((action) => [action.action_number || "", action.title || "", action.owner || "", action.status || "", displayDate(action.due_date)])
@@ -1558,7 +1558,7 @@ export default function HseInspectionsPage() {
       margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
-      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Name", "Position", "Company", "Date"]],
       body: [[record.signoff_name || "", record.signoff_position || "", record.signoff_company || "", displayDate(record.signoff_date)]],
       columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 55 }, 2: { cellWidth: 45 }, 3: { cellWidth: 36 } },
@@ -1584,7 +1584,7 @@ export default function HseInspectionsPage() {
         margin: pdfTableMargin,
         tableWidth: 186,
         styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
-        headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+        headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
         head: [["Item", "File", "Size", "Uploaded", "Link"]],
         body: evidenceRows.map((item) => [
           item.file.item_number || "General",
@@ -1688,7 +1688,7 @@ export default function HseInspectionsPage() {
       margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
-      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Field", "Details", "Field", "Details"]],
       body: [
         ["Form No.", template.documentNumber, "Revision", template.revision || ""],
@@ -1786,7 +1786,7 @@ export default function HseInspectionsPage() {
       margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
-      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Item", "Evidence / Photo Reference", "Notes"]],
       body: Array.from({ length: 5 }, () => ["", "", ""]),
       columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 76 }, 2: { cellWidth: 86 } },
@@ -1800,7 +1800,7 @@ export default function HseInspectionsPage() {
       margin: pdfTableMargin,
       tableWidth: 186,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
-      headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: "bold" },
+      headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Name", "Position", "Company", "Date", "Signature"]],
       body: [["", "", "", "", ""]],
       columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 42 }, 2: { cellWidth: 36 }, 3: { cellWidth: 28 }, 4: { cellWidth: 40 } },
@@ -1964,10 +1964,10 @@ function DashboardView({
   return (
     <>
       <section style={isMobile ? mobileStatsGridStyle : statsGridStyle}>
-        <QualityKpiCard title="Open Inspections" value={kpis.open} accent="#2563eb" onClick={() => onFilter("Open")} />
-        <QualityKpiCard title="Completed / Closed" value={kpis.complete} accent="#16a34a" onClick={() => onFilter("Complete")} />
-        <QualityKpiCard title="Open Findings" value={kpis.findings} accent="#dc2626" />
-        <QualityKpiCard title="Evidence Files" value={kpis.evidenceCount} accent="#7c3aed" />
+        <QualityKpiCard title="Open Inspections" value={kpis.open} accent="#63B1BC" onClick={() => onFilter("Open")} />
+        <QualityKpiCard title="Completed / Closed" value={kpis.complete} accent="#005670" onClick={() => onFilter("Complete")} />
+        <QualityKpiCard title="Open Findings" value={kpis.findings} accent="#F93822" />
+        <QualityKpiCard title="Evidence Files" value={kpis.evidenceCount} accent="#53565A" />
       </section>
 
       <section style={isMobile ? mobileDashboardGridStyle : dashboardGridStyle}>
@@ -2120,7 +2120,7 @@ function RegisterView({
                 key={record.id}
                 type="button"
                 onClick={() => onSelect(record)}
-                style={{ ...mobileRegisterCardStyle, borderColor: selected?.id === record.id ? "#3A9B98" : "#dbe3ef" }}
+                style={{ ...mobileRegisterCardStyle, borderColor: selected?.id === record.id ? "#005670" : "#dbe3ef" }}
               >
                 <div>
                   <strong style={mobileRegisterNumberStyle}>{record.inspection_number}</strong>
@@ -2169,7 +2169,7 @@ function RegisterView({
             </thead>
             <tbody>
               {records.map((record) => (
-                <tr key={record.id} onClick={() => onSelect(record)} style={{ ...clickableRowStyle, background: selected?.id === record.id ? "#ecfeff" : "white" }}>
+                <tr key={record.id} onClick={() => onSelect(record)} style={{ ...clickableRowStyle, background: selected?.id === record.id ? "#ECECE7" : "white" }}>
                   <td style={tdStrongStyle}>{record.inspection_number}</td>
                   <td style={tdStyle}>{record.form_title}</td>
                   <td style={tdStyle}>{record.area_zone || record.vessel_spread || "-"}</td>
@@ -2299,8 +2299,8 @@ function CreateInspectionView({
             onClick={() => onSelectTemplate(template.id)}
             style={{
               ...templateCardStyle,
-              borderColor: selectedTemplateId === template.id ? "#3A9B98" : "#cbd5e1",
-              boxShadow: selectedTemplateId === template.id ? "0 0 0 2px rgba(58, 155, 152, 0.14)" : "0 1px 2px rgba(15, 23, 42, 0.06)",
+              borderColor: selectedTemplateId === template.id ? "#005670" : "#cbd5e1",
+              boxShadow: selectedTemplateId === template.id ? "0 0 0 2px rgba(0, 86, 112, 0.14)" : "0 1px 2px rgba(15, 23, 42, 0.06)",
             }}
           >
             <span style={docNumberStyle}>{template.documentNumber}</span>
@@ -2423,9 +2423,9 @@ function InspectionForm({
                           key={answer}
                           style={{
                             ...mobileAnswerOptionStyle,
-                            borderColor: response.answer === answer ? "#3A9B98" : "#cbd5e1",
-                            background: response.answer === answer ? "#EEF8F7" : "#ffffff",
-                            color: response.answer === answer ? "#3A9B98" : "#0f172a",
+                            borderColor: response.answer === answer ? "#005670" : "#cbd5e1",
+                            background: response.answer === answer ? "#ECECE7" : "#ffffff",
+                            color: response.answer === answer ? "#005670" : "#0f172a",
                           }}
                         >
                           <input
@@ -2709,7 +2709,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function StatusPill({ status }: { status: string }) {
-  const color = status === "Closed" || status === "Complete" ? "#16a34a" : status === "Open" ? "#2563eb" : "#f59e0b";
+  const color = status === "Closed" || status === "Complete" ? "#005670" : status === "Open" ? "#63B1BC" : "#FFAD00";
   return <span style={{ ...statusPillInlineStyle, background: `${color}22`, color }}>{status}</span>;
 }
 
@@ -2720,7 +2720,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       onClick={onClick}
       style={{
         ...tabButtonStyle,
-        background: active ? "#3A9B98" : "#e2e8f0",
+        background: active ? "#005670" : "#e2e8f0",
         color: active ? "white" : "#0f172a",
       }}
     >
@@ -2760,7 +2760,7 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#3A9B98", fontWeight: 700, textDecoration: "none" };
+const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
 const tabRowStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "20px" };
 const tabButtonStyle: CSSProperties = { border: "none", borderRadius: "10px", padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
@@ -2772,9 +2772,9 @@ const emptyTextStyle: CSSProperties = { color: "#475569", margin: "0 0 14px", li
 const storyGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" };
 const miniTemplateStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "4px", color: "#0f172a", background: "#f8fafc" };
 const miniTemplateButtonStyle: CSSProperties = { ...miniTemplateStyle, textAlign: "left", cursor: "pointer", font: "inherit" };
-const blankPdfCueStyle: CSSProperties = { marginTop: "6px", color: "#3A9B98", fontWeight: 900 };
+const blankPdfCueStyle: CSSProperties = { marginTop: "6px", color: "#005670", fontWeight: 900 };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" };
-const panelHeaderStyle: CSSProperties = { background: "#3A9B98", color: "white", borderRadius: "10px", padding: "14px 16px", marginBottom: "18px" };
+const panelHeaderStyle: CSSProperties = { background: "#005670", color: "white", borderRadius: "10px", padding: "14px 16px", marginBottom: "18px" };
 const panelTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", fontWeight: 800 };
 const panelDescriptionStyle: CSSProperties = { margin: "4px 0 0", fontSize: "13px", lineHeight: 1.45 };
 const splitGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr", gap: "20px", alignItems: "start" };
@@ -2849,7 +2849,7 @@ const tdStyle: CSSProperties = {
   fontSize: "13px",
   lineHeight: 1.45,
 };
-const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#3A9B98" };
+const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#005670" };
 const reportTdStyle: CSSProperties = { ...tdStyle, textAlign: "center", width: "96px" };
 const clickableRowStyle: CSSProperties = { cursor: "pointer" };
 const emptyCellStyle: CSSProperties = {
@@ -2859,18 +2859,18 @@ const emptyCellStyle: CSSProperties = {
   background: "#f8fafc",
   borderBottom: "1px dashed #cbd5e1",
 };
-const primaryButtonStyle: CSSProperties = { background: "#3A9B98", color: "white", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
+const primaryButtonStyle: CSSProperties = { background: "#005670", color: "white", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
 const secondaryButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
 const pdfButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: "9px", padding: "8px 14px", fontWeight: 900, cursor: "pointer", minWidth: "54px", lineHeight: 1 };
-const dangerButtonStyle: CSSProperties = { background: "#b91c1c", color: "white", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
+const dangerButtonStyle: CSSProperties = { background: "#F93822", color: "white", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
 const primaryLinkStyle: CSSProperties = { ...primaryButtonStyle, display: "inline-flex", textDecoration: "none", alignItems: "center" };
 const secondaryLinkStyle: CSSProperties = { ...secondaryButtonStyle, display: "inline-flex", textDecoration: "none", alignItems: "center" };
 const templateGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "12px", marginBottom: "20px" };
 const templateCardStyle: CSSProperties = { minHeight: "164px", display: "flex", flexDirection: "column", gap: "8px", textAlign: "left", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "14px", padding: "14px", cursor: "pointer", color: "#0f172a" };
-const docNumberStyle: CSSProperties = { color: "#3A9B98", fontWeight: 900, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" };
-const templateStatusStyle: CSSProperties = { marginTop: "auto", color: "#3A9B98", fontWeight: 800, fontSize: "12px" };
-const selectedHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "14px", alignItems: "flex-start", border: "1px solid #BFE5E3", background: "#EEF8F7", borderRadius: "14px", padding: "16px", marginBottom: "18px" };
-const selectedEyebrowStyle: CSSProperties = { fontSize: "12px", color: "#3A9B98", fontWeight: 900, letterSpacing: "0.04em" };
+const docNumberStyle: CSSProperties = { color: "#005670", fontWeight: 900, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" };
+const templateStatusStyle: CSSProperties = { marginTop: "auto", color: "#005670", fontWeight: 800, fontSize: "12px" };
+const selectedHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "14px", alignItems: "flex-start", border: "1px solid #D0D0CE", background: "#ECECE7", borderRadius: "14px", padding: "16px", marginBottom: "18px" };
+const selectedEyebrowStyle: CSSProperties = { fontSize: "12px", color: "#005670", fontWeight: 900, letterSpacing: "0.04em" };
 const selectedTitleStyle: CSSProperties = { margin: "4px 0", fontSize: "22px", color: "#0f172a" };
 const selectedDescriptionStyle: CSSProperties = { margin: 0, color: "#475569", lineHeight: 1.45 };
 const statusPillStyle: CSSProperties = { background: "#dcfce7", color: "#166534", borderRadius: "999px", padding: "7px 10px", fontWeight: 800, fontSize: "12px", whiteSpace: "nowrap" };
@@ -2880,7 +2880,7 @@ const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "re
 const fieldStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: "6px", fontWeight: 800, color: "#334155", fontSize: "12px" };
 const labelStyle: CSSProperties = { textTransform: "uppercase", letterSpacing: "0.03em" };
 const inspectionSectionStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "14px", overflow: "hidden", marginBottom: "16px", background: "white" };
-const inspectionSectionTitleStyle: CSSProperties = { margin: 0, background: "#3A9B98", color: "white", padding: "12px 14px", fontSize: "16px", fontWeight: 900 };
+const inspectionSectionTitleStyle: CSSProperties = { margin: 0, background: "#005670", color: "white", padding: "12px 14px", fontSize: "16px", fontWeight: 900 };
 const inspectionSectionBodyStyle: CSSProperties = { padding: "14px" };
 const checklistShellStyle: CSSProperties = { display: "grid", gap: "0", border: "1px solid #dbe3ef", borderRadius: "10px", overflow: "hidden" };
 const checklistHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "center", background: "#f1f5f9", fontWeight: 900, color: "#0f172a", fontSize: "12px" };
@@ -2888,7 +2888,7 @@ const checklistRowStyle: CSSProperties = { display: "grid", gridTemplateColumns:
 const centerHeaderCellStyle: CSSProperties = { textAlign: "center", justifySelf: "center", width: "100%" };
 const centeredChecklistCellStyle: CSSProperties = { display: "flex", alignItems: "center", padding: "8px 8px 8px 0", lineHeight: 1.35 };
 const radioCellStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid #dbe3ef" };
-const itemUploadButtonStyle: CSSProperties = { margin: "8px", minHeight: "30px", border: "1px solid #BFE5E3", background: "#EEF8F7", color: "#3A9B98", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "11px", cursor: "pointer" };
+const itemUploadButtonStyle: CSSProperties = { margin: "8px", minHeight: "30px", border: "1px solid #D0D0CE", background: "#ECECE7", color: "#005670", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "11px", cursor: "pointer" };
 const smallTextareaStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px", fontSize: "13px", resize: "vertical", boxSizing: "border-box" };
 const largeTextareaStyle: CSSProperties = { ...smallTextareaStyle, minHeight: "110px" };
 const actionTableStyle: CSSProperties = { display: "grid", gap: 0, border: "1px solid #dbe3ef", borderRadius: "10px", overflow: "hidden", marginBottom: "12px" };
@@ -2912,11 +2912,11 @@ const mobileHeroStyle: CSSProperties = {
   marginBottom: "16px",
   padding: "20px 18px",
   borderRadius: "20px",
-  background: "linear-gradient(135deg, #3A9B98 0%, #2F7F7D 100%)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 64%, #63B1BC 160%)",
   color: "#ffffff",
   display: "grid",
   gap: "12px",
-  boxShadow: "0 16px 30px rgba(58, 155, 152, 0.18)",
+  boxShadow: "0 16px 30px rgba(0, 86, 112, 0.18)",
 };
 
 const mobileHeroEyebrowStyle: CSSProperties = {
@@ -3012,7 +3012,7 @@ const mobileRegisterCardStyle: CSSProperties = {
 
 const mobileRegisterNumberStyle: CSSProperties = {
   display: "block",
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 900,
   marginBottom: "4px",
 };

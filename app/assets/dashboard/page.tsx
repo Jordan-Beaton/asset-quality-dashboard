@@ -220,7 +220,7 @@ function getStatusRank(status: DueStatus) {
 }
 
 function getDueTone(status: DueStatus) {
-  if (status === "Overdue") return { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
+  if (status === "Overdue") return { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
   if (status === "Due Soon") return { bg: "#fef3c7", text: "#92400e", border: "#fde68a" };
   if (status === "In Date") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
   return { bg: "#e2e8f0", text: "#334155", border: "#cbd5e1" };
@@ -230,7 +230,7 @@ function getBoardTypeTone(type: AttentionBoardItem["type"]) {
   if (type === "Calibration") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
   if (type === "Inspection") return { bg: "#fef3c7", text: "#92400e", border: "#fde68a" };
   if (type === "Maintenance") return { bg: "#ede9fe", text: "#6d28d9", border: "#ddd6fe" };
-  return { bg: "#fee2e2", text: "#991b1b", border: "#fecaca" };
+  return { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
 }
 
 function buildAssetLabel(asset: Asset | null) {
@@ -597,11 +597,11 @@ function DashboardContent() {
       actionPressurePenalty +
       Math.round(fileCoveragePercent * 0.1)
   );
-  const scoreColour = assetControlScore >= 80 ? "#16a34a" : assetControlScore >= 55 ? "#f59e0b" : "#dc2626";
+  const scoreColour = assetControlScore >= 80 ? "#005670" : assetControlScore >= 55 ? "#FFAD00" : "#F93822";
 
   const assetStatusData = buildTopBuckets(assets, (asset) => asset.status, "Status not set", 6).map((item, index) => ({
     ...item,
-    colour: ["#3A9B98", "#2563eb", "#f59e0b", "#7c3aed", "#64748b", "#dc2626"][index] || "#64748b",
+    colour: ["#005670", "#63B1BC", "#FFAD00", "#53565A", "#64748b", "#F93822"][index] || "#64748b",
     href: `/assets?status=${encodeURIComponent(item.label)}`,
   }));
 
@@ -622,28 +622,28 @@ function DashboardContent() {
       label: "Calibration",
       value: overdueCalibrationsAll.length + dueSoonCalibrationsAll.length,
       detail: `${overdueCalibrationsAll.length} overdue / ${dueSoonCalibrationsAll.length} due soon`,
-      colour: "#dc2626",
+      colour: "#F93822",
       href: "/assets/calibration",
     },
     {
       label: "Inspection",
       value: overdueInspectionsAll.length + dueSoonInspectionsAll.length,
       detail: `${overdueInspectionsAll.length} overdue / ${dueSoonInspectionsAll.length} due soon`,
-      colour: "#f59e0b",
+      colour: "#FFAD00",
       href: "/assets/inspection",
     },
     {
       label: "Maintenance",
       value: overdueMaintenanceAll.length + dueSoonMaintenanceAll.length,
       detail: `${overdueMaintenanceAll.length} overdue / ${dueSoonMaintenanceAll.length} due soon`,
-      colour: "#7c3aed",
+      colour: "#53565A",
       href: "/assets/maintenance",
     },
     {
       label: "Actions",
       value: overdueAssetActions.length + openAssetActions.length,
       detail: `${overdueAssetActions.length} overdue / ${openAssetActions.length} open`,
-      colour: "#2563eb",
+      colour: "#63B1BC",
       href: "/assets/actions",
     },
   ];
@@ -653,14 +653,14 @@ function DashboardContent() {
       label: "Asset file coverage",
       value: fileCoveragePercent,
       detail: `${assetsWithFiles} of ${assets.length} assets`,
-      colour: "#3A9B98",
+      colour: "#005670",
       href: "/assets",
     },
     {
       label: "Current control records",
       value: inDatePercent,
       detail: `${inDateControlItems} in date from ${allControlItems} controls`,
-      colour: "#16a34a",
+      colour: "#005670",
       href: "/assets/dashboard",
     },
     {
@@ -670,7 +670,7 @@ function DashboardContent() {
         calibrationRecords.length
       ),
       detail: `${calibrationRecords.filter((record) => record.certificate_number || record.file_path || record.file_name).length} of ${calibrationRecords.length} records`,
-      colour: "#2563eb",
+      colour: "#63B1BC",
       href: "/assets/calibration",
     },
   ];
@@ -679,28 +679,28 @@ function DashboardContent() {
     {
       name: "Control Currency",
       value: inDatePercent,
-      fill: "#16a34a",
+      fill: "#005670",
       detail: `${inDateControlItems} in-date controls`,
       href: "/assets/dashboard",
     },
     {
       name: "File Coverage",
       value: fileCoveragePercent,
-      fill: "#3A9B98",
+      fill: "#005670",
       detail: `${assetsWithFiles} assets with files`,
       href: "/assets",
     },
     {
       name: "Certificate Evidence",
       value: coverageData[2].value,
-      fill: "#2563eb",
+      fill: "#63B1BC",
       detail: coverageData[2].detail,
       href: "/assets/calibration",
     },
     {
       name: "Action Health",
       value: percentage(Math.max(openAssetActions.length - overdueAssetActions.length, 0), Math.max(openAssetActions.length, 1)),
-      fill: "#7c3aed",
+      fill: "#53565A",
       detail: `${overdueAssetActions.length} overdue linked actions`,
       href: "/assets/actions",
     },
@@ -804,12 +804,12 @@ function DashboardContent() {
       </section>
 
       <section className="asset-kpi-grid" style={statsGridStyle}>
-        <QualityKpiCard title="Total Assets" value={assets.length} accent="#2563eb" href="/assets" />
-        <QualityKpiCard title="Due Risk Items" value={dueWatchCount} accent="#dc2626" href="/assets/dashboard" />
-        <QualityKpiCard title="Overdue Controls" value={overdueDueItems} accent="#991b1b" href="/assets/dashboard" />
-        <QualityKpiCard title="Open Asset Actions" value={openAssetActions.length} accent="#f59e0b" href="/assets/actions" />
-        <QualityKpiCard title="File Coverage" value={`${fileCoveragePercent}%`} accent="#3A9B98" href="/assets" />
-        <QualityKpiCard title="Control Records" value={allControlItems} accent="#7c3aed" href="/assets/dashboard" />
+        <QualityKpiCard title="Total Assets" value={assets.length} accent="#63B1BC" href="/assets" />
+        <QualityKpiCard title="Due Risk Items" value={dueWatchCount} accent="#F93822" href="/assets/dashboard" />
+        <QualityKpiCard title="Overdue Controls" value={overdueDueItems} accent="#F93822" href="/assets/dashboard" />
+        <QualityKpiCard title="Open Asset Actions" value={openAssetActions.length} accent="#FFAD00" href="/assets/actions" />
+        <QualityKpiCard title="File Coverage" value={`${fileCoveragePercent}%`} accent="#005670" href="/assets" />
+        <QualityKpiCard title="Control Records" value={allControlItems} accent="#53565A" href="/assets/dashboard" />
       </section>
 
       <section className="asset-health-grid" style={healthGridStyle}>
@@ -825,19 +825,19 @@ function DashboardContent() {
 
         <SectionCard title="Due Date Control" subtitle="Calibration, inspection, and maintenance currency.">
           <div className="asset-metric-grid" style={metricGridStyle}>
-            <ControlMetric title="In Date" value={inDateControlItems} detail={`${inDatePercent}% of dated controls`} colour="#16a34a" />
-            <ControlMetric title="Due Soon" value={dueSoonItems} detail="within 30 days" colour="#f59e0b" />
-            <ControlMetric title="Overdue" value={overdueDueItems} detail="past due date" colour="#dc2626" />
+            <ControlMetric title="In Date" value={inDateControlItems} detail={`${inDatePercent}% of dated controls`} colour="#005670" />
+            <ControlMetric title="Due Soon" value={dueSoonItems} detail="within 30 days" colour="#FFAD00" />
+            <ControlMetric title="Overdue" value={overdueDueItems} detail="past due date" colour="#F93822" />
           </div>
           <BarList rows={coverageData} maxValue={100} percent />
         </SectionCard>
 
         <SectionCard title="Location Picture" subtitle="Where the asset base currently sits.">
-          <BarList rows={locationData.map((item) => ({ ...item, detail: `${item.percent}% of assets`, colour: "#3A9B98" }))} maxValue={assets.length || 1} />
+          <BarList rows={locationData.map((item) => ({ ...item, detail: `${item.percent}% of assets`, colour: "#005670" }))} maxValue={assets.length || 1} />
         </SectionCard>
 
         <SectionCard title="Ownership Mix" subtitle="Asset ownership or responsible area split.">
-          <BarList rows={ownerData.map((item) => ({ ...item, detail: `${item.percent}% of assets`, colour: "#2563eb" }))} maxValue={assets.length || 1} />
+          <BarList rows={ownerData.map((item) => ({ ...item, detail: `${item.percent}% of assets`, colour: "#63B1BC" }))} maxValue={assets.length || 1} />
         </SectionCard>
       </section>
 
@@ -1060,7 +1060,7 @@ function PressureList({
               <strong>{row.value}</strong>
             </div>
             <div style={pressureTrackStyle}>
-              <div style={{ ...pressureFillStyle, width: `${width}%`, background: row.colour || "#3A9B98" }} />
+              <div style={{ ...pressureFillStyle, width: `${width}%`, background: row.colour || "#005670" }} />
             </div>
             {row.detail ? <small style={pressureDetailStyle}>{row.detail}</small> : null}
           </>
@@ -1099,7 +1099,7 @@ function BarList({
               <strong style={barValueStyle}>{percent ? `${row.value}%` : row.value}</strong>
             </div>
             <div style={barTrackStyle}>
-              <div style={{ ...barFillStyle, width: `${width}%`, background: row.colour || "#3A9B98" }} />
+              <div style={{ ...barFillStyle, width: `${width}%`, background: row.colour || "#005670" }} />
             </div>
             {row.detail ? <small style={barDetailStyle}>{row.detail}</small> : null}
           </div>
@@ -1278,8 +1278,8 @@ const commandScorePanelStyle: CSSProperties = {
   gap: "14px",
   alignItems: "center",
   color: "#ffffff",
-  background: "linear-gradient(135deg, #3A9B98 0%, #1f6769 58%, #174b56 100%)",
-  boxShadow: "0 24px 44px rgba(58, 155, 152, 0.18)",
+  background: "linear-gradient(135deg, #005670 0%, #005670 58%, #63B1BC 160%)",
+  boxShadow: "0 24px 44px rgba(0, 86, 112, 0.18)",
 };
 
 const commandCopyStyle: CSSProperties = {
@@ -1306,7 +1306,7 @@ const commandTextStyle: CSSProperties = {
   margin: 0,
   fontSize: "13px",
   lineHeight: 1.55,
-  color: "#e2f5f4",
+  color: "#ECECE7",
 };
 
 const scoreOrbStyle: CSSProperties = {
@@ -1534,7 +1534,7 @@ const metricGridStyle: CSSProperties = {
 
 const controlMetricStyle: CSSProperties = {
   border: "1px solid #dbe7f3",
-  borderTop: "4px solid #3A9B98",
+  borderTop: "4px solid #005670",
   borderRadius: "12px",
   background: "#f8fafc",
   padding: "10px",
@@ -1677,7 +1677,7 @@ const statusSplitLayoutStyle: CSSProperties = {
 
 const statusHeroStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "linear-gradient(180deg, #f8fafc 0%, #eef8f7 100%)",
+  background: "linear-gradient(180deg, #f8fafc 0%, #ECECE7 100%)",
   border: "1px solid #dbe7f3",
   padding: "16px",
   display: "grid",
@@ -1819,7 +1819,7 @@ const sectionSubtitleStyle: CSSProperties = {
 };
 
 const panelLinkStyle: CSSProperties = {
-  color: "#3A9B98",
+  color: "#005670",
   fontWeight: 700,
   textDecoration: "none",
   whiteSpace: "nowrap",
