@@ -274,10 +274,18 @@ export default function HomePage() {
   const [pendingRequests, setPendingRequests] = useState<Array<{ id: string; first_name: string; last_name: string; email: string; department: string; requested_modules: string[]; submitted_at: string }>>([]);
   const [heroTilt, setHeroTilt] = useState({ x: 0, y: 0 });
   const [homeView, setHomeView] = useState<HomeView>("grid");
+  const [isMobileHome, setIsMobileHome] = useState(false);
   const [spotlightIndex, setSpotlightIndex] = useState(0);
   const [viewPreferenceLoaded, setViewPreferenceLoaded] = useState(false);
   const headerVideoRef = useRef<HTMLVideoElement>(null);
   const hubVideoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 720px)");
+    const update = () => setIsMobileHome(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   useEffect(() => { if (!permissions.loaded || !permissions.isMasterAdmin) return; void fetch("/api/admin-settings", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((json) => setPendingRequests((json?.accessRequests || []).filter((request: { status: string }) => request.status === "Pending"))).catch(() => undefined); }, [permissions.isMasterAdmin, permissions.loaded]);
   useEffect(() => {
     const savedView = window.localStorage.getItem("enshore-ims-home-view");
@@ -288,8 +296,9 @@ export default function HomePage() {
     if (!viewPreferenceLoaded) return;
     window.localStorage.setItem("enshore-ims-home-view", homeView);
   }, [homeView, viewPreferenceLoaded]);
+  const effectiveHomeView: HomeView = isMobileHome ? "list" : homeView;
   useEffect(() => {
-    if (homeView !== "hub") return;
+    if (effectiveHomeView !== "hub") return;
     const master = headerVideoRef.current;
     const follower = hubVideoRef.current;
     if (!master || !follower) return;
@@ -303,7 +312,7 @@ export default function HomePage() {
     synchronize();
     const timer = window.setInterval(synchronize, 400);
     return () => window.clearInterval(timer);
-  }, [homeView]);
+  }, [effectiveHomeView]);
   const isModuleAccessible = (moduleKey: (typeof moduleCards)[number]["moduleKey"]) => {
     if (!permissions.loaded) return true;
     if (moduleKey === "field-tools") {
@@ -350,7 +359,7 @@ export default function HomePage() {
   };
 
   return (
-    <main style={pageStyle}>
+    <main className="ims-home-page" style={pageStyle}>
       <style>
         {`
           @keyframes imsOrbitSpin {
@@ -614,9 +623,9 @@ export default function HomePage() {
           </div>
         </div>
 
-        {homeView === "grid" ? <div style={moduleGridStyle}>{moduleCards.map((card, index) => renderModuleCard(card, index))}</div> : null}
+        {effectiveHomeView === "grid" ? <div style={moduleGridStyle}>{moduleCards.map((card, index) => renderModuleCard(card, index))}</div> : null}
 
-        {homeView === "spotlight" ? (
+        {effectiveHomeView === "spotlight" ? (
           <div className="module-spotlight-view">
             <button type="button" className="spotlight-arrow" aria-label="Previous workspace" onClick={() => setSpotlightIndex((index) => (index - 1 + moduleCards.length) % moduleCards.length)}>‹</button>
             <div className="spotlight-stage">{renderModuleCard(moduleCards[spotlightIndex], spotlightIndex, "spotlight")}</div>
@@ -625,10 +634,10 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        {homeView === "compact" ? <div className="module-compact-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "compact"))}</div> : null}
-        {homeView === "list" ? <div className="module-list-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
-        {homeView === "columns" ? <div className="module-columns-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
-        {homeView === "hub" ? (
+        {effectiveHomeView === "compact" ? <div className="module-compact-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "compact"))}</div> : null}
+        {effectiveHomeView === "list" ? <div className="module-list-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
+        {effectiveHomeView === "columns" ? <div className="module-columns-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
+        {effectiveHomeView === "hub" ? (
           <div className="module-hub-view">
             <div className="hub-connection-ring" aria-hidden="true" />
             <div className="hub-video-core" aria-hidden="true">
