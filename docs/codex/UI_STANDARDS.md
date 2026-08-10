@@ -123,7 +123,7 @@ Workspace cards:
 
 Home views:
 
-- The supported selector options are Card grid, Spotlight, Compact tiles, List, Two columns, and IMS hub.
+- The desktop selector options are Card grid, Spotlight, Compact tiles, List, Two columns, and IMS hub. The selector is deliberately hidden on phones, which always use the simple workspace list.
 - Spotlight provides one large workspace card with previous/next controls.
 - IMS hub centres an enlarged official animation with compact workspace segments around it; at narrower widths it must become an animation-led grid rather than retaining an unusable orbit.
 - Every view must use the same permission checks and module destinations.
@@ -359,8 +359,8 @@ Register actions:
 
 Mobile:
 
-- On narrow/mobile operational flows, tables can become stacked cards when implemented, as in HSE inspections.
-- Mobile register cards should retain selected state with brand border.
+- Standard tables become labelled cards through `MobileTableEnhancer.tsx`; specialist flows such as HSE inspections may retain their purpose-built stacked cards.
+- Mobile register cards must retain selected state with a brand border and expose secondary fields through Expand/Collapse where applicable.
 
 ## Reports
 
@@ -539,6 +539,7 @@ Mobile behavior should be deliberate, not left to accidental wrapping.
 Standards:
 
 - The shared AppShell converts the desktop side rail to a compact bottom navigation at `720px` and below; do not add page-local competing mobile navigation.
+- `src/components/MobileTableEnhancer.tsx` is the default register-card mechanism. Do not recreate its behavior independently in each module.
 - Standard IMS tables are enhanced centrally into labelled mobile cards. Priority fields remain visible and secondary fields use the row-level `Expand` / `Collapse` control.
 - Tables that must retain horizontal scrolling can opt out with `data-mobile-table="scroll"`; use this only where card conversion would damage meaning.
 - Shared `ImsPanel` sections expose phone-only `Collapse` / `Expand` controls while remaining permanently expanded on desktop.
@@ -549,6 +550,16 @@ Standards:
 - Forms should become one column.
 - Tables should either scroll horizontally or transform into cards, depending on workflow importance.
 - Detail panels on mobile use tighter padding, often `12px`, and smaller radius, around `14px`.
+- Public and dedicated field routes may remove normal AppShell padding through an explicit modifier such as `ims-page-container--public`; never compensate for phone padding with desktop negative margins.
+- Public form cards should use the full available width without horizontal page overflow. Controls must use `width: 100%`, `max-width: 100%`, `min-width: 0`, `box-sizing: border-box`, and a `16px` phone font size.
+- Preserve desktop inline layout values above `720px`. Responsive corrections should be scoped to the shared phone breakpoint or a narrower route-specific breakpoint.
+
+Public HSE Observation Card:
+
+- `/observe` is the public QR destination and has no standard AppShell header, side rail, bottom navigation, or authentication requirement.
+- At `520px` and below, the page uses edge-aligned public-container padding, compact `12px` page padding, `14px` card padding, and no negative margins.
+- Reporter choices use two equal columns; the final odd `Quick Fill` choice spans both columns.
+- Observation inputs, selects, textareas, and evidence upload remain within the card width. The Enshore and 3Rs logos retain their aspect ratios and the heading may wrap.
 
 Mobile HSE inspection behavior is the current best benchmark for complex field workflows:
 

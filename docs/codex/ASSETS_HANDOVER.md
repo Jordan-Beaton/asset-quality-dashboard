@@ -34,7 +34,7 @@ Asset Management exists but its UI layout has lagged behind Quality and HSE. Fut
 - Asset Calibration Dashboard compliance figures now count `In Use` items only. `Not In Use`, `Damaged`, `Missing / Lost`, and `Historic` records are excluded from due-risk, in-date, certificate coverage, due-window, supplier-mix, and missing-certificate figures, while the Availability / Exclusions panel shows the audit story for excluded items.
 - Asset Calibration dashboard exclusion bars and KPI cards drill into the filtered register.
 - Calibration item status, supplier references, and lifecycle history require the Supabase SQL in `scripts/sql/asset_calibration_item_status.sql`; run it before relying on the deployed status controls.
-- Asset Inspection and Maintenance registers now use compact HSE Observation-style table layouts with shared IMS filter panels, quick search, filtered counts, smaller Show/Hide Filters controls, and row-click detail behavior.
+- Asset Inspection and Maintenance registers use compact HSE Observation-style layouts, while all standard Asset tables also inherit the shared `MobileTableEnhancer` labelled-card and row Expand/Collapse behavior at phone widths. Shared filter panels, quick search, filtered counts, row-click detail behavior, and central Action links remain intact.
 - Asset Register, Calibration Register, Asset Actions, Asset People, and Asset Reports saved-report registers now use shared IMS register/filter/table primitives aligned to Quality/HSE patterns.
 - Asset Maintenance debug console output was removed from the save flow.
 - Asset Dashboard/Register, Calibration, Inspection, Maintenance, Asset Actions, Asset People, and Asset Reports now have page-level permission guards around key create/edit/delete/upload/action-generation mutation handlers, supplementing the AppShell click/submit guards.
@@ -56,7 +56,7 @@ Asset Management exists but its UI layout has lagged behind Quality and HSE. Fut
 
 1. Verify Asset Dashboard, Register, Calibration item status/exclusion behavior, supplier dropdown persistence, lifecycle history, register export, Inspection, Maintenance, and Reports on Vercel with real data.
 2. Verify linked Asset Inspection/Maintenance/Calibration action creation on Vercel with real records, including source fields and return/search behavior in central Action Management.
-3. Review mobile Asset Inspection and Maintenance registers on device/browser after the table conversion, especially horizontal scroll, filter search, and detail-panel scroll.
+3. Review Asset registers on a physical phone using the shared mobile QA matrix: card labels, Expand/Collapse, filter search, row-to-detail scroll, uploads and action links. Use horizontal scrolling only for explicitly opted-out tables.
 4. Continue low-risk migration of remaining local Asset panel/button styles toward shared primitives.
 5. Run a role-based Vercel spot check for Asset create/edit/read-only users after the local button-state alignment and real-data workflow QA.
 

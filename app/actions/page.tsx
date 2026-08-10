@@ -1357,7 +1357,7 @@ function ActionsPageContent() {
         : current.source || "Manual";
       const nextDepartment =
         prefillDepartment ||
-        (nextSource === "AINM" || nextSource === "HSE Inspection" || nextSource === "HSE" ? "HSE" : "") ||
+        (nextSource === "HSE Inspection" || nextSource === "HSE" ? "HSE" : "") ||
         (nextSource === "Observation" ? "HSE" : "") ||
         (nextSource === "Audit Finding" || nextSource === "NCR/CAPA" || nextSource === "MOC" ? "Quality" : "") ||
         (isAssetLinkedSource(nextSource) ? "Assets" : current.department);

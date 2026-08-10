@@ -16,6 +16,8 @@ In Progress. The Wadden Sea workspace is implemented and live, with production w
 
 The workspace follows the Quality Management visual structure: hero, top meta/status row, tabs, KPI cards, panels, filters, and compact registers.
 
+At phone widths the workspace inherits the whole-IMS bottom navigation, one-column grids/forms, collapsible panels, and automatic labelled register cards with expandable secondary fields. Keep project-specific desktop layouts unchanged and use `data-mobile-table="scroll"` only when a card representation would lose ITP/NOI meaning.
+
 ## Supplier ITP Programme
 
 - Stores physical current-revision documents in the `project-documents` Supabase bucket.
@@ -74,7 +76,7 @@ The workspace follows the Quality Management visual structure: hero, top meta/st
 3. Create a multi-point NOI, verify its planned dates in the tracker, and compare Word/PDF output.
 4. Reopen the NOI from the tracker in a separate authenticated session, edit it, and confirm stored files are replaced.
 5. Delete the latest trial NOI and confirm linked points return to Planned and the next number recalculates correctly.
-6. Verify dashboard and Creator layouts on mobile.
+6. Verify the Dashboard, ITP/NOI registers, NOI Creator and Project Reports against `MOBILE_COMPATIBILITY_HANDOVER.md`, including card expansion, document controls, date inputs and generated-output actions.
 7. Verify Open Points create/edit, People dropdowns, Add New Phase history, NCR linking, evidence, cumulative filters and all three register outputs.
 
 ## Guardrails

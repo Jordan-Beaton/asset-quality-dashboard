@@ -22,6 +22,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - HSE AINM supports internal/external distinction, dashboard/register/create/import/report flows, generated report history, and central Action links.
 - HSE inspections have a mobile-friendly flow, QR flow, item evidence upload, and multiple inspection forms staged/completed.
 - Public HSE observation route `/observe` exists without login and links observations to Action Management.
+- The public HSE Observation Card now has an explicit phone layout: full-width public container, corrected page margins, compact header/cards, two-column reporter choices, full-width form controls, and no horizontal overflow at the tested `390px` viewport. Desktop behavior remains unchanged.
 - Quality/HSE module-specific actions feed central Action Management.
 - Document Control is established as a central hub with asset-specific numbering support and document workflow foundations.
 - Admin/Settings is simplified to Users & Access, Reference Data, and Audit Log.
@@ -70,12 +71,12 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Admin permission-registry production QA: verify legacy fallback, explicit Full/Part/None saves, new-user defaults, and route denial for Lessons Learned and each Project Management area.
 - Access-request production QA after applying the latest `admin_settings.sql`: public validation, duplicate prevention, Home notification, view-only permission preparation, approval/rejection status, audit history and invite/setup-link fallback.
 - Report page migration from local style constants toward shared IMS primitives.
-- Production/device QA of the shared whole-IMS mobile card, panel, bottom-navigation, upload, and form behavior across representative permissions and real data.
+- Production/device QA of the shared whole-IMS mobile card, panel, bottom-navigation, upload, and form behavior across the device and module matrix in `MOBILE_COMPATIBILITY_HANDOVER.md`.
 - Risk Management shell and workflows.
 - Project Management production QA for saved NOI reopen/edit/delete, controlled document storage, sequential numbering, planned-date synchronisation, and mobile responsiveness.
 - Lessons Learned production QA for the 2,990-row import, uncapped KPI totals, cumulative filters, controlled dropdowns and repeat-record drill-downs.
 - Open Points production QA and confirmation that `scripts/sql/project_open_points.sql` has been applied to the live Supabase project.
-- IMS Home production/browser QA for synchronized video playback, persisted view preference, all six layouts, permission-restricted cards, and responsive IMS hub fallback.
+- IMS Home production/browser QA for synchronized video playback, persisted desktop preference, all six desktop layouts, permission-restricted cards, and the fixed phone workspace list.
 
 # Known Issues
 
@@ -89,7 +90,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - `NEXT_PUBLIC_SITE_URL` should ideally be set to deployed site URL.
 - AINM type dropdown should default to grey `Select Type`, not `Incident Report`.
 - AINM register needs Show Filters pattern, Classification display, Accident/Incident filter, and direct scroll to detail panel.
-- HSE Observation public/mobile submit flow still needs Vercel verification with real submission data after the submit-state hardening.
+- HSE Observation phone layout is locally verified at `390px` with no overflow; the public submit, evidence upload, saved register record, and Action linkage still need Vercel verification with real data.
 - HSE Reports and inspection PDFs need Vercel verification with real saved reports, longer checklist forms, and evidence photos after the latest local parity/formatting pass.
 - PTW exists but is parked/work in progress.
 - Asset Management is closer to Quality/HSE after dashboard drill-down, calibration item availability/status controls, dashboard exclusion logic, top meta/status, reports filtering cleanup, Inspection/Maintenance register compaction, and page-level permission guards, but still needs Vercel workflow QA, mobile register review, and role-based spot checks.
@@ -109,17 +110,17 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 6. Verify Asset Management on Vercel with real data: Dashboard drill-downs, Register detail scroll, Calibration item status/exclusion behavior, lifecycle history, supplier dropdown persistence, register export, compact Inspection/Maintenance registers, Reports, uploads, PDFs, central Action links, and role-based permission behavior.
 7. Verify HSE Reports on Vercel after the Quality-parity pass: saved reports behavior, year filters, snapshot-period editing, permissions, and executive summary in PDFs.
 8. Polish AINM register behavior: Show Filters, Classification column, Accident/Incident filter, Select Type default, and detail-panel scroll.
-9. Verify HSE Observation public/mobile submit flow and register linkage to Action Management.
+9. Verify the corrected HSE Observation Card on a physical phone: public submission, evidence upload, saved register record, and linkage to Action Management.
 10. Align old local style blocks with shared IMS primitives when touching each page.
 11. Review Risk Management pages for route completeness, visual consistency, and demo readiness.
 12. Verify Lessons Learned and the complete Wadden Sea workflow on Vercel, including Open Points database migration, phase history, NCR linking, evidence and register outputs.
-13. Verify IMS Home on desktop and mobile with representative permission profiles, including video synchronization and restoration of the last selected view after closing and reopening the browser.
+13. Verify IMS Home with representative permission profiles: all six layouts and persisted preference on desktop, plus the fixed simple workspace list with no selector on mobile.
 
 # Future Enhancements
 
 - PowerPoint export pack for leadership from Quality, HSE, Document Control, and Management Review.
 - More CEO-facing Management Review story views and drill-down packs.
-- Broader mobile/card register patterns across modules, based on HSE inspections.
+- Progressive specialist mobile workflows where the shared register-card foundation is insufficient, using HSE inspections as the field-work benchmark.
 - Further dashboard story panels for Assets, Risk, Actions, and Documents.
 - More consistent PDF/Word header/footer templates across all generated outputs.
 - Stronger linked-record chips across Actions, AINM, Observations, NCR, MOC, Audits, Assets, and Risk.
@@ -157,10 +158,10 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 ## HSE Management
 
 - Status: In Progress
-- Summary: HSE has broad coverage: Dashboard, AINM, Inspections, Observations, PTW, Actions, Calendar, and Reports. HSE inspections are the strongest mobile/field benchmark. HSE Actions, HSE Reports, AINM, Observations, and Inspections now have direct write permission guards. HSE Reports has been brought closer to Quality Reports, and inspection PDFs have a consistent header/footer/table margin pass. AINM register/filter polish appears implemented but still needs Vercel verification; PTW is parked.
+- Summary: HSE has broad coverage: Dashboard, AINM, Inspections, Observations, PTW, Actions, Calendar, and Reports. HSE inspections are the strongest mobile/field benchmark. The public Observation Card now has a dedicated overflow-free phone layout with compact two-column reporter selection and full-width controls. HSE Actions, HSE Reports, AINM, Observations, and Inspections have direct write permission guards. HSE Reports has been brought closer to Quality Reports, and inspection PDFs have a consistent header/footer/table margin pass. AINM register/filter polish appears implemented but still needs Vercel verification; PTW is parked.
 - Outstanding Actions:
   - Verify AINM register filters, Classification column, Accident/Incident filter, Select Type placeholder, detail-panel scroll, and create/edit/read-only behavior on Vercel.
-  - Verify Observation submit state and action linkage on Vercel after the submit-state and permission hardening pass.
+  - Verify the corrected Observation Card layout, submit state, evidence upload, register creation and action linkage on Vercel and a physical phone.
   - Verify HSE Reports on Vercel with real saved reports, year filtering, snapshot-period editing, PDF output, and create/edit/read-only behavior.
   - Verify HSE Actions/Reports, AINM, Observations, and Inspections create/edit/read-only behavior on Vercel after the permission hardening pass.
   - Verify HSE inspection PDFs on Vercel with longer forms and evidence photos after the local header/footer/table-margin pass.

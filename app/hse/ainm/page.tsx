@@ -124,12 +124,22 @@ type CentralAction = {
   id: string;
   action_number: string | null;
   title: string | null;
+  description: string | null;
   owner: string | null;
   status: string | null;
   priority: string | null;
   due_date: string | null;
   linked_ainm_id?: string | null;
   linked_ainm_number?: string | null;
+};
+
+type InlineActionDraft = {
+  title: string;
+  description: string;
+  department: string;
+  owner: string;
+  priority: string;
+  due_date: string;
 };
 
 type AINMEvidence = {
@@ -353,6 +363,33 @@ const emptyExternalRecord: ExternalAINMRecord = {
   updated_at: "",
 };
 
+const emptyInlineAction: InlineActionDraft = {
+  title: "",
+  description: "",
+  department: "",
+  owner: "",
+  priority: "Medium",
+  due_date: "",
+};
+
+const actionDepartmentOptions = [
+  "Assets",
+  "Commercial",
+  "Crewing",
+  "Engineering",
+  "Finance",
+  "Human Resources",
+  "Logistics",
+  "Marketing",
+  "Operations",
+  "Procurement",
+  "Project",
+  "Quality",
+  "Survey",
+  "HSE",
+  "HSEQ",
+] as const;
+
 function clean(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -382,6 +419,28 @@ function correctiveActionRowsFromText(value: unknown) {
 
 function correctiveActionRowsToText(rows: string[]) {
   return rows.map((row) => row.trim()).filter(Boolean).join("\n");
+}
+
+function attachmentIsSelected(values: string[], option: string) {
+  return option === "Other"
+    ? values.some((value) => value === "Other" || value.startsWith("Other: "))
+    : values.includes(option);
+}
+
+function attachmentOtherText(values: string[]) {
+  const saved = values.find((value) => value.startsWith("Other: "));
+  return saved ? saved.slice("Other: ".length) : "";
+}
+
+function nextActionNumber(actions: CentralAction[]) {
+  const used = new Set(
+    actions
+      .map((action) => Number.parseInt(action.action_number?.match(/(\d+)/)?.[1] || "", 10))
+      .filter((value) => Number.isFinite(value) && value > 0)
+  );
+  let next = 1;
+  while (used.has(next)) next += 1;
+  return `ACT-${String(next).padStart(3, "0")}`;
 }
 
 function normaliseTeamMembers(value: unknown): InvestigationTeamMember[] {
@@ -509,25 +568,10 @@ function getStageTone(status: string) {
   return { bg: "#e2e8f0", color: "#475569" };
 }
 
-function buildActionHref(record: AINMRecord, action?: AINMAction) {
-  const title = action?.action
-    ? `${record.ainm_number} - ${action.action.slice(0, 80)}`
-    : `${record.ainm_number} - ${record.title}`;
-  const description = [
-    `AINM: ${record.ainm_number} - ${record.title}`,
-    record.project ? `Project: ${record.project}` : "",
-    record.event_date ? `Event date: ${displayDate(record.event_date)}` : "",
-    record.brief_event_details ? `Event details:\n${record.brief_event_details}` : "",
-    action?.action ? `Tracker action:\n${action.action}` : "",
-    record.initial_cause ? `Initial cause:\n${record.initial_cause}` : "",
-  ].filter(Boolean).join("\n\n");
+function buildActionHref(record: AINMRecord) {
   const params = new URLSearchParams({
     prefill_source: "AINM",
-    prefill_department: "HSEQ",
     prefill_project: record.project || "",
-    prefill_title: title,
-    prefill_description: description,
-    prefill_owner: action?.assigned || record.owner || "",
     linked_ainm_id: record.id,
     linked_ainm_number: record.ainm_number,
   });
@@ -618,6 +662,8 @@ export default function HseAinmPage() {
   const [showAddReviewer, setShowAddReviewer] = useState(false);
   const [newReviewerName, setNewReviewerName] = useState("");
   const [newReviewerRole, setNewReviewerRole] = useState("");
+  const [inlineAction, setInlineAction] = useState<InlineActionDraft>(emptyInlineAction);
+  const [savingInlineAction, setSavingInlineAction] = useState(false);
   const [refreshStamp, setRefreshStamp] = useState("");
 
   const canCreateAinm = useMemo(() => {
@@ -1066,7 +1112,7 @@ export default function HseAinmPage() {
     }));
     setRecords(nextRecords);
     setActions((actionRes.data || []) as AINMAction[]);
-    setCentralActions(((centralActionRes.data || []) as CentralAction[]).filter((action) => action.linked_ainm_id || action.linked_ainm_number));
+    setCentralActions((centralActionRes.data || []) as CentralAction[]);
     setEvidence((evidenceRes.data || []) as AINMEvidence[]);
     setGeneratedDocuments((generatedRes.data || []) as AINMGeneratedDocument[]);
     const nextExternalRecords = externalRecordRes.error ? [] : ((externalRecordRes.data || []) as ExternalAINMRecord[]);
@@ -1098,10 +1144,62 @@ export default function HseAinmPage() {
   function toggleAttachment(value: string) {
     setDraft((current) => {
       const existing = new Set(current.attachments_checklist || []);
-      if (existing.has(value)) existing.delete(value);
+      if (value === "Other") {
+        const otherValues = [...existing].filter((item) => item === "Other" || item.startsWith("Other: "));
+        if (otherValues.length) otherValues.forEach((item) => existing.delete(item));
+        else existing.add("Other");
+      } else if (existing.has(value)) existing.delete(value);
       else existing.add(value);
       return { ...current, attachments_checklist: [...existing] };
     });
+  }
+
+  function updateAttachmentOtherText(value: string) {
+    setDraft((current) => ({
+      ...current,
+      attachments_checklist: [
+        ...(current.attachments_checklist || []).filter((item) => item !== "Other" && !item.startsWith("Other: ")),
+        value.trim() ? `Other: ${value}` : "Other",
+      ],
+    }));
+  }
+
+  async function createInlineCentralAction() {
+    if (!selectedId || !requireEditPermission("Creating linked AINM actions")) return;
+    if (!inlineAction.title.trim()) {
+      setMessage("Action title is required before adding a corrective action.");
+      return;
+    }
+    if (!inlineAction.department) {
+      setMessage("Select a department before adding a corrective action.");
+      return;
+    }
+
+    setSavingInlineAction(true);
+    const { error } = await supabase.from("actions").insert([{
+      action_number: nextActionNumber(centralActions),
+      title: inlineAction.title.trim(),
+      description: inlineAction.description.trim() || null,
+      department: inlineAction.department,
+      project: draft.project || null,
+      owner: inlineAction.owner.trim() || null,
+      priority: inlineAction.priority,
+      status: "Open",
+      due_date: inlineAction.due_date || null,
+      source: "AINM",
+      linked_ainm_id: selectedId,
+      linked_ainm_number: draft.ainm_number,
+    }]);
+    setSavingInlineAction(false);
+
+    if (error) {
+      setMessage(`Add corrective action failed: ${error.message}`);
+      return;
+    }
+
+    setInlineAction(emptyInlineAction);
+    setMessage(`Added a corrective action to ${draft.ainm_number}.`);
+    await loadData();
   }
 
   function updateCorrectiveActionRow(index: number, value: string) {
@@ -1902,13 +2000,15 @@ export default function HseAinmPage() {
   }
 
   function part1AttachmentRows(record: AINMRecord) {
-    const selected = new Set(record.attachments_checklist || []);
+    const selected = record.attachments_checklist || [];
     const rows: string[][] = [];
     const options = attachmentChecklistOptions.filter(Boolean);
     for (let index = 0; index < options.length; index += 3) {
       const items = [options[index], options[index + 1], options[index + 2]];
-      rows.push(items.flatMap((item) => (item ? [item, checkbox(selected.has(item))] : ["", ""])));
+      rows.push(items.flatMap((item) => (item ? [item, checkbox(attachmentIsSelected(selected, item))] : ["", ""])));
     }
+    const otherText = attachmentOtherText(selected);
+    if (otherText) rows.push(["Other details", otherText, "", "", "", ""]);
     return rows;
   }
 
@@ -1968,7 +2068,7 @@ export default function HseAinmPage() {
 
   function immediateActionTable(record: AINMRecord) {
     return wordBodyTable(
-      ["Action No.", "Immediate Corrective Action"],
+      ["Action No.", "Immediate Containment Action"],
       immediateActionRows(record),
       [900, 8460],
       [0],
@@ -1999,16 +2099,29 @@ export default function HseAinmPage() {
     return wordBodyTable(["", ""], rows, [4680, 4680], [], { repeatHeader: false, padEmptyRows: false });
   }
 
+  function part2RecommendationRows() {
+    const trackerRows = selectedActions.map((action, index) => [
+      action.tracker_no || String(index + 1),
+      action.action || "",
+      action.comments || "",
+      action.assigned || "",
+      displayDate(action.date_raised),
+    ]);
+    const centralRows = selectedCentralActions.map((action, index) => [
+      action.action_number || String(trackerRows.length + index + 1),
+      action.title || "",
+      action.description || "",
+      action.owner || "",
+      displayDate(action.due_date),
+    ]);
+    return [...trackerRows, ...centralRows];
+  }
+
   function part2RecommendationsTable() {
     return wordBodyTable(
-      ["No.", "Action Required", "Accountable Person (include position)", "Target Date"],
-      selectedActions.map((action, index) => [
-        action.tracker_no || String(index + 1),
-        action.action || "",
-        action.assigned || "",
-        displayDate(action.date_raised),
-      ]),
-      [650, 4050, 3300, 1360],
+      ["No.", "Action Title", "Description", "Accountable Person (include position)", "Target Date"],
+      part2RecommendationRows(),
+      [650, 2100, 2550, 2700, 1360],
       [0],
       { padEmptyRows: false }
     );
@@ -2221,7 +2334,7 @@ export default function HseAinmPage() {
             ["Quantity", record.environmental_release_quantity || ""],
           ], [2600, 6760], [0]),
           wordSpacer(),
-          wordSectionHeader("Immediate corrective actions implemented: (steps taken to make condition(s) safe)"),
+          wordSectionHeader("Immediate containment actions implemented: (steps taken to make condition(s) safe)"),
           immediateActionTable(record),
           wordSpacer(),
           wordSectionHeader("Event investigation and root cause analysis"),
@@ -2362,6 +2475,17 @@ export default function HseAinmPage() {
     return y + 11;
   }
 
+  function pdfSubsection(doc: jsPDF, title: string, y: number) {
+    doc.setFillColor(236, 236, 231);
+    doc.setDrawColor(208, 208, 206);
+    doc.roundedRect(12, y, 186, 7, 1.2, 1.2, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 86, 112);
+    doc.text(title, 15, y + 4.8);
+    return y + 9;
+  }
+
   function pdfTable(doc: jsPDF, y: number, head: string[][], body: string[][], columnStyles?: Record<number, { cellWidth?: number; halign?: "left" | "center" | "right" }>) {
     autoTable(doc, {
       startY: y,
@@ -2398,6 +2522,14 @@ export default function HseAinmPage() {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       pdfHeader(doc, "AINM Complete Report Pack", record, logoData);
       let y = 38;
+      const addSubheading = (title: string) => {
+        if (y > 260) {
+          doc.addPage();
+          pdfHeader(doc, "AINM Complete Report Pack", record, logoData);
+          y = 38;
+        }
+        y = pdfSubsection(doc, title, y);
+      };
 
       y = pdfSection(doc, "AINM Summary", y);
       y = pdfTable(doc, y, [["Field", "Details", "Field", "Details"]], [
@@ -2418,12 +2550,15 @@ export default function HseAinmPage() {
       ], { 0: { cellWidth: 48 } });
 
       y = pdfSection(doc, "Part 1 Report", y);
+      addSubheading("Event and Environmental Details");
       y = pdfTable(doc, y, [["Field", "Details"]], [
         ["Company in Control", record.company_in_control || ""],
         ["Environmental release type", record.environmental_release_type || ""],
         ["Environmental release quantity", record.environmental_release_quantity || ""],
       ], { 0: { cellWidth: 52 } });
-      y = pdfTable(doc, y, [["Action No.", "Immediate Corrective Action"]], immediateActionRows(record), { 0: { cellWidth: 24, halign: "center" } });
+      addSubheading("Immediate Containment Actions Implemented");
+      y = pdfTable(doc, y, [["Action No.", "Immediate Containment Action"]], immediateActionRows(record), { 0: { cellWidth: 24, halign: "center" } });
+      addSubheading("Event Investigation and Root Cause Analysis");
       y = pdfTable(doc, y, [["Root Cause Area", "Details"]], [
         ["People", record.root_cause_people || ""],
         ["Equipment", record.root_cause_equipment || ""],
@@ -2438,26 +2573,33 @@ export default function HseAinmPage() {
       }
 
       y = pdfSection(doc, "Part 2 Investigation", y);
+      addSubheading("Investigation Team Members");
       y = pdfTable(doc, y, [["Name", "Company", "Position", "Investigation Role"]], normaliseTeamMembers(record.investigation_team_members).map((row) => [row.name, row.company, row.position, row.role]));
+      addSubheading("Investigation Findings");
       y = pdfTable(doc, y, [["Investigation Finding", "Details"]], [
         ["People", record.investigation_findings_people || record.root_cause_people || ""],
         ["Equipment", record.investigation_findings_equipment || record.root_cause_equipment || ""],
         ["Environment/Conditions", record.investigation_findings_environment || record.root_cause_environment || ""],
         ["Process", record.investigation_findings_process || record.root_cause_process || ""],
       ], { 0: { cellWidth: 50 } });
+      addSubheading("Reference Documentation Used as Part of the Investigation");
       y = pdfTable(doc, y, [["No.", "Reference Document"]], splitLines(record.reference_documents).map((line, index) => [String(index + 1), line]), { 0: { cellWidth: 18, halign: "center" } });
-      y = pdfTable(doc, y, [["No.", "Action Required", "Accountable Person", "Target Date"]], selectedActions.map((action, index) => [
-        action.tracker_no || String(index + 1),
-        action.action || "",
-        action.assigned || "",
-        displayDate(action.date_raised),
-      ]), { 0: { cellWidth: 16, halign: "center" }, 3: { cellWidth: 26 } });
+      addSubheading("Corrective Actions / Recommendations");
+      y = pdfTable(doc, y, [["No.", "Action Title", "Description", "Accountable Person", "Target Date"]], part2RecommendationRows(), {
+        0: { cellWidth: 14, halign: "center" },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 58 },
+        3: { cellWidth: 46 },
+        4: { cellWidth: 26 },
+      });
+      addSubheading("Investigation Review and Sign-Off");
       y = pdfTable(doc, y, [["Role", "Name", "Position", "Date"]], [
         ["Location/Senior Representative", record.signoff_location_name || "", record.signoff_location_position || "", displayDate(record.signoff_location_date)],
         ["HSEQ Representative", record.signoff_hseq_name || "", record.signoff_hseq_position || "", displayDate(record.signoff_hseq_date)],
         ["Work/Project Manager", record.signoff_project_manager_name || "", record.signoff_project_manager_position || "", displayDate(record.signoff_project_manager_date)],
         ["Senior Management Team Representative", record.signoff_smt_name || "", record.signoff_smt_position || "", displayDate(record.signoff_smt_date)],
       ], { 0: { cellWidth: 54 }, 3: { cellWidth: 28 } });
+      addSubheading("Further Comments");
       y = pdfTable(doc, y, [["Further Comments"]], [[record.part2_further_comments || ""]]);
 
       if (y > 225) {
@@ -2528,6 +2670,92 @@ export default function HseAinmPage() {
     } finally {
       setGeneratingStage("");
     }
+  }
+
+  function renderInlineActionPanel() {
+    return (
+      <div style={inlineActionPanelStyle}>
+        <div>
+          <h3 style={inlineSectionTitleStyle}>Corrective Actions / Recommendations</h3>
+          <p style={bodyTextStyle}>Add an Action Management record here without leaving the AINM. Linked actions are included in the Part 2 and compiled reports.</p>
+        </div>
+        <div style={formGridStyle}>
+          <Field label="Action Title">
+            <input
+              style={inputStyle}
+              value={inlineAction.title}
+              onChange={(event) => setInlineAction((current) => ({ ...current, title: event.target.value }))}
+              placeholder="Describe the corrective action"
+            />
+          </Field>
+          <Field label="Department">
+            <select
+              style={inputStyle}
+              value={inlineAction.department}
+              onChange={(event) => setInlineAction((current) => ({ ...current, department: event.target.value }))}
+            >
+              <option value="">Select department</option>
+              {actionDepartmentOptions.map((department) => <option key={department} value={department}>{department}</option>)}
+            </select>
+          </Field>
+          <Field label="Accountable Person">
+            <select
+              style={inputStyle}
+              value={inlineAction.owner}
+              onChange={(event) => setInlineAction((current) => ({ ...current, owner: event.target.value }))}
+            >
+              <option value="">Select owner</option>
+              {peopleOptions.map((person) => <option key={person.id} value={person.name}>{person.name}</option>)}
+            </select>
+          </Field>
+          <TextAreaField
+            label="Description / Completion Requirements"
+            value={inlineAction.description}
+            onChange={(value) => setInlineAction((current) => ({ ...current, description: value }))}
+          />
+          <div style={formGridStyle}>
+            <Field label="Priority">
+              <select
+                style={inputStyle}
+                value={inlineAction.priority}
+                onChange={(event) => setInlineAction((current) => ({ ...current, priority: event.target.value }))}
+              >
+                {['Low', 'Medium', 'High', 'Critical'].map((priority) => <option key={priority}>{priority}</option>)}
+              </select>
+            </Field>
+            <Field label="Target Date">
+              <input
+                type="date"
+                style={inputStyle}
+                value={inlineAction.due_date}
+                onChange={(event) => setInlineAction((current) => ({ ...current, due_date: event.target.value }))}
+              />
+            </Field>
+          </div>
+        </div>
+        <div style={inlineActionButtonRowStyle}>
+          <button type="button" style={compactPrimaryButtonStyle} onClick={() => void createInlineCentralAction()} disabled={savingInlineAction || !canEditAinm}>
+            {savingInlineAction ? "Adding Action..." : "Add Corrective Action"}
+          </button>
+          <Link href={buildActionHref(draft)} style={compactPrimaryLinkStyle}>Open Full Action Form</Link>
+        </div>
+        <div style={compactLinkedActionListStyle}>
+          {selectedCentralActions.map((action) => (
+            <div key={action.id} style={compactLinkedActionCardStyle}>
+              <div style={compactLinkedActionInfoStyle}>
+                <strong>{action.action_number || "Action"} - {action.title || "Untitled action"}</strong>
+                <span style={compactLinkedActionMetaStyle}>{action.owner || "Unassigned"} | Due {displayDate(action.due_date)} | Priority {action.priority || "Not set"}</span>
+              </div>
+              <div style={compactLinkedActionControlsStyle}>
+                <StatusPill status={action.status || "Open"} />
+                <Link href={`/actions?actionId=${encodeURIComponent(action.id)}`} style={compactActionLinkStyle}>Open</Link>
+              </div>
+            </div>
+          ))}
+          {!selectedCentralActions.length ? <div style={emptyBoxStyle}>No corrective actions linked to this AINM yet.</div> : null}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -3135,12 +3363,12 @@ export default function HseAinmPage() {
                     <Field label="Environmental Release Type"><input style={inputStyle} value={draft.environmental_release_type || ""} onChange={(e) => updateDraft("environmental_release_type", e.target.value)} /></Field>
                     <Field label="Environmental Release Quantity"><input style={inputStyle} value={draft.environmental_release_quantity || ""} onChange={(e) => updateDraft("environmental_release_quantity", e.target.value)} /></Field>
                     <div style={{ gridColumn: "1 / -1" }}>
-                      <h3 style={inlineSectionTitleStyle}>Immediate corrective actions implemented: (steps taken to make condition(s) safe)</h3>
+                      <h3 style={inlineSectionTitleStyle}>Immediate containment actions implemented: (steps taken to make condition(s) safe)</h3>
                     </div>
                     <div style={{ gridColumn: "1 / -1" }}>
                       <div style={correctiveActionsTableStyle}>
                         <div style={correctiveHeaderCellStyle}>Action No.</div>
-                        <div style={correctiveHeaderCellStyle}>Immediate Corrective Action</div>
+                        <div style={correctiveHeaderCellStyle}>Immediate Containment Action</div>
                         <div style={correctiveHeaderCellStyle}>Remove</div>
                         {correctiveActionRows.map((action, index) => (
                           <React.Fragment key={`corrective-${index}`}>
@@ -3161,6 +3389,7 @@ export default function HseAinmPage() {
                         <button type="button" style={secondaryButtonStyle} onClick={addCorrectiveActionRow} disabled={!canEditAinm}>Add Row</button>
                       </div>
                     </div>
+                    <div style={{ gridColumn: "1 / -1" }}>{renderInlineActionPanel()}</div>
                     <div style={{ gridColumn: "1 / -1" }}>
                       <h3 style={inlineSectionTitleStyle}>Event investigation and root cause analysis</h3>
                     </div>
@@ -3175,11 +3404,23 @@ export default function HseAinmPage() {
                   <div style={checkGridStyle}>
                     {attachmentChecklistOptions.map((item) => (
                       <label key={item} style={checkItemStyle}>
-                        <input type="checkbox" checked={(draft.attachments_checklist || []).includes(item)} onChange={() => toggleAttachment(item)} />
+                        <input type="checkbox" checked={attachmentIsSelected(draft.attachments_checklist || [], item)} onChange={() => toggleAttachment(item)} />
                         <span>{item}</span>
                       </label>
                     ))}
                   </div>
+                  {attachmentIsSelected(draft.attachments_checklist || [], "Other") ? (
+                    <div style={{ marginTop: 12 }}>
+                      <Field label="Other attachment / information details">
+                        <input
+                          style={inputStyle}
+                          value={attachmentOtherText(draft.attachments_checklist || [])}
+                          onChange={(event) => updateAttachmentOtherText(event.target.value)}
+                          placeholder="Describe the other information or attachment"
+                        />
+                      </Field>
+                    </div>
+                  ) : null}
                   <div style={formGridStyle}>
                     <TextAreaField label="Additional Comments" value={draft.part1_additional_comments || ""} onChange={(value) => updateDraft("part1_additional_comments", value)} />
                     <Field label="Reviewed / Accepted By">
@@ -3313,8 +3554,7 @@ export default function HseAinmPage() {
                       </div>
                     </div>
                     <div style={{ gridColumn: "1 / -1" }}>
-                      <h3 style={inlineSectionTitleStyle}>Corrective Actions/Recommendations</h3>
-                      <p style={bodyTextStyle}>Use the Actions tab to add tracker actions or create central Action Management records. These rows appear in the Part 2 report.</p>
+                      {renderInlineActionPanel()}
                     </div>
                     <TextAreaField label="Further comments" value={draft.part2_further_comments || ""} onChange={(value) => updateDraft("part2_further_comments", value)} />
                     <div style={{ gridColumn: "1 / -1" }}>
@@ -3396,42 +3636,43 @@ export default function HseAinmPage() {
 
               {detailTab === "actions" ? (
                 <DetailSection>
-                  <div style={buttonRowStyle}>
-                    <Link href={buildActionHref(draft)} style={linkButtonStyle}>Create Central Action</Link>
+                  <div style={compactActionsTabToolbarStyle}>
+                    <Link href={buildActionHref(draft)} style={compactPrimaryLinkStyle}>Create Central Action</Link>
                   </div>
 
-                  <div style={{ marginTop: 16 }}>
+                  <div style={{ marginTop: 10 }}>
                     <h3 style={inlineSectionTitleStyle}>Linked Central Actions</h3>
                   </div>
-                  <div style={actionGridStyle}>
+                  <div style={compactLinkedActionListStyle}>
                     {selectedCentralActions.map((action) => (
-                      <div key={action.id} style={actionCardStyle}>
-                        <div style={actionCardHeaderStyle}>
+                      <div key={action.id} style={compactLinkedActionCardStyle}>
+                        <div style={compactLinkedActionInfoStyle}>
                           <strong>{action.action_number || "Action"} - {action.title || "Untitled action"}</strong>
-                          <StatusPill status={action.status || "Open"} />
+                          <span style={compactLinkedActionMetaStyle}>{action.owner || "Unassigned"} | Due {displayDate(action.due_date)} | Priority {action.priority || "Not set"}</span>
                         </div>
-                        <span>{action.owner || "Unassigned"} | Due {displayDate(action.due_date)} | Priority {action.priority || "Not set"}</span>
-                        <Link
-                          href={`/actions?actionId=${encodeURIComponent(action.id)}`}
-                          style={smallLinkButtonStyle}
-                        >
-                          Open Linked Action
-                        </Link>
+                        <div style={compactLinkedActionControlsStyle}>
+                          <StatusPill status={action.status || "Open"} />
+                          <Link href={`/actions?actionId=${encodeURIComponent(action.id)}`} style={compactActionLinkStyle}>Open</Link>
+                        </div>
                       </div>
                     ))}
                     {!selectedCentralActions.length ? <div style={emptyBoxStyle}>No central Action Management actions linked to this AINM yet.</div> : null}
                   </div>
 
-                  <div style={{ marginTop: 18 }}>
+                  <div style={{ marginTop: 12 }}>
                     <h3 style={inlineSectionTitleStyle}>AINM Tracker Actions</h3>
                   </div>
-                  <div style={actionGridStyle}>
+                  <div style={compactLinkedActionListStyle}>
                     {selectedActions.map((action) => (
-                      <div key={action.id} style={actionCardStyle}>
-                        <strong>{action.tracker_no || "Action"} - {action.action}</strong>
-                        <span>{action.assigned || "Unassigned"} | Raised {displayDate(action.date_raised)} | Closed {displayDate(action.date_closed)}</span>
-                        <StatusPill status={action.status || ""} />
-                        <Link href={buildActionHref(draft, action)} style={smallLinkButtonStyle}>Create Central Action from this row</Link>
+                      <div key={action.id} style={compactLinkedActionCardStyle}>
+                        <div style={compactLinkedActionInfoStyle}>
+                          <strong>{action.tracker_no || "Action"} - {action.action}</strong>
+                          <span style={compactLinkedActionMetaStyle}>{action.assigned || "Unassigned"} | Raised {displayDate(action.date_raised)} | Closed {displayDate(action.date_closed)}</span>
+                        </div>
+                        <div style={compactLinkedActionControlsStyle}>
+                          <StatusPill status={action.status || ""} />
+                          <Link href={buildActionHref(draft)} style={compactActionLinkStyle}>Create Central</Link>
+                        </div>
                       </div>
                     ))}
                     {!selectedActions.length ? <div style={emptyBoxStyle}>No tracker actions linked yet.</div> : null}
@@ -3441,25 +3682,25 @@ export default function HseAinmPage() {
 
               {detailTab === "evidence" ? (
                 <DetailSection>
-                  <div style={buttonRowStyle}>
-                    <select style={filterStyle} value={evidenceStage} onChange={(e) => setEvidenceStage(e.target.value)}>
+                  <div style={evidenceToolbarStyle}>
+                    <select style={evidenceStageSelectStyle} value={evidenceStage} onChange={(e) => setEvidenceStage(e.target.value)}>
                       {["General", "Notification", "Part 1", "Part 2", "Action Evidence"].map((stage) => <option key={stage} value={stage}>{stage}</option>)}
                     </select>
-                    <label style={uploadButtonStyle}>
+                    <label style={compactUploadButtonStyle}>
                       {uploading ? "Uploading..." : "Upload Evidence"}
                       <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event)} disabled={uploading || !canEditAinm} />
                     </label>
                   </div>
-                  <div style={evidenceListStyle}>
+                  <div style={compactEvidenceListStyle}>
                     {selectedEvidence.map((file) => (
-                      <div key={file.id} style={evidenceItemStyle}>
-                        <div>
-                          <strong>{file.file_name}</strong>
-                          <span>{file.stage} | {formatFileSize(file.file_size)} | Uploaded {displayDateTime(file.uploaded_at)}</span>
+                      <div key={file.id} style={compactEvidenceItemStyle}>
+                        <div style={evidenceFileInfoStyle}>
+                          <strong style={evidenceFileNameStyle}>{file.file_name}</strong>
+                          <span style={evidenceMetaStyle}>{file.stage} | {formatFileSize(file.file_size)} | Uploaded {displayDateTime(file.uploaded_at)}</span>
                         </div>
-                        <div style={buttonRowStyle}>
-                          <button type="button" style={secondaryButtonStyle} onClick={() => void openEvidence(file)}>Open / Preview</button>
-                          <button type="button" style={dangerButtonStyle} onClick={() => void deleteEvidence(file)} disabled={!canEditAinm}>Delete</button>
+                        <div style={compactEvidenceActionsStyle}>
+                          <button type="button" style={compactSecondaryButtonStyle} onClick={() => void openEvidence(file)}>Open / Preview</button>
+                          <button type="button" style={compactDangerButtonStyle} onClick={() => void deleteEvidence(file)} disabled={!canEditAinm}>Delete</button>
                         </div>
                       </div>
                     ))}
@@ -3905,7 +4146,6 @@ const smallDangerButtonStyle: CSSProperties = { ...dangerButtonStyle, padding: "
 const uploadButtonStyle: CSSProperties = { ...primaryButtonStyle, display: "inline-flex", alignItems: "center", justifyContent: "center" };
 const importToolbarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px, auto) minmax(220px, 320px)", gap: 14, alignItems: "end", marginBottom: 14 };
 const linkButtonStyle: CSSProperties = { ...primaryButtonStyle, textDecoration: "none" };
-const smallLinkButtonStyle: CSSProperties = { ...secondaryButtonStyle, textDecoration: "none", display: "inline-flex" };
 const toolbarStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -4011,14 +4251,33 @@ const teamTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "r
 const teamCellInputStyle: CSSProperties = { minHeight: 40, border: "none", borderTop: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", padding: "9px 10px", fontSize: 14, boxSizing: "border-box", color: "#0f172a", background: "white" };
 const signoffBlockStyle: CSSProperties = { gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, border: "1px solid #dbe3ef", borderRadius: 14, padding: 14, background: "white" };
 const signoffBlockTitleStyle: CSSProperties = { gridColumn: "1 / -1", margin: 0, background: "#e5e7eb", borderRadius: 8, padding: "10px 12px", color: "#0f172a", fontSize: 15 };
-const actionGridStyle: CSSProperties = { display: "grid", gap: 12 };
-const actionCardStyle: CSSProperties = { display: "grid", gap: 8, background: "white", border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, color: "#0f172a" };
-const actionCardHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" };
+const inlineActionPanelStyle: CSSProperties = { display: "grid", gap: 14, padding: 16, border: "1px solid #dbe3ef", borderRadius: 14, background: "#f8fafc" };
+const inlineActionButtonRowStyle: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 };
+const compactActionsTabToolbarStyle: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 };
+const compactPrimaryButtonStyle: CSSProperties = { ...primaryButtonStyle, minHeight: 38, padding: "8px 12px", fontSize: 13 };
+const compactPrimaryLinkStyle: CSSProperties = { ...compactPrimaryButtonStyle, display: "inline-flex", alignItems: "center", textDecoration: "none" };
+const compactLinkedActionListStyle: CSSProperties = { display: "grid", gap: 7 };
+const compactLinkedActionCardStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", background: "white", border: "1px solid #dbe3ef", borderRadius: 10, padding: "9px 11px", color: "#0f172a" };
+const compactLinkedActionInfoStyle: CSSProperties = { display: "grid", gap: 3, flex: "1 1 420px", minWidth: 0, fontSize: 13 };
+const compactLinkedActionMetaStyle: CSSProperties = { color: "#53565A", fontSize: 12, lineHeight: 1.3 };
+const compactLinkedActionControlsStyle: CSSProperties = { display: "flex", gap: 7, alignItems: "center" };
+const compactActionLinkStyle: CSSProperties = { ...secondaryButtonStyle, display: "inline-flex", alignItems: "center", minHeight: 32, padding: "5px 9px", borderRadius: 8, fontSize: 12, textDecoration: "none" };
 const emptyBoxStyle: CSSProperties = { border: "1px dashed #cbd5e1", borderRadius: 12, padding: 16, color: "#64748b", background: "white" };
 const evidenceListStyle: CSSProperties = { display: "grid", gap: 12 };
 const notificationEvidencePanelStyle: CSSProperties = { display: "grid", gap: 12, marginTop: 16, border: "1px solid #dbe3ef", borderRadius: 14, padding: 16, background: "white" };
 const addPersonPanelStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 16, border: "1px dashed #94a3b8", borderRadius: 14, padding: 16, background: "#f8fafc" };
 const evidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, background: "white", color: "#0f172a" };
+const evidenceToolbarStyle: CSSProperties = { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 };
+const evidenceStageSelectStyle: CSSProperties = { ...inputStyle, minHeight: 38, height: 38, flex: "1 1 280px", padding: "7px 10px" };
+const compactUploadButtonStyle: CSSProperties = { ...primaryButtonStyle, display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: 38, padding: "8px 13px" };
+const compactEvidenceListStyle: CSSProperties = { display: "grid", gap: 8 };
+const compactEvidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap", border: "1px solid #dbe3ef", borderRadius: 10, padding: "9px 11px", background: "white", color: "#0f172a" };
+const evidenceFileInfoStyle: CSSProperties = { display: "grid", gap: 3, flex: "1 1 320px", minWidth: 0 };
+const evidenceFileNameStyle: CSSProperties = { fontSize: 13, lineHeight: 1.3, overflowWrap: "anywhere" };
+const evidenceMetaStyle: CSSProperties = { color: "#64748b", fontSize: 12, lineHeight: 1.3 };
+const compactEvidenceActionsStyle: CSSProperties = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" };
+const compactSecondaryButtonStyle: CSSProperties = { ...secondaryButtonStyle, minHeight: 36, padding: "7px 11px", fontSize: 13 };
+const compactDangerButtonStyle: CSSProperties = { ...dangerButtonStyle, minHeight: 36, padding: "7px 11px", fontSize: 13 };
 const reportButtonGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 };
 const reportButtonStyle: CSSProperties = { border: "1px solid #D0D0CE", background: "#ECECE7", color: "#005670", borderRadius: 12, padding: "16px 14px", fontWeight: 900, cursor: "pointer" };
 const compiledReportButtonStyle: CSSProperties = { ...reportButtonStyle, background: "#005670", borderColor: "#005670", color: "white" };

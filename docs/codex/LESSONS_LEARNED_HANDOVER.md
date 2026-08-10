@@ -17,6 +17,7 @@ Implemented and live. Production QA and continued data-quality improvement remai
 - KPI cards and analytical panels drill into the corresponding filtered register dataset.
 - Register filters are cumulative: later project/department selections must remain constrained by earlier filters such as Open status.
 - The register uses fixed column widths so filtering does not move the layout.
+- Desktop fixed-column behavior remains unchanged. At phone widths the register inherits the shared labelled-card and Expand/Collapse behavior; use the horizontal-scroll opt-out only if physical-device QA proves the linked-learning context cannot be represented safely as cards.
 - Project Code and Project Name use controlled choices with Add New support; user-facing values must not include `Historic`.
 - Originator and Line Manager use People Management.
 - Asset uses Asset Management reference data.
@@ -48,4 +49,4 @@ Implemented and live. Production QA and continued data-quality improvement remai
 3. Test cumulative Status -> Project -> Department filtering.
 4. Test every KPI/chart drill-down and repeated-record insight link.
 5. Verify Project/People/Asset controlled dropdowns and Add New behavior.
-6. Review mobile register overflow and fixed-column behavior.
+6. Verify the mobile register cards, secondary-field expansion, repeat-record drill-down and evidence controls on a physical phone while confirming desktop fixed-column behavior is unchanged.
