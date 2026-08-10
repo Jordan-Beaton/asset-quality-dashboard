@@ -705,7 +705,7 @@ function QualityActionsPageContent() {
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/" style={backLinkStyle}>← Back to Dashboard</Link>
+        <Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link>
         <div style={topMetaActionsStyle}>
           <Link href="/actions?department=Quality" style={primaryLinkStyle}>Open Central Actions</Link>
           <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>

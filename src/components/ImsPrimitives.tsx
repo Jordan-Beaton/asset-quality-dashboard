@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
+import { useState } from "react";
 import { ModuleSectionHeader } from "./ModuleSectionHeader";
 import {
   imsActiveTabButtonStyle,
@@ -86,8 +87,8 @@ export function ImsLinkButton({
 }
 
 export function ImsTopMetaRow({
-  backHref = "/",
-  backLabel = "Back to Dashboard",
+  backHref = "/home",
+  backLabel = "Back to IMS Home",
   status,
   actions,
 }: {
@@ -149,10 +150,26 @@ export function ImsPanel({
   children: ReactNode;
   style?: CSSProperties;
 }) {
+  const [mobileCollapsed, setMobileCollapsed] = useState(false);
+  const mobileToggle = title ? (
+    <button
+      type="button"
+      className="ims-panel-mobile-toggle"
+      aria-expanded={!mobileCollapsed}
+      onClick={() => setMobileCollapsed((value) => !value)}
+    >
+      {mobileCollapsed ? "Expand" : "Collapse"}
+    </button>
+  ) : null;
+
   return (
     <section className="ims-panel" style={{ ...imsPanelStyle, ...style }}>
-      {title ? <ModuleSectionHeader title={title} subtitle={subtitle} actions={actions} /> : null}
-      {children}
+      {title ? (
+        <ModuleSectionHeader title={title} subtitle={subtitle} actions={<>{actions}{mobileToggle}</>} />
+      ) : null}
+      <div className={mobileCollapsed ? "ims-panel-content ims-panel-content--mobile-collapsed" : "ims-panel-content"}>
+        {children}
+      </div>
     </section>
   );
 }

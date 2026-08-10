@@ -100,6 +100,36 @@ Standard page container:
 - Use `20px` vertical separation between major sections.
 - Use `12px` to `16px` gaps inside dense grids and control rows.
 
+## IMS Home Launchpad
+
+IMS Home is the deliberate exception to the normal operational page structure. It is an access launchpad, not a module dashboard or management-review surface.
+
+Home header:
+
+- Keep the header compact so workspace access remains visible without excessive scrolling.
+- Use the approved Enshore dark blue as the main field with restrained `#63B1BC` glow, grid, ring, and signal-point details.
+- Use `/enshore-e-outline-loop.mp4` as the silent, autoplaying, looping centre animation.
+- Do not crop, stretch, recolour, add controls/audio, or replace the official animation with reconstructed artwork.
+- If both the header and IMS hub animation are visible, their playback positions must remain synchronized.
+- Keep copy short and access-oriented. Do not add module reviews, metrics, status summaries, or dashboard content to the header.
+
+Workspace cards:
+
+- Standard Card grid workspace cards use an explicit equal height of `216px`; content must not determine card height.
+- New module cards inherit the same dimensions automatically.
+- Cards show module identity, access state, and a clear launch action only. Detailed module summaries belong inside the module dashboard.
+- Available cards use the established lift interaction: upward translation, slight scale, Enshore accent border/glow, elevated shadow, icon response, and launch-arrow response.
+- Restricted cards remain visible when required by the permission design but must not navigate.
+
+Home views:
+
+- The supported selector options are Card grid, Spotlight, Compact tiles, List, Two columns, and IMS hub.
+- Spotlight provides one large workspace card with previous/next controls.
+- IMS hub centres an enlarged official animation with compact workspace segments around it; at narrower widths it must become an animation-led grid rather than retaining an unusable orbit.
+- Every view must use the same permission checks and module destinations.
+- Store the selected view in browser local storage under `enshore-ims-home-view` and restore it on return.
+- Do not restore the removed search bar, module filters, account-access explanatory sentence, status ribbon, labelled orbit pills, or Horizontal rail view unless explicitly requested.
+
 ## Hero Banners
 
 Standard hero:

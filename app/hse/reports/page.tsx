@@ -761,8 +761,8 @@ export default function HseReportsPage() {
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/hse" style={backLinkStyle}>
-          &larr; Back to Dashboard
+        <Link href="/home" style={backLinkStyle}>
+          &larr; Back to IMS Home
         </Link>
 
         <div style={topActionsStyle}>

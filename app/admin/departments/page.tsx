@@ -31,7 +31,7 @@ function AdminShellPage({ title, description, latestLabel, status, kpis, panels 
   return (
     <main>
       <QualityPageHero label="ADMIN / SETTINGS" title={title} description={description} contextCards={[{ label: "Last Refreshed", value: "Shell only" }, { label: latestLabel, value: "No settings changes yet" }]} />
-      <div style={topMetaRowStyle}><Link href="/admin" style={backLinkStyle}>← Back to Dashboard</Link><div style={statusBannerStyle}><strong>Status:</strong> {status}</div></div>
+      <div style={topMetaRowStyle}><Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link><div style={statusBannerStyle}><strong>Status:</strong> {status}</div></div>
       <section style={statsGridStyle}>{kpis.map((kpi) => <QualityKpiCard key={kpi.title} title={kpi.title} value={kpi.value} accent={kpi.accent} />)}</section>
       <section style={panelGridStyle}>{panels.map((panel) => <SectionCard key={panel.title} title={panel.title}>{panel.text}</SectionCard>)}</section>
     </main>

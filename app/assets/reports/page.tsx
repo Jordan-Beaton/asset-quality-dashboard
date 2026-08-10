@@ -1049,7 +1049,8 @@ export default function AssetReportsPage() {
 
       <ImsTopMetaRow
         backHref="/assets/dashboard"
-        backLabel="Back to Dashboard"
+        backHref="/home"
+        backLabel="Back to IMS Home"
         actions={
           <ImsButton onClick={() => void generatePdfReport()} disabled={isGeneratingPdf}>
             {isGeneratingPdf ? "Generating PDF..." : "Generate Monthly PDF"}

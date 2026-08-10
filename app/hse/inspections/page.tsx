@@ -1938,7 +1938,7 @@ function MobileInspectionHero({ latestSummary }: { latestSummary: string }) {
 function TopRow({ status }: { status: string }) {
   return (
     <div style={topMetaRowStyle}>
-      <Link href="/hse" style={backLinkStyle}>&larr; Back to Dashboard</Link>
+      <Link href="/home" style={backLinkStyle}>&larr; Back to IMS Home</Link>
       <div style={statusBannerStyle}><strong>Status:</strong> {status}</div>
     </div>
   );

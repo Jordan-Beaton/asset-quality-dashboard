@@ -755,8 +755,8 @@ export default function RiskRegisterPage() {
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/risk" style={backLinkStyle}>
-          ← Back to Dashboard
+        <Link href="/home" style={backLinkStyle}>
+          ← Back to IMS Home
         </Link>
 
         <div style={topMetaActionsStyle}>

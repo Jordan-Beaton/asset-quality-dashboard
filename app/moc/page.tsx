@@ -3326,7 +3326,8 @@ function MOCPageContent() {
 
       <ImsTopMetaRow
         backHref="/quality"
-        backLabel="Back to Dashboard"
+        backHref="/home"
+        backLabel="Back to IMS Home"
         status={<><strong>Status:</strong> {message}</>}
         actions={
           <button type="button" style={secondaryButtonStyle} onClick={() => void loadData()}>

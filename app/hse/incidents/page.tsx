@@ -60,8 +60,8 @@ function HseShellPage({
         ]}
       />
       <div style={topMetaRowStyle}>
-        <Link href="/hse" style={backLinkStyle}>
-          ← Back to Dashboard
+        <Link href="/home" style={backLinkStyle}>
+          ← Back to IMS Home
         </Link>
         <div style={statusBannerStyle}>
           <strong>Status:</strong> {status}

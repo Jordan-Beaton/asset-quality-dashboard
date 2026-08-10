@@ -13,7 +13,7 @@ export default function ProjectsPage() {
         title="Project Management"
         description="Project-specific quality controls, document registers, reporting annexes, and delivery intelligence in one workspace."
       />
-      <ImsTopMetaRow backHref="/home" backLabel="Back to Home" status={<><strong>Status:</strong> Project Management ready.</>} />
+      <ImsTopMetaRow backHref="/home" backLabel="Back to IMS Home" status={<><strong>Status:</strong> Project Management ready.</>} />
       <section style={section}>
         <div>
           <div style={kicker}>Active projects</div>

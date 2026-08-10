@@ -1106,7 +1106,7 @@ export default function HseActionsPage() {
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/hse" style={backLinkStyle}>← Back to Dashboard</Link>
+        <Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link>
         <div style={topMetaActionsStyle}>
           <Link href="/actions?department=HSE" style={primaryLinkStyle}>Open Central Actions</Link>
           <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>

@@ -997,7 +997,7 @@ export default function AdminDashboardPage() {
 
       <ImsTopMetaRow
         backHref="/home"
-        backLabel="Back to Home"
+        backLabel="Back to IMS Home"
         actions={<ImsButton onClick={loadAdminData} disabled={isLoading}>Refresh</ImsButton>}
         status={<><strong>Status:</strong> {message}</>}
       />

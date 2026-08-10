@@ -3137,7 +3137,7 @@ function ActionsPageContent() {
 
       <div style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
-          ← Back to Dashboard
+          ← Back to IMS Home
         </Link>
 
         <div style={statusBannerStyleInline}>

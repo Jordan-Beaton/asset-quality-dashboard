@@ -1085,8 +1085,8 @@ export default function ReportsPage() {
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/quality" style={backLinkStyle}>
-          ← Back to Dashboard
+        <Link href="/home" style={backLinkStyle}>
+          ← Back to IMS Home
         </Link>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>

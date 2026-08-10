@@ -69,8 +69,8 @@ function RiskShellPage({
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/risk" style={backLinkStyle}>
-          ← Back to Dashboard
+        <Link href="/home" style={backLinkStyle}>
+          ← Back to IMS Home
         </Link>
 
         <div style={statusBannerStyle}>
@@ -163,4 +163,3 @@ const emptyTextStyle: CSSProperties = {
   margin: 0,
   lineHeight: 1.55,
 };
-

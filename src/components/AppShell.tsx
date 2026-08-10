@@ -1437,7 +1437,7 @@ export default function AppShell({ children }: AppShellProps) {
                     fontWeight: 800,
                   }}
                 >
-                  Back to Home
+                  Back to IMS Home
                 </Link>
                 {signedInName ? (
                   <span

@@ -2543,7 +2543,7 @@ export default function HseAinmPage() {
       />
 
       <div style={topMetaRowStyle}>
-        <Link href="/hse" style={backLinkStyle}>← Back to Dashboard</Link>
+        <Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link>
         <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
       </div>
 
@@ -3668,7 +3668,26 @@ function SignoffBlock({
 }
 
 function SectionCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
-  return <section style={sectionStyle}><div style={sectionHeaderStyle}><h2 style={sectionTitleStyle}>{title}</h2>{subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}</div>{children}</section>;
+  const [mobileCollapsed, setMobileCollapsed] = useState(false);
+  return (
+    <section className="ainm-section-card" style={sectionStyle}>
+      <div className="ainm-section-header" style={sectionHeaderStyle}>
+        <div>
+          <h2 style={sectionTitleStyle}>{title}</h2>
+          {subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}
+        </div>
+        <button
+          type="button"
+          className="ainm-mobile-toggle"
+          aria-expanded={!mobileCollapsed}
+          onClick={() => setMobileCollapsed((value) => !value)}
+        >
+          {mobileCollapsed ? "Expand" : "Collapse"}
+        </button>
+      </div>
+      <div className={mobileCollapsed ? "ainm-section-content ainm-section-content--collapsed" : "ainm-section-content"}>{children}</div>
+    </section>
+  );
 }
 
 function DetailSection({ children }: { children: ReactNode }) {

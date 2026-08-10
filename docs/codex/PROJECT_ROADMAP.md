@@ -10,6 +10,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Shared UI standards documented in `UI_STANDARDS.md`.
 - The full IMS colour system now uses the approved 2026 Enshore palette across the shared shell, operational modules, mobile/field routes, charts, QR codes, notifications, generated outputs, and Admin defaults; restricted HSE 3Rs green and RapidScan purple are excluded from general IMS use.
 - Official 2026 Enshore primary colour/reverse logo artwork is now canonical across the IMS and generated PDF/Word outputs, with fixed 2:1 fitting, protected clear space, compliant minimum print sizing, and the HSE Observation 3Rs campaign logo preserved as the sole approved exception.
+- IMS Home is now a dedicated permission-aware launchpad with a compact Enshore dark-blue animated header, synchronized official outline-logo video treatments, equal-size workspace cards, pronounced hover interactions, and six selectable access layouts: Card grid, Spotlight, Compact tiles, List, Two columns, and IMS hub. The selected layout persists locally between browser sessions.
 - Shared visual primitives exist for hero banners, KPI cards, section headers, top meta rows, tabs, panels, filter panels, buttons, and links.
 - Quality dashboard has live KPI/story-style graphics and is the main layout benchmark.
 - NCR is now NCR-only in visible UI, with register/create/report layout, clickable KPIs, Excel import, owner dropdown, filtered PDF, and linked Action creation.
@@ -72,6 +73,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Project Management production QA for saved NOI reopen/edit/delete, controlled document storage, sequential numbering, planned-date synchronisation, and mobile responsiveness.
 - Lessons Learned production QA for the 2,990-row import, uncapped KPI totals, cumulative filters, controlled dropdowns and repeat-record drill-downs.
 - Open Points production QA and confirmation that `scripts/sql/project_open_points.sql` has been applied to the live Supabase project.
+- IMS Home production/browser QA for synchronized video playback, persisted view preference, all six layouts, permission-restricted cards, and responsive IMS hub fallback.
 
 # Known Issues
 
@@ -109,6 +111,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 10. Align old local style blocks with shared IMS primitives when touching each page.
 11. Review Risk Management pages for route completeness, visual consistency, and demo readiness.
 12. Verify Lessons Learned and the complete Wadden Sea workflow on Vercel, including Open Points database migration, phase history, NCR linking, evidence and register outputs.
+13. Verify IMS Home on desktop and mobile with representative permission profiles, including video synchronization and restoration of the last selected view after closing and reopening the browser.
 
 # Future Enhancements
 
@@ -123,6 +126,20 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - More robust notification usefulness for Document Control and action workflows.
 
 # Module Status
+
+## IMS Home / Launchpad
+
+- Status: Complete; production QA required
+- Summary: IMS Home is intentionally an access surface rather than a dashboard. It uses a compact Enshore dark-blue animated header and equal-size permission-aware workspace cards. Users can choose Card grid, Spotlight, Compact tiles, List, Two columns, or IMS hub. The IMS hub enlarges the official outline animation and positions compact workspace segments around it. The header and hub videos remain synchronized while both are visible, and the last selected view is restored from browser local storage.
+- Permanent Rules:
+  - Keep Home focused on entering modules; module performance, summaries, registers, and KPIs belong inside module dashboards.
+  - Standard Card grid workspace cards remain exactly equal in height, including future module cards.
+  - Preserve the official `/enshore-e-outline-loop.mp4` animation without recolouring, stretching, audio, controls, or replacement artwork.
+  - Keep all alternate layouts permission-aware and retain a responsive non-orbit fallback for the IMS hub.
+- Outstanding Actions:
+  - Verify all six views on Vercel at desktop, tablet, and mobile widths.
+  - Verify last-view persistence across browser close/reopen and confirm synchronized header/hub playback does not visibly drift.
+  - Test Full, Part, and None module permissions in each view.
 
 ## Quality Management
 

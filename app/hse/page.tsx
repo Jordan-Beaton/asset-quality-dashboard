@@ -489,7 +489,7 @@ export default function HseDashboardPage() {
 
       <ImsTopMetaRow
         backHref="/home"
-        backLabel="Back to Home"
+        backLabel="Back to IMS Home"
         actions={
           <>
             <label style={yearFilterStyle}>

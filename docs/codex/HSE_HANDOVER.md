@@ -1,6 +1,6 @@
 # HSE Management Codex Handover
 
-HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, green hero, KPI cards, shared filters, detail panels, report outputs, and central Action links.
+HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, approved Enshore dark-blue hero, KPI cards, shared filters, detail panels, report outputs, and central Action links. The HSE 3Rs green remains restricted to campaign content displayed with the approved 3Rs logo and is not a general HSE hero colour.
 
 ## Routes
 

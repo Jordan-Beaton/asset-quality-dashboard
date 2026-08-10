@@ -779,7 +779,7 @@ export default function ManagementReviewPage() {
 
       <ImsTopMetaRow
         backHref="/home"
-        backLabel="Back to Home"
+        backLabel="Back to IMS Home"
         actions={
           <>
             <ImsButton onClick={() => void loadSnapshot()} disabled={isLoading}>

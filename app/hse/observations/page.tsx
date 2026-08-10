@@ -355,7 +355,8 @@ export default function HseObservationsPage() {
 
       <ImsTopMetaRow
         backHref="/hse"
-        backLabel="Back to Dashboard"
+        backHref="/home"
+        backLabel="Back to IMS Home"
         actions={
           <>
             <label style={yearSelectStyle}>

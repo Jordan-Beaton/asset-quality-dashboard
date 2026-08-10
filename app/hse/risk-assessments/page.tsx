@@ -31,7 +31,7 @@ export default function HseRiskAssessmentsPage() {
 }
 
 function TopRow({ status }: { status: string }) {
-  return <div style={topMetaRowStyle}><Link href="/hse" style={backLinkStyle}>← Back to Dashboard</Link><div style={statusBannerStyle}><strong>Status:</strong> {status}</div></div>;
+  return <div style={topMetaRowStyle}><Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link><div style={statusBannerStyle}><strong>Status:</strong> {status}</div></div>;
 }
 
 function SectionCard({ title, children }: { title: string; children: ReactNode }) {
