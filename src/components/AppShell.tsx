@@ -204,7 +204,7 @@ function getAllowedModuleKeys(role: SystemRole) {
 }
 
 function getAccessAreaFromHref(href: string): AccessArea {
-  if (href === "/home" || href === "/") return "home";
+  if (href === "/home" || href === "/" || href === "/field-tools") return "home";
   if (href === "/actions") return "actions";
   if (href === "/people") return "people";
   if (href === "/management-review") return "management-review";
@@ -692,6 +692,7 @@ export default function AppShell({ children }: AppShellProps) {
   const isLoginPage = pathname === "/login";
   const isPublicObservationPage = pathname === "/observe";
   const isHomePage = pathname === "/home";
+  const isFieldToolsPage = pathname === "/field-tools";
   const isAssetModule = pathname.startsWith("/assets");
   const isRiskModule = pathname.startsWith("/risk");
   const isHseModule = pathname.startsWith("/hse");
@@ -712,7 +713,9 @@ export default function AppShell({ children }: AppShellProps) {
         ? "Asset Field Maintenance"
       : "HSE Field Inspection";
   const showLogo = !isLoginPage && !isPublicObservationPage;
-  const moduleTitle = isHomePage
+  const moduleTitle = isFieldToolsPage
+    ? "Field Tools"
+    : isHomePage
     ? "Enshore Management System"
     : isActionModule
     ? "Action Management"
@@ -733,7 +736,9 @@ export default function AppShell({ children }: AppShellProps) {
     : isPeopleModule
     ? "People Management"
     : "Quality Management";
-  const moduleSubtitle = isHomePage
+  const moduleSubtitle = isFieldToolsPage
+    ? "Mobile access to field inspections, reports, and asset records"
+    : isHomePage
     ? ""
     : isActionModule
     ? "Central action register and follow-up control"
@@ -774,13 +779,13 @@ export default function AppShell({ children }: AppShellProps) {
     ? lessonsNavItems
     : qualityNavItems;
   const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess, signedInTabPermissions);
-  const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldInspectionMode;
+  const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldToolsPage && !isFieldInspectionMode;
   const railOpen = isRailExpanded || isRailPinned;
   const currentAccessArea: AccessArea = isLoginPage
     ? "login"
     : isPublicObservationPage
     ? "public"
-    : isHomePage
+    : isHomePage || isFieldToolsPage
     ? "home"
     : getAccessAreaFromHref(pathname);
   const currentPermissionTarget = getPermissionTargetFromHref(pathname);

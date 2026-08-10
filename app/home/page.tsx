@@ -7,6 +7,17 @@ import { useImsPermissions } from "../../src/components/ImsPermissions";
 
 const moduleCards = [
   {
+    title: "Field Tools",
+    short: "Field",
+    icon: "field",
+    description: "Simple mobile access to inspections, reports, observations, and asset field records.",
+    href: "/field-tools",
+    moduleKey: "field-tools",
+    status: "Live",
+    group: "Operations",
+    cta: "Open",
+  },
+  {
     title: "Project Management",
     short: "Projects",
     icon: "projects",
@@ -151,6 +162,15 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
     strokeLinejoin: "round" as const,
   };
 
+  if (icon === "field") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
+        <rect {...common} x="7" y="2.5" width="10" height="19" rx="2" />
+        <path {...common} d="M10 6h4M10 17h4M12 12h.01" />
+      </svg>
+    );
+  }
+
   if (icon === "quality") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
@@ -286,6 +306,9 @@ export default function HomePage() {
   }, [homeView]);
   const isModuleAccessible = (moduleKey: (typeof moduleCards)[number]["moduleKey"]) => {
     if (!permissions.loaded) return true;
+    if (moduleKey === "field-tools") {
+      return permissions.canAccessModule("hse") || permissions.canAccessModule("assets");
+    }
     return permissions.canAccessModule(moduleKey);
   };
   const renderModuleCard = (card: ModuleCard, cardIndex: number, variant: "standard" | "spotlight" | "compact" | "list" | "hub" = "standard") => {
