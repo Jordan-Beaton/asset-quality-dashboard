@@ -42,9 +42,9 @@ export function QualityPageHero({
   title,
 }: QualityPageHeroProps) {
   return (
-    <section style={heroStyle}>
+    <section className="ims-page-hero" style={heroStyle}>
       <div style={innerStyle}>
-        <h1 style={titleStyle}>{title}</h1>
+        <h1 className="ims-page-hero-title" style={titleStyle}>{title}</h1>
       </div>
     </section>
   );

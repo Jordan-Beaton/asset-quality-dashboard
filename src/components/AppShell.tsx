@@ -995,6 +995,7 @@ export default function AppShell({ children }: AppShellProps) {
       onChangeCapture={handlePermissionChangeCapture}
     >
       {!isPublicObservationPage ? <header
+        className={isFieldInspectionMode ? "ims-app-header ims-app-header--field" : "ims-app-header"}
         style={{
           position: "sticky",
           top: 0,
@@ -1018,6 +1019,7 @@ export default function AppShell({ children }: AppShellProps) {
           }}
         >
           <div
+            className="ims-header-brand"
             style={{
               display: "flex",
               alignItems: "center",
@@ -1034,6 +1036,7 @@ export default function AppShell({ children }: AppShellProps) {
           >
             {showLogo ? (
               <span
+                className="ims-header-logo"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1057,6 +1060,7 @@ export default function AppShell({ children }: AppShellProps) {
           </div>
 
           <div
+            className="ims-header-content"
             style={{
               width: "100%",
               maxWidth: "1320px",
@@ -1071,8 +1075,9 @@ export default function AppShell({ children }: AppShellProps) {
               minHeight: isFieldInspectionMode ? undefined : "76px",
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+            <div className="ims-header-copy" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
               <div
+                className="ims-header-title"
                 style={{
                   color: "#0f172a",
                   fontWeight: 700,
@@ -1085,6 +1090,7 @@ export default function AppShell({ children }: AppShellProps) {
               </div>
               {moduleSubtitle && !isFieldInspectionMode ? (
                 <div
+                  className="ims-header-subtitle"
                   style={{
                     color: "#64748b",
                     fontSize: "12px",
@@ -1099,6 +1105,7 @@ export default function AppShell({ children }: AppShellProps) {
 
             {!isLoginPage && !isFieldInspectionMode ? (
               <div
+                className="ims-header-account"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -1180,6 +1187,7 @@ export default function AppShell({ children }: AppShellProps) {
 
       {showSideRail ? (
         <aside
+          className="ims-side-rail"
           onMouseEnter={() => setIsRailExpanded(true)}
           onMouseLeave={() => setIsRailExpanded(false)}
           onFocus={() => setIsRailExpanded(true)}
@@ -1206,6 +1214,7 @@ export default function AppShell({ children }: AppShellProps) {
           aria-label={`${moduleTitle} navigation`}
         >
           <div
+            className="ims-side-rail-label"
             style={{
               color: "#64748b",
               fontSize: "10px",
@@ -1221,6 +1230,7 @@ export default function AppShell({ children }: AppShellProps) {
           </div>
 
           <button
+            className="ims-side-rail-pin"
             type="button"
             onClick={() => setIsRailPinned((value) => !value)}
             title={isRailPinned ? "Unpin navigation" : "Pin navigation open"}
@@ -1274,7 +1284,7 @@ export default function AppShell({ children }: AppShellProps) {
             </span>
           </button>
 
-          <nav style={{ display: "grid", gap: "8px" }}>
+          <nav className="ims-side-rail-nav" style={{ display: "grid", gap: "8px" }}>
             {navItems.map((item) => {
               const isActive =
                 item.href === "/" ||
@@ -1368,6 +1378,7 @@ export default function AppShell({ children }: AppShellProps) {
 
       <main>
         <div
+          className={isFieldInspectionMode ? "ims-page-container ims-page-container--field" : "ims-page-container"}
           style={{
             maxWidth: "1320px",
             width: "100%",

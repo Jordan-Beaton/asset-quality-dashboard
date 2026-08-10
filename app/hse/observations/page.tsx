@@ -473,8 +473,8 @@ export default function HseObservationsPage() {
               </Field>
             </ImsFilterPanel>
             <div style={imsTableInfoRowStyle}>Showing <strong>{filteredRecords.length}</strong> of <strong>{yearRecords.length}</strong> observations</div>
-            <div style={{ overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: "14px" }}>
-              <table style={{ ...imsTableStyle, minWidth: 980 }}>
+            <div className="observation-table-wrap" style={{ overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: "14px" }}>
+              <table className="observation-table" style={{ ...imsTableStyle, minWidth: 980 }}>
                 <thead>
                   <tr>
                     {["Observation No.", "Type", "Project", "Location", "Risk", "Status", "Submitted As", "Submitted By", "Date"].map((heading) => (
@@ -485,15 +485,15 @@ export default function HseObservationsPage() {
                 <tbody>
                   {filteredRecords.map((record) => (
                     <tr key={record.id} onClick={() => selectObservationAndScroll(record.id)} style={selectedRecord?.id === record.id ? selectedRowStyle : rowStyle}>
-                      <td style={{ ...imsTableCellStyle, fontWeight: 900, color: imsColours.brandDark }}>{record.observation_number}</td>
-                      <td style={imsTableCellStyle}>{record.observation_type || "-"}</td>
-                      <td style={imsTableCellStyle}>{record.project || "-"}</td>
-                      <td style={imsTableCellStyle}>{record.site_location || "-"}</td>
-                      <td style={imsTableCellStyle}>{record.risk_level || "-"}</td>
-                      <td style={imsTableCellStyle}><StatusPill status={record.status || "New"} /></td>
-                      <td style={imsTableCellStyle}>{record.reporter_type || "Quick Fill"}</td>
-                      <td style={imsTableCellStyle}>{record.reporter_name || record.reporter_company || "Not provided"}</td>
-                      <td style={imsTableCellStyle}>{formatDate(record.observation_date || record.created_at)}</td>
+                      <td data-label="Observation" style={{ ...imsTableCellStyle, fontWeight: 900, color: imsColours.brandDark }}>{record.observation_number}</td>
+                      <td data-label="Type" style={imsTableCellStyle}>{record.observation_type || "-"}</td>
+                      <td data-label="Project" style={imsTableCellStyle}>{record.project || "-"}</td>
+                      <td data-label="Location" style={imsTableCellStyle}>{record.site_location || "-"}</td>
+                      <td data-label="Risk" style={imsTableCellStyle}>{record.risk_level || "-"}</td>
+                      <td data-label="Status" style={imsTableCellStyle}><StatusPill status={record.status || "New"} /></td>
+                      <td data-label="Submitted As" style={imsTableCellStyle}>{record.reporter_type || "Quick Fill"}</td>
+                      <td data-label="Submitted By" style={imsTableCellStyle}>{record.reporter_name || record.reporter_company || "Not provided"}</td>
+                      <td data-label="Date" style={imsTableCellStyle}>{formatDate(record.observation_date || record.created_at)}</td>
                     </tr>
                   ))}
                   {!filteredRecords.length ? (
@@ -527,7 +527,7 @@ export default function HseObservationsPage() {
       {activeView === "qr" ? (
         <ImsPanel title="QR Observation Link" subtitle="Use this link for posters, toolbox talks, vessels, workshops, and client or contractor access.">
           <div style={qrGridStyle}>
-            <div style={qrCardStyle}>
+            <div className="observation-qr-card" style={qrCardStyle}>
               <Image
                 src="/hse-observation-qr.png"
                 alt="QR code for public HSE observation card"
@@ -595,7 +595,7 @@ function ObservationDetail({
 
   return (
     <ImsPanel title={`Observation Detail - ${record.observation_number}`} subtitle="Review the submitted card, open evidence, assign owner, and manage status.">
-      <div style={detailGridStyle}>
+      <div className="observation-detail-grid" style={detailGridStyle}>
         <Info label="Submitted As" value={record.reporter_type || "Quick Fill"} />
         <Info label="Submitted By" value={record.reporter_name || "Not provided"} />
         <Info label="Company / Organisation" value={record.reporter_company} />
@@ -613,7 +613,7 @@ function ObservationDetail({
         <Info label="Suggested Action" value={record.suggested_action} large />
       </div>
 
-      <div style={editPanelStyle}>
+      <div className="observation-edit-panel" style={editPanelStyle}>
         <Field label="Status">
           <select style={imsInputStyle} value={draftStatus} onChange={(event) => setDraftStatus(event.target.value)}>
             {statusOptions.map((status) => <option key={status}>{status}</option>)}

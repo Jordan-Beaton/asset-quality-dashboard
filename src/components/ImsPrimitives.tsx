@@ -97,11 +97,11 @@ export function ImsTopMetaRow({
   actions?: ReactNode;
 }) {
   return (
-    <div style={imsTopMetaRowStyle}>
+    <div className="ims-top-meta-row" style={imsTopMetaRowStyle}>
       <Link href={backHref} style={imsBackLinkStyle}>
         ← {backLabel}
       </Link>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap" }}>
+      <div className="ims-top-meta-actions" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap" }}>
         {actions}
         {status ? <div style={imsStatusBannerStyle}>{status}</div> : null}
       </div>
@@ -121,7 +121,7 @@ export function ImsTabs<T extends string>({
   ariaLabel?: string;
 }) {
   return (
-    <nav style={imsTabListStyle} aria-label={ariaLabel}>
+    <nav className="ims-tabs" style={imsTabListStyle} aria-label={ariaLabel}>
       {tabs.map((tab) => (
         <button
           key={tab.value}
@@ -150,7 +150,7 @@ export function ImsPanel({
   style?: CSSProperties;
 }) {
   return (
-    <section style={{ ...imsPanelStyle, ...style }}>
+    <section className="ims-panel" style={{ ...imsPanelStyle, ...style }}>
       {title ? <ModuleSectionHeader title={title} subtitle={subtitle} actions={actions} /> : null}
       {children}
     </section>
@@ -175,8 +175,8 @@ export function ImsFilterPanel({
   actions?: ReactNode;
 }) {
   return (
-    <div style={imsFilterPanelStyle}>
-      <div style={imsFilterActionRowStyle}>
+    <div className="ims-filter-panel" style={imsFilterPanelStyle}>
+      <div className="ims-filter-action-row" style={imsFilterActionRowStyle}>
         {onSearchChange ? (
           <input
             value={search || ""}
@@ -198,7 +198,7 @@ export function ImsFilterPanel({
           </ImsButton>
         </div>
       </div>
-      {showFilters ? <div style={imsFilterGridStyle}>{children}</div> : null}
+      {showFilters ? <div className="ims-filter-grid" style={imsFilterGridStyle}>{children}</div> : null}
     </div>
   );
 }
