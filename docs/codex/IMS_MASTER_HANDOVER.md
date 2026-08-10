@@ -27,6 +27,7 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - IMS Home is a compact access launchpad, not a dashboard. Preserve its official synchronized Enshore animation, equal-size permission-aware workspace cards, six desktop view layouts, persisted desktop preference, and phone-only simple list behavior as defined in `UI_STANDARDS.md`.
 - At phone widths IMS Home deliberately becomes a simple workspace list without the view selector. Across secured modules, preserve the shared bottom navigation, automatic labelled register cards, expandable secondary row fields, compact collapsible panels, one-column forms, and unchanged desktop behavior.
 - Read `MOBILE_COMPATIBILITY_HANDOVER.md` before changing responsive behavior. It defines the shared breakpoint, register-card engine, public/field exceptions, device QA matrix, and desktop-preservation checks.
+- Mobile compatibility is a mandatory definition of done for every new module, route, tab, form, register and dialog. AppShell applies the shared responsive contract automatically; do not remove or bypass `ims-responsive-contract`, `MobileCompatibilityGuard`, or `MobileTableEnhancer`.
 - Do not create one-off local styles unless absolutely necessary.
 - If a matching pattern exists in Quality Management, copy the structure first and change only wording/data.
 
@@ -56,3 +57,7 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - Project Management with Wadden Sea workspace
 - Lessons Learned central knowledge repository
 - Admin / Settings
+
+## Latest Workflow Note
+
+- HSE AINM Part 1/Part 2 now supports inline department-controlled central Action creation, Part 1 containment terminology and attachment `Other` detail, and fuller labelled Word/compiled PDF outputs. See `HSE_HANDOVER.md` and `ACTION_MANAGEMENT_HANDOVER.md` before changing this flow.

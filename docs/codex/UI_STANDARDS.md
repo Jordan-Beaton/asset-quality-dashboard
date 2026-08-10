@@ -538,6 +538,8 @@ Mobile behavior should be deliberate, not left to accidental wrapping.
 
 Standards:
 
+- Every AppShell page inherits `ims-responsive-contract`. New modules and tabs must work within that contract rather than waiting for a later mobile retrofit.
+- `MobileCompatibilityGuard.tsx` audits phone-width layouts during development and reports horizontal-overflow offenders. Treat its warning as a defect, not an optional polish item.
 - The shared AppShell converts the desktop side rail to a compact bottom navigation at `720px` and below; do not add page-local competing mobile navigation.
 - `src/components/MobileTableEnhancer.tsx` is the default register-card mechanism. Do not recreate its behavior independently in each module.
 - Standard IMS tables are enhanced centrally into labelled mobile cards. Priority fields remain visible and secondary fields use the row-level `Expand` / `Collapse` control.
@@ -554,6 +556,17 @@ Standards:
 - Public form cards should use the full available width without horizontal page overflow. Controls must use `width: 100%`, `max-width: 100%`, `min-width: 0`, `box-sizing: border-box`, and a `16px` phone font size.
 - Preserve desktop inline layout values above `720px`. Responsive corrections should be scoped to the shared phone breakpoint or a narrower route-specific breakpoint.
 
+New module/tab definition of done:
+
+- Uses AppShell and retains the `ims-responsive-contract` page container.
+- Uses shared IMS primitives for tabs, panels, filters, controls and actions.
+- Has no horizontal page overflow at `320px`, `390px` and `430px` widths.
+- Keeps inputs, selects, textareas, uploads, embedded content and dialogs within the viewport.
+- Uses labelled mobile cards for standard tables or documents an explicit `data-mobile-table="scroll"` exception.
+- Keeps all actions reachable with touch targets around `42px` or taller.
+- Preserves create/edit/read-only permissions and linked-record behavior on mobile.
+- Is checked at desktop width to prove the responsive work did not alter the desktop layout.
+
 Public HSE Observation Card:
 
 - `/observe` is the public QR destination and has no standard AppShell header, side rail, bottom navigation, or authentication requirement.
@@ -568,6 +581,13 @@ Mobile HSE inspection behavior is the current best benchmark for complex field w
 - Register cards instead of dense table rows.
 - Checklist items as stacked mobile cards.
 - Evidence upload remains close to the checklist item.
+
+Field Tools launchers:
+
+- Direct field launchers must remain permission-aware and reuse the authoritative module workflow rather than creating a second data path.
+- Query-driven field modes may hide dashboard KPIs and workspace tabs, use the compact AppShell field header, and return to `/field-tools`.
+- Put essential capture fields first. Secondary ownership, classification and follow-up data should use a clearly labelled expandable section such as `Optional detail`.
+- After a successful repeatable field capture, clear the form and keep the field workflow ready unless the process specifically requires opening the saved record.
 
 ## Typography
 

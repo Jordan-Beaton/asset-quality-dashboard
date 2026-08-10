@@ -17,12 +17,18 @@ This file is the permanent implementation and QA reference for phone compatibili
 
 - `src/components/AppShell.tsx`: header, navigation, page-container modes and mobile table enhancer mounting.
 - `src/components/MobileTableEnhancer.tsx`: central register-card enhancement.
+- `src/components/MobileCompatibilityGuard.tsx`: automatic development-time phone overflow audit for every AppShell route.
 - `src/components/ImsPrimitives.tsx`: shared panels, filters, tabs, buttons and mobile panel controls.
 - `app/globals.css`: shared breakpoints, bottom navigation, grid/form constraints, register cards and specialist Observation Register cards.
 - `app/observe/page.tsx`: public QR Observation Card and its narrower phone-specific rules.
+- `app/field-tools/page.tsx`: permission-aware direct launchers, including Lessons Learned field capture.
+- `app/lessons-learned/page.tsx`: shared full workspace plus the query-driven compact field-entry mode.
 
 ## Mandatory Rules
 
+- Mobile compatibility is part of the acceptance criteria for every new module, route, tab, form, register and dialog; it is not a later enhancement phase.
+- AppShell automatically applies `ims-responsive-contract` and `data-mobile-contract="v1"`. Do not remove or replace them on module pages.
+- Resolve every development warning from `MobileCompatibilityGuard` before treating responsive work as complete.
 - Do not change desktop sizing or layout to solve a phone issue. Scope fixes to `720px`, `520px`, or an explicit field/public modifier.
 - Do not create a second page-local register-card system. Use the shared enhancer unless the workflow already has a justified specialist mobile representation.
 - Standard tables must have a proper `thead` so mobile cards receive meaningful labels.
@@ -31,6 +37,20 @@ This file is the permanent implementation and QA reference for phone compatibili
 - All phone controls must remain within their card, use border-box sizing, and avoid horizontal page overflow.
 - Keep touch targets approximately `42px` or taller and form font sizes at `16px` to avoid browser zoom on focus.
 - Preserve permissions, route behavior, linked records, evidence controls and generated-output actions during responsive changes.
+
+## Automatic Future-Module Contract
+
+Any new route rendered inside AppShell automatically receives:
+
+- Compact phone header/page spacing and bottom module navigation.
+- One-column inline grids and contained grid children.
+- Full-width, border-box inputs, selects, textareas, uploads, forms, fieldsets and labels.
+- Contained media, embedded content, code blocks and dialogs.
+- Touch-sized primary actions and horizontally scrollable tabs.
+- Shared panel Collapse/Expand and standard table-to-card enhancement.
+- A development-time horizontal-overflow audit identifying offending elements.
+
+This foundation reduces retrofit work but does not replace the device QA matrix. Matrix-like tables may use the documented scroll opt-out; specialist field workflows should use a dedicated compact mode while retaining the authoritative data path.
 
 ## Public Observation Card Standard
 
@@ -75,6 +95,14 @@ For each tested route confirm:
 8. Lessons Learned: register expansion, repeat drill-down and evidence.
 9. Risk, People, Management Review and Admin: registers, forms, permissions and outputs.
 10. IMS Home and Field Tools: phone list, module access, QR destinations and permission-aware navigation.
+
+### Lessons Learned field entry
+
+- Field Tools shows `Capture a Lesson` only when the user can access the Lessons Learned module.
+- Destination: `/lessons-learned?view=create&mode=field`.
+- The field mode uses the compact AppShell field header, hides workspace tabs/KPIs, returns to Field Tools, and reuses the normal secured save/evidence workflow.
+- Essential fields remain visible; ownership, contributing factors, dates, repeat grouping and other secondary data sit inside `Optional detail`.
+- Saving clears the form and leaves field mode ready for another capture. The normal desktop Lessons Learned route and layout remain unchanged.
 
 ## Current Remaining Work
 

@@ -31,7 +31,14 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, appr
 - Notification is mobile-friendly; Part 1 and Part 2 remain desktop-focused.
 - Reports include Notification, Part 1, Part 2, and compiled PDF.
 - Report outputs are stored and history is visible.
-- AINM actions link to central actions.
+- Part 1 uses `Immediate Containment Action` terminology in the screen, Word report, and compiled PDF while retaining the existing database field for compatibility.
+- Selecting `Other` in the Part 1 attachments checklist reveals a free-text description; the description persists without a schema change and appears in the Part 1 Word output.
+- Part 1 and Part 2 include an inline central Action Management form with explicit Action Title, Description, Department, Accountable Person, Priority, and Target Date fields.
+- Inline actions are linked to the selected AINM and use the explicitly selected Department; department is not inferred from the accountable person.
+- Opening the full Action form from AINM preserves the AINM link and project context but leaves Action Title, Description, Department, and Accountable Person for manual entry.
+- Part 2 Word and compiled PDF outputs include both legacy AINM tracker actions and linked central actions, with separate Action Title and Description columns and the central action target date.
+- The compiled PDF mirrors the Word report more closely with labelled Part 1 and Part 2 subsections, including corrective actions/recommendations, findings, references, sign-off, and comments.
+- Evidence rows, inline linked-action rows, and the Actions tab use compact layouts with small aligned row controls.
 - Dashboard graphs were recently tidied.
 - Internal and external AINM create/import/save/delete, evidence upload/delete, reviewer creation, and saved compiled PDF generation now have explicit page-level create/edit permission guards with matching disabled controls.
 
@@ -43,6 +50,7 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, appr
 - Register should filter by Accident/Incident.
 - Clicking a register item should scroll directly to the detail panel.
 - Above register/filter/detail polish appears implemented in `app/hse/ainm/page.tsx`; verify on Vercel with real data before clearing this section completely.
+- Verify inline action creation with each Department option, linked Action navigation, Part 1 `Other` text persistence, Part 1 Word output, Part 2 Word output, and the compiled PDF against real AINM records on Vercel.
 
 ## HSE Reports
 

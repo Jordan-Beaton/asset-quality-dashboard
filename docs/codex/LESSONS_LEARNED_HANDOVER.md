@@ -23,6 +23,8 @@ Implemented and live. Production QA and continued data-quality improvement remai
 - Asset uses Asset Management reference data.
 - J and B project records are treated as historic/closed; ENS project records can remain open.
 - Evidence supports photographs and supporting files.
+- Field Tools now includes permission-aware `Capture a Lesson`, linking to `/lessons-learned?view=create&mode=field`.
+- Field mode uses the existing Lessons Learned record, numbering, permission, reference-data and evidence workflows. It shows essential capture fields first, keeps additional classification/ownership fields in expandable `Optional detail`, returns to Field Tools, and stays ready for another capture after save.
 - Repeat groups link recurring lessons and should open the complete linked dataset, not only the source record.
 - “What We’ve Learned” uses a single interactive rotating insight card on a five-second cycle.
 - Historic imports and KPI counts must support substantially more than 1,000 rows.
@@ -50,3 +52,4 @@ Implemented and live. Production QA and continued data-quality improvement remai
 4. Test every KPI/chart drill-down and repeated-record insight link.
 5. Verify Project/People/Asset controlled dropdowns and Add New behavior.
 6. Verify the mobile register cards, secondary-field expansion, repeat-record drill-down and evidence controls on a physical phone while confirming desktop fixed-column behavior is unchanged.
+7. Verify Field Tools -> Capture a Lesson on a physical phone for create/read-only permissions, project selection, optional-detail expansion, photo upload, successful numbering and repeat capture.

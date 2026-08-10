@@ -7,6 +7,7 @@ import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { ImsPermissionNotice, ImsPermissionProvider, type ImsPermissionValue } from "./ImsPermissions";
 import { MobileTableEnhancer } from "./MobileTableEnhancer";
+import { MobileCompatibilityGuard } from "./MobileCompatibilityGuard";
 import { supabase } from "../lib/supabase";
 import { getPermissionTargetFromPath } from "../lib/imsPermissionRegistry";
 
@@ -706,13 +707,16 @@ export default function AppShell({ children }: AppShellProps) {
   const isAinmFieldMode = pathname === "/hse/ainm/field";
   const isAssetInspectionFieldMode = pathname === "/assets/inspection/field";
   const isAssetMaintenanceFieldMode = pathname === "/assets/maintenance/field";
+  const isLessonsFieldMode = isLessonsModule && isFieldInspectionMode;
   const fieldModeTitle = isAinmFieldMode
     ? "HSE AINM Field Entry"
     : isAssetInspectionFieldMode
       ? "Asset Field Inspection"
       : isAssetMaintenanceFieldMode
         ? "Asset Field Maintenance"
-      : "HSE Field Inspection";
+        : isLessonsFieldMode
+          ? "Capture a Lesson"
+          : "HSE Field Inspection";
   const showLogo = !isLoginPage && !isPublicObservationPage;
   const moduleTitle = isFieldToolsPage
     ? "Field Tools"
@@ -813,6 +817,7 @@ export default function AppShell({ children }: AppShellProps) {
         pathname === "/hse/inspections/field" ||
         pathname === "/assets/inspection/field" ||
         pathname === "/assets/maintenance/field" ||
+        (pathname === "/lessons-learned" && params.get("mode") === "field") ||
         (pathname === "/assets/inspection" &&
           window.innerWidth <= 720 &&
           params.get("view") === "create") ||
@@ -990,6 +995,7 @@ export default function AppShell({ children }: AppShellProps) {
   return (
     <ImsPermissionProvider value={activePermission}>
     <MobileTableEnhancer routeKey={pathname} />
+    <MobileCompatibilityGuard routeKey={pathname} />
     <div
       className="ims-app-root"
       style={{ minHeight: "100vh", background: "#f1f5f9", scrollbarGutter: "stable" }}
@@ -1383,11 +1389,12 @@ export default function AppShell({ children }: AppShellProps) {
         <div
           className={
             isFieldInspectionMode
-              ? "ims-page-container ims-page-container--field"
+              ? "ims-page-container ims-responsive-contract ims-page-container--field"
               : isPublicObservationPage
-              ? "ims-page-container ims-page-container--public"
-              : "ims-page-container"
+              ? "ims-page-container ims-responsive-contract ims-page-container--public"
+              : "ims-page-container ims-responsive-contract"
           }
+          data-mobile-contract="v1"
           style={{
             maxWidth: "1320px",
             width: "100%",

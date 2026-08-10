@@ -51,10 +51,21 @@ const assetTools: FieldTool[] = [
   },
 ];
 
+const learningTools: FieldTool[] = [
+  {
+    title: "Capture a Lesson",
+    description: "Record a learning, improvement, or successful practice while it is fresh.",
+    href: "/lessons-learned?view=create&mode=field",
+    icon: <LearningIcon />,
+    note: "Sign-in required",
+  },
+];
+
 export default function FieldToolsPage() {
   const permissions = useImsPermissions();
   const showHse = !permissions.loaded || permissions.canAccessModule("hse");
   const showAssets = !permissions.loaded || permissions.canAccessModule("assets");
+  const showLessons = !permissions.loaded || permissions.canAccessModule("lessons");
 
   return (
     <main style={pageStyle}>
@@ -82,11 +93,12 @@ export default function FieldToolsPage() {
 
       {showHse ? <ToolSection title="HSE" tools={hseTools} /> : null}
       {showAssets ? <ToolSection title="Assets" tools={assetTools} /> : null}
+      {showLessons ? <ToolSection title="Learning" tools={learningTools} /> : null}
 
-      {!showHse && !showAssets ? (
+      {!showHse && !showAssets && !showLessons ? (
         <section style={emptyStyle}>
           <strong>No field tools are assigned to your account.</strong>
-          <span>Ask an IMS administrator to review your HSE or Asset permissions.</span>
+          <span>Ask an IMS administrator to review your HSE, Asset, or Lessons Learned permissions.</span>
         </section>
       ) : null}
     </main>
@@ -122,6 +134,7 @@ function ClipboardIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true" st
 function AlertIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true" style={iconStyle}><path {...iconProps} d="M12 3 21 20H3zM12 9v5M12 17h.01" /></svg>; }
 function ObservationIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true" style={iconStyle}><path {...iconProps} d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" /><circle {...iconProps} cx="12" cy="12" r="2.5" /></svg>; }
 function ToolIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true" style={iconStyle}><path {...iconProps} d="M14 6a4 4 0 0 0-5 5L3.5 16.5l4 4L13 15a4 4 0 0 0 5-5l-3 2-3-3z" /></svg>; }
+function LearningIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true" style={iconStyle}><path {...iconProps} d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22zM20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22z" /></svg>; }
 
 const pageStyle: CSSProperties = { display: "grid", gap: 20 };
 const introStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", border: "1px solid #dbe7f3", borderRadius: 18, background: "#ffffff" };

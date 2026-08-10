@@ -339,6 +339,47 @@ body {
     box-sizing: border-box;
   }
 
+  .ims-responsive-contract main:not(.ims-home-page) form,
+  .ims-responsive-contract main:not(.ims-home-page) fieldset,
+  .ims-responsive-contract main:not(.ims-home-page) label,
+  .ims-responsive-contract main:not(.ims-home-page) details,
+  .ims-responsive-contract main:not(.ims-home-page) article {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .ims-responsive-contract main:not(.ims-home-page) input:not([type="checkbox"]):not([type="radio"]),
+  .ims-responsive-contract main:not(.ims-home-page) select,
+  .ims-responsive-contract main:not(.ims-home-page) textarea {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .ims-responsive-contract main:not(.ims-home-page) iframe,
+  .ims-responsive-contract main:not(.ims-home-page) embed,
+  .ims-responsive-contract main:not(.ims-home-page) object {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .ims-responsive-contract main:not(.ims-home-page) [role="dialog"] {
+    width: min(100%, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - 24px);
+    overflow: auto;
+    box-sizing: border-box;
+  }
+
+  .ims-responsive-contract main:not(.ims-home-page) button,
+  .ims-responsive-contract main:not(.ims-home-page) a[role="button"] {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
   .ims-page-container main:not(.ims-home-page) [style*="grid-template-columns"]:not(.observation-table tr) {
     grid-template-columns: minmax(0, 1fr) !important;
   }

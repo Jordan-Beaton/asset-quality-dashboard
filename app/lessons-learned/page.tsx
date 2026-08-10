@@ -63,6 +63,7 @@ function normaliseChoice(value: unknown, choices: string[], fallback: string) {
   return match || fallback;
 }
 function lessonNo(value: number) { return `LL-${String(value).padStart(5, "0")}`; }
+function todayValue() { return new Date().toISOString().slice(0, 10); }
 function safeFileName(value: string) { return value.replace(/[^a-zA-Z0-9._-]/g, "-"); }
 function textArray(value: string) { return value.split(",").map((item) => item.trim()).filter(Boolean); }
 function topCounts(values: string[], limit = 8) {
@@ -95,6 +96,20 @@ export default function LessonsLearnedPage() {
   const [referenceProjects, setReferenceProjects] = useState<ProjectOption[]>([]);
   const [peopleOptions, setPeopleOptions] = useState<PersonOption[]>([]); const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]);
   const [showNewProject, setShowNewProject] = useState(false); const [newProjectCode, setNewProjectCode] = useState(""); const [newProjectName, setNewProjectName] = useState("");
+  const [isFieldMode, setIsFieldMode] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fieldMode = params.get("mode") === "field";
+    setIsFieldMode(fieldMode);
+    if (fieldMode || params.get("view") === "create") {
+      setSelected(null);
+      setForm(fieldMode ? { ...emptyForm, report_date: todayValue() } : emptyForm);
+      setView("create");
+    } else if (params.get("view") === "register") {
+      setView("register");
+    }
+  }, []);
 
   async function loadAllLessons() {
     const pageSize = 1000;
@@ -317,7 +332,7 @@ export default function LessonsLearnedPage() {
     if (selected) { const { error } = await supabase.from("lessons_learned").update(payload()).eq("id", selected.id); if (error) { setMessage(`Update failed: ${error.message}`); setSaving(false); return; } }
     else { const next = Math.max(0, ...lessons.map((x) => Number(x.lesson_number.replace(/\D/g, "")) || 0)) + 1; const { data, error } = await supabase.from("lessons_learned").insert({ ...payload(), lesson_number: lessonNo(next) }).select("id").single(); if (error) { setMessage(`Create failed: ${error.message}`); setSaving(false); return; } recordId = data.id; }
     const uploadError = await uploadEvidence(recordId); setMessage(uploadError ? `Lesson saved, but evidence failed: ${uploadError}` : "Lesson saved to the central repository.");
-    setSaving(false); setFiles([]); setEvidenceNotes(""); setForm(emptyForm); setSelected(null); await loadData(); setView("register");
+    setSaving(false); setFiles([]); setEvidenceNotes(""); setForm(isFieldMode ? { ...emptyForm, report_date: todayValue() } : emptyForm); setSelected(null); await loadData(); setView(isFieldMode ? "create" : "register");
   }
   async function deleteLesson() { if (!selected || !requireEdit("delete lessons") || !window.confirm(`Delete ${selected.lesson_number}?`)) return; const { error } = await supabase.from("lessons_learned").delete().eq("id", selected.id); setMessage(error ? `Delete failed: ${error.message}` : `${selected.lesson_number} deleted.`); if (!error) { setSelected(null); setForm(emptyForm); await loadData(); } }
   async function openEvidence(item: Evidence) { const { data, error } = await supabase.storage.from("lessons-learned-evidence").createSignedUrl(item.file_path, 300); if (error) setMessage(`Evidence open failed: ${error.message}`); else window.open(data.signedUrl, "_blank", "noopener,noreferrer"); }
@@ -372,18 +387,18 @@ export default function LessonsLearnedPage() {
   }
 
   const chartTooltip = { contentStyle: { borderRadius: 12, border: "1px solid #dbe7f3", fontSize: 12 } };
-  return <ReferenceContext.Provider value={{ projects: referenceProjects, people: peopleOptions, assets: assetOptions, onSelectProject: selectProjectReference, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject: addProjectReference }}><main>
-    <QualityPageHero label="LESSONS LEARNED" title="Lessons Learned" description="Central repository for searchable project knowledge, repeat-failure prevention, evidence, actions, and trend analysis." />
-    <ImsTopMetaRow backHref="/home" backLabel="Back to IMS Home" actions={<ImsButton variant="secondary" onClick={() => void loadData()}>Refresh</ImsButton>} status={<><strong>Status:</strong> {message}</>} />
-    <ImsTabs tabs={tabs} active={view} onChange={(next) => { setView(next); if (next === "create") { setSelected(null); setForm(emptyForm); } }} ariaLabel="Lessons Learned views" />
-    <section style={kpiGrid}>
+  return <ReferenceContext.Provider value={{ projects: referenceProjects, people: peopleOptions, assets: assetOptions, onSelectProject: selectProjectReference, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject: addProjectReference }}><main className={isFieldMode ? "lessons-field-mode" : undefined}>
+    {isFieldMode ? <section style={fieldIntroStyle}><span style={fieldIntroIconStyle}><LearningFieldIcon /></span><span><strong style={fieldIntroTitleStyle}>Capture a Lesson</strong><small style={fieldIntroTextStyle}>Record the learning now; optional detail can be added or refined later.</small></span></section> : <QualityPageHero label="LESSONS LEARNED" title="Lessons Learned" description="Central repository for searchable project knowledge, repeat-failure prevention, evidence, actions, and trend analysis." />}
+    <ImsTopMetaRow backHref={isFieldMode ? "/field-tools" : "/home"} backLabel={isFieldMode ? "Back to Field Tools" : "Back to IMS Home"} actions={!isFieldMode ? <ImsButton variant="secondary" onClick={() => void loadData()}>Refresh</ImsButton> : undefined} status={<><strong>Status:</strong> {message}</>} />
+    {!isFieldMode ? <ImsTabs tabs={tabs} active={view} onChange={(next) => { setView(next); if (next === "create") { setSelected(null); setForm(emptyForm); } }} ariaLabel="Lessons Learned views" /> : null}
+    {!isFieldMode ? <section style={kpiGrid}>
       <QualityKpiCard title="Total Lessons" value={kpis.total} accent={imsColours.brand} active={analysisFilter === "all" && analysisLabel === "All lessons"} onClick={() => { clearAllFilters(); setView("register"); }} />
       <QualityKpiCard title="Open Actions" value={kpis.open} accent={imsColours.warning} active={analysisFilter === "open-actions"} onClick={() => openAnalysis("open-actions", "Open actions requiring follow-up")} />
       <QualityKpiCard title="High / Critical" value={kpis.high} accent={imsColours.danger} active={analysisFilter === "high-critical"} onClick={() => openAnalysis("high-critical", "High and critical lessons")} />
       <QualityKpiCard title="Repeated Lessons" value={kpis.repeats} accent={imsColours.purple} active={analysisFilter === "repeat-lessons"} onClick={() => openAnalysis("repeat-lessons", "Lessons in repeated themes")} />
       <QualityKpiCard title="Unowned Actions" value={kpis.unowned} accent={imsColours.blue} active={analysisFilter === "unowned-actions"} onClick={() => openAnalysis("unowned-actions", "Open actions without an owner")} />
       <QualityKpiCard title="Cross-Project Repeats" value={kpis.crossProject} accent={imsColours.success} active={analysisFilter === "cross-project-repeats"} onClick={() => openAnalysis("cross-project-repeats", "Repeat lessons affecting multiple projects")} />
-    </section>
+    </section> : null}
 
     {view === "dashboard" && <div style={twoColumn}>
       <ImsPanel title="What We’ve Learned" subtitle="Clear, reusable takeaways from sufficiently complete failure records. Weak and duplicated historic wording is excluded." style={{ gridColumn: "1 / -1" }}>
@@ -420,7 +435,7 @@ export default function LessonsLearnedPage() {
       <section ref={detailRef}>{selected ? <LessonForm title={`${selected.lesson_number} · ${selected.subject}`} subtitle="Review the full learning record, update ownership and repeat grouping, and add photo evidence." form={form} update={update} files={files} setFiles={setFiles} evidenceNotes={evidenceNotes} setEvidenceNotes={setEvidenceNotes} saving={saving} onSave={saveLesson} onDelete={deleteLesson} onClose={() => { setSelected(null); setForm(emptyForm); }} evidence={evidence.filter((x) => x.record_id === selected.id)} onOpenEvidence={openEvidence} /> : <ImsPanel><p style={muted}>Click a row to open the full detail and edit panel.</p></ImsPanel>}</section>
     </>}
 
-    {view === "create" && <LessonForm title="Create a New Lesson" subtitle="Capture what happened without blame, why it happened, what should change, who owns the action, and how teams can find it." form={form} update={update} files={files} setFiles={setFiles} evidenceNotes={evidenceNotes} setEvidenceNotes={setEvidenceNotes} saving={saving} onSave={saveLesson} evidence={[]} onOpenEvidence={openEvidence} />}
+    {view === "create" && <LessonForm fieldMode={isFieldMode} title={isFieldMode ? "New Field Lesson" : "Create a New Lesson"} subtitle={isFieldMode ? "Complete the essential fields, add a photo if useful, then expand Optional detail only when needed." : "Capture what happened without blame, why it happened, what should change, who owns the action, and how teams can find it."} form={form} update={update} files={files} setFiles={setFiles} evidenceNotes={evidenceNotes} setEvidenceNotes={setEvidenceNotes} saving={saving} onSave={saveLesson} evidence={[]} onOpenEvidence={openEvidence} />}
 
     {view === "import" && <ImsPanel title="Master Lessons Learned Excel Import" subtitle="Maps the supplied 18-column master workbook into the central repository. Existing project/subject/issue matches are flagged before import.">
       <div style={formGrid}><Field label="Excel File"><input type="file" accept=".xlsx,.xls" onChange={previewImport} style={imsInputStyle} /></Field><div style={importSummary}><strong>{importName || "No workbook selected"}</strong><span>{importRows.length ? `${importRows.length.toLocaleString()} rows · ${importRows.filter((x) => !x.errors.length).length.toLocaleString()} ready · ${importRows.filter((x) => !x.errors.length && x.warnings.length).length.toLocaleString()} mapped · ${importRows.filter((x) => x.errors.length).length.toLocaleString()} blocked` : "Select the Enshore master workbook to validate it."}</span></div></div>
@@ -440,11 +455,50 @@ function ControlledSelect({ value, onChange, placeholder, options }: { value: st
 function Textarea({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder?: string }) { return <textarea value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} style={{ ...imsInputStyle, minHeight: 104, resize: "vertical" }} />; }
 function Pill({ text, colour }: { text: string; colour: string }) { return <span style={{ background: `${colour}18`, color: colour, border: `1px solid ${colour}44`, borderRadius: 999, padding: "4px 8px", fontSize: 11, fontWeight: 800 }}>{text}</span>; }
 function ChartFrame({ children, height = 300 }: { children: React.ReactNode; height?: number }) { return <div style={{ width: "100%", minWidth: 0, height }}><ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>{children}</ResponsiveContainer></div>; }
-function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNotes, setEvidenceNotes, saving, onSave, onDelete, onClose, evidence, onOpenEvidence }: { title: string; subtitle: string; form: typeof emptyForm; update: (name: keyof typeof emptyForm, value: string) => void; files: File[]; setFiles: (files: File[]) => void; evidenceNotes: string; setEvidenceNotes: (value: string) => void; saving: boolean; onSave: () => void; onDelete?: () => void; onClose?: () => void; evidence: Evidence[]; onOpenEvidence: (item: Evidence) => void }) {
+function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNotes, setEvidenceNotes, saving, onSave, onDelete, onClose, evidence, onOpenEvidence, fieldMode = false }: { title: string; subtitle: string; form: typeof emptyForm; update: (name: keyof typeof emptyForm, value: string) => void; files: File[]; setFiles: (files: File[]) => void; evidenceNotes: string; setEvidenceNotes: (value: string) => void; saving: boolean; onSave: () => void; onDelete?: () => void; onClose?: () => void; evidence: Evidence[]; onOpenEvidence: (item: Evidence) => void; fieldMode?: boolean }) {
   const references = useContext(ReferenceContext);
   if (!references) return null;
   const { projects, people, assets, onSelectProject, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject } = references;
   const selectedProjectId = projects.find((item) => item.code === form.project_code && item.name === form.project_name)?.id || "";
+  if (fieldMode) return <ImsPanel title={title} subtitle={subtitle}>
+    <div style={fieldFormGrid}>
+      <Field label="Project"><select value={selectedProjectId} onChange={(e) => onSelectProject(e.target.value)} style={imsInputStyle}><option value="">Select project</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.code ? `${item.code} · ${item.name}` : item.name}</option>)}<option value="__add_new__">+ Add New Project</option></select></Field>
+      {showNewProject && <div style={fieldNewProjectPanel}><Field label="New Project Code"><Input value={newProjectCode} onChange={setNewProjectCode} placeholder="e.g. ENS26-001" /></Field><Field label="New Project Name"><Input value={newProjectName} onChange={setNewProjectName} placeholder="Official project name" /></Field><div style={actionRow}><ImsButton onClick={() => void onAddProject()}>Add Project</ImsButton><ImsButton variant="secondary" onClick={() => setShowNewProject(false)}>Cancel</ImsButton></div></div>}
+      <Field label="Report Date"><Input type="date" value={form.report_date} onChange={(x) => update("report_date", x)} /></Field>
+      <Field label="Vessel / Office"><Input value={form.vessel_office} onChange={(x) => update("vessel_office", x)} placeholder="Where did this learning arise?" /></Field>
+      <Field label="Department"><Input value={form.department} onChange={(x) => update("department", x)} /></Field>
+      <Field label="Outcome"><select value={form.outcome_type} onChange={(e) => update("outcome_type", e.target.value)} style={imsInputStyle}>{["Failure", "Success", "Opportunity"].map((x) => <option key={x}>{x}</option>)}</select></Field>
+      <Field label="Criticality"><select value={form.criticality} onChange={(e) => update("criticality", e.target.value)} style={imsInputStyle}>{["Low", "Medium", "High", "Critical"].map((x) => <option key={x}>{x}</option>)}</select></Field>
+      <Field label="Subject"><Input value={form.subject} onChange={(x) => update("subject", x)} placeholder="Short, searchable summary" /></Field>
+      <Field label="What Happened?"><Textarea value={form.issue_description} onChange={(x) => update("issue_description", x)} placeholder="Describe the event or successful practice without blame." /></Field>
+      <Field label="Lesson Learned"><Textarea value={form.lesson_learned} onChange={(x) => update("lesson_learned", x)} placeholder="What should another team know or repeat?" /></Field>
+      <Field label="Recommended Action"><Textarea value={form.recommended_action} onChange={(x) => update("recommended_action", x)} placeholder="What should happen next, if anything?" /></Field>
+      <Field label="Photo / File Evidence"><input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xlsx" onChange={(e) => setFiles(Array.from(e.target.files || []))} style={imsInputStyle} /></Field>
+      <Field label="Evidence Note"><Input value={evidenceNotes} onChange={setEvidenceNotes} placeholder={files.length ? `${files.length} file(s) selected` : "Optional description"} /></Field>
+    </div>
+    <details style={fieldOptionalStyle}>
+      <summary style={fieldOptionalSummaryStyle}>Optional detail</summary>
+      <p style={fieldOptionalTextStyle}>Add ownership, contributing factors, dates, classifications, or repeat-theme information when available.</p>
+      <div style={fieldFormGrid}>
+        <Field label="Date of Incident"><Input type="date" value={form.incident_date} onChange={(x) => update("incident_date", x)} /></Field>
+        <Field label="Asset"><ControlledSelect value={form.assets} onChange={(x) => update("assets", x)} placeholder="Select asset" options={assets.map((item) => ({ value: item.name, label: item.code ? `${item.code} · ${item.name}` : item.name }))} /></Field>
+        <Field label="Stage / Phase"><Input value={form.stage_phase} onChange={(x) => update("stage_phase", x)} /></Field>
+        <Field label="Originator"><ControlledSelect value={form.originator} onChange={(x) => update("originator", x)} placeholder="Select from People Management" options={people.map((item) => ({ value: item.name, label: item.role ? `${item.name} · ${item.role}` : item.name }))} /></Field>
+        <Field label="Line Manager"><ControlledSelect value={form.line_manager} onChange={(x) => update("line_manager", x)} placeholder="Select from People Management" options={people.map((item) => ({ value: item.name, label: item.role ? `${item.name} · ${item.role}` : item.name }))} /></Field>
+        <Field label="Status"><select value={form.status} onChange={(e) => update("status", e.target.value)} style={imsInputStyle}>{["Open", "In Progress", "Implemented", "Shared", "Closed"].map((x) => <option key={x}>{x}</option>)}</select></Field>
+        <Field label="Impact Rating"><select value={form.impact_rating} onChange={(e) => update("impact_rating", e.target.value)} style={imsInputStyle}>{["Low", "Medium", "High", "Critical"].map((x) => <option key={x}>{x}</option>)}</select></Field>
+        <Field label="Root Cause / Contributing Factors"><Textarea value={form.root_cause} onChange={(x) => update("root_cause", x)} /></Field>
+        <Field label="Action Taken"><Textarea value={form.action_taken} onChange={(x) => update("action_taken", x)} /></Field>
+        <Field label="Action Owner"><Input value={form.action_owner} onChange={(x) => update("action_owner", x)} /></Field>
+        <Field label="Target Date"><Input type="date" value={form.target_date} onChange={(x) => update("target_date", x)} /></Field>
+        <Field label="Completion Date"><Input type="date" value={form.completion_date} onChange={(x) => update("completion_date", x)} /></Field>
+        <Field label="Repeat Group"><Input value={form.repeat_group} onChange={(x) => update("repeat_group", x)} /></Field>
+        <Field label="Keywords"><Input value={form.keywords} onChange={(x) => update("keywords", x)} placeholder="Comma-separated" /></Field>
+        <Field label="Source File"><Input value={form.source_file} onChange={(x) => update("source_file", x)} /></Field>
+      </div>
+    </details>
+    <div style={fieldSaveRowStyle}><ImsButton onClick={() => void onSave()} disabled={saving}>{saving ? "Saving..." : "Save Lesson"}</ImsButton></div>
+  </ImsPanel>;
   return <ImsPanel title={title} subtitle={subtitle}><div style={formGrid}>
     <Field label="Project Code"><select value={selectedProjectId} onChange={(e) => onSelectProject(e.target.value)} style={imsInputStyle}><option value="">Select project code</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.code || "No code"}</option>)}<option value="__add_new__">+ Add New Project</option></select></Field><Field label="Project Name"><select value={selectedProjectId} onChange={(e) => onSelectProject(e.target.value)} style={imsInputStyle}><option value="">Select project name</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}<option value="__add_new__">+ Add New Project</option></select></Field>
     {showNewProject && <div style={newProjectPanel}><Field label="New Project Code"><Input value={newProjectCode} onChange={setNewProjectCode} placeholder="e.g. ENS26-001" /></Field><Field label="New Project Name"><Input value={newProjectName} onChange={setNewProjectName} placeholder="Official project name" /></Field><div style={actionRow}><ImsButton onClick={() => void onAddProject()}>Add Project</ImsButton><ImsButton variant="secondary" onClick={() => setShowNewProject(false)}>Cancel</ImsButton></div></div>}
@@ -497,3 +551,15 @@ const evidenceCard: CSSProperties = { display: "grid", gap: 5, padding: 12, text
 const importSummary: CSSProperties = { display: "grid", gap: 7, alignContent: "center", padding: 12, background: imsColours.panelAlt, borderRadius: 12, color: imsColours.slate };
 const activeAnalysisStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12, padding: "10px 12px", borderRadius: 12, background: imsColours.brandSoft, border: `1px solid ${imsColours.brandBorder}`, color: imsColours.brandDark, fontSize: 13 };
 const loadingOverlay: CSSProperties = { position: "fixed", right: 24, bottom: 24, padding: "12px 16px", background: imsColours.ink, color: "white", borderRadius: 12, boxShadow: "0 14px 28px rgba(15,23,42,.2)", zIndex: 20 };
+const fieldIntroStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: 14, borderRadius: 16, border: `1px solid ${imsColours.brandBorder}`, background: "#ffffff", boxShadow: "0 1px 3px rgba(15,23,42,.08)" };
+const fieldIntroIconStyle: CSSProperties = { flex: "0 0 auto", width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 13, background: imsColours.brand, color: "#ffffff" };
+const fieldIntroTitleStyle: CSSProperties = { display: "block", color: imsColours.ink, fontSize: 18, lineHeight: 1.2 };
+const fieldIntroTextStyle: CSSProperties = { display: "block", marginTop: 4, color: imsColours.slate, fontSize: 13, lineHeight: 1.4 };
+const fieldFormGrid: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12 };
+const fieldNewProjectPanel: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, padding: 12, borderRadius: 12, border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft };
+const fieldOptionalStyle: CSSProperties = { marginTop: 14, border: `1px solid ${imsColours.brandBorder}`, borderRadius: 14, background: imsColours.panelAlt, padding: "0 12px 12px" };
+const fieldOptionalSummaryStyle: CSSProperties = { minHeight: 44, display: "flex", alignItems: "center", cursor: "pointer", color: imsColours.brandDark, fontSize: 14, fontWeight: 900 };
+const fieldOptionalTextStyle: CSSProperties = { margin: "0 0 12px", color: imsColours.slate, fontSize: 13, lineHeight: 1.45 };
+const fieldSaveRowStyle: CSSProperties = { position: "sticky", bottom: 0, zIndex: 5, display: "grid", margin: "16px -12px -12px", padding: "12px", borderTop: `1px solid ${imsColours.brandBorder}`, background: "rgba(255,255,255,.96)", backdropFilter: "blur(8px)" };
+
+function LearningFieldIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 25, height: 25 }} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22zM20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22z" /></svg>; }
