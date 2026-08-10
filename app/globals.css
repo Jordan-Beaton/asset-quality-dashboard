@@ -352,6 +352,91 @@ body {
     -webkit-overflow-scrolling: touch;
   }
 
+  .ims-page-container table.ims-mobile-card-table {
+    display: block;
+    min-width: 0 !important;
+    overflow: visible;
+    background: transparent !important;
+  }
+
+  .ims-mobile-card-table thead {
+    display: none;
+  }
+
+  .ims-mobile-card-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .ims-mobile-card-table tbody > tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px 12px;
+    padding: 12px;
+    border: 1px solid #dbe3ef;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  }
+
+  .ims-mobile-card-table tbody > tr > td {
+    display: grid;
+    align-content: start;
+    gap: 3px;
+    min-width: 0;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow-wrap: anywhere;
+  }
+
+  .ims-mobile-card-table tbody > tr > td::before {
+    content: attr(data-mobile-label);
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .ims-mobile-card-table tbody > tr > td:first-child {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ims-mobile-card-table tbody > tr > td:first-child::before {
+    grid-column: 1 / -1;
+  }
+
+  .ims-mobile-card-table .ims-mobile-card-secondary {
+    display: none;
+  }
+
+  .ims-mobile-card-table tr[data-mobile-expanded="true"] .ims-mobile-card-secondary {
+    display: grid;
+  }
+
+  .ims-mobile-row-toggle {
+    min-height: 32px !important;
+    padding: 5px 9px;
+    border: 1px solid #D0D0CE;
+    border-radius: 8px;
+    background: #ECECE7;
+    color: #005670;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .ims-mobile-card-table td[colspan] {
+    grid-column: 1 / -1;
+    display: block !important;
+    padding: 16px !important;
+  }
+
   .ims-page-container main:not(.ims-home-page) img,
   .ims-page-container main:not(.ims-home-page) video,
   .ims-page-container main:not(.ims-home-page) canvas {

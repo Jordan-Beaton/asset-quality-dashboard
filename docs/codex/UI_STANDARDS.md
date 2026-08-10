@@ -538,6 +538,10 @@ Mobile behavior should be deliberate, not left to accidental wrapping.
 
 Standards:
 
+- The shared AppShell converts the desktop side rail to a compact bottom navigation at `720px` and below; do not add page-local competing mobile navigation.
+- Standard IMS tables are enhanced centrally into labelled mobile cards. Priority fields remain visible and secondary fields use the row-level `Expand` / `Collapse` control.
+- Tables that must retain horizontal scrolling can opt out with `data-mobile-table="scroll"`; use this only where card conversion would damage meaning.
+- Shared `ImsPanel` sections expose phone-only `Collapse` / `Expand` controls while remaining permanently expanded on desktop.
 - Use `auto-fit/minmax` grids or explicit mobile style branches for complex workflows.
 - At around `720px` and below, dense registers/checklists should become single-column/card layouts when needed.
 - Field/mobile modes can simplify header and remove side rail.
@@ -632,6 +636,6 @@ Before implementing a page:
 - Some report pages match the visual pattern but still use local style constants rather than shared primitives.
 - Asset Management layout remains less standardised than Quality/HSE.
 - Some HSE parked pages, such as PTW and removed/legacy tabs, may not represent the target standard.
-- Complex mobile behavior is implemented well in HSE inspections but is not uniformly applied across all registers.
+- Complex mobile behavior uses the shared AppShell/table/panel foundation across all registers, with HSE inspections remaining the reference for specialised checklist and evidence workflows.
 
 When touching these areas, prefer moving toward the standards above without risky rewrites.

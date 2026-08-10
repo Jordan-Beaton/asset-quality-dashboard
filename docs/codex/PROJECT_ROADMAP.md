@@ -12,6 +12,8 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Official 2026 Enshore primary colour/reverse logo artwork is now canonical across the IMS and generated PDF/Word outputs, with fixed 2:1 fitting, protected clear space, compliant minimum print sizing, and the HSE Observation 3Rs campaign logo preserved as the sole approved exception.
 - IMS Home is now a dedicated permission-aware launchpad with a compact Enshore dark-blue animated header, synchronized official outline-logo video treatments, equal-size workspace cards, pronounced hover interactions, and six selectable access layouts: Card grid, Spotlight, Compact tiles, List, Two columns, and IMS hub. The selected layout persists locally between browser sessions.
 - Shared visual primitives exist for hero banners, KPI cards, section headers, top meta rows, tabs, panels, filter panels, buttons, and links.
+- Whole-IMS phone compatibility now has a shared foundation: compact header and bottom navigation, single-column forms/grids, constrained media and overflow, touch-sized controls, phone-only collapsible panels, and automatic labelled register cards with expandable secondary fields. Desktop layouts remain unchanged above the mobile breakpoint.
+- IMS Home uses a fixed simple workspace list on phones with no view selector, while desktop retains the six selectable layouts. Main return links are standardised to `Back to IMS Home` and `/home`; contextual project/submodule return links remain specific.
 - Quality dashboard has live KPI/story-style graphics and is the main layout benchmark.
 - NCR is now NCR-only in visible UI, with register/create/report layout, clickable KPIs, Excel import, owner dropdown, filtered PDF, and linked Action creation.
 - Audits have internal tabs, clickable KPIs, evidence upload/open/delete on findings, finding PDF/Word output, and People dropdown for internal lead auditor.
@@ -68,7 +70,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Admin permission-registry production QA: verify legacy fallback, explicit Full/Part/None saves, new-user defaults, and route denial for Lessons Learned and each Project Management area.
 - Access-request production QA after applying the latest `admin_settings.sql`: public validation, duplicate prevention, Home notification, view-only permission preparation, approval/rejection status, audit history and invite/setup-link fallback.
 - Report page migration from local style constants toward shared IMS primitives.
-- Mobile responsiveness beyond the best-developed HSE inspection flow.
+- Production/device QA of the shared whole-IMS mobile card, panel, bottom-navigation, upload, and form behavior across representative permissions and real data.
 - Risk Management shell and workflows.
 - Project Management production QA for saved NOI reopen/edit/delete, controlled document storage, sequential numbering, planned-date synchronisation, and mobile responsiveness.
 - Lessons Learned production QA for the 2,990-row import, uncapped KPI totals, cumulative filters, controlled dropdowns and repeat-record drill-downs.

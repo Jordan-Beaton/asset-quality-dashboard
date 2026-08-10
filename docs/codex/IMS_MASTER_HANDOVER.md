@@ -25,6 +25,7 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - Enshore dark-blue hero bars, back/status rows, internal tabs, KPI cards, filters, detail panels, and report layouts should stay consistent.
 - The approved 2026 Enshore palette and restricted-colour rules are defined in `UI_STANDARDS.md`; do not reintroduce the legacy teal palette.
 - IMS Home is a compact access launchpad, not a dashboard. Preserve its official synchronized Enshore animation, equal-size permission-aware workspace cards, six supported view layouts, persisted last-view preference, and responsive IMS hub behavior as defined in `UI_STANDARDS.md`.
+- At phone widths IMS Home deliberately becomes a simple workspace list without the view selector. Across secured modules, preserve the shared bottom navigation, automatic labelled register cards, expandable secondary row fields, compact collapsible panels, one-column forms, and unchanged desktop behavior.
 - Do not create one-off local styles unless absolutely necessary.
 - If a matching pattern exists in Quality Management, copy the structure first and change only wording/data.
 

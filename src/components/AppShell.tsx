@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { FormEvent, MouseEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { ImsPermissionNotice, ImsPermissionProvider, type ImsPermissionValue } from "./ImsPermissions";
+import { MobileTableEnhancer } from "./MobileTableEnhancer";
 import { supabase } from "../lib/supabase";
 import { getPermissionTargetFromPath } from "../lib/imsPermissionRegistry";
 
@@ -988,6 +989,7 @@ export default function AppShell({ children }: AppShellProps) {
 
   return (
     <ImsPermissionProvider value={activePermission}>
+    <MobileTableEnhancer routeKey={pathname} />
     <div
       style={{ minHeight: "100vh", background: "#f1f5f9", scrollbarGutter: "stable" }}
       onClickCapture={handlePermissionClickCapture}
