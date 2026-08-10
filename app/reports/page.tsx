@@ -412,7 +412,7 @@ export default function ReportsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isDraftingSummary, setIsDraftingSummary] = useState(false);
-  const [logoFileName, setLogoFileName] = useState("/enshore-logo.png");
+  const [logoFileName, setLogoFileName] = useState("/enshore-primary-logo-colour.png");
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
   const [form, setForm] = useState<ReportForm>(defaultForm);
   const [savedReportSearch, setSavedReportSearch] = useState("");
@@ -928,11 +928,11 @@ export default function ReportsPage() {
         const logoResponse = await fetch(logoFileName);
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
-          const logoFile = new File([logoBlob], "enshore-logo.png", {
+          const logoFile = new File([logoBlob], "enshore-primary-logo-colour.png", {
             type: logoBlob.type || "image/png",
           });
           const logoDataUrl = await toDataUrl(logoFile);
-          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 22);
+          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 24);
         }
       } catch {
         // Keep PDF generation resilient if the logo cannot be loaded.
@@ -1093,9 +1093,9 @@ export default function ReportsPage() {
           <button
             type="button"
             style={secondaryButtonStyle}
-            onClick={() => setLogoFileName("/enshore-logo.png")}
+            onClick={() => setLogoFileName("/enshore-primary-logo-colour.png")}
           >
-            Use /enshore-logo.png
+            Use /enshore-primary-logo-colour.png
           </button>
           <button
             type="button"

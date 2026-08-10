@@ -552,7 +552,7 @@ export default function HseReportsPage() {
       const margin = 14;
 
       try {
-        const logoResponse = await fetch("/enshore-logo.png");
+        const logoResponse = await fetch("/enshore-primary-logo-colour.png");
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
           const reader = new FileReader();
@@ -561,7 +561,7 @@ export default function HseReportsPage() {
             reader.onerror = () => reject(reader.error);
             reader.readAsDataURL(logoBlob);
           });
-          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 22);
+          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 24);
         }
       } catch {
         // PDF can still be produced without the logo.
@@ -767,7 +767,7 @@ export default function HseReportsPage() {
 
         <div style={topActionsStyle}>
           <button type="button" style={secondaryButtonStyle}>
-            Use /enshore-logo.png
+            Use /enshore-primary-logo-colour.png
           </button>
           <button type="button" style={pdfButtonStyle} onClick={() => void generatePdfReport()} disabled={isGeneratingPdf}>
             {isGeneratingPdf ? "Generating PDF..." : "Generate Monthly PDF"}

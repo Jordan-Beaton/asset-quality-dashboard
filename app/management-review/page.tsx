@@ -500,7 +500,7 @@ export default function ManagementReviewPage() {
       const generatedAt = new Date().toLocaleString("en-GB");
 
       try {
-        const logoResponse = await fetch("/enshore-logo.png");
+        const logoResponse = await fetch("/enshore-primary-logo-colour.png");
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
           const logoDataUrl = await new Promise<string>((resolve, reject) => {
@@ -509,7 +509,7 @@ export default function ManagementReviewPage() {
             reader.onerror = reject;
             reader.readAsDataURL(logoBlob);
           });
-          if (logoDataUrl) doc.addImage(logoDataUrl, "PNG", margin, 9, 42, 18);
+          if (logoDataUrl) doc.addImage(logoDataUrl, "PNG", margin, 9, 42, 21);
         }
       } catch {
         // Keep export available if the logo cannot be loaded.

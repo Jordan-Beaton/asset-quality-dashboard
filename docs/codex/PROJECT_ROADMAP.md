@@ -9,6 +9,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Shared IMS shell with Enshore header, left workspace rail, role/module-aware navigation, and permission gating.
 - Shared UI standards documented in `UI_STANDARDS.md`.
 - The full IMS colour system now uses the approved 2026 Enshore palette across the shared shell, operational modules, mobile/field routes, charts, QR codes, notifications, generated outputs, and Admin defaults; restricted HSE 3Rs green and RapidScan purple are excluded from general IMS use.
+- Official 2026 Enshore primary colour/reverse logo artwork is now canonical across the IMS and generated PDF/Word outputs, with fixed 2:1 fitting, protected clear space, compliant minimum print sizing, and the HSE Observation 3Rs campaign logo preserved as the sole approved exception.
 - Shared visual primitives exist for hero banners, KPI cards, section headers, top meta rows, tabs, panels, filter panels, buttons, and links.
 - Quality dashboard has live KPI/story-style graphics and is the main layout benchmark.
 - NCR is now NCR-only in visible UI, with register/create/report layout, clickable KPIs, Excel import, owner dropdown, filtered PDF, and linked Action creation.

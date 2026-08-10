@@ -536,7 +536,7 @@ function buildActionHref(record: AINMRecord, action?: AINMAction) {
 
 async function getLogoDataUrl() {
   try {
-    const response = await fetch("/enshore-logo.png");
+    const response = await fetch("/enshore-primary-logo-colour.png");
     const blob = await response.blob();
     return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -2055,7 +2055,7 @@ export default function HseAinmPage() {
   function wordHeader(title: string, record: AINMRecord, logoData: string) {
     const logo =
       logoData && logoData.startsWith("data:image/")
-        ? new ImageRun({ type: "png", data: dataUrlToBytes(logoData), transformation: { width: 112, height: 34 } })
+        ? new ImageRun({ type: "png", data: dataUrlToBytes(logoData), transformation: { width: 112, height: 56 } })
         : wordRun("ENSHORE", { bold: true, size: 24 });
 
     return new Header({
@@ -2332,7 +2332,7 @@ export default function HseAinmPage() {
   function pdfHeader(doc: jsPDF, title: string, record: AINMRecord, logoData: string) {
     if (logoData) {
       try {
-        doc.addImage(logoData, "PNG", 12, 10, 40, 16);
+        doc.addImage(logoData, "PNG", 12, 10, 40, 20);
       } catch {
         doc.setFont("helvetica", "bold");
         doc.text("ENSHORE", 12, 18);

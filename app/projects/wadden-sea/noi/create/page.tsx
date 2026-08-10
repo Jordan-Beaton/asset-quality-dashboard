@@ -168,7 +168,7 @@ export default function NoiCreatorPage() {
 
   async function generatePdf() {
     const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-    try { doc.addImage(await imageData("/enshore-header-logo.png"), "PNG", 112, 12, 72, 18); } catch { /* retain text header if logo loading fails */ }
+    try { doc.addImage(await imageData("/enshore-primary-logo-colour.png"), "PNG", 112, 12, 48, 24); } catch { /* retain text header if logo loading fails */ }
     doc.setFont("helvetica", "bold"); doc.setTextColor(0, 86, 112); doc.setFontSize(21); doc.text("Notice Of Inspection", 20, 27);
     doc.setDrawColor(99, 177, 188); doc.line(20, 34, 190, 34);
     const common = { theme: "grid" as const, margin: { left: 20, right: 20 }, styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2, lineColor: [40, 40, 40] as [number, number, number], lineWidth: 0.15 }, headStyles: { fillColor: [190, 190, 190] as [number, number, number], textColor: 0, fontStyle: "bold" as const } };

@@ -392,6 +392,17 @@ Do Not:
 
 `AppShell` owns primary navigation.
 
+### Official Enshore Logo Assets
+
+- Use `/enshore-primary-logo-colour.svg` on white and light backgrounds.
+- Use `/enshore-primary-logo-reverse.svg` on Enshore dark-blue or other dark backgrounds.
+- PDF, Word, and PowerPoint generators that require raster data use the matching high-resolution transparent `.png` files.
+- Preserve the supplied `510.24 × 255.12` (2:1) artwork canvas. Never crop, stretch, recolour, rebuild, or add a strapline to the primary logo.
+- The no-strapline primary logo must render at a minimum 10 mm artwork height in print outputs. Current document placements use an approximately 15 mm or larger 2:1 image canvas so the artwork inside the supplied clear-space canvas remains compliant.
+- Preserve the exclusion zone included in the supplied canvas. Do not place text, rules, borders, or other graphics inside it.
+- `/enshore-3rs-primary-rgb.jpg` is retained only for the HSE Observation campaign. It must remain secondary to the Enshore primary logo and must not replace it.
+- Do not restore the obsolete `enshore-logo.png`, `enshore-header-logo.png`, `logo.png`, or strapline JPG assets. Use the canonical filenames above.
+
 Top header:
 
 - Sticky at top.

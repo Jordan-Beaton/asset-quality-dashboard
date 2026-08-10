@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 
 const moduleCards = [
@@ -23,7 +23,7 @@ const moduleCards = [
     icon: "quality",
     description: "NCR, audits, MOC, reporting, and HSEQ workflow control.",
     href: "/quality",
-    moduleKey: "lessons",
+    moduleKey: "quality",
     status: "Live",
     group: "Core IMS",
     cta: "Enter",
@@ -34,7 +34,7 @@ const moduleCards = [
     icon: "lessons",
     description: "Searchable project knowledge, repeat-failure links, photo evidence, action ownership, and trend analysis.",
     href: "/lessons-learned",
-    moduleKey: "quality",
+    moduleKey: "lessons",
     status: "Live",
     group: "Core IMS",
     cta: "Explore",
@@ -129,8 +129,18 @@ const moduleCards = [
   },
 ] as const;
 
-const orbitLabels = ["Quality", "HSE", "Assets", "Documents", "Actions", "Risk"] as const;
 type ModuleIcon = (typeof moduleCards)[number]["icon"];
+type ModuleCard = (typeof moduleCards)[number];
+type HomeView = "grid" | "spotlight" | "compact" | "list" | "columns" | "hub";
+
+const homeViews: Array<{ id: HomeView; label: string }> = [
+  { id: "grid", label: "Card grid" },
+  { id: "spotlight", label: "Spotlight" },
+  { id: "compact", label: "Compact tiles" },
+  { id: "list", label: "List" },
+  { id: "columns", label: "Two columns" },
+  { id: "hub", label: "IMS hub" },
+];
 
 function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
   const common = {
@@ -242,10 +252,78 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
 export default function HomePage() {
   const permissions = useImsPermissions();
   const [pendingRequests, setPendingRequests] = useState<Array<{ id: string; first_name: string; last_name: string; email: string; department: string; requested_modules: string[]; submitted_at: string }>>([]);
+  const [heroTilt, setHeroTilt] = useState({ x: 0, y: 0 });
+  const [homeView, setHomeView] = useState<HomeView>("grid");
+  const [spotlightIndex, setSpotlightIndex] = useState(0);
+  const [viewPreferenceLoaded, setViewPreferenceLoaded] = useState(false);
+  const headerVideoRef = useRef<HTMLVideoElement>(null);
+  const hubVideoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => { if (!permissions.loaded || !permissions.isMasterAdmin) return; void fetch("/api/admin-settings", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((json) => setPendingRequests((json?.accessRequests || []).filter((request: { status: string }) => request.status === "Pending"))).catch(() => undefined); }, [permissions.isMasterAdmin, permissions.loaded]);
+  useEffect(() => {
+    const savedView = window.localStorage.getItem("enshore-ims-home-view");
+    if (savedView && homeViews.some((view) => view.id === savedView)) setHomeView(savedView as HomeView);
+    setViewPreferenceLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!viewPreferenceLoaded) return;
+    window.localStorage.setItem("enshore-ims-home-view", homeView);
+  }, [homeView, viewPreferenceLoaded]);
+  useEffect(() => {
+    if (homeView !== "hub") return;
+    const master = headerVideoRef.current;
+    const follower = hubVideoRef.current;
+    if (!master || !follower) return;
+    const synchronize = () => {
+      if (!Number.isFinite(master.duration) || master.duration <= 0 || follower.readyState < 1) return;
+      const targetTime = master.currentTime % master.duration;
+      if (Math.abs(follower.currentTime - targetTime) > 0.08) follower.currentTime = targetTime;
+      if (master.paused) follower.pause();
+      else if (follower.paused) void follower.play().catch(() => undefined);
+    };
+    synchronize();
+    const timer = window.setInterval(synchronize, 400);
+    return () => window.clearInterval(timer);
+  }, [homeView]);
   const isModuleAccessible = (moduleKey: (typeof moduleCards)[number]["moduleKey"]) => {
     if (!permissions.loaded) return true;
     return permissions.canAccessModule(moduleKey);
+  };
+  const renderModuleCard = (card: ModuleCard, cardIndex: number, variant: "standard" | "spotlight" | "compact" | "list" | "hub" = "standard") => {
+    const hasAccess = isModuleAccessible(card.moduleKey);
+    const shellStyle = {
+      ...cardShellStyle,
+      cursor: hasAccess ? "pointer" : "not-allowed",
+    };
+    const cardContent = (
+      <article
+        className={`${hasAccess ? "home-module-card" : ""} module-card-${variant}`}
+        style={{
+          ...cardStyle,
+          animationDelay: `${Math.min(cardIndex, 7) * 55}ms`,
+          opacity: hasAccess ? 1 : 0.64,
+          filter: hasAccess ? "none" : "grayscale(0.18)",
+        }}
+      >
+        <span className="card-glow" aria-hidden="true" style={cardGlowStyle} />
+        <div style={cardTopLineStyle}>
+          <span className="module-icon" style={moduleIconStyle}><ModuleIconGlyph icon={card.icon} /></span>
+          <span className="module-launch-arrow" aria-hidden="true">{hasAccess ? "↗" : "—"}</span>
+        </div>
+        <div style={cardBodyStyle}>
+          <h3 style={cardTitleStyle}>{card.title}</h3>
+          <span className="module-access-label">{hasAccess ? "Open workspace" : "Access not assigned"}</span>
+        </div>
+        <div style={cardFooterStyle}>
+          <span style={{ ...cardShortStyle, color: hasAccess ? "#005670" : "#64748b" }}>
+            <span style={{ ...connectorDotStyle, background: hasAccess ? "#005670" : "#94a3b8", boxShadow: hasAccess ? "0 0 0 5px rgba(0,86,112,0.12)" : "none" }} />
+            {card.short}
+          </span>
+          <span className={hasAccess ? "module-connection live" : "module-connection"}>{hasAccess ? "Connected" : "Restricted"}</span>
+        </div>
+      </article>
+    );
+    if (!hasAccess) return <div key={card.title} style={shellStyle} aria-disabled="true" title="No access assigned for this module.">{cardContent}</div>;
+    return <Link key={card.title} href={card.href} style={shellStyle}>{cardContent}</Link>;
   };
 
   return (
@@ -262,55 +340,235 @@ export default function HomePage() {
             to { transform: rotate(-360deg); }
           }
 
+          @keyframes imsOrbitSpinReverse {
+            from { transform: rotate(360deg); }
+            to { transform: rotate(0deg); }
+          }
+
+          @keyframes imsOrbitCounterSpinReverse {
+            from { transform: rotate(-360deg); }
+            to { transform: rotate(0deg); }
+          }
+
+          @keyframes imsCenteredSpin {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+          }
+
+          @keyframes imsCenteredSpinReverse {
+            from { transform: translate(-50%, -50%) rotate(360deg); }
+            to { transform: translate(-50%, -50%) rotate(0deg); }
+          }
+
+          @keyframes imsHeroScan {
+            0% { transform: translateY(-140%); opacity: 0; }
+            18% { opacity: 0.55; }
+            70% { opacity: 0.18; }
+            100% { transform: translateY(520%); opacity: 0; }
+          }
+
+          @keyframes imsSignalPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(99,177,188,0.65); }
+            50% { box-shadow: 0 0 0 7px rgba(99,177,188,0); }
+          }
+
+          @keyframes imsCardReveal {
+            from { opacity: 0; transform: translateY(14px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+
+          .home-ims-hero {
+            transition: transform 220ms ease-out, box-shadow 220ms ease-out;
+            transform-style: preserve-3d;
+          }
+
+          .hero-grid {
+            position: absolute;
+            inset: 0;
+            opacity: 0.2;
+            background-image: linear-gradient(rgba(255,255,255,.14) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.14) 1px, transparent 1px);
+            background-size: 34px 34px;
+            mask-image: radial-gradient(circle at 72% 50%, rgba(0,0,0,.9), transparent 72%);
+            pointer-events: none;
+          }
+
+          .hero-scan {
+            position: absolute;
+            left: 0;
+            right: 38%;
+            top: 0;
+            height: 76px;
+            background: linear-gradient(180deg, transparent, rgba(99,177,188,.13), transparent);
+            animation: imsHeroScan 8s ease-in-out infinite;
+            pointer-events: none;
+          }
+
+          .ambient-ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1px solid rgba(255,255,255,.16); transform: translate(-50%, -50%); }
+          .ambient-ring-one { width: 142px; height: 142px; border-color: rgba(99,177,188,.62); box-shadow: 0 0 42px rgba(99,177,188,.2); }
+          .ambient-ring-two { width: 205px; height: 205px; border-style: dashed; border-color: rgba(255,255,255,.2); animation: imsCenteredSpin 32s linear infinite; }
+          .ambient-ring-three { width: 270px; height: 270px; border-color: rgba(255,255,255,.1); animation: imsCenteredSpinReverse 48s linear infinite; }
+          .ambient-node { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #63B1BC; box-shadow: 0 0 0 5px rgba(99,177,188,.1), 0 0 22px rgba(99,177,188,.75); }
+          .node-one { left: 50%; top: 6px; }
+          .node-two { right: 26px; top: 50%; }
+          .node-three { left: 20%; bottom: 36px; width: 5px; height: 5px; }
+          .node-four { left: 15px; top: 35%; width: 4px; height: 4px; opacity: .6; }
+          .module-launch-arrow { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid #D0D0CE; border-radius: 50%; color: #005670; background: rgba(255,255,255,.76); font-size: 17px; font-weight: 800; transition: 180ms ease; }
+          .home-module-card:hover .module-launch-arrow { transform: translate(2px, -2px); background: #005670; border-color: #005670; color: white; }
+          .module-access-label { color: #64748b; font-size: 12px; font-weight: 700; }
+          .module-connection { display: inline-flex; align-items: center; gap: 6px; color: #64748b; font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+          .module-connection::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; }
+          .module-connection.live { color: #005670; }
+          .module-connection.live::before { background: #63B1BC; box-shadow: 0 0 0 4px rgba(99,177,188,.15); }
+          .workspace-view-tools { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+          .workspace-view-select { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 5px 6px 5px 12px; border: 1px solid #D0D0CE; border-radius: 12px; background: white; color: #005670; box-shadow: 0 6px 16px rgba(15,23,42,.06); font-size: 12px; font-weight: 900; }
+          .workspace-view-select select { min-height: 30px; border: 0; border-radius: 8px; outline: 0; background: #ECECE7; color: #005670; padding: 4px 28px 4px 9px; font: inherit; cursor: pointer; }
+          .module-spotlight-view { position: relative; display: grid; grid-template-columns: 48px minmax(0, 640px) 48px; justify-content: center; align-items: center; gap: 18px; min-height: 350px; padding: 8px 20px 24px; }
+          .spotlight-stage, .spotlight-stage > a, .spotlight-stage > div { width: 100%; }
+          .module-card-spotlight { height: 294px !important; padding: 26px !important; }
+          .module-card-spotlight h3 { font-size: 34px !important; }
+          .module-card-spotlight .module-icon { width: 58px !important; height: 58px !important; }
+          .spotlight-arrow { width: 48px; height: 48px; border: 1px solid #D0D0CE; border-radius: 50%; background: white; color: #005670; cursor: pointer; font-size: 32px; line-height: 1; box-shadow: 0 10px 24px rgba(15,23,42,.08); transition: 180ms ease; }
+          .spotlight-arrow:hover { transform: scale(1.1); background: #005670; border-color: #005670; color: white; }
+          .spotlight-counter { position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%); color: #64748b; font-size: 12px; font-weight: 900; }
+          .module-compact-view { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+          .module-card-compact { height: 154px !important; min-height: 154px !important; padding: 14px !important; }
+          .module-card-compact > div:last-child { display: none !important; }
+          .module-card-compact h3 { font-size: 17px !important; }
+          .module-list-view { display: grid; gap: 10px; }
+          .module-columns-view { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+          .module-list-view > a, .module-list-view > div, .module-columns-view > a, .module-columns-view > div { width: 100%; }
+          .module-card-list { height: 104px !important; min-height: 104px !important; display: grid !important; grid-template-columns: 82px minmax(0, 1fr) minmax(150px, auto); align-items: center; gap: 16px !important; padding: 14px 18px !important; }
+          .module-card-list > div:first-of-type .module-launch-arrow { display: none; }
+          .module-card-list > div:last-child { border-top: 0 !important; padding-top: 0 !important; }
+          .module-card-list h3 { font-size: 18px !important; }
+          .module-hub-view { position: relative; min-height: 680px; overflow: hidden; border: 1px solid rgba(0,86,112,.12); border-radius: 20px; background: radial-gradient(circle at 50% 50%, rgba(99,177,188,.14) 0 15%, transparent 36%), linear-gradient(rgba(0,86,112,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(0,86,112,.035) 1px, transparent 1px), #fbfdfd; background-size: auto, 32px 32px, 32px 32px, auto; }
+          .hub-connection-ring { position: absolute; left: 50%; top: 50%; width: 74%; height: 76%; transform: translate(-50%, -50%); border: 1px dashed rgba(0,86,112,.2); border-radius: 50%; box-shadow: inset 0 0 70px rgba(99,177,188,.07); animation: imsCenteredSpin 70s linear infinite; }
+          .hub-video-core { position: absolute; left: 50%; top: 50%; width: 222px; height: 222px; padding: 10px; transform: translate(-50%, -50%); border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: #005670; box-shadow: 0 24px 54px rgba(0,86,112,.28), 0 0 0 18px rgba(99,177,188,.1), 0 0 0 19px rgba(0,86,112,.12); box-sizing: border-box; overflow: hidden; z-index: 2; }
+          .hub-video-core video { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+          .hub-module-position { position: absolute; width: 166px; transform: translate(-50%, -50%); z-index: 3; }
+          .hub-module-position > a, .hub-module-position > div { width: 100%; }
+          .module-card-hub { height: 92px !important; min-height: 92px !important; padding: 12px !important; gap: 8px !important; box-shadow: 0 10px 24px rgba(15,23,42,.1) !important; }
+          .module-card-hub > div:first-of-type { align-items: center; }
+          .module-card-hub .module-icon { width: 32px !important; height: 32px !important; border-radius: 10px !important; }
+          .module-card-hub .module-launch-arrow { width: 27px !important; height: 27px !important; font-size: 13px !important; }
+          .module-card-hub > div:nth-of-type(2) { align-content: start !important; }
+          .module-card-hub h3 { font-size: 13px !important; line-height: 1.05 !important; }
+          .module-card-hub .module-access-label, .module-card-hub > div:last-child { display: none !important; }
+
+          @media (prefers-reduced-motion: reduce) {
+            .ambient-ring,
+            .hero-scan,
+            .home-module-card {
+              animation-play-state: paused !important;
+            }
+            .home-ims-hero { transform: none !important; }
+          }
+
+          @media (max-width: 960px) {
+            .home-ims-hero {
+              grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            .home-ims-orbit {
+              justify-self: center !important;
+              transform: scale(0.9);
+              margin: -12px -20px;
+            }
+            .module-hub-view { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 230px 14px 14px; overflow: visible; }
+            .hub-video-core { top: 112px; width: 170px; height: 170px; }
+            .hub-connection-ring { top: 112px; width: 220px; height: 220px; }
+            .hub-module-position { position: static; width: auto; transform: none; }
+            .module-card-hub { height: 110px !important; min-height: 110px !important; }
+          }
+
+          @media (max-width: 560px) {
+            .home-ims-hero {
+              min-height: 0 !important;
+              padding: 24px 20px !important;
+            }
+
+            .home-ims-orbit {
+              transform: scale(0.72);
+              margin: -36px -54px;
+            }
+            .workspace-view-tools { justify-content: flex-start; }
+            .module-columns-view { grid-template-columns: 1fr; }
+            .module-hub-view { grid-template-columns: 1fr; }
+            .module-card-list { grid-template-columns: 64px minmax(0, 1fr); }
+            .module-card-list > div:last-child { display: none !important; }
+            .module-spotlight-view { grid-template-columns: 38px minmax(0, 1fr) 38px; gap: 8px; padding-inline: 0; }
+            .spotlight-arrow { width: 38px; height: 38px; }
+          }
+
           .home-module-card {
-            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+            position: relative;
+            z-index: 1;
+            transition: transform 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease, border-color 220ms ease, background 220ms ease;
+            animation: imsCardReveal 420ms backwards;
           }
 
           .home-module-card:hover {
-            transform: translateY(-6px) scale(1.025);
-            box-shadow: 0 22px 38px rgba(15, 23, 42, 0.13);
-            border-color: #D0D0CE;
+            z-index: 5;
+            transform: translateY(-11px) scale(1.035);
+            box-shadow: 0 28px 54px rgba(0, 86, 112, 0.2), 0 8px 18px rgba(15,23,42,.09);
+            border-color: #63B1BC;
+            background: linear-gradient(160deg, #ffffff 0%, #eefafa 100%);
           }
+
+          .module-icon { transition: transform 220ms cubic-bezier(.2,.8,.2,1), background 220ms ease, color 220ms ease, box-shadow 220ms ease; }
+          .home-module-card:hover .module-icon { transform: translateY(-3px) scale(1.12) rotate(-3deg); background: #005670 !important; color: white !important; box-shadow: 0 12px 24px rgba(0,86,112,.24); }
+          .card-glow { transition: transform 260ms ease, opacity 260ms ease; }
+          .home-module-card:hover .card-glow { transform: scale(1.7); opacity: .9; }
 
         `}
       </style>
-      <section style={heroStyle}>
+      <section
+        className="home-ims-hero"
+        style={{
+          ...heroStyle,
+          transform: `perspective(1400px) rotateX(${heroTilt.y * -1.2}deg) rotateY(${heroTilt.x * 1.2}deg)`,
+        }}
+        onPointerMove={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          setHeroTilt({
+            x: (event.clientX - bounds.left) / bounds.width - 0.5,
+            y: (event.clientY - bounds.top) / bounds.height - 0.5,
+          });
+        }}
+        onPointerLeave={() => setHeroTilt({ x: 0, y: 0 })}
+      >
+        <span className="hero-grid" aria-hidden="true" />
+        <span className="hero-scan" aria-hidden="true" />
         <div style={heroCopyStyle}>
-          <div style={eyebrowStyle}>Enshore IMS Hub</div>
-          <h1 style={heroTitleStyle}>Your IMS command hub.</h1>
+          <div style={eyebrowStyle}>Enshore Integrated Management System</div>
+          <h1 style={heroTitleStyle}>Everything connected.<br />One place to begin.</h1>
           <p style={heroSubtitleStyle}>
-            Navigate the management system from one connected workspace. Each module feeds the
-            same operational picture without feeling like a separate system.
+            Choose your workspace below.
           </p>
         </div>
 
-        <div style={orbitStyle} aria-hidden="true">
-          <div style={orbitRingOuterStyle} />
-          <div style={orbitRingInnerStyle} />
+        <div className="home-ims-orbit" style={orbitStyle} aria-hidden="true">
+          <span className="ambient-ring ambient-ring-one" />
+          <span className="ambient-ring ambient-ring-two" />
+          <span className="ambient-ring ambient-ring-three" />
+          <span className="ambient-node node-one" />
+          <span className="ambient-node node-two" />
+          <span className="ambient-node node-three" />
+          <span className="ambient-node node-four" />
           <div style={orbitCoreStyle}>
-            <span style={orbitCoreLabelStyle}>IMS</span>
-            <span style={orbitCoreSubStyle}>Connected</span>
-          </div>
-          <div style={orbitSpinLayerStyle}>
-            {orbitLabels.map((label, index) => {
-              const angle = (index / orbitLabels.length) * Math.PI * 2 - Math.PI / 2;
-              const radius = 122;
-              const x = Math.cos(angle) * radius;
-              const y = Math.sin(angle) * radius;
-              return (
-                <span
-                  key={label}
-                  style={{
-                    ...orbitNodePositionStyle,
-                    transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
-                  }}
-                >
-                  <span style={orbitNodeTextStyle}>
-                    <span style={orbitNodeStyle}>{label}</span>
-                  </span>
-                </span>
-              );
-            })}
+            <video
+              ref={headerVideoRef}
+              style={orbitVideoStyle}
+              className="ims-orbit-video"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              tabIndex={-1}
+            >
+              <source src="/enshore-e-outline-loop.mp4" type="video/mp4" />
+            </video>
           </div>
         </div>
       </section>
@@ -320,110 +578,58 @@ export default function HomePage() {
       <section style={commandSurfaceStyle} aria-label="Management modules">
         <div style={surfaceHeaderStyle}>
           <div>
-            <div style={surfaceEyebrowStyle}>Workspace Map</div>
-            <h2 style={surfaceTitleStyle}>Management Areas</h2>
+            <div style={surfaceEyebrowStyle}>Your workspaces</div>
+            <h2 style={surfaceTitleStyle}>Where would you like to go?</h2>
           </div>
-          <p style={surfaceHintStyle}>Select a module tile to enter the live workspace.</p>
+          <div className="workspace-view-tools">
+            <label className="workspace-view-select">
+              <span>View</span>
+              <select value={homeView} onChange={(event) => setHomeView(event.target.value as HomeView)}>
+                {homeViews.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
+              </select>
+            </label>
+          </div>
         </div>
 
-        <div style={moduleGridStyle}>
-          {moduleCards.map((card) => {
-            const hasAccess = isModuleAccessible(card.moduleKey);
-            const status = hasAccess ? card.status : "No Access";
-            const shellStyle = {
-              ...cardShellStyle,
-              cursor: hasAccess ? "pointer" : "not-allowed",
-            };
-            const cardContent = (
-              <article
-                className={hasAccess ? "home-module-card" : undefined}
-                style={{
-                  ...cardStyle,
-                  opacity: hasAccess ? 1 : 0.64,
-                  filter: hasAccess ? "none" : "grayscale(0.18)",
-                }}
-              >
-                <span aria-hidden="true" style={cardGlowStyle} />
-                <div style={cardTopLineStyle}>
-                  <span style={moduleIconStyle}>
-                    <ModuleIconGlyph icon={card.icon} />
-                  </span>
-                  <span
-                    style={{
-                      ...statusPillStyle,
-                      background: hasAccess
-                        ? card.status === "Shell"
-                          ? "#eef2f6"
-                          : "#DFF5F3"
-                        : "#fee2e2",
-                      color: hasAccess
-                        ? card.status === "Shell"
-                          ? "#475569"
-                          : "#005670"
-                        : "#F93822",
-                    }}
-                  >
-                    {status}
-                  </span>
-                </div>
+        {homeView === "grid" ? <div style={moduleGridStyle}>{moduleCards.map((card, index) => renderModuleCard(card, index))}</div> : null}
 
-                <div style={cardBodyStyle}>
-                  <div>
-                    <div style={groupStyle}>{card.group}</div>
-                    <h3 style={cardTitleStyle}>{card.title}</h3>
-                  </div>
-                  <p style={cardDescriptionStyle}>{card.description}</p>
-                </div>
+        {homeView === "spotlight" ? (
+          <div className="module-spotlight-view">
+            <button type="button" className="spotlight-arrow" aria-label="Previous workspace" onClick={() => setSpotlightIndex((index) => (index - 1 + moduleCards.length) % moduleCards.length)}>‹</button>
+            <div className="spotlight-stage">{renderModuleCard(moduleCards[spotlightIndex], spotlightIndex, "spotlight")}</div>
+            <button type="button" className="spotlight-arrow" aria-label="Next workspace" onClick={() => setSpotlightIndex((index) => (index + 1) % moduleCards.length)}>›</button>
+            <div className="spotlight-counter">{spotlightIndex + 1} / {moduleCards.length}</div>
+          </div>
+        ) : null}
 
-                <div style={cardFooterStyle}>
-                  <span
-                    style={{
-                      ...cardShortStyle,
-                      color: hasAccess ? "#005670" : "#64748b",
-                    }}
-                  >
-                    <span
-                      style={{
-                        ...connectorDotStyle,
-                        background: hasAccess ? "#005670" : "#94a3b8",
-                        boxShadow: hasAccess ? "0 0 0 5px rgba(0,86,112,0.12)" : "none",
-                      }}
-                    />
-                    {card.short}
-                  </span>
-                  <span
-                    style={{
-                      ...ctaStyle,
-                      background: hasAccess ? "#ECECE7" : "#eef2f6",
-                      color: hasAccess ? "#005670" : "#64748b",
-                    }}
-                  >
-                    {hasAccess ? card.cta : "Restricted"}
-                  </span>
-                </div>
-              </article>
-            );
-
-            if (!hasAccess) {
+        {homeView === "compact" ? <div className="module-compact-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "compact"))}</div> : null}
+        {homeView === "list" ? <div className="module-list-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
+        {homeView === "columns" ? <div className="module-columns-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
+        {homeView === "hub" ? (
+          <div className="module-hub-view">
+            <div className="hub-connection-ring" aria-hidden="true" />
+            <div className="hub-video-core" aria-hidden="true">
+              <video ref={hubVideoRef} autoPlay muted loop playsInline preload="auto" tabIndex={-1}>
+                <source src="/enshore-e-outline-loop.mp4" type="video/mp4" />
+              </video>
+            </div>
+            {moduleCards.map((card, index) => {
+              const angle = (index / moduleCards.length) * Math.PI * 2 - Math.PI / 2;
               return (
                 <div
+                  className="hub-module-position"
                   key={card.title}
-                  style={shellStyle}
-                  aria-disabled="true"
-                  title="No access assigned for this module."
+                  style={{
+                    left: `${50 + Math.cos(angle) * 42}%`,
+                    top: `${50 + Math.sin(angle) * 40}%`,
+                  }}
                 >
-                  {cardContent}
+                  {renderModuleCard(card, index, "hub")}
                 </div>
               );
-            }
-
-            return (
-              <Link key={card.title} href={card.href} style={shellStyle}>
-                {cardContent}
-              </Link>
-            );
-          })}
-        </div>
+            })}
+          </div>
+        ) : null}
       </section>
     </main>
   );
@@ -436,19 +642,20 @@ const pageStyle: CSSProperties = {
 
 const heroStyle: CSSProperties = {
   position: "relative",
-  minHeight: "286px",
+  minHeight: "252px",
   borderRadius: "24px",
-  padding: "34px",
+  padding: "26px 32px",
   boxSizing: "border-box",
   overflow: "hidden",
   display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) 360px",
-  gap: "28px",
+  gridTemplateColumns: "minmax(0, 1fr) 310px",
+  gap: "22px",
   alignItems: "center",
   background:
-    "radial-gradient(circle at 82% 42%, rgba(255,255,255,0.23), transparent 0 15%, transparent 34%), linear-gradient(135deg, #005670 0%, #005670 48%, #111827 128%)",
+    "radial-gradient(circle at 84% 42%, rgba(99,177,188,.28) 0 8%, transparent 31%), radial-gradient(circle at 10% 120%, rgba(99,177,188,.14), transparent 38%), linear-gradient(135deg, #005670 0%, #005670 58%, #003f53 100%)",
   color: "#ffffff",
-  boxShadow: "0 22px 44px rgba(15, 23, 42, 0.14)",
+  border: "1px solid rgba(255,255,255,.12)",
+  boxShadow: "0 18px 38px rgba(0,86,112,.18), inset 0 1px 0 rgba(255,255,255,.12)",
 };
 
 const heroCopyStyle: CSSProperties = {
@@ -458,50 +665,35 @@ const heroCopyStyle: CSSProperties = {
 };
 
 const eyebrowStyle: CSSProperties = {
-  color: "rgba(255,255,255,0.78)",
-  fontSize: "13px",
+  color: "rgba(255,255,255,.76)",
+  fontSize: "11px",
   fontWeight: 900,
   letterSpacing: "0.14em",
   textTransform: "uppercase",
-  marginBottom: "14px",
+  marginBottom: "10px",
 };
 
 const heroTitleStyle: CSSProperties = {
   margin: 0,
   maxWidth: "760px",
-  fontSize: "50px",
-  lineHeight: 1,
+  fontSize: "40px",
+  lineHeight: 1.02,
   letterSpacing: "-0.03em",
 };
 
 const heroSubtitleStyle: CSSProperties = {
-  margin: "18px 0 0",
+  margin: "12px 0 0",
   maxWidth: "700px",
-  color: "rgba(255,255,255,0.9)",
-  fontSize: "17px",
+  color: "rgba(255,255,255,.78)",
+  fontSize: "14px",
   lineHeight: 1.62,
 };
 
 const orbitStyle: CSSProperties = {
   position: "relative",
-  width: "320px",
-  height: "260px",
+  width: "290px",
+  height: "230px",
   justifySelf: "end",
-};
-
-const orbitRingOuterStyle: CSSProperties = {
-  position: "absolute",
-  inset: "0",
-  borderRadius: "999px",
-  border: "1px solid rgba(255,255,255,0.24)",
-  boxShadow: "inset 0 0 48px rgba(255,255,255,0.08)",
-};
-
-const orbitRingInnerStyle: CSSProperties = {
-  position: "absolute",
-  inset: "52px 62px",
-  borderRadius: "999px",
-  border: "1px dashed rgba(255,255,255,0.28)",
 };
 
 const orbitCoreStyle: CSSProperties = {
@@ -509,64 +701,29 @@ const orbitCoreStyle: CSSProperties = {
   left: "50%",
   top: "50%",
   transform: "translate(-50%, -50%)",
-  width: "122px",
-  height: "122px",
+  width: "132px",
+  height: "132px",
   borderRadius: "999px",
-  background: "rgba(255,255,255,0.16)",
-  border: "1px solid rgba(255,255,255,0.26)",
+  padding: "8px",
+  background: "#005670",
+  border: "1px solid rgba(255,255,255,0.34)",
   display: "flex",
-  flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
   backdropFilter: "blur(14px)",
+  boxShadow: "0 14px 34px rgba(0,0,0,0.24), inset 0 0 0 7px rgba(255,255,255,0.06)",
+  overflow: "hidden",
+  zIndex: 4,
+  boxSizing: "border-box",
 };
 
-const orbitCoreLabelStyle: CSSProperties = {
-  fontSize: "30px",
-  fontWeight: 900,
-  letterSpacing: "-0.03em",
-};
-
-const orbitCoreSubStyle: CSSProperties = {
-  fontSize: "11px",
-  fontWeight: 900,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase",
-  color: "rgba(255,255,255,0.72)",
-};
-
-const orbitSpinLayerStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  transformOrigin: "50% 50%",
-  animation: "imsOrbitSpin 28s linear infinite",
-};
-
-const orbitNodePositionStyle: CSSProperties = {
-  position: "absolute",
-  left: "50%",
-  top: "50%",
-};
-
-const orbitNodeTextStyle: CSSProperties = {
-  display: "inline-flex",
-  animation: "imsOrbitCounterSpin 28s linear infinite",
-};
-
-const orbitNodeStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  minWidth: "72px",
-  minHeight: "34px",
-  padding: "6px 10px",
+const orbitVideoStyle: CSSProperties = {
+  display: "block",
+  width: "100%",
+  height: "100%",
   borderRadius: "999px",
-  background: "rgba(255,255,255,0.16)",
-  border: "1px solid rgba(255,255,255,0.24)",
-  color: "#ffffff",
-  fontSize: "11px",
-  fontWeight: 900,
-  backdropFilter: "blur(10px)",
+  objectFit: "cover",
+  background: "#005670",
 };
 
 const commandSurfaceStyle: CSSProperties = {
@@ -614,7 +771,8 @@ const surfaceHintStyle: CSSProperties = {
 
 const moduleGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(255px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+  gridAutoRows: "216px",
   gap: "14px",
 };
 
@@ -627,10 +785,11 @@ const cardShellStyle: CSSProperties = {
 const cardStyle: CSSProperties = {
   position: "relative",
   width: "100%",
-  minHeight: "214px",
+  height: "216px",
+  minHeight: "216px",
   display: "flex",
   flexDirection: "column",
-  gap: "16px",
+  gap: "14px",
   padding: "18px",
   borderRadius: "18px",
   background: "linear-gradient(180deg, #ffffff 0%, #f9fcfd 100%)",
@@ -675,31 +834,11 @@ const iconSvgStyle: CSSProperties = {
   height: "22px",
 };
 
-const statusPillStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: "999px",
-  padding: "6px 10px",
-  fontSize: "11px",
-  fontWeight: 900,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-};
-
 const cardBodyStyle: CSSProperties = {
   display: "grid",
-  gap: "11px",
+  alignContent: "center",
+  gap: "7px",
   flex: 1,
-};
-
-const groupStyle: CSSProperties = {
-  color: "#64748b",
-  fontSize: "11px",
-  fontWeight: 900,
-  letterSpacing: "0.1em",
-  textTransform: "uppercase",
-  marginBottom: "7px",
 };
 
 const cardTitleStyle: CSSProperties = {
@@ -707,13 +846,6 @@ const cardTitleStyle: CSSProperties = {
   color: "#0f172a",
   fontSize: "22px",
   lineHeight: 1.14,
-};
-
-const cardDescriptionStyle: CSSProperties = {
-  margin: 0,
-  color: "#475569",
-  fontSize: "14px",
-  lineHeight: 1.55,
 };
 
 const cardFooterStyle: CSSProperties = {
@@ -740,20 +872,6 @@ const connectorDotStyle: CSSProperties = {
   borderRadius: "999px",
   background: "#005670",
   boxShadow: "0 0 0 5px rgba(0,86,112,0.12)",
-};
-
-const ctaStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  minHeight: "34px",
-  borderRadius: "10px",
-  padding: "8px 12px",
-  background: "#ECECE7",
-  color: "#005670",
-  fontSize: "12px",
-  fontWeight: 900,
-  whiteSpace: "nowrap",
 };
 
 const adminRequestPanel: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, margin: "0 auto 20px", maxWidth: 1320, padding: "16px 18px", border: "1px solid #fdba74", borderRadius: 16, background: "#fff7ed", boxShadow: "0 8px 20px rgba(154,52,18,.08)" };

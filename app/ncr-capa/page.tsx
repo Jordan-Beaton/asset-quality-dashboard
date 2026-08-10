@@ -2084,14 +2084,14 @@ function NcrCapaPageContent() {
         : "Non-Conformance Report";
 
       try {
-        const logoResponse = await fetch("/enshore-logo.png");
+        const logoResponse = await fetch("/enshore-primary-logo-colour.png");
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
-          const logoFile = new File([logoBlob], "enshore-logo.png", {
+          const logoFile = new File([logoBlob], "enshore-primary-logo-colour.png", {
             type: logoBlob.type || "image/png",
           });
           const logoDataUrl = await toDataUrl(logoFile);
-          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 22);
+          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 24);
         }
       } catch {
         // Keep PDF generation resilient if the logo cannot be loaded.
@@ -2446,7 +2446,7 @@ function NcrCapaPageContent() {
       let logoData: ArrayBuffer | null = null;
 
       try {
-        const logoResponse = await fetch("/enshore-logo.png");
+        const logoResponse = await fetch("/enshore-primary-logo-colour.png");
         if (logoResponse.ok) {
           logoData = await logoResponse.arrayBuffer();
         }
@@ -2473,7 +2473,7 @@ function NcrCapaPageContent() {
                             new ImageRun({
                               type: "png",
                               data: logoData,
-                              transformation: { width: 170, height: 78 },
+                              transformation: { width: 170, height: 85 },
                             }),
                           ]
                         : [new TextRun({ text: "ENSHORE", font: "Calibri", bold: true, size: 30 })],
@@ -2738,7 +2738,7 @@ function NcrCapaPageContent() {
       ];
 
       try {
-        const logoResponse = await fetch("/logo.png");
+        const logoResponse = await fetch("/enshore-primary-logo-colour.png");
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
           const logoDataUrl = await new Promise<string>((resolve, reject) => {
@@ -2747,7 +2747,7 @@ function NcrCapaPageContent() {
             reader.onerror = () => reject(new Error("Could not convert logo to data URL."));
             reader.readAsDataURL(logoBlob);
           });
-          doc.addImage(logoDataUrl, "PNG", margin, 8, 44, 20);
+          doc.addImage(logoDataUrl, "PNG", margin, 8, 44, 22);
         }
       } catch {
         // Keep report generation resilient if the logo cannot be loaded.

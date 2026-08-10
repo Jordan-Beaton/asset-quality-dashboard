@@ -921,7 +921,7 @@ function nextInspectionNumber(records: HseInspectionRecord[]) {
 
 async function getLogoDataUrl() {
   try {
-    const response = await fetch("/enshore-logo.png");
+    const response = await fetch("/enshore-primary-logo-colour.png");
     const blob = await response.blob();
     return await new Promise<string>((resolve) => {
       const reader = new FileReader();
@@ -1391,7 +1391,7 @@ export default function HseInspectionsPage() {
     doc.rect(0, 0, doc.internal.pageSize.getWidth(), 34, "F");
     if (logoData) {
       try {
-        doc.addImage(logoData, "PNG", 12, 10, 38, 15);
+        doc.addImage(logoData, "PNG", 12, 10, 38, 19);
       } catch {
         // Keep report generation working if the logo cannot be embedded.
       }

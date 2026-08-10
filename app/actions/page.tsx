@@ -2891,7 +2891,7 @@ function ActionsPageContent() {
       ];
 
       try {
-        const logoResponse = await fetch("/logo.png");
+        const logoResponse = await fetch("/enshore-primary-logo-colour.png");
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
           const logoDataUrl = await new Promise<string>((resolve, reject) => {
@@ -2900,7 +2900,7 @@ function ActionsPageContent() {
             reader.onerror = () => reject(new Error("Could not convert logo to data URL."));
             reader.readAsDataURL(logoBlob);
           });
-          doc.addImage(logoDataUrl, "PNG", margin, 8, 44, 20);
+          doc.addImage(logoDataUrl, "PNG", margin, 8, 44, 22);
         }
       } catch {
         // Keep report generation resilient if the logo cannot be loaded.

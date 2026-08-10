@@ -137,7 +137,7 @@ const defaultForm = (): ReportForm => ({
   nextMonthFocus: "",
 });
 
-const logoFileName = "/enshore-logo.png";
+const logoFileName = "/enshore-primary-logo-colour.png";
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "-";
@@ -799,11 +799,11 @@ export default function AssetReportsPage() {
         const logoResponse = await fetch(logoFileName);
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
-          const logoFile = new File([logoBlob], "enshore-logo.png", {
+          const logoFile = new File([logoBlob], "enshore-primary-logo-colour.png", {
             type: logoBlob.type || "image/png",
           });
           const logoDataUrl = await toDataUrl(logoFile);
-          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 22);
+          doc.addImage(logoDataUrl, "PNG", margin, 10, 48, 24);
         }
       } catch {
         // Keep PDF generation resilient if the logo cannot be loaded.

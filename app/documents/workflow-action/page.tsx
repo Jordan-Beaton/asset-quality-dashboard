@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import enshoreLogo from "../../../public/enshore-logo.png";
 
 type WorkflowActionDetails = {
   action: string;
@@ -110,7 +109,7 @@ function WorkflowActionContent() {
     <main style={pageStyle}>
       <section style={cardStyle}>
         <div style={headerStyle}>
-          <Image src={enshoreLogo} alt="Enshore" width={180} height={62} style={{ objectFit: "contain" }} />
+          <Image src="/enshore-primary-logo-colour.svg" alt="Enshore" width={180} height={90} style={{ width: "180px", height: "auto", objectFit: "contain" }} />
           <div>
             <div style={eyebrowStyle}>Document Control</div>
             <h1 style={titleStyle}>Workflow Confirmation</h1>

@@ -102,7 +102,7 @@ export default function PublicObservationPage() {
           `}
         </style>
         <header className="observe-header" style={headerStyle}>
-          <Image className="observe-logo" src="/enshore-primary-strapline-green-rgb.jpg" alt="Enshore — From Onshore to Offshore" width={3028} height={1593} priority style={{ width: "170px", height: "auto" }} />
+          <Image className="observe-logo" src="/enshore-primary-logo-colour.svg" alt="Enshore" width={510} height={255} priority style={{ width: "170px", height: "auto" }} />
           <div className="observe-header-copy" style={headerCopyStyle}>
             <span style={eyebrowStyle}>HSE Management</span>
             <h1 style={titleStyle}>{headerText}</h1>

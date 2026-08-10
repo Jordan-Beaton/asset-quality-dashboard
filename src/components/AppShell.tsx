@@ -1040,12 +1040,12 @@ export default function AppShell({ children }: AppShellProps) {
                 }}
               >
                 <Image
-                  src="/enshore-header-logo.png"
+                  src="/enshore-primary-logo-colour.svg"
                   alt="Enshore"
                   width={isFieldInspectionMode ? 124 : 202}
-                  height={isFieldInspectionMode ? 32 : 52}
+                  height={isFieldInspectionMode ? 62 : 101}
                   priority
-                  style={{ width: "100%", height: "auto", objectFit: "contain" }}
+                  style={{ width: "auto", height: "100%", maxWidth: "100%", objectFit: "contain" }}
                 />
               </span>
             ) : null}

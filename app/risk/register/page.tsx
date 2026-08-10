@@ -575,7 +575,7 @@ export default function RiskRegisterPage() {
       const generatedAt = new Date().toLocaleString("en-GB");
 
       try {
-        const logoResponse = await fetch("/logo.png");
+        const logoResponse = await fetch("/enshore-primary-logo-colour.png");
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
           const logoDataUrl = await new Promise<string>((resolve, reject) => {
@@ -584,7 +584,7 @@ export default function RiskRegisterPage() {
             reader.onerror = () => reject(new Error("Could not convert logo to data URL."));
             reader.readAsDataURL(logoBlob);
           });
-          doc.addImage(logoDataUrl, "PNG", margin, 8, 42, 18);
+          doc.addImage(logoDataUrl, "PNG", margin, 8, 42, 21);
         }
       } catch {
         // Keep PDF generation resilient if the logo cannot be loaded.

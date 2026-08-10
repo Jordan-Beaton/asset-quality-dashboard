@@ -502,7 +502,7 @@ function toDataUrl(blob: Blob) {
 
 async function getLogoDataUrl() {
   try {
-    const response = await fetch("/enshore-logo.png");
+    const response = await fetch("/enshore-primary-logo-colour.png");
     const blob = await response.blob();
     return await toDataUrl(blob);
   } catch {
@@ -2880,7 +2880,7 @@ function MOCPageContent() {
                 new ImageRun({
                   type: "png",
                   data: dataUrlToUint8Array(logoData),
-                  transformation: { width: 98, height: 30 },
+                  transformation: { width: 112, height: 56 },
                 }),
               ],
             }),

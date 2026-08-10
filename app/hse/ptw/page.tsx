@@ -336,7 +336,7 @@ function chunkItems(values: string[], size: number) {
 }
 
 async function getLogoDataUrl() {
-  const response = await fetch("/enshore-logo.png");
+  const response = await fetch("/enshore-primary-logo-colour.png");
   const blob = await response.blob();
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -347,7 +347,7 @@ async function getLogoDataUrl() {
 }
 
 async function getLogoBytes() {
-  const response = await fetch("/enshore-logo.png");
+  const response = await fetch("/enshore-primary-logo-colour.png");
   return new Uint8Array(await response.arrayBuffer());
 }
 
@@ -1069,7 +1069,7 @@ export default function HsePermitToWorkPage() {
     const attachmentLinks = await createSignedAttachmentLinks();
     const logoDataUrl = await getLogoDataUrl();
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    doc.addImage(logoDataUrl, "PNG", 14, 10, 32, 17);
+    doc.addImage(logoDataUrl, "PNG", 14, 10, 32, 16);
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
@@ -1183,7 +1183,7 @@ export default function HsePermitToWorkPage() {
                   children: [
                     new ImageRun({
                       data: logoBytes,
-                      transformation: { width: 104, height: 54 },
+                      transformation: { width: 112, height: 56 },
                       type: "png",
                     }),
                   ],
