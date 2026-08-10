@@ -26,9 +26,9 @@ type Lesson = {
 type Evidence = { id: string; record_id: string; file_name: string; file_path: string; file_size: number | null; notes: string | null };
 type ImportRow = Omit<Lesson, "id" | "created_at" | "updated_at"> & { rowNumber: number; errors: string[]; warnings: string[] };
 type ProjectOption = { id: string; code: string; name: string; source: "reference" | "historic" };
-type PersonOption = { id: string; name: string; role: string | null };
+type PersonOption = { id: string; name: string; role: string | null; department: string | null };
 type AssetOption = { id: string; name: string; code: string };
-type ReferenceContextValue = { projects: ProjectOption[]; people: PersonOption[]; assets: AssetOption[]; onSelectProject: (id: string) => void; showNewProject: boolean; setShowNewProject: (value: boolean) => void; newProjectCode: string; setNewProjectCode: (value: string) => void; newProjectName: string; setNewProjectName: (value: string) => void; onAddProject: () => void };
+type ReferenceContextValue = { projects: ProjectOption[]; people: PersonOption[]; assets: AssetOption[]; departments: string[]; onSelectProject: (id: string) => void; showNewProject: boolean; setShowNewProject: (value: boolean) => void; newProjectCode: string; setNewProjectCode: (value: string) => void; newProjectName: string; setNewProjectName: (value: string) => void; onAddProject: () => void };
 const ReferenceContext = createContext<ReferenceContextValue | null>(null);
 
 const tabs: Array<{ value: View; label: string }> = [
@@ -77,6 +77,21 @@ function meaningfulText(value: string | null | undefined) {
   const text = clean(value);
   return text.length >= 30 && !/^(n\/?a|none|unknown|not available|tbc|tbd|-+)$/i.test(text);
 }
+const projectCodeCollator = new Intl.Collator("en-GB", { numeric: true, sensitivity: "base" });
+function projectSortKey(code: string) {
+  const value = clean(code).toUpperCase();
+  const ens = value.match(/^ENS(\d{2})-(\d+)/);
+  if (ens) return { group: ens[1] === "25" ? 0 : 1, year: Number(ens[1]), sequence: Number(ens[2]) };
+  if (/^[BJ]/.test(value)) return { group: 2, year: 0, sequence: 0 };
+  return { group: 3, year: 0, sequence: 0 };
+}
+function compareProjects(a: ProjectOption, b: ProjectOption) {
+  const left = projectSortKey(a.code); const right = projectSortKey(b.code);
+  if (left.group !== right.group) return left.group - right.group;
+  if (left.group === 1 && left.year !== right.year) return right.year - left.year;
+  if (left.group <= 1 && left.sequence !== right.sequence) return left.sequence - right.sequence;
+  return projectCodeCollator.compare(a.code, b.code) || a.name.localeCompare(b.name);
+}
 
 export default function LessonsLearnedPage() {
   const permission = useImsPermissions();
@@ -94,7 +109,7 @@ export default function LessonsLearnedPage() {
   const [evidenceNotes, setEvidenceNotes] = useState(""); const detailRef = useRef<HTMLElement | null>(null);
   const [learningIndex, setLearningIndex] = useState(0); const [learningPaused, setLearningPaused] = useState(false);
   const [referenceProjects, setReferenceProjects] = useState<ProjectOption[]>([]);
-  const [peopleOptions, setPeopleOptions] = useState<PersonOption[]>([]); const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]);
+  const [peopleOptions, setPeopleOptions] = useState<PersonOption[]>([]); const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]); const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
   const [showNewProject, setShowNewProject] = useState(false); const [newProjectCode, setNewProjectCode] = useState(""); const [newProjectName, setNewProjectName] = useState("");
   const [isFieldMode, setIsFieldMode] = useState(false);
 
@@ -149,11 +164,12 @@ export default function LessonsLearnedPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [allLessons, allEvidence, projectResult, peopleResult, assetResult] = await Promise.all([
+      const [allLessons, allEvidence, projectResult, peopleResult, assetResult, departmentResult] = await Promise.all([
         loadAllLessons(), loadAllLessonEvidence(),
         supabase.from("ims_reference_projects").select("*").eq("active", true).order("name"),
-        supabase.from("people").select("id,name,role").eq("active", true).order("name"),
+        supabase.from("people").select("id,name,role,department").eq("active", true).order("name"),
         supabase.from("assets").select("id,name,asset_code,document_id_code,status").order("name"),
+        supabase.from("ims_reference_departments").select("name").eq("active", true).order("name"),
       ]);
       setLessons(allLessons);
       setEvidence(allEvidence);
@@ -161,8 +177,10 @@ export default function LessonsLearnedPage() {
       allLessons.forEach((item) => { const key = `${clean(item.project_code).toLowerCase()}|${clean(item.project_name).toLowerCase()}`; if (!historic.has(key)) historic.set(key, { id: key, code: clean(item.project_code), name: clean(item.project_name), source: "historic" }); });
       const refs = ((projectResult.data || []) as Array<{ id: string; code?: string | null; name: string }>).map((item) => ({ id: item.id, code: clean(item.code), name: item.name, source: "reference" as const }));
       refs.forEach((item) => historic.delete(`${item.code.toLowerCase()}|${item.name.toLowerCase()}`));
-      setReferenceProjects([...refs, ...historic.values()].sort((a, b) => a.name.localeCompare(b.name)));
-      setPeopleOptions(((peopleResult.data || []) as Array<{ id: string; name: string; role: string | null }>).filter((item) => clean(item.name)));
+      setReferenceProjects([...refs, ...historic.values()].sort(compareProjects));
+      const activePeople = ((peopleResult.data || []) as Array<{ id: string; name: string; role: string | null; department: string | null }>).filter((item) => clean(item.name));
+      setPeopleOptions(activePeople);
+      setDepartmentOptions([...new Set([...(departmentResult.data || []).map((item) => clean(item.name)), ...activePeople.map((item) => clean(item.department))].filter(Boolean))].sort());
       setAssetOptions(((assetResult.data || []) as Array<{ id: string; name: string; asset_code: string | null; document_id_code: string | null; status: string | null }>).filter((item) => clean(item.name) && clean(item.status).toLowerCase() !== "disposed").map((item) => ({ id: item.id, name: item.name, code: clean(item.asset_code) || clean(item.document_id_code) })));
       setMessage(`Loaded ${allLessons.length.toLocaleString()} lessons from the central repository.`);
     } catch (error) {
@@ -387,7 +405,7 @@ export default function LessonsLearnedPage() {
   }
 
   const chartTooltip = { contentStyle: { borderRadius: 12, border: "1px solid #dbe7f3", fontSize: 12 } };
-  return <ReferenceContext.Provider value={{ projects: referenceProjects, people: peopleOptions, assets: assetOptions, onSelectProject: selectProjectReference, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject: addProjectReference }}><main className={isFieldMode ? "lessons-field-mode" : undefined}>
+  return <ReferenceContext.Provider value={{ projects: referenceProjects, people: peopleOptions, assets: assetOptions, departments: departmentOptions, onSelectProject: selectProjectReference, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject: addProjectReference }}><main className={isFieldMode ? "lessons-field-mode" : undefined}>
     {isFieldMode ? <section style={fieldIntroStyle}><span style={fieldIntroIconStyle}><LearningFieldIcon /></span><span><strong style={fieldIntroTitleStyle}>Capture a Lesson</strong><small style={fieldIntroTextStyle}>Record the learning now; optional detail can be added or refined later.</small></span></section> : <QualityPageHero label="LESSONS LEARNED" title="Lessons Learned" description="Central repository for searchable project knowledge, repeat-failure prevention, evidence, actions, and trend analysis." />}
     <ImsTopMetaRow backHref={isFieldMode ? "/field-tools" : "/home"} backLabel={isFieldMode ? "Back to Field Tools" : "Back to IMS Home"} actions={!isFieldMode ? <ImsButton variant="secondary" onClick={() => void loadData()}>Refresh</ImsButton> : undefined} status={<><strong>Status:</strong> {message}</>} />
     {!isFieldMode ? <ImsTabs tabs={tabs} active={view} onChange={(next) => { setView(next); if (next === "create") { setSelected(null); setForm(emptyForm); } }} ariaLabel="Lessons Learned views" /> : null}
@@ -458,7 +476,9 @@ function ChartFrame({ children, height = 300 }: { children: React.ReactNode; hei
 function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNotes, setEvidenceNotes, saving, onSave, onDelete, onClose, evidence, onOpenEvidence, fieldMode = false }: { title: string; subtitle: string; form: typeof emptyForm; update: (name: keyof typeof emptyForm, value: string) => void; files: File[]; setFiles: (files: File[]) => void; evidenceNotes: string; setEvidenceNotes: (value: string) => void; saving: boolean; onSave: () => void; onDelete?: () => void; onClose?: () => void; evidence: Evidence[]; onOpenEvidence: (item: Evidence) => void; fieldMode?: boolean }) {
   const references = useContext(ReferenceContext);
   if (!references) return null;
-  const { projects, people, assets, onSelectProject, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject } = references;
+  const { projects, people, assets, departments, onSelectProject, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject } = references;
+  const peopleSelectOptions = people.map((item) => ({ value: item.name, label: item.role ? `${item.name} · ${item.role}` : item.name }));
+  const departmentSelectOptions = departments.map((item) => ({ value: item, label: item }));
   const selectedProjectId = projects.find((item) => item.code === form.project_code && item.name === form.project_name)?.id || "";
   if (fieldMode) return <ImsPanel title={title} subtitle={subtitle}>
     <div style={fieldFormGrid}>
@@ -466,7 +486,7 @@ function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNo
       {showNewProject && <div style={fieldNewProjectPanel}><Field label="New Project Code"><Input value={newProjectCode} onChange={setNewProjectCode} placeholder="e.g. ENS26-001" /></Field><Field label="New Project Name"><Input value={newProjectName} onChange={setNewProjectName} placeholder="Official project name" /></Field><div style={actionRow}><ImsButton onClick={() => void onAddProject()}>Add Project</ImsButton><ImsButton variant="secondary" onClick={() => setShowNewProject(false)}>Cancel</ImsButton></div></div>}
       <Field label="Report Date"><Input type="date" value={form.report_date} onChange={(x) => update("report_date", x)} /></Field>
       <Field label="Vessel / Office"><Input value={form.vessel_office} onChange={(x) => update("vessel_office", x)} placeholder="Where did this learning arise?" /></Field>
-      <Field label="Department"><Input value={form.department} onChange={(x) => update("department", x)} /></Field>
+      <Field label="Department"><ControlledSelect value={form.department} onChange={(x) => update("department", x)} placeholder="Select department" options={departmentSelectOptions} /></Field>
       <Field label="Outcome"><select value={form.outcome_type} onChange={(e) => update("outcome_type", e.target.value)} style={imsInputStyle}>{["Failure", "Success", "Opportunity"].map((x) => <option key={x}>{x}</option>)}</select></Field>
       <Field label="Criticality"><select value={form.criticality} onChange={(e) => update("criticality", e.target.value)} style={imsInputStyle}>{["Low", "Medium", "High", "Critical"].map((x) => <option key={x}>{x}</option>)}</select></Field>
       <Field label="Subject"><Input value={form.subject} onChange={(x) => update("subject", x)} placeholder="Short, searchable summary" /></Field>
@@ -483,13 +503,13 @@ function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNo
         <Field label="Date of Incident"><Input type="date" value={form.incident_date} onChange={(x) => update("incident_date", x)} /></Field>
         <Field label="Asset"><ControlledSelect value={form.assets} onChange={(x) => update("assets", x)} placeholder="Select asset" options={assets.map((item) => ({ value: item.name, label: item.code ? `${item.code} · ${item.name}` : item.name }))} /></Field>
         <Field label="Stage / Phase"><Input value={form.stage_phase} onChange={(x) => update("stage_phase", x)} /></Field>
-        <Field label="Originator"><ControlledSelect value={form.originator} onChange={(x) => update("originator", x)} placeholder="Select from People Management" options={people.map((item) => ({ value: item.name, label: item.role ? `${item.name} · ${item.role}` : item.name }))} /></Field>
-        <Field label="Line Manager"><ControlledSelect value={form.line_manager} onChange={(x) => update("line_manager", x)} placeholder="Select from People Management" options={people.map((item) => ({ value: item.name, label: item.role ? `${item.name} · ${item.role}` : item.name }))} /></Field>
+        <Field label="Originator"><ControlledSelect value={form.originator} onChange={(x) => update("originator", x)} placeholder="Select from People Management" options={peopleSelectOptions} /></Field>
+        <Field label="Line Manager"><ControlledSelect value={form.line_manager} onChange={(x) => update("line_manager", x)} placeholder="Select from People Management" options={peopleSelectOptions} /></Field>
         <Field label="Status"><select value={form.status} onChange={(e) => update("status", e.target.value)} style={imsInputStyle}>{["Open", "In Progress", "Implemented", "Shared", "Closed"].map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Impact Rating"><select value={form.impact_rating} onChange={(e) => update("impact_rating", e.target.value)} style={imsInputStyle}>{["Low", "Medium", "High", "Critical"].map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Root Cause / Contributing Factors"><Textarea value={form.root_cause} onChange={(x) => update("root_cause", x)} /></Field>
         <Field label="Action Taken"><Textarea value={form.action_taken} onChange={(x) => update("action_taken", x)} /></Field>
-        <Field label="Action Owner"><Input value={form.action_owner} onChange={(x) => update("action_owner", x)} /></Field>
+        <Field label="Action Owner"><ControlledSelect value={form.action_owner} onChange={(x) => update("action_owner", x)} placeholder="Select from People Management" options={peopleSelectOptions} /></Field>
         <Field label="Target Date"><Input type="date" value={form.target_date} onChange={(x) => update("target_date", x)} /></Field>
         <Field label="Completion Date"><Input type="date" value={form.completion_date} onChange={(x) => update("completion_date", x)} /></Field>
         <Field label="Repeat Group"><Input value={form.repeat_group} onChange={(x) => update("repeat_group", x)} /></Field>
@@ -504,8 +524,8 @@ function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNo
     {showNewProject && <div style={newProjectPanel}><Field label="New Project Code"><Input value={newProjectCode} onChange={setNewProjectCode} placeholder="e.g. ENS26-001" /></Field><Field label="New Project Name"><Input value={newProjectName} onChange={setNewProjectName} placeholder="Official project name" /></Field><div style={actionRow}><ImsButton onClick={() => void onAddProject()}>Add Project</ImsButton><ImsButton variant="secondary" onClick={() => setShowNewProject(false)}>Cancel</ImsButton></div></div>}
     <Field label="Report Date"><Input type="date" value={form.report_date} onChange={(x) => update("report_date", x)} /></Field><Field label="Date of Incident"><Input type="date" value={form.incident_date} onChange={(x) => update("incident_date", x)} /></Field>
     <Field label="Vessel / Office"><Input value={form.vessel_office} onChange={(x) => update("vessel_office", x)} /></Field><Field label="Asset"><ControlledSelect value={form.assets} onChange={(x) => update("assets", x)} placeholder="Select asset" options={assets.map((item) => ({ value: item.name, label: item.code ? `${item.code} · ${item.name}` : item.name }))} /></Field>
-    <Field label="Department"><Input value={form.department} onChange={(x) => update("department", x)} /></Field><Field label="Stage / Phase"><Input value={form.stage_phase} onChange={(x) => update("stage_phase", x)} /></Field>
-    <Field label="Originator"><ControlledSelect value={form.originator} onChange={(x) => update("originator", x)} placeholder="Select from People Management" options={people.map((item) => ({ value: item.name, label: item.role ? `${item.name} · ${item.role}` : item.name }))} /></Field><Field label="Line Manager"><ControlledSelect value={form.line_manager} onChange={(x) => update("line_manager", x)} placeholder="Select from People Management" options={people.map((item) => ({ value: item.name, label: item.role ? `${item.name} · ${item.role}` : item.name }))} /></Field>
+    <Field label="Department"><ControlledSelect value={form.department} onChange={(x) => update("department", x)} placeholder="Select department" options={departmentSelectOptions} /></Field><Field label="Stage / Phase"><Input value={form.stage_phase} onChange={(x) => update("stage_phase", x)} /></Field>
+    <Field label="Originator"><ControlledSelect value={form.originator} onChange={(x) => update("originator", x)} placeholder="Select from People Management" options={peopleSelectOptions} /></Field><Field label="Line Manager"><ControlledSelect value={form.line_manager} onChange={(x) => update("line_manager", x)} placeholder="Select from People Management" options={peopleSelectOptions} /></Field>
     <Field label="Outcome"><select value={form.outcome_type} onChange={(e) => update("outcome_type", e.target.value)} style={imsInputStyle}>{["Failure", "Success", "Opportunity"].map((x) => <option key={x}>{x}</option>)}</select></Field>
     <Field label="Status"><select value={form.status} onChange={(e) => update("status", e.target.value)} style={imsInputStyle}>{["Open", "In Progress", "Implemented", "Shared", "Closed"].map((x) => <option key={x}>{x}</option>)}</select></Field>
     <Field label="Criticality"><select value={form.criticality} onChange={(e) => update("criticality", e.target.value)} style={imsInputStyle}>{["Low", "Medium", "High", "Critical"].map((x) => <option key={x}>{x}</option>)}</select></Field>
@@ -515,7 +535,7 @@ function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNo
     <Field label="Root Cause / Contributing Factors" wide><Textarea value={form.root_cause} onChange={(x) => update("root_cause", x)} placeholder="Focus on systems, planning, interfaces, controls, information, equipment, or process conditions." /></Field>
     <Field label="Action Taken" wide><Textarea value={form.action_taken} onChange={(x) => update("action_taken", x)} /></Field><Field label="Lesson Learned" wide><Textarea value={form.lesson_learned} onChange={(x) => update("lesson_learned", x)} /></Field>
     <Field label="Recommended Action" wide><Textarea value={form.recommended_action} onChange={(x) => update("recommended_action", x)} /></Field>
-    <Field label="Action Owner"><Input value={form.action_owner} onChange={(x) => update("action_owner", x)} /></Field><Field label="Target Date"><Input type="date" value={form.target_date} onChange={(x) => update("target_date", x)} /></Field>
+    <Field label="Action Owner"><ControlledSelect value={form.action_owner} onChange={(x) => update("action_owner", x)} placeholder="Select from People Management" options={peopleSelectOptions} /></Field><Field label="Target Date"><Input type="date" value={form.target_date} onChange={(x) => update("target_date", x)} /></Field>
     <Field label="Completion Date"><Input type="date" value={form.completion_date} onChange={(x) => update("completion_date", x)} /></Field><Field label="Repeat Group"><Input value={form.repeat_group} onChange={(x) => update("repeat_group", x)} placeholder="e.g. Document control at mobilisation" /></Field>
     <Field label="Keywords" wide><Input value={form.keywords} onChange={(x) => update("keywords", x)} placeholder="Comma-separated: mobilisation, cable handling, document control" /></Field>
     <Field label="Source File"><Input value={form.source_file} onChange={(x) => update("source_file", x)} /></Field><Field label="Photo / File Evidence"><input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xlsx" onChange={(e) => setFiles(Array.from(e.target.files || []))} style={imsInputStyle} /></Field>
