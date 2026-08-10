@@ -75,15 +75,28 @@ export default function PublicObservationPage() {
   }
 
   return (
-    <main style={pageStyle}>
+    <main className="observe-page" style={pageStyle}>
       <section style={shellStyle}>
         <style>
           {`
             @media (max-width: 520px) {
+              .ims-app-root .ims-page-container.ims-page-container--public {
+                padding: 0 !important;
+              }
+
+              .observe-page {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 12px !important;
+              }
+
               .observe-header {
                 grid-template-columns: minmax(0, 1fr) auto !important;
                 justify-items: start !important;
-                padding: 16px !important;
+                gap: 10px 12px !important;
+                padding: 14px !important;
+                border-radius: 16px !important;
               }
 
               .observe-logo {
@@ -98,6 +111,28 @@ export default function PublicObservationPage() {
               .observe-header-copy {
                 grid-column: 1 / -1 !important;
               }
+
+              .observe-title {
+                white-space: normal !important;
+              }
+
+              .observe-card {
+                padding: 14px !important;
+                border-radius: 16px !important;
+              }
+
+              body .ims-page-container.ims-page-container--public main.observe-page .observe-reporter-grid.observe-reporter-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+              }
+
+              .observe-reporter-grid > button:last-child:nth-child(odd) {
+                grid-column: 1 / -1;
+              }
+
+              .observe-control {
+                min-width: 0 !important;
+                max-width: 100% !important;
+              }
             }
           `}
         </style>
@@ -105,7 +140,7 @@ export default function PublicObservationPage() {
           <Image className="observe-logo" src="/enshore-primary-logo-colour.svg" alt="Enshore" width={510} height={255} priority style={{ width: "170px", height: "auto" }} />
           <div className="observe-header-copy" style={headerCopyStyle}>
             <span style={eyebrowStyle}>HSE Management</span>
-            <h1 style={titleStyle}>{headerText}</h1>
+            <h1 className="observe-title" style={titleStyle}>{headerText}</h1>
             <p style={subtitleStyle}>Every observation helps make Enshore a safer place to work.</p>
           </div>
           <Image className="observe-three-rs-logo" src="/enshore-3rs-primary-rgb.jpg" alt="Recognise, Report, Resolve" width={1889} height={712} priority style={{ width: "145px", height: "auto" }} />
@@ -117,9 +152,9 @@ export default function PublicObservationPage() {
           </div>
         ) : null}
 
-        <section style={cardStyle}>
+        <section className="observe-card" style={cardStyle}>
             <h2 style={sectionTitleStyle}>Who is submitting?</h2>
-            <div style={choiceGridStyle}>
+            <div className="observe-reporter-grid" style={choiceGridStyle}>
               {reporterTypes.map((type) => (
                 <button
                   key={type}
@@ -138,7 +173,7 @@ export default function PublicObservationPage() {
 
         {hasSelectedReporterType ? (
         <form onSubmit={handleSubmit} style={formStyle}>
-          <section style={cardStyle}>
+          <section className="observe-card" style={cardStyle}>
             <div style={formHeaderRowStyle}>
               <h2 style={sectionTitleStyle}>Contact Details</h2>
               <button
@@ -157,10 +192,10 @@ export default function PublicObservationPage() {
             {!isQuickFill ? (
               <div style={responsiveGridStyle}>
                 <Field label="Name">
-                  <input name="reporter_name" style={inputStyle} placeholder="Your name" />
+                  <input className="observe-control" name="reporter_name" style={inputStyle} placeholder="Your name" />
                 </Field>
                 <Field label="Company">
-                  <input name="reporter_company" style={inputStyle} placeholder="Company / organisation" />
+                  <input className="observe-control" name="reporter_company" style={inputStyle} placeholder="Company / organisation" />
                 </Field>
               </div>
             ) : null}
@@ -169,62 +204,62 @@ export default function PublicObservationPage() {
             </button>
             {showContact ? (
               <Field label="Contact details">
-                <input name="reporter_contact" style={inputStyle} placeholder="Phone or email if HSE needs to follow up" />
+                <input className="observe-control" name="reporter_contact" style={inputStyle} placeholder="Phone or email if HSE needs to follow up" />
               </Field>
             ) : null}
           </section>
 
-          <section style={cardStyle}>
+          <section className="observe-card" style={cardStyle}>
             <h2 style={sectionTitleStyle}>Observation details</h2>
             <div style={responsiveGridStyle}>
               <Field label="Project / vessel / worksite">
-                <input name="project" style={inputStyle} placeholder="e.g. ENS24, Blyth Base, vessel name" />
+                <input className="observe-control" name="project" style={inputStyle} placeholder="e.g. ENS24, Blyth Base, vessel name" />
               </Field>
               <Field label="Exact location">
-                <input name="site_location" style={inputStyle} placeholder="Area, deck, room, workshop, yard..." />
+                <input className="observe-control" name="site_location" style={inputStyle} placeholder="Area, deck, room, workshop, yard..." />
               </Field>
               <Field label="Date">
-                <input type="date" name="observation_date" defaultValue={today()} style={inputStyle} />
+                <input className="observe-control" type="date" name="observation_date" defaultValue={today()} style={inputStyle} />
               </Field>
               <Field label="Time">
-                <input type="time" name="observation_time" defaultValue={currentTime()} style={inputStyle} />
+                <input className="observe-control" type="time" name="observation_time" defaultValue={currentTime()} style={inputStyle} />
               </Field>
               <Field label="Observation type">
-                <select name="observation_type" style={inputStyle} defaultValue="Unsafe Condition">
+                <select className="observe-control" name="observation_type" style={inputStyle} defaultValue="Unsafe Condition">
                   {observationTypes.map((type) => <option key={type}>{type}</option>)}
                 </select>
               </Field>
               <Field label="Category">
-                <select name="category" style={inputStyle} defaultValue="">
+                <select className="observe-control" name="category" style={inputStyle} defaultValue="">
                   <option value="">Select category</option>
                   {categories.map((category) => <option key={category}>{category}</option>)}
                 </select>
               </Field>
               <Field label="Risk / attention level">
-                <select name="risk_level" style={inputStyle} defaultValue="">
+                <select className="observe-control" name="risk_level" style={inputStyle} defaultValue="">
                   <option value="">Select level</option>
                   {riskLevels.map((level) => <option key={level}>{level}</option>)}
                 </select>
               </Field>
               <Field label="Short title">
-                <input name="title" style={inputStyle} placeholder="Short summary" />
+                <input className="observe-control" name="title" style={inputStyle} placeholder="Short summary" />
               </Field>
             </div>
             <Field label="What was observed?">
-              <textarea name="description" required style={textareaStyle} placeholder="Describe what happened, what you saw, or what could be improved." />
+              <textarea className="observe-control" name="description" required style={textareaStyle} placeholder="Describe what happened, what you saw, or what could be improved." />
             </Field>
             <Field label="Immediate action taken">
-              <textarea name="immediate_action" style={textareaStyle} placeholder="What was done straight away, if anything?" />
+              <textarea className="observe-control" name="immediate_action" style={textareaStyle} placeholder="What was done straight away, if anything?" />
             </Field>
             <Field label="Suggested action">
-              <textarea name="suggested_action" style={textareaStyle} placeholder="Suggested fix or follow-up action." />
+              <textarea className="observe-control" name="suggested_action" style={textareaStyle} placeholder="Suggested fix or follow-up action." />
             </Field>
           </section>
 
-          <section style={cardStyle}>
+          <section className="observe-card" style={cardStyle}>
             <h2 style={sectionTitleStyle}>Photos or supporting evidence</h2>
             <p style={helperTextStyle}>Optional. Add photos or files that help HSE understand the observation.</p>
-            <input name="evidence" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={fileInputStyle} />
+            <input className="observe-control" name="evidence" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={fileInputStyle} />
           </section>
 
           <button

@@ -85,6 +85,10 @@ body {
 }
 
 @media (max-width: 720px) {
+  .ims-app-root {
+    scrollbar-gutter: auto !important;
+  }
+
   html {
     overflow-x: hidden;
   }
@@ -195,6 +199,10 @@ body {
 
   .ims-page-container:not(.ims-page-container--field) {
     padding: 16px 12px 92px !important;
+  }
+
+  .ims-page-container--public {
+    padding: 0 !important;
   }
 
   .ims-page-hero {

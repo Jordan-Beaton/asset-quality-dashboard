@@ -991,6 +991,7 @@ export default function AppShell({ children }: AppShellProps) {
     <ImsPermissionProvider value={activePermission}>
     <MobileTableEnhancer routeKey={pathname} />
     <div
+      className="ims-app-root"
       style={{ minHeight: "100vh", background: "#f1f5f9", scrollbarGutter: "stable" }}
       onClickCapture={handlePermissionClickCapture}
       onSubmitCapture={handlePermissionSubmitCapture}
@@ -1380,7 +1381,13 @@ export default function AppShell({ children }: AppShellProps) {
 
       <main>
         <div
-          className={isFieldInspectionMode ? "ims-page-container ims-page-container--field" : "ims-page-container"}
+          className={
+            isFieldInspectionMode
+              ? "ims-page-container ims-page-container--field"
+              : isPublicObservationPage
+              ? "ims-page-container ims-page-container--public"
+              : "ims-page-container"
+          }
           style={{
             maxWidth: "1320px",
             width: "100%",
