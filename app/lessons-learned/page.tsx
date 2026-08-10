@@ -465,7 +465,7 @@ export default function LessonsLearnedPage() {
 
 function Field({ label, children, wide = false }: { label: string; children: React.ReactNode; wide?: boolean }) { return <label style={{ ...field, gridColumn: wide ? "1 / -1" : undefined }}><span style={labelStyle}>{label}</span>{children}</label>; }
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) { return <Field label={label}><select value={value} onChange={(e) => onChange(e.target.value)} style={imsInputStyle}><option value="">All</option>{options.map((x) => <option key={x}>{x}</option>)}</select></Field>; }
-function Input({ value, onChange, type = "text", placeholder }: { value: string; onChange: (value: string) => void; type?: string; placeholder?: string }) { return <input type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} style={imsInputStyle} />; }
+function Input({ value, onChange, type = "text", placeholder }: { value: string; onChange: (value: string) => void; type?: string; placeholder?: string }) { return <input type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} style={{ ...imsInputStyle, minWidth: 0, maxWidth: "100%", display: "block" }} />; }
 function ControlledSelect({ value, onChange, placeholder, options }: { value: string; onChange: (value: string) => void; placeholder: string; options: Array<{ value: string; label: string }> }) {
   const exists = options.some((item) => item.value === value);
   return <select value={value} onChange={(event) => onChange(event.target.value)} style={imsInputStyle}><option value="">{placeholder}</option>{value && !exists && <option value={value}>{value} · Historic value</option>}{options.map((item) => <option key={`${item.value}-${item.label}`} value={item.value}>{item.label}</option>)}</select>;
@@ -560,7 +560,7 @@ const newProjectPanel: CSSProperties = { gridColumn: "1 / -1", display: "grid", 
 const watchList: CSSProperties = { display: "grid", gap: 8 };
 const watchRow: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "11px 12px", borderRadius: 12, border: `1px solid ${imsColours.borderSoft}`, background: imsColours.panelAlt, textAlign: "left", cursor: "pointer" };
 const formGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 13 };
-const field: CSSProperties = { display: "grid", gap: 6, alignContent: "start" }; const labelStyle: CSSProperties = { color: imsColours.slate, fontSize: 12, fontWeight: 800 };
+const field: CSSProperties = { display: "grid", minWidth: 0, maxWidth: "100%", gap: 6, alignContent: "start" }; const labelStyle: CSSProperties = { color: imsColours.slate, fontSize: 12, fontWeight: 800 };
 const tableWrap: CSSProperties = { width: "100%", overflowX: "auto" }; const table: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 13 };
 const registerTableStyle: CSSProperties = { ...table, tableLayout: "fixed", minWidth: 1490 };
 const th: CSSProperties = { background: imsColours.panelAlt, color: "#334155", fontSize: 12, fontWeight: 900, letterSpacing: ".04em", textTransform: "uppercase", textAlign: "left", padding: "12px 14px", whiteSpace: "nowrap" };
