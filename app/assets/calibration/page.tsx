@@ -1392,7 +1392,6 @@ function CalibrationPageContent() {
       />
 
       <ImsTopMetaRow
-        backHref="/assets/dashboard"
         backHref="/home"
         backLabel="Back to IMS Home"
         status={

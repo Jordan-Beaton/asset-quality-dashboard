@@ -354,7 +354,6 @@ export default function HseObservationsPage() {
       />
 
       <ImsTopMetaRow
-        backHref="/hse"
         backHref="/home"
         backLabel="Back to IMS Home"
         actions={

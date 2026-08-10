@@ -698,7 +698,6 @@ export default function AssetActionsPage() {
       />
 
       <ImsTopMetaRow
-        backHref="/assets/dashboard"
         backHref="/home"
         backLabel="Back to IMS Home"
         actions={<Link href="/actions?department=Assets" style={primaryLinkStyle}>Open Central Actions</Link>}

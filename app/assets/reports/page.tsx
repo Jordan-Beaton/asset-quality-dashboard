@@ -1048,7 +1048,6 @@ export default function AssetReportsPage() {
       />
 
       <ImsTopMetaRow
-        backHref="/assets/dashboard"
         backHref="/home"
         backLabel="Back to IMS Home"
         actions={

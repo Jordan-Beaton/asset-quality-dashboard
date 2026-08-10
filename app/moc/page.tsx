@@ -3325,7 +3325,6 @@ function MOCPageContent() {
       />
 
       <ImsTopMetaRow
-        backHref="/quality"
         backHref="/home"
         backLabel="Back to IMS Home"
         status={<><strong>Status:</strong> {message}</>}
