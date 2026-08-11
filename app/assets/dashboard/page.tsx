@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { ImsButton, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { ImsButton, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -264,6 +264,7 @@ function DashboardContent() {
   const [linkedActions, setLinkedActions] = useState<AssetLinkedAction[]>([]);
   const [message, setMessage] = useState("Loading asset dashboard...");
   const [lastRefreshed, setLastRefreshed] = useState("");
+  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning">("overview");
 
   async function loadDashboardData() {
     const [assetsRes, calibrationsRes, inspectionsRes, maintenanceRes, filesRes, actionsRes] = await Promise.all([
@@ -709,6 +710,20 @@ function DashboardContent() {
   return (
     <main>
       <style>{`
+        .asset-view-command {
+          margin-bottom: 18px;
+          padding: 10px 12px;
+          background: #ffffff;
+          border: 1px solid #D0D0CE;
+          border-radius: 16px;
+          box-shadow: 0 1px 3px rgba(15,23,42,0.08);
+        }
+        .asset-view-command .ims-tabs { margin-bottom: 0 !important; }
+        .asset-view-panel { animation: assetViewEnter 220ms ease-out; }
+        @keyframes assetViewEnter {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         @media (max-width: 1120px) {
           .asset-command-deck,
           .asset-status-split,
@@ -760,6 +775,20 @@ function DashboardContent() {
         }
       />
 
+      <div className="asset-view-command">
+        <ImsTabs
+          tabs={[
+            { value: "overview", label: "Overview" },
+            { value: "analytics", label: "Analytics" },
+            { value: "planning", label: "Attention & Planning" },
+          ]}
+          active={dashboardView}
+          onChange={setDashboardView}
+          ariaLabel="Asset dashboard views"
+        />
+      </div>
+
+      {dashboardView === "overview" ? <div className="asset-view-panel" role="tabpanel">
       <section className="asset-command-deck" style={commandDeckStyle}>
         <div className="asset-command-score" style={commandScorePanelStyle}>
           <div style={commandCopyStyle}>
@@ -801,7 +830,9 @@ function DashboardContent() {
           <PressureList rows={pressureData} maxValue={Math.max(...pressureData.map((item) => item.value), 1)} />
         </div>
       </section>
+      </div> : null}
 
+      {dashboardView === "analytics" ? <div className="asset-view-panel" role="tabpanel">
       <section className="asset-kpi-grid" style={statsGridStyle}>
         <QualityKpiCard title="Total Assets" value={assets.length} accent="#63B1BC" href="/assets" />
         <QualityKpiCard title="Due Risk Items" value={dueWatchCount} accent="#F93822" href="/assets/dashboard" />
@@ -839,7 +870,9 @@ function DashboardContent() {
           <BarList rows={ownerData.map((item) => ({ ...item, detail: `${item.percent}% of assets`, colour: "#63B1BC" }))} maxValue={assets.length || 1} />
         </SectionCard>
       </section>
+      </div> : null}
 
+      {dashboardView === "planning" ? <div className="asset-view-panel" role="tabpanel">
       <section style={attentionBoardSectionStyle}>
         <SectionCard
           title="Asset Attention Board"
@@ -944,6 +977,7 @@ function DashboardContent() {
         </SectionCard>
 
       </section>
+      </div> : null}
     </main>
   );
 }

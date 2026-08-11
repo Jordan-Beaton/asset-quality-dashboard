@@ -1,6 +1,6 @@
 # Asset Management Codex Handover
 
-Asset Management exists but its UI layout has lagged behind Quality and HSE. Future work should standardise it against the shared IMS layout and Quality/HSE page patterns.
+Asset Management is covered by the completed whole-IMS visual baseline. Future work should preserve the shared contract while concentrating on production workflow, permission, mobile and real-data QA.
 
 ## Routes
 
@@ -22,6 +22,7 @@ Asset Management exists but its UI layout has lagged behind Quality and HSE. Fut
 - Asset Reports now has the Quality-style saved reports search, Show/Hide Filters pattern, year filter, Clear Filters action, and filtered report count.
 - Asset Dashboard KPI cards now drill into the relevant Asset workspaces.
 - Asset Management Dashboard now mirrors the Quality Dashboard structure in a condensed layout: hero/meta row, two-column command deck, KPI strip, health strip, chart/story grid, full-width attention board, and aligned bottom watchlists.
+- The standalone Asset Dashboard now separates that content into Overview, Analytics, and Attention & Planning command views while retaining the existing live metrics, health story, attention board, watchlists, and drill-down routes.
 - Asset Register Dashboard tab now has a cleaner shared-panel layout with an even KPI strip, Due Watch, Quality Links, and Register Health panels.
 - Asset Dashboard, Register, Calibration, Inspection, Maintenance, Asset Actions, Asset People, and Reports use the shared IMS top meta/status row.
 - Asset Inspection and Maintenance retain row-click detail-panel scroll and linked central Action generation.

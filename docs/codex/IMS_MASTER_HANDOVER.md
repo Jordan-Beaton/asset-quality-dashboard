@@ -16,6 +16,7 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - Do not expose, print, log, or summarize secrets.
 - If SQL is required, provide exact SQL for the Supabase editor.
 - For meaningful code changes, run `npm run lint` and `npm run build` unless the user tells you not to.
+- Run `npm run check:ui` for every UI, page, output, shared-component, or theme change. Treat failures as regressions, not optional style advice.
 - Preserve production workflows while improving UI.
 
 ## IMS Layout Standard
@@ -30,6 +31,10 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - Mobile compatibility is a mandatory definition of done for every new module, route, tab, form, register and dialog. AppShell applies the shared responsive contract automatically; do not remove or bypass `ims-responsive-contract`, `MobileCompatibilityGuard`, or `MobileTableEnhancer`.
 - Do not create one-off local styles unless absolutely necessary.
 - If a matching pattern exists in Quality Management, copy the structure first and change only wording/data.
+- The whole-IMS standardisation completed on 10 August 2026 is a permanent baseline, not an open redesign task. Do not schedule another broad standardisation pass unless the user explicitly requests a new design direction or an evidenced regression is found.
+- `UI_STANDARDS.md` is normative. `IMS_UI_AUDIT_2026-08-10.md` records the completed baseline and its remaining environment-dependent QA, while `PROJECT_ROADMAP.md` tracks only genuine product/workflow work.
+- New pages must use the shared primitives and theme tokens. Any necessary exception must be documented in `UI_STANDARDS.md` in the same change.
+- Operational dashboards follow the interactive command-view and high-contrast analytics contract in `UI_STANDARDS.md`. Keep reporting-period controls out of the top meta/status row and preserve all live drill-down behaviour.
 
 ## Module Handovers
 

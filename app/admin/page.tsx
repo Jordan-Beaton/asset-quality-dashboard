@@ -1005,7 +1005,7 @@ export default function AdminDashboardPage() {
 
       {activeView === "dashboard" ? (
         <>
-          <section style={kpiGridStyle}>
+          <section className="quality-kpi-grid" style={kpiGridStyle}>
             <QualityKpiCard title="IMS Users" value={userStats.total} accent={imsColours.brand} />
             <QualityKpiCard title="Active Access" value={userStats.active} accent={imsColours.success} />
             <QualityKpiCard title="Pending Invites" value={userStats.invited} accent={imsColours.warning} />

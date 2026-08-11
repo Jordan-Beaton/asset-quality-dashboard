@@ -273,6 +273,34 @@ body {
   color: #ffffff !important;
 }
 
+/* Shared dashboard analytics contract: keep charts legible and separate KPI tiers. */
+.ims-responsive-contract .recharts-cartesian-axis-tick-value,
+.ims-responsive-contract .recharts-polar-angle-axis-tick-value {
+  fill: #53565A;
+  font-weight: 700;
+}
+
+.ims-responsive-contract .recharts-cartesian-grid line {
+  stroke: #D0D0CE;
+}
+
+.ims-responsive-contract .recharts-default-tooltip {
+  background: #ffffff !important;
+  border: 1px solid #D0D0CE !important;
+  border-radius: 12px !important;
+  color: #000000 !important;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+}
+
+.ims-responsive-contract .recharts-tooltip-label,
+.ims-responsive-contract .recharts-tooltip-item {
+  color: #000000 !important;
+}
+
+.ims-responsive-contract .quality-kpi-grid {
+  margin-top: 18px;
+}
+
 /* Shared role-based type scale. Page-local inline sizes must not make the same
  * semantic element look different between IMS modules. */
 .ims-page-hero-title {

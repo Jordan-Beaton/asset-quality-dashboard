@@ -10,6 +10,7 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  LabelList,
   Line,
   LineChart,
   Pie,
@@ -19,7 +20,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ImsButton, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
+import { ImsButton, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { imsColours, imsPanelStyle, imsShadows } from "../../src/components/imsTheme";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
@@ -206,6 +207,7 @@ export default function HseDashboardPage() {
   const [message, setMessage] = useState("Loading HSE dashboard...");
   const [loading, setLoading] = useState(false);
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning">("overview");
 
   async function loadDashboard() {
     setLoading(true);
@@ -449,6 +451,24 @@ export default function HseDashboardPage() {
         .hse-live-pill {
           animation: hseLiveGlow 1.8s ease-in-out infinite alternate;
         }
+        .hse-view-command {
+          margin-bottom: 18px;
+          padding: 10px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          background: #ffffff;
+          border: 1px solid #D0D0CE;
+          border-radius: 16px;
+          box-shadow: 0 1px 3px rgba(15,23,42,0.08);
+        }
+        .hse-view-command .ims-tabs { margin-bottom: 0 !important; }
+        .hse-view-panel { animation: hseViewEnter 220ms ease-out; }
+        @keyframes hseViewEnter {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         @keyframes hsePulseDrift {
           from { transform: rotate(0deg) scale(1); }
           to { transform: rotate(8deg) scale(1.05); }
@@ -467,6 +487,7 @@ export default function HseDashboardPage() {
           }
         }
         @media (max-width: 640px) {
+          .hse-view-command { align-items: stretch; flex-direction: column; }
           .hse-command-score {
             grid-template-columns: 1fr !important;
             min-height: auto !important;
@@ -490,19 +511,29 @@ export default function HseDashboardPage() {
       <ImsTopMetaRow
         backHref="/home"
         backLabel="Back to IMS Home"
-        actions={
-          <>
-            <label style={yearFilterStyle}>
-              <span>Year</span>
-              <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
-                {availableYears.map((year) => <option key={year} value={year}>{year}</option>)}
-              </select>
-            </label>
-          </>
-        }
         status={<><strong>Status:</strong> {loading ? "Loading..." : message}</>}
       />
 
+      <div className="hse-view-command">
+        <ImsTabs
+          tabs={[
+            { value: "overview", label: "Overview" },
+            { value: "analytics", label: "Analytics" },
+            { value: "planning", label: "Planning" },
+          ]}
+          active={dashboardView}
+          onChange={setDashboardView}
+          ariaLabel="HSE dashboard views"
+        />
+        <label style={yearFilterStyle}>
+          <span>Reporting year</span>
+          <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
+            {availableYears.map((year) => <option key={year} value={year}>{year}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {dashboardView === "overview" ? <div className="hse-view-panel" role="tabpanel">
       <section className="hse-command-deck" style={commandDeckStyle}>
         <div className="hse-command-score" style={commandScorePanelStyle}>
           <div style={commandScoreCopyStyle}>
@@ -534,7 +565,11 @@ export default function HseDashboardPage() {
           ))}
         </div>
 
-        <section style={pressurePanelStyle}>
+      </section>
+      </div> : null}
+
+      {dashboardView === "analytics" ? <div className="hse-view-panel" role="tabpanel">
+        <section style={{ ...pressurePanelStyle, marginBottom: "22px" }}>
           <div style={pressureHeaderStyle}>
             <div>
               <h2 style={pressureTitleStyle}>Operational Pressure</h2>
@@ -545,10 +580,10 @@ export default function HseDashboardPage() {
           <div style={pressureChartWrapStyle}>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={hseOperationalPressureData} layout="vertical" margin={{ top: 8, right: 24, left: 20, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" allowDecimals={false} />
-                <YAxis type="category" dataKey="name" width={90} />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#D0D0CE" />
+                <XAxis type="number" allowDecimals={false} hide />
+                <YAxis type="category" dataKey="name" width={90} tick={{ fill: "#000000", fontWeight: 800 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ background: "#ffffff", color: "#000000", border: "1px solid #D0D0CE", borderRadius: 12 }} />
                 <Bar dataKey="value" name="Open / due items" radius={[0, 10, 10, 0]}>
                   {hseOperationalPressureData.map((entry) => (
                     <Cell
@@ -558,12 +593,12 @@ export default function HseDashboardPage() {
                       onClick={() => router.push(entry.href)}
                     />
                   ))}
+                  <LabelList dataKey="value" position="right" fill="#000000" fontSize={12} fontWeight={900} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </section>
-      </section>
 
       <section className="hse-kpi-grid" style={kpiGridStyle}>
         <QualityKpiCard title="Open AINMs" value={openAinms.length} accent={chartColours.red} onClick={() => router.push(buildHref("/hse/ainm", { status: "Open" }))} />
@@ -679,6 +714,10 @@ export default function HseDashboardPage() {
           </ChartFrame>
         </SectionCard>
 
+      </section>
+      </div> : null}
+
+      {dashboardView === "planning" ? <div className="hse-view-panel" role="tabpanel">
         <SectionCard title="Upcoming HSE Focus" subtitle="Overdue and upcoming planner items needing attention." href="/hse/calendar">
           <div style={focusListStyle}>
             {[...calendarOverdue, ...calendarUpcoming].slice(0, 8).map((item) => (
@@ -693,8 +732,7 @@ export default function HseDashboardPage() {
             {!calendarOverdue.length && !calendarUpcoming.length ? <div style={emptyStateStyle}>No overdue or upcoming calendar pressure.</div> : null}
           </div>
         </SectionCard>
-
-      </section>
+      </div> : null}
     </main>
   );
 }

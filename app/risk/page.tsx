@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
-import { imsBackLinkStyle } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
 
 type RiskRating = "Low" | "Medium" | "High" | "Critical";
@@ -73,6 +73,7 @@ export default function RiskDashboardPage() {
   const [risks, setRisks] = useState<RiskRow[]>([]);
   const [message, setMessage] = useState("Loading Risk Management dashboard...");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [dashboardView, setDashboardView] = useState<"overview" | "analytics">("overview");
 
   async function loadRisks() {
     const { data, error } = await supabase
@@ -117,6 +118,13 @@ export default function RiskDashboardPage() {
 
   return (
     <main>
+      <style>{`
+        .risk-view-command { margin-bottom: 18px; padding: 10px 12px; background: #fff; border: 1px solid #D0D0CE; border-radius: 16px; box-shadow: 0 1px 3px rgba(15,23,42,.08); }
+        .risk-view-command .ims-tabs { margin-bottom: 0 !important; }
+        .risk-view-panel { animation: riskViewEnter 220ms ease-out; }
+        @keyframes riskViewEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 720px) { .risk-dashboard-grid, .risk-rating-grid, .risk-kpi-grid { grid-template-columns: 1fr !important; } }
+      `}</style>
       <QualityPageHero
         label="RISK MANAGEMENT"
         title="Risk Dashboard"
@@ -127,31 +135,32 @@ export default function RiskDashboardPage() {
         ]}
       />
 
-      <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={imsBackLinkStyle}>&larr; Back to IMS Home</Link>
-        <div style={statusBannerStyle}>
-          <strong>Status:</strong> {message}
-        </div>
+      <ImsTopMetaRow status={<><strong>Status:</strong> {message}</>} />
+      <div className="risk-view-command">
+        <ImsTabs tabs={[{ value: "overview", label: "Overview" }, { value: "analytics", label: "Analytics" }]} active={dashboardView} onChange={setDashboardView} ariaLabel="Risk dashboard views" />
       </div>
-      <section style={statsGridStyle}>
+      {dashboardView === "overview" ? <div className="risk-view-panel" role="tabpanel">
+      <section className="risk-kpi-grid" style={statsGridStyle}>
         <QualityKpiCard title="Open Risks" value={openRisks} accent="#005670" />
         <QualityKpiCard title="High / Critical" value={highCriticalRisks} accent="#F93822" />
         <QualityKpiCard title="Overdue Reviews" value={overdueReviews} accent="#FFAD00" />
         <QualityKpiCard title="Linked Actions" value={openActionsPlaceholder} accent="#53565A" />
       </section>
 
-      <section style={dashboardGridStyle}>
-        <DashboardPanel title="Risk profile by rating" subtitle="Residual rating distribution">
-          <div style={ratingGridStyle}>
-            {(["Critical", "High", "Medium", "Low"] as RiskRating[]).map((rating) => (
-              <div key={rating} style={ratingItemStyle}>
-                <span style={ratingLabelStyle}>{rating}</span>
-                <strong style={ratingValueStyle}>{ratingCounts[rating] || 0}</strong>
-              </div>
-            ))}
-          </div>
-        </DashboardPanel>
+      <DashboardPanel title="Risk profile by rating" subtitle="Residual rating distribution">
+        <div className="risk-rating-grid" style={ratingGridStyle}>
+          {(["Critical", "High", "Medium", "Low"] as RiskRating[]).map((rating) => (
+            <div key={rating} style={{ ...ratingItemStyle, borderTop: `4px solid ${rating === "Critical" ? "#F93822" : rating === "High" ? "#FFAD00" : rating === "Medium" ? "#63B1BC" : "#005670"}` }}>
+              <span style={ratingLabelStyle}>{rating}</span>
+              <strong style={ratingValueStyle}>{ratingCounts[rating] || 0}</strong>
+            </div>
+          ))}
+        </div>
+      </DashboardPanel>
+      </div> : null}
 
+      {dashboardView === "analytics" ? <div className="risk-view-panel" role="tabpanel">
+      <section className="risk-dashboard-grid" style={dashboardGridStyle}>
         <DashboardPanel title="Open risks by category" subtitle="Open risk category profile">
           <BarList counts={categoryCounts} max={maxCategoryCount} />
         </DashboardPanel>
@@ -164,6 +173,7 @@ export default function RiskDashboardPage() {
           <BarList counts={responseCounts} max={Math.max(1, ...Object.values(responseCounts))} />
         </DashboardPanel>
       </section>
+      </div> : null}
     </main>
   );
 }
@@ -209,46 +219,6 @@ function BarList({ counts, max }: { counts: Record<string, number>; max: number 
     </div>
   );
 }
-
-const topMetaRowStyle: CSSProperties = {
-  marginBottom: 20,
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  flexWrap: "wrap",
-  alignItems: "center",
-  background: "rgba(255,255,255,0.92)",
-  border: "1px solid #D0D0CE",
-  borderRadius: "16px",
-  padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-
-const topMetaActionsStyle: CSSProperties = {
-  marginLeft: "auto",
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-  alignItems: "center",
-};
-
-const statusBannerStyle: CSSProperties = {
-  background: "white",
-  borderRadius: "12px",
-  padding: "12px 16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#000000",
-};
-
-const secondaryButtonStyle: CSSProperties = {
-  background: "#D0D0CE",
-  color: "#000000",
-  border: "none",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: 700,
-};
 
 const statsGridStyle: CSSProperties = {
   display: "grid",

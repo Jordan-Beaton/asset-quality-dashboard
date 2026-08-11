@@ -2,6 +2,8 @@
 
 This file is the single source of truth for reproducing the IMS visual language. A new Codex thread should read this file with `IMS_MASTER_HANDOVER.md` before creating or changing any IMS page.
 
+The whole-IMS baseline was completed on 10 August 2026 and is recorded in `IMS_UI_AUDIT_2026-08-10.md`. These rules are mandatory regression constraints. Run `npm run check:ui` after any UI-related change and the full `npm run check` before handing over meaningful implementation work.
+
 Base new UI on the current implemented IMS, especially the shared components in `src/components` and the more standardised Quality/HSE pages.
 
 ## Core Principle
@@ -22,6 +24,16 @@ Do Not:
 - Make module pages feel like separate apps.
 - Add bulky decorative layouts, marketing hero sections, random gradients, or oversized cards.
 - Hide important workflow controls in unusual locations.
+- Reopen broad visual standardisation as roadmap work merely because a legacy page still has local style constants; rendered conformance is enforced globally and internal migration is opportunistic.
+
+## Change Control
+
+- Prefer extending `ImsPrimitives.tsx`, `imsTheme.ts`, `exportTheme.ts`, and the shared global contract over adding page-local visual variants.
+- Approved six-digit interface colours are checked automatically. If a genuinely new semantic colour is required, update the brand guidance, shared tokens, and UI checker together and explain the exception.
+- Standalone user-facing `Refresh` controls are prohibited and checked automatically. Data must load on entry and reload after successful mutations while the status message reports progress or failure.
+- A new register must inherit `ims-data-table` behaviour or use the `ims-register-shell`, `ims-register-head`, and `ims-register-row` hooks for a non-semantic grid.
+- A new tab set must expose active state semantically through the shared `ImsTabs` primitive or equivalent `role`, `aria-selected`, and `data-active` attributes.
+- Any deliberate specialist exception must be added to this file in the same commit so later work does not mistake it for drift.
 
 ## Shared Components And Theme
 
@@ -220,6 +232,20 @@ Do Not:
 - Build ad hoc KPI cards when `QualityKpiCard` fits.
 - Use KPI cards for long explanatory text.
 - Make KPI grids inconsistent between equivalent modules.
+
+## Interactive Dashboard Standard
+
+The dashboard alignment completed on 11 August 2026 is the reference for operational dashboards and dashboard tabs.
+
+- Dense primary dashboards divide content into a small number of persistent command views such as `Overview`, `Analytics`, and `Planning` or their closest operational equivalents.
+- Do not add a second command-view row inside an existing workspace dashboard tab when the content is already concise; embedded dashboards keep their workspace tabs and inherit the shared analytics contract.
+- Put reporting-period controls in the dashboard command bar. Do not place them in `ImsTopMetaRow` or allow them to create a detached page-action row.
+- Overview shows the control pulse, executive signals, and immediate management focus. Analytics contains workload breakdowns, KPIs, closure health, and deeper trends. Planning contains actionable watchlists, upcoming work, and programme controls.
+- Dashboard charts use light, high-contrast plotting surfaces unless a specialist visual has explicitly accessible white text. Axis labels, values, gridlines, and tooltips must remain readable against their background.
+- Use approved semantic colours consistently: danger red for critical/overdue, warning amber for due pressure, brand dark blue for controlled/in-date, and brand accent for supporting series.
+- Show bar values directly when this materially improves scanning. Charts and KPI tiers require visible spacing and must not visually merge.
+- Every KPI, chart, bar, watchlist row, or signal that promises drill-down must continue to open the corresponding live filtered source.
+- At the shared mobile breakpoint, command bars stack cleanly, tabs remain usable, analytics grids become one column, and no desktop workflow behaviour changes.
 
 ## Internal Tabs
 
@@ -718,7 +744,7 @@ Do Not:
 
 - Quality Management is the master reference unless a module handover names another benchmark.
 - HSE pages are the closest second benchmark for mobile/field workflows.
-- Asset pages should be standardised toward Quality/HSE.
+- Asset pages follow the completed shared baseline; Quality/HSE remain useful structural references for new workflows.
 - Document Control can have workflow-specific complexity, but must still use IMS shell, hero, panels, filters, and detail rhythm.
 - Admin should stay simplified and uncluttered.
 - People Management should remain distinct from Admin login access.
@@ -732,12 +758,11 @@ Before implementing a page:
 4. Only add local style constants for genuinely page-specific needs.
 5. Keep permissions, linked records, evidence, reports, and workflow status visible where relevant.
 
-## Known Inconsistencies To Watch
+## Legacy Implementation Notes
 
-- Some older pages still define local versions of hero, panel, button, filter, table, and report styles instead of using `ImsPrimitives`.
-- Some report pages match the visual pattern but still use local style constants rather than shared primitives.
-- Asset Management layout remains less standardised than Quality/HSE.
-- Some HSE parked pages, such as PTW and removed/legacy tabs, may not represent the target standard.
+- Some older pages still define local versions of hero, panel, button, filter, table, and report styles, but their rendered appearance is governed by the shared global contract.
+- Some report pages retain local style constants; migrate these only during directly related work.
+- Parked or specialist workflows may have different information architecture, but all visible shared elements still follow this contract.
 - Complex mobile behavior uses the shared AppShell/table/panel foundation across all registers, with HSE inspections remaining the reference for specialised checklist and evidence workflows.
 
-When touching these areas, prefer moving toward the standards above without risky rewrites.
+Do not treat these internal implementation notes as visual defects or create another system-wide standardisation project. Fix only evidenced regressions or migrate opportunistically during related work.

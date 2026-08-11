@@ -3358,7 +3358,7 @@ function MOCPageContent() {
 
       {activeView === "dashboard" ? (
         <>
-      <section style={kpiRowStyle}>
+      <section className="quality-kpi-grid" style={kpiRowStyle}>
         <QualityKpiCard
           title="Active MOCs"
           value={openCount}

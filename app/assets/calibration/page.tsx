@@ -1460,7 +1460,7 @@ function CalibrationPageContent() {
         </div>
       </section>
 
-      <section style={dashboardKpiGridStyle}>
+      <section className="quality-kpi-grid" style={dashboardKpiGridStyle}>
         <QualityKpiCard title="Overdue In Use" value={dashboardCounts.overdue} accent="#F93822" onClick={() => applyCalibrationKpiFilter("Overdue")} />
         <QualityKpiCard title="Due Soon In Use" value={dashboardCounts.dueSoon} accent="#FFAD00" onClick={() => applyCalibrationKpiFilter("Due Soon")} />
         <QualityKpiCard title="In Date In Use" value={dashboardCounts.inDate} accent="#005670" onClick={() => applyCalibrationKpiFilter("In Date")} />

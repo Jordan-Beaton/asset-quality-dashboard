@@ -341,7 +341,7 @@ export default function CertificationPage() {
 
       {activeView === "dashboard" ? (
         <>
-          <section style={kpiGridStyle}>
+          <section className="quality-kpi-grid" style={kpiGridStyle}>
             <QualityKpiCard title="Active Certificates" value={kpis.active} accent={imsColours.brand} onClick={() => applyExpiryFilter("Active")} />
             <QualityKpiCard title="Expiring in 90 Days" value={kpis.dueSoon} accent={imsColours.warning} onClick={() => applyExpiryFilter("Due Soon")} />
             <QualityKpiCard title="Expired" value={kpis.expired} accent={imsColours.dangerBright} onClick={() => applyExpiryFilter("Expired")} />

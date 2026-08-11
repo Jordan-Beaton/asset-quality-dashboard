@@ -21,6 +21,7 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, appr
 - HSE module includes Dashboard, AINM, Inspections, Observations, PTW, Actions, Calendar, and Reports.
 - Incidents, Risk Assessments, and Environmental tabs were removed from nav earlier.
 - HSE Dashboard has graphics and a year filter.
+- HSE Dashboard now follows the Quality command-view model with Overview, Analytics and Planning. The reporting year is integrated into the command bar, and the operational-pressure chart uses the shared high-contrast analytics treatment with visible values.
 - HSE Actions are HSE-specific and link to central Action Management.
 - HSE Actions and HSE Reports now include explicit create/edit permission guards on direct write paths, with primary write controls disabled for restricted users.
 

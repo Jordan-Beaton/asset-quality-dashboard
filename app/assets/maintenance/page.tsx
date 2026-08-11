@@ -621,7 +621,7 @@ function MaintenancePageContent() {
 
       {activeView === "dashboard" ? (
       <>
-      <section style={attentionGridStyle}>
+      <section className="quality-kpi-grid" style={attentionGridStyle}>
         <QualityKpiCard
           title="Overdue"
           value={overdueCount}

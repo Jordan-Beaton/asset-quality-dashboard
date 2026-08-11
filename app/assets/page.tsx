@@ -2029,7 +2029,7 @@ function AssetsPageContent() {
 
       {activeView === "dashboard" ? (
         <>
-          <section style={dashboardKpiGridStyle}>
+          <section className="quality-kpi-grid" style={dashboardKpiGridStyle}>
             <QualityKpiCard
               title="Total Assets"
               value={totalAssets}

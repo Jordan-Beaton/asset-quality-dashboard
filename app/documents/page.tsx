@@ -2745,7 +2745,7 @@ function DocumentsPageContent() {
       </nav>
 
       {activeView === "dashboard" ? (
-      <section style={statsGridStyle}>
+      <section className="quality-kpi-grid" style={statsGridStyle}>
         <QualityKpiCard
           title="Total Documents"
           value={totalDocuments}

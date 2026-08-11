@@ -2,12 +2,15 @@
 
 The IMS is now a broad internal management system covering Quality, HSE, Assets, Document Control, Actions, People, Admin/Settings, Management Review, and Risk. The core application shell, Supabase-backed data model, permission model, left workspace navigation, shared IMS visual primitives, and several module workflows are in place.
 
-Quality Management is the strongest visual and workflow benchmark. HSE is the strongest benchmark for mobile/field workflows. The highest-value near-term work is demo hardening: verify critical workflows on Vercel, standardise remaining module layouts, reduce old local styling, and tighten permission/workflow edge cases without destabilising document numbering, revision history, or invite/auth flows.
+The ITP-derived whole-IMS visual and structural baseline is complete. Quality remains the workflow benchmark, Project ITP is the register benchmark, and HSE is the mobile/field benchmark. The highest-value near-term work is production workflow and permission QA without destabilising document numbering, revision history, invite/auth flows, or the completed UI contract.
 
 # Completed
 
 - Shared IMS shell with Enshore header, left workspace rail, role/module-aware navigation, and permission gating.
 - Shared UI standards documented in `UI_STANDARDS.md`.
+- Whole-IMS visual and structural standardisation completed across dashboards, tabs, registers, filters, forms, detail panels, outputs and meta/status rows; the permanent acceptance record is `IMS_UI_AUDIT_2026-08-10.md`.
+- Interactive dashboard alignment completed on 11 August 2026 across Quality, HSE, Assets, Risk, Wadden Sea and embedded IMS dashboard tabs: command views reduce first-screen clutter, reporting controls sit with dashboard navigation, charts use the shared high-contrast analytics contract, and KPI tiers retain consistent separation and drill-down behaviour.
+- Automated `npm run check:ui` guard rejects unapproved interface colours and reintroduced standalone Refresh controls. `npm run check` runs this contract, application lint, and the production build. Whole-repository `npm run lint` separately retains the known standalone deck/capture utility findings until those utilities are modernised.
 - The full IMS colour system now uses the approved 2026 Enshore palette across the shared shell, operational modules, mobile/field routes, charts, QR codes, notifications, generated outputs, and Admin defaults; restricted HSE 3Rs green and RapidScan purple are excluded from general IMS use.
 - Official 2026 Enshore primary colour/reverse logo artwork is now canonical across the IMS and generated PDF/Word outputs, with fixed 2:1 fitting, protected clear space, compliant minimum print sizing, and the HSE Observation 3Rs campaign logo preserved as the sole approved exception.
 - IMS Home is now a dedicated permission-aware launchpad with a compact Enshore dark-blue animated header, synchronized official outline-logo video treatments, equal-size workspace cards, pronounced hover interactions, and six selectable access layouts: Card grid, Spotlight, Compact tiles, List, Two columns, and IMS hub. The selected layout persists locally between browser sessions.
@@ -63,7 +66,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 
 # In Progress
 
-- Asset Management Vercel workflow QA, mobile register review, role-based spot checks, and remaining low-risk primitive migration after the latest register standardisation, action-link, and permission hardening passes.
+- Asset Management Vercel workflow QA, mobile register review, and role-based spot checks after the latest register, action-link, and permission hardening passes.
 - HSE AINM Vercel QA for register/detail behavior, inline central actions, Part 1 attachment `Other` text, containment terminology, and Word/compiled PDF parity.
 - HSE Reports and inspection PDF Vercel QA after the latest local parity/formatting pass.
 - Document Control workflow verification and revision handling, especially reject/resubmit/approve cleanup and up-rev history behavior.
@@ -71,7 +74,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Admin/Settings detail panel polish and Vercel invite-flow verification.
 - Admin permission-registry production QA: verify legacy fallback, explicit Full/Part/None saves, new-user defaults, and route denial for Lessons Learned and each Project Management area.
 - Access-request production QA after applying the latest `admin_settings.sql`: public validation, duplicate prevention, Home notification, view-only permission preparation, approval/rejection status, audit history and invite/setup-link fallback.
-- Report page migration from local style constants toward shared IMS primitives.
+- Opportunistic internal primitive migration only when a page is already being changed; the global UI contract is complete and this is not a standalone roadmap project.
 - Production/device QA of the shared whole-IMS mobile card, panel, bottom-navigation, upload, and form behavior across the device and module matrix in `MOBILE_COMPATIBILITY_HANDOVER.md`.
 - Risk Management shell and workflows.
 - Project Management production QA for saved NOI reopen/edit/delete, controlled document storage, sequential numbering, planned-date synchronisation, and mobile responsiveness.
@@ -94,7 +97,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - HSE Reports and inspection PDFs need Vercel verification with real saved reports, longer checklist forms, and evidence photos after the latest local parity/formatting pass.
 - PTW exists but is parked/work in progress.
 - Asset Management is closer to Quality/HSE after dashboard drill-down, calibration item availability/status controls, dashboard exclusion logic, top meta/status, reports filtering cleanup, Inspection/Maintenance register compaction, and page-level permission guards, but still needs Vercel workflow QA, mobile register review, and role-based spot checks.
-- Some pages still use local style constants instead of `ImsPrimitives`.
+- Some legacy pages retain local implementation constants, but the shared global contract governs their rendered appearance. Replace them only during related functional work; do not reopen a whole-IMS styling project for this alone.
 - Risk Management exists as shell/functionality but needs review for maturity and consistency.
 - NOIs created before editable NOI storage was introduced retain their linked tracker points but cannot recover manual form values that were never persisted; saving them once establishes the editable stored record.
 - Historic Lessons Learned narrative quality is inconsistent; automated trend statements must remain proportionate to the evidence.
@@ -111,7 +114,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 7. Verify HSE Reports on Vercel after the Quality-parity pass: saved reports behavior, year filters, snapshot-period editing, permissions, and executive summary in PDFs.
 8. Verify the complete AINM workflow on Vercel: register/type/filter/detail behavior, attachment `Other` text, containment wording, inline department-controlled actions, linked Action navigation, and Part 1/Part 2/compiled report content.
 9. Verify the corrected HSE Observation Card on a physical phone: public submission, evidence upload, saved register record, and linkage to Action Management.
-10. Align old local style blocks with shared IMS primitives when touching each page.
+10. Preserve the completed UI baseline when touching pages; migrate local styles only where it is low-risk and directly relevant to the active change.
 11. Review Risk Management pages for route completeness, visual consistency, and demo readiness.
 12. Verify Lessons Learned and the complete Wadden Sea workflow on Vercel, including Open Points database migration, phase history, NCR linking, evidence and register outputs.
 13. Verify IMS Home with representative permission profiles: all six layouts and persisted preference on desktop, plus the fixed simple workspace list with no selector on mobile.
@@ -122,9 +125,9 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - More CEO-facing Management Review story views and drill-down packs.
 - Progressive specialist mobile workflows where the shared register-card foundation is insufficient, using HSE inspections as the field-work benchmark.
 - Further dashboard story panels for Assets, Risk, Actions, and Documents.
-- More consistent PDF/Word header/footer templates across all generated outputs.
+- Extend the shared branded PDF/Word output theme only when adding a new generator or an evidenced output defect; existing generator families already follow the approved text and colour scheme.
 - Stronger linked-record chips across Actions, AINM, Observations, NCR, MOC, Audits, Assets, and Risk.
-- Progressive migration of local style constants into shared primitives/theme extensions.
+- Opportunistic migration of local style constants into shared primitives during related functional work, without reopening system-wide visual standardisation.
 - Additional audit log coverage for sensitive Admin, Document Control, and permission changes.
 - More robust notification usefulness for Document Control and action workflows.
 
@@ -153,7 +156,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
   - Avoid reintroducing visible CAPA language into NCR unless explicitly requested.
   - Regression-test linked Action generation from NCR, MOC, and Audits before demos.
   - Verify create/edit/read-only behavior on Vercel after the Quality permission hardening pass.
-  - Gradually replace any remaining local styles with shared primitives when safe.
+  - Preserve the completed UI contract; migrate local implementation styles only during related functional work.
 
 ## HSE Management
 
@@ -174,7 +177,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Outstanding Actions:
   - Verify Asset workflows on Vercel with real data, especially uploads, PDFs, Calibration item status/exclusion behavior, lifecycle history, supplier dropdown persistence, register export, compact Inspection/Maintenance registers, row-to-detail scroll, and dashboard/register drill-downs.
   - Verify create/edit/read-only permission behavior across Asset pages after the local button-state alignment and deployment.
-  - Continue low-risk migration of remaining local Asset panel/button/table styles toward shared IMS primitives.
+  - Preserve the completed Asset UI baseline while performing related functional changes.
   - Review mobile behavior of the compact Inspection/Maintenance registers after real-data testing.
   - Keep asset-specific document numbering compatible with Document Control.
   - Preserve links from Asset Inspection/Maintenance/Calibration to central Actions.
@@ -238,7 +241,7 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Status: Needs Review
 - Summary: A read-only executive snapshot and PDF export exist, with safe drill-down links. The desired direction is CEO-facing and business-story focused.
 - Outstanding Actions:
-  - Review current page against UI standards and executive/demo expectations.
+  - Review the executive narrative, metric usefulness, and demo readiness without reopening the completed visual baseline.
   - Confirm drill-down targets remain safe and permission-aware.
   - Plan PowerPoint/export pack from Quality, HSE, Document Control, and Management Review as a future enhancement.
 
@@ -247,9 +250,9 @@ Quality Management is the strongest visual and workflow benchmark. HSE is the st
 - Status: Needs Review
 - Summary: Risk routes and SQL exist for dashboard/register/reviews/controls/opportunities/actions/reports. The module is present as shell/functionality but is less documented than Quality/HSE/Assets/Documents.
 - Outstanding Actions:
-  - Review current Risk pages for data completeness, layout consistency, and demo readiness.
+  - Review current Risk pages for data completeness, workflow maturity, and demo readiness.
   - Ensure Risk Actions feed central Action Management correctly.
-  - Align Risk register, reviews, controls, opportunities, and reports with UI standards.
+  - Preserve the shared UI contract while completing Risk workflows and data validation.
   - Verify Risk Register create/edit/read-only behavior on Vercel after the page-level guard pass.
   - Confirm route/page/tab permissions are complete across the remaining Risk shell pages.
 

@@ -14,6 +14,7 @@ Quality Management is the master visual reference for the IMS. Equivalent pages 
 ## Current Status
 
 - Dashboard has live KPI/story-style graphics.
+- Dashboard is the interactive command-view benchmark: Overview prioritises the live pulse and management focus, Analytics combines a high-contrast pressure cockpit with control health and deeper trends, and Actions & Audits contains operational planning. The reporting year sits in the command bar rather than the top meta row.
 - Actions wording has been changed to Quality where relevant.
 - NCR is now NCR-only; CAPA was removed from the visible UI.
 - Quality Reports is the visual/reporting master for monthly reports.

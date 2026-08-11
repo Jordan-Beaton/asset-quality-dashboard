@@ -2796,7 +2796,7 @@ export default function HseAinmPage() {
             </button>
           </section>
 
-          <section style={kpiGridStyle}>
+          <section className="quality-kpi-grid" style={kpiGridStyle}>
             <QualityKpiCard title="Open AINMs" value={kpis.open} accent="#F93822" onClick={() => { setStatusFilter("Open"); setActiveView("register"); }} />
             <QualityKpiCard title="Incidents" value={kpis.incidents} accent="#63B1BC" onClick={() => openRegisterWithType("Incident")} />
             <QualityKpiCard title="Accidents" value={kpis.accidents} accent="#F93822" onClick={() => openRegisterWithType("Accident")} />

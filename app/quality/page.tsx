@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  LabelList,
   Line,
   LineChart,
   Pie,
@@ -18,7 +19,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ImsButton, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
+import { ImsButton, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { imsColours, imsShadows } from "../../src/components/imsTheme";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
@@ -314,6 +315,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning">("overview");
 
   async function fetchDashboardData() {
     setIsLoading(true);
@@ -737,7 +739,7 @@ export default function Home() {
   const operationalPressureData = useMemo(
     () => [
       { name: "NCRs", value: openNcrs, fill: "#F93822", href: buildHref("/ncr-capa", { view: "register", status: "Open" }) },
-      { name: "Findings", value: openAuditFindings, fill: "#53565A", href: buildHref("/audits", { view: "findings", findingStatus: "Open" }) },
+      { name: "Findings", value: openAuditFindings, fill: "#FFAD00", href: buildHref("/audits", { view: "findings", findingStatus: "Open" }) },
       { name: "MOCs", value: openMocs, fill: "#005670", href: buildHref("/moc", { attention: "open" }) },
       { name: "Actions", value: openQualityActions, fill: "#63B1BC", href: buildHref("/actions", { view: "register", department: "Quality", status: "Open" }) },
       { name: "Docs", value: overdueDocuments, fill: "#FFAD00", href: buildHref("/documents", { review: "Overdue" }) },
@@ -1107,6 +1109,35 @@ export default function Home() {
         .quality-live-pill {
           animation: qualityLiveGlow 1.8s ease-in-out infinite alternate;
         }
+        .quality-view-command {
+          margin-bottom: 18px;
+          border: 1px solid #D0D0CE;
+          border-radius: 16px;
+          background: #ffffff;
+          box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 10px 12px;
+        }
+        .quality-view-command .ims-tabs {
+          margin-bottom: 0 !important;
+        }
+        .quality-view-panel {
+          animation: qualityViewEnter 220ms ease-out;
+        }
+        .quality-analytics-cockpit {
+          display: grid;
+          grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.75fr);
+          gap: 18px;
+          margin-bottom: 22px;
+          align-items: stretch;
+        }
+        @keyframes qualityViewEnter {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         @keyframes qualityPulseDrift {
           from { transform: rotate(0deg) scale(1); }
           to { transform: rotate(8deg) scale(1.05); }
@@ -1122,6 +1153,9 @@ export default function Home() {
           .quality-kpi-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           }
+          .quality-analytics-cockpit {
+            grid-template-columns: 1fr;
+          }
         }
         @media (max-width: 760px) {
           .quality-kpi-grid,
@@ -1131,6 +1165,14 @@ export default function Home() {
           .quality-insight-grid,
           .quality-bottom-grid {
             grid-template-columns: 1fr !important;
+          }
+          .quality-view-command {
+            align-items: stretch;
+            flex-direction: column;
+          }
+          .quality-view-command .ims-tabs {
+            overflow-x: auto;
+            flex-wrap: nowrap !important;
           }
         }
       `}</style>
@@ -1153,26 +1195,33 @@ export default function Home() {
       <ImsTopMetaRow
         backHref="/home"
         backLabel="Back to IMS Home"
-        actions={
-          <>
-            <label style={yearFilterStyle}>
-              <span>Year</span>
-              <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
-                {availableYears.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
-        }
         status={
           <>
             <strong>Status:</strong> {isLoading ? "Loading..." : error ? `Loaded with warning: ${error}` : `Loaded ${yearFilter} quality dashboard successfully.`}
           </>
         }
       />
+
+      <div className="quality-view-command">
+        <ImsTabs
+          tabs={[
+            { value: "overview", label: "Overview" },
+            { value: "analytics", label: "Analytics" },
+            { value: "planning", label: "Actions & Audits" },
+          ]}
+          active={dashboardView}
+          onChange={setDashboardView}
+          ariaLabel="Quality dashboard views"
+        />
+        <label style={yearFilterStyle}>
+          <span>Reporting year</span>
+          <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
+            {availableYears.map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {error ? (
         <section style={errorBannerStyle}>
@@ -1181,7 +1230,8 @@ export default function Home() {
         </section>
       ) : null}
 
-      <section className="quality-command-deck" style={commandDeckStyle}>
+      {dashboardView === "overview" ? <div className="quality-view-panel" role="tabpanel">
+      <section className="quality-command-deck" style={{ ...commandDeckStyle, gridTemplateColumns: "minmax(300px, 1.05fr) minmax(420px, 1.45fr)" }}>
         <div className="quality-command-score" style={commandScorePanelStyle}>
           <div style={commandScoreCopyStyle}>
             <span style={commandEyebrowStyle}>Live Quality Pulse</span>
@@ -1215,6 +1265,53 @@ export default function Home() {
           ))}
         </div>
 
+      </section>
+
+      <section className="quality-insight-grid" style={insightGridStyle}>
+        <SectionCard title="Management Focus" subtitle="The current pressure points a manager should see first.">
+          <div style={focusGridStyle}>
+            {managementFocusItems.map((item) => (
+              <SummaryRow
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                href={item.href}
+                isLoading={isLoading}
+                tone={item.tone}
+              />
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Top Problem Areas" subtitle="Current highest-finding audit areas using the existing risk scoring approach.">
+          {isLoading ? (
+            <p style={emptyTextStyle}>Loading insight...</p>
+          ) : topProblemAreas.length === 0 ? (
+            <p style={emptyTextStyle}>No audit findings available yet.</p>
+          ) : (
+            <div style={topProblemAreasStackStyle}>
+              {topProblemAreas.map((item, index) => (
+                <Link key={item.label} href={buildHref("/audits", { search: item.label })} style={topProblemAreaLinkStyle}>
+                  <div style={topProblemAreaRankStyle}>#{index + 1}</div>
+                  <div style={compactInsightBodyStyle}>
+                    <div style={compactInsightTitleStyle}>{item.label}</div>
+                    <div style={compactInsightMetaStyle}>
+                      <span>{item.totalFindings} findings</span>
+                      <span>Risk {item.riskScore}</span>
+                      <span>{item.auditNumbers.join(", ")}</span>
+                    </div>
+                  </div>
+                  <span style={getFrequencyBadgeStyle(item.frequency as "Reduce" | "Maintain" | "Increase")}>{item.frequency}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      </section>
+      </div> : null}
+
+      {dashboardView === "analytics" ? <div className="quality-view-panel" role="tabpanel">
+        <section className="quality-analytics-cockpit">
         <div style={pressurePanelStyle}>
           <div style={pressureHeaderStyle}>
             <div>
@@ -1225,13 +1322,13 @@ export default function Home() {
           </div>
           <div style={pressureChartWrapStyle}>
             <ResponsiveContainer width="100%" height={158}>
-              <BarChart data={operationalPressureData} layout="vertical" margin={{ left: 0, right: 22, top: 6, bottom: 6 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.16)" />
+              <BarChart data={operationalPressureData} layout="vertical" margin={{ left: 4, right: 42, top: 6, bottom: 6 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#D0D0CE" />
                 <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#ECECE7", fontSize: 12, fontWeight: 800 }} />
+                <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#000000", fontSize: 12, fontWeight: 800 }} axisLine={false} tickLine={false} />
                 <Tooltip
-                  contentStyle={{ borderRadius: 12, border: "1px solid #D0D0CE" }}
-                  cursor={{ fill: "rgba(255,255,255,0.08)" }}
+                  contentStyle={{ borderRadius: 12, border: "1px solid #D0D0CE", background: "#ffffff", color: "#000000" }}
+                  cursor={{ fill: "#ECECE7" }}
                 />
                 <Bar
                   dataKey="value"
@@ -1248,12 +1345,38 @@ export default function Home() {
                   {operationalPressureData.map((entry) => (
                     <Cell key={entry.name} fill={entry.fill} />
                   ))}
+                  <LabelList dataKey="value" position="right" fill="#000000" fontSize={12} fontWeight={900} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-      </section>
+
+        <section style={analyticsHealthPanelStyle}>
+          <div style={analyticsHealthHeaderStyle}>
+            <div>
+              <h2 style={{ ...sectionTitleStyle, color: "#ffffff" }}>Control Health</h2>
+              <p style={{ ...sectionSubtitleStyle, color: "rgba(255,255,255,0.78)" }}>Closure strength across the core controls.</p>
+            </div>
+            <span style={healthAveragePillStyle}>
+              {isLoading ? "-" : `${Math.round(qualityHealthData.reduce((sum, item) => sum + item.value, 0) / Math.max(qualityHealthData.length, 1))}% avg`}
+            </span>
+          </div>
+          <div style={analyticsHealthListStyle}>
+            {qualityHealthData.map((item) => (
+              <Link key={item.name} href={item.href} className="quality-health-card" style={analyticsHealthRowStyle}>
+                <div style={analyticsHealthRowTopStyle}>
+                  <span>{item.name}</span>
+                  <strong>{isLoading ? "-" : `${item.value}%`}</strong>
+                </div>
+                <div style={healthGaugeTrackStyle}>
+                  <div style={{ ...healthGaugeFillStyle, width: `${item.value}%`, background: item.fill }} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+        </section>
 
       <section className="quality-kpi-grid" style={kpiGridStyle}>
         {kpis.map((item) => (
@@ -1264,23 +1387,6 @@ export default function Home() {
             accent={item.accent}
             href={item.href}
           />
-        ))}
-      </section>
-
-      <section className="quality-health-grid" style={healthGridStyle}>
-        {qualityHealthData.map((item) => (
-          <Link key={item.name} href={item.href} className="quality-health-card" style={healthCardStyle}>
-            <div>
-              <div style={healthLabelStyle}>{item.name}</div>
-              <div style={healthHintStyle}>Click to review source records</div>
-            </div>
-            <div style={healthGaugeStyle}>
-              <span>{isLoading ? "-" : `${item.value}%`}</span>
-              <div style={healthGaugeTrackStyle}>
-                <div style={{ ...healthGaugeFillStyle, width: `${item.value}%`, background: item.fill }} />
-              </div>
-            </div>
-          </Link>
         ))}
       </section>
 
@@ -1654,53 +1760,9 @@ export default function Home() {
           )}
         </SectionCard>
       </section>
+      </div> : null}
 
-      <section className="quality-insight-grid" style={insightGridStyle}>
-        <SectionCard title="Management Focus" subtitle="The current pressure points a manager should see first.">
-          <div style={focusGridStyle}>
-            {managementFocusItems.map((item) => (
-              <SummaryRow
-                key={item.label}
-                label={item.label}
-                value={item.value}
-                href={item.href}
-                isLoading={isLoading}
-                tone={item.tone}
-              />
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Top Problem Areas" subtitle="Current highest-finding audit areas using the existing risk scoring approach.">
-          {isLoading ? (
-            <p style={emptyTextStyle}>Loading insight...</p>
-          ) : topProblemAreas.length === 0 ? (
-            <p style={emptyTextStyle}>No audit findings available yet.</p>
-          ) : (
-            <div style={topProblemAreasStackStyle}>
-              {topProblemAreas.map((item, index) => (
-                <Link
-                  key={item.label}
-                  href={buildHref("/audits", { search: item.label })}
-                  style={topProblemAreaLinkStyle}
-                >
-                  <div style={topProblemAreaRankStyle}>#{index + 1}</div>
-                  <div style={compactInsightBodyStyle}>
-                    <div style={compactInsightTitleStyle}>{item.label}</div>
-                    <div style={compactInsightMetaStyle}>
-                      <span>{item.totalFindings} findings</span>
-                      <span>Risk {item.riskScore}</span>
-                      <span>{item.auditNumbers.join(", ")}</span>
-                    </div>
-                  </div>
-                  <span style={getFrequencyBadgeStyle(item.frequency as "Reduce" | "Maintain" | "Increase")}>{item.frequency}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </SectionCard>
-      </section>
-
+      {dashboardView === "planning" ? <div className="quality-view-panel" role="tabpanel">
       <section className="quality-bottom-grid" style={bottomGridStyle}>
         <SectionCard
           title="Quality Priority Actions"
@@ -1855,6 +1917,7 @@ export default function Home() {
           )}
         </SectionCard>
       </section>
+      </div> : null}
     </main>
   );
 }
@@ -2188,10 +2251,11 @@ const signalDetailStyle: CSSProperties = {
 
 const pressurePanelStyle: CSSProperties = {
   borderRadius: "22px",
-  padding: "18px",
-  color: "#ffffff",
-  background: "linear-gradient(135deg, #53565A 0%, #005670 100%)",
-  boxShadow: "0 22px 42px rgba(15, 23, 42, 0.16)",
+  padding: "20px",
+  color: "#000000",
+  background: "linear-gradient(145deg, #ffffff 0%, #ECECE7 100%)",
+  border: "1px solid #D0D0CE",
+  boxShadow: "0 14px 30px rgba(15, 23, 42, 0.08)",
   display: "grid",
   gap: "12px",
   minHeight: "226px",
@@ -2208,20 +2272,21 @@ const pressureTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
   lineHeight: 1.15,
+  color: "#000000",
 };
 
 const pressureSubtitleStyle: CSSProperties = {
   margin: "5px 0 0",
-  color: "rgba(255,255,255,0.74)",
+  color: "#53565A",
   fontSize: "12px",
 };
 
 const livePillStyle: CSSProperties = {
   borderRadius: "999px",
   padding: "7px 10px",
-  background: "rgba(220,252,231,0.14)",
-  border: "1px solid rgba(187,247,208,0.28)",
-  color: "#ECECE7",
+  background: "#005670",
+  border: "1px solid #005670",
+  color: "#ffffff",
   fontSize: "11px",
   fontWeight: 900,
   textTransform: "uppercase",
@@ -2239,46 +2304,62 @@ const kpiGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
   gap: "12px",
-  marginBottom: "18px",
+  marginBottom: "22px",
   alignItems: "stretch",
 };
 
-const healthGridStyle: CSSProperties = {
+const analyticsHealthPanelStyle: CSSProperties = {
+  borderRadius: "22px",
+  padding: "20px",
+  color: "#ffffff",
+  background: "linear-gradient(145deg, #005670 0%, #005670 66%, #63B1BC 170%)",
+  boxShadow: "0 18px 36px rgba(0, 86, 112, 0.18)",
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  alignContent: "start",
+  gap: "18px",
+};
+
+const analyticsHealthHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
   gap: "12px",
-  marginBottom: "18px",
 };
 
-const healthCardStyle: CSSProperties = {
+const healthAveragePillStyle: CSSProperties = {
+  padding: "7px 10px",
+  borderRadius: "999px",
+  background: "rgba(255,255,255,0.12)",
+  border: "1px solid rgba(255,255,255,0.24)",
+  color: "#ffffff",
+  fontSize: "11px",
+  fontWeight: 900,
+  whiteSpace: "nowrap",
+};
+
+const analyticsHealthListStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+};
+
+const analyticsHealthRowStyle: CSSProperties = {
   textDecoration: "none",
-  color: "#000000",
-  background: "white",
-  borderRadius: "18px",
-  padding: "16px",
-  border: "1px solid #D0D0CE",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  color: "#ffffff",
   display: "grid",
-  gap: "14px",
+  gap: "7px",
+  padding: "9px 10px",
+  borderRadius: "12px",
+  background: "rgba(255,255,255,0.08)",
+  border: "1px solid rgba(255,255,255,0.14)",
 };
 
-const healthLabelStyle: CSSProperties = {
-  fontSize: "14px",
-  fontWeight: 900,
-  color: "#000000",
-};
-
-const healthHintStyle: CSSProperties = {
-  marginTop: "4px",
+const analyticsHealthRowTopStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "10px",
   fontSize: "12px",
-  color: "#53565A",
-};
-
-const healthGaugeStyle: CSSProperties = {
-  display: "grid",
-  gap: "8px",
-  fontSize: "26px",
-  fontWeight: 900,
+  fontWeight: 800,
 };
 
 const healthGaugeTrackStyle: CSSProperties = {

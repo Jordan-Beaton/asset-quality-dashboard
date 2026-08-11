@@ -4002,7 +4002,7 @@ function AuditsPageContent() {
 
       {activeView === "dashboard" ? (
         <>
-        <section style={statsGridStyle}>
+        <section className="quality-kpi-grid" style={statsGridStyle}>
           <QualityKpiCard
             title="Remaining Audits"
             value={kpis.planned}

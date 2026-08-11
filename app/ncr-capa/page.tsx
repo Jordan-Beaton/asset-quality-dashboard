@@ -3132,7 +3132,7 @@ function NcrCapaPageContent() {
 
       {activeWorkspaceView === "dashboard" ? (
         <>
-          <section style={statsGridStyle}>
+          <section className="quality-kpi-grid" style={statsGridStyle}>
             <QualityKpiCard title="Open Items" value={kpis.openItems} accent="#FFAD00" onClick={() => applyKpiFilter("Open")} active={ncrQuickFilter === "Open"} />
             <QualityKpiCard title="In Progress" value={kpis.inProgress} accent="#53565A" onClick={() => applyKpiFilter("In Progress")} active={ncrQuickFilter === "In Progress"} />
             <QualityKpiCard title="Closed NCRs" value={kpis.closed} accent="#005670" onClick={() => applyKpiFilter("Closed")} active={ncrQuickFilter === "Closed"} />

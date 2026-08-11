@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { WaddenSeaWorkspaceNav } from "../../../src/components/WaddenSeaWorkspaceNav";
@@ -45,6 +45,7 @@ function formatDate(value: string | null) {
 export default function WaddenSeaPage() {
   const [itps, setItps] = useState<ItpRow[]>([]);
   const [noiPoints, setNoiPoints] = useState<NoiRow[]>([]);
+  const [dashboardView, setDashboardView] = useState<"overview" | "planning" | "controls">("overview");
   const [message, setMessage] = useState("Loading Wadden Sea project controls…");
 
   useEffect(() => {
@@ -95,13 +96,25 @@ export default function WaddenSeaPage() {
 
   return (
     <main style={page}>
+      <style>{`
+        .project-dashboard-command { margin-bottom: 18px; padding: 10px 12px; background: #fff; border: 1px solid #D0D0CE; border-radius: 16px; box-shadow: 0 1px 3px rgba(15,23,42,.08); }
+        .project-dashboard-command .ims-tabs { margin-bottom: 0 !important; }
+        .project-dashboard-panel { animation: projectViewEnter 220ms ease-out; }
+        @keyframes projectViewEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 720px) { .project-dashboard-grid, .project-dashboard-kpis, .project-dashboard-quick { grid-template-columns: 1fr !important; } }
+      `}</style>
       <QualityPageHero label="Project workspace · WSP" title="Wadden Sea" description="Live project controls, upcoming inspections, document reviews, and monthly reporting in one workspace." />
 
       <ImsTopMetaRow backHref="/projects" backLabel="Back to Project Management" status={<><strong>Status:</strong> {message}</>} />
 
       <WaddenSeaWorkspaceNav active="dashboard" />
 
-      <section className="quality-kpi-grid" style={metrics}>
+      <div className="project-dashboard-command">
+        <ImsTabs tabs={[{ value: "overview", label: "Overview" }, { value: "planning", label: "Inspection Planning" }, { value: "controls", label: "Project Controls" }]} active={dashboardView} onChange={setDashboardView} ariaLabel="Wadden Sea dashboard views" />
+      </div>
+
+      {dashboardView === "overview" ? <div className="project-dashboard-panel" role="tabpanel">
+      <section className="quality-kpi-grid project-dashboard-kpis" style={metrics}>
         <QualityKpiCard title="Current ITPs" value={currentItps} accent="#63B1BC" href="/projects/wadden-sea/itp" />
         <QualityKpiCard title="ITPs Requiring Attention" value={itpAttention.length} accent="#53565A" href="/projects/wadden-sea/itp" />
         <QualityKpiCard title="Upcoming Inspections" value={upcoming.length} accent="#005670" href="/projects/wadden-sea/reports" />
@@ -110,8 +123,10 @@ export default function WaddenSeaPage() {
         <QualityKpiCard title="NOI Requirements" value={noiPoints.length} accent="#005670" href="/projects/wadden-sea/noi" />
         <QualityKpiCard title="NOI Creator" value="Create" accent="#005670" href="/projects/wadden-sea/noi/create" />
       </section>
+      </div> : null}
 
-      <section style={dashboardGrid}>
+      {dashboardView === "planning" ? <div className="project-dashboard-panel" role="tabpanel">
+      <section className="project-dashboard-grid" style={dashboardGrid}>
         <div style={panel}>
           <div style={panelHeader}>
             <div><span style={kicker}>Next 8 weeks</span><h2 style={heading}>Upcoming inspections</h2></div>
@@ -147,15 +162,18 @@ export default function WaddenSeaPage() {
           </div>
         </div>
       </section>
+      </div> : null}
 
+      {dashboardView === "controls" ? <div className="project-dashboard-panel" role="tabpanel">
       <section style={quickPanel}>
         <div><span style={kicker}>Quick access</span><h2 style={heading}>Project controls</h2></div>
-        <div style={quickGrid}>
+        <div className="project-dashboard-quick" style={quickGrid}>
           <Link href="/projects/wadden-sea/itp" style={quickLink}><strong>Upload or review an ITP</strong><span>Manage metadata, revisions and Enshore decisions.</span></Link>
           <Link href="/projects/wadden-sea/noi" style={quickLink}><strong>Maintain NOI requirements</strong><span>Update inspection dates, numbers and status.</span></Link>
           <Link href="/projects/wadden-sea/reports" style={quickLink}><strong>Prepare monthly annexes</strong><span>Generate audit and eight-week lookahead outputs.</span></Link>
         </div>
       </section>
+      </div> : null}
     </main>
   );
 }
