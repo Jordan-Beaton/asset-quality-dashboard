@@ -67,8 +67,8 @@ export function QualityKpiCard({
 
   const content = (
     <div className={href || onClick ? "quality-kpi-card quality-kpi-card--clickable" : "quality-kpi-card"} style={cardStyle}>
-      <div style={labelStyle}>{title}</div>
-      <div style={valueStyle}>{value}</div>
+      <div className="quality-kpi-card-label" style={labelStyle}>{title}</div>
+      <div className="quality-kpi-card-value" style={valueStyle}>{value}</div>
     </div>
   );
 

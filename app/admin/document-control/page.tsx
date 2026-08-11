@@ -38,15 +38,15 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
-const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
+const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#000000" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" };
-const sectionTitleStyle: CSSProperties = { margin: "0 0 10px", fontSize: "20px", color: "#0f172a" };
-const emptyTextStyle: CSSProperties = { color: "#64748b", margin: 0, lineHeight: 1.55 };
+const sectionTitleStyle: CSSProperties = { margin: "0 0 10px", fontSize: "20px", color: "#000000" };
+const emptyTextStyle: CSSProperties = { color: "#53565A", margin: 0, lineHeight: 1.55 };

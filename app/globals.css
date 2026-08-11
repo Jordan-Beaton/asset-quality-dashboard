@@ -1,8 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #eef2f5;
-  --foreground: #0f172a;
+  --enshore-brand: #005670;
+  --enshore-accent: #63B1BC;
+  --enshore-page: #ECECE7;
+  --enshore-border: #D0D0CE;
+  --enshore-ink: #000000;
+  --enshore-muted: #53565A;
+  --enshore-warning: #FFAD00;
+  --enshore-danger: #F93822;
+  --ims-font-brand: "Azo Sans", "Segoe UI", Arial, Helvetica, sans-serif;
+  --ims-text-xs: 11px;
+  --ims-text-sm: 12px;
+  --ims-text-base: 14px;
+  --ims-text-lg: 16px;
+  --ims-text-xl: 18px;
+  --background: var(--enshore-page);
+  --foreground: var(--enshore-ink);
 }
 
 html {
@@ -14,8 +28,283 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--ims-font-brand);
+  font-size: var(--ims-text-base);
+  line-height: 1.45;
   scrollbar-gutter: stable;
+}
+
+.ims-app-root,
+.ims-page-container {
+  color: var(--enshore-ink);
+  font-family: var(--ims-font-brand);
+}
+
+.ims-page-container h1,
+.ims-page-container h2,
+.ims-page-container h3,
+.ims-page-container h4,
+.ims-page-container h5,
+.ims-page-container h6 {
+  font-family: var(--ims-font-brand);
+}
+
+.ims-page-container h2:not(.ims-page-hero-title):not(.ims-section-header-title) {
+  color: var(--enshore-brand);
+  font-size: var(--ims-text-xl) !important;
+  line-height: 1.25 !important;
+}
+
+.ims-page-container h1:not(.ims-page-hero-title) {
+  font-size: 22px !important;
+  line-height: 1.2 !important;
+}
+
+.ims-page-container h3,
+.ims-page-container h4,
+.ims-page-container h5,
+.ims-page-container h6 {
+  font-size: var(--ims-text-lg) !important;
+  line-height: 1.3 !important;
+}
+
+.ims-page-container input,
+.ims-page-container select,
+.ims-page-container textarea,
+.ims-page-container button {
+  color: var(--enshore-ink);
+  font-size: var(--ims-text-base);
+}
+
+.ims-page-container input,
+.ims-page-container select,
+.ims-page-container textarea {
+  border-color: var(--enshore-border) !important;
+}
+
+/* Shared form contract. This deliberately applies to Create, edit, import,
+ * report and detail tabs as well as register filters so operational forms do
+ * not inherit a different visual language on each route. */
+.ims-page-container form {
+  color: var(--enshore-ink);
+  font-family: var(--ims-font-brand);
+}
+
+.ims-page-container label {
+  color: var(--enshore-muted) !important;
+  font-weight: 800;
+}
+
+.ims-page-container textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px !important;
+  border: 1px solid var(--enshore-border) !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: var(--enshore-ink) !important;
+  font-family: var(--ims-font-brand) !important;
+  font-size: var(--ims-text-base) !important;
+  line-height: 1.45 !important;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.ims-page-container fieldset:not([data-ims-unstyled="true"]) {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--enshore-border);
+  border-radius: 12px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.ims-page-container fieldset:not([data-ims-unstyled="true"]) > legend {
+  padding: 0 6px;
+  color: var(--enshore-brand) !important;
+  font-size: 13px !important;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.ims-page-container input[type="checkbox"],
+.ims-page-container input[type="radio"] {
+  accent-color: var(--enshore-brand);
+}
+
+.ims-page-container input[type="file"] {
+  max-width: 100%;
+  padding: 8px;
+  border: 1px solid var(--enshore-border) !important;
+  border-radius: 10px;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.ims-page-container .ims-panel {
+  padding: 16px !important;
+}
+
+.ims-page-container .ims-panel .ims-section-header {
+  margin-bottom: 12px !important;
+}
+
+/* The white page meta bar has one purpose everywhere: return to IMS Home and
+ * report the current status. Page commands sit in their own action row. */
+.ims-top-meta-row {
+  min-height: 48px !important;
+  padding: 8px 12px !important;
+  border: 1px solid var(--enshore-border) !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 86, 112, 0.06) !important;
+}
+
+.ims-top-meta-status,
+.ims-top-meta-row > div:last-child {
+  padding: 8px 12px !important;
+  border: 0 !important;
+  background: var(--enshore-page) !important;
+  box-shadow: none !important;
+}
+
+.ims-top-meta-row > a:first-child {
+  color: var(--enshore-brand) !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  text-decoration: none !important;
+}
+
+.ims-page-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: -8px 0 16px;
+}
+
+/* One control contract for every register search and filter bar, including
+ * legacy pages that still render their controls directly. */
+.ims-filter-panel,
+.ims-register-toolbar {
+  box-sizing: border-box;
+  padding: 14px !important;
+  border: 1px solid var(--enshore-border) !important;
+  border-radius: 16px !important;
+  background: var(--enshore-page) !important;
+  box-shadow: 0 1px 3px rgba(0, 86, 112, 0.06) !important;
+}
+
+.ims-page-container input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+.ims-page-container select {
+  width: 100%;
+  min-height: 42px !important;
+  height: 42px;
+  padding: 10px 12px !important;
+  border: 1px solid var(--enshore-border) !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: var(--enshore-ink) !important;
+  font-family: var(--ims-font-brand) !important;
+  font-size: var(--ims-text-base) !important;
+  line-height: 1.35 !important;
+  box-sizing: border-box;
+}
+
+.ims-page-container input[placeholder*="Search" i] {
+  max-width: none !important;
+}
+
+.ims-page-container input::placeholder,
+.ims-page-container textarea::placeholder {
+  color: var(--enshore-muted);
+  opacity: 0.78;
+}
+
+.ims-page-container input:focus,
+.ims-page-container select:focus,
+.ims-page-container textarea:focus {
+  border-color: var(--enshore-brand) !important;
+  outline: 2px solid rgba(99, 177, 188, 0.32);
+  outline-offset: 1px;
+}
+
+.ims-page-hero-title,
+.ims-section-header-title {
+  color: #ffffff !important;
+}
+
+.ims-section-header-subtitle {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.ims-tabs > [role="tab"] {
+  min-height: 44px !important;
+  padding: 10px 14px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--enshore-ink);
+  font-size: var(--ims-text-base) !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  text-decoration: none !important;
+}
+
+.ims-tabs > button:not([data-active="true"]),
+.ims-tabs > a:not([data-active="true"]),
+.ims-tabs > [role="tab"]:not([data-active="true"]) {
+  background: #eef7f8 !important;
+  color: var(--enshore-ink) !important;
+}
+
+.ims-tabs > button[data-active="true"],
+.ims-tabs > button[aria-selected="true"],
+.ims-tabs > a[data-active="true"],
+.ims-tabs > a[aria-selected="true"],
+.ims-tabs > [role="tab"][data-active="true"],
+.ims-tabs > [role="tab"][aria-selected="true"] {
+  background: var(--enshore-brand) !important;
+  color: #ffffff !important;
+}
+
+/* Shared role-based type scale. Page-local inline sizes must not make the same
+ * semantic element look different between IMS modules. */
+.ims-page-hero-title {
+  font-size: var(--ims-text-xl) !important;
+  line-height: 1.2 !important;
+}
+
+.ims-section-header-title {
+  font-size: var(--ims-text-lg) !important;
+  line-height: 1.2 !important;
+}
+
+.ims-section-header-subtitle,
+.ims-page-container label {
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+}
+
+.ims-page-container button,
+.ims-page-container a {
+  font-family: var(--ims-font-brand);
+}
+
+.ims-page-container button {
+  font-size: var(--ims-text-base) !important;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 .quality-kpi-card {
@@ -27,12 +316,22 @@ body {
   transform-origin: center;
 }
 
+.quality-kpi-card-label {
+  font-size: var(--ims-text-sm) !important;
+  line-height: 1.35 !important;
+}
+
+.quality-kpi-card-value {
+  font-size: 26px !important;
+  line-height: 1.1 !important;
+}
+
 .quality-kpi-card:hover,
 .quality-kpi-card--clickable:hover,
 .quality-kpi-card--clickable:focus-within {
   transform: translateY(-6px) scale(1.025);
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16) !important;
-  border-color: #b7c6d8 !important;
+  border-color: var(--enshore-accent) !important;
   background: #ffffff;
 }
 
@@ -49,7 +348,7 @@ body {
 .ims-rail-link:hover,
 .ims-rail-link:focus-visible {
   background: #ECECE7 !important;
-  color: #0f172a !important;
+  color: var(--enshore-ink) !important;
   border-color: #D0D0CE !important;
   transform: translateX(3px);
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
@@ -82,6 +381,173 @@ body {
 
 .ainm-mobile-toggle {
   display: none;
+}
+
+/*
+ * Shared IMS register language. The compact Wadden Sea ITP Tracker is the
+ * visual benchmark: brand-blue, high-contrast headings and dense readable rows.
+ * MobileTableEnhancer adds this class to every secured table, including tables
+ * rendered after a tab or filter change, so routes cannot drift independently.
+ */
+.ims-page-container table {
+  width: calc(100% - 8px) !important;
+  margin: 4px !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  background: #ffffff !important;
+  color: #000000;
+  font-family: var(--ims-font-brand) !important;
+  font-size: 12px !important;
+}
+
+.ims-page-container table thead th:first-child {
+  border-top-left-radius: 10px !important;
+}
+
+.ims-page-container table thead th:last-child {
+  border-top-right-radius: 10px !important;
+}
+
+.ims-page-container table thead th {
+  padding: 9px 10px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--enshore-brand) !important;
+  background: var(--enshore-brand) !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0.04em !important;
+  text-align: left !important;
+  text-transform: uppercase !important;
+  white-space: nowrap;
+}
+
+.ims-page-container table tbody td {
+  padding: 10px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--enshore-border) !important;
+  background: #ffffff;
+  color: #000000;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+  font-weight: 400 !important;
+  text-align: left !important;
+  vertical-align: middle !important;
+}
+
+.ims-page-container table tbody td:not(:first-child) strong,
+.ims-page-container table tbody td:not(:first-child) b,
+.ims-page-container table tbody td:not(:first-child) span,
+.ims-page-container table tbody td:not(:first-child) a {
+  font-weight: 400 !important;
+  text-align: left !important;
+}
+
+.ims-page-container table tbody td:first-child,
+.ims-page-container table tbody td:first-child strong,
+.ims-page-container table tbody td:first-child b,
+.ims-page-container table tbody td:first-child span,
+.ims-page-container table tbody td:first-child a {
+  font-weight: 800 !important;
+  text-align: left !important;
+}
+
+.ims-page-container table button,
+.ims-page-container table a {
+  font-size: var(--ims-text-sm) !important;
+}
+
+.ims-page-container table button {
+  min-height: 32px !important;
+  padding: 6px 10px !important;
+  font-weight: 800 !important;
+}
+
+/* Custom grid registers use these hooks so they follow the same inset header,
+ * rounded corners and first-column emphasis as semantic tables. */
+.ims-register-shell {
+  padding: 4px !important;
+  box-sizing: border-box;
+}
+
+.ims-page-container .ims-register-head {
+  overflow: hidden;
+  border-radius: 10px 10px 0 0 !important;
+  font-family: var(--ims-font-brand) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+.ims-page-container .ims-register-head > * {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.ims-page-container .ims-register-head button {
+  color: #ffffff !important;
+  font-size: 10px !important;
+}
+
+.ims-page-container .ims-register-row {
+  font-family: var(--ims-font-brand) !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+.ims-page-container .ims-register-row > * {
+  justify-content: flex-start !important;
+  font-weight: 400 !important;
+  text-align: left !important;
+}
+
+.ims-page-container .ims-register-row > :not(:first-child) strong,
+.ims-page-container .ims-register-row > :not(:first-child) b,
+.ims-page-container .ims-register-row > :not(:first-child) span,
+.ims-page-container .ims-register-row > :not(:first-child) a {
+  font-weight: 400 !important;
+  text-align: left !important;
+}
+
+.ims-page-container .ims-register-row > :first-child,
+.ims-page-container .ims-register-row > :first-child strong,
+.ims-page-container .ims-register-row > :first-child b,
+.ims-page-container .ims-register-row > :first-child span,
+.ims-page-container .ims-register-row > :first-child a {
+  font-weight: 800 !important;
+  text-align: left !important;
+}
+
+.ims-page-container .ims-register-row button {
+  font-weight: 800 !important;
+}
+
+.ims-page-container table tbody tr {
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.ims-page-container table tbody tr:hover > td {
+  background: #f4f8f8;
+}
+
+.ims-page-container table tbody tr[aria-selected="true"] > td,
+.ims-page-container table tbody tr[data-selected="true"] > td {
+  background: #eef7f8;
+  box-shadow: inset 3px 0 0 #005670;
+}
+
+.ims-page-container .ims-register-row[aria-selected="true"],
+.ims-page-container .ims-register-row[aria-pressed="true"],
+.ims-page-container .ims-register-row[data-selected="true"] {
+  background: #eef7f8 !important;
+  box-shadow: inset 4px 0 0 var(--enshore-brand) !important;
+}
+
+.ims-page-container table tbody tr:last-child > td {
+  border-bottom: 0 !important;
 }
 
 @media (max-width: 720px) {
@@ -160,7 +626,7 @@ body {
     width: 100% !important;
     height: calc(72px + env(safe-area-inset-bottom, 0px));
     padding: 7px 8px calc(7px + env(safe-area-inset-bottom, 0px)) !important;
-    border-top: 1px solid #dbe3ef;
+    border-top: 1px solid #D0D0CE;
     border-right: 0 !important;
     box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12) !important;
     overflow-x: auto !important;
@@ -422,7 +888,7 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px 12px;
     padding: 12px;
-    border: 1px solid #dbe3ef;
+    border: 1px solid #D0D0CE;
     border-radius: 14px;
     background: #ffffff;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
@@ -440,7 +906,7 @@ body {
 
   .ims-mobile-card-table tbody > tr > td::before {
     content: attr(data-mobile-label);
-    color: #64748b;
+    color: #53565A;
     font-size: 10px;
     font-weight: 900;
     letter-spacing: 0.04em;
@@ -541,7 +1007,7 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px 12px;
     padding: 14px;
-    border: 1px solid #dbe3ef;
+    border: 1px solid #D0D0CE;
     border-radius: 14px;
     background: #ffffff;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
@@ -558,7 +1024,7 @@ body {
 
   .observation-table td::before {
     content: attr(data-label);
-    color: #64748b;
+    color: #53565A;
     font-size: 10px;
     font-weight: 900;
     letter-spacing: 0.04em;

@@ -214,7 +214,7 @@ function buildAssetLabel(asset: Asset | null) {
 function buildPdfMetricTable(doc: jsPDF, startY: number, title: string, rows: Array<[string, string | number]>) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(0, 0, 0);
   doc.text(title, 14, startY);
 
   autoTable(doc, {
@@ -226,8 +226,8 @@ function buildPdfMetricTable(doc: jsPDF, startY: number, title: string, rows: Ar
     styles: {
       fontSize: 9.2,
       cellPadding: 3,
-      textColor: [15, 23, 42],
-      lineColor: [226, 232, 240],
+      textColor: [0, 0, 0],
+      lineColor: [208, 208, 206],
       lineWidth: 0.2,
     },
     headStyles: {
@@ -239,7 +239,7 @@ function buildPdfMetricTable(doc: jsPDF, startY: number, title: string, rows: Ar
       0: { fontStyle: "bold", cellWidth: 120 },
       1: { halign: "right", cellWidth: 52 },
     },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
+    alternateRowStyles: { fillColor: [236, 236, 231] },
     rowPageBreak: "avoid",
   });
 
@@ -810,13 +810,13 @@ export default function AssetReportsPage() {
       }
 
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(20);
       doc.text("Asset Monthly Report", pageWidth - margin, 18, { align: "right" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(11);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(pdfMetrics.monthLabel, pageWidth - margin, 25, { align: "right" });
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 31, { align: "right" });
 
@@ -827,13 +827,13 @@ export default function AssetReportsPage() {
       let y = 45;
 
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(12);
       doc.text("Executive Summary", margin, y);
       y += 5;
 
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.setFontSize(10.2);
       const summaryLines = doc.splitTextToSize(executiveSummary, pageWidth - margin * 2);
       doc.text(summaryLines, margin, y);
@@ -876,13 +876,13 @@ export default function AssetReportsPage() {
           y = 18;
         }
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
         doc.text("Next Month Focus / Planned Activity", margin, y);
         y += 5;
 
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(71, 85, 105);
+        doc.setTextColor(83, 86, 90);
         doc.setFontSize(10.2);
         const nextMonthLines = doc.splitTextToSize(nextMonthFocus, pageWidth - margin * 2);
         doc.text(nextMonthLines, margin, y);
@@ -978,7 +978,7 @@ export default function AssetReportsPage() {
 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(12);
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.text(section.title, margin, y);
 
         autoTable(doc, {
@@ -993,9 +993,9 @@ export default function AssetReportsPage() {
           styles: {
             fontSize: 9.2,
             cellPadding: 3,
-            lineColor: [203, 213, 225],
+            lineColor: [208, 208, 206],
             lineWidth: 0.2,
-            textColor: [15, 23, 42],
+            textColor: [0, 0, 0],
             overflow: "linebreak",
           },
           headStyles: {
@@ -1003,7 +1003,7 @@ export default function AssetReportsPage() {
             textColor: [255, 255, 255],
             fontStyle: "bold",
           },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
+          alternateRowStyles: { fillColor: [236, 236, 231] },
           rowPageBreak: "avoid",
         });
 
@@ -1015,7 +1015,7 @@ export default function AssetReportsPage() {
         doc.setPage(page);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text(`Enshore Subsea | ${pdfMetrics.monthLabel}`, margin, pageHeight - 8);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8, {
           align: "right",
@@ -1274,7 +1274,7 @@ const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const sectionHeaderRowStyle: CSSProperties = {
@@ -1289,12 +1289,12 @@ const sectionHeaderRowStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
 };
 
@@ -1307,7 +1307,7 @@ const formGridStyle: CSSProperties = {
 const fieldLabelStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
 };
@@ -1321,10 +1321,10 @@ const narrativeStackStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   minWidth: "180px",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const textareaStyle: CSSProperties = {
@@ -1345,8 +1345,8 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -1375,9 +1375,9 @@ const periodPreviewStyle: CSSProperties = {
   marginTop: "14px",
   padding: "12px 14px",
   borderRadius: "12px",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  color: "#334155",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
+  color: "#53565A",
 };
 
 const snapshotCardsWrapStyle: CSSProperties = {
@@ -1387,16 +1387,16 @@ const snapshotCardsWrapStyle: CSSProperties = {
 };
 
 const snapshotCardStyle: CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const snapshotCardTitleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   marginBottom: "10px",
 };
 
@@ -1413,32 +1413,32 @@ const snapshotRowStyle: CSSProperties = {
 };
 
 const snapshotLabelStyle: CSSProperties = {
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
 };
 
 const snapshotValueStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "14px",
 };
 
 const registerCountStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   fontWeight: 700,
 };
 
 const emptyTextStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   margin: 0,
 };
 
 const compactTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const actionButtonsWrapStyle: CSSProperties = {

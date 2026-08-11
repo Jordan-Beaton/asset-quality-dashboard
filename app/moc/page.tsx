@@ -471,24 +471,24 @@ function createSignoffRows(roles: string[]): MocSignoffRow[] {
 
 function getStatusTone(status: string) {
   const value = (status || "").toLowerCase();
-  if (value.includes("closed")) return { bg: "#dcfce7", color: "#166534" };
-  if (value.includes("approved")) return { bg: "#fef3c7", color: "#92400e" };
-  if (value.includes("review")) return { bg: "#dbeafe", color: "#1d4ed8" };
-  return { bg: "#e2e8f0", color: "#334155" };
+  if (value.includes("closed")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("approved")) return { bg: "#ECECE7", color: "#000000" };
+  if (value.includes("review")) return { bg: "#ECECE7", color: "#005670" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function getActionPlanStatusTone(status: string) {
   const value = normaliseActionPlanStatus(status);
-  if (value === "Complete") return { background: "#dcfce7", color: "#166534" };
-  if (value === "Ongoing") return { background: "#dbeafe", color: "#1d4ed8" };
-  if (value === "Hold") return { background: "#fef3c7", color: "#92400e" };
-  return { background: "#fee2e2", color: "#F93822" };
+  if (value === "Complete") return { background: "#ECECE7", color: "#005670" };
+  if (value === "Ongoing") return { background: "#ECECE7", color: "#005670" };
+  if (value === "Hold") return { background: "#ECECE7", color: "#000000" };
+  return { background: "#ECECE7", color: "#F93822" };
 }
 
 function getChangeTypeTone(value: ChangeType) {
   return value === "Temporary"
-    ? { bg: "#fef3c7", color: "#92400e" }
-    : { bg: "#dcfce7", color: "#166534" };
+    ? { bg: "#ECECE7", color: "#000000" }
+    : { bg: "#ECECE7", color: "#005670" };
 }
 
 function toDataUrl(blob: Blob) {
@@ -721,10 +721,10 @@ function formatFileSize(value: number | null | undefined) {
 }
 
 function getNoticeColours(tone: NoticeTone) {
-  if (tone === "success") return { bg: "#ECECE7", border: "#ECECE7", text: "#166534" };
-  if (tone === "warning") return { bg: "#fffbeb", border: "#fde68a", text: "#92400e" };
-  if (tone === "error") return { bg: "#fef2f2", border: "#fecaca", text: "#F93822" };
-  return { bg: "#ffffff", border: "#e2e8f0", text: "#0f172a" };
+  if (tone === "success") return { bg: "#ECECE7", border: "#ECECE7", text: "#005670" };
+  if (tone === "warning") return { bg: "#ECECE7", border: "#ECECE7", text: "#000000" };
+  if (tone === "error") return { bg: "#ECECE7", border: "#ECECE7", text: "#F93822" };
+  return { bg: "#ffffff", border: "#D0D0CE", text: "#000000" };
 }
 
 function getCreatedOrUpdatedTime(report: MocReport) {
@@ -798,8 +798,8 @@ function getTemporaryValidityLabel(report: MocReport) {
 
 function getTemporaryValidityTone(report: MocReport) {
   if (isExpiredTemporary(report)) return { color: "#F93822" };
-  if (isNearingTemporaryExpiry(report)) return { color: "#b45309" };
-  return { color: "#475569" };
+  if (isNearingTemporaryExpiry(report)) return { color: "#000000" };
+  return { color: "#53565A" };
 }
 
 function getNextWorkflowStatus(status: MocStatus): MocStatus | null {
@@ -1336,9 +1336,9 @@ function MOCPageContent() {
     changeType?: "All" | ChangeType;
     view?: MocViewFilter;
   }) {
-    setStatusFilter(next.status ?? "All");
-    setChangeTypeFilter(next.changeType ?? "All");
-    setViewFilter(next.view ?? "All");
+    if (next.status !== undefined) setStatusFilter(next.status);
+    if (next.changeType !== undefined) setChangeTypeFilter(next.changeType);
+    if (next.view !== undefined) setViewFilter(next.view);
     setActiveView("register");
   }
 
@@ -2014,19 +2014,19 @@ function MOCPageContent() {
     const lineHeight = 4;
     const maxLines = Math.max(1, Math.floor((height - labelHeight - 3.5) / lineHeight));
 
-    doc.setDrawColor(203, 213, 225);
+    doc.setDrawColor(208, 208, 206);
     doc.setFillColor(255, 255, 255);
     doc.rect(x, y, width, height, "FD");
-    doc.setFillColor(241, 245, 249);
+    doc.setFillColor(236, 236, 231);
     doc.rect(x, y, width, labelHeight, "F");
     doc.line(x, y + labelHeight, x + width, y + labelHeight);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.2);
-    doc.setTextColor(71, 85, 105);
+    doc.setTextColor(83, 86, 90);
     doc.text(label, x + 2, y + 4.1);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.8);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
     const lines = doc.splitTextToSize(getPdfText(value) || " ", width - 4).slice(0, maxLines);
     doc.text(lines, x + 2, y + labelHeight + 4.4);
   }
@@ -2038,7 +2038,7 @@ function MOCPageContent() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
     doc.text(heading, 14, y + 5.3);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
   }
 
   function drawPdfPageChrome(doc: jsPDF, logoImage: PdfImageMeta | null, reportNo: string) {
@@ -2047,16 +2047,16 @@ function MOCPageContent() {
     }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13.5);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
     doc.text("ENS-HSEQ-FRM-008 Management of Change Form", 105, 13.5, { align: "center" });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.4);
-    doc.setTextColor(71, 85, 105);
+    doc.setTextColor(83, 86, 90);
     doc.text("Rev D", 198, 10.8, { align: "right" });
     doc.text(getPdfText(reportNo), 198, 15.4, { align: "right" });
-    doc.setDrawColor(203, 213, 225);
+    doc.setDrawColor(208, 208, 206);
     doc.line(12, 20.5, 198, 20.5);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
   }
 
   function getLastAutoTableY(doc: jsPDF, fallback: number) {
@@ -2076,10 +2076,10 @@ function MOCPageContent() {
     let rowY = y + 10.5;
 
     items.forEach((item) => {
-      doc.setDrawColor(100, 116, 139);
+      doc.setDrawColor(83, 86, 90);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.6);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text(`${getPdfCheckbox(item.checked)} ${item.label}`, x + 2.2, rowY);
       rowY += 4.6;
     });
@@ -2109,8 +2109,8 @@ function MOCPageContent() {
       styles: {
         fontSize: config.fontSize ?? 8,
         cellPadding: config.cellPadding ?? 2.2,
-        textColor: [15, 23, 42],
-        lineColor: [203, 213, 225],
+        textColor: [0, 0, 0],
+        lineColor: [208, 208, 206],
         lineWidth: 0.1,
         overflow: "linebreak",
         valign: "middle",
@@ -2121,7 +2121,7 @@ function MOCPageContent() {
         textColor: [255, 255, 255],
         fontStyle: "bold",
       },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
+      alternateRowStyles: { fillColor: [236, 236, 231] },
       bodyStyles: { fillColor: [255, 255, 255] },
       columnStyles: config.columnStyles,
       rowPageBreak: config.rowPageBreak ?? "avoid",
@@ -2274,19 +2274,19 @@ function MOCPageContent() {
     const blockHeight = 7 + rows * 5.2;
     const columnWidth = 186 / columns;
 
-    doc.setDrawColor(203, 213, 225);
+    doc.setDrawColor(208, 208, 206);
     doc.setFillColor(255, 255, 255);
     doc.rect(12, y, 186, blockHeight, "FD");
-    doc.setFillColor(241, 245, 249);
+    doc.setFillColor(236, 236, 231);
     doc.rect(12, y, 186, 6, "F");
     doc.line(12, y + 6, 198, y + 6);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.2);
-    doc.setTextColor(71, 85, 105);
+    doc.setTextColor(83, 86, 90);
     doc.text("Impact areas", 14, y + 4.1);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.2);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
 
     impactLines.forEach((line, index) => {
       const column = Math.floor(index / rows);
@@ -2574,7 +2574,7 @@ function MOCPageContent() {
     return bytes;
   }
 
-  const wordTableBorder = { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 };
+  const wordTableBorder = { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 };
   const wordTableBorders = {
     top: wordTableBorder,
     bottom: wordTableBorder,
@@ -2599,10 +2599,10 @@ function MOCPageContent() {
       children: [
             new TextRun({
               text,
-              font: "Calibri",
+              font: "Azo Sans",
               bold,
               italics: options?.italic,
-              color: options?.color || "0F172A",
+              color: options?.color || "000000",
           size: 18,
         }),
       ],
@@ -2623,7 +2623,7 @@ function MOCPageContent() {
               margins: { top: 110, bottom: 110, left: 150, right: 150 },
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: text.toUpperCase(), font: "Calibri", bold: true, color: "FFFFFF", size: 20 })],
+                  children: [new TextRun({ text: text.toUpperCase(), font: "Azo Sans", bold: true, color: "FFFFFF", size: 20 })],
                 }),
               ],
             }),
@@ -2634,7 +2634,7 @@ function MOCPageContent() {
   }
 
   function wordSpacer(size = 100) {
-    return new Paragraph({ children: [new TextRun({ text: "", font: "Calibri", size: 1 })], spacing: { after: size } });
+    return new Paragraph({ children: [new TextRun({ text: "", font: "Azo Sans", size: 1 })], spacing: { after: size } });
   }
 
   function wordCell(
@@ -2656,7 +2656,7 @@ function MOCPageContent() {
       shading: header
         ? { type: ShadingType.CLEAR, fill: "005670", color: "auto" }
         : options?.shaded
-          ? { type: ShadingType.CLEAR, fill: "F8FAFC", color: "auto" }
+          ? { type: ShadingType.CLEAR, fill: "ECECE7", color: "auto" }
           : undefined,
       margins: { top: 110, bottom: 110, left: 120, right: 120 },
       children: [
@@ -2665,9 +2665,9 @@ function MOCPageContent() {
           children: [
             new TextRun({
               text: wordValue(text),
-              font: "Calibri",
+              font: "Azo Sans",
               bold: header || label,
-              color: header ? "FFFFFF" : "0F172A",
+              color: header ? "FFFFFF" : "000000",
               size: options?.fontSize ?? (header ? 18 : 17),
             }),
           ],
@@ -2756,7 +2756,7 @@ function MOCPageContent() {
         (item) =>
           new Paragraph({
             spacing: { after: 45 },
-            children: [new TextRun({ text: item, font: "Calibri", color: "0F172A", size: 17 })],
+            children: [new TextRun({ text: item, font: "Azo Sans", color: "000000", size: 17 })],
           })
       ),
     });
@@ -2796,11 +2796,11 @@ function MOCPageContent() {
           children: [
             new TableCell({
               columnSpan: 3,
-              shading: { type: ShadingType.CLEAR, fill: "F1F5F9", color: "auto" },
+              shading: { type: ShadingType.CLEAR, fill: "ECECE7", color: "auto" },
               margins: { top: 90, bottom: 90, left: 120, right: 120 },
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: "Impact areas", font: "Calibri", bold: true, color: "475569", size: 15 })],
+                  children: [new TextRun({ text: "Impact areas", font: "Azo Sans", bold: true, color: "53565A", size: 15 })],
                 }),
               ],
             }),
@@ -2825,11 +2825,11 @@ function MOCPageContent() {
           tableHeader: true,
           children: [
             new TableCell({
-              shading: { type: ShadingType.CLEAR, fill: "F1F5F9", color: "auto" },
+              shading: { type: ShadingType.CLEAR, fill: "ECECE7", color: "auto" },
               margins: { top: 90, bottom: 90, left: 120, right: 120 },
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: "Variation Order", font: "Calibri", bold: true, color: "475569", size: 15 })],
+                  children: [new TextRun({ text: "Variation Order", font: "Azo Sans", bold: true, color: "53565A", size: 15 })],
                 }),
               ],
             }),
@@ -2847,8 +2847,8 @@ function MOCPageContent() {
                   children: [
                     new TextRun({
                       text: `${wordCheckbox(!report.variation_order_na)} Ref: ${wordValue(report.variation_order_reference_no)}`,
-                      font: "Calibri",
-                      color: "0F172A",
+                      font: "Azo Sans",
+                      color: "000000",
                       size: 17,
                     }),
                   ],
@@ -2857,8 +2857,8 @@ function MOCPageContent() {
                   children: [
                     new TextRun({
                       text: `${wordCheckbox(report.variation_order_na)} N/A`,
-                      font: "Calibri",
-                      color: "0F172A",
+                      font: "Azo Sans",
+                      color: "000000",
                       size: 17,
                     }),
                   ],
@@ -2887,7 +2887,7 @@ function MOCPageContent() {
           ]
         : [
             new Paragraph({
-              children: [new TextRun({ text: "ENSHORE", font: "Calibri", bold: true, size: 22, color: "0F172A" })],
+              children: [new TextRun({ text: "ENSHORE", font: "Azo Sans", bold: true, size: 22, color: "000000" })],
             }),
           ];
 
@@ -2909,7 +2909,7 @@ function MOCPageContent() {
                     new Paragraph({
                       alignment: AlignmentType.CENTER,
                       heading: HeadingLevel.HEADING_1,
-                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form", font: "Calibri", bold: true, size: 24, color: "0F172A" })],
+                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form", font: "Azo Sans", bold: true, size: 24, color: "000000" })],
                     }),
                   ],
                 }),
@@ -2917,8 +2917,8 @@ function MOCPageContent() {
                   borders: wordNoBorders,
                   margins: { top: 20, bottom: 45, left: 80, right: 0 },
                   children: [
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Rev D", font: "Calibri", size: 17, color: "475569" })] }),
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: wordValue(report.moc_report_no), font: "Calibri", size: 17, color: "475569" })] }),
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Rev D", font: "Azo Sans", size: 17, color: "53565A" })] }),
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: wordValue(report.moc_report_no), font: "Azo Sans", size: 17, color: "53565A" })] }),
                   ],
                 }),
               ],
@@ -2926,7 +2926,7 @@ function MOCPageContent() {
           ],
         }),
         new Paragraph({
-          border: { bottom: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 5 } },
+          border: { bottom: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 5 } },
           spacing: { after: 90 },
         }),
       ],
@@ -2937,9 +2937,9 @@ function MOCPageContent() {
     return new Footer({
       children: [
         new Paragraph({
-          border: { top: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 4 } },
+          border: { top: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 4 } },
           spacing: { before: 80 },
-                  children: [new TextRun({ text: "", font: "Calibri", size: 1 })],
+                  children: [new TextRun({ text: "", font: "Azo Sans", size: 1 })],
         }),
         new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
@@ -2953,7 +2953,7 @@ function MOCPageContent() {
                   borders: wordNoBorders,
                   children: [
                     new Paragraph({
-                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form Rev D", font: "Calibri", size: 16, color: "475569" })],
+                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form Rev D", font: "Azo Sans", size: 16, color: "53565A" })],
                     }),
                   ],
                 }),
@@ -2963,9 +2963,9 @@ function MOCPageContent() {
                     new Paragraph({
                       alignment: AlignmentType.RIGHT,
                       children: [
-                        new TextRun({ text: "Page ", font: "Calibri", size: 16, color: "475569" }),
+                        new TextRun({ text: "Page ", font: "Azo Sans", size: 16, color: "53565A" }),
                         new SimpleField("PAGE"),
-                        new TextRun({ text: " of ", font: "Calibri", size: 16, color: "475569" }),
+                        new TextRun({ text: " of ", font: "Azo Sans", size: 16, color: "53565A" }),
                         new SimpleField("NUMPAGES"),
                       ],
                     }),
@@ -3004,9 +3004,9 @@ function MOCPageContent() {
         .sort((a, b) => new Date(b.uploaded_at || 0).getTime() - new Date(a.uploaded_at || 0).getTime());
 
       const children = [
-        wordPara(`Generated ${new Date().toLocaleString("en-GB")}`, false, { italic: true, color: "475569", after: 60 }),
+        wordPara(`Generated ${new Date().toLocaleString("en-GB")}`, false, { italic: true, color: "53565A", after: 60 }),
         wordPara("Generated from IMS as an editable working circulation copy. Controlled PDF output remains the formal record.", true, {
-          color: "475569",
+          color: "53565A",
           after: 160,
         }),
 
@@ -3181,33 +3181,33 @@ function MOCPageContent() {
           default: {
             document: {
               run: {
-                font: "Calibri",
+                font: "Azo Sans",
                 size: 18,
-                color: "0F172A",
+                color: "000000",
               },
             },
             title: {
               run: {
-                font: "Calibri",
+                font: "Azo Sans",
                 size: 28,
                 bold: true,
-                color: "0F172A",
+                color: "000000",
               },
             },
             heading1: {
               run: {
-                font: "Calibri",
+                font: "Azo Sans",
                 size: 24,
                 bold: true,
-                color: "0F172A",
+                color: "000000",
               },
             },
             heading2: {
               run: {
-                font: "Calibri",
+                font: "Azo Sans",
                 size: 20,
                 bold: true,
-                color: "0F172A",
+                color: "000000",
               },
             },
           },
@@ -3295,11 +3295,11 @@ function MOCPageContent() {
         doc.setPage(page);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
-        doc.setTextColor(71, 85, 105);
+        doc.setTextColor(83, 86, 90);
         doc.line(12, 288.5, 198, 288.5);
         doc.text("ENS-HSEQ-FRM-008 Management of Change Form Rev D", 12, 292);
         doc.text(`${page}/${pageCount}`, 198, 292, { align: "right" });
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
       }
 
       doc.save(`${bundle.report.moc_report_no || "MOC"}-${bundle.report.moc_report_title || "Form"}.pdf`);
@@ -3328,14 +3328,9 @@ function MOCPageContent() {
         backHref="/home"
         backLabel="Back to IMS Home"
         status={<><strong>Status:</strong> {message}</>}
-        actions={
-          <button type="button" style={secondaryButtonStyle} onClick={() => void loadData()}>
-            Refresh
-          </button>
-        }
       />
 
-      <nav style={mocViewNavStyle} aria-label="MOC workspace views">
+      <nav className="ims-tabs" style={mocViewNavStyle} aria-label="MOC workspace views" role="tablist">
         {[
           ["dashboard", "Dashboard"],
           ["register", "MOC Register"],
@@ -3345,6 +3340,9 @@ function MOCPageContent() {
           <button
             key={view}
             type="button"
+            role="tab"
+            aria-selected={activeView === view}
+            data-active={activeView === view ? "true" : "false"}
             style={activeView === view ? activeViewButtonStyle : viewButtonStyle}
             onClick={() => switchMocWorkspaceView(view as MocWorkspaceView)}
           >
@@ -3388,7 +3386,7 @@ function MOCPageContent() {
         <QualityKpiCard
           title="Expiry in 7 Days"
           value={expirySoonCount}
-          accent="#b45309"
+          accent="#000000"
           onClick={() => applyMocDashboardFilter({ view: "Expiry Soon" })}
         />
         <QualityKpiCard
@@ -3499,7 +3497,7 @@ function MOCPageContent() {
                           ...segmentedButtonStyle,
                           ...segmentedButtonFillStyle,
                           background: starterForm.change_type === option ? "#005670" : "transparent",
-                          color: starterForm.change_type === option ? "#ffffff" : "#0f172a",
+                          color: starterForm.change_type === option ? "#ffffff" : "#000000",
                         }}
                         onClick={() => setStarterForm((prev) => ({ ...prev, change_type: option }))}
                       >
@@ -3531,7 +3529,7 @@ function MOCPageContent() {
       {activeView === "register" ? (
       <section style={workspaceGridStyle}>
         <SectionCard title="MOC Register" subtitle="Main operational register for saved MOC reports. Click a row to open the full detail and edit panel.">
-          <div style={toolbarStyle}>
+          <div className="ims-filter-panel" style={toolbarStyle}>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -3549,7 +3547,7 @@ function MOCPageContent() {
           </div>
 
           {showRegisterFilters ? (
-            <div style={toolbarFiltersStyle}>
+            <div className="ims-filter-panel" style={toolbarFiltersStyle}>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "All" | "Active" | MocStatus)}>
                 <option value="All">All statuses</option>
                 <option value="Active">Active</option>
@@ -3601,8 +3599,8 @@ function MOCPageContent() {
                 : "No MOC records match the current filters."}
             </div>
           ) : (
-            <div style={registerTableWrapStyle}>
-              <div style={mocRegisterHeadStyle}>
+            <div className="ims-register-shell" style={registerTableWrapStyle}>
+              <div className="ims-register-head" style={mocRegisterHeadStyle}>
                 <div>MOC Report No.</div>
                 <div>MOC Report Title</div>
                 <div>Project / Worksite Address</div>
@@ -3622,11 +3620,14 @@ function MOCPageContent() {
 
                   return (
                     <button
+                      className="ims-register-row"
+                      aria-pressed={active}
+                      data-selected={active ? "true" : "false"}
                       key={report.id}
                       type="button"
                       style={{
                         ...mocRegisterRowStyle,
-                        background: active ? "#eff6ff" : "#ffffff",
+                        background: active ? "#eef7f8" : "#ffffff",
                         borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                       }}
                       onClick={() => openBundle(report.id)}
@@ -3810,7 +3811,7 @@ function MOCPageContent() {
                               ...segmentedButtonStyle,
                               ...segmentedButtonFillStyle,
                               background: detailReport.change_type === option ? "#005670" : "transparent",
-                              color: detailReport.change_type === option ? "#ffffff" : "#0f172a",
+                              color: detailReport.change_type === option ? "#ffffff" : "#000000",
                               opacity: canEditStructural ? 1 : 0.65,
                             }}
                             disabled={!canEditStructural}
@@ -4622,11 +4623,11 @@ function ImpactToggle({ label, checked, onToggle }: { label: string; checked: bo
       style={{
         ...impactToggleStyle,
         background: checked ? "#ECECE7" : "#ffffff",
-        borderColor: checked ? "#005670" : "#cbd5e1",
+        borderColor: checked ? "#005670" : "#D0D0CE",
       }}
       onClick={onToggle}
     >
-      <span style={{ ...impactCheckboxStyle, background: checked ? "#005670" : "#ffffff", color: checked ? "#ffffff" : "#0f172a" }}>
+      <span style={{ ...impactCheckboxStyle, background: checked ? "#005670" : "#ffffff", color: checked ? "#ffffff" : "#000000" }}>
         {checked ? "x" : ""}
       </span>
       <span>{label}</span>
@@ -4890,8 +4891,8 @@ const mocViewNavStyle: CSSProperties = {
 };
 
 const viewButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#ECECE7",
+  color: "#000000",
   border: "none",
   padding: "10px 14px",
   borderRadius: "10px",
@@ -4925,8 +4926,8 @@ const quickActionGridStyle: CSSProperties = {
 };
 
 const quickActionCardStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: "14px",
   padding: "14px",
   cursor: "pointer",
@@ -4938,14 +4939,14 @@ const quickActionCardStyle: CSSProperties = {
 const quickActionLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#475569",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
 
 const quickActionValueStyle: CSSProperties = {
   fontSize: "28px",
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1,
 };
 
@@ -4972,12 +4973,12 @@ const reportActionLabelStyle: CSSProperties = {
 
 const reportActionTitleStyle: CSSProperties = {
   fontSize: "18px",
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.25,
 };
 
 const reportActionHintStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.45,
 };
@@ -4986,7 +4987,7 @@ const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const sectionHeaderStyle: CSSProperties = {
@@ -4996,12 +4997,12 @@ const sectionHeaderStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
 };
 
@@ -5044,18 +5045,18 @@ const inputStyle: CSSProperties = {
   width: "100%",
   padding: "10px 12px",
   borderRadius: 10,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   outline: "none",
   fontSize: 14,
-  color: "#0f172a",
+  color: "#000000",
   boxSizing: "border-box",
 };
 
 const readOnlyInputStyle: CSSProperties = {
   ...inputStyle,
-  background: "#f8fafc",
-  color: "#475569",
+  background: "#ECECE7",
+  color: "#53565A",
 };
 
 const textareaStyle: CSSProperties = {
@@ -5073,7 +5074,7 @@ const tallTextareaStyle: CSSProperties = {
 const labelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  color: "#475569",
+  color: "#53565A",
   marginBottom: 6,
   display: "block",
   letterSpacing: 0.2,
@@ -5082,10 +5083,10 @@ const labelStyle: CSSProperties = {
 
 const segmentedWrapStyle: CSSProperties = {
   display: "inline-flex",
-  background: "#e9eef5",
+  background: "#D0D0CE",
   borderRadius: 14,
   padding: 4,
-  border: "1px solid #d3dce8",
+  border: "1px solid #D0D0CE",
 };
 
 const segmentedWrapWideStyle: CSSProperties = {
@@ -5118,10 +5119,10 @@ const toolbarStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 
 const toolbarSearchStyle: CSSProperties = {
@@ -5147,7 +5148,7 @@ const tableInfoRowStyle: CSSProperties = {
   justifyContent: "flex-start",
   gap: "4px",
   flexWrap: "wrap",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
   margin: "12px 0",
@@ -5155,24 +5156,24 @@ const tableInfoRowStyle: CSSProperties = {
 
 const registerTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const mocRegisterHeadStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1.7fr 1.2fr 1.1fr 1.2fr 0.9fr 0.9fr 1.15fr 0.7fr",
-  gap: "12px",
-  padding: "14px 16px",
-  background: "#f8fafc",
-  borderBottom: "1px solid #e5e7eb",
-  fontSize: "12px",
+  gap: "8px",
+  padding: "9px 10px",
+  background: "#005670",
+  borderBottom: "1px solid #005670",
+  fontSize: "10px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#ffffff",
   textTransform: "uppercase",
-  letterSpacing: 0.3,
+  letterSpacing: "0.04em",
   alignItems: "center",
 };
 
@@ -5186,30 +5187,30 @@ const mocRegisterRowStyle: CSSProperties = {
   textAlign: "left",
   display: "grid",
   gridTemplateColumns: "1fr 1.7fr 1.2fr 1.1fr 1.2fr 0.9fr 0.9fr 1.15fr 0.7fr",
-  gap: "12px",
-  padding: "16px",
+  gap: "8px",
+  padding: "10px",
   border: "none",
-  borderBottom: "1px solid #eef2f7",
+  borderBottom: "1px solid #D0D0CE",
   cursor: "pointer",
   alignItems: "start",
 };
 
 const registerTitleStyle: CSSProperties = {
-  fontSize: "15px",
+  fontSize: "12px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   marginBottom: "6px",
 };
 
 const registerDescriptionStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.45,
 };
 
 const registerSimpleTextStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 700,
 };
 
@@ -5228,25 +5229,25 @@ const detailHeaderStyle: CSSProperties = {
   flexWrap: "wrap",
   paddingBottom: "14px",
   marginBottom: "18px",
-  borderBottom: "1px solid #e2e8f0",
+  borderBottom: "1px solid #D0D0CE",
 };
 
 const detailRecordNumberStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const detailRecordTitleStyle: CSSProperties = {
   margin: "4px 0 0 0",
   fontSize: "22px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const detailWorkflowHintStyle: CSSProperties = {
   marginTop: "8px",
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.45,
 };
 
@@ -5280,11 +5281,11 @@ const subSectionStackStyle: CSSProperties = {
 };
 
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
 
@@ -5303,9 +5304,9 @@ const detailTemporaryHintStyle: CSSProperties = {
   marginBottom: "2px",
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #fde68a",
-  background: "#fffbeb",
-  color: "#92400e",
+  border: "1px solid #ECECE7",
+  background: "#ECECE7",
+  color: "#000000",
   fontSize: "13px",
   fontWeight: 700,
 };
@@ -5329,11 +5330,11 @@ const repeatCardStackStyle: CSSProperties = {
 };
 
 const repeatCardStyle: CSSProperties = {
-  border: "1px solid #d7dee7",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
   padding: "14px",
-  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)",
+  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
 };
 
 const compactRepeatCardStyle: CSSProperties = {
@@ -5353,7 +5354,7 @@ const repeatCardHeaderStyle: CSSProperties = {
 const repeatCardKickerStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
@@ -5362,7 +5363,7 @@ const repeatCardTitleStyle: CSSProperties = {
   marginTop: "3px",
   fontSize: "15px",
   fontWeight: 900,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const actionPlanCardGridStyle: CSSProperties = {
@@ -5377,7 +5378,7 @@ const actionPlanIntroStyle: CSSProperties = {
   borderRadius: "14px",
   border: "1px solid #D0D0CE",
   background: "#ECECE7",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const actionPlanIntroTitleStyle: CSSProperties = {
@@ -5392,7 +5393,7 @@ const actionPlanIntroTextStyle: CSSProperties = {
   display: "block",
   fontSize: "13px",
   lineHeight: 1.45,
-  color: "#475569",
+  color: "#53565A",
 };
 
 const actionPlanCardTitleRowStyle: CSSProperties = {
@@ -5413,7 +5414,7 @@ const miniMetaLabelStyle: CSSProperties = {
   display: "block",
   fontSize: "11px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   marginBottom: "3px",
@@ -5422,7 +5423,7 @@ const miniMetaLabelStyle: CSSProperties = {
 const miniMetaValueStyle: CSSProperties = {
   display: "block",
   fontSize: "13px",
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.35,
 };
 
@@ -5462,9 +5463,9 @@ const reviewChoiceStyle: CSSProperties = {
   minHeight: "38px",
   padding: "8px 12px",
   borderRadius: "999px",
-  border: "1px solid #cbd5e1",
-  background: "#f8fafc",
-  color: "#0f172a",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
+  color: "#000000",
   fontSize: "13px",
   fontWeight: 800,
 };
@@ -5487,7 +5488,7 @@ const actionPlanHeadStyle: CSSProperties = {
   gap: "10px",
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: 0.3,
 };
@@ -5505,7 +5506,7 @@ const simpleDocHeadStyle: CSSProperties = {
   gap: "10px",
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
 };
 
@@ -5530,12 +5531,12 @@ const reviewHeadStyle: CSSProperties = {
   gap: "10px",
   padding: "10px 12px",
   borderRadius: "14px",
-  border: "1px solid #d7dee7",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   minWidth: "1320px",
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: 0.3,
   alignItems: "center",
@@ -5549,7 +5550,7 @@ const reviewRowStyle: CSSProperties = {
   alignItems: "center",
   padding: "12px",
   borderRadius: "14px",
-  border: "1px solid #d7dee7",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   minWidth: "1320px",
 };
@@ -5560,7 +5561,7 @@ const checkboxCellStyle: CSSProperties = {
   alignItems: "center",
   minHeight: "42px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
 };
 
@@ -5570,12 +5571,12 @@ const simpleSignoffHeadStyle: CSSProperties = {
   gap: "10px",
   padding: "10px 12px",
   borderRadius: "14px",
-  border: "1px solid #d7dee7",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   minWidth: "1040px",
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: 0.3,
 };
@@ -5587,7 +5588,7 @@ const simpleSignoffRowStyle: CSSProperties = {
   alignItems: "center",
   padding: "12px",
   borderRadius: "14px",
-  border: "1px solid #d7dee7",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   minWidth: "1040px",
 };
@@ -5665,27 +5666,27 @@ const signatureImageThumbStyle: CSSProperties = {
   objectFit: "contain",
   borderRadius: "6px",
   background: "#ffffff",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   padding: "2px",
 };
 
 const signaturePreviewTextStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
-  color: "#475569",
+  color: "#53565A",
 };
 
 const signatureHintStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const rowMoveButtonStyle: CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 700,
   cursor: "pointer",
 };
@@ -5693,8 +5694,8 @@ const rowMoveButtonStyle: CSSProperties = {
 const removeRowButtonStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: 10,
-  border: "1px solid #fecaca",
-  background: "#fff5f5",
+  border: "1px solid #ECECE7",
+  background: "#ECECE7",
   color: "#F93822",
   fontWeight: 700,
   cursor: "pointer",
@@ -5710,11 +5711,11 @@ const impactToggleStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   padding: "12px 14px",
   cursor: "pointer",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 700,
   textAlign: "left",
 };
@@ -5736,7 +5737,7 @@ const checkToggleStyle: CSSProperties = {
   alignItems: "center",
   gap: "10px",
   minHeight: "42px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   borderRadius: "10px",
   padding: "0 12px",
   background: "#ffffff",
@@ -5764,9 +5765,9 @@ const primaryButtonStyle: CSSProperties = {
 const secondaryButtonStyle: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 700,
   cursor: "pointer",
 };
@@ -5774,9 +5775,9 @@ const secondaryButtonStyle: CSSProperties = {
 const secondaryButtonSmall: CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 700,
   cursor: "pointer",
 };
@@ -5784,8 +5785,8 @@ const secondaryButtonSmall: CSSProperties = {
 const dangerButtonStyle: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
-  border: "1px solid #fecaca",
-  background: "#fff5f5",
+  border: "1px solid #ECECE7",
+  background: "#ECECE7",
   color: "#F93822",
   fontWeight: 700,
   cursor: "pointer",
@@ -5807,7 +5808,7 @@ const detailButtonRowStyle: CSSProperties = {
 
 const attachmentSectionIntroStyle: CSSProperties = {
   marginBottom: "12px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.5,
 };
@@ -5822,16 +5823,16 @@ const attachmentToolbarStyle: CSSProperties = {
 };
 
 const attachmentToolbarHintStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
 };
 
 const attachmentEmptyStateStyle: CSSProperties = {
   padding: "16px",
   borderRadius: "14px",
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   background: "#ffffff",
-  color: "#475569",
+  color: "#53565A",
 };
 
 const attachmentListStyle: CSSProperties = {
@@ -5847,21 +5848,21 @@ const attachmentRowStyle: CSSProperties = {
   flexWrap: "wrap",
   padding: "14px 16px",
   borderRadius: "14px",
-  border: "1px solid #d7dee7",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
 };
 
 const attachmentFileNameStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   overflowWrap: "anywhere",
 };
 
 const attachmentMetaStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const attachmentActionsStyle: CSSProperties = {
@@ -5874,8 +5875,8 @@ const emptyBoardStyle: CSSProperties = {
   padding: 18,
   borderRadius: 16,
   background: "#ffffff",
-  border: "1px dashed #cbd5e1",
-  color: "#475569",
+  border: "1px dashed #D0D0CE",
+  color: "#53565A",
 };
 
 export default function MOCPage() {

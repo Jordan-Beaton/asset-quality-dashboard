@@ -295,12 +295,12 @@ function getTimestampValue(value: string | null | undefined) {
 function getStatusTone(status: string) {
   const value = status.toLowerCase();
 
-  if (value === "active") return { bg: "#dcfce7", color: "#166534" };
-  if (value === "inactive") return { bg: "#e5e7eb", color: "#374151" };
-  if (value.includes("quarantine")) return { bg: "#fee2e2", color: "#F93822" };
-  if (value.includes("maintenance")) return { bg: "#fef3c7", color: "#92400e" };
+  if (value === "active") return { bg: "#ECECE7", color: "#005670" };
+  if (value === "inactive") return { bg: "#D0D0CE", color: "#53565A" };
+  if (value.includes("quarantine")) return { bg: "#ECECE7", color: "#F93822" };
+  if (value.includes("maintenance")) return { bg: "#ECECE7", color: "#000000" };
 
-  return { bg: "#e2e8f0", color: "#334155" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function countQualityLinks(record: AssetQualityRecord) {
@@ -1058,7 +1058,7 @@ function AssetsPageContent() {
       width: 280,
       margin: 1,
       color: {
-        dark: "#0f172a",
+        dark: "#000000",
         light: "#ffffff",
       },
     })
@@ -1668,11 +1668,11 @@ function AssetsPageContent() {
           <title>${assetLabel} QR Code</title>
           <style>
             body {
-              font-family: Arial, Helvetica, sans-serif;
+              font-family: "Azo Sans", "Segoe UI", Arial, Helvetica, sans-serif;
               display: grid;
               place-items: center;
               padding: 32px;
-              color: #0f172a;
+              color: #000000;
             }
             .wrap {
               text-align: center;
@@ -1690,7 +1690,7 @@ function AssetsPageContent() {
             }
             .meta {
               font-size: 14px;
-              color: #475569;
+              color: #53565A;
               word-break: break-word;
             }
           </style>
@@ -1989,11 +1989,8 @@ function AssetsPageContent() {
   function applyAssetKpiFilter(next: { status?: string; qualityLinked?: boolean }) {
     setActiveView("register");
     setShowRegisterFilters(true);
-    setSearch("");
-    setLocationFilter("");
-    setOwnerFilter("");
-    setStatusFilter(next.status || "");
-    setQualityLinkedFilter(Boolean(next.qualityLinked));
+    if (next.status !== undefined) setStatusFilter(next.status);
+    if (next.qualityLinked !== undefined) setQualityLinkedFilter(next.qualityLinked);
   }
 
   return (
@@ -2048,7 +2045,7 @@ function AssetsPageContent() {
             <QualityKpiCard
               title="Under Maintenance"
               value={underMaintenanceAssets}
-              accent="#d97706"
+              accent="#000000"
               onClick={() => applyAssetKpiFilter({ status: "Under Maintenance" })}
             />
             <QualityKpiCard
@@ -2084,28 +2081,28 @@ function AssetsPageContent() {
                   value={overdueInspectionAssets}
                   hint={`${dueSoonInspectionAssets} due soon`}
                   tone="#F93822"
-                  bg="#fff1f2"
+                  bg="#ECECE7"
                 />
                 <DashboardMetricCard
                   label="Inspection Due Soon"
                   value={dueSoonInspectionAssets}
                   hint="Next 30 days"
-                  tone="#92400e"
-                  bg="#fffbeb"
+                  tone="#000000"
+                  bg="#ECECE7"
                 />
                 <DashboardMetricCard
                   label="Maintenance Overdue"
                   value={overdueMaintenanceAssets}
                   hint={`${dueSoonMaintenanceAssets} due soon`}
                   tone="#F93822"
-                  bg="#fff1f2"
+                  bg="#ECECE7"
                 />
                 <DashboardMetricCard
                   label="Maintenance Due Soon"
                   value={dueSoonMaintenanceAssets}
                   hint="Next 30 days"
-                  tone="#92400e"
-                  bg="#fffbeb"
+                  tone="#000000"
+                  bg="#ECECE7"
                 />
               </div>
             </ImsPanel>
@@ -2120,28 +2117,28 @@ function AssetsPageContent() {
                   value={qualitySnapshotData.find((item) => item.name === "NCRs")?.value || 0}
                   hint="Quality records"
                   tone="#F93822"
-                  bg="#fff1f2"
+                  bg="#ECECE7"
                 />
                 <DashboardMetricCard
                   label="Linked Actions"
                   value={qualitySnapshotData.find((item) => item.name === "Actions")?.value || 0}
                   hint="Central action links"
-                  tone="#1d4ed8"
-                  bg="#eff6ff"
+                  tone="#005670"
+                  bg="#ECECE7"
                 />
                 <DashboardMetricCard
                   label="Calibration Links"
                   value={qualitySnapshotData.find((item) => item.name === "Calibration")?.value || 0}
                   hint="Calibration evidence"
-                  tone="#92400e"
-                  bg="#fffbeb"
+                  tone="#000000"
+                  bg="#ECECE7"
                 />
                 <DashboardMetricCard
                   label="Inspection Links"
                   value={qualitySnapshotData.find((item) => item.name === "Inspection")?.value || 0}
                   hint="Inspection evidence"
-                  tone="#166534"
-                  bg="#f0fdf4"
+                  tone="#005670"
+                  bg="#ECECE7"
                 />
               </div>
             </ImsPanel>
@@ -2162,24 +2159,24 @@ function AssetsPageContent() {
                   label="Inactive"
                   value={inactiveAssets}
                   hint="Inactive or parked"
-                  tone="#475569"
-                  bg="#f8fafc"
+                  tone="#53565A"
+                  bg="#ECECE7"
                 />
                 <DashboardMetricCard
                   label="Active Share"
                   value={totalAssets > 0 ? Math.round((activeAssets / totalAssets) * 100) : 0}
                   suffix="%"
                   hint="Active assets"
-                  tone="#166534"
-                  bg="#f0fdf4"
+                  tone="#005670"
+                  bg="#ECECE7"
                 />
                 <DashboardMetricCard
                   label="Quality Coverage"
                   value={totalAssets > 0 ? Math.round((qualityLinkedAssets / totalAssets) * 100) : 0}
                   suffix="%"
                   hint="Linked assets"
-                  tone="#1d4ed8"
-                  bg="#eff6ff"
+                  tone="#005670"
+                  bg="#ECECE7"
                 />
               </div>
             </ImsPanel>
@@ -2457,7 +2454,7 @@ function AssetsPageContent() {
                     }}
                     style={{
                       ...registerTableRowStyle,
-                      background: selectedAssetId === asset.id ? "#eff6ff" : "#ffffff",
+                      background: selectedAssetId === asset.id ? "#eef7f8" : "#ffffff",
                       boxShadow: selectedAssetId === asset.id ? "inset 4px 0 0 #005670" : "inset 4px 0 0 transparent",
                     }}
                   >
@@ -3059,19 +3056,19 @@ function AssetsPageContent() {
                 <ModuleSectionHeader title="Quality Links" />
 
                 <div style={qualityMiniGridStyle}>
-                  <MiniMetricCard label="NCRs" value={qualityDraft.linked_ncrs.length} tone="#F93822" bg="#fee2e2" />
-                  <MiniMetricCard label="Actions" value={qualityDraft.linked_actions.length} tone="#1d4ed8" bg="#dbeafe" />
+                  <MiniMetricCard label="NCRs" value={qualityDraft.linked_ncrs.length} tone="#F93822" bg="#ECECE7" />
+                  <MiniMetricCard label="Actions" value={qualityDraft.linked_actions.length} tone="#005670" bg="#ECECE7" />
                   <MiniMetricCard
                     label="Calibration"
                     value={qualityDraft.calibration_records.length}
-                    tone="#92400e"
-                    bg="#fef3c7"
+                    tone="#000000"
+                    bg="#ECECE7"
                   />
                   <MiniMetricCard
                     label="Inspection"
                     value={qualityDraft.inspection_records.length}
-                    tone="#166534"
-                    bg="#dcfce7"
+                    tone="#005670"
+                    bg="#ECECE7"
                   />
                 </div>
 
@@ -3368,19 +3365,19 @@ function AssetsPageContent() {
                 label="Inspection Watch"
                 value={overdueInspectionAssets + dueSoonInspectionAssets}
                 tone="#F93822"
-                bg="#fee2e2"
+                bg="#ECECE7"
               />
               <MiniMetricCard
                 label="Maintenance Watch"
                 value={overdueMaintenanceAssets + dueSoonMaintenanceAssets}
-                tone="#92400e"
-                bg="#fef3c7"
+                tone="#000000"
+                bg="#ECECE7"
               />
               <MiniMetricCard
                 label="Linked Actions"
                 value={qualitySnapshotData.find((item) => item.name === "Actions")?.value || 0}
-                tone="#1d4ed8"
-                bg="#dbeafe"
+                tone="#005670"
+                bg="#ECECE7"
               />
             </div>
 
@@ -3443,9 +3440,9 @@ function SummaryPill({
     <div
       style={{
         ...summaryPillStyle,
-        background: tone?.bg || "#f8fafc",
-        color: tone?.color || "#0f172a",
-        border: `1px solid ${tone ? "transparent" : "#e2e8f0"}`,
+        background: tone?.bg || "#ECECE7",
+        color: tone?.color || "#000000",
+        border: `1px solid ${tone ? "transparent" : "#D0D0CE"}`,
       }}
     >
       <div style={summaryPillLabelStyle}>{label}</div>
@@ -3464,10 +3461,10 @@ function HeroPill({
   tone: "green" | "amber" | "red" | "blue" | "neutral";
 }) {
   const tones = {
-    green: { bg: "rgba(220,252,231,0.15)", border: "rgba(220,252,231,0.26)", text: "#dcfce7" },
-    amber: { bg: "rgba(254,243,199,0.15)", border: "rgba(254,243,199,0.28)", text: "#fef3c7" },
-    red: { bg: "rgba(254,226,226,0.15)", border: "rgba(254,226,226,0.28)", text: "#fee2e2" },
-    blue: { bg: "rgba(219,234,254,0.15)", border: "rgba(219,234,254,0.28)", text: "#dbeafe" },
+    green: { bg: "rgba(220,252,231,0.15)", border: "rgba(220,252,231,0.26)", text: "#ECECE7" },
+    amber: { bg: "rgba(254,243,199,0.15)", border: "rgba(254,243,199,0.28)", text: "#ECECE7" },
+    red: { bg: "rgba(254,226,226,0.15)", border: "rgba(254,226,226,0.28)", text: "#ECECE7" },
+    blue: { bg: "rgba(219,234,254,0.15)", border: "rgba(219,234,254,0.28)", text: "#ECECE7" },
     neutral: { bg: "rgba(255,255,255,0.12)", border: "rgba(255,255,255,0.20)", text: "#ffffff" },
   };
 
@@ -3739,7 +3736,7 @@ const dashboardMetricValueStyle: CSSProperties = {
 
 const dashboardMetricHintStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   fontWeight: 700,
   lineHeight: 1.35,
 };
@@ -3763,7 +3760,7 @@ const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "22px",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
 };
 
@@ -3774,12 +3771,12 @@ const sectionHeaderStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
 };
 
@@ -3804,15 +3801,15 @@ const fieldWrapStyle: CSSProperties = {
 const fieldLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
-  color: "#334155",
+  color: "#53565A",
 };
 
 const inputStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
   width: "100%",
   boxSizing: "border-box",
   minWidth: 0,
@@ -3820,8 +3817,8 @@ const inputStyle: CSSProperties = {
 
 const readonlyInputStyle: CSSProperties = {
   ...inputStyle,
-  background: "#f8fafc",
-  color: "#475569",
+  background: "#ECECE7",
+  color: "#53565A",
 };
 
 const textareaStyle: CSSProperties = {
@@ -3829,11 +3826,11 @@ const textareaStyle: CSSProperties = {
   minHeight: "96px",
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
   resize: "vertical",
-  fontFamily: "Arial, Helvetica, sans-serif",
+  fontFamily: "\"Azo Sans\", \"Segoe UI\", Arial, Helvetica, sans-serif",
   boxSizing: "border-box",
   lineHeight: 1.5,
   minWidth: 0,
@@ -3864,8 +3861,8 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -3910,8 +3907,8 @@ const reportLinkButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#dbeafe",
-  color: "#1d4ed8",
+  background: "#ECECE7",
+  color: "#005670",
   borderRadius: "10px",
   padding: "10px 16px",
   fontWeight: 700,
@@ -3922,11 +3919,11 @@ const reportLinkButtonStyle: CSSProperties = {
 };
 
 const qualityIntroBoxStyle: CSSProperties = {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   padding: "14px",
-  color: "#334155",
+  color: "#53565A",
   lineHeight: 1.5,
 };
 
@@ -3948,7 +3945,7 @@ const miniMetricValueStyle: CSSProperties = {
 
 const compactTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
@@ -3962,16 +3959,16 @@ const registerTableRowStyle: CSSProperties = {
 const tableSubTextStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.45,
   wordBreak: "break-word",
 };
 
 const emptyTableCellStyle: CSSProperties = {
   padding: "24px 14px",
-  color: "#64748b",
+  color: "#53565A",
   textAlign: "center",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const assetSummaryStripStyle: CSSProperties = {
@@ -3981,11 +3978,11 @@ const assetSummaryStripStyle: CSSProperties = {
 };
 
 const emptyDetailStyle: CSSProperties = {
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   borderRadius: "16px",
   padding: "24px",
-  color: "#64748b",
-  background: "#f8fafc",
+  color: "#53565A",
+  background: "#ECECE7",
 };
 
 const detailWorkspaceStyle: CSSProperties = {
@@ -4012,7 +4009,7 @@ const detailBadgeRowStyle: CSSProperties = {
 const detailEyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   marginBottom: "6px",
 };
@@ -4020,7 +4017,7 @@ const detailEyebrowStyle: CSSProperties = {
 const detailTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "22px",
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.25,
   overflowWrap: "anywhere",
 };
@@ -4041,7 +4038,7 @@ const imagePreviewWrapStyle: CSSProperties = {
   height: "160px",
   borderRadius: "14px",
   overflow: "hidden",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
 };
 
@@ -4058,7 +4055,7 @@ const imagePlaceholderStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  color: "#64748b",
+  color: "#53565A",
   fontWeight: 700,
   fontSize: "13px",
   textAlign: "center",
@@ -4073,10 +4070,10 @@ const imageMetaWrapStyle: CSSProperties = {
 
 const qrCardStyle: CSSProperties = {
   marginTop: "16px",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "16px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   display: "grid",
   gridTemplateColumns: "minmax(160px, 200px) minmax(0, 1fr)",
   gap: "16px",
@@ -4088,7 +4085,7 @@ const qrPreviewWrapStyle: CSSProperties = {
   maxWidth: "200px",
   aspectRatio: "1 / 1",
   borderRadius: "14px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   display: "grid",
   placeItems: "center",
@@ -4104,7 +4101,7 @@ const qrImageStyle: CSSProperties = {
 
 const qrLoadingStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   textAlign: "center",
   padding: "16px",
 };
@@ -4118,19 +4115,19 @@ const qrDetailsStyle: CSSProperties = {
 const qrCardTitleStyle: CSSProperties = {
   fontSize: "16px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const qrCardMetaStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.45,
 };
 
 const qrTargetLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   marginTop: "4px",
@@ -4138,7 +4135,7 @@ const qrTargetLabelStyle: CSSProperties = {
 
 const qrTargetValueStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.45,
   overflowWrap: "anywhere",
 };
@@ -4146,37 +4143,37 @@ const qrTargetValueStyle: CSSProperties = {
 const imageMetaTitleStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
 };
 
 const imageMetaFileStyle: CSSProperties = {
   fontSize: "16px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   wordBreak: "break-word",
   overflowWrap: "anywhere",
 };
 
 const imageMetaSubStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.45,
   overflowWrap: "anywhere",
 };
 
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
   minWidth: 0,
 };
 
 const detailSectionIntroStyle: CSSProperties = {
   marginBottom: "14px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.6,
 };
@@ -4193,7 +4190,7 @@ const summaryPillStyle: CSSProperties = {
 const summaryPillLabelStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
@@ -4218,7 +4215,7 @@ const detailSectionTitleStyle: CSSProperties = {
 const detailSubsectionTitleStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#475569",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   marginTop: "18px",
@@ -4260,7 +4257,7 @@ const linkGroupStyle: CSSProperties = {
 const linkGroupTitleStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
 };
 
@@ -4274,8 +4271,8 @@ const linkPillStyle: CSSProperties = {
   display: "inline-block",
   padding: "6px 10px",
   borderRadius: "999px",
-  background: "#dbeafe",
-  color: "#1d4ed8",
+  background: "#ECECE7",
+  color: "#005670",
   fontSize: "12px",
   fontWeight: 800,
   textDecoration: "none",
@@ -4285,7 +4282,7 @@ const editablePillWrapStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   gap: "4px",
-  background: "#dbeafe",
+  background: "#ECECE7",
   borderRadius: "999px",
   paddingRight: "6px",
 };
@@ -4293,7 +4290,7 @@ const editablePillWrapStyle: CSSProperties = {
 const pillRemoveButtonStyle: CSSProperties = {
   background: "transparent",
   border: "none",
-  color: "#1d4ed8",
+  color: "#005670",
   fontWeight: 800,
   cursor: "pointer",
   fontSize: "14px",
@@ -4302,7 +4299,7 @@ const pillRemoveButtonStyle: CSSProperties = {
 
 const recordsSectionStyle: CSSProperties = {
   marginTop: "18px",
-  borderTop: "1px solid #e2e8f0",
+  borderTop: "1px solid #D0D0CE",
   paddingTop: "16px",
 };
 
@@ -4318,7 +4315,7 @@ const recordsHeaderStyle: CSSProperties = {
 const recordsTitleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const recordsListStyle: CSSProperties = {
@@ -4334,10 +4331,10 @@ const historyWorkspaceGridStyle: CSSProperties = {
 };
 
 const historyPanelStyle: CSSProperties = {
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "16px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   minWidth: 0,
 };
 
@@ -4348,10 +4345,10 @@ const timelineListStyle: CSSProperties = {
 };
 
 const timelineCardStyle: CSSProperties = {
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px 16px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   display: "grid",
   gap: "10px",
 };
@@ -4374,21 +4371,21 @@ const timelineTitleWrapStyle: CSSProperties = {
 const timelineTitleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.35,
 };
 
 const timelineMetaStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   marginTop: "4px",
 };
 
 const timelineStatusStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
-  color: "#334155",
-  background: "#e2e8f0",
+  color: "#53565A",
+  background: "#D0D0CE",
   borderRadius: "999px",
   padding: "5px 10px",
   whiteSpace: "nowrap",
@@ -4396,7 +4393,7 @@ const timelineStatusStyle: CSSProperties = {
 
 const timelineDescriptionStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.5,
   overflowWrap: "anywhere",
 };
@@ -4404,18 +4401,18 @@ const timelineDescriptionStyle: CSSProperties = {
 const historyCountStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const recordCardStyle: CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const historyRecordCardStyle: CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
   background: "#ffffff",
@@ -4435,7 +4432,7 @@ const historyRecordHeaderStyle: CSSProperties = {
 const historyRecordTitleStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.4,
   overflowWrap: "anywhere",
 };
@@ -4443,7 +4440,7 @@ const historyRecordTitleStyle: CSSProperties = {
 const historyRecordMetaStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.5,
   overflowWrap: "anywhere",
 };
@@ -4452,13 +4449,13 @@ const historyInfoGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "8px 12px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.5,
 };
 
 const historyBodyTextStyle: CSSProperties = {
-  color: "#334155",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.6,
   overflowWrap: "anywhere",
@@ -4475,20 +4472,20 @@ const recordMetaStyle: CSSProperties = {
   gap: "12px",
   flexWrap: "wrap",
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   marginTop: "10px",
 };
 
 const emptyRecordStyle: CSSProperties = {
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   borderRadius: "12px",
   padding: "14px",
-  color: "#64748b",
-  background: "#f8fafc",
+  color: "#53565A",
+  background: "#ECECE7",
 };
 
 const mutedTextStyle: CSSProperties = {
-  color: "#94a3b8",
+  color: "#D0D0CE",
   fontSize: "13px",
 };
 
@@ -4511,52 +4508,52 @@ export default function AssetsPage() {
 function getConditionTone(condition: string | null) {
   const value = (condition || "").toLowerCase();
 
-  if (!value) return { bg: "#e2e8f0", color: "#334155" };
+  if (!value) return { bg: "#D0D0CE", color: "#53565A" };
   if (value.includes("excellent") || value.includes("good")) {
-    return { bg: "#dcfce7", color: "#166534" };
+    return { bg: "#ECECE7", color: "#005670" };
   }
   if (value.includes("fair") || value.includes("service")) {
-    return { bg: "#fef3c7", color: "#92400e" };
+    return { bg: "#ECECE7", color: "#000000" };
   }
   if (value.includes("poor") || value.includes("damage") || value.includes("fail")) {
-    return { bg: "#fee2e2", color: "#F93822" };
+    return { bg: "#ECECE7", color: "#F93822" };
   }
 
-  return { bg: "#dbeafe", color: "#1d4ed8" };
+  return { bg: "#ECECE7", color: "#005670" };
 }
 
 function getInspectionResultTone(result: string) {
   const value = result.toLowerCase();
 
-  if (value === "pass") return { bg: "#dcfce7", color: "#166534" };
-  if (value === "fail") return { bg: "#fee2e2", color: "#F93822" };
-  if (value.includes("observation")) return { bg: "#fef3c7", color: "#92400e" };
+  if (value === "pass") return { bg: "#ECECE7", color: "#005670" };
+  if (value === "fail") return { bg: "#ECECE7", color: "#F93822" };
+  if (value.includes("observation")) return { bg: "#ECECE7", color: "#000000" };
 
-  return { bg: "#e2e8f0", color: "#334155" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function getTimelineTypeTone(type: AssetTimelineEntry["type"]) {
-  if (type === "File") return { bg: "#dbeafe", color: "#1d4ed8" };
-  if (type === "Calibration") return { bg: "#fef3c7", color: "#92400e" };
-  if (type === "Inspection") return { bg: "#dcfce7", color: "#166534" };
-  if (type === "Maintenance") return { bg: "#ede9fe", color: "#6d28d9" };
-  return { bg: "#fee2e2", color: "#F93822" };
+  if (type === "File") return { bg: "#ECECE7", color: "#005670" };
+  if (type === "Calibration") return { bg: "#ECECE7", color: "#000000" };
+  if (type === "Inspection") return { bg: "#ECECE7", color: "#005670" };
+  if (type === "Maintenance") return { bg: "#ECECE7", color: "#53565A" };
+  return { bg: "#ECECE7", color: "#F93822" };
 }
 
 function getMaintenanceTypeTone(type: string) {
   const value = type.toLowerCase();
 
-  if (value === "corrective") return { bg: "#fee2e2", color: "#F93822" };
-  if (value === "preventative") return { bg: "#dbeafe", color: "#1d4ed8" };
+  if (value === "corrective") return { bg: "#ECECE7", color: "#F93822" };
+  if (value === "preventative") return { bg: "#ECECE7", color: "#005670" };
 
-  return { bg: "#e2e8f0", color: "#334155" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function getDueWindowTone(days: number | null) {
-  if (days === null) return { bg: "#e2e8f0", color: "#334155" };
-  if (days < 0) return { bg: "#fee2e2", color: "#F93822" };
-  if (days <= 30) return { bg: "#fef3c7", color: "#92400e" };
-  return { bg: "#dcfce7", color: "#166534" };
+  if (days === null) return { bg: "#D0D0CE", color: "#53565A" };
+  if (days < 0) return { bg: "#ECECE7", color: "#F93822" };
+  if (days <= 30) return { bg: "#ECECE7", color: "#000000" };
+  return { bg: "#ECECE7", color: "#005670" };
 }
 
 function getDaysUntil(value: string | null) {

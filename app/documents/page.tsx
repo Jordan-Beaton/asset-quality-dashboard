@@ -374,12 +374,12 @@ function normalizeWorkflowStatus(
 }
 
 function getWorkflowTone(status: WorkflowStatus) {
-  if (status === "Approved") return { bg: "#dcfce7", color: "#166534" };
+  if (status === "Approved") return { bg: "#ECECE7", color: "#005670" };
   if (status === "Pending Approval") return { bg: "#ECECE7", color: "#005670" };
-  if (status === "Pending Review" || status === "Reviewed") return { bg: "#fef3c7", color: "#92400e" };
-  if (status === "Rejected") return { bg: "#fee2e2", color: "#F93822" };
-  if (status === "Superseded" || status === "Archived") return { bg: "#e2e8f0", color: "#334155" };
-  return { bg: "#dbeafe", color: "#1d4ed8" };
+  if (status === "Pending Review" || status === "Reviewed") return { bg: "#ECECE7", color: "#000000" };
+  if (status === "Rejected") return { bg: "#ECECE7", color: "#F93822" };
+  if (status === "Superseded" || status === "Archived") return { bg: "#D0D0CE", color: "#53565A" };
+  return { bg: "#ECECE7", color: "#005670" };
 }
 
 function getLegacyStatusForWorkflow(status: WorkflowStatus): DocumentStatus {
@@ -401,30 +401,30 @@ function getLegacyApprovalForWorkflow(status: WorkflowStatus): ReviewApprovalSta
 function getStatusTone(status: string) {
   const value = status.toLowerCase();
 
-  if (value.includes("live")) return { bg: "#dcfce7", color: "#166534" };
-  if (value.includes("approved")) return { bg: "#dcfce7", color: "#166534" };
-  if (value.includes("draft")) return { bg: "#dbeafe", color: "#1d4ed8" };
-  if (value.includes("review")) return { bg: "#fef3c7", color: "#92400e" };
-  if (value.includes("superseded")) return { bg: "#fee2e2", color: "#F93822" };
-  if (value.includes("obsolete")) return { bg: "#e5e7eb", color: "#374151" };
-  if (value.includes("archived")) return { bg: "#ede9fe", color: "#6d28d9" };
+  if (value.includes("live")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("approved")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("draft")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("review")) return { bg: "#ECECE7", color: "#000000" };
+  if (value.includes("superseded")) return { bg: "#ECECE7", color: "#F93822" };
+  if (value.includes("obsolete")) return { bg: "#D0D0CE", color: "#53565A" };
+  if (value.includes("archived")) return { bg: "#ECECE7", color: "#53565A" };
 
-  return { bg: "#e2e8f0", color: "#334155" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function getReviewApprovalTone(status: string) {
   const value = status.toLowerCase();
 
-  if (value.includes("approved")) return { bg: "#dcfce7", color: "#166534" };
-  if (value.includes("reviewed")) return { bg: "#dbeafe", color: "#1d4ed8" };
-  if (value.includes("pending")) return { bg: "#fef3c7", color: "#92400e" };
-  if (value.includes("rejected")) return { bg: "#fee2e2", color: "#F93822" };
-  return { bg: "#e2e8f0", color: "#334155" };
+  if (value.includes("approved")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("reviewed")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("pending")) return { bg: "#ECECE7", color: "#000000" };
+  if (value.includes("rejected")) return { bg: "#ECECE7", color: "#F93822" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function getReviewTone(nextReviewDate: string | null | undefined) {
   if (!nextReviewDate) {
-    return { label: "Not set", bg: "#e2e8f0", color: "#334155" };
+    return { label: "Not set", bg: "#D0D0CE", color: "#53565A" };
   }
 
   const today = new Date();
@@ -435,9 +435,9 @@ function getReviewTone(nextReviewDate: string | null | undefined) {
 
   const diffDays = Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) return { label: "Overdue", bg: "#fee2e2", color: "#F93822" };
-  if (diffDays <= 30) return { label: "Due soon", bg: "#fef3c7", color: "#92400e" };
-  return { label: "In date", bg: "#dcfce7", color: "#166534" };
+  if (diffDays < 0) return { label: "Overdue", bg: "#ECECE7", color: "#F93822" };
+  if (diffDays <= 30) return { label: "Due soon", bg: "#ECECE7", color: "#000000" };
+  return { label: "In date", bg: "#ECECE7", color: "#005670" };
 }
 
 function buildNextReviewDate(issueDate: string, reviewCycleYears: number) {
@@ -1334,12 +1334,11 @@ function DocumentsPageContent() {
     review?: string;
   }) {
     setActiveView("register");
-    setSearch("");
-    setTypeFilter("");
-    setOwnerFilter("");
-    setStatusFilter(filter.statuses?.length ? `__multi:${filter.statuses.join("|")}` : filter.status || "");
-    setApprovalFilter(filter.approval || "");
-    setReviewFilter(filter.review || "");
+    if (filter.statuses?.length || filter.status !== undefined) {
+      setStatusFilter(filter.statuses?.length ? `__multi:${filter.statuses.join("|")}` : filter.status || "");
+    }
+    if (filter.approval !== undefined) setApprovalFilter(filter.approval);
+    if (filter.review !== undefined) setReviewFilter(filter.review);
     setMessage("Snapshot filter applied.");
     window.setTimeout(() => {
       document.getElementById("document-register")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1405,13 +1404,13 @@ function DocumentsPageContent() {
       pdf.setFont("helvetica", "normal");
       pdf.text("Document Control Report", margin, 17);
 
-      pdf.setTextColor(15, 23, 42);
+      pdf.setTextColor(0, 0, 0);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(18);
       pdf.text(title, margin, 34);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9);
-      pdf.setTextColor(71, 85, 105);
+      pdf.setTextColor(83, 86, 90);
       pdf.text(`Generated: ${generatedAt}`, margin, 40);
       pdf.text(`Documents in report: ${rows.length}`, margin, 45);
 
@@ -1447,8 +1446,8 @@ function DocumentsPageContent() {
           cellPadding: 2,
           overflow: "linebreak",
           valign: "top",
-          textColor: [15, 23, 42],
-          lineColor: [203, 213, 225],
+          textColor: [0, 0, 0],
+          lineColor: [208, 208, 206],
           lineWidth: 0.1,
         },
         headStyles: {
@@ -1458,7 +1457,7 @@ function DocumentsPageContent() {
           halign: "left",
         },
         alternateRowStyles: {
-          fillColor: [248, 250, 252],
+          fillColor: [236, 236, 231],
         },
         columnStyles: {
           0: { cellWidth: 26 },
@@ -1474,7 +1473,7 @@ function DocumentsPageContent() {
         didDrawPage: () => {
           const pageNumber = pdf.getNumberOfPages();
           pdf.setFontSize(8);
-          pdf.setTextColor(100, 116, 139);
+          pdf.setTextColor(83, 86, 90);
           pdf.text("Read-only export from Document Control.", margin, pageHeight - 8);
           pdf.text(`Page ${pageNumber}`, pageWidth - margin, pageHeight - 8, { align: "right" });
         },
@@ -1482,7 +1481,7 @@ function DocumentsPageContent() {
 
       if (rows.length === 0) {
         pdf.setFontSize(11);
-        pdf.setTextColor(100, 116, 139);
+        pdf.setTextColor(83, 86, 90);
         pdf.text("No documents matched this report.", margin, 58);
       }
 
@@ -2712,7 +2711,7 @@ function DocumentsPageContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           ← Back to IMS Home
         </Link>
@@ -2722,7 +2721,7 @@ function DocumentsPageContent() {
         </div>
       </div>
 
-      <nav style={documentViewNavStyle} aria-label="Document workspace views">
+      <nav className="ims-tabs" style={documentViewNavStyle} aria-label="Document workspace views" role="tablist">
         {[
           ["dashboard", "Dashboard"],
           ["register", "Document Register"],
@@ -2734,6 +2733,9 @@ function DocumentsPageContent() {
           <button
             key={view}
             type="button"
+            role="tab"
+            aria-selected={activeView === view}
+            data-active={activeView === view ? "true" : "false"}
             style={activeView === view ? activeViewButtonStyle : viewButtonStyle}
             onClick={() => switchWorkspaceView(view as DocumentWorkspaceView)}
           >
@@ -2765,13 +2767,13 @@ function DocumentsPageContent() {
         <QualityKpiCard
           title="Proposed / Not Drafted"
           value={proposedDocuments}
-          accent="#8b5cf6"
+          accent="#53565A"
           onClick={() => applySnapshotFilter({ statuses: ["Proposed", "Not drafted"] })}
         />
         <QualityKpiCard
           title="Archived Documents"
           value={archivedDocuments}
-          accent="#f97316"
+          accent="#FFAD00"
           onClick={() => applySnapshotFilter({ status: "Archived" })}
         />
         <QualityKpiCard
@@ -2783,7 +2785,7 @@ function DocumentsPageContent() {
         <QualityKpiCard
           title="Due Soon"
           value={dueSoonReviews}
-          accent="#f97316"
+          accent="#FFAD00"
           onClick={() => applySnapshotFilter({ review: "Due soon" })}
         />
       </section>
@@ -3024,7 +3026,7 @@ function DocumentsPageContent() {
               </FormSection>
             </div>
 
-            <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #e2e8f0" }}>
+            <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #D0D0CE" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                 <button type="submit" style={{ ...primaryButtonStyle, padding: "13px 28px", fontSize: "15px" }} disabled={isSaving || !canCreateDocument}>
                   {isSaving ? "Saving..." : "Create Draft Document →"}
@@ -3039,7 +3041,7 @@ function DocumentsPageContent() {
                 </button>
                 <span style={helperTextStyle}>Next sequence: {String(nextSequence).padStart(3, "0")}</span>
               </div>
-              <p style={{ margin: "10px 0 0", fontSize: "13px", color: "#64748b" }}>
+              <p style={{ margin: "10px 0 0", fontSize: "13px", color: "#53565A" }}>
                 Your document will be saved as a <strong>Draft</strong>. Open it from the Document Register to upload the file and submit it for review.
               </p>
             </div>
@@ -3056,7 +3058,7 @@ function DocumentsPageContent() {
           title="Document Register"
           subtitle="Full-width register. Click a row to open the detail panel below."
         >
-          <div style={toolbarStyle}>
+          <div className="ims-filter-panel" style={toolbarStyle}>
             <input
               placeholder="Search document no., title, owner or type"
               value={search}
@@ -3074,7 +3076,7 @@ function DocumentsPageContent() {
           </div>
 
           {showRegisterFilters ? (
-            <div style={toolbarFiltersStyle}>
+            <div className="ims-filter-panel" style={toolbarFiltersStyle}>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -3156,8 +3158,8 @@ function DocumentsPageContent() {
             documents
           </div>
 
-          <div style={registerTableWrapStyle}>
-            <div style={registerHeadStyle}>
+          <div className="ims-register-shell" style={registerTableWrapStyle}>
+            <div className="ims-register-head" style={registerHeadStyle}>
               <div>Document No.</div>
               <div>Title</div>
               <div>Type</div>
@@ -3179,12 +3181,15 @@ function DocumentsPageContent() {
 
                   return (
                     <button
+                      className="ims-register-row"
+                      aria-pressed={selectedDocumentId === doc.id}
+                      data-selected={selectedDocumentId === doc.id ? "true" : "false"}
                       key={doc.id}
                       type="button"
                       onClick={() => handleSelectDocument(doc.id)}
                       style={{
                         ...registerRowStyle,
-                        background: selectedDocumentId === doc.id ? "#eff6ff" : "#ffffff",
+                        background: selectedDocumentId === doc.id ? "#eef7f8" : "#ffffff",
                         borderLeft:
                           selectedDocumentId === doc.id ? "4px solid #005670" : "4px solid transparent",
                       }}
@@ -3943,11 +3948,11 @@ function RevisionRow({
 
         <div style={revisionBadgeWrapStyle}>
           {revision.is_current ? (
-            <span style={{ ...reviewBadgeStyle, background: "#dcfce7", color: "#166534" }}>
+            <span style={{ ...reviewBadgeStyle, background: "#ECECE7", color: "#005670" }}>
               Current
             </span>
           ) : (
-            <span style={{ ...reviewBadgeStyle, background: "#e2e8f0", color: "#334155" }}>
+            <span style={{ ...reviewBadgeStyle, background: "#D0D0CE", color: "#53565A" }}>
               Historic
             </span>
           )}
@@ -4229,10 +4234,10 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const backLinkStyle: CSSProperties = {
@@ -4245,8 +4250,8 @@ const statusBannerStyle: CSSProperties = {
   background: "white",
   borderRadius: "12px",
   padding: "12px 16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+  color: "#000000",
 };
 
 const documentViewNavStyle: CSSProperties = {
@@ -4257,8 +4262,8 @@ const documentViewNavStyle: CSSProperties = {
 };
 
 const viewButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#ECECE7",
+  color: "#000000",
   border: "none",
   padding: "10px 14px",
   borderRadius: "10px",
@@ -4299,8 +4304,8 @@ const quickActionGridStyle: CSSProperties = {
 };
 
 const quickActionCardStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: "14px",
   padding: "14px",
   cursor: "pointer",
@@ -4312,14 +4317,14 @@ const quickActionCardStyle: CSSProperties = {
 const quickActionLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#475569",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
 
 const quickActionValueStyle: CSSProperties = {
   fontSize: "28px",
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1,
 };
 
@@ -4347,7 +4352,7 @@ const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "18px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const sectionHeaderStyle: CSSProperties = {
@@ -4357,12 +4362,12 @@ const sectionHeaderStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
 };
 
@@ -4386,30 +4391,30 @@ const fieldWrapStyle: CSSProperties = {
 const fieldLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
-  color: "#334155",
+  color: "#53565A",
 };
 
 const inputStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
   width: "100%",
   boxSizing: "border-box",
 };
 
 const readOnlyInputStyle: CSSProperties = {
   ...inputStyle,
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontWeight: 700,
 };
 
 const disabledInputStyle: CSSProperties = {
   ...inputStyle,
-  background: "#f8fafc",
-  color: "#94a3b8",
+  background: "#ECECE7",
+  color: "#D0D0CE",
   cursor: "not-allowed",
 };
 
@@ -4426,9 +4431,9 @@ const peopleSuggestionListStyle: CSSProperties = {
   right: 0,
   zIndex: 20,
   background: "#ffffff",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
-  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.12)",
+  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.12)",
   overflow: "hidden",
 };
 
@@ -4437,7 +4442,7 @@ const peopleSuggestionButtonStyle: CSSProperties = {
   padding: "10px 12px",
   border: "none",
   background: "#ffffff",
-  color: "#0f172a",
+  color: "#000000",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
@@ -4448,25 +4453,25 @@ const peopleSuggestionButtonStyle: CSSProperties = {
 };
 
 const peopleSuggestionMetaStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
   whiteSpace: "nowrap",
 };
 
 const peopleSelectorHintStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const peopleSelectorWarningStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#b45309",
+  color: "#000000",
   fontWeight: 600,
 };
 
 const notificationListStyle: CSSProperties = {
-  border: "1px solid #dbeafe",
-  background: "#f8fbff",
+  border: "1px solid #ECECE7",
+  background: "#ECECE7",
   borderRadius: "12px",
   padding: "10px 12px",
   display: "grid",
@@ -4476,7 +4481,7 @@ const notificationListStyle: CSSProperties = {
 const notificationListHeaderStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
-  color: "#334155",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
@@ -4488,8 +4493,8 @@ const snapshotMetaGridStyle: CSSProperties = {
 };
 
 const snapshotMetaItemStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: "12px",
   padding: "10px 12px",
   display: "grid",
@@ -4499,7 +4504,7 @@ const snapshotMetaItemStyle: CSSProperties = {
 const snapshotMetaLabelStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
@@ -4507,7 +4512,7 @@ const snapshotMetaLabelStyle: CSSProperties = {
 const snapshotMetaValueStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 700,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const notificationListGridStyle: CSSProperties = {
@@ -4525,25 +4530,25 @@ const notificationListRowStyle: CSSProperties = {
 const notificationListRowLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
-  color: "#334155",
+  color: "#53565A",
 };
 
 const notificationListRowValueStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#0f172a",
+  color: "#000000",
   textAlign: "right",
   overflowWrap: "anywhere",
 };
 
 const notificationMissingTextStyle: CSSProperties = {
   ...notificationListRowValueStyle,
-  color: "#b45309",
+  color: "#000000",
   fontWeight: 600,
 };
 
 const notificationListEmptyStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const toolbarSearchStyle: CSSProperties = {
@@ -4562,11 +4567,11 @@ const compactTextareaStyle: CSSProperties = {
   minHeight: "72px",
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
   resize: "vertical",
-  fontFamily: "Arial, Helvetica, sans-serif",
+  fontFamily: "\"Azo Sans\", \"Segoe UI\", Arial, Helvetica, sans-serif",
   boxSizing: "border-box",
 };
 
@@ -4575,11 +4580,11 @@ const textareaStyle: CSSProperties = {
   minHeight: "92px",
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
   resize: "vertical",
-  fontFamily: "Arial, Helvetica, sans-serif",
+  fontFamily: "\"Azo Sans\", \"Segoe UI\", Arial, Helvetica, sans-serif",
   boxSizing: "border-box",
 };
 
@@ -4599,8 +4604,8 @@ const workflowButtonRowStyle: CSSProperties = {
 };
 
 const workflowActionPanelStyle: CSSProperties = {
-  border: "1px solid #bfdbfe",
-  background: "#f8fbff",
+  border: "1px solid #ECECE7",
+  background: "#ECECE7",
   borderRadius: "16px",
   padding: "16px",
   display: "grid",
@@ -4609,14 +4614,14 @@ const workflowActionPanelStyle: CSSProperties = {
 
 const workflowActionTitleStyle: CSSProperties = {
   margin: "3px 0",
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "20px",
   lineHeight: 1.2,
 };
 
 const workflowActionHintStyle: CSSProperties = {
   margin: 0,
-  color: "#475569",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.45,
 };
@@ -4633,7 +4638,7 @@ const workflowRejectGridStyle: CSSProperties = {
   gridTemplateColumns: "minmax(220px, 0.8fr) minmax(260px, 1fr) auto",
   gap: "12px",
   alignItems: "end",
-  borderTop: "1px solid #dbe4ef",
+  borderTop: "1px solid #D0D0CE",
   paddingTop: "12px",
 };
 
@@ -4645,19 +4650,19 @@ const workflowActionButtonWrapStyle: CSSProperties = {
 };
 
 const workflowParticipantCardStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   borderRadius: "12px",
   padding: "11px 12px",
   display: "grid",
   gap: "4px",
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "13px",
   minHeight: "58px",
 };
 
 const workflowParticipantLabelStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "11px",
   fontWeight: 800,
   textTransform: "uppercase",
@@ -4677,10 +4682,10 @@ const formLayoutStyle: CSSProperties = {
 };
 
 const formSectionStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   display: "grid",
   gap: "10px",
 };
@@ -4701,16 +4706,16 @@ const formSectionGridStyle: CSSProperties = {
 
 const formSectionHintStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   background: "#ffffff",
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   borderRadius: "10px",
   padding: "10px 12px",
 };
 
 const helperTextStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   fontWeight: 700,
 };
 
@@ -4725,8 +4730,8 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -4735,8 +4740,8 @@ const secondaryButtonStyle: CSSProperties = {
 };
 
 const workflowButtonStyle: CSSProperties = {
-  background: "#dbeafe",
-  color: "#1d4ed8",
+  background: "#ECECE7",
+  color: "#005670",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -4745,8 +4750,8 @@ const workflowButtonStyle: CSSProperties = {
 };
 
 const approveButtonStyle: CSSProperties = {
-  background: "#dcfce7",
-  color: "#166534",
+  background: "#ECECE7",
+  color: "#005670",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -4755,7 +4760,7 @@ const approveButtonStyle: CSSProperties = {
 };
 
 const rejectButtonStyle: CSSProperties = {
-  background: "#fee2e2",
+  background: "#ECECE7",
   color: "#F93822",
   border: "none",
   padding: "10px 16px",
@@ -4795,8 +4800,8 @@ const reportLinkButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#dbeafe",
-  color: "#1d4ed8",
+  background: "#ECECE7",
+  color: "#005670",
   borderRadius: "10px",
   padding: "10px 16px",
   fontWeight: 700,
@@ -4870,10 +4875,10 @@ const toolbarStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 
 const registerWorkspaceGridStyle: CSSProperties = {
@@ -4888,8 +4893,8 @@ const documentSidePanelStyle: CSSProperties = {
   background: "#ffffff",
   borderRadius: "18px",
   padding: "18px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  border: "1px solid #e2e8f0",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+  border: "1px solid #D0D0CE",
   gap: "14px",
   position: "sticky",
   top: "96px",
@@ -4901,13 +4906,13 @@ const documentSidePanelStyle: CSSProperties = {
 const sidePanelTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "22px",
-  color: "#0f172a",
+  color: "#000000",
   wordBreak: "break-word",
 };
 
 const sidePanelSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.45,
 };
@@ -4941,7 +4946,7 @@ const reportActionCardStyle: CSSProperties = {
 };
 
 const reportActionHintStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.45,
 };
@@ -4952,8 +4957,8 @@ const toolbarFiltersStyle: CSSProperties = {
   gap: "10px",
   marginBottom: "12px",
   padding: "12px",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
 };
 
@@ -4963,7 +4968,7 @@ const tableInfoRowStyle: CSSProperties = {
   justifyContent: "flex-start",
   gap: "4px",
   flexWrap: "wrap",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
   margin: "12px 0",
@@ -4971,24 +4976,24 @@ const tableInfoRowStyle: CSSProperties = {
 
 const registerTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const registerHeadStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1.15fr 3fr 0.9fr 0.95fr 0.65fr 1.15fr 0.9fr 1fr",
-  gap: "12px",
-  padding: "14px 16px",
-  background: "#f8fafc",
-  borderBottom: "1px solid #e5e7eb",
-  fontSize: "12px",
+  gap: "8px",
+  padding: "9px 10px",
+  background: "#005670",
+  borderBottom: "1px solid #005670",
+  fontSize: "10px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#ffffff",
   textTransform: "uppercase",
-  letterSpacing: 0.25,
+  letterSpacing: "0.04em",
   alignItems: "center",
 };
 
@@ -5002,33 +5007,33 @@ const registerRowStyle: CSSProperties = {
   textAlign: "left",
   display: "grid",
   gridTemplateColumns: "1.15fr 3fr 0.9fr 0.95fr 0.65fr 1.15fr 0.9fr 1fr",
-  gap: "12px",
-  padding: "14px 16px",
+  gap: "8px",
+  padding: "10px",
   border: "none",
-  borderBottom: "1px solid #eef2f7",
+  borderBottom: "1px solid #D0D0CE",
   borderLeft: "4px solid transparent",
   cursor: "pointer",
   alignItems: "center",
 };
 
 const registerPrimaryStyle: CSSProperties = {
-  fontSize: "14px",
+  fontSize: "12px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.35,
   wordBreak: "break-word",
 };
 
 const registerCellTextStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#475569",
+  fontSize: "12px",
+  color: "#53565A",
   lineHeight: 1.45,
   wordBreak: "break-word",
 };
 
 const emptyRegisterStyle: CSSProperties = {
   padding: "24px 16px",
-  color: "#64748b",
+  color: "#53565A",
   textAlign: "center",
 };
 
@@ -5068,7 +5073,7 @@ const detailTopActionsStyle: CSSProperties = {
 const detailEyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   marginBottom: "6px",
 };
@@ -5076,7 +5081,7 @@ const detailEyebrowStyle: CSSProperties = {
 const detailTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "22px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const fileStripStyle: CSSProperties = {
@@ -5099,21 +5104,21 @@ const fileMetaWrapStyle: CSSProperties = {
 const fileMetaTitleStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
 };
 
 const fileMetaFileStyle: CSSProperties = {
   fontSize: "16px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   wordBreak: "break-word",
   overflowWrap: "anywhere",
 };
 
 const fileMetaSubStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.45,
 };
 
@@ -5125,11 +5130,11 @@ const fileButtonsWrapStyle: CSSProperties = {
 };
 
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
 
@@ -5165,18 +5170,18 @@ const revisionListStyle: CSSProperties = {
 };
 
 const emptyRevisionStyle: CSSProperties = {
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   borderRadius: "12px",
   padding: "14px",
-  color: "#64748b",
-  background: "#f8fafc",
+  color: "#53565A",
+  background: "#ECECE7",
 };
 
 const revisionCardStyle: CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const revisionTopRowStyle: CSSProperties = {
@@ -5190,12 +5195,12 @@ const revisionTopRowStyle: CSSProperties = {
 const revisionTitleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const revisionMetaStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   marginTop: "4px",
 };
 
@@ -5215,7 +5220,7 @@ const revisionGridStyle: CSSProperties = {
 
 const revisionInfoBlockStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "10px",
   padding: "10px",
 };
@@ -5223,20 +5228,20 @@ const revisionInfoBlockStyle: CSSProperties = {
 const revisionInfoLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 700,
-  color: "#64748b",
+  color: "#53565A",
   marginBottom: "4px",
 };
 
 const revisionInfoValueStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const revisionNoteStyle: CSSProperties = {
   marginTop: "12px",
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.5,
 };
 export default function DocumentsPage() {

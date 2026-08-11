@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { imsBackLinkStyle } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
 
 type RiskRating = "Low" | "Medium" | "High" | "Critical";
@@ -125,17 +127,12 @@ export default function RiskDashboardPage() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
-        <div style={topMetaActionsStyle}>
-          <button type="button" style={secondaryButtonStyle} onClick={() => void loadRisks()}>
-            Refresh
-          </button>
-          <div style={statusBannerStyle}>
-            <strong>Status:</strong> {message}
-          </div>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
+        <Link href="/home" style={imsBackLinkStyle}>&larr; Back to IMS Home</Link>
+        <div style={statusBannerStyle}>
+          <strong>Status:</strong> {message}
         </div>
       </div>
-
       <section style={statsGridStyle}>
         <QualityKpiCard title="Open Risks" value={openRisks} accent="#005670" />
         <QualityKpiCard title="High / Critical" value={highCriticalRisks} accent="#F93822" />
@@ -221,7 +218,7 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
@@ -240,12 +237,12 @@ const statusBannerStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "12px 16px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -272,23 +269,23 @@ const panelStyle: CSSProperties = {
   borderRadius: "18px",
   padding: "20px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   display: "grid",
   alignContent: "start",
   gap: "18px",
 };
 
 const panelHeaderStyle: CSSProperties = { display: "grid", gap: "6px" };
-const panelTitleStyle: CSSProperties = { margin: 0, fontSize: "20px", color: "#0f172a" };
-const panelSubtitleStyle: CSSProperties = { margin: 0, color: "#64748b", fontSize: "14px", lineHeight: 1.45 };
+const panelTitleStyle: CSSProperties = { margin: 0, fontSize: "20px", color: "#000000" };
+const panelSubtitleStyle: CSSProperties = { margin: 0, color: "#53565A", fontSize: "14px", lineHeight: 1.45 };
 const ratingGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "12px" };
-const ratingItemStyle: CSSProperties = { borderRadius: "14px", border: "1px solid #e2e8f0", background: "#f8fafc", padding: "14px", minHeight: "92px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
-const ratingLabelStyle: CSSProperties = { color: "#64748b", fontSize: "12px", fontWeight: 800 };
-const ratingValueStyle: CSSProperties = { color: "#0f172a", fontSize: "28px", lineHeight: 1 };
+const ratingItemStyle: CSSProperties = { borderRadius: "14px", border: "1px solid #D0D0CE", background: "#ECECE7", padding: "14px", minHeight: "92px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
+const ratingLabelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 800 };
+const ratingValueStyle: CSSProperties = { color: "#000000", fontSize: "28px", lineHeight: 1 };
 const placeholderChartStyle: CSSProperties = { display: "grid", gap: "12px" };
 const barRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "120px 1fr 28px", alignItems: "center", gap: "12px" };
-const barLabelStyle: CSSProperties = { color: "#334155", fontSize: "13px", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
-const barTrackStyle: CSSProperties = { height: "12px", borderRadius: "999px", background: "#e2e8f0", overflow: "hidden" };
+const barLabelStyle: CSSProperties = { color: "#53565A", fontSize: "13px", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+const barTrackStyle: CSSProperties = { height: "12px", borderRadius: "999px", background: "#D0D0CE", overflow: "hidden" };
 const barFillStyle: CSSProperties = { height: "100%", borderRadius: "999px", background: "#005670", opacity: 0.62 };
-const barValueStyle: CSSProperties = { color: "#0f172a", fontSize: "14px", textAlign: "right" };
-const emptyStateStyle: CSSProperties = { minHeight: "150px", borderRadius: "14px", border: "1px dashed #cbd5e1", background: "#f8fafc", color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 };
+const barValueStyle: CSSProperties = { color: "#000000", fontSize: "14px", textAlign: "right" };
+const emptyStateStyle: CSSProperties = { minHeight: "150px", borderRadius: "14px", border: "1px dashed #D0D0CE", background: "#ECECE7", color: "#53565A", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 };

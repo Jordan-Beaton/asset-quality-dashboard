@@ -561,11 +561,11 @@ function getNextExternalAinmNumber(records: ExternalAINMRecord[]) {
 }
 
 function getStageTone(status: string) {
-  if (status === "Complete" || status === "Issued") return { bg: "#dcfce7", color: "#166534" };
-  if (status === "Draft" || status === "In Progress") return { bg: "#fef3c7", color: "#92400e" };
-  if (status === "Closed") return { bg: "#dcfce7", color: "#166534" };
-  if (status === "Open") return { bg: "#dbeafe", color: "#1d4ed8" };
-  return { bg: "#e2e8f0", color: "#475569" };
+  if (status === "Complete" || status === "Issued") return { bg: "#ECECE7", color: "#005670" };
+  if (status === "Draft" || status === "In Progress") return { bg: "#ECECE7", color: "#000000" };
+  if (status === "Closed") return { bg: "#ECECE7", color: "#005670" };
+  if (status === "Open") return { bg: "#ECECE7", color: "#005670" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function buildActionHref(record: AINMRecord) {
@@ -750,6 +750,7 @@ export default function HseAinmPage() {
 
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const searchTerms = query.split(/\s+/).filter(Boolean);
     return records.filter((record) => {
       const haystack = [
         record.ainm_number,
@@ -759,7 +760,7 @@ export default function HseAinmPage() {
         record.event_classification,
         record.owner,
       ].join(" ").toLowerCase();
-      const matchesSearch = !query || haystack.includes(query);
+      const matchesSearch = searchTerms.length === 0 || searchTerms.every((term) => haystack.includes(term));
       const matchesStatus = !statusFilter || record.overall_status === statusFilter;
       const matchesType = !typeFilter || ainmTypeLabel(record) === typeFilter;
       const matchesClassification = !classificationFilter || record.event_classification === classificationFilter;
@@ -854,10 +855,6 @@ export default function HseAinmPage() {
       color: status === "Closed" ? "#005670" : status === "In Progress" ? "#FFAD00" : "#63B1BC",
       onClick: () => {
         setStatusFilter(status);
-        setStageFilter("");
-        setTypeFilter("");
-        setClassificationFilter("");
-        setSearch("");
         setActiveView("register");
       },
     }));
@@ -868,10 +865,6 @@ export default function HseAinmPage() {
         color: "#63B1BC",
         onClick: () => {
           setTypeFilter("Incident");
-          setSearch("");
-          setStatusFilter("");
-          setStageFilter("");
-          setClassificationFilter("");
           setActiveView("register");
         },
       },
@@ -881,10 +874,6 @@ export default function HseAinmPage() {
         color: "#F93822",
         onClick: () => {
           setTypeFilter("Accident");
-          setSearch("");
-          setStatusFilter("");
-          setStageFilter("");
-          setClassificationFilter("");
           setActiveView("register");
         },
       },
@@ -901,10 +890,6 @@ export default function HseAinmPage() {
         color: "#005670",
         onClick: () => {
           setClassificationFilter(classification);
-          setSearch("");
-          setStatusFilter("");
-          setStageFilter("");
-          setTypeFilter("");
           setActiveView("register");
         },
       }))
@@ -917,11 +902,7 @@ export default function HseAinmPage() {
         value: dashboardRecords.filter((record) => clean(record.project) === project).length,
         color: "#005670",
         onClick: () => {
-          setSearch(project);
-          setStatusFilter("");
-          setStageFilter("");
-          setTypeFilter("");
-          setClassificationFilter("");
+          setSearch((current) => current.trim() ? `${current.trim()} ${project}` : project);
           setActiveView("register");
         },
       }))
@@ -945,10 +926,6 @@ export default function HseAinmPage() {
 
   function openRegisterWithType(type: AINMType) {
     setTypeFilter(type);
-    setSearch("");
-    setStatusFilter("");
-    setStageFilter("");
-    setClassificationFilter("");
     setShowRegisterFilters(true);
     setActiveView("register");
   }
@@ -986,7 +963,7 @@ export default function HseAinmPage() {
         ["Compiled Report Packs", String(kpis.compiledReports), "Final compiled PDF packs generated"],
       ],
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 3, textColor: [15, 23, 42], lineColor: [203, 213, 225], lineWidth: 0.15 },
+      styles: { fontSize: 9, cellPadding: 3, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.15 },
       headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       columnStyles: { 1: { halign: "center", cellWidth: 32 } },
       margin: { left: 12, right: 12 },
@@ -1002,7 +979,7 @@ export default function HseAinmPage() {
         dashboardInsights.projectRows[index]?.value ? String(dashboardInsights.projectRows[index].value) : "",
       ]),
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 3, textColor: [15, 23, 42], lineColor: [203, 213, 225], lineWidth: 0.15 },
+      styles: { fontSize: 9, cellPadding: 3, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.15 },
       headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       columnStyles: { 1: { halign: "center", cellWidth: 25 }, 3: { halign: "center", cellWidth: 25 } },
       margin: { left: 12, right: 12 },
@@ -1012,7 +989,7 @@ export default function HseAinmPage() {
     for (let page = 1; page <= pages; page += 1) {
       doc.setPage(page);
       doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(83, 86, 90);
       doc.text(`Page ${page} of ${pages}`, 285, 202, { align: "right" });
     }
     doc.save(`AINM-dashboard-summary-${dashboardYear || "all-years"}.pdf`);
@@ -1028,7 +1005,7 @@ export default function HseAinmPage() {
     QRCode.toDataURL(fieldUrl, {
       margin: 1,
       width: 220,
-      color: { dark: "#0f172a", light: "#ffffff" },
+      color: { dark: "#000000", light: "#ffffff" },
     })
       .then(setFieldQrDataUrl)
       .catch(() => setFieldQrDataUrl(""));
@@ -1835,15 +1812,15 @@ export default function HseAinmPage() {
   function wordRun(text: string, options?: { bold?: boolean; color?: string; size?: number; italics?: boolean }) {
     return new TextRun({
       text: clean(text),
-      font: "Calibri",
+      font: "Azo Sans",
       bold: options?.bold,
       italics: options?.italics,
-      color: options?.color || "0F172A",
+      color: options?.color || "000000",
       size: options?.size || 18,
     });
   }
 
-  const wordBorder = { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 };
+  const wordBorder = { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 };
   const wordBorders = { top: wordBorder, bottom: wordBorder, left: wordBorder, right: wordBorder, insideHorizontal: wordBorder, insideVertical: wordBorder };
   const wordHeaderBorder = { style: BorderStyle.SINGLE, color: "005670", size: 2 };
   const wordHeaderBorders = {
@@ -1860,13 +1837,13 @@ export default function HseAinmPage() {
       width: options?.width ? { size: options.width, type: WidthType.DXA } : undefined,
       verticalAlign: VerticalAlign.CENTER,
       shading: options?.header || options?.label
-        ? { type: ShadingType.CLEAR, fill: "F8FAFC", color: "auto" }
+        ? { type: ShadingType.CLEAR, fill: "ECECE7", color: "auto" }
         : undefined,
       margins: { top: 110, bottom: 110, left: 120, right: 120 },
       children: [
         new Paragraph({
           alignment: options?.align === "center" ? AlignmentType.CENTER : AlignmentType.LEFT,
-          children: [wordRun(text, { bold: options?.header || options?.label, color: "0F172A" })],
+          children: [wordRun(text, { bold: options?.header || options?.label, color: "000000" })],
         }),
       ],
     });
@@ -2194,15 +2171,15 @@ export default function HseAinmPage() {
                 }),
                 new TableCell({
                   children: [
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(record.ainm_number, { color: "475569" })] }),
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(displayDate(record.event_date), { color: "475569" })] }),
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(record.ainm_number, { color: "53565A" })] }),
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(displayDate(record.event_date), { color: "53565A" })] }),
                   ],
                 }),
               ],
             }),
           ],
         }),
-        new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 5 } } }),
+        new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 5 } } }),
       ],
     });
   }
@@ -2213,7 +2190,7 @@ export default function HseAinmPage() {
         new Paragraph({ border: { top: { style: BorderStyle.SINGLE, color: "005670", size: 4 } } }),
         new Paragraph({
           alignment: AlignmentType.RIGHT,
-          children: [wordRun("Page ", { color: "64748B", size: 16 }), new SimpleField("PAGE"), wordRun(" of ", { color: "64748B", size: 16 }), new SimpleField("NUMPAGES")],
+          children: [wordRun("Page ", { color: "53565A", size: 16 }), new SimpleField("PAGE"), wordRun(" of ", { color: "53565A", size: 16 }), new SimpleField("NUMPAGES")],
         }),
       ],
     });
@@ -2289,7 +2266,7 @@ export default function HseAinmPage() {
           classificationTable(record),
           new Paragraph({
             spacing: { before: 120, after: 80 },
-            children: [wordRun("Please avoid names - use job title or term 'IP' (Injured Person).", { italics: true, color: "64748B", size: 17 })],
+            children: [wordRun("Please avoid names - use job title or term 'IP' (Injured Person).", { italics: true, color: "53565A", size: 17 })],
           }),
           wordSectionHeader("Brief details of the event"),
           wordBodyTable([""], [[record.brief_event_details || ""]], [9360], [], { repeatHeader: false, padEmptyRows: false }),
@@ -2309,7 +2286,7 @@ export default function HseAinmPage() {
           evidenceWordTable(notificationEvidenceWithUrls),
           new Paragraph({
             spacing: { before: 70 },
-            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "64748B", size: 16 })],
+            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "53565A", size: 16 })],
           })
         );
       }
@@ -2354,7 +2331,7 @@ export default function HseAinmPage() {
           evidenceWordTable(part1EvidenceWithUrls),
           new Paragraph({
             spacing: { before: 70 },
-            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "64748B", size: 16 })],
+            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "53565A", size: 16 })],
           }),
           wordSpacer(),
           wordSectionHeader("Reviewed and accepted by"),
@@ -2402,13 +2379,13 @@ export default function HseAinmPage() {
           evidenceWordTable(part2EvidenceWithUrls),
           new Paragraph({
             spacing: { before: 70 },
-            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "64748B", size: 16 })],
+            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "53565A", size: 16 })],
           })
         );
       }
 
       const doc = new WordDocument({
-        styles: { default: { document: { run: { font: "Calibri", size: 18, color: "0F172A" } } } },
+        styles: { default: { document: { run: { font: "Azo Sans", size: 18, color: "000000" } } } },
         sections: [
           {
             headers: { default: wordHeader(title, record, logoData) },
@@ -2453,11 +2430,11 @@ export default function HseAinmPage() {
     }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
     doc.text(title, 105, 18, { align: "center" });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
+    doc.setTextColor(83, 86, 90);
     doc.text(record.ainm_number, 198, 14, { align: "right" });
     doc.text(displayDate(record.event_date), 198, 20, { align: "right" });
     doc.setDrawColor(0, 86, 112);
@@ -2492,9 +2469,9 @@ export default function HseAinmPage() {
       head,
       body: body.length ? body : [head[0].map(() => "")],
       theme: "grid",
-      styles: { fontSize: 8, cellPadding: 2, textColor: [15, 23, 42], lineColor: [203, 213, 225], lineWidth: 0.15 },
-      headStyles: { fillColor: [248, 250, 252], textColor: [15, 23, 42], fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
+      styles: { fontSize: 8, cellPadding: 2, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.15 },
+      headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [236, 236, 231] },
       margin: { left: 12, right: 12 },
       columnStyles,
     });
@@ -2508,7 +2485,7 @@ export default function HseAinmPage() {
       doc.setDrawColor(0, 86, 112);
       doc.line(12, 286, 198, 286);
       doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(83, 86, 90);
       doc.text(`Page ${page} of ${pages}`, 198, 291, { align: "right" });
     }
   }
@@ -2620,8 +2597,8 @@ export default function HseAinmPage() {
           ? evidenceWithUrls.map(({ file }) => [file.stage, file.file_name, formatFileSize(file.file_size), displayDateTime(file.uploaded_at), ""])
           : [["", "", "", "", ""]],
         theme: "grid",
-        styles: { fontSize: 8, cellPadding: 2, textColor: [15, 23, 42], lineColor: [203, 213, 225], lineWidth: 0.15 },
-        headStyles: { fillColor: [248, 250, 252], textColor: [15, 23, 42], fontStyle: "bold" },
+        styles: { fontSize: 8, cellPadding: 2, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.15 },
+        headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
         margin: { left: 12, right: 12 },
         columnStyles: { 0: { cellWidth: 24 }, 2: { cellWidth: 22 }, 3: { cellWidth: 34 }, 4: { cellWidth: 28 } },
         didDrawCell: (data) => {
@@ -2630,10 +2607,10 @@ export default function HseAinmPage() {
             if (item?.url) {
               doc.setFont("helvetica", "bold");
               doc.setFontSize(8);
-              doc.setTextColor(29, 78, 216);
+              doc.setTextColor(0, 86, 112);
               doc.textWithLink("Open Evidence", data.cell.x + 2, data.cell.y + 5, { url: item.url });
               doc.setFont("helvetica", "normal");
-              doc.setTextColor(15, 23, 42);
+              doc.setTextColor(0, 0, 0);
             }
           }
         },
@@ -2770,12 +2747,12 @@ export default function HseAinmPage() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link>
         <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
       </div>
 
-      <nav style={viewNavStyle}>
+      <nav className="ims-tabs" style={viewNavStyle} role="tablist" aria-label="AINM workspace views">
         {[
           ["dashboard", "Dashboard"],
           ["register", "AINM Register"],
@@ -2784,7 +2761,7 @@ export default function HseAinmPage() {
           ["import", "Import Tracker"],
           ["reports", "Reports"],
         ].map(([view, label]) => (
-          <button key={view} type="button" style={activeView === view ? activeViewButtonStyle : viewButtonStyle} onClick={() => setActiveView(view as AINMView)}>
+          <button key={view} type="button" role="tab" aria-selected={activeView === view} data-active={activeView === view ? "true" : "false"} style={activeView === view ? activeViewButtonStyle : viewButtonStyle} onClick={() => setActiveView(view as AINMView)}>
             {label}
           </button>
         ))}
@@ -2907,7 +2884,7 @@ export default function HseAinmPage() {
           <div style={formGridStyle}>
             <Field label="AINM Type">
               <select
-                style={newAinmType ? inputStyle : { ...inputStyle, color: "#94a3b8" }}
+                style={newAinmType ? inputStyle : { ...inputStyle, color: "#D0D0CE" }}
                 value={newAinmType}
                 onChange={(event) => setNewAinmType(event.target.value as NewAINMType)}
               >
@@ -2916,7 +2893,7 @@ export default function HseAinmPage() {
                 <option value="Accident">Accident Report</option>
               </select>
             </Field>
-            <Field label="AINM No."><input style={{ ...inputStyle, background: "#f8fafc" }} value={newRecord.ainm_number} readOnly /></Field>
+            <Field label="AINM No."><input style={{ ...inputStyle, background: "#ECECE7" }} value={newRecord.ainm_number} readOnly /></Field>
             <Field label="Title"><input style={inputStyle} value={newRecord.title} onChange={(e) => updateNew("title", e.target.value)} placeholder="ENS1100 Jetting Sword Damage" /></Field>
             <Field label="Project"><input style={inputStyle} value={newRecord.project || ""} onChange={(e) => updateNew("project", e.target.value)} /></Field>
             <Field label="Location / Site"><input style={inputStyle} value={newRecord.location_site || ""} onChange={(e) => updateNew("location_site", e.target.value)} /></Field>
@@ -2954,7 +2931,7 @@ export default function HseAinmPage() {
             <div style={formGridStyle}>
               <Field label="External AINM No.">
                 <input
-                  style={{ ...inputStyle, background: "#f8fafc" }}
+                  style={{ ...inputStyle, background: "#ECECE7" }}
                   value={newExternalRecord.external_ainm_number || getNextExternalAinmNumber(externalRecords)}
                   onChange={(event) => updateNewExternal("external_ainm_number", event.target.value)}
                 />
@@ -3021,14 +2998,14 @@ export default function HseAinmPage() {
           </SectionCard>
 
           <SectionCard title="External AINM Register" subtitle="External-only register for supplier, contractor, client, and third-party AINM records.">
-            <div style={toolbarStyle}>
+            <div className="ims-filter-panel" style={toolbarStyle}>
               <input style={searchStyle} value={externalSearch} onChange={(event) => setExternalSearch(event.target.value)} placeholder="Search external AINM no., supplier, project, reference..." />
               <button type="button" style={showExternalFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowExternalFilters((current) => !current)}>
                 {showExternalFilters ? "Hide Filters" : "Show Filters"}
               </button>
             </div>
             {showExternalFilters ? (
-              <div style={toolbarStyle}>
+              <div className="ims-filter-panel" style={toolbarStyle}>
                 <select style={filterStyle} value={externalStatusFilter} onChange={(event) => setExternalStatusFilter(event.target.value)}>
                   <option value="">All Status</option>
                   {externalAinmStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -3057,7 +3034,7 @@ export default function HseAinmPage() {
                 </thead>
                 <tbody>
                   {filteredExternalRecords.map((record) => (
-                    <tr key={record.id} style={selectedExternalId === record.id ? selectedRowStyle : trStyle} onClick={() => setSelectedExternalId(record.id)}>
+                    <tr key={record.id} aria-selected={selectedExternalId === record.id} data-selected={selectedExternalId === record.id ? "true" : "false"} style={selectedExternalId === record.id ? selectedRowStyle : trStyle} onClick={() => setSelectedExternalId(record.id)}>
                       <td style={tdStrongStyle}>{record.external_ainm_number}</td>
                       <td style={tdStyle}>{record.supplier_name || ""}</td>
                       <td style={tdStyle}>{record.external_party_type || ""}</td>
@@ -3197,14 +3174,14 @@ export default function HseAinmPage() {
       {activeView === "register" ? (
         <section style={registerLayoutStyle}>
           <SectionCard title="AINM Register" subtitle="Tracker-style register with three-stage AINM workflow status.">
-            <div style={toolbarStyle}>
+            <div className="ims-filter-panel" style={toolbarStyle}>
               <input style={searchStyle} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search AINM no., title, project, owner..." />
               <button type="button" style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowRegisterFilters((current) => !current)}>
                 {showRegisterFilters ? "Hide Filters" : "Show Filters"}
               </button>
             </div>
             {showRegisterFilters ? (
-            <div style={toolbarStyle}>
+            <div className="ims-filter-panel" style={toolbarStyle}>
               <select style={filterStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="">All Status</option>
                 {overallStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -3244,7 +3221,7 @@ export default function HseAinmPage() {
                 </thead>
                 <tbody>
                   {filteredRecords.map((record) => (
-                    <tr key={record.id} style={selectedId === record.id ? selectedRowStyle : trStyle} onClick={() => selectAinmAndScroll(record)}>
+                    <tr key={record.id} aria-selected={selectedId === record.id} data-selected={selectedId === record.id ? "true" : "false"} style={selectedId === record.id ? selectedRowStyle : trStyle} onClick={() => selectAinmAndScroll(record)}>
                       <td style={tdStrongStyle}>{record.ainm_number}</td>
                       <td style={tdStyle}>{record.title}</td>
                       <td style={tdStyle}>{ainmTypeLabel(record)}</td>
@@ -3265,7 +3242,7 @@ export default function HseAinmPage() {
           {selected ? (
             <div ref={selectedDetailRef}>
             <SectionCard title={`${draft.ainm_number} - ${draft.title}`} subtitle="Open/hide style detail panel for notification, Part 1, Part 2, tracker actions, evidence, and reports.">
-              <nav style={detailTabStyle}>
+              <nav className="ims-tabs" style={detailTabStyle} role="tablist" aria-label="AINM detail views">
                 {[
                   ["notification", "Notification"],
                   ["part1", "Part 1"],
@@ -3274,7 +3251,7 @@ export default function HseAinmPage() {
                   ["evidence", "Evidence"],
                   ["reports", "Reports"],
                 ].map(([tab, label]) => (
-                  <button key={tab} type="button" style={detailTab === tab ? activeViewButtonStyle : viewButtonStyle} onClick={() => setDetailTab(tab as DetailTab)}>{label}</button>
+                  <button key={tab} type="button" role="tab" aria-selected={detailTab === tab} data-active={detailTab === tab ? "true" : "false"} style={detailTab === tab ? activeViewButtonStyle : viewButtonStyle} onClick={() => setDetailTab(tab as DetailTab)}>{label}</button>
                 ))}
               </nav>
 
@@ -3740,14 +3717,14 @@ export default function HseAinmPage() {
 
       {activeView === "reports" ? (
         <SectionCard title="AINM Reports" subtitle="Compiled PDF outputs only. Generate the final pack from the selected record's Reports tab.">
-          <div style={toolbarStyle}>
+          <div className="ims-filter-panel" style={toolbarStyle}>
             <input style={searchStyle} value="" readOnly placeholder={`${groupedCompiledPdfReports.length} AINM report record${groupedCompiledPdfReports.length === 1 ? "" : "s"} / ${filteredCompiledPdfReports.length} generated PDF${filteredCompiledPdfReports.length === 1 ? "" : "s"}`} />
             <button type="button" style={showReportFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowReportFilters((current) => !current)}>
               {showReportFilters ? "Hide Filters" : "Show Filters"}
             </button>
           </div>
           {showReportFilters ? (
-          <div style={toolbarStyle}>
+          <div className="ims-filter-panel" style={toolbarStyle}>
             <select style={filterStyle} value={reportTypeFilter} onChange={(event) => setReportTypeFilter(event.target.value as "" | "IR" | "AR")}>
               <option value="">All AINM Types</option>
               <option value="IR">Incident Reports (IR)</option>
@@ -3999,7 +3976,7 @@ function DonutChart({ total, segments }: { total: number; segments: { label: str
   return (
     <div style={donutWrapStyle}>
       <svg width="170" height="170" viewBox="0 0 120 120" role="img" aria-label="AINM type split">
-        <circle cx="60" cy="60" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="17" />
+        <circle cx="60" cy="60" r={radius} fill="none" stroke="#D0D0CE" strokeWidth="17" />
         {segmentSlices.map(({ segment, length, offset }) => (
             <circle
               key={segment.label}
@@ -4015,8 +3992,8 @@ function DonutChart({ total, segments }: { total: number; segments: { label: str
               transform="rotate(-90 60 60)"
             />
         ))}
-        <text x="60" y="56" textAnchor="middle" style={{ fontSize: 19, fontWeight: 900, fill: "#0f172a" }}>{total}</text>
-        <text x="60" y="72" textAnchor="middle" style={{ fontSize: 8, fontWeight: 800, fill: "#64748b" }}>AINMs</text>
+        <text x="60" y="56" textAnchor="middle" style={{ fontSize: 19, fontWeight: 900, fill: "#000000" }}>{total}</text>
+        <text x="60" y="72" textAnchor="middle" style={{ fontSize: 8, fontWeight: 800, fill: "#53565A" }}>AINMs</text>
       </svg>
     </div>
   );
@@ -4029,7 +4006,7 @@ function ColumnChart({ rows }: { rows: { label: string; value: number; color: st
       {rows.map((row) => (
         <div key={row.label} style={columnItemStyle}>
           <span style={columnValueStyle}>{row.value || ""}</span>
-          <span style={{ ...columnBarStyle, height: `${Math.max(4, (row.value / max) * 120)}px`, background: row.value ? row.color : "#e2e8f0" }} />
+          <span style={{ ...columnBarStyle, height: `${Math.max(4, (row.value / max) * 120)}px`, background: row.value ? row.color : "#D0D0CE" }} />
           <span style={columnLabelStyle}>{row.label}</span>
         </div>
       ))}
@@ -4045,33 +4022,33 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
-const statusBannerStyle: CSSProperties = { background: "white", borderRadius: 12, padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
+const statusBannerStyle: CSSProperties = { background: "white", borderRadius: 12, padding: "12px 16px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", color: "#000000" };
 const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 };
-const viewButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
+const viewButtonStyle: CSSProperties = { background: "#ECECE7", color: "#000000", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
 const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#005670", color: "white" };
 const kpiGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 16, marginBottom: 20 };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 20 };
-const dashboardStoryHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", background: "white", borderRadius: 18, padding: 20, boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: 20 };
-const dashboardStoryTitleStyle: CSSProperties = { margin: 0, color: "#0f172a", fontSize: 22 };
-const dashboardStoryTextStyle: CSSProperties = { margin: "6px 0 0", color: "#475569", lineHeight: 1.45, fontSize: 14 };
+const dashboardStoryHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", background: "white", borderRadius: 18, padding: 20, boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", marginBottom: 20 };
+const dashboardStoryTitleStyle: CSSProperties = { margin: 0, color: "#000000", fontSize: 22 };
+const dashboardStoryTextStyle: CSSProperties = { margin: "6px 0 0", color: "#53565A", lineHeight: 1.45, fontSize: 14 };
 const dashboardYearFilterStyle: CSSProperties = { minWidth: 220, display: "grid", gap: 6 };
 const dashboardVisualGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 18 };
-const panelStyle: CSSProperties = { background: "white", borderRadius: 18, padding: 20, boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", minHeight: 260 };
-const panelTitleStyle: CSSProperties = { margin: 0, color: "#0f172a", fontSize: 17 };
-const panelSubtitleStyle: CSSProperties = { margin: "5px 0 14px", color: "#64748b", fontSize: 12, lineHeight: 1.45, fontWeight: 700 };
-const sectionStyle: CSSProperties = { background: "white", borderRadius: 18, padding: 20, boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: 20 };
+const panelStyle: CSSProperties = { background: "white", borderRadius: 18, padding: 20, boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", minHeight: 260 };
+const panelTitleStyle: CSSProperties = { margin: 0, color: "#000000", fontSize: 17 };
+const panelSubtitleStyle: CSSProperties = { margin: "5px 0 14px", color: "#53565A", fontSize: 12, lineHeight: 1.45, fontWeight: 700 };
+const sectionStyle: CSSProperties = { background: "white", borderRadius: 18, padding: 20, boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", marginBottom: 20 };
 const sectionHeaderStyle: CSSProperties = { background: "#005670", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
 const sectionTitleStyle: CSSProperties = { margin: 0, color: "white", fontSize: 18 };
 const sectionSubtitleStyle: CSSProperties = { margin: "4px 0 0", color: "rgba(255,255,255,0.82)", fontSize: 13 };
-const bodyTextStyle: CSSProperties = { color: "#475569", lineHeight: 1.55, margin: 0 };
+const bodyTextStyle: CSSProperties = { color: "#53565A", lineHeight: 1.55, margin: 0 };
 const miniMetricStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: 12,
   padding: "12px 14px",
   display: "grid",
@@ -4079,17 +4056,17 @@ const miniMetricStyle: CSSProperties = {
   gap: 6,
   alignContent: "center",
   minHeight: 66,
-  color: "#0f172a",
+  color: "#000000",
   background: "#ffffff",
 };
 const miniMetricLabelStyle: CSSProperties = {
-  color: "#475569",
+  color: "#53565A",
   fontSize: 12,
   fontWeight: 800,
   lineHeight: 1.2,
 };
 const miniMetricValueStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: 20,
   fontWeight: 900,
   lineHeight: 1.1,
@@ -4100,18 +4077,18 @@ const dashboardFigureStripStyle: CSSProperties = { display: "grid", gridTemplate
 const donutWrapStyle: CSSProperties = { display: "flex", justifyContent: "center", alignItems: "center", minHeight: 170 };
 const progressListStyle: CSSProperties = { display: "grid", gap: 12 };
 const progressRowStyle: CSSProperties = { display: "grid", gap: 7, border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" };
-const progressLabelRowStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, color: "#0f172a", fontSize: 13 };
-const progressTrackStyle: CSSProperties = { height: 12, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" };
+const progressLabelRowStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, color: "#000000", fontSize: 13 };
+const progressTrackStyle: CSSProperties = { height: 12, background: "#D0D0CE", borderRadius: 999, overflow: "hidden" };
 const progressFillStyle: CSSProperties = { display: "block", height: "100%", borderRadius: 999 };
 const columnChartStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", gap: 6, alignItems: "end", minHeight: 178, paddingTop: 12 };
 const columnItemStyle: CSSProperties = { display: "grid", justifyItems: "center", alignItems: "end", gap: 5, minWidth: 0 };
-const columnValueStyle: CSSProperties = { color: "#475569", fontSize: 11, minHeight: 14, fontWeight: 800 };
+const columnValueStyle: CSSProperties = { color: "#53565A", fontSize: 11, minHeight: 14, fontWeight: 800 };
 const columnBarStyle: CSSProperties = { width: "72%", borderRadius: "8px 8px 2px 2px", minHeight: 4 };
-const columnLabelStyle: CSSProperties = { color: "#64748b", fontSize: 10, fontWeight: 800 };
+const columnLabelStyle: CSSProperties = { color: "#53565A", fontSize: 10, fontWeight: 800 };
 const qrAccessWrapStyle: CSSProperties = { display: "grid", gridTemplateColumns: "132px minmax(0, 1fr)", gap: 16, alignItems: "center" };
 const qrBoxStyle: CSSProperties = { width: 132, height: 132, border: "1px solid #D0D0CE", borderRadius: 16, background: "#ffffff", display: "grid", placeItems: "center", padding: 8, boxSizing: "border-box" };
 const qrImageStyle: CSSProperties = { width: "100%", height: "100%", objectFit: "contain", display: "block" };
-const qrCopyStyle: CSSProperties = { display: "grid", gap: 9, color: "#334155", fontSize: 13, lineHeight: 1.45 };
+const qrCopyStyle: CSSProperties = { display: "grid", gap: 9, color: "#53565A", fontSize: 13, lineHeight: 1.45 };
 const reportReadinessStyle: CSSProperties = { display: "grid", placeItems: "center", minHeight: 145, border: "1px solid #D0D0CE", background: "#ECECE7", color: "#005670", borderRadius: 16, cursor: "pointer", marginBottom: 14 };
 const externalNoticeStyle: CSSProperties = {
   display: "flex",
@@ -4120,7 +4097,7 @@ const externalNoticeStyle: CSSProperties = {
   alignItems: "center",
   border: "1px solid #D0D0CE",
   background: "#ECECE7",
-  color: "#0f172a",
+  color: "#000000",
   borderRadius: 14,
   padding: "12px 14px",
   marginBottom: 16,
@@ -4130,17 +4107,17 @@ const externalNoticeStyle: CSSProperties = {
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 };
 const stageGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 16 };
 const fieldStyle: CSSProperties = { display: "grid", gap: 6 };
-const labelStyle: CSSProperties = { color: "#334155", fontSize: 12, fontWeight: 900 };
-const helperTextStyle: CSSProperties = { color: "#64748b", fontSize: 12, fontStyle: "italic", fontWeight: 700 };
+const labelStyle: CSSProperties = { color: "#53565A", fontSize: 12, fontWeight: 900 };
+const helperTextStyle: CSSProperties = { color: "#53565A", fontSize: 12, fontStyle: "italic", fontWeight: 700 };
 const inlineSectionTitleStyle: CSSProperties = { margin: "4px 0 0", background: "#005670", color: "white", borderRadius: 10, padding: "11px 14px", fontSize: 16 };
-const carryForwardPanelStyle: CSSProperties = { background: "white", border: "1px solid #dbe3ef", borderRadius: 14, padding: 16, marginBottom: 16 };
-const carryForwardTitleStyle: CSSProperties = { margin: "0 0 12px", color: "#0f172a", fontSize: 18 };
-const carryForwardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, color: "#334155", fontSize: 13 };
-const inputStyle: CSSProperties = { width: "100%", minHeight: 42, border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", color: "#0f172a", background: "white" };
+const carryForwardPanelStyle: CSSProperties = { background: "white", border: "1px solid #D0D0CE", borderRadius: 14, padding: 16, marginBottom: 16 };
+const carryForwardTitleStyle: CSSProperties = { margin: "0 0 12px", color: "#000000", fontSize: 18 };
+const carryForwardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, color: "#53565A", fontSize: 13 };
+const inputStyle: CSSProperties = { width: "100%", minHeight: 42, border: "1px solid #D0D0CE", borderRadius: 10, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", color: "#000000", background: "white" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: 96, resize: "vertical", lineHeight: 1.45 };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 14 };
 const primaryButtonStyle: CSSProperties = { border: "none", background: "#005670", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
-const secondaryButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "#e2e8f0", color: "#0f172a", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
+const secondaryButtonStyle: CSSProperties = { border: "1px solid #D0D0CE", background: "#D0D0CE", color: "#000000", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
 const dangerButtonStyle: CSSProperties = { border: "none", background: "#F93822", color: "white", borderRadius: 10, padding: "10px 13px", fontWeight: 900, cursor: "pointer" };
 const smallDangerButtonStyle: CSSProperties = { ...dangerButtonStyle, padding: "7px 9px", fontSize: 12, alignSelf: "center" };
 const uploadButtonStyle: CSSProperties = { ...primaryButtonStyle, display: "inline-flex", alignItems: "center", justifyContent: "center" };
@@ -4153,10 +4130,10 @@ const toolbarStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 const searchStyle: CSSProperties = { ...inputStyle, minHeight: 44 };
 const filterStyle: CSSProperties = { ...inputStyle, minHeight: 44 };
@@ -4166,7 +4143,7 @@ const tableInfoRowStyle: CSSProperties = {
   justifyContent: "flex-start",
   gap: "4px",
   flexWrap: "wrap",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
   margin: "12px 0",
@@ -4174,10 +4151,10 @@ const tableInfoRowStyle: CSSProperties = {
 const registerLayoutStyle: CSSProperties = { display: "grid", gap: 20 };
 const registerTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 const registerTableStyle: CSSProperties = {
   width: "100%",
@@ -4189,92 +4166,92 @@ const registerTableStyle: CSSProperties = {
 const thStyle: CSSProperties = {
   textAlign: "left",
   padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 900,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
+  borderBottom: "1px solid #D0D0CE",
   whiteSpace: "nowrap",
 };
 const tdStyle: CSSProperties = {
   padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
+  borderBottom: "1px solid #ECECE7",
+  color: "#000000",
   verticalAlign: "middle",
   fontSize: "13px",
   lineHeight: 1.45,
 };
 const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#005670" };
 const reportHistoryPanelStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: 16,
   padding: 14,
   marginTop: 16,
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 const trStyle: CSSProperties = { cursor: "pointer" };
-const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ECECE7" };
+const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#eef7f8", boxShadow: "inset 4px 0 0 #005670" };
 const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 900 };
 const detailTabStyle: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 };
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
 const detailFooterStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 };
 const checkGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, margin: "16px 0" };
-const checkItemStyle: CSSProperties = { display: "flex", gap: 8, alignItems: "center", background: "white", border: "1px solid #dbe3ef", borderRadius: 10, padding: "10px 12px", color: "#0f172a", fontWeight: 700, fontSize: 13 };
+const checkItemStyle: CSSProperties = { display: "flex", gap: 8, alignItems: "center", background: "white", border: "1px solid #D0D0CE", borderRadius: 10, padding: "10px 12px", color: "#000000", fontWeight: 700, fontSize: 13 };
 const externalCheckboxStyle: CSSProperties = {
   gridColumn: "1 / -1",
   display: "flex",
   alignItems: "center",
   gap: 10,
-  border: "1px solid #dbe3ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: 12,
   padding: "12px 14px",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 800,
   fontSize: 13,
 };
-const correctiveActionsTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "110px minmax(0, 1fr) 100px", border: "1px solid #dbe3ef", borderRadius: 12, overflow: "hidden", background: "white" };
-const referenceDocumentsTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "70px minmax(0, 1fr) 100px", border: "1px solid #dbe3ef", borderRadius: 12, overflow: "hidden", background: "white" };
+const correctiveActionsTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "110px minmax(0, 1fr) 100px", border: "1px solid #D0D0CE", borderRadius: 12, overflow: "hidden", background: "white" };
+const referenceDocumentsTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "70px minmax(0, 1fr) 100px", border: "1px solid #D0D0CE", borderRadius: 12, overflow: "hidden", background: "white" };
 const correctiveHeaderCellStyle: CSSProperties = { background: "#005670", color: "white", padding: "10px 12px", fontWeight: 900, fontSize: 13 };
-const correctiveNumberCellStyle: CSSProperties = { padding: "9px 12px", borderTop: "1px solid #e2e8f0", color: "#0f172a", fontWeight: 900, background: "#f8fafc" };
-const correctiveTextareaStyle: CSSProperties = { width: "100%", minHeight: 38, border: "none", borderTop: "1px solid #e2e8f0", borderLeft: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", padding: "9px 12px", fontSize: 14, lineHeight: 1.4, resize: "vertical", boxSizing: "border-box", color: "#0f172a", background: "white" };
-const teamTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr)) 100px", border: "1px solid #dbe3ef", borderRadius: 12, overflow: "hidden", background: "white", marginTop: 12 };
-const teamCellInputStyle: CSSProperties = { minHeight: 40, border: "none", borderTop: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", padding: "9px 10px", fontSize: 14, boxSizing: "border-box", color: "#0f172a", background: "white" };
-const signoffBlockStyle: CSSProperties = { gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, border: "1px solid #dbe3ef", borderRadius: 14, padding: 14, background: "white" };
-const signoffBlockTitleStyle: CSSProperties = { gridColumn: "1 / -1", margin: 0, background: "#e5e7eb", borderRadius: 8, padding: "10px 12px", color: "#0f172a", fontSize: 15 };
-const inlineActionPanelStyle: CSSProperties = { display: "grid", gap: 14, padding: 16, border: "1px solid #dbe3ef", borderRadius: 14, background: "#f8fafc" };
+const correctiveNumberCellStyle: CSSProperties = { padding: "9px 12px", borderTop: "1px solid #D0D0CE", color: "#000000", fontWeight: 900, background: "#ECECE7" };
+const correctiveTextareaStyle: CSSProperties = { width: "100%", minHeight: 38, border: "none", borderTop: "1px solid #D0D0CE", borderLeft: "1px solid #D0D0CE", borderRight: "1px solid #D0D0CE", padding: "9px 12px", fontSize: 14, lineHeight: 1.4, resize: "vertical", boxSizing: "border-box", color: "#000000", background: "white" };
+const teamTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr)) 100px", border: "1px solid #D0D0CE", borderRadius: 12, overflow: "hidden", background: "white", marginTop: 12 };
+const teamCellInputStyle: CSSProperties = { minHeight: 40, border: "none", borderTop: "1px solid #D0D0CE", borderRight: "1px solid #D0D0CE", padding: "9px 10px", fontSize: 14, boxSizing: "border-box", color: "#000000", background: "white" };
+const signoffBlockStyle: CSSProperties = { gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, border: "1px solid #D0D0CE", borderRadius: 14, padding: 14, background: "white" };
+const signoffBlockTitleStyle: CSSProperties = { gridColumn: "1 / -1", margin: 0, background: "#D0D0CE", borderRadius: 8, padding: "10px 12px", color: "#000000", fontSize: 15 };
+const inlineActionPanelStyle: CSSProperties = { display: "grid", gap: 14, padding: 16, border: "1px solid #D0D0CE", borderRadius: 14, background: "#ECECE7" };
 const inlineActionButtonRowStyle: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 };
 const compactActionsTabToolbarStyle: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 };
 const compactPrimaryButtonStyle: CSSProperties = { ...primaryButtonStyle, minHeight: 38, padding: "8px 12px", fontSize: 13 };
 const compactPrimaryLinkStyle: CSSProperties = { ...compactPrimaryButtonStyle, display: "inline-flex", alignItems: "center", textDecoration: "none" };
 const compactLinkedActionListStyle: CSSProperties = { display: "grid", gap: 7 };
-const compactLinkedActionCardStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", background: "white", border: "1px solid #dbe3ef", borderRadius: 10, padding: "9px 11px", color: "#0f172a" };
+const compactLinkedActionCardStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", background: "white", border: "1px solid #D0D0CE", borderRadius: 10, padding: "9px 11px", color: "#000000" };
 const compactLinkedActionInfoStyle: CSSProperties = { display: "grid", gap: 3, flex: "1 1 420px", minWidth: 0, fontSize: 13 };
 const compactLinkedActionMetaStyle: CSSProperties = { color: "#53565A", fontSize: 12, lineHeight: 1.3 };
 const compactLinkedActionControlsStyle: CSSProperties = { display: "flex", gap: 7, alignItems: "center" };
 const compactActionLinkStyle: CSSProperties = { ...secondaryButtonStyle, display: "inline-flex", alignItems: "center", minHeight: 32, padding: "5px 9px", borderRadius: 8, fontSize: 12, textDecoration: "none" };
-const emptyBoxStyle: CSSProperties = { border: "1px dashed #cbd5e1", borderRadius: 12, padding: 16, color: "#64748b", background: "white" };
+const emptyBoxStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: 12, padding: 16, color: "#53565A", background: "white" };
 const evidenceListStyle: CSSProperties = { display: "grid", gap: 12 };
-const notificationEvidencePanelStyle: CSSProperties = { display: "grid", gap: 12, marginTop: 16, border: "1px solid #dbe3ef", borderRadius: 14, padding: 16, background: "white" };
-const addPersonPanelStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 16, border: "1px dashed #94a3b8", borderRadius: 14, padding: 16, background: "#f8fafc" };
-const evidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", border: "1px solid #dbe3ef", borderRadius: 12, padding: 14, background: "white", color: "#0f172a" };
+const notificationEvidencePanelStyle: CSSProperties = { display: "grid", gap: 12, marginTop: 16, border: "1px solid #D0D0CE", borderRadius: 14, padding: 16, background: "white" };
+const addPersonPanelStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 16, border: "1px dashed #D0D0CE", borderRadius: 14, padding: 16, background: "#ECECE7" };
+const evidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", border: "1px solid #D0D0CE", borderRadius: 12, padding: 14, background: "white", color: "#000000" };
 const evidenceToolbarStyle: CSSProperties = { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 };
 const evidenceStageSelectStyle: CSSProperties = { ...inputStyle, minHeight: 38, height: 38, flex: "1 1 280px", padding: "7px 10px" };
 const compactUploadButtonStyle: CSSProperties = { ...primaryButtonStyle, display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: 38, padding: "8px 13px" };
 const compactEvidenceListStyle: CSSProperties = { display: "grid", gap: 8 };
-const compactEvidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap", border: "1px solid #dbe3ef", borderRadius: 10, padding: "9px 11px", background: "white", color: "#0f172a" };
+const compactEvidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap", border: "1px solid #D0D0CE", borderRadius: 10, padding: "9px 11px", background: "white", color: "#000000" };
 const evidenceFileInfoStyle: CSSProperties = { display: "grid", gap: 3, flex: "1 1 320px", minWidth: 0 };
 const evidenceFileNameStyle: CSSProperties = { fontSize: 13, lineHeight: 1.3, overflowWrap: "anywhere" };
-const evidenceMetaStyle: CSSProperties = { color: "#64748b", fontSize: 12, lineHeight: 1.3 };
+const evidenceMetaStyle: CSSProperties = { color: "#53565A", fontSize: 12, lineHeight: 1.3 };
 const compactEvidenceActionsStyle: CSSProperties = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" };
 const compactSecondaryButtonStyle: CSSProperties = { ...secondaryButtonStyle, minHeight: 36, padding: "7px 11px", fontSize: 13 };
 const compactDangerButtonStyle: CSSProperties = { ...dangerButtonStyle, minHeight: 36, padding: "7px 11px", fontSize: 13 };
@@ -4282,4 +4259,4 @@ const reportButtonGridStyle: CSSProperties = { display: "grid", gridTemplateColu
 const reportButtonStyle: CSSProperties = { border: "1px solid #D0D0CE", background: "#ECECE7", color: "#005670", borderRadius: 12, padding: "16px 14px", fontWeight: 900, cursor: "pointer" };
 const compiledReportButtonStyle: CSSProperties = { ...reportButtonStyle, background: "#005670", borderColor: "#005670", color: "white" };
 const previewGridStyle: CSSProperties = { display: "grid", gap: 10, marginBottom: 14 };
-const previewCardStyle: CSSProperties = { display: "grid", gap: 4, border: "1px solid #dbe3ef", background: "#f8fafc", borderRadius: 12, padding: 12, color: "#0f172a" };
+const previewCardStyle: CSSProperties = { display: "grid", gap: 4, border: "1px solid #D0D0CE", background: "#ECECE7", borderRadius: 12, padding: 12, color: "#000000" };

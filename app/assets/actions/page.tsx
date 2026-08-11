@@ -540,7 +540,6 @@ export default function AssetActionsPage() {
 
   function openRegister(status = "") {
     setStatusFilter(status);
-    setPressureFilter("");
     setActiveView("register");
   }
 
@@ -704,9 +703,9 @@ export default function AssetActionsPage() {
         status={<><strong>Status:</strong> {message}</>}
       />
 
-      <nav style={viewNavStyle}>
+      <nav className="ims-tabs" style={viewNavStyle} role="tablist" aria-label="Asset Action views">
         {viewTabs.map((tab) => (
-          <button key={tab.id} type="button" style={activeView === tab.id ? activeViewButtonStyle : viewButtonStyle} onClick={() => setActiveView(tab.id)} disabled={tab.id === "create" && !hasCreateAccess()}>
+          <button key={tab.id} type="button" role="tab" aria-selected={activeView === tab.id} data-active={activeView === tab.id ? "true" : "false"} style={activeView === tab.id ? activeViewButtonStyle : viewButtonStyle} onClick={() => setActiveView(tab.id)} disabled={tab.id === "create" && !hasCreateAccess()}>
             {tab.label}
           </button>
         ))}
@@ -717,9 +716,9 @@ export default function AssetActionsPage() {
           <section style={statsGridStyle}>
             <QualityKpiCard title="Asset Actions" value={kpis.total} accent="#005670" onClick={() => openRegister()} />
             <QualityKpiCard title="Open Actions" value={kpis.open} accent="#63B1BC" onClick={() => openRegister("Open")} />
-            <QualityKpiCard title="Overdue Actions" value={kpis.overdue} accent="#F93822" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("overdue"); setActiveView("register"); }} />
-            <QualityKpiCard title="Due This Week" value={kpis.dueWeek} accent="#FFAD00" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setPressureFilter("dueWeek"); setActiveView("register"); }} />
-            <QualityKpiCard title="High Priority Open" value={kpis.high} accent="#53565A" onClick={() => { setPriorityFilter("High"); setStatusFilter(""); setPressureFilter(""); setActiveView("register"); }} />
+            <QualityKpiCard title="Overdue Actions" value={kpis.overdue} accent="#F93822" onClick={() => { setPressureFilter("overdue"); setActiveView("register"); }} />
+            <QualityKpiCard title="Due This Week" value={kpis.dueWeek} accent="#FFAD00" onClick={() => { setPressureFilter("dueWeek"); setActiveView("register"); }} />
+            <QualityKpiCard title="High Priority Open" value={kpis.high} accent="#53565A" onClick={() => { setPriorityFilter("High"); setActiveView("register"); }} />
             <QualityKpiCard title="Completed Actions" value={kpis.closed} accent="#005670" onClick={() => openRegister("Closed")} />
           </section>
 
@@ -735,9 +734,9 @@ export default function AssetActionsPage() {
             </SectionCard>
             <SectionCard title="Manager Focus" subtitle="Immediate Asset action pressure requiring management attention.">
               <div style={focusGridStyle}>
-                <MiniFocus label="Overdue" value={kpis.overdue} tone="red" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setSearch(""); setPressureFilter("overdue"); setActiveView("register"); }} />
-                <MiniFocus label="Due this week" value={kpis.dueWeek} tone="amber" onClick={() => { setStatusFilter(""); setPriorityFilter(""); setSearch(""); setPressureFilter("dueWeek"); setActiveView("register"); }} />
-                <MiniFocus label="High priority" value={kpis.high} tone="purple" onClick={() => { setPriorityFilter("High"); setStatusFilter(""); setSearch(""); setPressureFilter(""); setActiveView("register"); }} />
+                <MiniFocus label="Overdue" value={kpis.overdue} tone="red" onClick={() => { setPressureFilter("overdue"); setActiveView("register"); }} />
+                <MiniFocus label="Due this week" value={kpis.dueWeek} tone="amber" onClick={() => { setPressureFilter("dueWeek"); setActiveView("register"); }} />
+                <MiniFocus label="High priority" value={kpis.high} tone="purple" onClick={() => { setPriorityFilter("High"); setActiveView("register"); }} />
               </div>
             </SectionCard>
           </section>
@@ -804,7 +803,7 @@ export default function AssetActionsPage() {
               </thead>
               <tbody>
                 {filteredActions.length ? filteredActions.map((action) => (
-                  <tr key={action.id} style={selectedId === action.id ? selectedTableRowStyle : registerTableRowStyle} onClick={() => setSelectedId(action.id)}>
+                  <tr key={action.id} aria-selected={selectedId === action.id} data-selected={selectedId === action.id ? "true" : "false"} style={selectedId === action.id ? selectedTableRowStyle : registerTableRowStyle} onClick={() => setSelectedId(action.id)}>
                     <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#005670" }}>{action.action_number || "-"}</td>
                     <td style={imsTableCellStyle}>
                       <strong>{action.title || "-"}</strong>
@@ -814,7 +813,7 @@ export default function AssetActionsPage() {
                     <td style={imsTableCellStyle}>{action.source || "-"}</td>
                     <td style={imsTableCellStyle}>
                       <strong>{formatDate(action.due_date)}</strong>
-                      <div style={{ ...mutedTextStyle, color: isOverdue(action) ? "#F93822" : "#64748b" }}>{getDueLabel(action.due_date)}</div>
+                      <div style={{ ...mutedTextStyle, color: isOverdue(action) ? "#F93822" : "#53565A" }}>{getDueLabel(action.due_date)}</div>
                     </td>
                     <td style={imsTableCellStyle}>{action.priority || "-"}</td>
                     <td style={imsTableCellStyle}><StatusPill status={action.status || "Open"} /></td>
@@ -1001,7 +1000,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function StatusPill({ status }: { status: string }) {
   const closed = isClosedLikeStatus(status);
-  return <span style={{ ...pillStyle, background: closed ? "#dcfce7" : "#dbeafe", color: closed ? "#166534" : "#1d4ed8" }}>{status || "Open"}</span>;
+  return <span style={{ ...pillStyle, background: closed ? "#ECECE7" : "#ECECE7", color: closed ? "#005670" : "#005670" }}>{status || "Open"}</span>;
 }
 
 function BarList({ rows, total, accent, onClick }: { rows: { label: string; value: number }[]; total: number; accent: string; onClick?: (label: string) => void }) {
@@ -1017,7 +1016,7 @@ function MiniFocus({ label, value, tone, onClick }: { label: string; value: numb
 const primaryLinkStyle: CSSProperties = { background: "#005670", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
 const smallLinkStyle: CSSProperties = { ...primaryLinkStyle, padding: "8px 10px", fontSize: 12 };
 const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 };
-const viewButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
+const viewButtonStyle: CSSProperties = { background: "#ECECE7", color: "#000000", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
 const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#005670", color: "white" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
@@ -1025,41 +1024,41 @@ const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", p
 const sectionHeaderStyle: CSSProperties = { background: "#005670", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
 const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", color: "white" };
 const sectionSubtitleStyle: CSSProperties = { color: "rgba(255,255,255,0.82)", margin: "4px 0 0", lineHeight: 1.45, fontSize: 13 };
-const emptyTextStyle: CSSProperties = { color: "#64748b", margin: 0, lineHeight: 1.55, fontSize: 13 };
-const inputStyle: CSSProperties = { width: "100%", minHeight: 42, border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", color: "#0f172a", background: "white" };
-const readOnlyInputStyle: CSSProperties = { ...inputStyle, background: "#f8fafc", color: "#64748b" };
+const emptyTextStyle: CSSProperties = { color: "#53565A", margin: 0, lineHeight: 1.55, fontSize: 13 };
+const inputStyle: CSSProperties = { width: "100%", minHeight: 42, border: "1px solid #D0D0CE", borderRadius: 10, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", color: "#000000", background: "white" };
+const readOnlyInputStyle: CSSProperties = { ...inputStyle, background: "#ECECE7", color: "#53565A" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: 110, resize: "vertical", lineHeight: 1.45 };
-const secondaryButtonStyle: CSSProperties = { border: "1px solid #cbd5e1", background: "#e2e8f0", color: "#0f172a", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
+const secondaryButtonStyle: CSSProperties = { border: "1px solid #D0D0CE", background: "#D0D0CE", color: "#000000", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
 const primaryButtonStyle: CSSProperties = { border: "none", background: "#005670", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
-const compactTableWrapStyle: CSSProperties = { overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: "16px", background: "#ffffff", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)" };
+const compactTableWrapStyle: CSSProperties = { overflowX: "auto", border: "1px solid #D0D0CE", borderRadius: "16px", background: "#ffffff", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)" };
 const registerTableRowStyle: CSSProperties = { cursor: "pointer" };
-const selectedTableRowStyle: CSSProperties = { cursor: "pointer", background: "#eff6ff", boxShadow: "inset 4px 0 0 #005670" };
-const mutedTextStyle: CSSProperties = { color: "#64748b", fontSize: 12, marginTop: 4 };
-const emptyTableCellStyle: CSSProperties = { padding: "26px 14px", textAlign: "center", color: "#64748b", background: "#f8fafc", borderBottom: "1px dashed #cbd5e1" };
+const selectedTableRowStyle: CSSProperties = { cursor: "pointer", background: "#eef7f8", boxShadow: "inset 4px 0 0 #005670" };
+const mutedTextStyle: CSSProperties = { color: "#53565A", fontSize: 12, marginTop: 4 };
+const emptyTableCellStyle: CSSProperties = { padding: "26px 14px", textAlign: "center", color: "#53565A", background: "#ECECE7", borderBottom: "1px dashed #D0D0CE" };
 const detailCardStyle: CSSProperties = {
   marginTop: 18,
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
   display: "grid",
   gap: 12,
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
   minWidth: 0,
 };
-const detailTitleStyle: CSSProperties = { margin: 0, color: "#0f172a", fontSize: 18 };
-const detailMetaGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, color: "#334155", fontSize: 13 };
+const detailTitleStyle: CSSProperties = { margin: 0, color: "#000000", fontSize: 18 };
+const detailMetaGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, color: "#53565A", fontSize: 13 };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 };
 const fieldStyle: CSSProperties = { display: "grid", gap: 6 };
-const labelStyle: CSSProperties = { color: "#334155", fontSize: 12, fontWeight: 900 };
+const labelStyle: CSSProperties = { color: "#53565A", fontSize: 12, fontWeight: 900 };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 14 };
 const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 900 };
 const barListStyle: CSSProperties = { display: "grid", gap: 12 };
 const barRowStyle: CSSProperties = { display: "grid", gap: 7, border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" };
-const barLabelStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, color: "#0f172a", fontSize: 13 };
-const barTrackStyle: CSSProperties = { height: 12, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" };
+const barLabelStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, color: "#000000", fontSize: 13 };
+const barTrackStyle: CSSProperties = { height: 12, background: "#D0D0CE", borderRadius: 999, overflow: "hidden" };
 const barFillStyle: CSSProperties = { display: "block", height: "100%", borderRadius: 999 };
-const emptyBoxStyle: CSSProperties = { border: "1px dashed #cbd5e1", borderRadius: 12, padding: 16, color: "#64748b", background: "white" };
+const emptyBoxStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: 12, padding: 16, color: "#53565A", background: "white" };
 const focusGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 };
-const miniFocusStyle: CSSProperties = { border: "1px solid #e2e8f0", borderRadius: 12, padding: 14, display: "grid", gap: 8, color: "#0f172a", background: "white", textAlign: "left", cursor: "pointer" };
+const miniFocusStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: 12, padding: 14, display: "grid", gap: 8, color: "#000000", background: "white", textAlign: "left", cursor: "pointer" };
 

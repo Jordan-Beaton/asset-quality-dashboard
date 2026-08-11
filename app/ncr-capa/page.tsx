@@ -279,22 +279,22 @@ function dueState(date: string | null | undefined) {
 
 function getStatusTone(status: string) {
   const value = (status || "").toLowerCase();
-  if (value.includes("open")) return { bg: "#fee2e2", color: "#F93822" };
-  if (value.includes("progress")) return { bg: "#fef3c7", color: "#92400e" };
-  if (value.includes("hold")) return { bg: "#ede9fe", color: "#5b21b6" };
-  if (value.includes("closed")) return { bg: "#dcfce7", color: "#166534" };
-  if (value.includes("complete")) return { bg: "#dcfce7", color: "#166534" };
-  return { bg: "#e2e8f0", color: "#334155" };
+  if (value.includes("open")) return { bg: "#ECECE7", color: "#F93822" };
+  if (value.includes("progress")) return { bg: "#ECECE7", color: "#000000" };
+  if (value.includes("hold")) return { bg: "#ECECE7", color: "#53565A" };
+  if (value.includes("closed")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("complete")) return { bg: "#ECECE7", color: "#005670" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function getSeverityTone(severity: string) {
   const value = (severity || "").toLowerCase();
   if (value.includes("high") || value.includes("major") || value.includes("critical")) {
-    return { bg: "#fee2e2", color: "#F93822" };
+    return { bg: "#ECECE7", color: "#F93822" };
   }
-  if (value.includes("medium")) return { bg: "#fef3c7", color: "#92400e" };
-  if (value.includes("low") || value.includes("minor")) return { bg: "#dcfce7", color: "#166534" };
-  return { bg: "#e2e8f0", color: "#334155" };
+  if (value.includes("medium")) return { bg: "#ECECE7", color: "#000000" };
+  if (value.includes("low") || value.includes("minor")) return { bg: "#ECECE7", color: "#005670" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function getSeverityDisplay(severity: string | null | undefined) {
@@ -339,14 +339,14 @@ function getTrailingNumber(value: string | null | undefined) {
 function hexToRgbTriplet(value: string) {
   const normalized = value.replace("#", "");
   const parts = normalized.match(/.{1,2}/g);
-  if (!parts || parts.length < 3) return [226, 232, 240] as [number, number, number];
+  if (!parts || parts.length < 3) return [208, 208, 206] as [number, number, number];
   return parts.slice(0, 3).map((item) => Number.parseInt(item, 16)) as [number, number, number];
 }
 
 function getTypeTone(type: "NCR" | "CAPA") {
   return type === "NCR"
-    ? { bg: "#dbeafe", color: "#1d4ed8", border: "#93c5fd" }
-    : { bg: "#ede9fe", color: "#6d28d9", border: "#c4b5fd" };
+    ? { bg: "#ECECE7", color: "#005670", border: "#63B1BC" }
+    : { bg: "#ECECE7", color: "#53565A", border: "#ECECE7" };
 }
 
 function buildNextNumber(prefix: string, values: (string | null)[]) {
@@ -380,10 +380,10 @@ function wordParagraph(text: string, options?: { bold?: boolean; size?: number; 
     children: [
       new TextRun({
         text: wordText(text),
-        font: "Calibri",
+        font: "Azo Sans",
         bold: options?.bold,
         size: options?.size ?? 20,
-        color: options?.color ?? "0F172A",
+        color: options?.color ?? "000000",
       }),
     ],
   });
@@ -395,10 +395,10 @@ function wordHeading(text: string) {
     children: [
       new TextRun({
         text,
-        font: "Calibri",
+        font: "Azo Sans",
         bold: true,
         size: 22,
-        color: "0F172A",
+        color: "000000",
       }),
     ],
   });
@@ -423,9 +423,9 @@ function wordCell(
             children: [
               new TextRun({
                 text: wordText(children),
-                font: "Calibri",
+                font: "Azo Sans",
                 bold: options?.bold,
-                color: options?.color ?? "0F172A",
+                color: options?.color ?? "000000",
                 size: options?.size ?? 18,
               }),
             ],
@@ -448,12 +448,12 @@ function wordTable(rows: TableRow[], columnWidths?: number[]) {
     layout: TableLayoutType.FIXED,
     columnWidths,
     borders: {
-      top: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
-      bottom: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
-      left: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
-      right: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
-      insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
-      insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "CBD5E1" },
+      top: { style: BorderStyle.SINGLE, size: 1, color: "D0D0CE" },
+      bottom: { style: BorderStyle.SINGLE, size: 1, color: "D0D0CE" },
+      left: { style: BorderStyle.SINGLE, size: 1, color: "D0D0CE" },
+      right: { style: BorderStyle.SINGLE, size: 1, color: "D0D0CE" },
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "D0D0CE" },
+      insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "D0D0CE" },
     },
     rows,
   });
@@ -477,9 +477,9 @@ function wordKeyValueTable(rows: Array<[string, string, string, string]>) {
           new TableRow({
             cantSplit: true,
             children: [
-              wordCell(row[0], { fill: "F8FAFC", bold: true, width: widths[0] }),
+              wordCell(row[0], { fill: "ECECE7", bold: true, width: widths[0] }),
               wordCell(row[1], { fill: "FFFFFF", width: widths[1] }),
-              wordCell(row[2], { fill: "F8FAFC", bold: true, width: widths[2] }),
+              wordCell(row[2], { fill: "ECECE7", bold: true, width: widths[2] }),
               wordCell(row[3], { fill: "FFFFFF", width: widths[3] }),
             ],
           })
@@ -491,7 +491,7 @@ function wordKeyValueTable(rows: Array<[string, string, string, string]>) {
 
 function wordParagraphBox(label: string, value: string | null | undefined) {
   return [
-    wordParagraph(label, { bold: true, size: 18, color: "0F172A", spacingAfter: 60 }),
+    wordParagraph(label, { bold: true, size: 18, color: "000000", spacingAfter: 60 }),
     wordTable(
       [
         new TableRow({
@@ -504,9 +504,9 @@ function wordParagraphBox(label: string, value: string | null | undefined) {
                   children: [
                     new TextRun({
                       text: wordText(value),
-                      font: "Calibri",
+                      font: "Azo Sans",
                       size: 18,
-                      color: "1E293B",
+                      color: "000000",
                     }),
                   ],
                 }),
@@ -551,16 +551,16 @@ function wordReportFooter(reference: string) {
         rows: [
           new TableRow({
             children: [
-              wordCell(`Enshore | ${reference}`, { width: 6500, size: 16, color: "64748B" }),
+              wordCell(`Enshore | ${reference}`, { width: 6500, size: 16, color: "53565A" }),
               new TableCell({
                 width: { size: 2860, type: WidthType.DXA },
                 children: [
                   new Paragraph({
                     alignment: AlignmentType.RIGHT,
                     children: [
-                      new TextRun({ text: "Page ", font: "Calibri", size: 16, color: "64748B" }),
+                      new TextRun({ text: "Page ", font: "Azo Sans", size: 16, color: "53565A" }),
                       new SimpleField("PAGE"),
-                      new TextRun({ text: " of ", font: "Calibri", size: 16, color: "64748B" }),
+                      new TextRun({ text: " of ", font: "Azo Sans", size: 16, color: "53565A" }),
                       new SimpleField("NUMPAGES"),
                     ],
                   }),
@@ -1342,12 +1342,6 @@ function NcrCapaPageContent() {
     setActiveWorkspaceView("register");
     setActiveLogTab("NCR");
     setNcrQuickFilter(filter);
-    setSearch("");
-    setSeverityFilter("All");
-    setSourceFilter("All");
-    setProjectFilter("All");
-    setShowAttentionOnly(false);
-    setStatusFilter(filter === "Open" || filter === "In Progress" || filter === "Closed" ? filter : "All");
   }
 
   function toggleNcrSort(key: NcrSortKey) {
@@ -1443,7 +1437,7 @@ function NcrCapaPageContent() {
       {
         label: "No Due Date",
         value: yearScopedNcrRows.filter((row) => !row.due_date).length,
-        color: "#64748b",
+        color: "#53565A",
       },
     ],
     [yearScopedNcrRows]
@@ -2098,13 +2092,13 @@ function NcrCapaPageContent() {
       }
 
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(18);
       doc.text(title, pageWidth - margin, 17, { align: "right" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10.5);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(`Reference: ${selectedRow.number}`, pageWidth - margin, 24, { align: "right" });
       doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`, pageWidth - margin, 30, {
         align: "right",
@@ -2129,9 +2123,9 @@ function NcrCapaPageContent() {
           font: "helvetica",
           fontSize: 9,
           cellPadding: 2.4,
-          lineColor: [203, 213, 225],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
-          textColor: [15, 23, 42],
+          textColor: [0, 0, 0],
           overflow: "linebreak",
         },
         headStyles: {
@@ -2156,7 +2150,7 @@ function NcrCapaPageContent() {
         }
         doc.setFont("helvetica", "bold");
         doc.setFontSize(12);
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.text(heading, margin, y);
         y += 5;
       };
@@ -2168,18 +2162,18 @@ function NcrCapaPageContent() {
         }
         doc.setFont("helvetica", "bold");
         doc.setFontSize(9.5);
-        doc.setTextColor(30, 41, 59);
+        doc.setTextColor(0, 0, 0);
         doc.text(label, margin, y);
         const text = getPdfText(value);
         const lines = text ? doc.splitTextToSize(text, pageWidth - margin * 2 - 4) : [];
         const bodyHeight = Math.max(minHeight, lines.length * 4.5 + 6);
-        doc.setDrawColor(203, 213, 225);
+        doc.setDrawColor(208, 208, 206);
         doc.setFillColor(255, 255, 255);
         doc.roundedRect(margin, y + 2, pageWidth - margin * 2, bodyHeight, 1.8, 1.8, "FD");
         if (lines.length > 0) {
           doc.setFont("helvetica", "normal");
           doc.setFontSize(9.2);
-          doc.setTextColor(51, 65, 85);
+          doc.setTextColor(83, 86, 90);
           doc.text(lines, margin + 2, y + 7);
         }
         y += bodyHeight + 8;
@@ -2199,14 +2193,14 @@ function NcrCapaPageContent() {
             font: "helvetica",
             fontSize: 8.8,
             cellPadding: 2.2,
-            lineColor: [203, 213, 225],
+            lineColor: [208, 208, 206],
             lineWidth: 0.2,
-            textColor: [15, 23, 42],
+            textColor: [0, 0, 0],
             overflow: "linebreak",
             valign: "top",
           },
           columnStyles: {
-            0: { cellWidth: 46, fontStyle: "bold", fillColor: [248, 250, 252] },
+            0: { cellWidth: 46, fontStyle: "bold", fillColor: [236, 236, 231] },
             1: { cellWidth: 136 },
           },
         });
@@ -2272,13 +2266,13 @@ function NcrCapaPageContent() {
                 font: "helvetica",
                 fontSize: 8.6,
                 cellPadding: 2.1,
-                lineColor: [203, 213, 225],
+                lineColor: [208, 208, 206],
               lineWidth: 0.2,
-              textColor: [15, 23, 42],
+              textColor: [0, 0, 0],
               overflow: "linebreak",
             },
               headStyles: {
-                fillColor: [15, 23, 42],
+                fillColor: [0, 0, 0],
                 textColor: [255, 255, 255],
                 fontStyle: "bold",
               },
@@ -2299,14 +2293,14 @@ function NcrCapaPageContent() {
                 const linkText = "Open evidence";
                 doc.setFont("helvetica", "normal");
                 doc.setFontSize(8.6);
-                doc.setTextColor(29, 78, 216);
+                doc.setTextColor(0, 86, 112);
                 doc.textWithLink(
                   linkText,
                   data.cell.x + 1.8,
                   data.cell.y + data.cell.height / 2 + 1.4,
                   { url: row.url }
                 );
-                doc.setTextColor(15, 23, 42);
+                doc.setTextColor(0, 0, 0);
               },
             });
 
@@ -2345,17 +2339,17 @@ function NcrCapaPageContent() {
 
                   doc.setFont("helvetica", "bold");
                   doc.setFontSize(9.4);
-                  doc.setTextColor(30, 41, 59);
+                  doc.setTextColor(0, 0, 0);
                   doc.text(captionLines, margin, y);
                   y += captionHeight;
 
                   doc.setFont("helvetica", "normal");
                   doc.setFontSize(8.2);
-                  doc.setTextColor(100, 116, 139);
+                  doc.setTextColor(83, 86, 90);
                   doc.text(metaLine, margin, y);
                   y += 4;
 
-                  doc.setDrawColor(203, 213, 225);
+                  doc.setDrawColor(208, 208, 206);
                   doc.roundedRect(margin, y, drawWidth, drawHeight, 1.2, 1.2);
                   doc.addImage(preview.dataUrl, "PNG", margin, y, drawWidth, drawHeight, undefined, "FAST");
                   y += drawHeight + 8;
@@ -2372,7 +2366,7 @@ function NcrCapaPageContent() {
         doc.setPage(page);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.8);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text(`Enshore | ${selectedRow.number}`, margin, pageHeight - 8);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8, {
           align: "right",
@@ -2476,7 +2470,7 @@ function NcrCapaPageContent() {
                               transformation: { width: 170, height: 85 },
                             }),
                           ]
-                        : [new TextRun({ text: "ENSHORE", font: "Calibri", bold: true, size: 30 })],
+                        : [new TextRun({ text: "ENSHORE", font: "Azo Sans", bold: true, size: 30 })],
                     }),
                   ],
                 }),
@@ -2487,16 +2481,16 @@ function NcrCapaPageContent() {
                     new Paragraph({
                       alignment: AlignmentType.RIGHT,
                       spacing: { after: 55 },
-                      children: [new TextRun({ text: title, font: "Calibri", bold: true, size: 30, color: "0F172A" })],
+                      children: [new TextRun({ text: title, font: "Azo Sans", bold: true, size: 30, color: "000000" })],
                     }),
                     new Paragraph({
                       alignment: AlignmentType.RIGHT,
                       spacing: { after: 35 },
-                      children: [new TextRun({ text: `Reference: ${selectedRow.number}`, font: "Calibri", size: 20, color: "475569" })],
+                      children: [new TextRun({ text: `Reference: ${selectedRow.number}`, font: "Azo Sans", size: 20, color: "53565A" })],
                     }),
                     new Paragraph({
                       alignment: AlignmentType.RIGHT,
-                      children: [new TextRun({ text: `Generated: ${generatedAt}`, font: "Calibri", size: 20, color: "475569" })],
+                      children: [new TextRun({ text: `Generated: ${generatedAt}`, font: "Azo Sans", size: 20, color: "53565A" })],
                     }),
                   ],
                 }),
@@ -2555,12 +2549,12 @@ function NcrCapaPageContent() {
               [
                 new TableRow({
                   children: [
-                    wordCell("Record", { fill: "0F172A", color: "FFFFFF", bold: true, width: 1200 }),
-                    wordCell("File Name", { fill: "0F172A", color: "FFFFFF", bold: true, width: 2600 }),
-                    wordCell("Type", { fill: "0F172A", color: "FFFFFF", bold: true, width: 1200 }),
-                    wordCell("Uploaded", { fill: "0F172A", color: "FFFFFF", bold: true, width: 1600 }),
-                    wordCell("Reference", { fill: "0F172A", color: "FFFFFF", bold: true, width: 1800 }),
-                    wordCell("Link", { fill: "0F172A", color: "FFFFFF", bold: true, width: 960 }),
+                    wordCell("Record", { fill: "000000", color: "FFFFFF", bold: true, width: 1200 }),
+                    wordCell("File Name", { fill: "000000", color: "FFFFFF", bold: true, width: 2600 }),
+                    wordCell("Type", { fill: "000000", color: "FFFFFF", bold: true, width: 1200 }),
+                    wordCell("Uploaded", { fill: "000000", color: "FFFFFF", bold: true, width: 1600 }),
+                    wordCell("Reference", { fill: "000000", color: "FFFFFF", bold: true, width: 1800 }),
+                    wordCell("Link", { fill: "000000", color: "FFFFFF", bold: true, width: 960 }),
                   ],
                 }),
                 ...selectedNcrPdfEvidence.map((file) => {
@@ -2627,12 +2621,12 @@ function NcrCapaPageContent() {
                   wordParagraph(file.notes ? `${file.file_name} - ${file.notes}` : file.file_name, {
                     bold: true,
                     size: 19,
-                    color: "1E293B",
+                    color: "000000",
                     spacingAfter: 40,
                   }),
                   wordParagraph(`${selectedRow.number} | ${formatDateTime(file.uploaded_at)}`, {
                     size: 16,
-                    color: "64748B",
+                    color: "53565A",
                     spacingAfter: 80,
                   }),
                   new Paragraph({
@@ -2662,9 +2656,9 @@ function NcrCapaPageContent() {
           default: {
             document: {
               run: {
-                font: "Calibri",
+                font: "Azo Sans",
                 size: 19,
-                color: "0F172A",
+                color: "000000",
               },
             },
           },
@@ -2755,12 +2749,12 @@ function NcrCapaPageContent() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(17);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text("Filtered NCR Report", pageWidth / 2, 17, { align: "center" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text("Management meeting register of NCRs matching the current register filters.", pageWidth / 2, 23, {
         align: "center",
       });
@@ -2781,12 +2775,12 @@ function NcrCapaPageContent() {
           font: "helvetica",
           fontSize: 8.2,
           cellPadding: 1.6,
-          lineColor: [203, 213, 225],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
-          textColor: [15, 23, 42],
+          textColor: [0, 0, 0],
         },
         columnStyles: {
-          0: { cellWidth: 28, fontStyle: "bold", fillColor: [248, 250, 252] },
+          0: { cellWidth: 28, fontStyle: "bold", fillColor: [236, 236, 231] },
           1: { cellWidth: 72 },
         },
       });
@@ -2836,14 +2830,14 @@ function NcrCapaPageContent() {
           font: "helvetica",
           fontSize: 7.4,
           cellPadding: 1.8,
-          lineColor: [203, 213, 225],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
-          textColor: [15, 23, 42],
+          textColor: [0, 0, 0],
           overflow: "linebreak",
           valign: "top",
         },
         headStyles: {
-          fillColor: [15, 23, 42],
+          fillColor: [0, 0, 0],
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
@@ -2880,7 +2874,7 @@ function NcrCapaPageContent() {
         didDrawPage: () => {
           doc.setFont("helvetica", "normal");
           doc.setFontSize(8.5);
-          doc.setTextColor(100, 116, 139);
+          doc.setTextColor(83, 86, 90);
           doc.text("Enshore Quality Management System", margin, pageHeight - 6);
           doc.text(
             `Page ${doc.getCurrentPageInfo().pageNumber} of ${doc.getNumberOfPages()}`,
@@ -3111,26 +3105,23 @@ function NcrCapaPageContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           ← Back to IMS Home
         </Link>
 
-        <div style={topMetaActionsStyle}>
-          <button type="button" style={secondaryButton} onClick={() => void loadData()}>
-            Refresh
-          </button>
-          <div style={statusBannerStyle}>
-            <strong>Status:</strong> {message || "Ready"}
-          </div>
+        <div style={statusBannerStyle}>
+          <strong>Status:</strong> {message || "Ready"}
         </div>
       </div>
-
-      <nav style={workspaceNavStyle} aria-label="NCR workspace views">
+      <nav className="ims-tabs" style={workspaceNavStyle} aria-label="NCR workspace views" role="tablist">
         {ncrWorkspaceViews.map((view) => (
           <button
             key={view.id}
             type="button"
+            role="tab"
+            aria-selected={activeWorkspaceView === view.id}
+            data-active={activeWorkspaceView === view.id ? "true" : "false"}
             style={activeWorkspaceView === view.id ? activeWorkspaceNavButtonStyle : workspaceNavButtonStyle}
             onClick={() => setActiveWorkspaceView(view.id)}
           >
@@ -3145,9 +3136,9 @@ function NcrCapaPageContent() {
             <QualityKpiCard title="Open Items" value={kpis.openItems} accent="#FFAD00" onClick={() => applyKpiFilter("Open")} active={ncrQuickFilter === "Open"} />
             <QualityKpiCard title="In Progress" value={kpis.inProgress} accent="#53565A" onClick={() => applyKpiFilter("In Progress")} active={ncrQuickFilter === "In Progress"} />
             <QualityKpiCard title="Closed NCRs" value={kpis.closed} accent="#005670" onClick={() => applyKpiFilter("Closed")} active={ncrQuickFilter === "Closed"} />
-            <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#ef4444" onClick={() => applyKpiFilter("Overdue")} active={ncrQuickFilter === "Overdue"} />
-            <QualityKpiCard title="Due in 7 Days" value={kpis.dueSoon} accent="#22c55e" onClick={() => applyKpiFilter("DueSoon")} active={ncrQuickFilter === "DueSoon"} />
-            <QualityKpiCard title="Total NCRs" value={kpis.totalNcrs} accent="#60a5fa" onClick={() => applyKpiFilter("All")} active={ncrQuickFilter === "All"} />
+            <QualityKpiCard title="Overdue" value={kpis.overdue} accent="#F93822" onClick={() => applyKpiFilter("Overdue")} active={ncrQuickFilter === "Overdue"} />
+            <QualityKpiCard title="Due in 7 Days" value={kpis.dueSoon} accent="#005670" onClick={() => applyKpiFilter("DueSoon")} active={ncrQuickFilter === "DueSoon"} />
+            <QualityKpiCard title="Total NCRs" value={kpis.totalNcrs} accent="#63B1BC" onClick={() => applyKpiFilter("All")} active={ncrQuickFilter === "All"} />
           </section>
 
           <section style={dashboardPanelGridStyle}>
@@ -3243,7 +3234,7 @@ function NcrCapaPageContent() {
                 {importHasErrors ? (
                   <span style={{ color: "#F93822", fontWeight: 800 }}>Resolve row errors before import.</span>
                 ) : (
-                  <span style={{ color: "#166534", fontWeight: 800 }}>Ready to import.</span>
+                  <span style={{ color: "#005670", fontWeight: 800 }}>Ready to import.</span>
                 )}
               </div>
 
@@ -3265,7 +3256,7 @@ function NcrCapaPageContent() {
                     key={`${row.rowNumber}-${row.ncr_number}`}
                     style={{
                       ...importTableRowStyle,
-                      background: row.errors.length ? "#fff7f7" : "#ffffff",
+                      background: row.errors.length ? "#ECECE7" : "#ffffff",
                     }}
                   >
                     <div>{row.rowNumber}</div>
@@ -3598,7 +3589,7 @@ function NcrCapaPageContent() {
                     />
                   </div>
 
-                  <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                  <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#000000" }}>
                     CAPA Action Structure
                   </div>
 
@@ -3626,7 +3617,7 @@ function NcrCapaPageContent() {
                     />
                   </div>
 
-                  <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                  <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#000000" }}>
                     Effectiveness Review
                   </div>
 
@@ -3877,10 +3868,10 @@ function NcrCapaPageContent() {
                   const state = dueState(item.due_date);
                   const dueBadgeStyle =
                     state === "overdue"
-                      ? { background: "#fee2e2", color: "#F93822" }
+                      ? { background: "#ECECE7", color: "#F93822" }
                       : state === "soon"
-                      ? { background: "#fef3c7", color: "#92400e" }
-                      : { background: "#dcfce7", color: "#166534" };
+                      ? { background: "#ECECE7", color: "#000000" }
+                      : { background: "#ECECE7", color: "#005670" };
                   const matchingRow = combinedRows.find((row) => row.type === "CAPA" && row.id === item.id) || null;
 
                   return (
@@ -3930,7 +3921,7 @@ function NcrCapaPageContent() {
       {activeWorkspaceView === "register" ? (
       <section style={workspaceGridStyle}>
         <SectionCard title="NCR Register" subtitle="Table-led working register for day-to-day review, update, evidence handling, linked actions, and PDF reporting.">
-          <div style={toolbarStyle}>
+          <div className="ims-filter-panel" style={toolbarStyle}>
             <input
               style={toolbarSearchStyle}
               value={search}
@@ -3948,7 +3939,7 @@ function NcrCapaPageContent() {
           </div>
 
           {showRegisterFilters ? (
-            <div style={toolbarFiltersStyle}>
+            <div className="ims-filter-panel" style={toolbarFiltersStyle}>
               <div style={toolbarLabeledControlStyle}>
                 <label style={toolbarLabelStyle}>Status</label>
                 <select style={toolbarSelectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -4016,7 +4007,7 @@ function NcrCapaPageContent() {
               {activeLogTab === "NCR" ? (
                 <button
                   type="button"
-                  style={{ ...toolbarButtonStyle, border: "1px solid #bfdbfe", color: "#1d4ed8" }}
+                  style={{ ...toolbarButtonStyle, border: "1px solid #ECECE7", color: "#005670" }}
                   onClick={() => void generateFilteredNcrReport()}
                   disabled={generatingFilteredNcrReport || filteredRows.filter((row) => row.type === "NCR").length === 0}
                 >
@@ -4036,8 +4027,8 @@ function NcrCapaPageContent() {
           ) : filteredRows.length === 0 ? (
             <div style={emptyBoardStyle}>No matching records found.</div>
           ) : (
-            <div style={registerTableWrapStyle}>
-              <div style={registerHeadStyle}>
+            <div className="ims-register-shell" style={registerTableWrapStyle}>
+              <div className="ims-register-head" style={registerHeadStyle}>
                 {activeLogTab === "NCR" ? (
                   <>
                     <button type="button" style={sortableHeaderButtonStyle} onClick={() => toggleNcrSort("number")}>
@@ -4076,12 +4067,15 @@ function NcrCapaPageContent() {
 
                   return (
                     <button
+                      className="ims-register-row"
+                      aria-pressed={active}
+                      data-selected={active ? "true" : "false"}
                       key={`${row.type}-${row.id}`}
                       type="button"
                       onClick={() => selectRowAndScroll(row)}
                       style={{
                         ...registerRowStyle,
-                        background: active ? "#eff6ff" : "#ffffff",
+                        background: active ? "#eef7f8" : "#ffffff",
                         borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                       }}
                     >
@@ -4089,14 +4083,6 @@ function NcrCapaPageContent() {
 
                       <div>
                         <div style={registerTitleStyle}>{row.title || "Untitled"}</div>
-                        <div style={registerDescriptionStyle}>
-                          {row.description || (row.type === "NCR" ? "No NCR description" : "No CAPA description")}
-                        </div>
-                        <div style={registerMetaStyle}>
-                          {row.project ? <span>Project: {row.project}</span> : null}
-                          {row.type === "NCR" && row.area && <span>Area: {row.area}</span>}
-                          <span>Created: {formatDate(row.created_at)}</span>
-                        </div>
                       </div>
                       {activeLogTab === "NCR" ? (
                         <div>
@@ -4124,8 +4110,8 @@ function NcrCapaPageContent() {
                               dueTone === "overdue"
                                 ? "#F93822"
                                 : dueTone === "soon"
-                                ? "#a16207"
-                                : "#0f172a",
+                                ? "#000000"
+                                : "#000000",
                           }}
                         >
                           {formatDate(row.due_date)}
@@ -4140,8 +4126,8 @@ function NcrCapaPageContent() {
                               dueTone === "overdue"
                                 ? "#F93822"
                                 : dueTone === "soon"
-                                ? "#a16207"
-                                : "#0f172a",
+                                ? "#000000"
+                                : "#000000",
                           }}
                         >
                           {formatDate(row.due_date)}
@@ -4385,7 +4371,7 @@ function NcrCapaPageContent() {
 
                   {editRow.type === "CAPA" && (
                     <>
-                      <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                      <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#000000" }}>
                         CAPA Action Structure
                       </div>
 
@@ -4414,7 +4400,7 @@ function NcrCapaPageContent() {
                         />
                       </div>
 
-                      <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                      <div style={{ gridColumn: "1 / -1", fontSize: 13, fontWeight: 700, color: "#000000" }}>
                         Effectiveness Review
                       </div>
 
@@ -4707,9 +4693,9 @@ function NcrCapaPageContent() {
                     type="button"
                     style={{
                       ...secondaryButton,
-                      border: "1px solid #fecaca",
+                      border: "1px solid #ECECE7",
                       color: "#F93822",
-                      background: "#fff5f5",
+                      background: "#ECECE7",
                     }}
                     onClick={() => void deleteSelected()}
                     disabled={saving || !canEditNcr}
@@ -4798,9 +4784,9 @@ function NcrCapaPageContent() {
                             type="button"
                             style={{
                               ...secondaryButtonSmall,
-                              border: "1px solid #fecaca",
+                              border: "1px solid #ECECE7",
                               color: "#F93822",
-                              background: "#fff5f5",
+                              background: "#ECECE7",
                             }}
                             onClick={() => void deleteEvidence(file)}
                             disabled={!canEditNcr}
@@ -4825,7 +4811,7 @@ function NcrCapaPageContent() {
             title="NCR Reports"
             subtitle="Filter the NCR register here, then generate a controlled PDF output from the visible records."
           >
-            <div style={reportFilterPanelStyle}>
+            <div className="ims-filter-panel" style={reportFilterPanelStyle}>
               <div style={filterActionRowStyle}>
                 <input
                   style={toolbarSearchStyle}
@@ -4843,7 +4829,7 @@ function NcrCapaPageContent() {
               </div>
 
               {showReportFilters ? (
-              <div style={toolbarFiltersStyle}>
+              <div className="ims-filter-panel" style={toolbarFiltersStyle}>
                 <div style={toolbarLabeledControlStyle}>
                   <label style={toolbarLabelStyle}>Status</label>
                   <select style={toolbarSelectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -4998,10 +4984,10 @@ function HeroPill({
   tone: "green" | "amber" | "red" | "blue";
 }) {
   const tones = {
-    green: { bg: "rgba(220,252,231,0.15)", border: "rgba(220,252,231,0.26)", text: "#dcfce7" },
-    amber: { bg: "rgba(254,243,199,0.15)", border: "rgba(254,243,199,0.28)", text: "#fef3c7" },
-    red: { bg: "rgba(254,226,226,0.15)", border: "rgba(254,226,226,0.28)", text: "#fee2e2" },
-    blue: { bg: "rgba(219,234,254,0.15)", border: "rgba(219,234,254,0.28)", text: "#dbeafe" },
+    green: { bg: "rgba(220,252,231,0.15)", border: "rgba(220,252,231,0.26)", text: "#ECECE7" },
+    amber: { bg: "rgba(254,243,199,0.15)", border: "rgba(254,243,199,0.28)", text: "#ECECE7" },
+    red: { bg: "rgba(254,226,226,0.15)", border: "rgba(254,226,226,0.28)", text: "#ECECE7" },
+    blue: { bg: "rgba(219,234,254,0.15)", border: "rgba(219,234,254,0.28)", text: "#ECECE7" },
   };
 
   const colours = tones[tone];
@@ -5033,7 +5019,7 @@ function HeroMetaCard({
 
 function SelectedFilesList({ files }: { files: File[] }) {
   if (files.length === 0) {
-    return <div style={{ marginTop: 12, fontSize: 13, color: "#64748b" }}>No files selected.</div>;
+    return <div style={{ marginTop: 12, fontSize: 13, color: "#53565A" }}>No files selected.</div>;
   }
 
   return (
@@ -5047,8 +5033,8 @@ function SelectedFilesList({ files }: { files: File[] }) {
             alignItems: "center",
             padding: "8px 10px",
             borderRadius: 999,
-            background: "#eef2ff",
-            color: "#3730a3",
+            background: "#ECECE7",
+            color: "#005670",
             fontSize: 12,
             fontWeight: 700,
           }}
@@ -5164,10 +5150,10 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const topMetaActionsStyle: CSSProperties = {
@@ -5187,8 +5173,8 @@ const statusBannerStyle: CSSProperties = {
   background: "white",
   borderRadius: "12px",
   padding: "12px 16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+  color: "#000000",
 };
 
 const statsGridStyle: CSSProperties = {
@@ -5206,8 +5192,8 @@ const workspaceNavStyle: CSSProperties = {
 };
 
 const workspaceNavButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   padding: "10px 14px",
   borderRadius: "10px",
@@ -5241,8 +5227,8 @@ const quickActionGridStyle: CSSProperties = {
 };
 
 const quickActionCardStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: "14px",
   padding: "14px",
   cursor: "pointer",
@@ -5254,14 +5240,14 @@ const quickActionCardStyle: CSSProperties = {
 const quickActionLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#475569",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
 
 const quickActionValueStyle: CSSProperties = {
   fontSize: "28px",
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1,
 };
 
@@ -5272,8 +5258,8 @@ const storyGridStyle: CSSProperties = {
 };
 
 const storyCardStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: "14px",
   padding: "14px",
   display: "grid",
@@ -5281,7 +5267,7 @@ const storyCardStyle: CSSProperties = {
 };
 
 const storyTitleStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "14px",
   fontWeight: 800,
 };
@@ -5299,7 +5285,7 @@ const storyBarRowStyle: CSSProperties = {
 };
 
 const storyBarLabelStyle: CSSProperties = {
-  color: "#475569",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 700,
 };
@@ -5307,7 +5293,7 @@ const storyBarLabelStyle: CSSProperties = {
 const storyTrackStyle: CSSProperties = {
   height: "12px",
   borderRadius: "999px",
-  background: "#e2e8f0",
+  background: "#D0D0CE",
   overflow: "hidden",
 };
 
@@ -5317,7 +5303,7 @@ const storyFillStyle: CSSProperties = {
 };
 
 const storyBarValueStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "13px",
   fontWeight: 900,
   textAlign: "right",
@@ -5329,15 +5315,15 @@ const dashboardMetricGridStyle: CSSProperties = {
 };
 
 const dashboardMetricCardStyle: CSSProperties = {
-  border: "1px solid #dbe3ec",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: "14px",
   padding: "14px",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
   gap: "12px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
 };
@@ -5373,8 +5359,8 @@ const reportFilterPanelStyle: CSSProperties = {
   gap: "12px",
   padding: "14px",
   borderRadius: "16px",
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   marginBottom: "14px",
 };
 
@@ -5387,8 +5373,8 @@ const filterActionRowStyle: CSSProperties = {
 
 const reportActionCardStyle: CSSProperties = {
   borderRadius: "16px",
-  border: "1px solid #dbe3ec",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   padding: "16px",
   display: "grid",
   gap: "14px",
@@ -5396,14 +5382,14 @@ const reportActionCardStyle: CSSProperties = {
 };
 
 const reportActionLabelStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "15px",
   fontWeight: 800,
 };
 
 const reportActionHintStyle: CSSProperties = {
   marginTop: "6px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.5,
 };
@@ -5424,7 +5410,7 @@ const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const sectionHeaderStyle: CSSProperties = {
@@ -5434,12 +5420,12 @@ const sectionHeaderStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
 };
 
@@ -5447,11 +5433,11 @@ const inputStyle: CSSProperties = {
   width: "100%",
   padding: "10px 12px",
   borderRadius: 10,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   outline: "none",
   fontSize: 14,
-  color: "#0f172a",
+  color: "#000000",
   boxSizing: "border-box",
 };
 
@@ -5469,9 +5455,9 @@ const toolbarSelectStyle: CSSProperties = {
 const toolbarButtonStyle: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 700,
   cursor: "pointer",
   minWidth: "150px",
@@ -5490,7 +5476,7 @@ const toolbarLabelStyle: CSSProperties = {
   fontWeight: 700,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  color: "#475569",
+  color: "#53565A",
 };
 
 const textareaStyle: CSSProperties = {
@@ -5503,7 +5489,7 @@ const textareaStyle: CSSProperties = {
 const labelStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 700,
-  color: "#475569",
+  color: "#53565A",
   marginBottom: 6,
   display: "block",
   letterSpacing: 0.2,
@@ -5523,9 +5509,9 @@ const primaryButton: CSSProperties = {
 const secondaryButton: CSSProperties = {
   padding: "10px 16px",
   borderRadius: 10,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 700,
   cursor: "pointer",
 };
@@ -5533,9 +5519,9 @@ const secondaryButton: CSSProperties = {
 const secondaryButtonSmall: CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 700,
   cursor: "pointer",
 };
@@ -5549,7 +5535,7 @@ const buttonRowStyle: CSSProperties = {
 
 const attentionNumberStyle: CSSProperties = {
   fontSize: 13,
-  color: "#64748b",
+  color: "#53565A",
   fontWeight: 800,
   marginBottom: 8,
 };
@@ -5557,7 +5543,7 @@ const attentionNumberStyle: CSSProperties = {
 const attentionTitleStyle: CSSProperties = {
   fontSize: 16,
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   marginBottom: 8,
 };
 
@@ -5565,16 +5551,16 @@ const emptyBoardStyle: CSSProperties = {
   padding: 18,
   borderRadius: 16,
   background: "#ffffff",
-  border: "1px dashed #cbd5e1",
-  color: "#475569",
+  border: "1px dashed #D0D0CE",
+  color: "#53565A",
 };
 
 const createTabWrapStyle: CSSProperties = {
   display: "inline-flex",
-  background: "#e9eef5",
+  background: "#D0D0CE",
   borderRadius: 14,
   padding: 4,
-  border: "1px solid #d3dce8",
+  border: "1px solid #D0D0CE",
   marginBottom: 16,
 };
 
@@ -5589,15 +5575,15 @@ const createTabButtonStyle: CSSProperties = {
 const createPanelNcrStyle: CSSProperties = {
   padding: 18,
   borderRadius: 18,
-  background: "#eef4fb",
-  border: "1px solid #d3dfef",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
 };
 
 const createPanelCapaStyle: CSSProperties = {
   padding: 18,
   borderRadius: 18,
-  background: "#f3efff",
-  border: "1px solid #ddd6fe",
+  background: "#ECECE7",
+  border: "1px solid #ECECE7",
 };
 
 const detailFormGridStyle: CSSProperties = {
@@ -5610,7 +5596,7 @@ const formSectionTitleStyle: CSSProperties = {
   gridColumn: "1 / -1",
   fontSize: 13,
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   paddingTop: 4,
 };
 
@@ -5628,7 +5614,7 @@ const linkWrapStyle: CSSProperties = {
 };
 
 const mutedTextStyle: CSSProperties = {
-  color: "#94a3b8",
+  color: "#D0D0CE",
   fontSize: "13px",
 };
 
@@ -5636,7 +5622,7 @@ const editablePillWrapStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   gap: "4px",
-  background: "#dbeafe",
+  background: "#ECECE7",
   borderRadius: "999px",
   paddingRight: "6px",
 };
@@ -5645,8 +5631,8 @@ const linkPillStyle: CSSProperties = {
   display: "inline-block",
   padding: "6px 10px",
   borderRadius: "999px",
-  background: "#dbeafe",
-  color: "#1d4ed8",
+  background: "#ECECE7",
+  color: "#005670",
   fontSize: "12px",
   fontWeight: 800,
   textDecoration: "none",
@@ -5655,7 +5641,7 @@ const linkPillStyle: CSSProperties = {
 const pillRemoveButtonStyle: CSSProperties = {
   background: "transparent",
   border: "none",
-  color: "#1d4ed8",
+  color: "#005670",
   fontWeight: 800,
   cursor: "pointer",
   fontSize: "14px",
@@ -5669,10 +5655,10 @@ const toolbarStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 
 const toolbarFiltersStyle: CSSProperties = {
@@ -5711,13 +5697,13 @@ const importTableStyle: CSSProperties = {
 const importTableHeadStyle: CSSProperties = {
   textAlign: "left",
   padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 900,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
+  borderBottom: "1px solid #D0D0CE",
   whiteSpace: "nowrap",
 };
 
@@ -5726,9 +5712,9 @@ const importTableRowStyle: CSSProperties = {
   gridTemplateColumns: "0.5fr 0.9fr 1.8fr 1fr 1fr 0.8fr 0.9fr 0.9fr 2fr",
   gap: "10px",
   padding: "12px",
-  borderBottom: "1px solid #eef2f7",
+  borderBottom: "1px solid #ECECE7",
   fontSize: "12px",
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.4,
   alignItems: "start",
 };
@@ -5739,7 +5725,7 @@ const importErrorTextStyle: CSSProperties = {
 };
 
 const importOkTextStyle: CSSProperties = {
-  color: "#166534",
+  color: "#005670",
   fontWeight: 800,
 };
 
@@ -5747,8 +5733,8 @@ const pdfExportPanelStyle: CSSProperties = {
   marginTop: "18px",
   padding: "16px",
   borderRadius: "18px",
-  border: "1px solid #dbeafe",
-  background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+  border: "1px solid #ECECE7",
+  background: "linear-gradient(180deg, #ECECE7 0%, #ffffff 100%)",
   display: "grid",
   gap: "14px",
 };
@@ -5763,13 +5749,13 @@ const pdfExportHeaderStyle: CSSProperties = {
 const pdfExportTitleStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const pdfExportSubtitleStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12.5px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.5,
 };
 
@@ -5784,11 +5770,11 @@ const checkboxCardStyle: CSSProperties = {
   gap: "10px",
   padding: "10px 12px",
   borderRadius: "14px",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   fontSize: "13px",
   fontWeight: 600,
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.4,
 };
 
@@ -5797,7 +5783,7 @@ const checkboxHintStyle: CSSProperties = {
   marginTop: "3px",
   fontSize: "11.5px",
   fontWeight: 500,
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const pdfSavedMetaStyle: CSSProperties = {
@@ -5805,15 +5791,15 @@ const pdfSavedMetaStyle: CSSProperties = {
   flexWrap: "wrap",
   gap: "10px 18px",
   fontSize: "12.5px",
-  color: "#475569",
+  color: "#53565A",
 };
 
 const linkedActionsPanelStyle: CSSProperties = {
   marginTop: "16px",
   padding: "14px",
   borderRadius: "16px",
-  background: "#f8fafc",
-  border: "1px solid #dbeafe",
+  background: "#ECECE7",
+  border: "1px solid #ECECE7",
 };
 
 const linkedActionListStyle: CSSProperties = {
@@ -5829,19 +5815,19 @@ const linkedActionItemStyle: CSSProperties = {
   padding: "12px",
   borderRadius: "12px",
   background: "#ffffff",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
 };
 
 const linkedActionTitleStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const linkedActionMetaStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const compactInsightListStyle: CSSProperties = {
@@ -5851,9 +5837,9 @@ const compactInsightListStyle: CSSProperties = {
 
 const compactInsightCardStyle: CSSProperties = {
   borderRadius: "16px",
-  border: "1px solid #dbe3ec",
+  border: "1px solid #D0D0CE",
   padding: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const compactInsightHeaderStyle: CSSProperties = {
@@ -5869,7 +5855,7 @@ const compactInsightMetaLineStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   gap: "10px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.45,
   flexWrap: "wrap",
@@ -5881,7 +5867,7 @@ const tableInfoRowStyle: CSSProperties = {
   justifyContent: "flex-start",
   gap: "4px",
   flexWrap: "wrap",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
   margin: "12px 0",
@@ -5889,24 +5875,24 @@ const tableInfoRowStyle: CSSProperties = {
 
 const registerTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const registerHeadStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1.1fr 2.3fr 1fr 1fr 1fr 1.1fr",
-  gap: "12px",
-  padding: "14px 16px",
-  background: "#f8fafc",
-  borderBottom: "1px solid #e5e7eb",
-  fontSize: "12px",
+  gap: "8px",
+  padding: "9px 10px",
+  background: "#005670",
+  borderBottom: "1px solid #005670",
+  fontSize: "10px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#ffffff",
   textTransform: "uppercase",
-  letterSpacing: 0.3,
+  letterSpacing: "0.04em",
   alignItems: "center",
 };
 
@@ -5932,10 +5918,10 @@ const registerRowStyle: CSSProperties = {
   textAlign: "left",
   display: "grid",
   gridTemplateColumns: "1.1fr 2.3fr 1fr 1fr 1fr 1.1fr",
-  gap: "12px",
-  padding: "16px",
+  gap: "8px",
+  padding: "10px",
   border: "none",
-  borderBottom: "1px solid #eef2f7",
+  borderBottom: "1px solid #D0D0CE",
   cursor: "pointer",
   alignItems: "start",
 };
@@ -5951,14 +5937,14 @@ const registerTagStyle: CSSProperties = {
 const registerTitleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   marginBottom: "6px",
   lineHeight: 1.35,
 };
 
 const registerDescriptionStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.45,
 };
 
@@ -5968,12 +5954,12 @@ const registerMetaStyle: CSSProperties = {
   flexWrap: "wrap",
   marginTop: "10px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const registerSimpleTextStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 700,
 };
 
@@ -5989,13 +5975,13 @@ const editHeaderStyle: CSSProperties = {
 const detailRecordNumberStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const detailRecordTitleStyle: CSSProperties = {
   margin: "4px 0 0 0",
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const evidenceListStyle: CSSProperties = {
@@ -6011,26 +5997,26 @@ const evidenceItemStyle: CSSProperties = {
   alignItems: "flex-start",
   padding: "14px",
   borderRadius: "12px",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
 };
 
 const evidenceFileNameStyle: CSSProperties = {
   fontWeight: 700,
-  color: "#0f172a",
+  color: "#000000",
   wordBreak: "break-word",
 };
 
 const evidenceMetaTextStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   marginTop: "4px",
   lineHeight: 1.45,
 };
 
 const evidenceNoteStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#475569",
+  color: "#53565A",
   marginTop: "6px",
 };
 

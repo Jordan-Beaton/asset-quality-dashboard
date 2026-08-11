@@ -137,13 +137,13 @@ function ToolIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true" style={
 function LearningIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true" style={iconStyle}><path {...iconProps} d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22zM20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22z" /></svg>; }
 
 const pageStyle: CSSProperties = { display: "grid", gap: 20 };
-const introStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", border: "1px solid #dbe7f3", borderRadius: 18, background: "#ffffff" };
+const introStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", border: "1px solid #D0D0CE", borderRadius: 18, background: "#ffffff" };
 const introIconStyle: CSSProperties = { flex: "0 0 auto", width: 48, height: 48, borderRadius: 14, display: "grid", placeItems: "center", background: "#ECECE7", color: "#005670" };
 const introTitleStyle: CSSProperties = { margin: "0 0 4px", color: "#000000", fontSize: 19, fontWeight: 800 };
 const introTextStyle: CSSProperties = { margin: 0, color: "#53565A", fontSize: 14, lineHeight: 1.45 };
-const sectionStyle: CSSProperties = { padding: 18, border: "1px solid #dbe7f3", borderRadius: 18, background: "#ffffff", boxShadow: "0 1px 3px rgba(15,23,42,.08)" };
+const sectionStyle: CSSProperties = { padding: 18, border: "1px solid #D0D0CE", borderRadius: 18, background: "#ffffff", boxShadow: "0 1px 3px rgba(15,23,42,.08)" };
 const sectionTitleStyle: CSSProperties = { margin: "0 0 14px", color: "#005670", fontSize: 17, fontWeight: 900 };
-const toolCardStyle: CSSProperties = { minHeight: 126, padding: 18, boxSizing: "border-box", display: "grid", gridTemplateColumns: "48px minmax(0, 1fr) 22px", gap: 13, alignItems: "center", color: "inherit", textDecoration: "none", background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #D0D0CE", borderRadius: 16 };
+const toolCardStyle: CSSProperties = { minHeight: 126, padding: 18, boxSizing: "border-box", display: "grid", gridTemplateColumns: "48px minmax(0, 1fr) 22px", gap: 13, alignItems: "center", color: "inherit", textDecoration: "none", background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)", border: "1px solid #D0D0CE", borderRadius: 16 };
 const toolIconStyle: CSSProperties = { width: 48, height: 48, display: "grid", placeItems: "center", borderRadius: 14, background: "#005670", color: "#ffffff" };
 const toolCopyStyle: CSSProperties = { minWidth: 0, display: "grid", gap: 5 };
 const toolTitleStyle: CSSProperties = { color: "#000000", fontSize: 17, fontWeight: 900 };

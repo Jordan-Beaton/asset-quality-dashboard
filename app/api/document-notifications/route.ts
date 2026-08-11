@@ -74,7 +74,7 @@ function buildActionButtons(buttons: WorkflowButton[]) {
         })
         .join("")}
     </div>
-    <p style="font-size: 12px; color: #64748b;">
+    <p style="font-size: 12px; color: #53565A;">
       These links open a secure confirmation page before the workflow is updated. Links are single-use and expire automatically.
     </p>
   `;
@@ -89,7 +89,7 @@ function buildHtml(
   const subject = buildSubject(payload.eventType, payload.documentNumber);
 
   return `
-    <div style="font-family: Arial, Helvetica, sans-serif; color: #0f172a; line-height: 1.5;">
+    <div style="font-family: 'Azo Sans', 'Segoe UI', Arial, Helvetica, sans-serif; color: #000000; line-height: 1.5;">
       <h2 style="margin-bottom: 12px;">${escapeHtml(subject)}</h2>
       <p><strong>Document:</strong> ${escapeHtml(payload.documentNumber || "-")}</p>
       <p><strong>Title:</strong> ${escapeHtml(payload.documentTitle || "-")}</p>
@@ -123,11 +123,11 @@ function buildHtml(
           ? `<p><strong>Controlled File:</strong> ${escapeHtml(controlledFile.fileName)}</p>
              <p>
                <a href="${escapeHtml(controlledFile.url)}"
-                  style="display: inline-block; background: #e2e8f0; color: #0f172a; text-decoration: none; border-radius: 10px; padding: 10px 14px; font-weight: 700;">
+                  style="display: inline-block; background: #D0D0CE; color: #000000; text-decoration: none; border-radius: 10px; padding: 10px 14px; font-weight: 700;">
                  Open Controlled File
                </a>
              </p>
-             <p style="font-size: 12px; color: #64748b;">File links are secure signed URLs and may expire.</p>`
+             <p style="font-size: 12px; color: #53565A;">File links are secure signed URLs and may expire.</p>`
           : ""
       }
       ${buildActionButtons(buttons)}

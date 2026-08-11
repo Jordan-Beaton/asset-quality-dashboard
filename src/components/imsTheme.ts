@@ -59,22 +59,22 @@ export const imsPanelStyle: CSSProperties = {
   borderRadius: imsRadii.panel,
   border: `1px solid ${imsColours.border}`,
   boxShadow: imsShadows.panel,
-  padding: "20px",
+  padding: "16px",
   boxSizing: "border-box",
 };
 
 export const imsTopMetaRowStyle: CSSProperties = {
-  minHeight: "auto",
+  minHeight: "48px",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
   gap: "12px",
   flexWrap: "wrap",
   marginBottom: "20px",
-  padding: "12px 14px",
-  borderRadius: "16px",
-  background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  padding: "8px 12px",
+  borderRadius: "14px",
+  background: "#ffffff",
+  border: `1px solid ${imsColours.border}`,
   boxShadow: imsShadows.panel,
   boxSizing: "border-box",
 };
@@ -88,11 +88,11 @@ export const imsBackLinkStyle: CSSProperties = {
 };
 
 export const imsStatusBannerStyle: CSSProperties = {
-  background: "white",
+  background: imsColours.page,
   color: imsColours.ink,
-  padding: "12px 16px",
-  borderRadius: "12px",
-  boxShadow: imsShadows.panel,
+  padding: "8px 12px",
+  borderRadius: "10px",
+  boxShadow: "none",
 };
 
 export const imsTabListStyle: CSSProperties = {
@@ -105,7 +105,7 @@ export const imsTabListStyle: CSSProperties = {
 
 export const imsTabButtonStyle: CSSProperties = {
   border: "none",
-  background: "#e2e8f0",
+  background: "#eef7f8",
   color: imsColours.ink,
   borderRadius: imsRadii.control,
   padding: "10px 14px",
@@ -147,7 +147,7 @@ export const imsPrimaryButtonStyle: CSSProperties = {
 
 export const imsSecondaryButtonStyle: CSSProperties = {
   ...imsButtonBaseStyle,
-  background: "#e2e8f0",
+  background: imsColours.brandSoft,
   color: imsColours.ink,
 };
 
@@ -168,11 +168,50 @@ export const imsInputStyle: CSSProperties = {
   width: "100%",
   minHeight: "42px",
   borderRadius: imsRadii.control,
-  border: "1px solid #cbd5e1",
+  border: `1px solid ${imsColours.border}`,
   padding: "10px 12px",
   fontSize: "14px",
   background: "#ffffff",
   color: imsColours.ink,
+  boxSizing: "border-box",
+};
+
+export const imsTextareaStyle: CSSProperties = {
+  ...imsInputStyle,
+  minHeight: "96px",
+  height: "auto",
+  lineHeight: 1.45,
+  resize: "vertical",
+};
+
+export const imsFieldStyle: CSSProperties = {
+  display: "grid",
+  gap: "6px",
+  minWidth: 0,
+  alignContent: "start",
+};
+
+export const imsLabelStyle: CSSProperties = {
+  color: imsColours.muted,
+  fontSize: "13px",
+  fontWeight: 800,
+  lineHeight: 1.4,
+};
+
+export const imsFormGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "12px",
+  alignItems: "start",
+};
+
+export const imsFieldsetStyle: CSSProperties = {
+  minWidth: 0,
+  margin: 0,
+  padding: "14px",
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: "12px",
+  background: imsColours.panel,
   boxSizing: "border-box",
 };
 
@@ -181,8 +220,9 @@ export const imsFilterPanelStyle: CSSProperties = {
   gap: "12px",
   padding: "14px",
   borderRadius: "16px",
-  border: "1px solid #dbe4ef",
+  border: `1px solid ${imsColours.border}`,
   background: imsColours.panelAlt,
+  boxShadow: "0 1px 3px rgba(0, 86, 112, 0.06)",
   marginBottom: "14px",
 };
 
@@ -216,27 +256,29 @@ export const imsTableStyle: CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
   background: imsColours.panel,
-  fontSize: "13px",
+  fontSize: "12px",
 };
 
 export const imsTableHeadStyle: CSSProperties = {
   textAlign: "left",
-  padding: "12px 14px",
-  background: imsColours.panelAlt,
-  color: "#334155",
-  fontSize: "12px",
-  fontWeight: 900,
+  padding: "9px 10px",
+  background: imsColours.brand,
+  color: "#ffffff",
+  fontSize: "10px",
+  fontWeight: 800,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
+  borderBottom: `1px solid ${imsColours.brand}`,
   whiteSpace: "nowrap",
 };
 
 export const imsTableCellStyle: CSSProperties = {
-  padding: "12px 14px",
-  borderBottom: "1px solid #edf2f7",
+  padding: "10px",
+  borderBottom: `1px solid ${imsColours.border}`,
   color: imsColours.ink,
   verticalAlign: "middle",
-  fontSize: "13px",
-  lineHeight: 1.45,
+  fontSize: "12px",
+  fontWeight: 400,
+  lineHeight: 1.35,
+  textAlign: "left",
 };

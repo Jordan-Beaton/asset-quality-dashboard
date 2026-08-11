@@ -346,8 +346,8 @@ export default function HomePage() {
           <span className="module-access-label">{hasAccess ? "Open workspace" : "Access not assigned"}</span>
         </div>
         <div style={cardFooterStyle}>
-          <span style={{ ...cardShortStyle, color: hasAccess ? "#005670" : "#64748b" }}>
-            <span style={{ ...connectorDotStyle, background: hasAccess ? "#005670" : "#94a3b8", boxShadow: hasAccess ? "0 0 0 5px rgba(0,86,112,0.12)" : "none" }} />
+          <span style={{ ...cardShortStyle, color: hasAccess ? "#005670" : "#53565A" }}>
+            <span style={{ ...connectorDotStyle, background: hasAccess ? "#005670" : "#D0D0CE", boxShadow: hasAccess ? "0 0 0 5px rgba(0,86,112,0.12)" : "none" }} />
             {card.short}
           </span>
           <span className={hasAccess ? "module-connection live" : "module-connection"}>{hasAccess ? "Connected" : "Restricted"}</span>
@@ -446,9 +446,9 @@ export default function HomePage() {
           .node-four { left: 15px; top: 35%; width: 4px; height: 4px; opacity: .6; }
           .module-launch-arrow { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid #D0D0CE; border-radius: 50%; color: #005670; background: rgba(255,255,255,.76); font-size: 17px; font-weight: 800; transition: 180ms ease; }
           .home-module-card:hover .module-launch-arrow { transform: translate(2px, -2px); background: #005670; border-color: #005670; color: white; }
-          .module-access-label { color: #64748b; font-size: 12px; font-weight: 700; }
-          .module-connection { display: inline-flex; align-items: center; gap: 6px; color: #64748b; font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-          .module-connection::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; }
+          .module-access-label { color: #53565A; font-size: 12px; font-weight: 700; }
+          .module-connection { display: inline-flex; align-items: center; gap: 6px; color: #53565A; font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+          .module-connection::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #D0D0CE; }
           .module-connection.live { color: #005670; }
           .module-connection.live::before { background: #63B1BC; box-shadow: 0 0 0 4px rgba(99,177,188,.15); }
           .workspace-view-tools { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
@@ -461,7 +461,7 @@ export default function HomePage() {
           .module-card-spotlight .module-icon { width: 58px !important; height: 58px !important; }
           .spotlight-arrow { width: 48px; height: 48px; border: 1px solid #D0D0CE; border-radius: 50%; background: white; color: #005670; cursor: pointer; font-size: 32px; line-height: 1; box-shadow: 0 10px 24px rgba(15,23,42,.08); transition: 180ms ease; }
           .spotlight-arrow:hover { transform: scale(1.1); background: #005670; border-color: #005670; color: white; }
-          .spotlight-counter { position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%); color: #64748b; font-size: 12px; font-weight: 900; }
+          .spotlight-counter { position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%); color: #53565A; font-size: 12px; font-weight: 900; }
           .module-compact-view { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
           .module-card-compact { height: 154px !important; min-height: 154px !important; padding: 14px !important; }
           .module-card-compact > div:last-child { display: none !important; }
@@ -473,7 +473,7 @@ export default function HomePage() {
           .module-card-list > div:first-of-type .module-launch-arrow { display: none; }
           .module-card-list > div:last-child { border-top: 0 !important; padding-top: 0 !important; }
           .module-card-list h3 { font-size: 18px !important; }
-          .module-hub-view { position: relative; min-height: 680px; overflow: hidden; border: 1px solid rgba(0,86,112,.12); border-radius: 20px; background: radial-gradient(circle at 50% 50%, rgba(99,177,188,.14) 0 15%, transparent 36%), linear-gradient(rgba(0,86,112,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(0,86,112,.035) 1px, transparent 1px), #fbfdfd; background-size: auto, 32px 32px, 32px 32px, auto; }
+          .module-hub-view { position: relative; min-height: 680px; overflow: hidden; border: 1px solid rgba(0,86,112,.12); border-radius: 20px; background: radial-gradient(circle at 50% 50%, rgba(99,177,188,.14) 0 15%, transparent 36%), linear-gradient(rgba(0,86,112,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(0,86,112,.035) 1px, transparent 1px), #ECECE7; background-size: auto, 32px 32px, 32px 32px, auto; }
           .hub-connection-ring { position: absolute; left: 50%; top: 50%; width: 74%; height: 76%; transform: translate(-50%, -50%); border: 1px dashed rgba(0,86,112,.2); border-radius: 50%; box-shadow: inset 0 0 70px rgba(99,177,188,.07); animation: imsCenteredSpin 70s linear infinite; }
           .hub-video-core { position: absolute; left: 50%; top: 50%; width: 222px; height: 222px; padding: 10px; transform: translate(-50%, -50%); border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: #005670; box-shadow: 0 24px 54px rgba(0,86,112,.28), 0 0 0 18px rgba(99,177,188,.1), 0 0 0 19px rgba(0,86,112,.12); box-sizing: border-box; overflow: hidden; z-index: 2; }
           .hub-video-core video { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
@@ -544,7 +544,7 @@ export default function HomePage() {
             transform: translateY(-11px) scale(1.035);
             box-shadow: 0 28px 54px rgba(0, 86, 112, 0.2), 0 8px 18px rgba(15,23,42,.09);
             border-color: #63B1BC;
-            background: linear-gradient(160deg, #ffffff 0%, #eefafa 100%);
+            background: linear-gradient(160deg, #ffffff 0%, #ECECE7 100%);
           }
 
           .module-icon { transition: transform 220ms cubic-bezier(.2,.8,.2,1), background 220ms ease, color 220ms ease, box-shadow 220ms ease; }
@@ -684,7 +684,7 @@ const heroStyle: CSSProperties = {
   gap: "22px",
   alignItems: "center",
   background:
-    "radial-gradient(circle at 84% 42%, rgba(99,177,188,.28) 0 8%, transparent 31%), radial-gradient(circle at 10% 120%, rgba(99,177,188,.14), transparent 38%), linear-gradient(135deg, #005670 0%, #005670 58%, #003f53 100%)",
+    "radial-gradient(circle at 84% 42%, rgba(99,177,188,.28) 0 8%, transparent 31%), radial-gradient(circle at 10% 120%, rgba(99,177,188,.14), transparent 38%), linear-gradient(135deg, #005670 0%, #005670 58%, #005670 100%)",
   color: "#ffffff",
   border: "1px solid rgba(255,255,255,.12)",
   boxShadow: "0 18px 38px rgba(0,86,112,.18), inset 0 1px 0 rgba(255,255,255,.12)",
@@ -760,7 +760,7 @@ const orbitVideoStyle: CSSProperties = {
 
 const commandSurfaceStyle: CSSProperties = {
   borderRadius: "24px",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   background:
     "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,251,252,0.98) 100%), linear-gradient(90deg, rgba(0,86,112,0.08) 1px, transparent 1px)",
   backgroundSize: "auto, 36px 36px",
@@ -788,7 +788,7 @@ const surfaceEyebrowStyle: CSSProperties = {
 
 const surfaceTitleStyle: CSSProperties = {
   margin: "4px 0 0",
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "26px",
   lineHeight: 1.12,
 };
@@ -796,7 +796,7 @@ const surfaceTitleStyle: CSSProperties = {
 const surfaceHintStyle: CSSProperties = {
   margin: 0,
   maxWidth: "460px",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.5,
 };
@@ -824,8 +824,8 @@ const cardStyle: CSSProperties = {
   gap: "14px",
   padding: "18px",
   borderRadius: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f9fcfd 100%)",
-  border: "1px solid #d7e6ee",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  border: "1px solid #D0D0CE",
   boxShadow: "0 10px 22px rgba(15, 23, 42, 0.055)",
   boxSizing: "border-box",
   overflow: "hidden",
@@ -875,7 +875,7 @@ const cardBodyStyle: CSSProperties = {
 
 const cardTitleStyle: CSSProperties = {
   margin: 0,
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "22px",
   lineHeight: 1.14,
 };
@@ -885,7 +885,7 @@ const cardFooterStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: "12px",
-  borderTop: "1px solid #edf2f7",
+  borderTop: "1px solid #ECECE7",
   paddingTop: "13px",
 };
 
@@ -906,6 +906,6 @@ const connectorDotStyle: CSSProperties = {
   boxShadow: "0 0 0 5px rgba(0,86,112,0.12)",
 };
 
-const adminRequestPanel: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, margin: "0 auto 20px", maxWidth: 1320, padding: "16px 18px", border: "1px solid #fdba74", borderRadius: 16, background: "#fff7ed", boxShadow: "0 8px 20px rgba(154,52,18,.08)" };
-const adminRequestTitle: CSSProperties = { margin: "3px 0 5px", color: "#9a3412", fontSize: 19 };
+const adminRequestPanel: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, margin: "0 auto 20px", maxWidth: 1320, padding: "16px 18px", border: "1px solid #ECECE7", borderRadius: 16, background: "#ECECE7", boxShadow: "0 8px 20px rgba(154,52,18,.08)" };
+const adminRequestTitle: CSSProperties = { margin: "3px 0 5px", color: "#000000", fontSize: 19 };
 const adminRequestLink: CSSProperties = { flex: "0 0 auto", display: "inline-flex", alignItems: "center", minHeight: 42, padding: "10px 14px", borderRadius: 10, background: "#005670", color: "#ffffff", textDecoration: "none", fontSize: 14, fontWeight: 900 };

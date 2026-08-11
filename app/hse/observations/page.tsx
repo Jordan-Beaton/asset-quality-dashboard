@@ -364,7 +364,6 @@ export default function HseObservationsPage() {
                 {availableYears.map((year) => <option key={year}>{year}</option>)}
               </select>
             </label>
-            <ImsButton onClick={() => void loadData()} disabled={loading}>Refresh</ImsButton>
           </>
         }
         status={<><strong>Status:</strong> {message}</>}
@@ -473,7 +472,7 @@ export default function HseObservationsPage() {
               </Field>
             </ImsFilterPanel>
             <div style={imsTableInfoRowStyle}>Showing <strong>{filteredRecords.length}</strong> of <strong>{yearRecords.length}</strong> observations</div>
-            <div className="observation-table-wrap" style={{ overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: "14px" }}>
+            <div className="observation-table-wrap" style={{ overflowX: "auto", border: "1px solid #D0D0CE", borderRadius: "14px" }}>
               <table className="observation-table" style={{ ...imsTableStyle, minWidth: 980 }}>
                 <thead>
                   <tr>
@@ -484,7 +483,7 @@ export default function HseObservationsPage() {
                 </thead>
                 <tbody>
                   {filteredRecords.map((record) => (
-                    <tr key={record.id} onClick={() => selectObservationAndScroll(record.id)} style={selectedRecord?.id === record.id ? selectedRowStyle : rowStyle}>
+                    <tr key={record.id} aria-selected={selectedRecord?.id === record.id} data-selected={selectedRecord?.id === record.id ? "true" : "false"} onClick={() => selectObservationAndScroll(record.id)} style={selectedRecord?.id === record.id ? selectedRowStyle : rowStyle}>
                       <td data-label="Observation" style={{ ...imsTableCellStyle, fontWeight: 900, color: imsColours.brandDark }}>{record.observation_number}</td>
                       <td data-label="Type" style={imsTableCellStyle}>{record.observation_type || "-"}</td>
                       <td data-label="Project" style={imsTableCellStyle}>{record.project || "-"}</td>
@@ -718,12 +717,12 @@ function Info({ label, value, large = false }: { label: string; value: ReactNode
 
 function StatusPill({ status }: { status: string }) {
   const colour = isClosed(status)
-    ? { background: "#dcfce7", color: "#166534" }
+    ? { background: "#ECECE7", color: "#005670" }
     : normalise(status) === "new"
-    ? { background: "#dbeafe", color: "#1d4ed8" }
+    ? { background: "#ECECE7", color: "#005670" }
     : normalise(status) === "action required"
-    ? { background: "#fee2e2", color: "#F93822" }
-    : { background: "#fef3c7", color: "#92400e" };
+    ? { background: "#ECECE7", color: "#F93822" }
+    : { background: "#ECECE7", color: "#000000" };
   return <span style={{ ...pillStyle, ...colour }}>{status || "New"}</span>;
 }
 
@@ -735,7 +734,7 @@ const yearSelectStyle: CSSProperties = {
   padding: "0 10px",
   borderRadius: "10px",
   background: "#ffffff",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   color: imsColours.ink,
   fontWeight: 900,
 };
@@ -743,27 +742,27 @@ const kpiGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "rep
 const chartGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
 const registerGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "20px", alignItems: "start" };
 const fieldStyle: CSSProperties = { display: "grid", gap: "6px" };
-const labelStyle: CSSProperties = { color: "#334155", fontSize: "12px", fontWeight: 900 };
-const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#ECECE7" };
+const labelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 900 };
+const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#eef7f8", boxShadow: "inset 4px 0 0 #005670" };
 const rowStyle: CSSProperties = { cursor: "pointer" };
-const emptyCellStyle: CSSProperties = { padding: "28px 14px", textAlign: "center", color: imsColours.slate, background: "#f8fafc" };
-const emptyStateStyle: CSSProperties = { border: "1px dashed #cbd5e1", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: "#f8fafc", lineHeight: 1.45 };
+const emptyCellStyle: CSSProperties = { padding: "28px 14px", textAlign: "center", color: imsColours.slate, background: "#ECECE7" };
+const emptyStateStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: "#ECECE7", lineHeight: 1.45 };
 const latestListStyle: CSSProperties = { display: "grid", gap: "10px" };
-const latestItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #dbe3ef", borderRadius: "14px", padding: "12px", background: "#ffffff", textAlign: "left", cursor: "pointer" };
+const latestItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #D0D0CE", borderRadius: "14px", padding: "12px", background: "#ffffff", textAlign: "left", cursor: "pointer" };
 const detailGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", marginBottom: "12px" };
 const narrativeGridStyle: CSSProperties = { display: "grid", gap: "10px", marginBottom: "14px" };
-const infoStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "13px", background: "#f8fafc", padding: "12px", display: "grid", gap: "5px" };
+const infoStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "13px", background: "#ECECE7", padding: "12px", display: "grid", gap: "5px" };
 const infoLabelStyle: CSSProperties = { color: imsColours.muted, fontSize: "11px", fontWeight: 900, letterSpacing: "0.06em", textTransform: "uppercase" };
 const infoValueStyle: CSSProperties = { color: imsColours.ink, fontSize: "13px", lineHeight: 1.45 };
-const editPanelStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px", border: "1px solid #dbe3ef", borderRadius: "14px", background: "#ffffff", padding: "14px", marginBottom: "14px" };
+const editPanelStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px", border: "1px solid #D0D0CE", borderRadius: "14px", background: "#ffffff", padding: "14px", marginBottom: "14px" };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
 const subHeadingStyle: CSSProperties = { margin: "0 0 10px", color: imsColours.ink, fontSize: "16px", fontWeight: 900 };
 const evidenceListStyle: CSSProperties = { display: "grid", gap: "10px" };
-const evidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #dbe3ef", borderRadius: "13px", background: "#f8fafc", padding: "12px" };
+const evidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #D0D0CE", borderRadius: "13px", background: "#ECECE7", padding: "12px" };
 const linkedActionButtonGroupStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" };
 const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: "999px", padding: "5px 9px", fontSize: "12px", fontWeight: 900 };
 const qrGridStyle: CSSProperties = { display: "grid", gap: "16px" };
-const qrCardStyle: CSSProperties = { display: "grid", gridTemplateColumns: "110px minmax(0, 1fr)", gap: "18px", alignItems: "center", border: "1px solid #dbe3ef", background: "#f8fafc", borderRadius: "18px", padding: "18px" };
+const qrCardStyle: CSSProperties = { display: "grid", gridTemplateColumns: "110px minmax(0, 1fr)", gap: "18px", alignItems: "center", border: "1px solid #D0D0CE", background: "#ECECE7", borderRadius: "18px", padding: "18px" };
 const qrImageStyle: CSSProperties = { width: "132px", height: "132px", borderRadius: "14px", background: "#ffffff", border: `1px solid ${imsColours.brandBorder}`, padding: "8px", objectFit: "contain", boxSizing: "border-box" };
 const qrTitleStyle: CSSProperties = { margin: "0 0 6px", color: imsColours.ink, fontSize: "22px", fontWeight: 900 };
 const emptyTextStyle: CSSProperties = { color: imsColours.slate, margin: 0, lineHeight: 1.55 };

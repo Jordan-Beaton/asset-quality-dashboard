@@ -56,10 +56,10 @@ const actionsStyle: CSSProperties = {
 
 export function ModuleSectionHeader({ title, subtitle, actions }: ModuleSectionHeaderProps) {
   return (
-    <div style={headerStyle}>
+    <div className="ims-section-header" style={headerStyle}>
       <div style={copyStyle}>
-        <h2 style={titleStyle}>{title}</h2>
-        {subtitle ? <p style={subtitleStyle}>{subtitle}</p> : null}
+        <h2 className="ims-section-header-title" style={titleStyle}>{title}</h2>
+        {subtitle ? <p className="ims-section-header-subtitle" style={subtitleStyle}>{subtitle}</p> : null}
       </div>
       {actions ? <div style={actionsStyle}>{actions}</div> : null}
     </div>

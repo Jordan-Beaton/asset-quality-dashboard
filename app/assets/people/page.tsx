@@ -52,8 +52,8 @@ function formatDateTime(value: string | null | undefined) {
 
 function statusTone(active: boolean) {
   return active
-    ? { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" }
-    : { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
+    ? { bg: "#ECECE7", text: "#005670", border: "#ECECE7" }
+    : { bg: "#ECECE7", text: "#F93822", border: "#ECECE7" };
 }
 
 function PeoplePageContent() {
@@ -508,7 +508,7 @@ const stackedGridStyle: CSSProperties = {
 const panelStyle: CSSProperties = {
   background: "#ffffff",
   borderRadius: "18px",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
   padding: "22px",
 };
@@ -525,12 +525,12 @@ const sectionHeaderRowStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.55,
 };
@@ -549,25 +549,25 @@ const fieldWrapStyle: CSSProperties = {
 const fieldLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
-  color: "#475569",
+  color: "#53565A",
 };
 
 const inputStyle: CSSProperties = {
   width: "100%",
   height: "46px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   padding: "10px 12px",
   fontSize: "14px",
   background: "#ffffff",
-  color: "#0f172a",
+  color: "#000000",
   boxSizing: "border-box",
 };
 
 const readOnlyInputStyle: CSSProperties = {
   ...inputStyle,
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontWeight: 700,
 };
 
@@ -598,8 +598,8 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   borderRadius: "10px",
   padding: "9px 12px",
@@ -620,9 +620,9 @@ const miniButtonStyle: CSSProperties = {
 };
 
 const dangerButtonStyle: CSSProperties = {
-  background: "#fee2e2",
+  background: "#ECECE7",
   color: "#F93822",
-  border: "1px solid #fecaca",
+  border: "1px solid #ECECE7",
   borderRadius: "10px",
   padding: "9px 12px",
   fontWeight: 700,
@@ -632,7 +632,7 @@ const dangerButtonStyle: CSSProperties = {
 
 const compactTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
@@ -644,16 +644,16 @@ const registerTableRowStyle: CSSProperties = {
 
 const selectedTableRowStyle: CSSProperties = {
   cursor: "pointer",
-  background: "#eff6ff",
+  background: "#ECECE7",
   boxShadow: "inset 4px 0 0 #005670",
 };
 
 const emptyTableCellStyle: CSSProperties = {
   padding: "26px 14px",
   textAlign: "center",
-  color: "#64748b",
-  background: "#f8fafc",
-  borderBottom: "1px dashed #cbd5e1",
+  color: "#53565A",
+  background: "#ECECE7",
+  borderBottom: "1px dashed #D0D0CE",
 };
 
 const pillStyle: CSSProperties = {
@@ -669,10 +669,10 @@ const pillStyle: CSSProperties = {
 const detailPanelStyle: CSSProperties = {
   display: "grid",
   gap: "18px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
   width: "100%",
   boxSizing: "border-box",
@@ -687,8 +687,8 @@ const detailSummaryRowStyle: CSSProperties = {
 
 const summaryTileStyle: CSSProperties = {
   borderRadius: "14px",
-  border: "1px solid #dbe7f3",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   padding: "14px 16px",
 };
 
@@ -697,14 +697,14 @@ const summaryTileLabelStyle: CSSProperties = {
   fontWeight: 800,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  color: "#64748b",
+  color: "#53565A",
   marginBottom: "6px",
 };
 
 const summaryTileValueStyle: CSSProperties = {
   fontSize: "16px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   wordBreak: "break-word",
 };
 
@@ -714,21 +714,21 @@ const detailFooterBarStyle: CSSProperties = {
   gap: "12px",
   flexWrap: "wrap",
   alignItems: "center",
-  borderTop: "1px solid #e2e8f0",
+  borderTop: "1px solid #D0D0CE",
   paddingTop: "16px",
 };
 
 const helperTextStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.5,
 };
 
 const emptyStateStyle: CSSProperties = {
   borderRadius: "14px",
-  border: "1px dashed #cbd5e1",
-  background: "#f8fafc",
-  color: "#64748b",
+  border: "1px dashed #D0D0CE",
+  background: "#ECECE7",
+  color: "#53565A",
   padding: "18px",
   fontSize: "14px",
 };

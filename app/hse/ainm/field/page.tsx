@@ -508,7 +508,7 @@ const pageWrapStyle: CSSProperties = {
   padding: "14px 12px 96px",
   display: "flex",
   justifyContent: "center",
-  background: "linear-gradient(180deg, #ECECE7 0%, #f8fafc 100%)",
+  background: "linear-gradient(180deg, #ECECE7 0%, #ECECE7 100%)",
 };
 
 const shellStyle: CSSProperties = {
@@ -532,7 +532,7 @@ const brandBarStyle: CSSProperties = {
 
 const summaryCardStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "16px",
   display: "grid",
@@ -552,28 +552,28 @@ const titleStyle: CSSProperties = {
   margin: 0,
   fontSize: "28px",
   lineHeight: 1.08,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const introStyle: CSSProperties = {
   margin: 0,
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.45,
 };
 
 const statusStyle: CSSProperties = {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   padding: "10px",
   fontSize: "12px",
-  color: "#334155",
+  color: "#53565A",
 };
 
 const panelStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "14px",
   display: "grid",
@@ -584,7 +584,7 @@ const panelStyle: CSSProperties = {
 const panelTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "18px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const actionGridStyle: CSSProperties = {
@@ -601,21 +601,21 @@ const fieldStyle: CSSProperties = {
 const labelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 900,
-  color: "#334155",
+  color: "#53565A",
   letterSpacing: "0.04em",
   textTransform: "uppercase",
 };
 
 const hintStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   fontStyle: "italic",
 };
 
 const inputStyle: CSSProperties = {
   width: "100%",
   minHeight: "46px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   padding: "11px 12px",
   fontSize: "16px",
@@ -648,8 +648,8 @@ const primaryButtonStyle: CSSProperties = {
 
 const secondaryButtonStyle: CSSProperties = {
   ...primaryButtonStyle,
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
 };
 
 const textButtonStyle: CSSProperties = {
@@ -668,8 +668,8 @@ const toggleRowStyle: CSSProperties = {
 
 const toggleButtonStyle: CSSProperties = {
   ...secondaryButtonStyle,
-  background: "#f8fafc",
-  border: "1px solid #cbd5e1",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
 };
 
 const selectedToggleStyle: CSSProperties = {
@@ -690,7 +690,7 @@ const actionButtonsStyle: CSSProperties = {
   gridTemplateColumns: "1fr 1fr",
   gap: "8px",
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "8px",
   boxShadow: "0 8px 18px rgba(15, 23, 42, 0.06)",
@@ -705,15 +705,15 @@ const formHeaderStyle: CSSProperties = {
 
 const helperTextStyle: CSSProperties = {
   margin: "4px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
 };
 
 const evidenceBoxStyle: CSSProperties = {
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   display: "grid",
   gap: "10px",
 };
@@ -721,7 +721,7 @@ const evidenceBoxStyle: CSSProperties = {
 const smallTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "15px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const uploadButtonStyle: CSSProperties = {
@@ -736,12 +736,12 @@ const recordListStyle: CSSProperties = {
 };
 
 const recordCardStyle: CSSProperties = {
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   borderRadius: "14px",
   padding: "12px",
   textAlign: "left",
-  color: "#0f172a",
+  color: "#000000",
   display: "grid",
   gap: "6px",
 };
@@ -755,17 +755,17 @@ const pillStyle: CSSProperties = {
   width: "fit-content",
   borderRadius: "999px",
   padding: "5px 9px",
-  background: "#dcfce7",
-  color: "#166534",
+  background: "#ECECE7",
+  color: "#005670",
   fontSize: "12px",
   fontWeight: 900,
 };
 
 const emptyStyle: CSSProperties = {
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   borderRadius: "12px",
   padding: "12px",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
 };
 

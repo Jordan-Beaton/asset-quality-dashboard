@@ -358,10 +358,10 @@ function makeWordCell(text: string, width: number, options?: { header?: boolean;
         children: [
           new TextRun({
             text: text || "-",
-            font: "Arial",
+            font: "Azo Sans",
             size: options?.header ? 15 : 14,
             bold: options?.header,
-            color: options?.header ? "FFFFFF" : "0F172A",
+            color: options?.header ? "FFFFFF" : "000000",
           }),
         ],
       }),
@@ -646,7 +646,7 @@ export default function ProjectReportsPage() {
 
     setGeneratingAuditAnnex(kind === "ncr" ? "ncr-word" : "programme-word");
     try {
-      const border = { style: BorderStyle.SINGLE, size: 2, color: "CBD5E1" };
+      const border = { style: BorderStyle.SINGLE, size: 2, color: "D0D0CE" };
       const borders = { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border };
       const auditMap = new Map(projectAudits.map((audit) => [audit.id, audit]));
       const headers = kind === "ncr"
@@ -696,7 +696,7 @@ export default function ProjectReportsPage() {
             new TableRow({
               cantSplit: true,
               children: row.map((value, index) =>
-                makeWordCell(value, widths[index], { fill: rowIndex % 2 === 0 ? "F8FAFC" : undefined, center: index > 3 && kind === "programme" })
+                makeWordCell(value, widths[index], { fill: rowIndex % 2 === 0 ? "ECECE7" : undefined, center: index > 3 && kind === "programme" })
               ),
             })
           ),
@@ -704,14 +704,14 @@ export default function ProjectReportsPage() {
       });
       const title = kind === "ncr" ? "Audit NCR Report" : "Audit Programme";
       const document = new WordDocument({
-        styles: { default: { document: { run: { font: "Arial", size: 17, color: "0F172A" } } } },
+        styles: { default: { document: { run: { font: "Azo Sans", size: 17, color: "000000" } } } },
         sections: [{
           properties: { page: { size: { orientation: PageOrientation.LANDSCAPE }, margin: { top: 540, right: 540, bottom: 720, left: 540, footer: 300 } } },
-          footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Wadden Sea | ${title} | Page `, font: "Arial", size: 15, color: "64748B" }), new SimpleField("PAGE"), new TextRun({ text: " of ", font: "Arial", size: 15, color: "64748B" }), new SimpleField("NUMPAGES")] })] }) },
+          footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Wadden Sea | ${title} | Page `, font: "Azo Sans", size: 15, color: "53565A" }), new SimpleField("PAGE"), new TextRun({ text: " of ", font: "Azo Sans", size: 15, color: "53565A" }), new SimpleField("NUMPAGES")] })] }) },
           children: [
-            new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Arial", bold: true, size: 32, color: "005670" })] }),
-            new Paragraph({ spacing: { after: 70 }, children: [new TextRun({ text: title, font: "Arial", bold: true, size: 26 })] }),
-            new Paragraph({ spacing: { after: 170 }, children: [new TextRun({ text: `${auditsToExport.length} selected audits${kind === "ncr" ? ` | ${selectedNcrFindings.length} findings` : ""} | Generated ${new Date().toLocaleString("en-GB")}`, font: "Arial", size: 16, color: "64748B" })] }),
+            new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Azo Sans", bold: true, size: 32, color: "005670" })] }),
+            new Paragraph({ spacing: { after: 70 }, children: [new TextRun({ text: title, font: "Azo Sans", bold: true, size: 26 })] }),
+            new Paragraph({ spacing: { after: 170 }, children: [new TextRun({ text: `${auditsToExport.length} selected audits${kind === "ncr" ? ` | ${selectedNcrFindings.length} findings` : ""} | Generated ${new Date().toLocaleString("en-GB")}`, font: "Azo Sans", size: 16, color: "53565A" })] }),
             table,
           ],
         }],
@@ -766,14 +766,14 @@ export default function ProjectReportsPage() {
         head,
         body,
         headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
-        styles: { fontSize: kind === "ncr" ? 7 : 8, cellPadding: 2, textColor: [15, 23, 42], lineColor: [226, 232, 240], lineWidth: 0.2, valign: "middle", overflow: "linebreak" },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
+        styles: { fontSize: kind === "ncr" ? 7 : 8, cellPadding: 2, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.2, valign: "middle", overflow: "linebreak" },
+        alternateRowStyles: { fillColor: [236, 236, 231] },
       });
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
         doc.setFontSize(8);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text(`Wadden Sea | ${title}`, 10, pageHeight - 6);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - 10, pageHeight - 6, { align: "right" });
       }
@@ -852,7 +852,7 @@ export default function ProjectReportsPage() {
 
     setIsGenerating("word");
     try {
-      const border = { style: BorderStyle.SINGLE, size: 2, color: "CBD5E1" };
+      const border = { style: BorderStyle.SINGLE, size: 2, color: "D0D0CE" };
       const borders = {
         top: border,
         bottom: border,
@@ -891,7 +891,7 @@ export default function ProjectReportsPage() {
               ].map((value, index) =>
                 makeWordCell(value, detailWidths[index], {
                   center: [4, 5, 6, 8].includes(index),
-                  fill: rowIndex % 2 === 0 ? "F8FAFC" : undefined,
+                  fill: rowIndex % 2 === 0 ? "ECECE7" : undefined,
                 })
               ),
             })
@@ -922,12 +922,12 @@ export default function ProjectReportsPage() {
               cantSplit: true,
               children: [
                 makeWordCell(`${record.supplier} - ${record.activity}`, timelineWidths[0], {
-                  fill: rowIndex % 2 === 0 ? "F8FAFC" : undefined,
+                  fill: rowIndex % 2 === 0 ? "ECECE7" : undefined,
                 }),
                 ...weekStarts.map((week, index) =>
                   makeWordCell(isInWeek(record, week) ? "INSPECTION" : "", timelineWidths[index + 1], {
                     center: true,
-                    fill: isInWeek(record, week) ? "F59E0B" : rowIndex % 2 === 0 ? "F8FAFC" : undefined,
+                    fill: isInWeek(record, week) ? "F59E0B" : rowIndex % 2 === 0 ? "ECECE7" : undefined,
                   })
                 ),
               ],
@@ -938,7 +938,7 @@ export default function ProjectReportsPage() {
 
       const document = new WordDocument({
         styles: {
-          default: { document: { run: { font: "Arial", size: 18, color: "0F172A" } } },
+          default: { document: { run: { font: "Azo Sans", size: 18, color: "000000" } } },
         },
         sections: [
           {
@@ -954,9 +954,9 @@ export default function ProjectReportsPage() {
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
                     children: [
-                      new TextRun({ text: "Wadden Sea | Eight-Week Inspection Lookahead | Page ", font: "Arial", size: 15, color: "64748B" }),
+                      new TextRun({ text: "Wadden Sea | Eight-Week Inspection Lookahead | Page ", font: "Azo Sans", size: 15, color: "53565A" }),
                       new SimpleField("PAGE"),
-                      new TextRun({ text: " of ", font: "Arial", size: 15, color: "64748B" }),
+                      new TextRun({ text: " of ", font: "Azo Sans", size: 15, color: "53565A" }),
                       new SimpleField("NUMPAGES"),
                     ],
                   }),
@@ -984,10 +984,10 @@ export default function ProjectReportsPage() {
                         margins: { top: 170, bottom: 170, left: 180, right: 180 },
                         children: [
                           new Paragraph({
-                            children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Arial", bold: true, size: 34, color: "FFFFFF" })],
+                            children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Azo Sans", bold: true, size: 34, color: "FFFFFF" })],
                           }),
                           new Paragraph({
-                            children: [new TextRun({ text: "Eight-Week Inspection Lookahead", font: "Arial", bold: true, size: 20, color: "FFFFFF" })],
+                            children: [new TextRun({ text: "Eight-Week Inspection Lookahead", font: "Azo Sans", bold: true, size: 20, color: "FFFFFF" })],
                           }),
                         ],
                       }),
@@ -997,23 +997,23 @@ export default function ProjectReportsPage() {
               }),
               new Paragraph({
                 spacing: { before: 170, after: 50 },
-                children: [new TextRun({ text: "Annex - Eight-Week Inspection Lookahead", font: "Arial", bold: true, size: 30 })],
+                children: [new TextRun({ text: "Annex - Eight-Week Inspection Lookahead", font: "Azo Sans", bold: true, size: 30 })],
               }),
               new Paragraph({
                 spacing: { after: 160 },
                 children: [
                   new TextRun({
                     text: `${formatDate(horizonStart)} to ${formatDate(horizonEnd)} | ${selected.length} selected activities | Source: Live IMS NOI register${workbookSummary ? ` + ${workbookSummary.fileName}` : ""}`,
-                    font: "Arial",
+                    font: "Azo Sans",
                     size: 17,
-                    color: "475569",
+                    color: "53565A",
                   }),
                 ],
               }),
               detailTable,
               new Paragraph({
                 spacing: { before: 220, after: 80 },
-                children: [new TextRun({ text: "Eight-Week Timeline", font: "Arial", bold: true, size: 24 })],
+                children: [new TextRun({ text: "Eight-Week Timeline", font: "Azo Sans", bold: true, size: 24 })],
               }),
               timelineTable,
               new Paragraph({
@@ -1021,10 +1021,10 @@ export default function ProjectReportsPage() {
                 children: [
                   new TextRun({
                     text: "Dates are derived from the uploaded NOI tracker. Week-only entries are shown across the stated week.",
-                    font: "Arial",
+                    font: "Azo Sans",
                     italics: true,
                     size: 15,
-                    color: "64748B",
+                    color: "53565A",
                   }),
                 ],
               }),
@@ -1066,12 +1066,12 @@ export default function ProjectReportsPage() {
       doc.text("WADDEN SEA PROJECT", margin, 11);
       doc.setFontSize(10);
       doc.text("Eight-Week Inspection Lookahead", margin, 18);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(15);
       doc.text("Annex - Eight-Week Inspection Lookahead", margin, 34);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(`${formatDate(horizonStart)} to ${formatDate(horizonEnd)} | ${selected.length} selected activities`, margin, 41);
       doc.text(`Source: Live IMS NOI register${workbookSummary ? ` + ${workbookSummary.fileName}` : ""}`, pageWidth - margin, 41, { align: "right" });
 
@@ -1092,8 +1092,8 @@ export default function ProjectReportsPage() {
           record.witnessHours || "-",
         ]),
         headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
-        styles: { fontSize: 7.2, cellPadding: 1.8, textColor: [15, 23, 42], lineColor: [226, 232, 240], lineWidth: 0.2, valign: "middle" },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
+        styles: { fontSize: 7.2, cellPadding: 1.8, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.2, valign: "middle" },
+        alternateRowStyles: { fillColor: [236, 236, 231] },
         columnStyles: {
           0: { cellWidth: 16 },
           1: { cellWidth: 22 },
@@ -1128,7 +1128,7 @@ export default function ProjectReportsPage() {
           ...weekStarts.map((week) => (isInWeek(record, week) ? "INSPECTION" : "")),
         ]),
         headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold", halign: "center" },
-        styles: { fontSize: 7.2, cellPadding: 2, textColor: [15, 23, 42], lineColor: [203, 213, 225], lineWidth: 0.2, valign: "middle", halign: "center" },
+        styles: { fontSize: 7.2, cellPadding: 2, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.2, valign: "middle", halign: "center" },
         columnStyles: { 0: { cellWidth: 72, halign: "left" } },
         didParseCell: (data) => {
           if (data.section === "body" && data.column.index > 0 && data.cell.raw === "INSPECTION") {
@@ -1142,11 +1142,11 @@ export default function ProjectReportsPage() {
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
-        doc.setDrawColor(226, 232, 240);
+        doc.setDrawColor(208, 208, 206);
         doc.line(margin, pageHeight - 11, pageWidth - margin, pageHeight - 11);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text("Wadden Sea | Eight-Week Inspection Lookahead", margin, pageHeight - 6);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6, { align: "right" });
       }
@@ -1177,7 +1177,7 @@ export default function ProjectReportsPage() {
 
       <WaddenSeaWorkspaceNav active="reports" />
 
-      <nav style={reportWorkspaceTabsStyle} aria-label="Project report annexes">
+      <nav className="ims-tabs" style={reportWorkspaceTabsStyle} aria-label="Project report annexes" role="tablist">
         {[
           ["audit-ncr", "Audit NCR Report"],
           ["audit-programme", "Audit Programme"],
@@ -1187,6 +1187,9 @@ export default function ProjectReportsPage() {
           <button
             key={view}
             type="button"
+            role="tab"
+            aria-selected={activeAnnex === view}
+            data-active={activeAnnex === view ? "true" : "false"}
             onClick={() => setActiveAnnex(view as ProjectAnnex)}
             style={activeAnnex === view ? activeReportWorkspaceTabStyle : reportWorkspaceButtonStyle}
           >
@@ -1201,7 +1204,7 @@ export default function ProjectReportsPage() {
         <QualityKpiCard title="NOI Requirements" value={imsRecords.length} accent="#005670" href="/projects/wadden-sea/noi" />
         <QualityKpiCard title="In Eight Weeks" value={lookaheadMetrics.total} accent="#FFAD00" onClick={() => setActiveAnnex("lookahead")} active={activeAnnex === "lookahead"} />
         <QualityKpiCard title="Hold Points" value={lookaheadMetrics.hold} accent="#F93822" onClick={() => setActiveAnnex("lookahead")} />
-        <QualityKpiCard title="NOI Outstanding" value={lookaheadMetrics.noiOutstanding} accent="#ea580c" onClick={() => setActiveAnnex("lookahead")} />
+        <QualityKpiCard title="NOI Outstanding" value={lookaheadMetrics.noiOutstanding} accent="#FFAD00" onClick={() => setActiveAnnex("lookahead")} />
       </section>
 
       {activeAnnex === "open-points" ? <WaddenSeaOpenPoints /> : null}
@@ -1349,7 +1352,7 @@ export default function ProjectReportsPage() {
                       style={{
                         ...embeddedAuditRowStyle,
                         background: selected ? "#ECECE7" : "#ffffff",
-                        borderColor: selected ? "#005670" : "#e2e8f0",
+                        borderColor: selected ? "#005670" : "#D0D0CE",
                       }}
                     >
                       <input
@@ -1440,9 +1443,9 @@ export default function ProjectReportsPage() {
               </div>
               <div style={inspectionMetricGridStyle}>
                 <div style={inspectionMetricStyle}><span>Upcoming</span><strong>{lookaheadMetrics.total}</strong><small>dated inspections</small></div>
-                <div style={{ ...inspectionMetricStyle, borderColor: "#fecaca", background: "#fff7f7" }}><span>Hold points</span><strong>{lookaheadMetrics.hold}</strong><small>H or combined H</small></div>
-                <div style={{ ...inspectionMetricStyle, borderColor: "#fde68a", background: "#fffbeb" }}><span>Witness points</span><strong>{lookaheadMetrics.witness}</strong><small>W or combined W</small></div>
-                <div style={{ ...inspectionMetricStyle, borderColor: lookaheadMetrics.noiOutstanding ? "#fdba74" : "#bbf7d0", background: lookaheadMetrics.noiOutstanding ? "#fff7ed" : "#f0fdf4" }}><span>NOI outstanding</span><strong>{lookaheadMetrics.noiOutstanding}</strong><small>number not yet recorded</small></div>
+                <div style={{ ...inspectionMetricStyle, borderColor: "#ECECE7", background: "#ECECE7" }}><span>Hold points</span><strong>{lookaheadMetrics.hold}</strong><small>H or combined H</small></div>
+                <div style={{ ...inspectionMetricStyle, borderColor: "#ECECE7", background: "#ECECE7" }}><span>Witness points</span><strong>{lookaheadMetrics.witness}</strong><small>W or combined W</small></div>
+                <div style={{ ...inspectionMetricStyle, borderColor: lookaheadMetrics.noiOutstanding ? "#ECECE7" : "#ECECE7", background: lookaheadMetrics.noiOutstanding ? "#ECECE7" : "#ECECE7" }}><span>NOI outstanding</span><strong>{lookaheadMetrics.noiOutstanding}</strong><small>number not yet recorded</small></div>
               </div>
               <div style={inspectionCalendarStyle}>
                 {calendarWeeks.map(({ weekStart, records: weekRecords }, index) => (
@@ -1520,7 +1523,7 @@ export default function ProjectReportsPage() {
                 filteredRecords.map((record) => {
                   const selected = selectedIds.includes(record.id);
                   return (
-                    <label key={record.id} style={{ ...activityRowStyle, background: selected ? "#ECECE7" : "#ffffff", borderColor: selected ? "#005670" : "#e2e8f0" }}>
+                    <label key={record.id} style={{ ...activityRowStyle, background: selected ? "#ECECE7" : "#ffffff", borderColor: selected ? "#005670" : "#D0D0CE" }}>
                       {!showUnresolved ? <input type="checkbox" checked={selected} onChange={() => toggleRecord(record.id)} style={checkboxStyle} /> : <span style={warningDotStyle}>!</span>}
                       <span style={activityIdentityStyle}>
                         <strong>{record.supplier || "Unknown supplier"} · {record.activity}</strong>
@@ -1582,59 +1585,59 @@ export default function ProjectReportsPage() {
 }
 
 const reportWorkspaceTabsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "20px" };
-const reportWorkspaceTabStyle: CSSProperties = { minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: "10px", border: "none", background: "#e2e8f0", color: "#0f172a", textDecoration: "none", fontWeight: 800, fontSize: "13px", boxSizing: "border-box" };
+const reportWorkspaceTabStyle: CSSProperties = { minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "10px 14px", borderRadius: "10px", border: "none", background: "#ECECE7", color: "#000000", textDecoration: "none", fontWeight: 800, fontSize: "13px", boxSizing: "border-box" };
 const reportWorkspaceButtonStyle: CSSProperties = { ...reportWorkspaceTabStyle, fontFamily: "inherit", cursor: "pointer" };
 const activeReportWorkspaceTabStyle: CSSProperties = { ...reportWorkspaceButtonStyle, background: "#005670", color: "#ffffff" };
 const reportStatsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelStyle: CSSProperties = { background: "#ffffff", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15,23,42,0.08)", marginBottom: "20px" };
 const sectionHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "14px", flexWrap: "wrap", marginBottom: "16px" };
-const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "20px", color: "#0f172a" };
-const sectionSubtitleStyle: CSSProperties = { margin: "6px 0 0", color: "#64748b", fontSize: "14px", maxWidth: "760px", lineHeight: 1.5 };
+const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "20px", color: "#000000" };
+const sectionSubtitleStyle: CSSProperties = { margin: "6px 0 0", color: "#53565A", fontSize: "14px", maxWidth: "760px", lineHeight: 1.5 };
 const annexCardsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "12px" };
-const annexCardStyle: CSSProperties = { display: "grid", gap: "8px", padding: "16px", minHeight: "125px", border: "1px solid #dbe4ef", borderRadius: "14px", background: "#f8fafc", color: "#334155", textDecoration: "none", fontSize: "13px", lineHeight: 1.45, textAlign: "left", cursor: "pointer", fontFamily: "inherit" };
+const annexCardStyle: CSSProperties = { display: "grid", gap: "8px", padding: "16px", minHeight: "125px", border: "1px solid #D0D0CE", borderRadius: "14px", background: "#ECECE7", color: "#53565A", textDecoration: "none", fontSize: "13px", lineHeight: 1.45, textAlign: "left", cursor: "pointer", fontFamily: "inherit" };
 const activeAnnexCardStyle: CSSProperties = { borderColor: "#005670", background: "#ECECE7", boxShadow: "0 0 0 2px rgba(0,86,112,0.08)" };
 const annexEyebrowStyle: CSSProperties = { color: "#005670", fontSize: "11px", fontWeight: 900, letterSpacing: "0.05em" };
 const uploadButtonStyle: CSSProperties = { ...annexEyebrowStyle, display: "inline-flex", padding: "11px 16px", borderRadius: "10px", background: "#005670", color: "#ffffff", cursor: "pointer", letterSpacing: 0 };
 const controlGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px, 1fr) repeat(2, minmax(180px, 0.7fr))", gap: "12px" };
-const fieldStyle: CSSProperties = { display: "grid", gap: "6px", color: "#475569", fontSize: "13px", fontWeight: 800 };
-const inputStyle: CSSProperties = { padding: "10px 12px", borderRadius: "10px", border: "1px solid #cbd5e1", background: "#ffffff", color: "#0f172a", minHeight: "40px", boxSizing: "border-box" };
+const fieldStyle: CSSProperties = { display: "grid", gap: "6px", color: "#53565A", fontSize: "13px", fontWeight: 800 };
+const inputStyle: CSSProperties = { padding: "10px 12px", borderRadius: "10px", border: "1px solid #D0D0CE", background: "#ffffff", color: "#000000", minHeight: "40px", boxSizing: "border-box" };
 const dateWindowCardStyle: CSSProperties = { display: "grid", gap: "5px", padding: "11px 14px", borderRadius: "12px", background: "#ECECE7", border: "1px solid #ECECE7", color: "#005670", fontSize: "12px" };
 const validationGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginTop: "16px" };
-const validationCardStyle: CSSProperties = { display: "grid", gap: "4px", padding: "13px", borderRadius: "12px", border: "1px solid #dbe4ef", background: "#f8fafc", textAlign: "left", color: "#334155" };
-const warningCardStyle: CSSProperties = { ...validationCardStyle, cursor: "pointer", borderColor: "#fde68a", background: "#fffbeb" };
-const emptyStateStyle: CSSProperties = { display: "grid", gap: "6px", marginTop: "16px", padding: "22px", border: "1px dashed #94a3b8", borderRadius: "14px", background: "#f8fafc", color: "#475569", textAlign: "center" };
+const validationCardStyle: CSSProperties = { display: "grid", gap: "4px", padding: "13px", borderRadius: "12px", border: "1px solid #D0D0CE", background: "#ECECE7", textAlign: "left", color: "#53565A" };
+const warningCardStyle: CSSProperties = { ...validationCardStyle, cursor: "pointer", borderColor: "#ECECE7", background: "#ECECE7" };
+const emptyStateStyle: CSSProperties = { display: "grid", gap: "6px", marginTop: "16px", padding: "22px", border: "1px dashed #D0D0CE", borderRadius: "14px", background: "#ECECE7", color: "#53565A", textAlign: "center" };
 const inspectionMetricGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px", marginBottom: "16px" };
-const inspectionMetricStyle: CSSProperties = { display: "grid", gap: "3px", padding: "13px", border: "1px solid #ECECE7", borderRadius: "12px", background: "#ECECE7", color: "#334155" };
+const inspectionMetricStyle: CSSProperties = { display: "grid", gap: "3px", padding: "13px", border: "1px solid #ECECE7", borderRadius: "12px", background: "#ECECE7", color: "#53565A" };
 const inspectionCalendarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(8, minmax(185px, 1fr))", gap: "10px", overflowX: "auto", paddingBottom: "6px" };
-const inspectionWeekStyle: CSSProperties = { minWidth: "185px", border: "1px solid #dbe4ef", borderRadius: "12px", overflow: "hidden", background: "#f8fafc" };
+const inspectionWeekStyle: CSSProperties = { minWidth: "185px", border: "1px solid #D0D0CE", borderRadius: "12px", overflow: "hidden", background: "#ECECE7" };
 const inspectionWeekHeaderStyle: CSSProperties = { display: "grid", gap: "2px", padding: "10px", background: "#005670", color: "#ffffff", fontSize: "11px" };
 const inspectionWeekBodyStyle: CSSProperties = { display: "grid", alignContent: "start", gap: "7px", padding: "8px", minHeight: "145px" };
-const inspectionCardStyle: CSSProperties = { display: "grid", gap: "5px", padding: "9px", border: "1px solid #dbe4ef", borderRadius: "9px", background: "#ffffff", color: "#334155", fontSize: "11px", lineHeight: 1.35 };
+const inspectionCardStyle: CSSProperties = { display: "grid", gap: "5px", padding: "9px", border: "1px solid #D0D0CE", borderRadius: "9px", background: "#ffffff", color: "#53565A", fontSize: "11px", lineHeight: 1.35 };
 const inspectionCardTopStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" };
-const holdPointStyle: CSSProperties = { padding: "3px 6px", borderRadius: "999px", background: "#fee2e2", color: "#F93822", fontWeight: 900 };
-const witnessPointStyle: CSSProperties = { padding: "3px 6px", borderRadius: "999px", background: "#fef3c7", color: "#92400e", fontWeight: 900 };
-const emptyWeekStyle: CSSProperties = { color: "#94a3b8", fontSize: "11px", textAlign: "center", padding: "22px 4px" };
+const holdPointStyle: CSSProperties = { padding: "3px 6px", borderRadius: "999px", background: "#ECECE7", color: "#F93822", fontWeight: 900 };
+const witnessPointStyle: CSSProperties = { padding: "3px 6px", borderRadius: "999px", background: "#ECECE7", color: "#000000", fontWeight: 900 };
+const emptyWeekStyle: CSSProperties = { color: "#D0D0CE", fontSize: "11px", textAlign: "center", padding: "22px 4px" };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: "9px", flexWrap: "wrap", alignItems: "center" };
 const primaryButtonStyle: CSSProperties = { padding: "10px 15px", border: 0, borderRadius: "10px", background: "#005670", color: "#ffffff", fontWeight: 800, cursor: "pointer" };
-const secondaryButtonStyle: CSSProperties = { ...primaryButtonStyle, background: "#e2e8f0", color: "#0f172a" };
+const secondaryButtonStyle: CSSProperties = { ...primaryButtonStyle, background: "#D0D0CE", color: "#000000" };
 const filterRowStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "14px" };
 const activityListStyle: CSSProperties = { display: "grid", gap: "8px", maxHeight: "520px", overflowY: "auto" };
-const activityRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "24px minmax(260px, 1.5fr) minmax(120px, 0.5fr) minmax(180px, 0.7fr) 76px", gap: "12px", alignItems: "center", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "12px", cursor: "pointer" };
+const activityRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "24px minmax(260px, 1.5fr) minmax(120px, 0.5fr) minmax(180px, 0.7fr) 76px", gap: "12px", alignItems: "center", padding: "12px", border: "1px solid #D0D0CE", borderRadius: "12px", cursor: "pointer" };
 const checkboxStyle: CSSProperties = { width: "18px", height: "18px", accentColor: "#005670" };
-const warningDotStyle: CSSProperties = { display: "grid", placeItems: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#fef3c7", color: "#92400e", fontWeight: 900 };
-const activityIdentityStyle: CSSProperties = { display: "grid", gap: "3px", color: "#0f172a", fontSize: "13px" };
-const activityMetaStyle: CSSProperties = { color: "#475569", fontSize: "12px", lineHeight: 1.4 };
+const warningDotStyle: CSSProperties = { display: "grid", placeItems: "center", width: "20px", height: "20px", borderRadius: "50%", background: "#ECECE7", color: "#000000", fontWeight: 900 };
+const activityIdentityStyle: CSSProperties = { display: "grid", gap: "3px", color: "#000000", fontSize: "13px" };
+const activityMetaStyle: CSSProperties = { color: "#53565A", fontSize: "12px", lineHeight: 1.4 };
 const noiBadgeStyle: CSSProperties = { padding: "5px 8px", borderRadius: "999px", background: "#ECECE7", color: "#005670", fontSize: "11px", fontWeight: 900, textAlign: "center" };
-const emptyTextStyle: CSSProperties = { margin: 0, color: "#64748b", padding: "14px" };
+const emptyTextStyle: CSSProperties = { margin: 0, color: "#53565A", padding: "14px" };
 const selectionSummaryStyle: CSSProperties = { display: "inline-flex", alignItems: "center", padding: "8px 11px", borderRadius: "999px", background: "#ECECE7", color: "#005670", fontSize: "12px", fontWeight: 900 };
 const embeddedAuditListStyle: CSSProperties = { display: "grid", gap: "8px", maxHeight: "560px", overflowY: "auto", marginTop: "14px" };
-const embeddedAuditRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "24px minmax(280px, 1.4fr) 90px 120px 135px 95px", gap: "12px", alignItems: "center", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "12px", cursor: "pointer" };
-const auditFindingSummaryStyle: CSSProperties = { color: "#475569", fontSize: "12px", fontWeight: 800 };
-const auditStatusBadgeStyle: CSSProperties = { padding: "5px 8px", borderRadius: "999px", background: "#dcfce7", color: "#166534", fontSize: "11px", fontWeight: 900, textAlign: "center" };
-const timelineWrapStyle: CSSProperties = { width: "100%", overflowX: "auto", border: "1px solid #dbe4ef", borderRadius: "14px" };
+const embeddedAuditRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "24px minmax(280px, 1.4fr) 90px 120px 135px 95px", gap: "12px", alignItems: "center", padding: "12px", border: "1px solid #D0D0CE", borderRadius: "12px", cursor: "pointer" };
+const auditFindingSummaryStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 800 };
+const auditStatusBadgeStyle: CSSProperties = { padding: "5px 8px", borderRadius: "999px", background: "#ECECE7", color: "#005670", fontSize: "11px", fontWeight: 900, textAlign: "center" };
+const timelineWrapStyle: CSSProperties = { width: "100%", overflowX: "auto", border: "1px solid #D0D0CE", borderRadius: "14px" };
 const timelineColumns = "minmax(300px, 2fr) repeat(8, minmax(100px, 1fr))";
 const timelineHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: timelineColumns, minWidth: "1120px", background: "#005670", color: "#ffffff", fontSize: "11px", fontWeight: 800 };
-const timelineRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: timelineColumns, minWidth: "1120px", minHeight: "58px", borderBottom: "1px solid #e2e8f0" };
-const timelineTaskStyle: CSSProperties = { display: "grid", gap: "3px", padding: "10px 12px", borderRight: "1px solid #e2e8f0", color: "#334155", fontSize: "12px" };
-const timelineCellStyle: CSSProperties = { display: "grid", placeItems: "center", padding: "6px", borderRight: "1px solid #e2e8f0", background: "#f8fafc" };
-const timelineBarStyle: CSSProperties = { display: "block", width: "100%", padding: "7px 4px", borderRadius: "6px", background: "#FFAD00", color: "#78350f", textAlign: "center", fontSize: "9px", fontWeight: 900 };
+const timelineRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: timelineColumns, minWidth: "1120px", minHeight: "58px", borderBottom: "1px solid #D0D0CE" };
+const timelineTaskStyle: CSSProperties = { display: "grid", gap: "3px", padding: "10px 12px", borderRight: "1px solid #D0D0CE", color: "#53565A", fontSize: "12px" };
+const timelineCellStyle: CSSProperties = { display: "grid", placeItems: "center", padding: "6px", borderRight: "1px solid #D0D0CE", background: "#ECECE7" };
+const timelineBarStyle: CSSProperties = { display: "block", width: "100%", padding: "7px 4px", borderRadius: "6px", background: "#FFAD00", color: "#000000", textAlign: "center", fontSize: "9px", fontWeight: 900 };

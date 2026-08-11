@@ -404,10 +404,10 @@ export default function LessonsLearnedPage() {
     setImporting(false); setImportRows([]); setImportName(""); setMessage(`Imported ${imported.toLocaleString()} lessons from ${importName}.`); await loadData(); setView("dashboard");
   }
 
-  const chartTooltip = { contentStyle: { borderRadius: 12, border: "1px solid #dbe7f3", fontSize: 12 } };
+  const chartTooltip = { contentStyle: { borderRadius: 12, border: "1px solid #D0D0CE", fontSize: 12 } };
   return <ReferenceContext.Provider value={{ projects: referenceProjects, people: peopleOptions, assets: assetOptions, departments: departmentOptions, onSelectProject: selectProjectReference, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject: addProjectReference }}><main className={isFieldMode ? "lessons-field-mode" : undefined}>
     {isFieldMode ? <section style={fieldIntroStyle}><span style={fieldIntroIconStyle}><LearningFieldIcon /></span><span><strong style={fieldIntroTitleStyle}>Capture a Lesson</strong><small style={fieldIntroTextStyle}>Record the learning now; optional detail can be added or refined later.</small></span></section> : <QualityPageHero label="LESSONS LEARNED" title="Lessons Learned" description="Central repository for searchable project knowledge, repeat-failure prevention, evidence, actions, and trend analysis." />}
-    <ImsTopMetaRow backHref={isFieldMode ? "/field-tools" : "/home"} backLabel={isFieldMode ? "Back to Field Tools" : "Back to IMS Home"} actions={!isFieldMode ? <ImsButton variant="secondary" onClick={() => void loadData()}>Refresh</ImsButton> : undefined} status={<><strong>Status:</strong> {message}</>} />
+    <ImsTopMetaRow backHref={isFieldMode ? "/field-tools" : "/home"} backLabel={isFieldMode ? "Back to Field Tools" : "Back to IMS Home"} status={<><strong>Status:</strong> {message}</>} />
     {!isFieldMode ? <ImsTabs tabs={tabs} active={view} onChange={(next) => { setView(next); if (next === "create") { setSelected(null); setForm(emptyForm); } }} ariaLabel="Lessons Learned views" /> : null}
     {!isFieldMode ? <section style={kpiGrid}>
       <QualityKpiCard title="Total Lessons" value={kpis.total} accent={imsColours.brand} active={analysisFilter === "all" && analysisLabel === "All lessons"} onClick={() => { clearAllFilters(); setView("register"); }} />
@@ -550,7 +550,7 @@ const twoColumn: CSSProperties = { display: "grid", gridTemplateColumns: "repeat
 const repeatGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 };
 const repeatCard: CSSProperties = { display: "grid", gap: 7, textAlign: "left", padding: 14, borderRadius: 14, border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft, color: imsColours.ink, cursor: "pointer" };
 const learningSpotlightWrap: CSSProperties = { display: "grid", gap: 10 };
-const learningSpotlightCard: CSSProperties = { width: "100%", display: "grid", alignContent: "center", gap: 10, minHeight: 220, padding: "24px clamp(20px, 4vw, 48px)", borderRadius: 16, border: `1px solid ${imsColours.brandBorder}`, background: "linear-gradient(135deg, #ffffff 0%, #effaf8 58%, #e0f4f1 100%)", color: imsColours.ink, textAlign: "left", font: "inherit", cursor: "pointer" };
+const learningSpotlightCard: CSSProperties = { width: "100%", display: "grid", alignContent: "center", gap: 10, minHeight: 220, padding: "24px clamp(20px, 4vw, 48px)", borderRadius: 16, border: `1px solid ${imsColours.brandBorder}`, background: "linear-gradient(135deg, #ffffff 0%, #ECECE7 58%, #ECECE7 100%)", color: imsColours.ink, textAlign: "left", font: "inherit", cursor: "pointer" };
 const learningEyebrow: CSSProperties = { color: imsColours.brandDark, fontSize: 11, fontWeight: 900, letterSpacing: ".05em", textTransform: "uppercase" };
 const learningTitleStyle: CSSProperties = { fontSize: 22, lineHeight: 1.2 };
 const learningTextStyle: CSSProperties = { maxWidth: 980, margin: 0, fontSize: 16, lineHeight: 1.65 };
@@ -563,7 +563,7 @@ const formGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(
 const field: CSSProperties = { display: "grid", minWidth: 0, maxWidth: "100%", gap: 6, alignContent: "start" }; const labelStyle: CSSProperties = { color: imsColours.slate, fontSize: 12, fontWeight: 800 };
 const tableWrap: CSSProperties = { width: "100%", overflowX: "auto" }; const table: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 13 };
 const registerTableStyle: CSSProperties = { ...table, tableLayout: "fixed", minWidth: 1490 };
-const th: CSSProperties = { background: imsColours.panelAlt, color: "#334155", fontSize: 12, fontWeight: 900, letterSpacing: ".04em", textTransform: "uppercase", textAlign: "left", padding: "12px 14px", whiteSpace: "nowrap" };
+const th: CSSProperties = { background: imsColours.panelAlt, color: "#53565A", fontSize: 12, fontWeight: 900, letterSpacing: ".04em", textTransform: "uppercase", textAlign: "left", padding: "12px 14px", whiteSpace: "nowrap" };
 const td: CSSProperties = { padding: "12px 14px", borderBottom: `1px solid ${imsColours.borderSoft}`, verticalAlign: "top", lineHeight: 1.45, maxWidth: 280 };
 const infoRow: CSSProperties = { color: imsColours.slate, fontSize: 13, fontWeight: 700, margin: "12px 0" }; const muted: CSSProperties = { color: imsColours.muted, fontSize: 13, lineHeight: 1.5 };
 const actionRow: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 10, marginTop: 18 }; const evidenceGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginTop: 16 };

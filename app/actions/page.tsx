@@ -344,7 +344,7 @@ const departmentOptions = [
   "HSEQ",
 ] as const;
 
-const chartColours = ["#005670", "#63B1BC", "#53565A", "#FFAD00", "#F93822", "#64748b", "#005670"];
+const chartColours = ["#005670", "#63B1BC", "#53565A", "#FFAD00", "#F93822", "#53565A", "#005670"];
 
 const actionViews: Array<{ id: ActionView; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
@@ -2908,12 +2908,12 @@ function ActionsPageContent() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(17);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text("Filtered Action Register PDF", pageWidth / 2, 17, { align: "center" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text("Central Action Management register filtered to the current view.", pageWidth / 2, 23, {
         align: "center",
       });
@@ -2933,12 +2933,12 @@ function ActionsPageContent() {
           font: "helvetica",
           fontSize: 8.2,
           cellPadding: 1.6,
-          lineColor: [203, 213, 225],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
-          textColor: [15, 23, 42],
+          textColor: [0, 0, 0],
         },
         columnStyles: {
-          0: { cellWidth: 30, fontStyle: "bold", fillColor: [248, 250, 252] },
+          0: { cellWidth: 30, fontStyle: "bold", fillColor: [236, 236, 231] },
           1: { cellWidth: 72 },
         },
       });
@@ -2978,14 +2978,14 @@ function ActionsPageContent() {
           font: "helvetica",
           fontSize: 7.4,
           cellPadding: 1.8,
-          lineColor: [203, 213, 225],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
-          textColor: [15, 23, 42],
+          textColor: [0, 0, 0],
           overflow: "linebreak",
           valign: "top",
         },
         headStyles: {
-          fillColor: [15, 23, 42],
+          fillColor: [0, 0, 0],
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
@@ -3012,7 +3012,7 @@ function ActionsPageContent() {
         didDrawPage: () => {
           doc.setFont("helvetica", "normal");
           doc.setFontSize(8.5);
-          doc.setTextColor(100, 116, 139);
+          doc.setTextColor(83, 86, 90);
           doc.text("Enshore Action Management", margin, pageHeight - 6);
           doc.text(
             `Page ${doc.getCurrentPageInfo().pageNumber} of ${doc.getNumberOfPages()}`,
@@ -3056,24 +3056,24 @@ function ActionsPageContent() {
   function openRegisterDrilldown(options: RegisterDrilldownOptions = {}) {
     setActiveView("register");
     setSelectedEvidenceAction(null);
-    setSearch(options.search || "");
-    setStatusFilter(options.status || "");
-    setPriorityFilter(options.priority || "");
-    setOwnerFilter(options.owner || "");
-    setProjectFilter(options.project || "");
-    setSourceFilter(options.source || "");
-    setDepartmentFilter(options.department || "");
-    setShowOverdueOnly(Boolean(options.overdue));
-    setShowOpenOnly(Boolean(options.openOnly));
-    setShowClosedOnly(Boolean(options.closedOnly));
-    setQuickFilter(options.quickFilter || "");
-    setShowEvidenceOnly(Boolean(options.evidenceOnly));
-    setShowLinkedIssuesOnly(Boolean(options.linkedIssuesOnly));
-    setDueStartFilter(options.dueStart || 0);
-    setDueWindowFilter(options.dueWindow || 0);
-    setShowNoDueDateOnly(Boolean(options.noDueDateOnly));
-    setCreatedMonthFilter(options.createdMonth || "");
-    setClosedMonthFilter(options.closedMonth || "");
+    if (options.search !== undefined) setSearch(options.search);
+    if (options.status !== undefined) setStatusFilter(options.status);
+    if (options.priority !== undefined) setPriorityFilter(options.priority);
+    if (options.owner !== undefined) setOwnerFilter(options.owner);
+    if (options.project !== undefined) setProjectFilter(options.project);
+    if (options.source !== undefined) setSourceFilter(options.source);
+    if (options.department !== undefined) setDepartmentFilter(options.department);
+    if (options.overdue !== undefined) setShowOverdueOnly(options.overdue);
+    if (options.openOnly !== undefined) setShowOpenOnly(options.openOnly);
+    if (options.closedOnly !== undefined) setShowClosedOnly(options.closedOnly);
+    if (options.quickFilter !== undefined) setQuickFilter(options.quickFilter);
+    if (options.evidenceOnly !== undefined) setShowEvidenceOnly(options.evidenceOnly);
+    if (options.linkedIssuesOnly !== undefined) setShowLinkedIssuesOnly(options.linkedIssuesOnly);
+    if (options.dueStart !== undefined) setDueStartFilter(options.dueStart);
+    if (options.dueWindow !== undefined) setDueWindowFilter(options.dueWindow);
+    if (options.noDueDateOnly !== undefined) setShowNoDueDateOnly(options.noDueDateOnly);
+    if (options.createdMonth !== undefined) setCreatedMonthFilter(options.createdMonth);
+    if (options.closedMonth !== undefined) setClosedMonthFilter(options.closedMonth);
   }
 
   function handleStatusDrilldown(status: string) {
@@ -3135,7 +3135,7 @@ function ActionsPageContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           ← Back to IMS Home
         </Link>
@@ -3806,7 +3806,7 @@ function ActionsPageContent() {
                         return (
                           <tr
                             key={action.id}
-                            style={{ ...tableRowStyle, cursor: "pointer", background: overdue ? "#fff7f7" : "white" }}
+                            style={{ ...tableRowStyle, cursor: "pointer", background: overdue ? "#ECECE7" : "white" }}
                             onClick={() => openActionInRegister(action)}
                           >
                             <td style={tableCellStyle}><div style={actionNumberCellStyle}>{action.action_number || "-"}</div></td>
@@ -3819,7 +3819,7 @@ function ActionsPageContent() {
                             <td style={tableCellStyle}><span style={badgeStyle}>{action.priority || "-"}</span></td>
                             <td style={tableCellStyle}>
                               <div style={primaryCellTextStyle}>{formatDate(action.due_date)}</div>
-                              <div style={{ ...secondaryCellTextStyle, color: overdue ? "#F93822" : "#64748b", fontWeight: overdue ? 700 : 500 }}>
+                              <div style={{ ...secondaryCellTextStyle, color: overdue ? "#F93822" : "#53565A", fontWeight: overdue ? 700 : 500 }}>
                                 {getDueLabel(action.due_date)}
                               </div>
                             </td>
@@ -3978,7 +3978,7 @@ function ActionsPageContent() {
             title="Action Register"
             subtitle="Search the central register or show filters to narrow the action list."
           >
-        <div style={simpleFilterShellStyle}>
+        <div className="ims-filter-panel" style={simpleFilterShellStyle}>
           <div style={simpleFilterTopRowStyle}>
             <input
               placeholder="Search action no. / title / project / owner"
@@ -3996,7 +3996,7 @@ function ActionsPageContent() {
           </div>
 
           {showRegisterFilters ? (
-          <div style={filterBarStyle}>
+          <div className="ims-filter-panel" style={filterBarStyle}>
 
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={inputStyle}>
             <option value="">All Status</option>
@@ -4071,8 +4071,8 @@ function ActionsPageContent() {
             onClick={() => setShowOverdueOnly((current) => !current)}
             style={{
               ...secondaryButtonStyle,
-              background: showOverdueOnly ? "#0f172a" : "#e2e8f0",
-              color: showOverdueOnly ? "#ffffff" : "#0f172a",
+              background: showOverdueOnly ? "#000000" : "#D0D0CE",
+              color: showOverdueOnly ? "#ffffff" : "#000000",
             }}
           >
             {showOverdueOnly ? "Showing Overdue Only" : "Include All Due Status"}
@@ -4181,11 +4181,11 @@ function ActionsPageContent() {
                         ...tableRowStyle,
                         cursor: "pointer",
                         background: overdue
-                          ? "#fff7f7"
+                          ? "#ECECE7"
                           : selected
-                          ? "#f5f3ff"
+                          ? "#ECECE7"
                           : linkedMatch
-                          ? "#eff6ff"
+                          ? "#eef7f8"
                           : "white",
                       }}
                     >
@@ -4213,7 +4213,7 @@ function ActionsPageContent() {
                         <div
                           style={{
                             ...secondaryCellTextStyle,
-                            color: overdue ? "#F93822" : "#64748b",
+                            color: overdue ? "#F93822" : "#53565A",
                             fontWeight: overdue ? 700 : 500,
                           }}
                         >
@@ -4896,11 +4896,14 @@ function ActionViewTabs({
   onChange: (view: ActionView) => void;
 }) {
   return (
-    <nav style={viewTabsStyle} aria-label="Action Management views">
+    <nav className="ims-tabs" style={viewTabsStyle} aria-label="Action Management views" role="tablist">
       {actionViews.map((view) => (
         <button
           key={view.id}
           type="button"
+          role="tab"
+          aria-selected={activeView === view.id}
+          data-active={activeView === view.id ? "true" : "false"}
           onClick={() => onChange(view.id)}
           style={{
             ...viewTabButtonStyle,
@@ -4924,10 +4927,10 @@ function HeroPill({
   tone: "green" | "amber" | "red" | "blue" | "neutral";
 }) {
   const tones = {
-    green: { bg: "rgba(220,252,231,0.15)", border: "rgba(220,252,231,0.26)", text: "#dcfce7" },
-    amber: { bg: "rgba(254,243,199,0.15)", border: "rgba(254,243,199,0.28)", text: "#fef3c7" },
-    red: { bg: "rgba(254,226,226,0.15)", border: "rgba(254,226,226,0.28)", text: "#fee2e2" },
-    blue: { bg: "rgba(219,234,254,0.15)", border: "rgba(219,234,254,0.28)", text: "#dbeafe" },
+    green: { bg: "rgba(220,252,231,0.15)", border: "rgba(220,252,231,0.26)", text: "#ECECE7" },
+    amber: { bg: "rgba(254,243,199,0.15)", border: "rgba(254,243,199,0.28)", text: "#ECECE7" },
+    red: { bg: "rgba(254,226,226,0.15)", border: "rgba(254,226,226,0.28)", text: "#ECECE7" },
+    blue: { bg: "rgba(219,234,254,0.15)", border: "rgba(219,234,254,0.28)", text: "#ECECE7" },
     neutral: { bg: "rgba(255,255,255,0.12)", border: "rgba(255,255,255,0.20)", text: "#ffffff" },
   };
 
@@ -4979,7 +4982,7 @@ function MiniListCard({
               style={{
                 ...miniListItemStyle,
                 borderLeft: item.tone === "red" ? "4px solid #F93822" : "4px solid #FFAD00",
-                background: item.tone === "red" ? "#fef2f2" : "#fffbeb",
+                background: item.tone === "red" ? "#ECECE7" : "#ECECE7",
                 cursor: onItemClick ? "pointer" : "default",
               }}
             >
@@ -5020,9 +5023,9 @@ function QuickFilterButton({
       onClick={onClick}
       style={{
         ...quickFilterButtonStyle,
-        background: active ? "#005670" : "#f8fafc",
-        color: active ? "#ffffff" : "#0f172a",
-        borderColor: active ? "#005670" : "#cbd5e1",
+        background: active ? "#005670" : "#ECECE7",
+        color: active ? "#ffffff" : "#000000",
+        borderColor: active ? "#005670" : "#D0D0CE",
         opacity: disabled ? 0.55 : 1,
         cursor: disabled ? "not-allowed" : "pointer",
       }}
@@ -5081,12 +5084,12 @@ function StatusBadge({ value }: { value: string }) {
 
   const styles =
     lower === "closed" || lower === "complete" || lower === "completed"
-      ? { background: "#dcfce7", color: "#166534" }
+      ? { background: "#ECECE7", color: "#005670" }
       : lower === "open"
-      ? { background: "#dbeafe", color: "#1d4ed8" }
+      ? { background: "#ECECE7", color: "#005670" }
       : lower === "in progress"
-      ? { background: "#fef3c7", color: "#92400e" }
-      : { background: "#e5e7eb", color: "#374151" };
+      ? { background: "#ECECE7", color: "#000000" }
+      : { background: "#D0D0CE", color: "#53565A" };
 
   return <span style={{ ...badgeStyle, ...styles }}>{value}</span>;
 }
@@ -5096,12 +5099,12 @@ function PriorityBadge({ value }: { value: string }) {
 
   const styles =
     lower === "high"
-      ? { background: "#fee2e2", color: "#F93822" }
+      ? { background: "#ECECE7", color: "#F93822" }
       : lower === "medium"
-      ? { background: "#fef3c7", color: "#92400e" }
+      ? { background: "#ECECE7", color: "#000000" }
       : lower === "low"
-      ? { background: "#dcfce7", color: "#166534" }
-      : { background: "#e5e7eb", color: "#374151" };
+      ? { background: "#ECECE7", color: "#005670" }
+      : { background: "#D0D0CE", color: "#53565A" };
 
   return <span style={{ ...badgeStyle, ...styles }}>{value}</span>;
 }
@@ -5215,18 +5218,18 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const statusBannerStyleInline: CSSProperties = {
   background: "white",
   borderRadius: "12px",
   padding: "12px 16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+  color: "#000000",
 };
 
 const viewTabsStyle: CSSProperties = {
@@ -5237,8 +5240,8 @@ const viewTabsStyle: CSSProperties = {
 };
 
 const viewTabButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#ECECE7",
+  color: "#000000",
   border: "none",
   padding: "10px 14px",
   borderRadius: "10px",
@@ -5275,7 +5278,7 @@ const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
   marginBottom: "20px",
 };
 
@@ -5291,12 +5294,12 @@ const sectionHeaderRowStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
 };
 
@@ -5308,7 +5311,7 @@ const fieldWrapStyle: CSSProperties = {
 const fieldLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
-  color: "#334155",
+  color: "#53565A",
 };
 
 const formGridStyle: CSSProperties = {
@@ -5320,9 +5323,9 @@ const formGridStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   padding: "11px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
   width: "100%",
   boxSizing: "border-box",
 };
@@ -5331,15 +5334,15 @@ const textAreaStyle: CSSProperties = {
   ...inputStyle,
   minHeight: "92px",
   resize: "vertical",
-  fontFamily: "Arial, Helvetica, sans-serif",
+  fontFamily: "\"Azo Sans\", \"Segoe UI\", Arial, Helvetica, sans-serif",
 };
 
 const readOnlyInputStyle: CSSProperties = {
   padding: "11px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
-  background: "#f8fafc",
-  color: "#334155",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
+  color: "#53565A",
   width: "100%",
   fontWeight: 700,
   boxSizing: "border-box",
@@ -5348,10 +5351,10 @@ const readOnlyInputStyle: CSSProperties = {
 const smallInputStyle: CSSProperties = {
   padding: "8px 10px",
   borderRadius: "8px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   width: "100%",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
   boxSizing: "border-box",
 };
 
@@ -5370,20 +5373,20 @@ const filterActionRowStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 
 const simpleFilterShellStyle: CSSProperties = {
   display: "grid",
   gap: "12px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 
 const simpleFilterTopRowStyle: CSSProperties = {
@@ -5397,10 +5400,10 @@ const importPanelStyle: CSSProperties = {
   display: "grid",
   gap: "12px",
   padding: "14px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 
 const importControlRowStyle: CSSProperties = {
@@ -5413,12 +5416,12 @@ const importControlRowStyle: CSSProperties = {
 const fileInputStyle: CSSProperties = {
   width: "100%",
   minHeight: 42,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   borderRadius: "10px",
   padding: "9px 12px",
   fontSize: "14px",
   boxSizing: "border-box",
-  color: "#0f172a",
+  color: "#000000",
   background: "white",
 };
 
@@ -5431,11 +5434,11 @@ const importTableStyle: CSSProperties = {
 };
 
 const importWarningRowStyle: CSSProperties = {
-  background: "#fff7ed",
+  background: "#ECECE7",
 };
 
 const helperTextStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
 };
 
@@ -5450,8 +5453,8 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -5470,7 +5473,7 @@ const miniButtonStyle: CSSProperties = {
 };
 
 const miniButtonGreyStyle: CSSProperties = {
-  background: "#64748b",
+  background: "#53565A",
   color: "white",
   border: "none",
   padding: "8px 12px",
@@ -5512,16 +5515,16 @@ const dashboardGridStyle: CSSProperties = {
 
 const chartPanelStyle: CSSProperties = {
   minHeight: "280px",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   padding: "14px",
 };
 
 const chartPanelTitleStyle: CSSProperties = {
   margin: "0 0 12px",
   fontSize: "15px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const quickFilterRowStyle: CSSProperties = {
@@ -5533,19 +5536,19 @@ const quickFilterRowStyle: CSSProperties = {
 };
 
 const quickFilterButtonStyle: CSSProperties = {
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   padding: "10px 14px",
   borderRadius: "999px",
   fontWeight: 800,
 };
 
 const myActionsNoticeStyle: CSSProperties = {
-  border: "1px solid #dbe4f0",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: "12px",
   padding: "10px 12px",
   marginBottom: "16px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
 };
 
@@ -5557,16 +5560,16 @@ const reportSummaryGridStyle: CSSProperties = {
 };
 
 const reportSummaryCardStyle: CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   padding: "14px",
 };
 
 const reportSummaryLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   marginBottom: "8px",
 };
@@ -5580,12 +5583,12 @@ const reportSummaryValueStyle: CSSProperties = {
 const reportSummaryTextStyle: CSSProperties = {
   fontSize: "16px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const miniListCardStyle: CSSProperties = {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
 };
@@ -5594,7 +5597,7 @@ const miniListTitleStyle: CSSProperties = {
   marginTop: 0,
   marginBottom: "12px",
   fontSize: "16px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const miniListWrapStyle: CSSProperties = {
@@ -5615,12 +5618,12 @@ const miniListItemStyle: CSSProperties = {
 
 const miniListLine1Style: CSSProperties = {
   fontWeight: 700,
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "14px",
 };
 
 const miniListLine2Style: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
   marginTop: "4px",
   lineHeight: 1.45,
@@ -5633,10 +5636,10 @@ const filterBarStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 
 const tableInfoRowStyle: CSSProperties = {
@@ -5645,14 +5648,14 @@ const tableInfoRowStyle: CSSProperties = {
   justifyContent: "flex-start",
   gap: "4px",
   flexWrap: "wrap",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
   margin: "12px 0",
 };
 
 const linkedSearchHintStyle: CSSProperties = {
-  color: "#1d4ed8",
+  color: "#005670",
   fontWeight: 600,
 };
 
@@ -5683,17 +5686,17 @@ const linkedChipStyle: CSSProperties = {
 
 const linkedChipToneStyles: Record<LinkedRecordChip["tone"], CSSProperties> = {
   teal: { background: "#D0D0CE", color: "#005670", borderColor: "#D0D0CE" },
-  blue: { background: "#dbeafe", color: "#1d4ed8", borderColor: "#bfdbfe" },
-  purple: { background: "#ede9fe", color: "#6d28d9", borderColor: "#ddd6fe" },
-  amber: { background: "#fef3c7", color: "#92400e", borderColor: "#fde68a" },
-  red: { background: "#fee2e2", color: "#F93822", borderColor: "#fecaca" },
-  slate: { background: "#e2e8f0", color: "#334155", borderColor: "#cbd5e1" },
+  blue: { background: "#ECECE7", color: "#005670", borderColor: "#ECECE7" },
+  purple: { background: "#ECECE7", color: "#53565A", borderColor: "#ECECE7" },
+  amber: { background: "#ECECE7", color: "#000000", borderColor: "#ECECE7" },
+  red: { background: "#ECECE7", color: "#F93822", borderColor: "#ECECE7" },
+  slate: { background: "#D0D0CE", color: "#53565A", borderColor: "#D0D0CE" },
 };
 
 const linkedWarningStyle: CSSProperties = {
-  border: "1px solid #fde68a",
-  background: "#fffbeb",
-  color: "#92400e",
+  border: "1px solid #ECECE7",
+  background: "#ECECE7",
+  color: "#000000",
   borderRadius: "10px",
   padding: "9px 10px",
   fontSize: "13px",
@@ -5711,13 +5714,13 @@ const tableStyle: CSSProperties = {
 const tableHeadStyle: CSSProperties = {
   textAlign: "left",
   padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 900,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
+  borderBottom: "1px solid #D0D0CE",
   whiteSpace: "nowrap",
 };
 
@@ -5728,8 +5731,8 @@ const tableRowStyle: CSSProperties = {
 
 const tableCellStyle: CSSProperties = {
   padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
+  borderBottom: "1px solid #ECECE7",
+  color: "#000000",
   verticalAlign: "middle",
   fontSize: "13px",
   lineHeight: 1.45,
@@ -5737,12 +5740,12 @@ const tableCellStyle: CSSProperties = {
 
 const primaryCellTextStyle: CSSProperties = {
   fontWeight: 600,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const secondaryCellTextStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   marginTop: "4px",
 };
 
@@ -5754,8 +5757,8 @@ const actionNumberCellStyle: CSSProperties = {
 
 const readOnlyTableCellStyle: CSSProperties = {
   padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
+  borderBottom: "1px solid #ECECE7",
+  color: "#000000",
   verticalAlign: "middle",
   fontSize: "13px",
   lineHeight: 1.45,
@@ -5764,9 +5767,9 @@ const readOnlyTableCellStyle: CSSProperties = {
 const emptyTableCellStyle: CSSProperties = {
   padding: "26px 14px",
   textAlign: "center",
-  color: "#64748b",
-  background: "#f8fafc",
-  borderBottom: "1px dashed #cbd5e1",
+  color: "#53565A",
+  background: "#ECECE7",
+  borderBottom: "1px dashed #D0D0CE",
 };
 
 const actionButtonsWrapStyle: CSSProperties = {
@@ -5785,7 +5788,7 @@ const badgeStyle: CSSProperties = {
 };
 
 const emptyTextStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   margin: 0,
 };
 
@@ -5802,8 +5805,8 @@ const selectedFileChipStyle: CSSProperties = {
   alignItems: "center",
   padding: "8px 10px",
   borderRadius: "999px",
-  background: "#eef2ff",
-  color: "#3730a3",
+  background: "#ECECE7",
+  color: "#005670",
   fontSize: "12px",
   fontWeight: 700,
 };
@@ -5815,7 +5818,7 @@ const selectedFileMetaStyle: CSSProperties = {
 const selectedFilesEmptyStyle: CSSProperties = {
   marginTop: "14px",
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const evidenceCountBadgeStyle: CSSProperties = {
@@ -5824,8 +5827,8 @@ const evidenceCountBadgeStyle: CSSProperties = {
   textAlign: "center",
   padding: "5px 10px",
   borderRadius: "999px",
-  background: "#ede9fe",
-  color: "#6d28d9",
+  background: "#ECECE7",
+  color: "#53565A",
   fontWeight: 800,
   fontSize: "12px",
 };
@@ -5833,9 +5836,9 @@ const evidenceCountBadgeStyle: CSSProperties = {
 const emptyEvidencePanelStyle: CSSProperties = {
   padding: "18px",
   borderRadius: "14px",
-  background: "#f8fafc",
-  border: "1px dashed #cbd5e1",
-  color: "#64748b",
+  background: "#ECECE7",
+  border: "1px dashed #D0D0CE",
+  color: "#53565A",
 };
 
 const myRegisterHeaderStyle: CSSProperties = {
@@ -5849,14 +5852,14 @@ const myRegisterHeaderStyle: CSSProperties = {
 
 const myRegisterTitleStyle: CSSProperties = {
   margin: 0,
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "18px",
   fontWeight: 800,
 };
 
 const myRegisterSubtitleStyle: CSSProperties = {
   margin: "4px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
 };
 
@@ -5867,15 +5870,15 @@ const evidencePanelGridStyle: CSSProperties = {
 };
 
 const evidenceUploadCardStyle: CSSProperties = {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "16px",
 };
 
 const evidenceListCardStyle: CSSProperties = {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "16px",
 };
@@ -5883,13 +5886,13 @@ const evidenceListCardStyle: CSSProperties = {
 const evidencePanelHeadingStyle: CSSProperties = {
   fontSize: "16px",
   fontWeight: 700,
-  color: "#0f172a",
+  color: "#000000",
   marginBottom: "10px",
 };
 
 const evidenceMetaTextStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.45,
 };
 
@@ -5900,9 +5903,9 @@ const evidenceFieldWrapStyle: CSSProperties = {
 };
 
 const linkedSourceCardStyle: CSSProperties = {
-  border: "1px solid #dbe4f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   padding: "12px 14px",
   display: "grid",
   gap: "6px",
@@ -5912,12 +5915,12 @@ const linkedSourceCardStyle: CSSProperties = {
 const linkedSourceTitleStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const linkedSourceMetaStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
 };
 
 const detailPanelGridStyle: CSSProperties = {
@@ -5927,13 +5930,13 @@ const detailPanelGridStyle: CSSProperties = {
 };
 
 const detailSectionCardStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
   padding: "18px",
   display: "grid",
   gap: "14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
 
@@ -5945,7 +5948,7 @@ const detailPanelHeaderStyle: CSSProperties = {
   flexWrap: "wrap",
   paddingBottom: "14px",
   marginBottom: "4px",
-  borderBottom: "1px solid #e2e8f0",
+  borderBottom: "1px solid #D0D0CE",
 };
 
 const detailActionNumberStyle: CSSProperties = {
@@ -5959,7 +5962,7 @@ const detailActionNumberStyle: CSSProperties = {
 const detailActionTitleStyle: CSSProperties = {
   fontSize: "22px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const detailBadgeWrapStyle: CSSProperties = {
@@ -5987,20 +5990,20 @@ const evidenceItemStyle: CSSProperties = {
   padding: "14px",
   borderRadius: "12px",
   background: "white",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
 };
 
 const evidenceFileNameStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 700,
-  color: "#0f172a",
+  color: "#000000",
   wordBreak: "break-word",
 };
 
 const evidenceNoteStyle: CSSProperties = {
   marginTop: "6px",
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.45,
 };
 export default function ActionsPage() {

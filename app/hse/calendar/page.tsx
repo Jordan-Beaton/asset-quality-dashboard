@@ -682,11 +682,8 @@ export default function HseCalendarPage() {
   }
 
   function openFilteredRegister(source: string, status = "") {
-    setSearch("");
     setSourceFilter(source);
     setStatusFilter(status);
-    setOwnerFilter("");
-    setSelectedDateKey("");
     setSelectedId("");
     setActiveView("register");
     setShowFilters(true);
@@ -730,7 +727,6 @@ export default function HseCalendarPage() {
       <ImsTopMetaRow
         backHref="/hse"
         status={<><strong>Status:</strong> {loading ? "Loading..." : message}</>}
-        actions={<ImsButton onClick={() => void loadData()} disabled={loading}>Refresh</ImsButton>}
       />
 
       <ImsTabs tabs={viewTabs} active={activeView} onChange={setActiveView} ariaLabel="HSE calendar views" />
@@ -838,7 +834,7 @@ export default function HseCalendarPage() {
               ) : null}
             </div>
 
-            <div style={{ overflowX: "auto", border: "1px solid #dbe3ef", borderRadius: "14px" }}>
+            <div style={{ overflowX: "auto", border: "1px solid #D0D0CE", borderRadius: "14px" }}>
               <table style={calendarRegisterTableStyle}>
                 <thead>
                   <tr>
@@ -1170,7 +1166,7 @@ function StatusPill({ event }: { event: CalendarEvent }) {
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div style={{ border: "1px dashed #cbd5e1", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: "#f8fafc" }}>{text}</div>;
+  return <div style={{ border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: "#ECECE7" }}>{text}</div>;
 }
 
 function EventListButton({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
@@ -1302,9 +1298,9 @@ const systemDetailStyle: CSSProperties = {
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
   gap: "14px",
   padding: "14px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const fieldLabelStyle: CSSProperties = {
@@ -1334,7 +1330,7 @@ const listButtonStyle: CSSProperties = {
   gridTemplateColumns: "12px minmax(0, 1fr) auto auto",
   gap: "10px",
   alignItems: "center",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "12px",
   background: "#ffffff",
@@ -1348,9 +1344,9 @@ const dateDetailStyle: CSSProperties = {
   gap: "12px",
   marginTop: "16px",
   padding: "14px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const dateDetailHeaderStyle: CSSProperties = {
@@ -1407,10 +1403,10 @@ const pillStyle: CSSProperties = {
 };
 
 const noticeStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   color: imsColours.slate,
   lineHeight: 1.55,
 };
@@ -1445,10 +1441,10 @@ const legendItemStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   gap: "6px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "999px",
   padding: "6px 10px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   color: imsColours.slate,
   fontSize: "12px",
   fontWeight: 900,
@@ -1466,7 +1462,7 @@ const calendarToolbarStyle: CSSProperties = {
 const calendarGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   overflow: "hidden",
 };
@@ -1483,15 +1479,15 @@ const calendarHeadStyle: CSSProperties = {
 const calendarCellStyle: CSSProperties = {
   minHeight: "116px",
   padding: "10px",
-  borderRight: "1px solid #edf2f7",
-  borderBottom: "1px solid #edf2f7",
+  borderRight: "1px solid #ECECE7",
+  borderBottom: "1px solid #ECECE7",
   background: "#ffffff",
   boxSizing: "border-box",
 };
 
 const blankCalendarCellStyle: CSSProperties = {
   ...calendarCellStyle,
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const calendarDayRowStyle: CSSProperties = {
@@ -1535,10 +1531,10 @@ const calendarEventStyle: CSSProperties = {
   gap: "6px",
   width: "100%",
   minWidth: 0,
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "9px",
   padding: "5px 6px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   color: imsColours.ink,
   fontSize: "11px",
   fontWeight: 800,

@@ -19,10 +19,10 @@ type Asset = {
 
 function getStatusTone(value: string | null | undefined) {
   const normal = (value || "").trim().toLowerCase();
-  if (normal === "active") return { bg: "#dcfce7", color: "#166534" };
-  if (normal.includes("maintenance")) return { bg: "#fef3c7", color: "#92400e" };
-  if (normal === "quarantine") return { bg: "#fee2e2", color: "#F93822" };
-  return { bg: "#e2e8f0", color: "#334155" };
+  if (normal === "active") return { bg: "#ECECE7", color: "#005670" };
+  if (normal.includes("maintenance")) return { bg: "#ECECE7", color: "#000000" };
+  if (normal === "quarantine") return { bg: "#ECECE7", color: "#F93822" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function buildAssetRouteValue(asset: Asset) {
@@ -145,7 +145,7 @@ const brandBarStyle: CSSProperties = {
 
 const summaryCardStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
   display: "grid",
@@ -166,12 +166,12 @@ const titleStyle: CSSProperties = {
   fontSize: "28px",
   lineHeight: 1.15,
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const introStyle: CSSProperties = {
   margin: 0,
-  color: "#475569",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.45,
 };
@@ -180,10 +180,10 @@ const searchInputStyle: CSSProperties = {
   width: "100%",
   minHeight: "44px",
   borderRadius: "12px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   padding: "10px 12px",
   fontSize: "15px",
-  color: "#0f172a",
+  color: "#000000",
   boxSizing: "border-box",
 };
 
@@ -194,13 +194,13 @@ const assetListStyle: CSSProperties = {
 
 const assetCardStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "16px",
   display: "grid",
   gap: "9px",
   textDecoration: "none",
-  color: "#0f172a",
+  color: "#000000",
   boxShadow: "0 10px 22px rgba(15, 23, 42, 0.05)",
 };
 
@@ -228,7 +228,7 @@ const assetTitleStyle: CSSProperties = {
 const assetMetaStyle: CSSProperties = {
   display: "grid",
   gap: "4px",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.4,
 };
@@ -243,10 +243,10 @@ const statusBadgeStyle: CSSProperties = {
 
 const emptyCardStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   borderRadius: "16px",
   padding: "18px",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
   textAlign: "center",
 };

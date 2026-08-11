@@ -168,12 +168,14 @@ Use `ImsTopMetaRow` for the row beneath the hero.
 
 Standard behavior:
 
-- Left side: back link, normally Enshore dark blue and bold.
-- Right side: action buttons and a status banner.
+- Left side: the exact link `Back to IMS Home`, Enshore dark blue and bold. Nested workspaces do not substitute a module-level back destination in this bar.
+- Right side: the status message only.
+- Refresh, PDF, create, export and other page commands must sit in the relevant tab/panel or a separate action row beneath the meta bar; they must never appear inside the white meta bar.
+- Do not show standalone `Refresh` buttons beneath or beside the meta bar. Pages load automatically on entry and refresh their data after successful create, edit, delete, import or workflow operations. The dynamic status message communicates loading, readiness and errors.
 - Background: white with slight transparency.
-- Border: `1px solid #dbe3ef`.
-- Border radius: `16px`.
-- Padding: `12px 14px`.
+- Border: `1px solid #D0D0CE`.
+- Border radius: `14px`.
+- Padding: `8px 12px`.
 - Bottom margin: `20px`.
 - Layout wraps on smaller widths.
 
@@ -232,7 +234,7 @@ Standard tab row:
 
 Standard tab button:
 
-- Inactive background: `#e2e8f0`.
+- Inactive background: pale Enshore brand tint `#eef7f8` on every workspace and nested tab.
 - Active background: `#005670`.
 - Active text: white.
 - Border radius: `10px`.
@@ -268,7 +270,7 @@ Panel standard:
 - Background: white.
 - Border: `1px solid #dbe7f3`.
 - Border radius: `18px`.
-- Padding: `20px`.
+- Padding: `16px` for normal operational panels. Use `20px` only where a dense report or specialist workflow genuinely needs the extra breathing room.
 - Shadow: `0 1px 3px rgba(15, 23, 42, 0.08)`.
 - Box sizing: border-box.
 
@@ -287,6 +289,21 @@ Standard panel headings outside `ModuleSectionHeader`:
 
 - Section title: `18px` to `20px`, ink, `700` to `900`.
 - Subtitle: `13px` to `14px`, muted/slate, line-height around `1.4` to `1.55`.
+
+## Create, Edit And Import Forms
+
+Create forms, edit/detail panels, imports, report builders and dialog forms use the same control contract as register filters. A different tab must never look like a separate application.
+
+- Labels: `13px`, `800`, Pantone cool gray 11 `#53565A`.
+- Inputs and selects: `42px` high, white, `10px` radius, `#D0D0CE` border, `14px` text and `10px 12px` padding.
+- Textareas: `96px` minimum height, vertically resizable; use a taller field only for genuinely long narrative content.
+- Standard form grids use `repeat(auto-fit, minmax(220px, 1fr))`, a `12px` grid gap and `6px` between a label and its control.
+- Fieldsets use a white background, `#D0D0CE` border, `12px` radius and `14px` padding. Legends use Enshore dark blue at `13px`, `800`.
+- File controls, checkboxes and radio buttons use the same border and Enshore dark-blue focus/accent treatment.
+- Keep the primary save/create action at the end of the form and group secondary actions beside it.
+- Do not place a single short field inside an oversized full-width card. Use the responsive form grid or a compact inset section.
+- Do not duplicate a panel inside another panel unless the inner box communicates a distinct workflow stage.
+- Create and edit tabs should reveal advanced, review-only or infrequently used fields progressively when this reduces the initial form height without hiding required information.
 
 ## Detail Panels
 
@@ -328,27 +345,49 @@ Registers should be dense, scannable, and filterable.
 Standard filter panel:
 
 - Use `ImsFilterPanel`.
-- Background: `#f8fafc`.
-- Border: `1px solid #dbe4ef`.
+- Legacy register toolbars must carry the shared `ims-filter-panel` class until migrated to `ImsFilterPanel`.
+- Background: Enshore off-white `#ECECE7`.
+- Border: `1px solid #D0D0CE`.
 - Border radius: `16px`.
 - Padding: `14px`.
 - Bottom margin: `14px`.
+- Shadow: `0 1px 3px rgba(0, 86, 112, 0.06)`.
 - Top row commonly uses search plus Show/Hide Filters button.
 - Filter grid uses `repeat(auto-fit, minmax(180px, 1fr))`.
 - Use exact labels `Show Filters`, `Hide Filters`, and `Clear Filters`.
+- Search inputs and selects use the same `42px` height, `10px` radius, `10px 12px` padding, white background, `#D0D0CE` border and `14px` text.
+- Search boxes fill their available grid/flex column; do not add page-specific maximum widths.
+- Focus uses a `#005670` border with a restrained `#63B1BC` outline.
+
+Filter accuracy contract:
+
+- Every active search, dropdown, toggle, KPI drill-down, date range and linked-record criterion combines with strict AND logic. Adding a filter must only retain or reduce the current result count; it must never broaden it.
+- OR matching is permitted only inside one clearly labelled criterion, such as a text search across several fields or a multi-select value within a single filter.
+- When filters apply to linked child records, all active child criteria must match the same child record. Do not allow one linked record to satisfy Status while another satisfies Category.
+- Dropdown filters use exact normalised value matching. Free-text search may use case-insensitive substring matching across its documented searchable fields.
+- Clearing one filter must not silently clear unrelated active filters. `Clear Filters` is the only general control that resets the complete filter set.
+- KPI and quick-filter buttons must combine with visible filters unless their label/action explicitly says it is opening a fresh filtered view.
+- Result summaries must reflect the final conjunctive result and use the format `Showing X of Y`.
 
 Standard table:
 
 - Wrap in horizontal overflow when needed.
-- Width: `100%`.
+- Inset the complete table by `4px` on every side of its shell; do not let the header touch the panel edge.
+- Width: `calc(100% - 8px)` for semantic tables. Custom grid registers use the `ims-register-shell` inset instead so header and row columns remain aligned.
 - Background: white.
-- Font size: `13px`.
-- Header background: `#f8fafc`.
-- Header text: `#334155`, `12px`, `900`, uppercase, letter spacing `0.04em`.
-- Header padding: `12px 14px`.
-- Cell padding: `12px 14px`.
-- Cell border bottom: `1px solid #edf2f7`.
-- Cell line-height: around `1.45`.
+- Font size: `12px`.
+- Header background: Enshore Pantone 7708c `#005670`, retaining the compact Project Management ITP Tracker layout.
+- Header text: white, `10px`, `800`, uppercase, letter spacing `0.04em`.
+- Header top corners: `10px`; never mix square and rounded register headers.
+- Header padding: `9px 10px`.
+- Cell padding: `10px`.
+- Cell border bottom: `1px solid #e4eaf0`.
+- Cell line-height: around `1.35`.
+- Every header and body cell is left-aligned, including numeric, status, date and action columns. Do not mix centred and left-aligned data within equivalent registers.
+- Every first-column value is bold (`800`) to make the primary identifier consistently scannable.
+- All other body-cell text is normal weight (`400`), including nested spans, links, badges, numbers and status values. Column headers and interactive action buttons remain bold as controls.
+- Selected rows use pale brand tint `#eef7f8` with a `#005670` inset marker. Custom grid rows must expose `aria-selected` and `data-selected`; unselected rows remain white.
+- Desktop row hover uses a restrained `#f7fafb`; selected rows use `#eef7f8` with an Enshore `#005670` inset marker.
 - Table info row: `Showing X of Y`, slate, `13px`, `700`, margin `12px 0`.
 
 Register actions:
@@ -513,11 +552,11 @@ Standard input style:
 - Width: `100%`.
 - Minimum height: `42px`.
 - Border radius: `10px`.
-- Border: `1px solid #cbd5e1`.
+- Border: `1px solid #D0D0CE`.
 - Padding: `10px 12px`.
 - Font size: `14px`.
 - Background: white.
-- Text: `#0f172a`.
+- Text: `#000000`.
 
 Standard form grid:
 
@@ -593,20 +632,25 @@ Field Tools launchers:
 
 Global font:
 
-- Arial/Helvetica/sans-serif.
-- Body text colour: `#0f172a`.
+- Azo Sans is the primary Enshore brand typeface and the first choice for the IMS.
+- Use the CSS stack `"Azo Sans", "Segoe UI", Arial, Helvetica, sans-serif` so the interface remains usable until a licensed Azo Sans webfont is supplied.
+- Calibri is reserved for internal Microsoft Office documents where Azo Sans is unavailable; it is not the IMS web-interface font.
+- Body text colour: Enshore black `#000000`.
+- Secondary and explanatory text: Pantone cool gray 11 `#53565A`.
 
 Typical sizes:
 
-- Hero title: about `18px` to `22px` in the compact shared hero.
-- Section title: `18px` to `20px`.
-- Section subtitle/body: `13px` to `14px`.
+- Hero title: `18px` in the compact shared hero.
+- Section-bar title: `16px`; standalone panel/page section title: `18px`.
+- Section subtitle: `13px`; standard body and controls: `14px`.
 - KPI label: `12px`.
 - KPI value: `26px`.
-- Table header: `12px` uppercase.
-- Table cell: `13px`.
+- Table header: `10px` uppercase.
+- Table cell: `12px`.
 - Button: `14px`.
 - Badges/pills: `11px` to `12px`.
+
+These sizes are semantic roles, not page-level suggestions. Do not introduce alternate sizes for the same role in a different module. Shared CSS classes override legacy inline values where necessary.
 
 Rules:
 
@@ -614,6 +658,34 @@ Rules:
 - Do not scale font size with viewport width.
 - Avoid negative letter spacing except where already present in existing components.
 - Long text must wrap cleanly and not overlap controls.
+
+### Generated PDF And Word Outputs
+
+All generated reports, registers, forms, certificates, packs, and other downloadable documents use the same Enshore typography and colour system as the IMS. New generators must import the canonical tokens from `src/lib/exportTheme.ts` rather than introducing a local palette.
+
+Typography:
+
+- Word outputs request Azo Sans. Calibri is the permitted Microsoft Office fallback only where Azo Sans is not installed.
+- PDF outputs use embedded Azo Sans when licensed font files are available. Until then, use jsPDF Helvetica as the portable fallback; do not substitute an unrelated decorative or condensed font.
+- Standard print roles are: title `18pt`, heading `13pt`, subheading `11pt`, body `9pt`, table text `8pt`, and caption/footer `8pt`.
+- Use bold weight for titles, headings, table headers, and primary record identifiers. Use normal weight for narrative body copy.
+
+Colour and table treatment:
+
+- Primary title bands and table headers: `#005670` with white text.
+- Supporting accent: `#63B1BC`, used sparingly and never behind normal-sized white text.
+- Main text: `#000000`; secondary text: `#53565A`.
+- Page/alternate-row fill: `#ECECE7`; borders and rules: `#D0D0CE`.
+- Warning and danger states use `#FFAD00` and `#F93822` respectively.
+- Table bodies remain white with optional `#ECECE7` alternating rows. Do not use legacy slate-blue header, border, or zebra colours.
+- `#78C57E` remains restricted to approved HSE/3Rs campaign material and `#503488` remains restricted to RapidScan.
+
+Layout rules:
+
+- Preserve the official Enshore logo artwork, clear space, aspect ratio, and minimum print size defined above.
+- Repeat the report title/header and page number/footer on multipage outputs where the format supports it.
+- Keep tables inside the printable page width, repeat column headers after page breaks, and prevent clipped text or split record identifiers.
+- Word and PDF versions of the same record must use matching headings, field labels, colours, and information hierarchy.
 
 ## Colour And Styling Rules
 
@@ -623,13 +695,12 @@ Use the IMS palette consistently:
 - Enshore aqua for supporting accents, charts, and decorative highlights; do not place normal-sized white text directly on aqua.
 - Enshore amber for warnings and attention states, and Enshore bright red for danger, overdue, and destructive states.
 - Enshore off-white and cool greys for page backgrounds, secondary surfaces, borders, and muted text.
-- White panels on light slate page background.
-- Slate and muted text for secondary information.
-- Blue for open/in-progress states where established.
-- Green for completed/success states.
+- White panels on Enshore off-white `#ECECE7` page backgrounds.
+- Cool gray 11 `#53565A` for secondary information and cool gray 2 `#D0D0CE` for borders.
+- Pantone 7708c `#005670` for open/in-progress and completed/success states where a distinction is not otherwise required; always pair colour with a text label.
 - Red for overdue/danger/delete states.
 - Amber for due soon/warning states.
-- Purple for secondary analytical/evidence accents.
+- Do not use purple for general analytics; `#503488` is reserved for RapidScan.
 
 Do:
 

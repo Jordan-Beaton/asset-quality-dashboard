@@ -348,9 +348,9 @@ function Field({
 
 function StatusPill({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "good" | "warn" | "danger" }) {
   const colour =
-    tone === "good" ? "#dcfce7" : tone === "warn" ? "#fef3c7" : tone === "danger" ? "#fee2e2" : "#e2e8f0";
+    tone === "good" ? "#ECECE7" : tone === "warn" ? "#ECECE7" : tone === "danger" ? "#ECECE7" : "#D0D0CE";
   const text =
-    tone === "good" ? "#166534" : tone === "warn" ? "#92400e" : tone === "danger" ? "#F93822" : "#334155";
+    tone === "good" ? "#005670" : tone === "warn" ? "#000000" : tone === "danger" ? "#F93822" : "#53565A";
 
   return (
     <span style={{ display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", background: colour, color: text, fontSize: "12px", fontWeight: 900 }}>
@@ -998,7 +998,6 @@ export default function AdminDashboardPage() {
       <ImsTopMetaRow
         backHref="/home"
         backLabel="Back to IMS Home"
-        actions={<ImsButton onClick={loadAdminData} disabled={isLoading}>Refresh</ImsButton>}
         status={<><strong>Status:</strong> {message}</>}
       />
 
@@ -1243,7 +1242,7 @@ export default function AdminDashboardPage() {
                         </tr>
                         {isSelected ? (
                           <tr key={`${person.id}-permissions`}>
-                            <td style={{ ...imsTableCellStyle, background: "#f8fafc", padding: 16 }} colSpan={5}>
+                            <td style={{ ...imsTableCellStyle, background: "#ECECE7", padding: 16 }} colSpan={5}>
                               <div id="selected-user-permissions">
                                 {renderPersonPermissionEditor(person)}
                               </div>
@@ -1662,7 +1661,7 @@ const invitePermissionMatrixStyle: CSSProperties = {
 };
 
 const invitePermissionMatrixHeaderStyle: CSSProperties = {
-  background: "#f8fafc",
+  background: "#ECECE7",
   borderBottom: `1px solid ${imsColours.border}`,
   padding: "14px 16px",
 };
@@ -1718,7 +1717,7 @@ const invitePermissionOptionGroupStyle: CSSProperties = {
 const invitePermissionOptionStyle: CSSProperties = {
   border: `1px solid ${imsColours.border}`,
   borderRadius: 10,
-  background: "#eef2f7",
+  background: "#ECECE7",
   color: imsColours.ink,
   cursor: "pointer",
   fontSize: 14,
@@ -1732,8 +1731,8 @@ const invitePermissionOptionActiveStyle: CSSProperties = {
   color: "#ffffff",
 };
 const requestQueue: CSSProperties = { display: "grid", gap: 10 };
-const requestCard: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "start", gap: 16, padding: 14, border: "1px solid #dbe7f3", borderRadius: 12, background: "#f8fafc" };
-const requestMeta: CSSProperties = { display: "block", marginTop: 4, color: "#64748b", fontSize: 12, lineHeight: 1.4 };
+const requestCard: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "start", gap: 16, padding: 14, border: "1px solid #D0D0CE", borderRadius: 12, background: "#ECECE7" };
+const requestMeta: CSSProperties = { display: "block", marginTop: 4, color: "#53565A", fontSize: 12, lineHeight: 1.4 };
 const requestActions: CSSProperties = { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 };
 
 const userSearchRowStyle: CSSProperties = {
@@ -1831,7 +1830,7 @@ const segmentedButtonRowStyle: CSSProperties = {
 const permissionModeButtonStyle: CSSProperties = {
   border: `1px solid ${imsColours.border}`,
   borderRadius: 10,
-  background: "#e2e8f0",
+  background: "#D0D0CE",
   color: imsColours.ink,
   fontWeight: 900,
   padding: "10px 12px",
@@ -1863,7 +1862,7 @@ const tabPermissionRowStyle: CSSProperties = {
 
 const tabPermissionHeadRowStyle: CSSProperties = {
   borderTop: "none",
-  background: "#f8fafc",
+  background: "#ECECE7",
   color: imsColours.slate,
   fontSize: 12,
   fontWeight: 900,

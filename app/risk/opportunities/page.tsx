@@ -68,7 +68,7 @@ function RiskShellPage({
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           ← Back to IMS Home
         </Link>
@@ -112,7 +112,7 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
@@ -129,7 +129,7 @@ const statusBannerStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "12px 16px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const statsGridStyle: CSSProperties = {
@@ -155,11 +155,11 @@ const panelStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: "0 0 10px",
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const emptyTextStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   margin: 0,
   lineHeight: 1.55,
 };

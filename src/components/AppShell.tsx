@@ -998,7 +998,7 @@ export default function AppShell({ children }: AppShellProps) {
     <MobileCompatibilityGuard routeKey={pathname} />
     <div
       className="ims-app-root"
-      style={{ minHeight: "100vh", background: "#f1f5f9", scrollbarGutter: "stable" }}
+      style={{ minHeight: "100vh", background: "#ECECE7", scrollbarGutter: "stable" }}
       onClickCapture={handlePermissionClickCapture}
       onSubmitCapture={handlePermissionSubmitCapture}
       onChangeCapture={handlePermissionChangeCapture}
@@ -1010,7 +1010,7 @@ export default function AppShell({ children }: AppShellProps) {
           top: 0,
           zIndex: 1000,
           background: "#ffffff",
-          borderBottom: "1px solid #dbe3ef",
+          borderBottom: "1px solid #D0D0CE",
           boxShadow: "0 6px 20px rgba(15, 23, 42, 0.08)",
         }}
       >
@@ -1088,7 +1088,7 @@ export default function AppShell({ children }: AppShellProps) {
               <div
                 className="ims-header-title"
                 style={{
-                  color: "#0f172a",
+                  color: "#000000",
                   fontWeight: 700,
                   fontSize: isFieldInspectionMode ? "15px" : "20px",
                   letterSpacing: "-0.01em",
@@ -1101,7 +1101,7 @@ export default function AppShell({ children }: AppShellProps) {
                 <div
                   className="ims-header-subtitle"
                   style={{
-                    color: "#64748b",
+                    color: "#53565A",
                     fontSize: "12px",
                     fontWeight: 500,
                     whiteSpace: "nowrap",
@@ -1152,7 +1152,7 @@ export default function AppShell({ children }: AppShellProps) {
                     gap: "8px",
                     minHeight: "38px",
                     maxWidth: "210px",
-                    color: "#0f172a",
+                    color: "#000000",
                     fontSize: "13px",
                     fontWeight: 800,
                     whiteSpace: "nowrap",
@@ -1213,7 +1213,7 @@ export default function AppShell({ children }: AppShellProps) {
             zIndex: 900,
             width: railOpen ? "236px" : "74px",
             background: "rgba(255,255,255,0.96)",
-            borderRight: "1px solid #dbe3ef",
+            borderRight: "1px solid #D0D0CE",
             boxShadow: "10px 0 28px rgba(15, 23, 42, 0.08)",
             padding: "14px 10px",
             boxSizing: "border-box",
@@ -1225,7 +1225,7 @@ export default function AppShell({ children }: AppShellProps) {
           <div
             className="ims-side-rail-label"
             style={{
-              color: "#64748b",
+              color: "#53565A",
               fontSize: "10px",
               fontWeight: 900,
               letterSpacing: "0.12em",
@@ -1248,9 +1248,9 @@ export default function AppShell({ children }: AppShellProps) {
               minHeight: "34px",
               marginBottom: "10px",
               borderRadius: "11px",
-              border: "1px solid #dbe3ef",
+              border: "1px solid #D0D0CE",
               background: isRailPinned ? "#ECECE7" : "#ffffff",
-              color: isRailPinned ? "#005670" : "#475569",
+              color: isRailPinned ? "#005670" : "#53565A",
               cursor: "pointer",
               display: "grid",
               gridTemplateColumns: "42px minmax(0, 1fr)",
@@ -1271,7 +1271,7 @@ export default function AppShell({ children }: AppShellProps) {
                 alignItems: "center",
                 justifyContent: "center",
                 justifySelf: "center",
-                background: isRailPinned ? "#D0D0CE" : "#eef4f6",
+                background: isRailPinned ? "#D0D0CE" : "#ECECE7",
                 fontSize: "12px",
                 lineHeight: 1,
               }}
@@ -1324,7 +1324,7 @@ export default function AppShell({ children }: AppShellProps) {
                     boxSizing: "border-box",
                     textDecoration: "none",
                     background: isActive ? "#005670" : "transparent",
-                    color: isActive ? "#ffffff" : "#0f172a",
+                    color: isActive ? "#ffffff" : "#000000",
                     border: isActive ? "1px solid #005670" : "1px solid transparent",
                     transition: "background 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
                   }}
@@ -1353,7 +1353,7 @@ export default function AppShell({ children }: AppShellProps) {
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      background: isActive ? "rgba(255,255,255,0.18)" : "#eef4f6",
+                      background: isActive ? "rgba(255,255,255,0.18)" : "#ECECE7",
                       color: isActive ? "#ffffff" : "#005670",
                       fontSize: "11px",
                       fontWeight: 900,
@@ -1416,7 +1416,7 @@ export default function AppShell({ children }: AppShellProps) {
             <section
               style={{
                 background: "#ffffff",
-                border: "1px solid #dbe3ef",
+                border: "1px solid #D0D0CE",
                 borderRadius: "18px",
                 padding: "24px",
                 boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
@@ -1438,7 +1438,7 @@ export default function AppShell({ children }: AppShellProps) {
                 </div>
                 <h1 style={{ margin: "8px 0 0", fontSize: "28px", lineHeight: 1.1 }}>You do not currently have access to this area.</h1>
               </div>
-              <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
+              <p style={{ margin: 0, color: "#53565A", lineHeight: 1.6 }}>
                 Your current role or individual permissions do not include the {moduleTitle} workspace. If this looks wrong, ask an Admin to review your role or permission override in Admin / Settings.
               </p>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -1462,8 +1462,8 @@ export default function AppShell({ children }: AppShellProps) {
                       alignItems: "center",
                       borderRadius: "10px",
                       padding: "12px 14px",
-                      background: "#eef4f6",
-                      color: "#334155",
+                      background: "#ECECE7",
+                      color: "#53565A",
                       fontWeight: 800,
                     }}
                   >

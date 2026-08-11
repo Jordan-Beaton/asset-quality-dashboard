@@ -87,8 +87,6 @@ export function ImsLinkButton({
 }
 
 export function ImsTopMetaRow({
-  backHref = "/home",
-  backLabel = "Back to IMS Home",
   status,
   actions,
 }: {
@@ -97,16 +95,17 @@ export function ImsTopMetaRow({
   status?: ReactNode;
   actions?: ReactNode;
 }) {
+  const backLabel = "Back to IMS Home";
   return (
+    <>
     <div className="ims-top-meta-row" style={imsTopMetaRowStyle}>
-      <Link href={backHref} style={imsBackLinkStyle}>
+      <Link href="/home" style={imsBackLinkStyle}>
         ← {backLabel}
       </Link>
-      <div className="ims-top-meta-actions" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap" }}>
-        {actions}
-        {status ? <div style={imsStatusBannerStyle}>{status}</div> : null}
-      </div>
+      {status ? <div className="ims-top-meta-status" style={imsStatusBannerStyle}>{status}</div> : null}
     </div>
+    {actions ? <div className="ims-page-actions">{actions}</div> : null}
+    </>
   );
 }
 
@@ -122,11 +121,14 @@ export function ImsTabs<T extends string>({
   ariaLabel?: string;
 }) {
   return (
-    <nav className="ims-tabs" style={imsTabListStyle} aria-label={ariaLabel}>
+    <nav className="ims-tabs" style={imsTabListStyle} aria-label={ariaLabel} role="tablist">
       {tabs.map((tab) => (
         <button
           key={tab.value}
           type="button"
+          role="tab"
+          aria-selected={active === tab.value}
+          data-active={active === tab.value ? "true" : "false"}
           style={active === tab.value ? imsActiveTabButtonStyle : imsTabButtonStyle}
           onClick={() => onChange(tab.value)}
         >

@@ -157,9 +157,9 @@ type AttachmentWithUrl = {
 
 const evidenceBucket = "quality-evidence";
 const pdfBrand: [number, number, number] = [0, 86, 112];
-const pdfPale: [number, number, number] = [241, 245, 249];
-const pdfLine: [number, number, number] = [203, 213, 225];
-const pdfInk: [number, number, number] = [15, 23, 42];
+const pdfPale: [number, number, number] = [236, 236, 231];
+const pdfLine: [number, number, number] = [208, 208, 206];
+const pdfInk: [number, number, number] = [0, 0, 0];
 
 const viewTabs: Array<{ value: PtwView; label: string }> = [
   { value: "dashboard", label: "Dashboard" },
@@ -1051,7 +1051,7 @@ export default function HsePermitToWorkPage() {
       theme: "grid",
       styles: { fontSize: 8.2, cellPadding: 2.3, lineColor: pdfLine, lineWidth: 0.2, valign: "middle", overflow: "linebreak", textColor: pdfInk },
       headStyles: { fillColor: pdfPale, textColor: pdfInk, fontStyle: "bold" },
-      columnStyles: { 0: { cellWidth: 48, fontStyle: "bold" }, 1: { cellWidth: 96 }, 2: { cellWidth: 38, textColor: [37, 99, 235], fontStyle: "bold" } },
+      columnStyles: { 0: { cellWidth: 48, fontStyle: "bold" }, 1: { cellWidth: 96 }, 2: { cellWidth: 38, textColor: [0, 86, 112], fontStyle: "bold" } },
       margin: { left: 14, right: 14 },
       didDrawCell: (data) => {
         if (data.section !== "body" || data.column.index !== 2) return;
@@ -1070,7 +1070,7 @@ export default function HsePermitToWorkPage() {
     const logoDataUrl = await getLogoDataUrl();
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     doc.addImage(logoDataUrl, "PNG", 14, 10, 32, 16);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.text(draft.ptwNumber || "PTW", 178, 18, { align: "right" });
@@ -1116,7 +1116,7 @@ export default function HsePermitToWorkPage() {
     for (let page = 1; page <= pages; page += 1) {
       doc.setPage(page);
       doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(83, 86, 90);
       doc.text("ENS-HSEQ-FRM-010", 14, 287);
       doc.text(`Page ${page} of ${pages}`, 181, 287);
     }
@@ -1129,9 +1129,9 @@ export default function HsePermitToWorkPage() {
     return new TextRun({
       text,
       bold: options.bold,
-      color: options.color || "0F172A",
+      color: options.color || "000000",
       size: options.size || 20,
-      font: "Calibri",
+      font: "Azo Sans",
     });
   }
 
@@ -1143,10 +1143,10 @@ export default function HsePermitToWorkPage() {
       shading: options.fill ? { fill: options.fill } : undefined,
       margins: { top: 120, bottom: 120, left: 140, right: 140 },
       borders: {
-        top: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 },
-        bottom: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 },
-        left: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 },
-        right: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 },
+        top: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 },
+        bottom: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 },
+        left: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 },
+        right: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 },
       },
       children: [
         new Paragraph({
@@ -1197,7 +1197,7 @@ export default function HsePermitToWorkPage() {
                 new Paragraph({
                   alignment: AlignmentType.CENTER,
                   spacing: { after: 80 },
-                  children: [wordRun("", { bold: true, color: "0F172A", size: 20 })],
+                  children: [wordRun("", { bold: true, color: "000000", size: 20 })],
                 }),
               ],
             }),
@@ -1205,8 +1205,8 @@ export default function HsePermitToWorkPage() {
               width: { size: 2400, type: WidthType.DXA },
               borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
               children: [
-                new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(draft.ptwNumber || "PTW", { color: "64748B", size: 18 })] }),
-                new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), { color: "64748B", size: 18 })] }),
+                new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(draft.ptwNumber || "PTW", { color: "53565A", size: 18 })] }),
+                new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), { color: "53565A", size: 18 })] }),
               ],
             }),
           ],
@@ -1244,8 +1244,8 @@ export default function HsePermitToWorkPage() {
           }),
           new TableRow({
             children: [
-              wordCell("Field", { bold: true, fill: "F1F5F9", width: 3000 }),
-              wordCell("Details", { bold: true, fill: "F1F5F9", width: 7440 }),
+              wordCell("Field", { bold: true, fill: "ECECE7", width: 3000 }),
+              wordCell("Details", { bold: true, fill: "ECECE7", width: 7440 }),
             ],
           }),
           ...rows.map(([field, value]) => new TableRow({ children: [wordCell(field, { bold: true, width: 3000 }), wordCell(value || "", { width: 7440 })] })),
@@ -1279,9 +1279,9 @@ export default function HsePermitToWorkPage() {
           new TableRow({ children: [wordCell("Attachments and Distribution", { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 3 })] }),
           new TableRow({
             children: [
-              wordCell("Attachment / Distribution", { bold: true, fill: "F1F5F9", width: 2800 }),
-              wordCell("Uploaded Document / Details", { bold: true, fill: "F1F5F9", width: 5600 }),
-              wordCell("Link", { bold: true, fill: "F1F5F9", width: 2040 }),
+              wordCell("Attachment / Distribution", { bold: true, fill: "ECECE7", width: 2800 }),
+              wordCell("Uploaded Document / Details", { bold: true, fill: "ECECE7", width: 5600 }),
+              wordCell("Link", { bold: true, fill: "ECECE7", width: 2040 }),
             ],
           }),
           ...rows.map((item) => new TableRow({
@@ -1293,10 +1293,10 @@ export default function HsePermitToWorkPage() {
                     verticalAlign: VerticalAlign.CENTER,
                     margins: { top: 120, bottom: 120, left: 140, right: 140 },
                     borders: {
-                      top: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 },
-                      bottom: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 },
-                      left: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 },
-                      right: { style: BorderStyle.SINGLE, color: "CBD5E1", size: 2 },
+                      top: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 },
+                      bottom: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 },
+                      left: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 },
+                      right: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 },
                     },
                     children: [
                       new Paragraph({
@@ -1312,7 +1312,7 @@ export default function HsePermitToWorkPage() {
             children: [
               wordCell(
                 "PTW Distribution: Original - Issuing Authority; 1st Copy - Displayed at Work Location; 2nd Copy - At Isolation Point.\nChecklists to be attached to Original PTW.\nAll Copies to be returned to Issuing Authority on completion.",
-                { fill: "E2E8F0", width: WORD_TABLE_WIDTH, columnSpan: 3 },
+                { fill: "D0D0CE", width: WORD_TABLE_WIDTH, columnSpan: 3 },
               ),
             ],
           }),
@@ -1359,35 +1359,35 @@ export default function HsePermitToWorkPage() {
       new TableRow({ children: [wordCell("Section 3 - Preparation and Precautions to be Undertaken", { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 6 })] }),
       new TableRow({
         children: [
-          wordCell("Risk Assessment", { bold: true, fill: "F1F5F9", width: 3000, columnSpan: 2 }),
+          wordCell("Risk Assessment", { bold: true, fill: "ECECE7", width: 3000, columnSpan: 2 }),
           wordCell(draft.riskAssessment || "", { width: 7440, columnSpan: 4 }),
         ],
       }),
       new TableRow({
         children: [
-          wordCell("Lift Plan", { bold: true, fill: "F1F5F9", width: 3000, columnSpan: 2 }),
+          wordCell("Lift Plan", { bold: true, fill: "ECECE7", width: 3000, columnSpan: 2 }),
           wordCell(draft.liftPlan || "", { width: 7440, columnSpan: 4 }),
         ],
       }),
       new TableRow({
         children: [
-          wordCell("Isolation Required", { bold: true, fill: "F1F5F9", width: 3000, columnSpan: 2 }),
+          wordCell("Isolation Required", { bold: true, fill: "ECECE7", width: 3000, columnSpan: 2 }),
           wordCell(selectedAnswer(draft.isolationRequired), { bold: Boolean(draft.isolationRequired), width: 2220 }),
-          wordCell("Electrical", { bold: true, fill: "F1F5F9", width: 3000, columnSpan: 2 }),
+          wordCell("Electrical", { bold: true, fill: "ECECE7", width: 3000, columnSpan: 2 }),
           wordCell(selectedAnswer(draft.electricalIsolation), { bold: Boolean(draft.electricalIsolation), width: 2220 }),
         ],
       }),
       new TableRow({
         children: [
-          wordCell("Mechanical", { bold: true, fill: "F1F5F9", width: 3000, columnSpan: 2 }),
+          wordCell("Mechanical", { bold: true, fill: "ECECE7", width: 3000, columnSpan: 2 }),
           wordCell(selectedAnswer(draft.mechanicalIsolation), { bold: Boolean(draft.mechanicalIsolation), width: 2220 }),
-          wordCell("Pressure", { bold: true, fill: "F1F5F9", width: 3000, columnSpan: 2 }),
+          wordCell("Pressure", { bold: true, fill: "ECECE7", width: 3000, columnSpan: 2 }),
           wordCell(selectedAnswer(draft.pressureIsolation), { bold: Boolean(draft.pressureIsolation), width: 2220 }),
         ],
       }),
       new TableRow({
         children: [
-          wordCell("Description of Isolation", { bold: true, fill: "F1F5F9", width: 3000, columnSpan: 2 }),
+          wordCell("Description of Isolation", { bold: true, fill: "ECECE7", width: 3000, columnSpan: 2 }),
           wordCell(draft.isolationDescription || "", { width: 7440, columnSpan: 4 }),
         ],
       }),
@@ -1416,11 +1416,11 @@ export default function HsePermitToWorkPage() {
       }),
       new TableRow({
         children: [
-          wordCell("Check List Used?", { bold: true, fill: "F1F5F9", width: 1760 }),
+          wordCell("Check List Used?", { bold: true, fill: "ECECE7", width: 1760 }),
           wordCell(selectedAnswer(draft.checklistUsed), { bold: Boolean(draft.checklistUsed), width: 1180 }),
-          wordCell("Condition of PTE to be Inspected", { bold: true, fill: "F1F5F9", width: 3060 }),
+          wordCell("Condition of PTE to be Inspected", { bold: true, fill: "ECECE7", width: 3060 }),
           wordCell(draft.pteCondition || "", { width: 1700 }),
-          wordCell("Hrs. by Issuing Authority", { bold: true, fill: "F1F5F9", width: 2500 }),
+          wordCell("Hrs. by Issuing Authority", { bold: true, fill: "ECECE7", width: 2500 }),
           wordCell(draft.issuingAuthorityHours || "", { width: 960 }),
         ],
       }),
@@ -1445,19 +1445,19 @@ export default function HsePermitToWorkPage() {
           new TableRow({ children: [wordCell("Section 4 - Permit to Work Issue / Acceptance (maximum 12 hours or to shift change)", { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 5 })] }),
           new TableRow({
             children: [
-              wordCell("Start Time / Date", { bold: true, fill: "F1F5F9", width: 2200 }),
+              wordCell("Start Time / Date", { bold: true, fill: "ECECE7", width: 2200 }),
               wordCell([draft.startTime, formatDateForReport(draft.startDate)].filter(Boolean).join(" "), { width: 2480 }),
-              wordCell("End Time / Date", { bold: true, fill: "F1F5F9", width: 2200 }),
+              wordCell("End Time / Date", { bold: true, fill: "ECECE7", width: 2200 }),
               wordCell([draft.endTime, formatDateForReport(draft.endDate)].filter(Boolean).join(" "), { width: 2480, columnSpan: 2 }),
             ],
           }),
           new TableRow({
             children: [
-              wordCell("Role", { bold: true, fill: "F1F5F9", width: 2500 }),
-              wordCell("Name", { bold: true, fill: "F1F5F9", width: 1900 }),
-              wordCell("Signature / Confirmation", { bold: true, fill: "F1F5F9", width: 2500 }),
-              wordCell("Position", { bold: true, fill: "F1F5F9", width: 1600 }),
-              wordCell("Date", { bold: true, fill: "F1F5F9", width: 860 }),
+              wordCell("Role", { bold: true, fill: "ECECE7", width: 2500 }),
+              wordCell("Name", { bold: true, fill: "ECECE7", width: 1900 }),
+              wordCell("Signature / Confirmation", { bold: true, fill: "ECECE7", width: 2500 }),
+              wordCell("Position", { bold: true, fill: "ECECE7", width: 1600 }),
+              wordCell("Date", { bold: true, fill: "ECECE7", width: 860 }),
             ],
           }),
           new TableRow({
@@ -1493,17 +1493,17 @@ export default function HsePermitToWorkPage() {
           new TableRow({ children: [wordCell(`Section ${extension.label} - Permit Extension (only if conditions of PTW have not changed)`, { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 5 })] }),
           new TableRow({
             children: [
-              wordCell("PTW Extended To", { bold: true, fill: "F1F5F9", width: 2200 }),
+              wordCell("PTW Extended To", { bold: true, fill: "ECECE7", width: 2200 }),
               wordCell([extension.extendedToTime, formatDateForReport(extension.extendedToDate)].filter(Boolean).join(" "), { width: 7160, columnSpan: 4 }),
             ],
           }),
           new TableRow({
             children: [
-              wordCell("Role", { bold: true, fill: "F1F5F9", width: 2700 }),
-              wordCell("Name", { bold: true, fill: "F1F5F9", width: 1700 }),
-              wordCell("Position", { bold: true, fill: "F1F5F9", width: 1900 }),
-              wordCell("Company", { bold: true, fill: "F1F5F9", width: 1500 }),
-              wordCell("Signature", { bold: true, fill: "F1F5F9", width: 1560 }),
+              wordCell("Role", { bold: true, fill: "ECECE7", width: 2700 }),
+              wordCell("Name", { bold: true, fill: "ECECE7", width: 1700 }),
+              wordCell("Position", { bold: true, fill: "ECECE7", width: 1900 }),
+              wordCell("Company", { bold: true, fill: "ECECE7", width: 1500 }),
+              wordCell("Signature", { bold: true, fill: "ECECE7", width: 1560 }),
             ],
           }),
           new TableRow({
@@ -1539,17 +1539,17 @@ export default function HsePermitToWorkPage() {
           new TableRow({ children: [wordCell("Section 5E - Permit Closure by Site Manager / Designate", { bold: true, fill: "005670", color: "FFFFFF", width: WORD_TABLE_WIDTH, columnSpan: 5 })] }),
           new TableRow({
             children: [
-              wordCell("Closure Confirmation", { bold: true, fill: "F1F5F9", width: 2400 }),
+              wordCell("Closure Confirmation", { bold: true, fill: "ECECE7", width: 2400 }),
               wordCell("All work completed / suspended. Tags and key returned. Area checked as safe and tidy.", { width: 6960, columnSpan: 4 }),
             ],
           }),
           new TableRow({
             children: [
-              wordCell("Role", { bold: true, fill: "F1F5F9", width: 2700 }),
-              wordCell("Name", { bold: true, fill: "F1F5F9", width: 1800 }),
-              wordCell("Position", { bold: true, fill: "F1F5F9", width: 2100 }),
-              wordCell("Date", { bold: true, fill: "F1F5F9", width: 1200 }),
-              wordCell("Signature", { bold: true, fill: "F1F5F9", width: 1560 }),
+              wordCell("Role", { bold: true, fill: "ECECE7", width: 2700 }),
+              wordCell("Name", { bold: true, fill: "ECECE7", width: 1800 }),
+              wordCell("Position", { bold: true, fill: "ECECE7", width: 2100 }),
+              wordCell("Date", { bold: true, fill: "ECECE7", width: 1200 }),
+              wordCell("Signature", { bold: true, fill: "ECECE7", width: 1560 }),
             ],
           }),
           new TableRow({
@@ -1597,12 +1597,12 @@ export default function HsePermitToWorkPage() {
                 new TableCell({
                   width: { size: WORD_TABLE_WIDTH / 2, type: WidthType.DXA },
                   borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                  children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [wordRun("ENS-HSEQ-FRM-010", { color: "64748B", size: 16 })] })],
+                  children: [new Paragraph({ alignment: AlignmentType.LEFT, children: [wordRun("ENS-HSEQ-FRM-010", { color: "53565A", size: 16 })] })],
                 }),
                 new TableCell({
                   width: { size: WORD_TABLE_WIDTH / 2, type: WidthType.DXA },
                   borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                  children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun("Page ", { color: "64748B", size: 16 }), new SimpleField("PAGE"), wordRun(" of ", { color: "64748B", size: 16 }), new SimpleField("NUMPAGES")] })],
+                  children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun("Page ", { color: "53565A", size: 16 }), new SimpleField("PAGE"), wordRun(" of ", { color: "53565A", size: 16 }), new SimpleField("NUMPAGES")] })],
                 }),
               ],
             }),
@@ -1704,7 +1704,7 @@ export default function HsePermitToWorkPage() {
 
       {activeView === "register" ? (
         <ImsPanel title="PTW Register" subtitle="Saved permits. Click a row to open the PTW form for edit.">
-          <div style={registerToolbarStyle}>
+          <div className="ims-filter-panel" style={registerToolbarStyle}>
             <input
               style={registerSearchStyle}
               value={registerSearch}
@@ -1716,7 +1716,7 @@ export default function HsePermitToWorkPage() {
             </button>
           </div>
           {showRegisterFilters ? (
-            <div style={registerToolbarStyle}>
+            <div className="ims-filter-panel" style={registerToolbarStyle}>
               <select style={registerFilterStyle} value={registerStatusFilter} onChange={(event) => setRegisterStatusFilter(event.target.value)}>
                 <option value="">All Statuses</option>
                 {["Draft", "Awaiting Issue", "Issued", "Extended", "Closed"].map((status) => <option key={status} value={status}>{status}</option>)}
@@ -1757,7 +1757,7 @@ export default function HsePermitToWorkPage() {
                 </thead>
                 <tbody>
                   {filteredRecords.map((record) => (
-                    <tr key={record.id} onClick={() => selectRecord(record)} style={{ cursor: "pointer", background: record.id === selectedId ? "#ECECE7" : "#ffffff" }}>
+                    <tr key={record.id} aria-selected={record.id === selectedId} data-selected={record.id === selectedId ? "true" : "false"} onClick={() => selectRecord(record)} style={{ cursor: "pointer", background: record.id === selectedId ? "#ECECE7" : "#ffffff" }}>
                       <td style={{ ...imsTableCellStyle, fontWeight: 900, color: imsColours.brandDark }}>{record.ptw_number}</td>
                       <td style={imsTableCellStyle}>{record.status || "-"}</td>
                       <td style={imsTableCellStyle}>{record.work_types?.join(", ") || "-"}</td>
@@ -2094,13 +2094,13 @@ function SignatureFields({
 const kpiGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "16px" };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" };
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   padding: "20px",
   display: "grid",
   gap: "16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 const recordHeaderStyle: CSSProperties = {
   background: imsColours.brand,
@@ -2118,42 +2118,42 @@ const recordSubtitleStyle: CSSProperties = { margin: "4px 0 0", color: "rgba(255
 const statusPillStyle: CSSProperties = { borderRadius: "999px", background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.28)", padding: "7px 10px", fontSize: "12px", fontWeight: 900 };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "14px" };
 const signatureGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" };
-const labelStyle: CSSProperties = { color: "#334155", fontSize: "12px", fontWeight: 900, lineHeight: 1.2 };
-const inputStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #cbd5e1", borderRadius: "10px", padding: "10px 12px", fontSize: "14px", lineHeight: 1.35, boxSizing: "border-box", color: imsColours.ink, background: "#ffffff" };
+const labelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 900, lineHeight: 1.2 };
+const inputStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "10px 12px", fontSize: "14px", lineHeight: 1.35, boxSizing: "border-box", color: imsColours.ink, background: "#ffffff" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: "96px", lineHeight: 1.45, resize: "vertical" };
 const inlineSectionTitleStyle: CSSProperties = { background: imsColours.brand, color: "#ffffff", borderRadius: "10px", padding: "11px 14px" };
 const inlineSectionHeadingStyle: CSSProperties = { margin: 0, fontSize: "16px", fontWeight: 800, lineHeight: 1.25 };
 const inlineSectionSubtitleStyle: CSSProperties = { margin: "4px 0 0", color: "rgba(255,255,255,0.84)", fontSize: "12px", lineHeight: 1.4, fontWeight: 700 };
 const checkGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "10px" };
-const checkStyle: CSSProperties = { minHeight: "42px", border: "1px solid #dbe3ef", borderRadius: "10px", background: "#ffffff", color: imsColours.ink, display: "grid", gridTemplateColumns: "24px 1fr", gap: "8px", alignItems: "center", padding: "9px 11px", textAlign: "left", fontWeight: 800, fontSize: "13px", lineHeight: 1.3, cursor: "pointer" };
+const checkStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: "#ffffff", color: imsColours.ink, display: "grid", gridTemplateColumns: "24px 1fr", gap: "8px", alignItems: "center", padding: "9px 11px", textAlign: "left", fontWeight: 800, fontSize: "13px", lineHeight: 1.3, cursor: "pointer" };
 const selectedCheckStyle: CSSProperties = { ...checkStyle, borderColor: imsColours.brandBorder, background: imsColours.brandSoft, color: imsColours.brandDark };
 const yesNoGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" };
-const choiceStyle: CSSProperties = { minHeight: "42px", border: "1px solid #dbe3ef", borderRadius: "10px", background: "#ffffff", color: imsColours.ink, fontWeight: 900, fontSize: "14px", cursor: "pointer" };
+const choiceStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: "#ffffff", color: imsColours.ink, fontWeight: 900, fontSize: "14px", cursor: "pointer" };
 const selectedChoiceStyle: CSSProperties = { ...choiceStyle, borderColor: imsColours.brandBorder, background: imsColours.brandSoft, color: imsColours.brandDark };
-const signatureCardStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "12px", background: "#ffffff", padding: "14px", display: "grid", gap: "12px" };
-const extensionCardStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "14px", background: "#ffffff", padding: "14px", display: "grid", gap: "12px" };
+const signatureCardStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "12px", background: "#ffffff", padding: "14px", display: "grid", gap: "12px" };
+const extensionCardStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", background: "#ffffff", padding: "14px", display: "grid", gap: "12px" };
 const smallHeadingStyle: CSSProperties = { margin: 0, color: imsColours.ink, fontSize: "15px", fontWeight: 900 };
 const actionRowStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap" };
-const emptyStateStyle: CSSProperties = { border: "1px dashed #cbd5e1", borderRadius: "14px", padding: "18px", background: "#f8fafc", color: imsColours.slate };
+const emptyStateStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "18px", background: "#ECECE7", color: imsColours.slate };
 const noticeStyle: CSSProperties = { ...emptyStateStyle, borderStyle: "solid", lineHeight: 1.55 };
 const workflowGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" };
 const workflowStepStyle: CSSProperties = { ...imsPanelStyle, padding: "14px", display: "grid", gap: "8px" };
 const templateGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" };
-const templateTileStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "14px", padding: "16px", background: "#f8fafc", color: imsColours.ink, fontWeight: 900 };
-const registerToolbarStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "14px", background: "#ffffff", padding: "10px", display: "grid", gridTemplateColumns: "minmax(220px, 1fr) minmax(180px, 420px)", gap: "12px", alignItems: "center", marginBottom: "12px" };
-const registerSearchStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #cbd5e1", borderRadius: "10px", padding: "10px 12px", fontSize: "14px", lineHeight: 1.35, boxSizing: "border-box", color: imsColours.ink, background: "#ffffff" };
+const templateTileStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "16px", background: "#ECECE7", color: imsColours.ink, fontWeight: 900 };
+const registerToolbarStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", background: "#ffffff", padding: "10px", display: "grid", gridTemplateColumns: "minmax(220px, 1fr) minmax(180px, 420px)", gap: "12px", alignItems: "center", marginBottom: "12px" };
+const registerSearchStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "10px 12px", fontSize: "14px", lineHeight: 1.35, boxSizing: "border-box", color: imsColours.ink, background: "#ffffff" };
 const registerFilterStyle: CSSProperties = { ...registerSearchStyle };
 const registerPrimaryButtonStyle: CSSProperties = { minHeight: "42px", border: `1px solid ${imsColours.brandBorder}`, borderRadius: "10px", background: imsColours.brand, color: "#ffffff", fontWeight: 900, fontSize: "14px", cursor: "pointer", padding: "9px 14px" };
-const registerSecondaryButtonStyle: CSSProperties = { minHeight: "42px", border: "1px solid #dbe3ef", borderRadius: "10px", background: "#e8eef6", color: imsColours.ink, fontWeight: 900, fontSize: "14px", cursor: "pointer", padding: "9px 14px" };
+const registerSecondaryButtonStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: "#D0D0CE", color: imsColours.ink, fontWeight: 900, fontSize: "14px", cursor: "pointer", padding: "9px 14px" };
 const registerCountStyle: CSSProperties = { color: imsColours.ink, fontSize: "12px", fontWeight: 800, lineHeight: 1.4, margin: "0 0 10px" };
-const distributionStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "14px", padding: "14px", background: imsColours.brandSoft, color: imsColours.brandDark, fontWeight: 800, lineHeight: 1.45 };
+const distributionStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "14px", background: imsColours.brandSoft, color: imsColours.brandDark, fontWeight: 800, lineHeight: 1.45 };
 const attachmentUploadGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" };
-const attachmentUploadCardStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "14px", background: "#ffffff", padding: "14px", display: "grid", gap: "10px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)" };
+const attachmentUploadCardStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", background: "#ffffff", padding: "14px", display: "grid", gap: "10px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)" };
 const attachmentUploadHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" };
 const attachmentUploadButtonStyle: CSSProperties = { border: `1px solid ${imsColours.brandBorder}`, borderRadius: "10px", background: imsColours.brandSoft, color: imsColours.brandDark, minHeight: "36px", padding: "8px 12px", fontSize: "12px", fontWeight: 900, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", whiteSpace: "nowrap" };
 const attachmentHintStyle: CSSProperties = { margin: "4px 0 0", color: imsColours.slate, fontSize: "12px", lineHeight: 1.35, fontWeight: 700 };
 const attachmentEmptyStyle: CSSProperties = { margin: 0, color: imsColours.slate, fontSize: "12px", lineHeight: 1.35 };
-const attachmentFileRowStyle: CSSProperties = { border: "1px solid #e2e8f0", borderRadius: "10px", background: "#f8fafc", padding: "8px 10px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", alignItems: "center", gap: "10px", color: imsColours.ink, fontSize: "12px", fontWeight: 800, lineHeight: 1.35 };
-const attachmentRemoveButtonStyle: CSSProperties = { border: "1px solid #fecaca", borderRadius: "8px", background: "#fff1f2", color: "#F93822", minHeight: "28px", padding: "5px 8px", fontSize: "11px", fontWeight: 900, cursor: "pointer" };
-const mobileSummaryStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "14px", padding: "14px", background: "#ffffff", color: imsColours.ink };
-const tableWrapStyle: CSSProperties = { border: "1px solid #dbe3ef", borderRadius: "14px", overflowX: "auto", background: "#ffffff" };
+const attachmentFileRowStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "10px", background: "#ECECE7", padding: "8px 10px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", alignItems: "center", gap: "10px", color: imsColours.ink, fontSize: "12px", fontWeight: 800, lineHeight: 1.35 };
+const attachmentRemoveButtonStyle: CSSProperties = { border: "1px solid #ECECE7", borderRadius: "8px", background: "#ECECE7", color: "#F93822", minHeight: "28px", padding: "5px 8px", fontSize: "11px", fontWeight: 900, cursor: "pointer" };
+const mobileSummaryStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "14px", background: "#ffffff", color: imsColours.ink };
+const tableWrapStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", overflowX: "auto", background: "#ffffff" };

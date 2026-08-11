@@ -43,9 +43,9 @@ function currentRevision(itp: Itp) {
 }
 
 function typeTone(type: InterventionType) {
-  if (type.includes("/")) return { background: "#ede9fe", color: "#5b21b6" };
-  if (type === "H") return { background: "#fee2e2", color: "#F93822" };
-  return { background: "#dbeafe", color: "#1e40af" };
+  if (type.includes("/")) return { background: "#ECECE7", color: "#53565A" };
+  if (type === "H") return { background: "#ECECE7", color: "#F93822" };
+  return { background: "#ECECE7", color: "#005670" };
 }
 
 function validIntervention(value: string) {
@@ -313,7 +313,7 @@ export default function NoiTrackerPage() {
     for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       doc.setPage(pageNumber);
       doc.setFontSize(7);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(83, 86, 90);
       doc.text(`Wadden Sea · Project NOI Requirements · Page ${pageNumber} of ${pageCount}`, 10, 204);
     }
     doc.save(`wadden-sea-noi-requirements-${generatedAt.toISOString().slice(0, 10)}.pdf`);
@@ -408,33 +408,33 @@ export default function NoiTrackerPage() {
 
 const page: CSSProperties = { display: "grid", gap: 16 };
 const metricsGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 16, marginBottom: 4 };
-const surface: CSSProperties = { background: "#fff", border: "1px solid #d8e2eb", borderRadius: 18, overflow: "hidden" };
+const surface: CSSProperties = { background: "#fff", border: "1px solid #D0D0CE", borderRadius: 18, overflow: "hidden" };
 const sectionHeader: CSSProperties = { padding: "16px 18px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 };
 const kicker: CSSProperties = { color: "#005670", fontWeight: 900, fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase" };
-const title: CSSProperties = { margin: "3px 0 0", color: "#14263a", fontSize: 20 };
+const title: CSSProperties = { margin: "3px 0 0", color: "#53565A", fontSize: 20 };
 const scanner: CSSProperties = { padding: "4px 18px 14px", display: "grid", gridTemplateColumns: "1fr auto auto", alignItems: "end", gap: 10 };
-const field: CSSProperties = { display: "grid", gap: 5, color: "#526477", fontWeight: 800, fontSize: 11 };
-const input: CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #cad7e3", borderRadius: 9, background: "#fff", padding: "9px 10px", color: "#26384b", font: "inherit" };
+const field: CSSProperties = { display: "grid", gap: 5, color: "#53565A", fontWeight: 800, fontSize: 11 };
+const input: CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #D0D0CE", borderRadius: 9, background: "#fff", padding: "9px 10px", color: "#53565A", font: "inherit" };
 const primaryButton: CSSProperties = { border: 0, borderRadius: 9, background: "#005670", color: "#fff", padding: "10px 14px", fontWeight: 900, cursor: "pointer" };
-const secondaryButton: CSSProperties = { ...primaryButton, background: "#e8eef3", color: "#3b4c5f" };
-const notice: CSSProperties = { margin: "0 18px 14px", padding: "10px 12px", borderRadius: 9, background: "#fff7d6", color: "#774b00", fontSize: 12 };
-const candidatePanel: CSSProperties = { borderTop: "1px solid #e2e8f0", background: "#f7fafc", padding: 16, display: "grid", gap: 7 };
+const secondaryButton: CSSProperties = { ...primaryButton, background: "#D0D0CE", color: "#53565A" };
+const notice: CSSProperties = { margin: "0 18px 14px", padding: "10px 12px", borderRadius: 9, background: "#ECECE7", color: "#000000", fontSize: 12 };
+const candidatePanel: CSSProperties = { borderTop: "1px solid #D0D0CE", background: "#ECECE7", padding: 16, display: "grid", gap: 7 };
 const manualPanel: CSSProperties = { ...candidatePanel, background: "#ECECE7" };
 const manualGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(130px,1fr))", gap: 9 };
-const candidateHeader: CSSProperties = { display: "flex", justifyContent: "space-between", color: "#5d6e80", fontSize: 11, marginBottom: 3 };
-const candidateRow: CSSProperties = { display: "grid", gridTemplateColumns: "22px 75px 1fr 60px 190px", gap: 7, alignItems: "center", background: "#fff", border: "1px solid #dbe5ee", borderRadius: 8, padding: 7 };
+const candidateHeader: CSSProperties = { display: "flex", justifyContent: "space-between", color: "#53565A", fontSize: 11, marginBottom: 3 };
+const candidateRow: CSSProperties = { display: "grid", gridTemplateColumns: "22px 75px 1fr 60px 190px", gap: 7, alignItems: "center", background: "#fff", border: "1px solid #D0D0CE", borderRadius: 8, padding: 7 };
 const compactInput: CSSProperties = { ...input, padding: "6px 7px", borderRadius: 6, fontSize: 10 };
 const wideInput: CSSProperties = { ...compactInput, width: "100%" };
-const source: CSSProperties = { display: "grid", gap: 2, color: "#45576a", fontSize: 10 };
+const source: CSSProperties = { display: "grid", gap: 2, color: "#53565A", fontSize: 10 };
 const candidateActions: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 5 };
 const filterGrid: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px,1.4fr) repeat(5,minmax(120px,1fr))", gap: 8, padding: "3px 18px 14px" };
-const tableWrap: CSSProperties = { width: "100%", overflowX: "auto", borderTop: "1px solid #e2e8f0" };
+const tableWrap: CSSProperties = { width: "100%", overflowX: "auto", borderTop: "1px solid #D0D0CE" };
 const table: CSSProperties = { width: "100%", minWidth: 1200, borderCollapse: "collapse", tableLayout: "fixed", fontSize: 10 };
-const th: CSSProperties = { textAlign: "left", background: "#1f3043", color: "#fff", padding: "9px 7px", fontSize: 9, textTransform: "uppercase" };
-const td: CSSProperties = { borderBottom: "1px solid #e4eaf0", padding: "7px", verticalAlign: "top", color: "#2b3c4f" };
+const th: CSSProperties = { textAlign: "left", background: "#005670", color: "#fff", padding: "9px 7px", fontSize: 9, textTransform: "uppercase" };
+const td: CSSProperties = { borderBottom: "1px solid #D0D0CE", padding: "7px", verticalAlign: "top", color: "#53565A" };
 const teal: CSSProperties = { color: "#005670", display: "block" };
-const small: CSSProperties = { display: "block", color: "#718096", marginTop: 3, lineHeight: 1.25 };
-const deleteButton: CSSProperties = { border: "1px solid #fecaca", borderRadius: 6, background: "#fff1f2", color: "#b42318", padding: "5px 7px", fontWeight: 900, fontSize: 9, cursor: "pointer" };
+const small: CSSProperties = { display: "block", color: "#53565A", marginTop: 3, lineHeight: 1.25 };
+const deleteButton: CSSProperties = { border: "1px solid #ECECE7", borderRadius: 6, background: "#ECECE7", color: "#F93822", padding: "5px 7px", fontWeight: 900, fontSize: 9, cursor: "pointer" };
 const rowActions: CSSProperties = { display: "flex", gap: 5, alignItems: "center" };
 const noiButton: CSSProperties = { borderRadius: 6, background: "#ECECE7", color: "#005670", padding: "6px 8px", fontWeight: 900, fontSize: 10, textDecoration: "none" };
-const empty: CSSProperties = { padding: 30, textAlign: "center", color: "#64748b" };
+const empty: CSSProperties = { padding: 30, textAlign: "center", color: "#53565A" };

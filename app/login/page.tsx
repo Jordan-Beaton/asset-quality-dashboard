@@ -186,10 +186,10 @@ function LoginPageContent() {
       }}
     >
       <div style={{ marginBottom: "20px" }}>
-        <h1 style={{ margin: 0, fontSize: "28px", color: "#0f172a" }}>
+        <h1 style={{ margin: 0, fontSize: "28px", color: "#000000" }}>
           {mode === "login" ? "Sign in" : mode === "forgot" ? "Reset password" : mode === "request" ? "Request IMS access" : "Set new password"}
         </h1>
-        <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: "14px" }}>
+        <p style={{ margin: "8px 0 0", color: "#53565A", fontSize: "14px" }}>
           {mode === "request"
             ? "Submit your details for review by an IMS Administrator."
             : mode === "forgot"
@@ -273,9 +273,9 @@ function LoginPageContent() {
             marginTop: "14px",
             padding: "12px 14px",
             borderRadius: "10px",
-            background: "#f8fafc",
-            border: "1px solid #e2e8f0",
-            color: "#334155",
+            background: "#ECECE7",
+            border: "1px solid #D0D0CE",
+            color: "#53565A",
             fontSize: "14px",
           }}
         >
@@ -283,11 +283,11 @@ function LoginPageContent() {
         </div>
       ) : null}
 
-      <div style={{ marginTop: "18px", fontSize: "14px", color: "#475569" }}>
+      <div style={{ marginTop: "18px", fontSize: "14px", color: "#53565A" }}>
         {mode === "login" ? (
           <>
             <InlineButton onClick={() => { setMode("request"); setMessage(null); }}>Request access</InlineButton>
-            <span style={{ margin: "0 8px", color: "#cbd5e1" }}>{" | "}</span>
+            <span style={{ margin: "0 8px", color: "#D0D0CE" }}>{" | "}</span>
             <InlineButton
               onClick={() => {
                 setMode("forgot");
@@ -340,22 +340,22 @@ const labelStyle: React.CSSProperties = {
   display: "block",
   marginBottom: "6px",
   fontWeight: 600,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "12px 14px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   fontSize: "14px",
   outline: "none",
   boxSizing: "border-box",
 };
 const requestNameGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 };
-const moduleFieldset: React.CSSProperties = { margin: 0, padding: 12, border: "1px solid #dbe7f3", borderRadius: 12 };
+const moduleFieldset: React.CSSProperties = { margin: 0, padding: 12, border: "1px solid #D0D0CE", borderRadius: 12 };
 const moduleRequestGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 };
-const moduleRequestOption: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, color: "#334155", fontSize: 13, fontWeight: 700 };
+const moduleRequestOption: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, color: "#53565A", fontSize: 13, fontWeight: 700 };
 
 export default function LoginPage() {
   return (

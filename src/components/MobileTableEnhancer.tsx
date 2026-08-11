@@ -62,7 +62,11 @@ export function MobileTableEnhancer({ routeKey }: { routeKey: string }) {
     const scan = () => {
       scheduled = false;
       const tables = document.querySelectorAll<HTMLTableElement>(".ims-page-container table");
-      tables.forEach((table) => media.matches ? enhanceTable(table) : clearTable(table));
+      tables.forEach((table) => {
+        table.classList.add("ims-data-table");
+        if (media.matches) enhanceTable(table);
+        else clearTable(table);
+      });
     };
 
     const scheduleScan = () => {

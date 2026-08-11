@@ -16,20 +16,16 @@ export default function RiskActionsPage() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           ← Back to IMS Home
         </Link>
 
-        <div style={topMetaActionsStyle}>
-          <Link href="/actions" style={primaryLinkStyle}>
-            Open Central Actions
-          </Link>
-          <div style={statusBannerStyle}>
-            <strong>Status:</strong> Risk action linking will use the existing central Actions register.
-          </div>
+        <div style={statusBannerStyle}>
+          <strong>Status:</strong> Risk action linking will use the existing central Actions register.
         </div>
       </div>
+      <div className="ims-page-actions"><Link href="/actions" style={primaryLinkStyle}>Open Central Actions</Link></div>
 
       <section style={statsGridStyle}>
         <QualityKpiCard title="Risk-Linked Actions" value="-" accent="#005670" />
@@ -73,7 +69,7 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
@@ -97,7 +93,7 @@ const statusBannerStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "12px 16px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const primaryLinkStyle: CSSProperties = {
@@ -134,11 +130,11 @@ const panelStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: "0 0 10px",
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const emptyTextStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   margin: 0,
   lineHeight: 1.55,
 };

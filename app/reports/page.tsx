@@ -366,7 +366,7 @@ function buildPdfMetricTable(
 ) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(0, 0, 0);
   doc.text(title, 14, startY);
 
   autoTable(doc, {
@@ -378,8 +378,8 @@ function buildPdfMetricTable(
     styles: {
       fontSize: 9.2,
       cellPadding: 3,
-      textColor: [15, 23, 42],
-      lineColor: [226, 232, 240],
+      textColor: [0, 0, 0],
+      lineColor: [208, 208, 206],
       lineWidth: 0.2,
     },
     headStyles: {
@@ -391,7 +391,7 @@ function buildPdfMetricTable(
       0: { fontStyle: "bold", cellWidth: 120 },
       1: { halign: "right", cellWidth: 52 },
     },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
+    alternateRowStyles: { fillColor: [236, 236, 231] },
     rowPageBreak: "avoid",
   });
 
@@ -939,13 +939,13 @@ export default function ReportsPage() {
       }
 
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(20);
       doc.text("Monthly Management Report", pageWidth - margin, 18, { align: "right" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(11);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(pdfMetrics.monthLabel, pageWidth - margin, 25, { align: "right" });
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 31, { align: "right" });
 
@@ -956,13 +956,13 @@ export default function ReportsPage() {
       let y = 45;
       if (executiveSummary) {
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
         doc.text("Executive Summary", margin, y);
         y += 5;
 
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(71, 85, 105);
+        doc.setTextColor(83, 86, 90);
         doc.setFontSize(10.2);
         const summaryLines = doc.splitTextToSize(executiveSummary, pageWidth - margin * 2);
         doc.text(summaryLines, margin, y);
@@ -978,7 +978,7 @@ export default function ReportsPage() {
 
       doc.setFont("helvetica", "italic");
       doc.setFontSize(8.8);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(83, 86, 90);
       const findingsBasis = doc.splitTextToSize(
         pdfMetrics.auditSummary.findingsBasisLabel,
         pageWidth - margin * 2
@@ -1035,13 +1035,13 @@ export default function ReportsPage() {
         }
 
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
         doc.text("Next Month Focus / Planned Activity", margin, y);
         y += 5;
 
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(71, 85, 105);
+        doc.setTextColor(83, 86, 90);
         doc.setFontSize(10.2);
         const nextMonthLines = doc.splitTextToSize(nextMonthFocus, pageWidth - margin * 2);
         doc.text(nextMonthLines, margin, y);
@@ -1052,7 +1052,7 @@ export default function ReportsPage() {
         doc.setPage(i);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text(`Enshore Subsea | ${pdfMetrics.monthLabel}`, margin, pageHeight - 8);
         doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, {
           align: "right",
@@ -1084,12 +1084,15 @@ export default function ReportsPage() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           ← Back to IMS Home
         </Link>
-
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ ...statusBannerStyle, marginBottom: 0, borderRadius: "12px", padding: "8px 12px" }}>
+          <strong>Status:</strong> {message}
+        </div>
+      </div>
+      <div className="ims-page-actions">
           <button
             type="button"
             style={secondaryButtonStyle}
@@ -1105,17 +1108,13 @@ export default function ReportsPage() {
           >
             {isGeneratingPdf ? "Generating PDF..." : "Generate Monthly PDF"}
           </button>
-          <div style={{ ...statusBannerStyle, marginBottom: 0, borderRadius: "12px", padding: "12px 16px" }}>
-            <strong>Status:</strong> {message}
-          </div>
-        </div>
       </div>
 
-      <nav style={reportWorkspaceTabsStyle} aria-label="Report workspace">
-        <Link href="/reports" style={activeReportWorkspaceTabStyle}>
+      <nav className="ims-tabs" style={reportWorkspaceTabsStyle} aria-label="Report workspace" role="tablist">
+        <Link href="/reports" role="tab" aria-selected="true" data-active="true" style={activeReportWorkspaceTabStyle}>
           Monthly Reports
         </Link>
-        <Link href="/projects/wadden-sea/reports" style={reportWorkspaceTabStyle}>
+        <Link href="/projects/wadden-sea/reports" role="tab" aria-selected="false" data-active="false" style={reportWorkspaceTabStyle}>
           Project Reports
         </Link>
       </nav>
@@ -1254,7 +1253,7 @@ export default function ReportsPage() {
           <div style={registerCountStyle}>{filteredReports.length} of {reports.length} reports</div>
         </div>
 
-        <div style={filterPanelStyle}>
+        <div className="ims-filter-panel" style={filterPanelStyle}>
           <div style={filterActionRowStyle}>
             <input
               value={savedReportSearch}
@@ -1272,7 +1271,7 @@ export default function ReportsPage() {
           </div>
 
           {showSavedReportFilters ? (
-            <div style={toolbarFiltersStyle}>
+            <div className="ims-filter-panel" style={toolbarFiltersStyle}>
               <select
                 value={savedReportYearFilter}
                 onChange={(event) => setSavedReportYearFilter(event.target.value)}
@@ -1422,10 +1421,10 @@ const topMetaRowStyle: React.CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const reportWorkspaceTabsStyle: React.CSSProperties = {
@@ -1434,7 +1433,7 @@ const reportWorkspaceTabsStyle: React.CSSProperties = {
   padding: "6px",
   marginBottom: "20px",
   background: "#ffffff",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   width: "fit-content",
 };
@@ -1442,7 +1441,7 @@ const reportWorkspaceTabsStyle: React.CSSProperties = {
 const reportWorkspaceTabStyle: React.CSSProperties = {
   padding: "9px 14px",
   borderRadius: "10px",
-  color: "#475569",
+  color: "#53565A",
   textDecoration: "none",
   fontWeight: 800,
   fontSize: "13px",
@@ -1459,7 +1458,7 @@ const statusBannerStyle: React.CSSProperties = {
   borderRadius: "14px",
   padding: "14px 18px",
   marginBottom: "24px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const twoColumnGridStyle: React.CSSProperties = {
@@ -1473,7 +1472,7 @@ const panelStyle: React.CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const sectionHeaderRowStyle: React.CSSProperties = {
@@ -1488,12 +1487,12 @@ const sectionHeaderRowStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: React.CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
 };
 
@@ -1508,8 +1507,8 @@ const filterPanelStyle: React.CSSProperties = {
   gap: "12px",
   padding: "14px",
   borderRadius: "16px",
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   marginBottom: "14px",
 };
 
@@ -1530,7 +1529,7 @@ const toolbarFiltersStyle: React.CSSProperties = {
 const fieldLabelStyle: React.CSSProperties = {
   display: "grid",
   gap: "6px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
 };
@@ -1552,10 +1551,10 @@ const narrativeHeaderRowStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   minWidth: "180px",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const textareaStyle: React.CSSProperties = {
@@ -1576,8 +1575,8 @@ const primaryButtonStyle: React.CSSProperties = {
 };
 
 const secondaryButtonStyle: React.CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -1606,9 +1605,9 @@ const periodPreviewStyle: React.CSSProperties = {
   marginTop: "14px",
   padding: "12px 14px",
   borderRadius: "12px",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  color: "#334155",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
+  color: "#53565A",
 };
 
 const snapshotCardsWrapStyle: React.CSSProperties = {
@@ -1618,16 +1617,16 @@ const snapshotCardsWrapStyle: React.CSSProperties = {
 };
 
 const snapshotCardStyle: React.CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const snapshotCardTitleStyle: React.CSSProperties = {
   fontSize: "15px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   marginBottom: "10px",
 };
 
@@ -1644,29 +1643,29 @@ const snapshotRowStyle: React.CSSProperties = {
 };
 
 const snapshotLabelStyle: React.CSSProperties = {
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
 };
 
 const snapshotValueStyle: React.CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "14px",
 };
 
 const snapshotNoteStyle: React.CSSProperties = {
   marginTop: "10px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const registerCountStyle: React.CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   fontWeight: 700,
 };
 
 const emptyTextStyle: React.CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   margin: 0,
 };
 
@@ -1681,20 +1680,20 @@ const tableStyle: React.CSSProperties = {
 const tableHeadStyle: React.CSSProperties = {
   textAlign: "left",
   padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 900,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
+  borderBottom: "1px solid #D0D0CE",
   whiteSpace: "nowrap",
 };
 
 const tableCellStyle: React.CSSProperties = {
   padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
+  borderBottom: "1px solid #ECECE7",
+  color: "#000000",
   verticalAlign: "middle",
   fontSize: "13px",
   lineHeight: 1.45,

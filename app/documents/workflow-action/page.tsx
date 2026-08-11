@@ -192,17 +192,17 @@ export default function WorkflowActionPage() {
 
 const pageStyle: CSSProperties = {
   minHeight: "100vh",
-  background: "#eef6f7",
+  background: "#ECECE7",
   padding: "32px 16px",
   display: "grid",
   placeItems: "start center",
-  fontFamily: "Arial, Helvetica, sans-serif",
+  fontFamily: "\"Azo Sans\", \"Segoe UI\", Arial, Helvetica, sans-serif",
 };
 
 const cardStyle: CSSProperties = {
   width: "min(860px, 100%)",
   background: "#ffffff",
-  border: "1px solid #d6e3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "22px",
   boxShadow: "0 12px 34px rgba(15, 23, 42, 0.1)",
   padding: "24px",
@@ -227,23 +227,23 @@ const eyebrowStyle: CSSProperties = {
 
 const titleStyle: CSSProperties = {
   margin: "4px 0",
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "34px",
   lineHeight: 1.05,
 };
 
 const subtitleStyle: CSSProperties = {
   margin: 0,
-  color: "#475569",
+  color: "#53565A",
   fontSize: "15px",
 };
 
 const statusStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "13px 15px",
-  color: "#0f172a",
-  background: "#f8fafc",
+  color: "#000000",
+  background: "#ECECE7",
 };
 
 const contentStyle: CSSProperties = {
@@ -258,8 +258,8 @@ const summaryGridStyle: CSSProperties = {
 };
 
 const summaryItemStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: "14px",
   padding: "13px",
   display: "grid",
@@ -267,7 +267,7 @@ const summaryItemStyle: CSSProperties = {
 };
 
 const summaryLabelStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "11px",
   fontWeight: 800,
   textTransform: "uppercase",
@@ -280,7 +280,7 @@ const fieldStyle: CSSProperties = {
 };
 
 const labelStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "13px",
   fontWeight: 800,
   textTransform: "uppercase",
@@ -290,7 +290,7 @@ const textareaStyle: CSSProperties = {
   width: "100%",
   minHeight: "120px",
   borderRadius: "14px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   padding: "12px",
   font: "inherit",
   resize: "vertical",

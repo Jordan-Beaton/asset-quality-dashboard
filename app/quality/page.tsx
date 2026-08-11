@@ -632,7 +632,7 @@ export default function Home() {
       { name: "Overdue", value: overdue, fill: "#F93822" },
       { name: "Due 7 Days", value: due7, fill: "#FFAD00" },
       { name: "Due 30 Days", value: due30, fill: "#63B1BC" },
-      { name: "No Due Date", value: noDueDate, fill: "#64748b" },
+      { name: "No Due Date", value: noDueDate, fill: "#53565A" },
     ];
   }, [qualityActions]);
 
@@ -1165,9 +1165,6 @@ export default function Home() {
                 ))}
               </select>
             </label>
-            <ImsButton onClick={() => void fetchDashboardData()} disabled={isLoading}>
-              Refresh
-            </ImsButton>
           </>
         }
         status={
@@ -1509,7 +1506,7 @@ export default function Home() {
                           entry.name === "Overdue"
                             ? "#F93822"
                             : entry.name === "Draft"
-                              ? "#64748b"
+                              ? "#53565A"
                               : entry.name === "Under Review"
                                 ? "#FFAD00"
                                 : "#005670"
@@ -1730,7 +1727,7 @@ export default function Home() {
                     className="quality-work-item"
                     style={{
                       ...workItemStyle,
-                      background: overdue ? "#fff7f7" : "#f8fafc",
+                      background: overdue ? "#ECECE7" : "#ECECE7",
                     }}
                   >
                     <div style={workItemTopStyle}>
@@ -1902,9 +1899,9 @@ function SummaryRow({
 }) {
   const toneStyles =
     tone === "critical"
-      ? { background: "#fff7f7", borderColor: "#fecaca" }
+      ? { background: "#ECECE7", borderColor: "#ECECE7" }
       : tone === "warning"
-      ? { background: "#fffaf0", borderColor: "#fde68a" }
+      ? { background: "#ECECE7", borderColor: "#ECECE7" }
       : null;
 
   const content = (
@@ -1944,18 +1941,18 @@ function StatusBadge({ value }: { value: string }) {
 
   const styles =
     lower === "closed" || lower === "complete" || lower === "completed"
-      ? { background: "#dcfce7", color: "#166534" }
+      ? { background: "#ECECE7", color: "#005670" }
       : lower === "open"
-      ? { background: "#dbeafe", color: "#1d4ed8" }
+      ? { background: "#ECECE7", color: "#005670" }
       : lower === "in review"
-      ? { background: "#ede9fe", color: "#6d28d9" }
+      ? { background: "#ECECE7", color: "#53565A" }
       : lower === "in progress"
-      ? { background: "#fef3c7", color: "#92400e" }
+      ? { background: "#ECECE7", color: "#000000" }
       : lower === "planned"
-      ? { background: "#dbeafe", color: "#1d4ed8" }
+      ? { background: "#ECECE7", color: "#005670" }
       : lower === "overdue"
-      ? { background: "#fee2e2", color: "#F93822" }
-      : { background: "#e5e7eb", color: "#374151" };
+      ? { background: "#ECECE7", color: "#F93822" }
+      : { background: "#D0D0CE", color: "#53565A" };
 
   return (
     <span
@@ -1976,12 +1973,12 @@ function StatusBadge({ value }: { value: string }) {
 
 function getFrequencyBadgeStyle(frequency: "Reduce" | "Maintain" | "Increase"): CSSProperties {
   if (frequency === "Increase") {
-    return { ...badgeStyle, background: "#fee2e2", color: "#F93822" };
+    return { ...badgeStyle, background: "#ECECE7", color: "#F93822" };
   }
   if (frequency === "Reduce") {
-    return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
+    return { ...badgeStyle, background: "#ECECE7", color: "#005670" };
   }
-  return { ...badgeStyle, background: "#fef3c7", color: "#92400e" };
+  return { ...badgeStyle, background: "#ECECE7", color: "#000000" };
 }
 
 const heroStyle: CSSProperties = {
@@ -2052,9 +2049,9 @@ const metaChipValueStyle: CSSProperties = {
 };
 
 const errorBannerStyle: CSSProperties = {
-  background: "#fef2f2",
+  background: "#ECECE7",
   color: "#F93822",
-  border: "1px solid #fecaca",
+  border: "1px solid #ECECE7",
   borderRadius: "14px",
   padding: "14px 16px",
   marginBottom: "18px",
@@ -2158,7 +2155,7 @@ const signalCardStyle: CSSProperties = {
   minHeight: "104px",
   textDecoration: "none",
   color: imsColours.ink,
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
   border: `1px solid ${imsColours.border}`,
   borderTop: "4px solid #005670",
   borderRadius: "18px",
@@ -2193,7 +2190,7 @@ const pressurePanelStyle: CSSProperties = {
   borderRadius: "22px",
   padding: "18px",
   color: "#ffffff",
-  background: "linear-gradient(135deg, #10202f 0%, #1f6f70 100%)",
+  background: "linear-gradient(135deg, #53565A 0%, #005670 100%)",
   boxShadow: "0 22px 42px rgba(15, 23, 42, 0.16)",
   display: "grid",
   gap: "12px",
@@ -2224,7 +2221,7 @@ const livePillStyle: CSSProperties = {
   padding: "7px 10px",
   background: "rgba(220,252,231,0.14)",
   border: "1px solid rgba(187,247,208,0.28)",
-  color: "#dcfce7",
+  color: "#ECECE7",
   fontSize: "11px",
   fontWeight: 900,
   textTransform: "uppercase",
@@ -2255,11 +2252,11 @@ const healthGridStyle: CSSProperties = {
 
 const healthCardStyle: CSSProperties = {
   textDecoration: "none",
-  color: "#0f172a",
+  color: "#000000",
   background: "white",
   borderRadius: "18px",
   padding: "16px",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
   display: "grid",
   gap: "14px",
@@ -2268,13 +2265,13 @@ const healthCardStyle: CSSProperties = {
 const healthLabelStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 900,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const healthHintStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const healthGaugeStyle: CSSProperties = {
@@ -2287,7 +2284,7 @@ const healthGaugeStyle: CSSProperties = {
 const healthGaugeTrackStyle: CSSProperties = {
   height: "10px",
   borderRadius: "999px",
-  background: "#e2e8f0",
+  background: "#D0D0CE",
   overflow: "hidden",
 };
 
@@ -2324,10 +2321,10 @@ const bottomGridStyle: CSSProperties = {
 };
 
 const panelStyle: CSSProperties = {
-  background: "linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
   borderRadius: "18px",
   padding: "18px",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   boxShadow: "0 14px 30px rgba(15, 23, 42, 0.06)",
 };
 
@@ -2343,12 +2340,12 @@ const sectionHeaderRowStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.45,
 };
@@ -2367,7 +2364,7 @@ const chartWrapStyle: CSSProperties = {
 };
 
 const emptyTextStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   margin: 0,
 };
 
@@ -2388,9 +2385,9 @@ const compactInsightLinkStyle: CSSProperties = {
   gap: "12px",
   padding: "10px 12px",
   borderRadius: "14px",
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
-  color: "#0f172a",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
+  color: "#000000",
 };
 
 const topProblemAreaLinkStyle: CSSProperties = {
@@ -2403,8 +2400,8 @@ const compactInsightRankStyle: CSSProperties = {
   width: "30px",
   height: "30px",
   borderRadius: "999px",
-  background: "#dbeafe",
-  color: "#1d4ed8",
+  background: "#ECECE7",
+  color: "#005670",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -2427,7 +2424,7 @@ const compactInsightBodyStyle: CSSProperties = {
 const compactInsightTitleStyle: CSSProperties = {
   fontWeight: 800,
   fontSize: "13px",
-  color: "#0f172a",
+  color: "#000000",
   marginBottom: "2px",
 };
 
@@ -2436,7 +2433,7 @@ const compactInsightMetaStyle: CSSProperties = {
   gap: "8px",
   flexWrap: "wrap",
   fontSize: "11px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.4,
 };
 
@@ -2448,19 +2445,19 @@ const auditMonthSummaryGridStyle: CSSProperties = {
 
 const summaryMetricCardStyle: CSSProperties = {
   textDecoration: "none",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   padding: "10px 12px",
   display: "grid",
   gap: "4px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const summaryMetricLabelStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 700,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.03em",
 };
@@ -2468,11 +2465,11 @@ const summaryMetricLabelStyle: CSSProperties = {
 const summaryMetricValueStyle: CSSProperties = {
   fontSize: "22px",
   lineHeight: 1.1,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const nextMonthPreviewStyle: CSSProperties = {
-  borderTop: "1px solid #e2e8f0",
+  borderTop: "1px solid #D0D0CE",
   paddingTop: "12px",
   display: "grid",
   gap: "8px",
@@ -2489,12 +2486,12 @@ const nextMonthPreviewHeaderStyle: CSSProperties = {
 const nextMonthPreviewLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const nextMonthPreviewCountStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
 };
 
 const nextMonthSnippetListStyle: CSSProperties = {
@@ -2504,65 +2501,65 @@ const nextMonthSnippetListStyle: CSSProperties = {
 
 const nextMonthSnippetItemStyle: CSSProperties = {
   textDecoration: "none",
-  color: "#0f172a",
+  color: "#000000",
   display: "grid",
   gridTemplateColumns: "auto 1fr auto",
   alignItems: "center",
   gap: "10px",
   padding: "8px 10px",
   borderRadius: "10px",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
 };
 
 const nextMonthSnippetNumberStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   whiteSpace: "nowrap",
 };
 
 const nextMonthSnippetTitleStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 600,
-  color: "#0f172a",
+  color: "#000000",
   minWidth: 0,
 };
 
 const summaryRowStyle: CSSProperties = {
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   padding: "12px 14px",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
   gap: "12px",
-  color: "#0f172a",
+  color: "#000000",
   minHeight: "58px",
   boxSizing: "border-box",
 };
 
 const summaryRowLabelStyle: CSSProperties = {
-  color: "#334155",
+  color: "#53565A",
   fontWeight: 800,
   lineHeight: 1.25,
   minWidth: 0,
 };
 
 const summaryRowValueStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "17px",
   flex: "0 0 auto",
 };
 
 const workItemStyle: CSSProperties = {
   textDecoration: "none",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px 16px",
-  color: "#0f172a",
+  color: "#000000",
   display: "grid",
   gap: "8px",
 };
@@ -2578,13 +2575,13 @@ const workItemTopStyle: CSSProperties = {
 const workItemNumberStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const workItemTitleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 700,
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.4,
 };
 
@@ -2593,7 +2590,7 @@ const workItemMetaStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const badgeStyle: CSSProperties = {
@@ -2615,7 +2612,7 @@ const yearFilterStyle: CSSProperties = {
   padding: "0 10px",
   borderRadius: "10px",
   background: "#ffffff",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   color: imsColours.ink,
   fontWeight: 900,
 };

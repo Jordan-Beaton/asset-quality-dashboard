@@ -127,10 +127,10 @@ function getDueStatus(value: string | null | undefined): DueStatus {
 }
 
 function getStatusTone(status: DueStatus) {
-  if (status === "Overdue") return { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
-  if (status === "Due Soon") return { bg: "#fef3c7", text: "#92400e", border: "#fde68a" };
-  if (status === "In Date") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
-  return { bg: "#e2e8f0", text: "#334155", border: "#cbd5e1" };
+  if (status === "Overdue") return { bg: "#ECECE7", text: "#F93822", border: "#ECECE7" };
+  if (status === "Due Soon") return { bg: "#ECECE7", text: "#000000", border: "#ECECE7" };
+  if (status === "In Date") return { bg: "#ECECE7", text: "#005670", border: "#ECECE7" };
+  return { bg: "#D0D0CE", text: "#53565A", border: "#D0D0CE" };
 }
 
 function getStatusRank(status: DueStatus) {
@@ -142,9 +142,9 @@ function getStatusRank(status: DueStatus) {
 
 function getTypeTone(type: string | null | undefined) {
   const value = (type || "").toLowerCase();
-  if (value === "corrective") return { bg: "#fee2e2", text: "#F93822" };
-  if (value === "preventative") return { bg: "#dbeafe", text: "#1d4ed8" };
-  return { bg: "#e2e8f0", text: "#334155" };
+  if (value === "corrective") return { bg: "#ECECE7", text: "#F93822" };
+  if (value === "preventative") return { bg: "#ECECE7", text: "#005670" };
+  return { bg: "#D0D0CE", text: "#53565A" };
 }
 
 function extractMaintenanceNumber(value: string | null | undefined) {
@@ -377,8 +377,6 @@ function MaintenancePageContent() {
   function applyMaintenanceKpiFilter(status: "" | DueStatus) {
     setActiveView("register");
     setShowRegisterFilters(true);
-    setAssetFilter("");
-    setTypeFilter("");
     setDueStatusFilter(status);
   }
 
@@ -1221,9 +1219,9 @@ function AttentionCard({
   tone: "red" | "amber" | "blue";
 }) {
   const tones = {
-    red: { bg: "#fff1f2", border: "#fecdd3", title: "#F93822", summary: "#7f1d1d" },
-    amber: { bg: "#fffbeb", border: "#fde68a", title: "#92400e", summary: "#78350f" },
-    blue: { bg: "#eff6ff", border: "#bfdbfe", title: "#1d4ed8", summary: "#1e3a8a" },
+    red: { bg: "#ECECE7", border: "#ECECE7", title: "#F93822", summary: "#F93822" },
+    amber: { bg: "#ECECE7", border: "#ECECE7", title: "#000000", summary: "#000000" },
+    blue: { bg: "#ECECE7", border: "#ECECE7", title: "#005670", summary: "#005670" },
   };
   const colours = tones[tone];
 
@@ -1296,7 +1294,7 @@ const fieldModeEyebrowStyle: CSSProperties = {
 const fieldModeTitleStyle: CSSProperties = {
   fontSize: "20px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.3,
   overflowWrap: "anywhere",
 };
@@ -1309,7 +1307,7 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
@@ -1323,8 +1321,8 @@ const backLinkStyle: CSSProperties = {
 
 const statusBannerStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
-  color: "#0f172a",
+  border: "1px solid #D0D0CE",
+  color: "#000000",
   padding: "10px 14px",
   borderRadius: "14px",
   fontSize: "14px",
@@ -1335,7 +1333,7 @@ const desktopStatusBannerStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "12px 16px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const attentionGridStyle: CSSProperties = {
@@ -1363,7 +1361,7 @@ const qrPanelBodyStyle: CSSProperties = {
 const qrImageStyle: CSSProperties = {
   width: "170px",
   height: "170px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "8px",
   background: "#ffffff",
@@ -1372,10 +1370,10 @@ const qrImageStyle: CSSProperties = {
 const qrPlaceholderStyle: CSSProperties = {
   width: "170px",
   height: "170px",
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   borderRadius: "14px",
-  background: "#f8fafc",
-  color: "#64748b",
+  background: "#ECECE7",
+  color: "#53565A",
   display: "grid",
   placeItems: "center",
   textAlign: "center",
@@ -1391,7 +1389,7 @@ const qrCopyStackStyle: CSSProperties = {
 const qrTitleStyle: CSSProperties = {
   fontSize: "18px",
   fontWeight: 900,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const secondaryLinkButtonStyle: CSSProperties = {
@@ -1401,8 +1399,8 @@ const secondaryLinkButtonStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   borderRadius: "10px",
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   textDecoration: "none",
   fontSize: "14px",
   fontWeight: 800,
@@ -1434,7 +1432,7 @@ const stackedGridStyle: CSSProperties = {
 const panelStyle: CSSProperties = {
   background: "#ffffff",
   borderRadius: "18px",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
   padding: "22px",
 };
@@ -1451,12 +1449,12 @@ const sectionHeaderRowStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.55,
 };
@@ -1475,7 +1473,7 @@ const filterGridStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
@@ -1489,18 +1487,18 @@ const fieldWrapStyle: CSSProperties = {
 const fieldLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
-  color: "#475569",
+  color: "#53565A",
 };
 
 const inputStyle: CSSProperties = {
   width: "100%",
   height: "46px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   padding: "10px 12px",
   fontSize: "14px",
   background: "#ffffff",
-  color: "#0f172a",
+  color: "#000000",
   boxSizing: "border-box",
 };
 
@@ -1517,14 +1515,14 @@ const fullSpanStyle: CSSProperties = {
 
 const helperTextStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.5,
 };
 
 const readOnlyInputStyle: CSSProperties = {
   ...inputStyle,
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontWeight: 700,
 };
 
@@ -1568,8 +1566,8 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   borderRadius: "10px",
   padding: "9px 12px",
@@ -1607,9 +1605,9 @@ const actionLinkButtonStyle: CSSProperties = {
 };
 
 const dangerButtonStyle: CSSProperties = {
-  background: "#fee2e2",
+  background: "#ECECE7",
   color: "#F93822",
-  border: "1px solid #fecaca",
+  border: "1px solid #ECECE7",
   borderRadius: "10px",
   padding: "9px 12px",
   fontWeight: 700,
@@ -1642,7 +1640,7 @@ const attentionCardSummaryStyle: CSSProperties = {
 
 const attentionCardDetailStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.5,
 };
 
@@ -1654,8 +1652,8 @@ const historyListStyle: CSSProperties = {
 
 const historyCardStyle: CSSProperties = {
   borderRadius: "16px",
-  border: "1px solid #dbe7f3",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   padding: "16px",
   display: "grid",
   gap: "12px",
@@ -1663,7 +1661,7 @@ const historyCardStyle: CSSProperties = {
 
 const compactTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   background: "#ffffff",
 };
@@ -1700,10 +1698,10 @@ const emptyTableCellStyle: CSSProperties = {
 const detailPanelStyle: CSSProperties = {
   display: "grid",
   gap: "18px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
   width: "100%",
   boxSizing: "border-box",
@@ -1718,8 +1716,8 @@ const detailSummaryRowStyle: CSSProperties = {
 
 const summaryTileStyle: CSSProperties = {
   borderRadius: "14px",
-  border: "1px solid #dbe7f3",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   padding: "14px 16px",
 };
 
@@ -1728,14 +1726,14 @@ const summaryTileLabelStyle: CSSProperties = {
   fontWeight: 800,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  color: "#64748b",
+  color: "#53565A",
   marginBottom: "6px",
 };
 
 const summaryTileValueStyle: CSSProperties = {
   fontSize: "16px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   wordBreak: "break-word",
 };
 
@@ -1745,7 +1743,7 @@ const detailFooterBarStyle: CSSProperties = {
   gap: "12px",
   flexWrap: "wrap",
   alignItems: "flex-end",
-  borderTop: "1px solid #e2e8f0",
+  borderTop: "1px solid #D0D0CE",
   paddingTop: "16px",
 };
 
@@ -1760,13 +1758,13 @@ const historyHeaderStyle: CSSProperties = {
 const historyTitleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const historyMetaStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.5,
 };
 
@@ -1790,14 +1788,14 @@ const historyGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   gap: "10px 16px",
-  color: "#334155",
+  color: "#53565A",
   fontSize: "14px",
 };
 
 const historyBodyStyle: CSSProperties = {
   display: "grid",
   gap: "8px",
-  color: "#334155",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.6,
 };
@@ -1807,15 +1805,15 @@ const historyFooterStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: "12px",
   flexWrap: "wrap",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
 };
 
 const emptyStateStyle: CSSProperties = {
   borderRadius: "14px",
-  border: "1px dashed #cbd5e1",
-  background: "#f8fafc",
-  color: "#64748b",
+  border: "1px dashed #D0D0CE",
+  background: "#ECECE7",
+  color: "#53565A",
   padding: "18px",
   fontSize: "14px",
 };

@@ -1398,7 +1398,7 @@ export default function HseInspectionsPage() {
     }
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
+    doc.setTextColor(83, 86, 90);
     doc.text(record.inspection_number || "", 195, 16, { align: "right" });
     doc.text(displayDate(record.inspection_date), 195, 22, { align: "right" });
     doc.setDrawColor(0, 86, 112);
@@ -1413,7 +1413,7 @@ export default function HseInspectionsPage() {
     doc.rect(0, pageHeight - 14, pageWidth, 14, "F");
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
+    doc.setTextColor(208, 208, 206);
     doc.text(label, 12, pageHeight - 10);
     doc.text(`Page ${page} of ${pageCount}`, pageWidth - 12, pageHeight - 10, { align: "right" });
   }
@@ -1447,7 +1447,7 @@ export default function HseInspectionsPage() {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
     doc.text(`${record.inspection_number} - ${record.title}`, 12, y);
     y += 7;
 
@@ -1456,7 +1456,7 @@ export default function HseInspectionsPage() {
       theme: "grid",
       margin: pdfTableMargin,
       tableWidth: 186,
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0] },
       headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Field", "Details", "Field", "Details"]],
       body: [
@@ -1484,8 +1484,8 @@ export default function HseInspectionsPage() {
         theme: "grid",
         margin: pdfTableMargin,
         tableWidth: 186,
-        styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.6, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42], overflow: "linebreak" },
-        headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
+        styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.6, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0], overflow: "linebreak" },
+        headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
         head: [["Item", "Description", "N/A", "Yes", "No", "Comments"]],
         body: section.items.map((item) => {
           const response = record.checklist_responses?.[item.id] || { answer: "", comments: "" };
@@ -1525,7 +1525,7 @@ export default function HseInspectionsPage() {
       theme: "grid",
       margin: pdfTableMargin,
       tableWidth: 186,
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2 },
       body: [[record.additional_comments || ""]],
       columnStyles: { 0: { cellWidth: 186, minCellHeight: 18 } },
     });
@@ -1541,7 +1541,7 @@ export default function HseInspectionsPage() {
       theme: "grid",
       margin: pdfTableMargin,
       tableWidth: 186,
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2, overflow: "linebreak" },
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2, overflow: "linebreak" },
       headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Action No.", "Title", "Owner", "Status", "Due Date"]],
       body: linkedActions.length
@@ -1557,7 +1557,7 @@ export default function HseInspectionsPage() {
       theme: "grid",
       margin: pdfTableMargin,
       tableWidth: 186,
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2 },
       headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Name", "Position", "Company", "Date"]],
       body: [[record.signoff_name || "", record.signoff_position || "", record.signoff_company || "", displayDate(record.signoff_date)]],
@@ -1583,7 +1583,7 @@ export default function HseInspectionsPage() {
         theme: "grid",
         margin: pdfTableMargin,
         tableWidth: 186,
-        styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
+        styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2 },
         headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
         head: [["Item", "File", "Size", "Uploaded", "Link"]],
         body: evidenceRows.map((item) => [
@@ -1593,13 +1593,13 @@ export default function HseInspectionsPage() {
           displayDateTime(item.file.uploaded_at),
           { content: "", url: item.url },
         ]),
-        columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 72 }, 2: { cellWidth: 22 }, 3: { cellWidth: 40 }, 4: { cellWidth: 32, textColor: [37, 99, 235] } },
+        columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 72 }, 2: { cellWidth: 22 }, 3: { cellWidth: 40 }, 4: { cellWidth: 32, textColor: [0, 86, 112] } },
         didDrawCell: (data) => {
           if (data.section !== "body" || data.column.index !== 4) return;
           const raw = data.cell.raw as { url?: string } | string;
           const url = typeof raw === "object" ? raw.url : "";
           if (url) {
-            doc.setTextColor(37, 99, 235);
+            doc.setTextColor(0, 86, 112);
             doc.setFont("helvetica", "bold");
             doc.setFontSize(8);
             doc.textWithLink("Open Evidence", data.cell.x + 2, data.cell.y + 5, { url });
@@ -1634,7 +1634,7 @@ export default function HseInspectionsPage() {
             }
             doc.setFont("helvetica", "bold");
             doc.setFontSize(8);
-            doc.setTextColor(15, 23, 42);
+            doc.setTextColor(0, 0, 0);
             doc.text(`${item.file.item_number || "General"} - ${item.file.file_name}`, x, y + 4, { maxWidth: 86 });
             doc.addImage(dataUrl, item.file.content_type?.includes("png") ? "PNG" : "JPEG", x, y + 7, 86, 58);
             if (column === 0) {
@@ -1678,7 +1678,7 @@ export default function HseInspectionsPage() {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
     doc.text(`${template.documentNumber} - ${template.title}`, 12, y);
     y += 7;
 
@@ -1687,7 +1687,7 @@ export default function HseInspectionsPage() {
       theme: "grid",
       margin: pdfTableMargin,
       tableWidth: 186,
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2.2, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0] },
       headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Field", "Details", "Field", "Details"]],
       body: [
@@ -1717,8 +1717,8 @@ export default function HseInspectionsPage() {
           theme: "grid",
           margin: pdfTableMargin,
           tableWidth: 186,
-          styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.8, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42], overflow: "linebreak" },
-          headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
+          styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.8, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0], overflow: "linebreak" },
+          headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
           head: [["Item", "Description", "N/A", "Yes", "No", "Comments / Action Notes"]],
           body: section.items.map((item) => [item.number, item.text, "", "", "", ""]),
           columnStyles: {
@@ -1745,8 +1745,8 @@ export default function HseInspectionsPage() {
           theme: "grid",
           margin: pdfTableMargin,
           tableWidth: 186,
-          styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2, textColor: [15, 23, 42] },
-          headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
+          styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0] },
+          headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
           head: [["Item", "Check / Requirement", "N/A", "Yes", "No", "Comments"]],
           body: Array.from({ length: 5 }, (_, rowIndex) => [`${index + 1}.${rowIndex + 1}`, "", "", "", "", ""]),
           columnStyles: {
@@ -1773,7 +1773,7 @@ export default function HseInspectionsPage() {
       theme: "grid",
       margin: pdfTableMargin,
       tableWidth: 186,
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2 },
       body: [[""]],
       columnStyles: { 0: { cellWidth: 186, minCellHeight: 24 } },
     });
@@ -1785,7 +1785,7 @@ export default function HseInspectionsPage() {
       theme: "grid",
       margin: pdfTableMargin,
       tableWidth: 186,
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2 },
       headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Item", "Evidence / Photo Reference", "Notes"]],
       body: Array.from({ length: 5 }, () => ["", "", ""]),
@@ -1799,7 +1799,7 @@ export default function HseInspectionsPage() {
       theme: "grid",
       margin: pdfTableMargin,
       tableWidth: 186,
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], lineWidth: 0.2 },
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2 },
       headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
       head: [["Name", "Position", "Company", "Date", "Signature"]],
       body: [["", "", "", "", ""]],
@@ -1832,7 +1832,7 @@ export default function HseInspectionsPage() {
 
       {!isFieldCreateMode ? <TopRow status={message} /> : null}
 
-      {!isFieldCreateMode ? <nav style={tabRowStyle} aria-label="HSE inspection views">
+      {!isFieldCreateMode ? <nav className="ims-tabs" style={tabRowStyle} aria-label="HSE inspection views" role="tablist">
         <TabButton active={activeView === "dashboard"} onClick={() => setActiveView("dashboard")}>Dashboard</TabButton>
         <TabButton active={activeView === "register"} onClick={() => setActiveView("register")}>Inspection Register</TabButton>
         <TabButton active={activeView === "create"} onClick={() => startCreate()}>Create Inspection</TabButton>
@@ -1937,7 +1937,7 @@ function MobileInspectionHero({ latestSummary }: { latestSummary: string }) {
 
 function TopRow({ status }: { status: string }) {
   return (
-    <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
       <Link href="/home" style={backLinkStyle}>&larr; Back to IMS Home</Link>
       <div style={statusBannerStyle}><strong>Status:</strong> {status}</div>
     </div>
@@ -2096,7 +2096,7 @@ function RegisterView({
     <section style={splitGridStyle}>
       <div style={isMobile ? mobilePanelStyle : panelStyle}>
         <PanelHeader title="Inspection Register" description="Logged HSE inspections with status, findings, evidence, and report output." />
-        <div style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
+        <div className="ims-filter-panel" style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
           <input style={inputStyle} placeholder="Search inspections" value={search} onChange={(event) => onSearch(event.target.value)} />
           <button type="button" onClick={() => setShowFilters((current) => !current)} style={showFilters ? secondaryButtonStyle : primaryButtonStyle}>
             {showFilters ? "Hide Filters" : "Show Filters"}
@@ -2104,7 +2104,7 @@ function RegisterView({
           <button type="button" onClick={onCreate} style={primaryButtonStyle} disabled={!canCreateInspection}>Create Inspection</button>
         </div>
         {showFilters ? (
-        <div style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
+        <div className="ims-filter-panel" style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
           <select style={selectStyle} value={statusFilter} onChange={(event) => onStatusFilter(event.target.value)}>
             <option value="">All Statuses</option>
             {["Draft", "Open", "Complete", "Closed"].map((status) => <option key={status} value={status}>{status}</option>)}
@@ -2120,7 +2120,7 @@ function RegisterView({
                 key={record.id}
                 type="button"
                 onClick={() => onSelect(record)}
-                style={{ ...mobileRegisterCardStyle, borderColor: selected?.id === record.id ? "#005670" : "#dbe3ef" }}
+                style={{ ...mobileRegisterCardStyle, borderColor: selected?.id === record.id ? "#005670" : "#D0D0CE" }}
               >
                 <div>
                   <strong style={mobileRegisterNumberStyle}>{record.inspection_number}</strong>
@@ -2169,7 +2169,7 @@ function RegisterView({
             </thead>
             <tbody>
               {records.map((record) => (
-                <tr key={record.id} onClick={() => onSelect(record)} style={{ ...clickableRowStyle, background: selected?.id === record.id ? "#ECECE7" : "white" }}>
+                <tr key={record.id} aria-selected={selected?.id === record.id} data-selected={selected?.id === record.id ? "true" : "false"} onClick={() => onSelect(record)} style={{ ...clickableRowStyle, background: selected?.id === record.id ? "#ECECE7" : "white" }}>
                   <td style={tdStrongStyle}>{record.inspection_number}</td>
                   <td style={tdStyle}>{record.form_title}</td>
                   <td style={tdStyle}>{record.area_zone || record.vessel_spread || "-"}</td>
@@ -2299,8 +2299,8 @@ function CreateInspectionView({
             onClick={() => onSelectTemplate(template.id)}
             style={{
               ...templateCardStyle,
-              borderColor: selectedTemplateId === template.id ? "#005670" : "#cbd5e1",
-              boxShadow: selectedTemplateId === template.id ? "0 0 0 2px rgba(0, 86, 112, 0.14)" : "0 1px 2px rgba(15, 23, 42, 0.06)",
+              borderColor: selectedTemplateId === template.id ? "#005670" : "#D0D0CE",
+              boxShadow: selectedTemplateId === template.id ? "0 0 0 2px rgba(0, 86, 112, 0.14)" : "0 1px 2px rgba(0, 0, 0, 0.06)",
             }}
           >
             <span style={docNumberStyle}>{template.documentNumber}</span>
@@ -2386,7 +2386,7 @@ function InspectionForm({
     <div style={compact ? (isMobile ? mobileCompactFormStyle : compactFormStyle) : undefined}>
       <InspectionSection title="Report Details">
         <div style={isMobile ? mobileFormGridStyle : formGridStyle}>
-          <Field label="Inspection No."><input style={{ ...inputStyle, background: "#f8fafc" }} value={draft.inspection_number} readOnly /></Field>
+          <Field label="Inspection No."><input style={{ ...inputStyle, background: "#ECECE7" }} value={draft.inspection_number} readOnly /></Field>
           <Field label="Status">
             <select style={inputStyle} value={draft.status} onChange={(event) => onDraftChange("status", event.target.value as InspectionStatus)}>
               {["Draft", "Open", "Complete", "Closed"].map((status) => <option key={status} value={status}>{status}</option>)}
@@ -2423,9 +2423,9 @@ function InspectionForm({
                           key={answer}
                           style={{
                             ...mobileAnswerOptionStyle,
-                            borderColor: response.answer === answer ? "#005670" : "#cbd5e1",
+                            borderColor: response.answer === answer ? "#005670" : "#D0D0CE",
                             background: response.answer === answer ? "#ECECE7" : "#ffffff",
-                            color: response.answer === answer ? "#005670" : "#0f172a",
+                            color: response.answer === answer ? "#005670" : "#000000",
                           }}
                         >
                           <input
@@ -2461,8 +2461,8 @@ function InspectionForm({
               })}
             </div>
           ) : (
-            <div style={checklistShellStyle}>
-              <div style={checklistHeaderStyle}>
+            <div className="ims-register-shell" style={checklistShellStyle}>
+              <div className="ims-register-head" style={checklistHeaderStyle}>
                 <span>Item</span>
                 <span>Description</span>
               <span style={centerHeaderCellStyle}>N/A</span>
@@ -2474,7 +2474,7 @@ function InspectionForm({
               {section.items.map((item) => {
                 const response = draft.checklist_responses[item.id] || { answer: "", comments: "" };
                 return (
-                <div key={item.id} style={checklistRowStyle}>
+                <div key={item.id} className="ims-register-row" style={checklistRowStyle}>
                   <strong style={centeredChecklistCellStyle}>{item.number}</strong>
                   <span style={centeredChecklistCellStyle}>{item.text}</span>
                     {(["N/A", "Yes", "No"] as ChecklistAnswer[]).map((answer) => (
@@ -2717,11 +2717,14 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
+      data-active={active ? "true" : "false"}
       onClick={onClick}
       style={{
         ...tabButtonStyle,
-        background: active ? "#005670" : "#e2e8f0",
-        color: active ? "white" : "#0f172a",
+        background: active ? "#005670" : "#ECECE7",
+        color: active ? "white" : "#000000",
       }}
     >
       {children}
@@ -2755,25 +2758,25 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
-const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
+const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", color: "#000000" };
 const tabRowStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "20px" };
 const tabButtonStyle: CSSProperties = { border: "none", borderRadius: "10px", padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
-const sectionCardStyle: CSSProperties = { background: "white", borderRadius: "16px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" };
-const sectionTitleStyle: CSSProperties = { margin: "0 0 10px", fontSize: "18px", color: "#0f172a" };
-const emptyTextStyle: CSSProperties = { color: "#475569", margin: "0 0 14px", lineHeight: 1.55 };
+const sectionCardStyle: CSSProperties = { background: "white", borderRadius: "16px", padding: "20px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)" };
+const sectionTitleStyle: CSSProperties = { margin: "0 0 10px", fontSize: "18px", color: "#000000" };
+const emptyTextStyle: CSSProperties = { color: "#53565A", margin: "0 0 14px", lineHeight: 1.55 };
 const storyGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" };
-const miniTemplateStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "4px", color: "#0f172a", background: "#f8fafc" };
+const miniTemplateStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "4px", color: "#000000", background: "#ECECE7" };
 const miniTemplateButtonStyle: CSSProperties = { ...miniTemplateStyle, textAlign: "left", cursor: "pointer", font: "inherit" };
 const blankPdfCueStyle: CSSProperties = { marginTop: "6px", color: "#005670", fontWeight: 900 };
-const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" };
+const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)" };
 const panelHeaderStyle: CSSProperties = { background: "#005670", color: "white", borderRadius: "10px", padding: "14px 16px", marginBottom: "18px" };
 const panelTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", fontWeight: 800 };
 const panelDescriptionStyle: CSSProperties = { margin: "4px 0 0", fontSize: "13px", lineHeight: 1.45 };
@@ -2781,11 +2784,11 @@ const splitGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1
 const detailPanelStyle: CSSProperties = {
   display: "grid",
   gap: "18px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   width: "100%",
   boxSizing: "border-box",
   minWidth: 0,
@@ -2797,12 +2800,12 @@ const registerToolbarStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
-const inputStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #cbd5e1", borderRadius: "9px", padding: "9px 12px", fontSize: "14px", background: "white", boxSizing: "border-box" };
+const inputStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "9px", padding: "9px 12px", fontSize: "14px", background: "white", boxSizing: "border-box" };
 const selectStyle: CSSProperties = { ...inputStyle };
 const tableInfoStyle: CSSProperties = {
   display: "flex",
@@ -2810,17 +2813,17 @@ const tableInfoStyle: CSSProperties = {
   justifyContent: "flex-start",
   gap: "4px",
   flexWrap: "wrap",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
   margin: "12px 0",
 };
 const tableShellStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 const tableStyle: CSSProperties = {
   width: "100%",
@@ -2832,19 +2835,19 @@ const tableStyle: CSSProperties = {
 const thStyle: CSSProperties = {
   textAlign: "left",
   padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 900,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
+  borderBottom: "1px solid #D0D0CE",
   whiteSpace: "nowrap",
 };
 const tdStyle: CSSProperties = {
   padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
+  borderBottom: "1px solid #ECECE7",
+  color: "#000000",
   verticalAlign: "middle",
   fontSize: "13px",
   lineHeight: 1.45,
@@ -2855,53 +2858,53 @@ const clickableRowStyle: CSSProperties = { cursor: "pointer" };
 const emptyCellStyle: CSSProperties = {
   padding: "26px 14px",
   textAlign: "center",
-  color: "#64748b",
-  background: "#f8fafc",
-  borderBottom: "1px dashed #cbd5e1",
+  color: "#53565A",
+  background: "#ECECE7",
+  borderBottom: "1px dashed #D0D0CE",
 };
 const primaryButtonStyle: CSSProperties = { background: "#005670", color: "white", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
-const secondaryButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
-const pdfButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", borderRadius: "9px", padding: "8px 14px", fontWeight: 900, cursor: "pointer", minWidth: "54px", lineHeight: 1 };
+const secondaryButtonStyle: CSSProperties = { background: "#D0D0CE", color: "#000000", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
+const pdfButtonStyle: CSSProperties = { background: "#D0D0CE", color: "#000000", border: "none", borderRadius: "9px", padding: "8px 14px", fontWeight: 900, cursor: "pointer", minWidth: "54px", lineHeight: 1 };
 const dangerButtonStyle: CSSProperties = { background: "#F93822", color: "white", border: "none", borderRadius: "10px", padding: "11px 16px", fontWeight: 800, cursor: "pointer" };
 const primaryLinkStyle: CSSProperties = { ...primaryButtonStyle, display: "inline-flex", textDecoration: "none", alignItems: "center" };
 const secondaryLinkStyle: CSSProperties = { ...secondaryButtonStyle, display: "inline-flex", textDecoration: "none", alignItems: "center" };
 const templateGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "12px", marginBottom: "20px" };
-const templateCardStyle: CSSProperties = { minHeight: "164px", display: "flex", flexDirection: "column", gap: "8px", textAlign: "left", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "14px", padding: "14px", cursor: "pointer", color: "#0f172a" };
+const templateCardStyle: CSSProperties = { minHeight: "164px", display: "flex", flexDirection: "column", gap: "8px", textAlign: "left", background: "#ECECE7", border: "1px solid #D0D0CE", borderRadius: "14px", padding: "14px", cursor: "pointer", color: "#000000" };
 const docNumberStyle: CSSProperties = { color: "#005670", fontWeight: 900, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.04em" };
 const templateStatusStyle: CSSProperties = { marginTop: "auto", color: "#005670", fontWeight: 800, fontSize: "12px" };
 const selectedHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "14px", alignItems: "flex-start", border: "1px solid #D0D0CE", background: "#ECECE7", borderRadius: "14px", padding: "16px", marginBottom: "18px" };
 const selectedEyebrowStyle: CSSProperties = { fontSize: "12px", color: "#005670", fontWeight: 900, letterSpacing: "0.04em" };
-const selectedTitleStyle: CSSProperties = { margin: "4px 0", fontSize: "22px", color: "#0f172a" };
-const selectedDescriptionStyle: CSSProperties = { margin: 0, color: "#475569", lineHeight: 1.45 };
-const statusPillStyle: CSSProperties = { background: "#dcfce7", color: "#166534", borderRadius: "999px", padding: "7px 10px", fontWeight: 800, fontSize: "12px", whiteSpace: "nowrap" };
+const selectedTitleStyle: CSSProperties = { margin: "4px 0", fontSize: "22px", color: "#000000" };
+const selectedDescriptionStyle: CSSProperties = { margin: 0, color: "#53565A", lineHeight: 1.45 };
+const statusPillStyle: CSSProperties = { background: "#ECECE7", color: "#005670", borderRadius: "999px", padding: "7px 10px", fontWeight: 800, fontSize: "12px", whiteSpace: "nowrap" };
 const statusPillInlineStyle: CSSProperties = { borderRadius: "999px", padding: "6px 9px", fontWeight: 900, fontSize: "12px", whiteSpace: "nowrap" };
 const compactFormStyle: CSSProperties = { maxHeight: "62vh", overflow: "auto", paddingRight: "6px" };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" };
-const fieldStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: "6px", fontWeight: 800, color: "#334155", fontSize: "12px" };
+const fieldStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: "6px", fontWeight: 800, color: "#53565A", fontSize: "12px" };
 const labelStyle: CSSProperties = { textTransform: "uppercase", letterSpacing: "0.03em" };
-const inspectionSectionStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "14px", overflow: "hidden", marginBottom: "16px", background: "white" };
+const inspectionSectionStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", overflow: "hidden", marginBottom: "16px", background: "white" };
 const inspectionSectionTitleStyle: CSSProperties = { margin: 0, background: "#005670", color: "white", padding: "12px 14px", fontSize: "16px", fontWeight: 900 };
 const inspectionSectionBodyStyle: CSSProperties = { padding: "14px" };
-const checklistShellStyle: CSSProperties = { display: "grid", gap: "0", border: "1px solid #dbe3ef", borderRadius: "10px", overflow: "hidden" };
-const checklistHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "center", background: "#f1f5f9", fontWeight: 900, color: "#0f172a", fontSize: "12px" };
-const checklistRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "stretch", borderTop: "1px solid #dbe3ef", fontSize: "13px" };
+const checklistShellStyle: CSSProperties = { display: "grid", gap: "0", border: "1px solid #D0D0CE", borderRadius: "10px", overflow: "hidden" };
+const checklistHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "center", padding: "9px 10px", background: "#005670", fontWeight: 800, color: "#ffffff", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" };
+const checklistRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "stretch", borderTop: "1px solid #D0D0CE", fontSize: "12px" };
 const centerHeaderCellStyle: CSSProperties = { textAlign: "center", justifySelf: "center", width: "100%" };
 const centeredChecklistCellStyle: CSSProperties = { display: "flex", alignItems: "center", padding: "8px 8px 8px 0", lineHeight: 1.35 };
-const radioCellStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid #dbe3ef" };
+const radioCellStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid #D0D0CE" };
 const itemUploadButtonStyle: CSSProperties = { margin: "8px", minHeight: "30px", border: "1px solid #D0D0CE", background: "#ECECE7", color: "#005670", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "11px", cursor: "pointer" };
-const smallTextareaStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px", fontSize: "13px", resize: "vertical", boxSizing: "border-box" };
+const smallTextareaStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "8px", padding: "8px", fontSize: "13px", resize: "vertical", boxSizing: "border-box" };
 const largeTextareaStyle: CSSProperties = { ...smallTextareaStyle, minHeight: "110px" };
-const actionTableStyle: CSSProperties = { display: "grid", gap: 0, border: "1px solid #dbe3ef", borderRadius: "10px", overflow: "hidden", marginBottom: "12px" };
-const actionHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "52px minmax(220px, 1fr) 180px 150px 110px", background: "#f1f5f9", fontWeight: 900, fontSize: "12px" };
-const actionRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "52px minmax(220px, 1fr) 180px 150px 110px", gap: "8px", alignItems: "center", padding: "8px", borderTop: "1px solid #dbe3ef" };
+const actionTableStyle: CSSProperties = { display: "grid", gap: 0, border: "1px solid #D0D0CE", borderRadius: "10px", overflow: "hidden", marginBottom: "12px" };
+const actionHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "52px minmax(220px, 1fr) 180px 150px 110px", padding: "9px 10px", background: "#005670", color: "#ffffff", fontWeight: 800, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" };
+const actionRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "52px minmax(220px, 1fr) 180px 150px 110px", gap: "8px", alignItems: "center", padding: "10px", borderTop: "1px solid #D0D0CE", fontSize: "12px" };
 const formActionsStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap", marginTop: "16px" };
-const emptyBoxStyle: CSSProperties = { border: "1px dashed #cbd5e1", borderRadius: "12px", padding: "18px", color: "#64748b", background: "#f8fafc" };
+const emptyBoxStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: "12px", padding: "18px", color: "#53565A", background: "#ECECE7" };
 const uploadButtonStyle: CSSProperties = { ...primaryButtonStyle, display: "inline-flex", width: "fit-content", marginBottom: "12px" };
 const evidenceListStyle: CSSProperties = { display: "grid", gap: "10px" };
-const evidenceCardStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #dbe3ef", borderRadius: "12px", padding: "12px", background: "#f8fafc" };
-const mutedTextStyle: CSSProperties = { color: "#64748b", fontSize: "12px", marginTop: "4px" };
+const evidenceCardStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #D0D0CE", borderRadius: "12px", padding: "12px", background: "#ECECE7" };
+const mutedTextStyle: CSSProperties = { color: "#53565A", fontSize: "12px", marginTop: "4px" };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: "8px", flexWrap: "wrap" };
-const qrImageStyle: CSSProperties = { width: "160px", height: "160px", border: "1px solid #dbe3ef", borderRadius: "12px", padding: "8px", background: "white", marginBottom: "10px" };
+const qrImageStyle: CSSProperties = { width: "160px", height: "160px", border: "1px solid #D0D0CE", borderRadius: "12px", padding: "8px", background: "white", marginBottom: "10px" };
 
 const mobileMainStyle: CSSProperties = {
   maxWidth: "100%",
@@ -2998,16 +3001,16 @@ const mobileRegisterListStyle: CSSProperties = {
 
 const mobileRegisterCardStyle: CSSProperties = {
   width: "100%",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   background: "#ffffff",
   padding: "12px",
   textAlign: "left",
   display: "grid",
   gap: "10px",
-  color: "#0f172a",
+  color: "#000000",
   cursor: "pointer",
-  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)",
+  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
 };
 
 const mobileRegisterNumberStyle: CSSProperties = {
@@ -3029,7 +3032,7 @@ const mobileRegisterMetaStyle: CSSProperties = {
   justifyContent: "space-between",
   gap: "8px",
   flexWrap: "wrap",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "12px",
 };
 
@@ -3070,10 +3073,10 @@ const mobileChecklistListStyle: CSSProperties = {
 };
 
 const mobileChecklistCardStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   padding: "12px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   display: "grid",
   gap: "10px",
 };
@@ -3084,7 +3087,7 @@ const mobileChecklistItemHeaderStyle: CSSProperties = {
   gap: "8px",
   alignItems: "start",
   lineHeight: 1.35,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const mobileAnswerGridStyle: CSSProperties = {
@@ -3095,7 +3098,7 @@ const mobileAnswerGridStyle: CSSProperties = {
 
 const mobileAnswerOptionStyle: CSSProperties = {
   minHeight: "40px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   borderRadius: "10px",
   background: "#ffffff",
   display: "flex",

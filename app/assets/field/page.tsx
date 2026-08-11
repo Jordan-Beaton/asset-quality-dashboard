@@ -20,10 +20,10 @@ type Asset = {
 
 function getStatusTone(value: string | null | undefined) {
   const normal = (value || "").trim().toLowerCase();
-  if (normal === "active") return { bg: "#dcfce7", color: "#166534" };
-  if (normal.includes("maintenance")) return { bg: "#fef3c7", color: "#92400e" };
-  if (normal === "quarantine") return { bg: "#fee2e2", color: "#F93822" };
-  return { bg: "#e2e8f0", color: "#334155" };
+  if (normal === "active") return { bg: "#ECECE7", color: "#005670" };
+  if (normal.includes("maintenance")) return { bg: "#ECECE7", color: "#000000" };
+  if (normal === "quarantine") return { bg: "#ECECE7", color: "#F93822" };
+  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function FieldAssetPageContent() {
@@ -172,10 +172,10 @@ const brandBarStyle: CSSProperties = {
 
 const messageCardStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "22px 18px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "15px",
   textAlign: "center",
   boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
@@ -183,7 +183,7 @@ const messageCardStyle: CSSProperties = {
 
 const summaryCardStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
   display: "grid",
@@ -204,7 +204,7 @@ const titleStyle: CSSProperties = {
   fontSize: "24px",
   lineHeight: 1.2,
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   overflowWrap: "anywhere",
 };
 
@@ -215,7 +215,7 @@ const metaStackStyle: CSSProperties = {
 
 const metaLineStyle: CSSProperties = {
   fontSize: "14px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.5,
   overflowWrap: "anywhere",
 };

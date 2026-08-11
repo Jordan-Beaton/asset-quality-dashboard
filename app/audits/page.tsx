@@ -322,30 +322,30 @@ function formatFileSize(value: number | null) {
 function getStatusTone(status: string) {
   const value = status.toLowerCase();
 
-  if (value.includes("overdue")) return { bg: "#fee2e2", color: "#F93822" };
-  if (value.includes("progress")) return { bg: "#fef3c7", color: "#92400e" };
-  if (value.includes("planned")) return { bg: "#dbeafe", color: "#1d4ed8" };
-  if (value.includes("completed") || value.includes("closed")) return { bg: "#dcfce7", color: "#166534" };
-  if (value.includes("cancelled")) return { bg: "#e2e8f0", color: "#334155" };
+  if (value.includes("overdue")) return { bg: "#ECECE7", color: "#F93822" };
+  if (value.includes("progress")) return { bg: "#ECECE7", color: "#000000" };
+  if (value.includes("planned")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("completed") || value.includes("closed")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("cancelled")) return { bg: "#D0D0CE", color: "#53565A" };
 
-  return { bg: "#f1f5f9", color: "#475569" };
+  return { bg: "#ECECE7", color: "#53565A" };
 }
 
 function getFindingTone(category: FindingSeverity) {
-  if (category === "Major") return { bg: "#fee2e2", color: "#F93822" };
-  if (category === "Minor") return { bg: "#fef3c7", color: "#92400e" };
-  if (category === "OBS") return { bg: "#dbeafe", color: "#1d4ed8" };
-  return { bg: "#dcfce7", color: "#166534" };
+  if (category === "Major") return { bg: "#ECECE7", color: "#F93822" };
+  if (category === "Minor") return { bg: "#ECECE7", color: "#000000" };
+  if (category === "OBS") return { bg: "#ECECE7", color: "#005670" };
+  return { bg: "#ECECE7", color: "#005670" };
 }
 
 function getFrequencyBadgeStyle(frequency: "Reduce" | "Maintain" | "Increase"): CSSProperties {
   if (frequency === "Increase") {
-    return { ...badgeStyle, background: "#fee2e2", color: "#F93822" };
+    return { ...badgeStyle, background: "#ECECE7", color: "#F93822" };
   }
   if (frequency === "Reduce") {
-    return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
+    return { ...badgeStyle, background: "#ECECE7", color: "#005670" };
   }
-  return { ...badgeStyle, background: "#fef3c7", color: "#92400e" };
+  return { ...badgeStyle, background: "#ECECE7", color: "#000000" };
 }
 
 function countFindingsForAudit(auditId: string, findings: FindingRecord[]) {
@@ -597,9 +597,9 @@ function MultiSelectStandards({
             onClick={() => onToggle(option)}
             style={{
               ...chipButtonStyle,
-              background: active ? "#005670" : "#f8fafc",
-              color: active ? "#ffffff" : "#334155",
-              borderColor: active ? "#005670" : "#cbd5e1",
+              background: active ? "#005670" : "#ECECE7",
+              color: active ? "#ffffff" : "#53565A",
+              borderColor: active ? "#005670" : "#D0D0CE",
             }}
           >
             {option}
@@ -1296,12 +1296,15 @@ function AuditsPageContent() {
       const matchesMonth = monthFilter === "All" || audit.audit_month === monthFilter;
       const matchesQuickFilter = auditQuickFilter !== "Major" || audit.findings.major > 0;
       const scopedFindings = findings.filter((finding) => finding.audit_id === audit.id);
-      const matchesFindingStatus =
-        linkedFindingStatus === "All" ||
-        scopedFindings.some((finding) => finding.status === linkedFindingStatus);
-      const matchesFindingCategory =
-        linkedFindingCategory === "All" ||
-        scopedFindings.some((finding) => finding.category === linkedFindingCategory);
+      const hasFindingStatusFilter = linkedFindingStatus !== "All";
+      const hasFindingCategoryFilter = linkedFindingCategory !== "All";
+      const matchesLinkedFindingFilters =
+        (!hasFindingStatusFilter && !hasFindingCategoryFilter) ||
+        scopedFindings.some(
+          (finding) =>
+            (!hasFindingStatusFilter || finding.status === linkedFindingStatus) &&
+            (!hasFindingCategoryFilter || finding.category === linkedFindingCategory)
+        );
 
       return (
         matchesSearch &&
@@ -1309,8 +1312,7 @@ function AuditsPageContent() {
         matchesType &&
         matchesMonth &&
         matchesQuickFilter &&
-        matchesFindingStatus &&
-        matchesFindingCategory
+        matchesLinkedFindingFilters
       );
     });
 
@@ -1567,13 +1569,11 @@ function AuditsPageContent() {
     setAuditView(null);
     setActiveView("programme");
     setStatusFilter(status);
-    setAuditQuickFilter("");
   }
 
   function applyMajorFindingsFilter() {
     setAuditView(null);
     setActiveView("programme");
-    setStatusFilter("All");
     setAuditQuickFilter("Major");
   }
 
@@ -2347,7 +2347,7 @@ function AuditsPageContent() {
     return formatFileSize(value);
   }
 
-  const wordBorder = { style: BorderStyle.SINGLE, color: "E2E8F0", size: 2 };
+  const wordBorder = { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 };
   const wordBorders = {
     top: wordBorder,
     bottom: wordBorder,
@@ -2361,10 +2361,10 @@ function AuditsPageContent() {
   function wordRun(text: string, options?: { bold?: boolean; color?: string; size?: number; italics?: boolean }) {
     return new TextRun({
       text: exportText(text),
-      font: "Calibri",
+      font: "Azo Sans",
       bold: options?.bold,
       italics: options?.italics,
-      color: options?.color || "0F172A",
+      color: options?.color || "000000",
       size: options?.size ?? 19,
     });
   }
@@ -2420,7 +2420,7 @@ function AuditsPageContent() {
             children: row.map((cell, cellIndex) =>
               wordCell(cell, {
                 width: widths[cellIndex],
-                fill: options?.labelColumns?.includes(cellIndex) || rowIndex % 2 === 0 ? "F8FAFC" : undefined,
+                fill: options?.labelColumns?.includes(cellIndex) || rowIndex % 2 === 0 ? "ECECE7" : undefined,
                 bold: options?.labelColumns?.includes(cellIndex),
                 size: 18,
               })
@@ -2467,12 +2467,12 @@ function AuditsPageContent() {
             cantSplit: true,
             children: [
               new TableCell({
-                shading: { type: ShadingType.CLEAR, fill: "F8FAFC", color: "auto" },
+                shading: { type: ShadingType.CLEAR, fill: "ECECE7", color: "auto" },
                 margins: { top: 170, bottom: 170, left: 150, right: 150 },
                 children: [
                   new Paragraph({
                     spacing: { line: 260 },
-                    children: [wordRun(value, { size: 18, color: "1E293B" })],
+                    children: [wordRun(value, { size: 18, color: "000000" })],
                   }),
                 ],
               }),
@@ -2506,13 +2506,13 @@ function AuditsPageContent() {
           rows: [
             new TableRow({
               children: [
-                wordCell(`Enshore Subsea | ${reference}`, { width: 6500, size: 16, color: "64748B" }),
+                wordCell(`Enshore Subsea | ${reference}`, { width: 6500, size: 16, color: "53565A" }),
                 new TableCell({
                   width: { size: 2860, type: WidthType.DXA },
                   children: [
                     new Paragraph({
                       alignment: AlignmentType.RIGHT,
-                      children: [wordRun("Page ", { size: 16, color: "64748B" }), new SimpleField("PAGE"), wordRun(" of ", { size: 16, color: "64748B" }), new SimpleField("NUMPAGES")],
+                      children: [wordRun("Page ", { size: 16, color: "53565A" }), new SimpleField("PAGE"), wordRun(" of ", { size: 16, color: "53565A" }), new SimpleField("NUMPAGES")],
                     }),
                   ],
                 }),
@@ -2587,7 +2587,7 @@ function AuditsPageContent() {
 
                 return wordCell(cell, {
                   width: [4200, 1100, 2300, 1760][cellIndex],
-                  fill: rowIndex % 2 === 0 ? "F8FAFC" : undefined,
+                  fill: rowIndex % 2 === 0 ? "ECECE7" : undefined,
                   size: 18,
                 });
               }),
@@ -2599,7 +2599,7 @@ function AuditsPageContent() {
       const document = new WordDocument({
         styles: {
           default: {
-            document: { run: { font: "Calibri", size: 19, color: "0F172A" } },
+            document: { run: { font: "Azo Sans", size: 19, color: "000000" } },
           },
         },
         sections: [
@@ -2638,10 +2638,10 @@ function AuditsPageContent() {
               }),
               new Paragraph({ spacing: { after: 180 }, children: [wordRun("", { size: 1 })] }),
               new Paragraph({ children: [wordRun(finding.reference || "Audit Finding", { bold: true, size: 36 })] }),
-              new Paragraph({ spacing: { after: 180 }, children: [wordRun(`${audit.audit_number} - ${audit.title}`, { color: "475569", size: 20 })] }),
-              new Paragraph({ spacing: { after: 180 }, children: [wordRun(`Generated: ${exportDateTime(new Date().toISOString())}`, { color: "475569", size: 18 })] }),
-              new Paragraph({ children: [wordRun("IMS Record ID", { color: "94A3B8", size: 14 })] }),
-              new Paragraph({ spacing: { after: 120 }, children: [wordRun(finding.id, { color: "94A3B8", size: 14 })] }),
+              new Paragraph({ spacing: { after: 180 }, children: [wordRun(`${audit.audit_number} - ${audit.title}`, { color: "53565A", size: 20 })] }),
+              new Paragraph({ spacing: { after: 180 }, children: [wordRun(`Generated: ${exportDateTime(new Date().toISOString())}`, { color: "53565A", size: 18 })] }),
+              new Paragraph({ children: [wordRun("IMS Record ID", { color: "D0D0CE", size: 14 })] }),
+              new Paragraph({ spacing: { after: 120 }, children: [wordRun(finding.id, { color: "D0D0CE", size: 14 })] }),
               wordTable(
                 ["Field", "Details", "Field", "Details"],
                 [
@@ -2662,7 +2662,7 @@ function AuditsPageContent() {
               evidenceTable,
               new Paragraph({
                 spacing: { before: 80 },
-                children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "64748B", size: 16 })],
+                children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "53565A", size: 16 })],
               }),
             ],
           },
@@ -2721,12 +2721,12 @@ function AuditsPageContent() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text(finding.reference || "Audit Finding", margin, 34);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(`${audit.audit_number} - ${audit.title}`, margin, 41);
       doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 41, { align: "right" });
 
@@ -2742,16 +2742,16 @@ function AuditsPageContent() {
           ["Auditee", exportText(audit.auditee), "Lead Auditor", exportText(audit.lead_auditor)],
         ],
         columnStyles: {
-          0: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 34 },
+          0: { fontStyle: "bold", fillColor: [236, 236, 231], cellWidth: 34 },
           1: { cellWidth: 62 },
-          2: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 34 },
+          2: { fontStyle: "bold", fillColor: [236, 236, 231], cellWidth: 34 },
           3: { cellWidth: 52 },
         },
         styles: {
           fontSize: 9.5,
           cellPadding: 3,
-          textColor: [15, 23, 42],
-          lineColor: [226, 232, 240],
+          textColor: [0, 0, 0],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
           valign: "middle",
         },
@@ -2768,19 +2768,19 @@ function AuditsPageContent() {
 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(10);
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.text(title, margin, y);
         y += 4;
 
         const lines = doc.splitTextToSize(exportText(value), pageWidth - margin * 2 - 6);
         const boxHeight = Math.max(minHeight, lines.length * 4.5 + 8);
 
-        doc.setDrawColor(226, 232, 240);
-        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(208, 208, 206);
+        doc.setFillColor(236, 236, 231);
         doc.roundedRect(margin, y, pageWidth - margin * 2, boxHeight, 2, 2, "FD");
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.setTextColor(30, 41, 59);
+        doc.setTextColor(0, 0, 0);
         doc.text(lines, margin + 3, y + 6);
         y += boxHeight + 7;
       };
@@ -2797,14 +2797,14 @@ function AuditsPageContent() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(12);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text("Uploaded Evidence", margin, y);
       y += 5;
 
       if (evidenceWithUrls.length === 0) {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.setTextColor(71, 85, 105);
+        doc.setTextColor(83, 86, 90);
         doc.text("No evidence files uploaded against this finding.", margin, y);
         y += 8;
       } else {
@@ -2827,8 +2827,8 @@ function AuditsPageContent() {
           styles: {
             fontSize: 8.5,
             cellPadding: 2.5,
-            textColor: [15, 23, 42],
-            lineColor: [226, 232, 240],
+            textColor: [0, 0, 0],
+            lineColor: [208, 208, 206],
             lineWidth: 0.2,
             overflow: "linebreak",
           },
@@ -2836,7 +2836,7 @@ function AuditsPageContent() {
             0: { cellWidth: 70 },
             1: { cellWidth: 22 },
             2: { cellWidth: 42 },
-            3: { cellWidth: 48, textColor: [29, 78, 216], fontStyle: "bold" },
+            3: { cellWidth: 48, textColor: [0, 86, 112], fontStyle: "bold" },
           },
           didDrawCell: (data) => {
             if (data.section !== "body" || data.column.index !== 3) return;
@@ -2851,7 +2851,7 @@ function AuditsPageContent() {
 
         doc.setFont("helvetica", "italic");
         doc.setFontSize(8);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text("Evidence links are secure signed URLs and may expire after generation.", margin, y);
       }
 
@@ -2862,7 +2862,7 @@ function AuditsPageContent() {
         doc.line(margin, pageHeight - 13, pageWidth - margin, pageHeight - 13);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text(`Enshore Subsea | ${finding.reference}`, margin, pageHeight - 8);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: "right" });
       }
@@ -2919,12 +2919,12 @@ function AuditsPageContent() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text(selectedAudit.title, margin, 34);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(`Audit Number: ${selectedAudit.audit_number}`, margin, 41);
       doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 41, { align: "right" });
 
@@ -2935,8 +2935,8 @@ function AuditsPageContent() {
       styles: {
         fontSize: 9.5,
         cellPadding: 3,
-        textColor: [15, 23, 42],
-        lineColor: [226, 232, 240],
+        textColor: [0, 0, 0],
+        lineColor: [208, 208, 206],
         lineWidth: 0.2,
         valign: "middle",
       },
@@ -2949,9 +2949,9 @@ function AuditsPageContent() {
         ["Report Upload", selectedAudit.report_file_name || "-", "Form Ref", reportCode],
       ],
       columnStyles: {
-        0: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 30 },
+        0: { fontStyle: "bold", fillColor: [236, 236, 231], cellWidth: 30 },
         1: { cellWidth: 65 },
-        2: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 30 },
+        2: { fontStyle: "bold", fillColor: [236, 236, 231], cellWidth: 30 },
         3: { cellWidth: 51 },
       },
       });
@@ -2961,7 +2961,7 @@ function AuditsPageContent() {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
     doc.text("Findings Summary", margin, y);
 
       autoTable(doc, {
@@ -2989,13 +2989,13 @@ function AuditsPageContent() {
       styles: {
         fontSize: 8.4,
         cellPadding: 2.5,
-        textColor: [15, 23, 42],
-        lineColor: [226, 232, 240],
+        textColor: [0, 0, 0],
+        lineColor: [208, 208, 206],
         lineWidth: 0.2,
         overflow: "linebreak",
       },
       alternateRowStyles: {
-        fillColor: [248, 250, 252],
+        fillColor: [236, 236, 231],
       },
       columnStyles: {
         0: { cellWidth: 14 },
@@ -3020,7 +3020,7 @@ function AuditsPageContent() {
       nextY += 10;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text(`${finding.reference} Action Detail`, margin, nextY);
 
         autoTable(doc, {
@@ -3035,12 +3035,12 @@ function AuditsPageContent() {
         styles: {
           fontSize: 8.8,
           cellPadding: 2.8,
-          textColor: [15, 23, 42],
-          lineColor: [226, 232, 240],
+          textColor: [0, 0, 0],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
         },
         columnStyles: {
-          0: { fontStyle: "bold", fillColor: [248, 250, 252], cellWidth: 38 },
+          0: { fontStyle: "bold", fillColor: [236, 236, 231], cellWidth: 38 },
           1: { cellWidth: pageWidth - margin * 2 - 38 },
         },
         });
@@ -3069,8 +3069,8 @@ function AuditsPageContent() {
           styles: {
             fontSize: 8.3,
             cellPadding: 2.5,
-            textColor: [15, 23, 42],
-            lineColor: [226, 232, 240],
+            textColor: [0, 0, 0],
+            lineColor: [208, 208, 206],
             lineWidth: 0.2,
             overflow: "linebreak",
           },
@@ -3078,7 +3078,7 @@ function AuditsPageContent() {
             0: { cellWidth: 72 },
             1: { cellWidth: 22 },
             2: { cellWidth: 42 },
-            3: { cellWidth: 46, textColor: [29, 78, 216], fontStyle: "bold" },
+            3: { cellWidth: 46, textColor: [0, 86, 112], fontStyle: "bold" },
           },
           didDrawCell: (data) => {
             if (data.section !== "body" || data.column.index !== 3) return;
@@ -3095,12 +3095,12 @@ function AuditsPageContent() {
 
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
-        doc.setDrawColor(226, 232, 240);
+        doc.setDrawColor(208, 208, 206);
         doc.line(margin, pageHeight - 14, pageWidth - margin, pageHeight - 14);
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text(`Enshore Subsea | ${selectedAudit.audit_number}`, margin, pageHeight - 8.5);
         doc.text(reportCode, pageWidth / 2, pageHeight - 8.5, { align: "center" });
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8.5, { align: "right" });
@@ -3149,12 +3149,12 @@ function AuditsPageContent() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text(reportTitle, margin, 34);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 34, { align: "right" });
       doc.text(`Filters: ${typeSummary} | ${categorySummary}`, margin, 41);
       doc.text(`Open findings: ${reportRows.length}`, pageWidth - margin, 41, { align: "right" });
@@ -3199,14 +3199,14 @@ function AuditsPageContent() {
         styles: {
           fontSize: 7,
           cellPadding: 1.7,
-          textColor: [15, 23, 42],
-          lineColor: [226, 232, 240],
+          textColor: [0, 0, 0],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
           overflow: "linebreak",
           valign: "top",
         },
         alternateRowStyles: {
-          fillColor: [248, 250, 252],
+          fillColor: [236, 236, 231],
         },
         columnStyles: {
           0: { cellWidth: 14 },
@@ -3230,20 +3230,20 @@ function AuditsPageContent() {
           if (data.column.index === 4) {
             const tone = getFindingTone(finding.category);
             const fillColor: [number, number, number] =
-              tone.bg === "#fee2e2"
+              tone.bg === "#ECECE7"
                 ? [254, 226, 226]
-                : tone.bg === "#fef3c7"
+                : tone.bg === "#ECECE7"
                   ? [254, 243, 199]
-                  : tone.bg === "#dbeafe"
+                  : tone.bg === "#ECECE7"
                     ? [219, 234, 254]
                     : [220, 252, 231];
             const textColor: [number, number, number] =
               tone.color === "#F93822"
                 ? [153, 27, 27]
-                : tone.color === "#92400e"
+                : tone.color === "#000000"
                   ? [146, 64, 14]
-                  : tone.color === "#1d4ed8"
-                    ? [29, 78, 216]
+                  : tone.color === "#005670"
+                    ? [0, 86, 112]
                     : [22, 101, 52];
             data.cell.styles.fillColor = fillColor;
             data.cell.styles.textColor = textColor;
@@ -3263,12 +3263,12 @@ function AuditsPageContent() {
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
-        doc.setDrawColor(226, 232, 240);
+        doc.setDrawColor(208, 208, 206);
         doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text("Enshore Subsea | Audit Open Findings", margin, pageHeight - 6.5);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6.5, { align: "right" });
       }
@@ -3314,12 +3314,12 @@ function AuditsPageContent() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text("Closed Audit NCR Report", margin, 34);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(`Generated: ${formatDateTime(generatedAt)}`, pageWidth - margin, 34, { align: "right" });
       doc.text(`Filters: ${typeSummary} | ${categorySummary}`, margin, 41);
       doc.text(`Closed findings: ${filteredClosedFindings.length}`, pageWidth - margin, 41, { align: "right" });
@@ -3360,14 +3360,14 @@ function AuditsPageContent() {
         styles: {
           fontSize: 7.4,
           cellPadding: 1.8,
-          textColor: [15, 23, 42],
-          lineColor: [226, 232, 240],
+          textColor: [0, 0, 0],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
           overflow: "linebreak",
           valign: "top",
         },
         alternateRowStyles: {
-          fillColor: [248, 250, 252],
+          fillColor: [236, 236, 231],
         },
         columnStyles: {
           0: { cellWidth: 16 },
@@ -3389,20 +3389,20 @@ function AuditsPageContent() {
           if (data.column.index === 4) {
             const tone = getFindingTone(finding.category);
             const fillColor: [number, number, number] =
-              tone.bg === "#fee2e2"
+              tone.bg === "#ECECE7"
                 ? [254, 226, 226]
-                : tone.bg === "#fef3c7"
+                : tone.bg === "#ECECE7"
                   ? [254, 243, 199]
-                  : tone.bg === "#dbeafe"
+                  : tone.bg === "#ECECE7"
                     ? [219, 234, 254]
                     : [220, 252, 231];
             const textColor: [number, number, number] =
               tone.color === "#F93822"
                 ? [153, 27, 27]
-                : tone.color === "#92400e"
+                : tone.color === "#000000"
                   ? [146, 64, 14]
-                  : tone.color === "#1d4ed8"
-                    ? [29, 78, 216]
+                  : tone.color === "#005670"
+                    ? [0, 86, 112]
                     : [22, 101, 52];
             data.cell.styles.fillColor = fillColor;
             data.cell.styles.textColor = textColor;
@@ -3413,12 +3413,12 @@ function AuditsPageContent() {
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
-        doc.setDrawColor(226, 232, 240);
+        doc.setDrawColor(208, 208, 206);
         doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text("Enshore Subsea | Audit Closed Findings", margin, pageHeight - 6.5);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6.5, { align: "right" });
       }
@@ -3468,11 +3468,11 @@ function AuditsPageContent() {
       doc.text("Custom Audit NCR Report", margin, 18);
 
       doc.setFontSize(16);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text("Custom Audit NCR Report", margin, 34);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(`Generated: ${formatDateTime(new Date().toISOString())}`, pageWidth - margin, 34, { align: "right" });
       doc.text(
         `Selected audits: ${selectedAudits.length} | Finding status: ${customReportFindingStatus} | Category: ${customReportCategoryFilter}`,
@@ -3517,13 +3517,13 @@ function AuditsPageContent() {
         styles: {
           fontSize: 7,
           cellPadding: 1.6,
-          textColor: [15, 23, 42],
-          lineColor: [226, 232, 240],
+          textColor: [0, 0, 0],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
           overflow: "linebreak",
           valign: "top",
         },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
+        alternateRowStyles: { fillColor: [236, 236, 231] },
         columnStyles: {
           0: { cellWidth: 14 },
           1: { cellWidth: 18 },
@@ -3543,11 +3543,11 @@ function AuditsPageContent() {
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
-        doc.setDrawColor(226, 232, 240);
+        doc.setDrawColor(208, 208, 206);
         doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text("Enshore Subsea | Custom Audit Findings", margin, pageHeight - 6.5);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6.5, { align: "right" });
       }
@@ -3612,7 +3612,7 @@ function AuditsPageContent() {
       const document = new WordDocument({
         styles: {
           default: {
-            document: { run: { font: "Calibri", size: 19, color: "0F172A" } },
+            document: { run: { font: "Azo Sans", size: 19, color: "000000" } },
           },
         },
         sections: [
@@ -3663,7 +3663,7 @@ function AuditsPageContent() {
                   wordRun(
                     `${selectedAudits.length} selected audit${selectedAudits.length === 1 ? "" : "s"} | ` +
                       `${customReportRows.length} finding${customReportRows.length === 1 ? "" : "s"}`,
-                    { color: "475569", size: 20 }
+                    { color: "53565A", size: 20 }
                   ),
                 ],
               }),
@@ -3673,7 +3673,7 @@ function AuditsPageContent() {
                   wordRun(
                     `Generated: ${exportDateTime(new Date().toISOString())} | ` +
                       `Finding status: ${customReportFindingStatus} | Category: ${customReportCategoryFilter}`,
-                    { color: "475569", size: 18 }
+                    { color: "53565A", size: 18 }
                   ),
                 ],
               }),
@@ -3729,7 +3729,7 @@ function AuditsPageContent() {
       const document = new WordDocument({
         styles: {
           default: {
-            document: { run: { font: "Calibri", size: 17, color: "0F172A" } },
+            document: { run: { font: "Azo Sans", size: 17, color: "000000" } },
           },
         },
         sections: [
@@ -3746,9 +3746,9 @@ function AuditsPageContent() {
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
                     children: [
-                      wordRun("Enshore Subsea | Audit Programme | Page ", { size: 15, color: "64748B" }),
+                      wordRun("Enshore Subsea | Audit Programme | Page ", { size: 15, color: "53565A" }),
                       new SimpleField("PAGE"),
-                      wordRun(" of ", { size: 15, color: "64748B" }),
+                      wordRun(" of ", { size: 15, color: "53565A" }),
                       new SimpleField("NUMPAGES"),
                     ],
                   }),
@@ -3796,7 +3796,7 @@ function AuditsPageContent() {
                 children: [
                   wordRun(
                     `${selectedAudits.length} selected audit${selectedAudits.length === 1 ? "" : "s"} | Generated ${exportDateTime(new Date().toISOString())}`,
-                    { color: "475569", size: 18 }
+                    { color: "53565A", size: 18 }
                   ),
                 ],
               }),
@@ -3862,11 +3862,11 @@ function AuditsPageContent() {
       doc.setFontSize(10);
       doc.text("Audit Programme Snapshot", margin, 18);
       doc.setFontSize(15);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text("Audit Programme", margin, 34);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(`${selectedAudits.length} selected audits`, margin, 41);
       doc.text(`Generated: ${formatDateTime(new Date().toISOString())}`, pageWidth - margin, 41, { align: "right" });
 
@@ -3906,13 +3906,13 @@ function AuditsPageContent() {
         styles: {
           fontSize: 7.5,
           cellPadding: 2,
-          textColor: [15, 23, 42],
-          lineColor: [226, 232, 240],
+          textColor: [0, 0, 0],
+          lineColor: [208, 208, 206],
           lineWidth: 0.2,
           valign: "middle",
           overflow: "linebreak",
         },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
+        alternateRowStyles: { fillColor: [236, 236, 231] },
         columnStyles: {
           0: { cellWidth: 18 },
           1: { cellWidth: 39 },
@@ -3932,10 +3932,10 @@ function AuditsPageContent() {
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
-        doc.setDrawColor(226, 232, 240);
+        doc.setDrawColor(208, 208, 206);
         doc.line(margin, pageHeight - 11, pageWidth - margin, pageHeight - 11);
         doc.setFontSize(8);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text("Enshore Subsea | Audit Programme", margin, pageHeight - 6);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6, { align: "right" });
       }
@@ -3962,7 +3962,7 @@ function AuditsPageContent() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           ← Back to IMS Home
         </Link>
@@ -3978,7 +3978,7 @@ function AuditsPageContent() {
         </section>
       ) : null}
 
-      <nav style={auditViewNavStyle} aria-label="Audit workspace views">
+      <nav className="ims-tabs" style={auditViewNavStyle} aria-label="Audit workspace views" role="tablist">
         {[
           ["dashboard", "Dashboard"],
           ["programme", "Audit Programme"],
@@ -3989,6 +3989,9 @@ function AuditsPageContent() {
           <button
             key={view}
             type="button"
+            role="tab"
+            aria-selected={activeView === view}
+            data-active={activeView === view ? "true" : "false"}
             style={activeView === view ? activeViewButtonStyle : viewButtonStyle}
             onClick={() => switchAuditWorkspaceView(view as AuditWorkspaceView)}
           >
@@ -4074,7 +4077,7 @@ function AuditsPageContent() {
                           ...findingTypeBarSegmentStyle,
                           width: `${openWidth}%`,
                           minWidth: item.open > 0 ? "36px" : 0,
-                          background: "#f97316",
+                          background: "#FFAD00",
                         }}
                         onClick={() => openFindingStatusByType(item.auditType, "open")}
                         disabled={item.open === 0}
@@ -4102,7 +4105,7 @@ function AuditsPageContent() {
               })}
             </div>
             <div style={findingTypeLegendStyle}>
-              <span><i style={{ ...findingTypeLegendDotStyle, background: "#f97316" }} />Open</span>
+              <span><i style={{ ...findingTypeLegendDotStyle, background: "#FFAD00" }} />Open</span>
               <span><i style={{ ...findingTypeLegendDotStyle, background: "#005670" }} />Closed</span>
             </div>
           </SectionCard>
@@ -4184,7 +4187,7 @@ function AuditsPageContent() {
               </div>
 
               {showFindingsFilters ? (
-                <div style={toolbarFiltersStyle}>
+                <div className="ims-filter-panel" style={toolbarFiltersStyle}>
                   <select
                     value={openFindingTypeFilter}
                     onChange={(e) => setOpenFindingTypeFilter(e.target.value as AuditType | "All")}
@@ -4234,8 +4237,8 @@ function AuditsPageContent() {
                 </div>
               ) : null}
 
-              <div style={openFindingsTableWrapStyle}>
-                <div style={openFindingsHeadStyle}>
+              <div className="ims-register-shell" style={openFindingsTableWrapStyle}>
+                <div className="ims-register-head" style={openFindingsHeadStyle}>
                   <div>Finding Ref</div>
                   <div>Audit Number</div>
                   <div>Audit Title</div>
@@ -4262,12 +4265,15 @@ function AuditsPageContent() {
 
                       return (
                         <button
+                          className="ims-register-row"
+                          aria-pressed={active}
+                          data-selected={active ? "true" : "false"}
                           key={finding.id}
                           type="button"
                           onClick={() => openOpenFindingDetail(finding.id)}
                           style={{
                             ...openFindingsRowStyle,
-                            background: active ? "#eff6ff" : "#ffffff",
+                            background: active ? "#eef7f8" : "#ffffff",
                             borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                           }}
                         >
@@ -4634,7 +4640,7 @@ function AuditsPageContent() {
       {activeView === "programme" ? (
       <section style={tableLayoutStyle}>
         <SectionCard title="Audit Programme" subtitle="Main working view with schedule, findings summary, and risk-based frequency outcome.">
-          <div style={toolbarStyle}>
+          <div className="ims-filter-panel" style={toolbarStyle}>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -4652,7 +4658,7 @@ function AuditsPageContent() {
           </div>
 
           {showProgrammeFilters ? (
-            <div style={toolbarFiltersStyle}>
+            <div className="ims-filter-panel" style={toolbarFiltersStyle}>
               <select
                 value={statusFilter}
                 onChange={(e) => {
@@ -4708,8 +4714,8 @@ function AuditsPageContent() {
             Showing <strong>{filteredAudits.length}</strong> of <strong>{audits.length}</strong> audits
           </div>
 
-          <div ref={programmeSectionRef} tabIndex={-1} style={programmeTableWrapStyle}>
-            <div style={programmeHeadStyle}>
+          <div ref={programmeSectionRef} tabIndex={-1} className="ims-register-shell" style={programmeTableWrapStyle}>
+            <div className="ims-register-head" style={programmeHeadStyle}>
               <div>Audit No.</div>
               <div>Title / Function</div>
               <div>Type</div>
@@ -4736,12 +4742,15 @@ function AuditsPageContent() {
 
                 return (
                   <button
+                    className="ims-register-row"
+                    aria-pressed={active}
+                    data-selected={active ? "true" : "false"}
                     key={audit.id}
                     type="button"
                     onClick={() => selectAuditAndScroll(audit.id)}
                     style={{
                       ...programmeRowStyle,
-                      background: active ? "#eff6ff" : linkedMatch ? "#ECECE7" : "#ffffff",
+                      background: active ? "#eef7f8" : linkedMatch ? "#ECECE7" : "#ffffff",
                       borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                     }}
                   >
@@ -4882,10 +4891,10 @@ function AuditsPageContent() {
               </div>
 
               <div style={miniKpiGridStyle}>
-                <MiniStat label="Major" value={selectedAudit.findings.major} tone="#F93822" bg="#fee2e2" />
-                <MiniStat label="Minor" value={selectedAudit.findings.minor} tone="#92400e" bg="#fef3c7" />
-                <MiniStat label="OFI" value={selectedAudit.findings.ofi} tone="#166534" bg="#dcfce7" />
-                <MiniStat label="OBS" value={selectedAudit.findings.obs} tone="#1d4ed8" bg="#dbeafe" />
+                <MiniStat label="Major" value={selectedAudit.findings.major} tone="#F93822" bg="#ECECE7" />
+                <MiniStat label="Minor" value={selectedAudit.findings.minor} tone="#000000" bg="#ECECE7" />
+                <MiniStat label="OFI" value={selectedAudit.findings.ofi} tone="#005670" bg="#ECECE7" />
+                <MiniStat label="OBS" value={selectedAudit.findings.obs} tone="#005670" bg="#ECECE7" />
               </div>
 
                 <div style={detailSectionStyle}>
@@ -5445,8 +5454,8 @@ function AuditsPageContent() {
                 type="button"
                 style={{
                   ...reportActionCardStyle,
-                  borderColor: showCustomReportBuilder ? "#005670" : "#dbe4ef",
-                  background: showCustomReportBuilder ? "#ECECE7" : "#f8fafc",
+                  borderColor: showCustomReportBuilder ? "#005670" : "#D0D0CE",
+                  background: showCustomReportBuilder ? "#ECECE7" : "#ECECE7",
                 }}
                 onClick={() => setShowCustomReportBuilder((current) => !current)}
               >
@@ -5461,8 +5470,8 @@ function AuditsPageContent() {
                 type="button"
                 style={{
                   ...reportActionCardStyle,
-                  borderColor: showProgrammeSnapshot ? "#005670" : "#dbe4ef",
-                  background: showProgrammeSnapshot ? "#ECECE7" : "#f8fafc",
+                  borderColor: showProgrammeSnapshot ? "#005670" : "#D0D0CE",
+                  background: showProgrammeSnapshot ? "#ECECE7" : "#ECECE7",
                 }}
                 onClick={() => setShowProgrammeSnapshot((current) => !current)}
               >
@@ -5815,7 +5824,7 @@ function AuditsPageContent() {
                           key={audit.id}
                           style={{
                             ...customReportAuditRowStyle,
-                            borderColor: checked ? "#005670" : "#e2e8f0",
+                            borderColor: checked ? "#005670" : "#D0D0CE",
                             background: checked ? "#ECECE7" : "#ffffff",
                           }}
                         >
@@ -5946,10 +5955,10 @@ function HeroPill({
   tone: "green" | "amber" | "red" | "blue" | "neutral";
 }) {
   const tones = {
-    green: { bg: "rgba(220,252,231,0.15)", border: "rgba(220,252,231,0.26)", text: "#dcfce7" },
-    amber: { bg: "rgba(254,243,199,0.15)", border: "rgba(254,243,199,0.28)", text: "#fef3c7" },
-    red: { bg: "rgba(254,226,226,0.15)", border: "rgba(254,226,226,0.28)", text: "#fee2e2" },
-    blue: { bg: "rgba(219,234,254,0.15)", border: "rgba(219,234,254,0.28)", text: "#dbeafe" },
+    green: { bg: "rgba(220,252,231,0.15)", border: "rgba(220,252,231,0.26)", text: "#ECECE7" },
+    amber: { bg: "rgba(254,243,199,0.15)", border: "rgba(254,243,199,0.28)", text: "#ECECE7" },
+    red: { bg: "rgba(254,226,226,0.15)", border: "rgba(254,226,226,0.28)", text: "#ECECE7" },
+    blue: { bg: "rgba(219,234,254,0.15)", border: "rgba(219,234,254,0.28)", text: "#ECECE7" },
     neutral: { bg: "rgba(255,255,255,0.12)", border: "rgba(255,255,255,0.20)", text: "#ffffff" },
   };
 
@@ -6050,9 +6059,9 @@ function SortChip({
       onClick={onClick}
       style={{
         ...sortChipStyle,
-        background: active ? "#005670" : "#f8fafc",
-        color: active ? "#ffffff" : "#334155",
-        borderColor: active ? "#005670" : "#cbd5e1",
+        background: active ? "#005670" : "#ECECE7",
+        color: active ? "#ffffff" : "#53565A",
+        borderColor: active ? "#005670" : "#D0D0CE",
       }}
     >
       {label} {active ? (asc ? "↑" : "↓") : ""}
@@ -6084,7 +6093,7 @@ const editablePillWrapStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   gap: "4px",
-  background: "#dbeafe",
+  background: "#ECECE7",
   borderRadius: "999px",
   paddingRight: "6px",
 };
@@ -6092,7 +6101,7 @@ const editablePillWrapStyle: CSSProperties = {
 const pillRemoveButtonStyle: CSSProperties = {
   background: "transparent",
   border: "none",
-  color: "#1d4ed8",
+  color: "#005670",
   fontWeight: 800,
   cursor: "pointer",
   fontSize: "14px",
@@ -6216,10 +6225,10 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const backLinkStyle: CSSProperties = {
@@ -6232,8 +6241,8 @@ const statusBannerStyle: CSSProperties = {
   background: "white",
   borderRadius: "12px",
   padding: "12px 16px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-  color: "#0f172a",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+  color: "#000000",
 };
 
 const statsGridStyle: CSSProperties = {
@@ -6251,8 +6260,8 @@ const auditViewNavStyle: CSSProperties = {
 };
 
 const viewButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#ECECE7",
+  color: "#000000",
   border: "none",
   padding: "10px 14px",
   borderRadius: "10px",
@@ -6294,14 +6303,14 @@ const findingTypeRowStyle: CSSProperties = {
 const findingTypeLabelStyle: CSSProperties = {
   display: "grid",
   gap: "4px",
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "13px",
 };
 
 const findingTypeBarTrackStyle: CSSProperties = {
   minHeight: "34px",
   borderRadius: "999px",
-  background: "#e2e8f0",
+  background: "#D0D0CE",
   overflow: "hidden",
   display: "flex",
   alignItems: "stretch",
@@ -6324,7 +6333,7 @@ const findingTypeLegendStyle: CSSProperties = {
   gap: "14px",
   flexWrap: "wrap",
   marginTop: "14px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
 };
@@ -6358,30 +6367,30 @@ const openFindingsHeaderMetaStyle: CSSProperties = {
 };
 
 const openFindingsSummaryStyle: CSSProperties = {
-  color: "#475569",
+  color: "#53565A",
   fontSize: "14px",
 };
 
 const openFindingsTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const openFindingsHeadStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1.15fr 1.8fr 0.85fr 2.2fr 1fr 0.9fr 0.95fr 1.4fr 0.95fr",
-  gap: "12px",
-  padding: "14px 16px",
-  background: "#f8fafc",
-  borderBottom: "1px solid #e5e7eb",
-  fontSize: "12px",
+  gap: "8px",
+  padding: "9px 10px",
+  background: "#005670",
+  borderBottom: "1px solid #005670",
+  fontSize: "10px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#ffffff",
   textTransform: "uppercase",
-  letterSpacing: 0.25,
+  letterSpacing: "0.04em",
   alignItems: "center",
 };
 
@@ -6394,11 +6403,11 @@ const openFindingsRowStyle: CSSProperties = {
   textAlign: "left",
   display: "grid",
   gridTemplateColumns: "1fr 1.15fr 1.8fr 0.85fr 2.2fr 1fr 0.9fr 0.95fr 1.4fr 0.95fr",
-  gap: "12px",
-  padding: "14px 16px",
+  gap: "8px",
+  padding: "10px",
   borderTop: "none",
   borderRight: "none",
-  borderBottom: "1px solid #eef2f7",
+  borderBottom: "1px solid #D0D0CE",
   borderLeft: "4px solid transparent",
   cursor: "pointer",
   alignItems: "center",
@@ -6406,26 +6415,32 @@ const openFindingsRowStyle: CSSProperties = {
 
 const openFindingsPrimaryCellStyle: CSSProperties = {
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   overflowWrap: "anywhere",
 };
 
 const openFindingsCellMutedStyle: CSSProperties = {
-  color: "#475569",
-  fontSize: "13px",
+  color: "#53565A",
+  fontSize: "12px",
   overflowWrap: "anywhere",
 };
 
 const openFindingsTitleCellStyle: CSSProperties = {
   fontWeight: 700,
-  color: "#0f172a",
+  color: "#000000",
+  fontSize: "12px",
   overflowWrap: "anywhere",
 };
 
 const openFindingsBodyTextStyle: CSSProperties = {
-  color: "#334155",
-  fontSize: "13px",
+  color: "#53565A",
+  fontSize: "12px",
+  lineHeight: 1.35,
   overflowWrap: "anywhere",
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 2,
+  overflow: "hidden",
 };
 
 const openFindingsActionCellStyle: CSSProperties = {
@@ -6434,26 +6449,27 @@ const openFindingsActionCellStyle: CSSProperties = {
 };
 
 const openFindingsActionPillStyle: CSSProperties = {
-  padding: "6px 10px",
+  padding: "5px 9px",
   borderRadius: "999px",
-  background: "#ede9fe",
-  color: "#6d28d9",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
+  color: "#005670",
   fontWeight: 800,
-  fontSize: "12px",
+  fontSize: "11px",
 };
 
 const openFindingsEmptyStyle: CSSProperties = {
   padding: "18px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const openFindingDetailWrapStyle: CSSProperties = {
   marginTop: "16px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
 
@@ -6465,7 +6481,7 @@ const openFindingDetailHeadStyle: CSSProperties = {
   alignItems: "center",
   paddingBottom: "14px",
   marginBottom: "16px",
-  borderBottom: "1px solid #e2e8f0",
+  borderBottom: "1px solid #D0D0CE",
 };
 
 const topGridStyle: CSSProperties = {
@@ -6496,7 +6512,7 @@ const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
   marginBottom: "20px",
 };
 
@@ -6513,8 +6529,8 @@ const reportActionGridStyle: CSSProperties = {
 };
 
 const reportActionCardStyle: CSSProperties = {
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   borderRadius: "14px",
   padding: "14px",
   cursor: "pointer",
@@ -6527,19 +6543,19 @@ const reportActionCardStyle: CSSProperties = {
 const reportActionLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#475569",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
 
 const reportActionValueStyle: CSSProperties = {
   fontSize: "28px",
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1,
 };
 
 const reportActionHintStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.45,
 };
@@ -6549,7 +6565,7 @@ const customReportBuilderStyle: CSSProperties = {
   gap: "16px",
   marginTop: "18px",
   paddingTop: "18px",
-  borderTop: "1px solid #e2e8f0",
+  borderTop: "1px solid #D0D0CE",
 };
 
 const programmeSnapshotBuilderStyle: CSSProperties = {
@@ -6568,10 +6584,10 @@ const programmeSnapshotTotalsStyle: CSSProperties = {
 
 const programmeSnapshotFrameStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe4ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   background: "#ffffff",
-  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
 };
 
 const programmeSnapshotTitleBarStyle: CSSProperties = {
@@ -6599,9 +6615,9 @@ const programmeSnapshotHeadStyle: CSSProperties = {
   gap: "8px",
   alignItems: "center",
   padding: "9px 14px",
-  background: "#f8fafc",
-  borderBottom: "1px solid #dbe4ef",
-  color: "#475569",
+  background: "#ECECE7",
+  borderBottom: "1px solid #D0D0CE",
+  color: "#53565A",
   fontSize: "10px",
   fontWeight: 800,
   textTransform: "uppercase",
@@ -6614,8 +6630,8 @@ const programmeSnapshotRowStyle: CSSProperties = {
   gap: "8px",
   alignItems: "center",
   padding: "11px 14px",
-  borderBottom: "1px solid #e2e8f0",
-  color: "#0f172a",
+  borderBottom: "1px solid #D0D0CE",
+  color: "#000000",
   fontSize: "12px",
 };
 
@@ -6629,13 +6645,13 @@ const customReportBuilderHeaderStyle: CSSProperties = {
 
 const customReportBuilderTitleStyle: CSSProperties = {
   margin: 0,
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "18px",
 };
 
 const customReportBuilderHintStyle: CSSProperties = {
   margin: "5px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.5,
   maxWidth: "760px",
@@ -6677,7 +6693,7 @@ const customReportAuditRowStyle: CSSProperties = {
   gap: "12px",
   alignItems: "center",
   padding: "12px",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   cursor: "pointer",
 };
@@ -6691,12 +6707,12 @@ const customReportCheckboxStyle: CSSProperties = {
 const customReportAuditIdentityStyle: CSSProperties = {
   display: "grid",
   gap: "2px",
-  color: "#334155",
+  color: "#53565A",
   fontSize: "13px",
 };
 
 const customReportAuditMetaStyle: CSSProperties = {
-  color: "#475569",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 700,
 };
@@ -6705,7 +6721,7 @@ const customReportFindingCountsStyle: CSSProperties = {
   display: "flex",
   gap: "8px",
   justifyContent: "flex-end",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 700,
 };
@@ -6746,23 +6762,23 @@ const fieldWrapStyle: CSSProperties = {
 const fieldLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
-  color: "#334155",
+  color: "#53565A",
 };
 
 const inputStyle: CSSProperties = {
   padding: "11px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
   width: "100%",
   boxSizing: "border-box",
 };
 
 const readOnlyInputStyle: CSSProperties = {
   ...inputStyle,
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontWeight: 700,
 };
 
@@ -6771,11 +6787,11 @@ const textareaStyle: CSSProperties = {
   minHeight: "96px",
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
   resize: "vertical",
-  fontFamily: "Arial, Helvetica, sans-serif",
+  fontFamily: "\"Azo Sans\", \"Segoe UI\", Arial, Helvetica, sans-serif",
   boxSizing: "border-box",
 };
 
@@ -6789,7 +6805,7 @@ const createAuditFooterStyle: CSSProperties = {
 };
 
 const createAuditHintStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
   maxWidth: "620px",
   lineHeight: 1.5,
@@ -6806,8 +6822,8 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   padding: "11px 16px",
   borderRadius: "10px",
@@ -6841,8 +6857,8 @@ const reportLinkButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "#dbeafe",
-  color: "#1d4ed8",
+  background: "#ECECE7",
+  color: "#005670",
   borderRadius: "10px",
   padding: "11px 16px",
   fontWeight: 700,
@@ -6856,7 +6872,7 @@ const chipGridStyle: CSSProperties = {
 };
 
 const chipButtonStyle: CSSProperties = {
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   borderRadius: "999px",
   padding: "9px 12px",
   fontWeight: 700,
@@ -6874,10 +6890,10 @@ const compactProblemRowStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: "12px",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "12px 14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const compactProblemRankStyle: CSSProperties = {
@@ -6899,7 +6915,7 @@ const compactProblemBodyStyle: CSSProperties = {
 };
 
 const compactProblemTitleStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 800,
   fontSize: "14px",
   lineHeight: 1.35,
@@ -6910,7 +6926,7 @@ const compactProblemMetaStyle: CSSProperties = {
   display: "flex",
   gap: "10px",
   flexWrap: "wrap",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
   lineHeight: 1.4,
 };
@@ -6922,10 +6938,10 @@ const toolbarStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 
 const toolbarSearchStyle: CSSProperties = {
@@ -6953,7 +6969,7 @@ const sortChipRowStyle: CSSProperties = {
 };
 
 const sortChipStyle: CSSProperties = {
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   borderRadius: "999px",
   padding: "8px 12px",
   fontWeight: 700,
@@ -6967,7 +6983,7 @@ const programmeInfoStyle: CSSProperties = {
   justifyContent: "flex-start",
   gap: "4px",
   flexWrap: "wrap",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
   margin: "12px 0",
@@ -6975,24 +6991,25 @@ const programmeInfoStyle: CSSProperties = {
 
 const programmeTableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const programmeHeadStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 2.4fr 0.9fr 1.15fr 1fr 1fr 0.6fr 0.6fr 0.8fr 0.85fr 1fr 0.95fr",
-  gap: "12px",
-  padding: "14px 16px",
-  background: "#f8fafc",
-  borderBottom: "1px solid #e5e7eb",
-  fontSize: "12px",
+  gap: "8px",
+  padding: "9px 10px",
+  background: "#005670",
+  borderBottom: "1px solid #005670",
+  fontSize: "10px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#ffffff",
   textTransform: "uppercase",
-  letterSpacing: 0.25,
+  letterSpacing: "0.04em",
+  lineHeight: 1.25,
   alignItems: "center",
 };
 
@@ -7006,18 +7023,18 @@ const programmeRowStyle: CSSProperties = {
   textAlign: "left",
   display: "grid",
   gridTemplateColumns: "1fr 2.4fr 0.9fr 1.15fr 1fr 1fr 0.6fr 0.6fr 0.8fr 0.85fr 1fr 0.95fr",
-  gap: "12px",
-  padding: "14px 16px",
+  gap: "8px",
+  padding: "10px",
   borderTop: "none",
   borderRight: "none",
-  borderBottom: "1px solid #eef2f7",
+  borderBottom: "1px solid #D0D0CE",
   borderLeft: "4px solid transparent",
   cursor: "pointer",
   alignItems: "center",
 };
 
 const programmePrimaryStyle: CSSProperties = {
-  fontSize: "13px",
+  fontSize: "12px",
   fontWeight: 800,
   color: "#005670",
   lineHeight: 1.45,
@@ -7030,9 +7047,9 @@ const programmeTitleCellStyle: CSSProperties = {
 };
 
 const programmeTitleStyle: CSSProperties = {
-  fontSize: "14px",
+  fontSize: "12px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.35,
   whiteSpace: "normal",
   wordBreak: "break-word",
@@ -7040,29 +7057,29 @@ const programmeTitleStyle: CSSProperties = {
 };
 
 const programmeTypeCellStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#0f172a",
+  fontSize: "12px",
+  color: "#000000",
   fontWeight: 700,
   whiteSpace: "nowrap",
 };
 
 const programmeCellMutedStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.35,
 };
 
 const programmeLeadCellStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#0f172a",
+  fontSize: "12px",
+  color: "#000000",
   lineHeight: 1.35,
   minWidth: 0,
   overflowWrap: "anywhere",
 };
 
 const programmeFindingsStyle: CSSProperties = {
-  fontSize: "13px",
-  color: "#0f172a",
+  fontSize: "12px",
+  color: "#000000",
   fontWeight: 700,
   textAlign: "center",
 };
@@ -7070,7 +7087,7 @@ const programmeFindingsStyle: CSSProperties = {
 const programmeRiskCellStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   textAlign: "center",
 };
 
@@ -7100,13 +7117,13 @@ const detailTopActionsStyle: CSSProperties = {
 const detailAuditNumberStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const detailAuditTitleStyle: CSSProperties = {
   margin: "4px 0 0 0",
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const topUploadStripStyle: CSSProperties = {
@@ -7129,14 +7146,14 @@ const topUploadMetaStyle: CSSProperties = {
 const topUploadTitleStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 800,
-  color: "#64748b",
+  color: "#53565A",
   textTransform: "uppercase",
 };
 
 const topUploadFileStyle: CSSProperties = {
   fontSize: "16px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   whiteSpace: "normal",
   wordBreak: "break-word",
   overflowWrap: "anywhere",
@@ -7144,7 +7161,7 @@ const topUploadFileStyle: CSSProperties = {
 
 const topUploadSubStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.45,
 };
 
@@ -7168,8 +7185,8 @@ const auditDocumentRowStyle: CSSProperties = {
   gap: "12px",
   padding: "12px 14px",
   borderRadius: "14px",
-  border: "1px solid #dbe4f0",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
 };
 
 const auditDocumentMetaStyle: CSSProperties = {
@@ -7181,13 +7198,13 @@ const auditDocumentMetaStyle: CSSProperties = {
 const auditDocumentNameStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 700,
-  color: "#0f172a",
+  color: "#000000",
   overflowWrap: "anywhere",
 };
 
 const auditDocumentSubStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   overflowWrap: "anywhere",
 };
 
@@ -7202,9 +7219,9 @@ const auditDocumentActionsStyle: CSSProperties = {
 const auditDocumentEmptyStyle: CSSProperties = {
   padding: "12px 14px",
   borderRadius: "14px",
-  border: "1px dashed #cbd5e1",
-  background: "#f8fafc",
-  color: "#64748b",
+  border: "1px dashed #D0D0CE",
+  background: "#ECECE7",
+  color: "#53565A",
   fontSize: "13px",
 };
 
@@ -7231,11 +7248,11 @@ const miniStatValueStyle: CSSProperties = {
 };
 
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
 
@@ -7271,7 +7288,7 @@ const detailTagsWrapStyle: CSSProperties = {
 };
 
 const detailTagMutedStyle: CSSProperties = {
-  color: "#94a3b8",
+  color: "#D0D0CE",
   fontSize: "13px",
 };
 
@@ -7279,8 +7296,8 @@ const detailTagLinkStyle: CSSProperties = {
   display: "inline-block",
   padding: "6px 10px",
   borderRadius: "999px",
-  background: "#dbeafe",
-  color: "#1d4ed8",
+  background: "#ECECE7",
+  color: "#005670",
   fontSize: "12px",
   fontWeight: 800,
   textDecoration: "none",
@@ -7292,10 +7309,10 @@ const findingListStyle: CSSProperties = {
 };
 
 const findingCardStyle: CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px 16px",
-  background: "#f8fafc",
+  background: "#ECECE7",
 };
 
 const findingHeadStyle: CSSProperties = {
@@ -7322,9 +7339,9 @@ const findingCardActionsStyle: CSSProperties = {
 };
 
 const optionsMenuStyle: CSSProperties = { position: "relative", marginLeft: "auto" };
-const optionsSummaryStyle: CSSProperties = { listStyle: "none", cursor: "pointer", padding: "10px 14px", borderRadius: "10px", border: "1px solid #cbd5e1", background: "#e8eef7", color: "#0f172a", fontSize: "13px", fontWeight: 800, userSelect: "none" };
-const optionsMenuPanelStyle: CSSProperties = { position: "absolute", zIndex: 40, right: 0, bottom: "calc(100% + 8px)", width: "220px", display: "grid", padding: "6px", borderRadius: "12px", border: "1px solid #cbd5e1", background: "#ffffff", boxShadow: "0 16px 35px rgba(15,23,42,.18)" };
-const optionsMenuItemStyle: CSSProperties = { display: "block", width: "100%", boxSizing: "border-box", border: 0, borderRadius: "8px", background: "transparent", padding: "10px 11px", color: "#0f172a", textAlign: "left", font: "inherit", fontSize: "13px", fontWeight: 700, cursor: "pointer" };
+const optionsSummaryStyle: CSSProperties = { listStyle: "none", cursor: "pointer", padding: "10px 14px", borderRadius: "10px", border: "1px solid #D0D0CE", background: "#D0D0CE", color: "#000000", fontSize: "13px", fontWeight: 800, userSelect: "none" };
+const optionsMenuPanelStyle: CSSProperties = { position: "absolute", zIndex: 40, right: 0, bottom: "calc(100% + 8px)", width: "220px", display: "grid", padding: "6px", borderRadius: "12px", border: "1px solid #D0D0CE", background: "#ffffff", boxShadow: "0 16px 35px rgba(15,23,42,.18)" };
+const optionsMenuItemStyle: CSSProperties = { display: "block", width: "100%", boxSizing: "border-box", border: 0, borderRadius: "8px", background: "transparent", padding: "10px 11px", color: "#000000", textAlign: "left", font: "inherit", fontSize: "13px", fontWeight: 700, cursor: "pointer" };
 const importPreviewStyle: CSSProperties = { marginTop: "14px", padding: "16px", borderRadius: "14px", border: "1px solid #D0D0CE", background: "#ECECE7", display: "grid", gap: "14px" };
 const importPreviewHeadStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" };
 const importComparisonStyle: CSSProperties = { display: "grid", gap: "10px" };
@@ -7345,7 +7362,7 @@ const findingEvidenceItemStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: "12px",
   background: "#ffffff",
-  border: "1px solid #dbeafe",
+  border: "1px solid #ECECE7",
 };
 
 const findingEvidenceMetaStyle: CSSProperties = {
@@ -7355,14 +7372,14 @@ const findingEvidenceMetaStyle: CSSProperties = {
 const findingEvidenceNameStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   overflowWrap: "anywhere",
 };
 
 const findingEvidenceSubStyle: CSSProperties = {
   marginTop: "3px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const findingEvidenceButtonRowStyle: CSSProperties = {
@@ -7374,19 +7391,19 @@ const findingEvidenceButtonRowStyle: CSSProperties = {
 };
 
 const findingEvidenceEmptyStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 700,
 };
 
 const findingRefStyle: CSSProperties = {
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "14px",
 };
 
 const findingClauseStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
   marginTop: "4px",
 };
@@ -7401,7 +7418,7 @@ const badgeStyle: CSSProperties = {
 };
 
 const emptyTextStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   margin: 0,
 };
 export default function AuditsPage() {

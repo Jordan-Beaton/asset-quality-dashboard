@@ -200,7 +200,7 @@ function buildPdfMetricTable(
 ) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(0, 0, 0);
   doc.text(title, 14, startY);
 
   autoTable(doc, {
@@ -212,8 +212,8 @@ function buildPdfMetricTable(
     styles: {
       fontSize: 9.2,
       cellPadding: 3,
-      textColor: [15, 23, 42],
-      lineColor: [226, 232, 240],
+      textColor: [0, 0, 0],
+      lineColor: [208, 208, 206],
       lineWidth: 0.2,
     },
     headStyles: {
@@ -225,7 +225,7 @@ function buildPdfMetricTable(
       0: { fontStyle: "bold", cellWidth: 120 },
       1: { halign: "right", cellWidth: 52 },
     },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
+    alternateRowStyles: { fillColor: [236, 236, 231] },
     rowPageBreak: "avoid",
   });
 
@@ -568,13 +568,13 @@ export default function HseReportsPage() {
       }
 
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(20);
       doc.text("Monthly Management Report", pageWidth - margin, 18, { align: "right" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(11);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(monthLabel, pageWidth - margin, 25, { align: "right" });
       doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`, pageWidth - margin, 31, { align: "right" });
 
@@ -585,13 +585,13 @@ export default function HseReportsPage() {
       let y = 45;
       if (summary) {
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
         doc.text("Executive Summary", margin, y);
         y += 5;
 
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(71, 85, 105);
+        doc.setTextColor(83, 86, 90);
         doc.setFontSize(10.2);
         const lines = doc.splitTextToSize(summary, pageWidth - margin * 2);
         doc.text(lines, margin, y);
@@ -648,13 +648,13 @@ export default function HseReportsPage() {
 
         y += 10;
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.setFontSize(12);
         doc.text("Next Month Focus / Planned Activity", margin, y);
         y += 5;
 
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(71, 85, 105);
+        doc.setTextColor(83, 86, 90);
         doc.setFontSize(10.2);
         const lines = doc.splitTextToSize(focus, pageWidth - margin * 2);
         doc.text(lines, margin, y);
@@ -665,7 +665,7 @@ export default function HseReportsPage() {
         doc.setPage(page);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text(`Enshore Subsea | ${monthLabel}`, margin, pageHeight - 8);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8, {
           align: "right",
@@ -760,22 +760,21 @@ export default function HseReportsPage() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           &larr; Back to IMS Home
         </Link>
-
-        <div style={topActionsStyle}>
+        <div style={{ ...statusBannerStyle, marginBottom: 0, borderRadius: "12px", padding: "8px 12px" }}>
+          <strong>Status:</strong> {message}
+        </div>
+      </div>
+      <div className="ims-page-actions">
           <button type="button" style={secondaryButtonStyle}>
             Use /enshore-primary-logo-colour.png
           </button>
           <button type="button" style={pdfButtonStyle} onClick={() => void generatePdfReport()} disabled={isGeneratingPdf}>
             {isGeneratingPdf ? "Generating PDF..." : "Generate Monthly PDF"}
           </button>
-          <div style={{ ...statusBannerStyle, marginBottom: 0, borderRadius: "12px", padding: "12px 16px" }}>
-            <strong>Status:</strong> {message}
-          </div>
-        </div>
       </div>
 
       <section style={twoColumnGridStyle}>
@@ -894,7 +893,7 @@ export default function HseReportsPage() {
           <div style={registerCountStyle}>{filteredReports.length} of {reports.length} reports</div>
         </div>
 
-        <div style={filterPanelStyle}>
+        <div className="ims-filter-panel" style={filterPanelStyle}>
           <div style={filterActionRowStyle}>
             <input
               value={savedReportSearch}
@@ -907,7 +906,7 @@ export default function HseReportsPage() {
             </button>
           </div>
           {showSavedReportFilters ? (
-            <div style={toolbarFiltersStyle}>
+            <div className="ims-filter-panel" style={toolbarFiltersStyle}>
               <select
                 value={savedReportYearFilter}
                 onChange={(event) => setSavedReportYearFilter(event.target.value)}
@@ -990,10 +989,10 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const topActionsStyle: CSSProperties = {
@@ -1008,7 +1007,7 @@ const statusBannerStyle: CSSProperties = {
   borderRadius: "14px",
   padding: "14px 18px",
   marginBottom: "24px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const twoColumnGridStyle: CSSProperties = {
@@ -1022,7 +1021,7 @@ const panelStyle: CSSProperties = {
   background: "white",
   borderRadius: "18px",
   padding: "20px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 
 const sectionHeaderRowStyle: CSSProperties = {
@@ -1037,12 +1036,12 @@ const sectionHeaderRowStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "20px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "14px",
 };
 
@@ -1057,8 +1056,8 @@ const filterPanelStyle: CSSProperties = {
   gap: "12px",
   padding: "14px",
   borderRadius: "16px",
-  border: "1px solid #dbe4ef",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   marginBottom: "14px",
 };
 
@@ -1079,7 +1078,7 @@ const toolbarFiltersStyle: CSSProperties = {
 const fieldLabelStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
 };
@@ -1101,10 +1100,10 @@ const narrativeHeaderRowStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: "10px",
-  border: "1px solid #cbd5e1",
+  border: "1px solid #D0D0CE",
   minWidth: "180px",
   background: "white",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const textareaStyle: CSSProperties = {
@@ -1125,8 +1124,8 @@ const primaryButtonStyle: CSSProperties = {
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  background: "#e2e8f0",
-  color: "#0f172a",
+  background: "#D0D0CE",
+  color: "#000000",
   border: "none",
   padding: "10px 16px",
   borderRadius: "10px",
@@ -1155,9 +1154,9 @@ const periodPreviewStyle: CSSProperties = {
   marginTop: "14px",
   padding: "12px 14px",
   borderRadius: "12px",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  color: "#334155",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
+  color: "#53565A",
 };
 
 const snapshotCardsWrapStyle: CSSProperties = {
@@ -1167,10 +1166,10 @@ const snapshotCardsWrapStyle: CSSProperties = {
 };
 
 const snapshotCardStyle: CSSProperties = {
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   minHeight: "178px",
   boxSizing: "border-box",
 };
@@ -1178,7 +1177,7 @@ const snapshotCardStyle: CSSProperties = {
 const snapshotCardTitleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   marginBottom: "10px",
 };
 
@@ -1195,13 +1194,13 @@ const snapshotRowStyle: CSSProperties = {
 };
 
 const snapshotLabelStyle: CSSProperties = {
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   minWidth: 0,
 };
 
 const snapshotValueStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "14px",
   whiteSpace: "nowrap",
 };
@@ -1209,17 +1208,17 @@ const snapshotValueStyle: CSSProperties = {
 const snapshotNoteStyle: CSSProperties = {
   marginTop: "10px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const registerCountStyle: CSSProperties = {
   fontSize: "13px",
-  color: "#64748b",
+  color: "#53565A",
   fontWeight: 700,
 };
 
 const emptyTextStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   margin: 0,
 };
 
@@ -1234,20 +1233,20 @@ const tableStyle: CSSProperties = {
 const tableHeadStyle: CSSProperties = {
   textAlign: "left",
   padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 900,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
+  borderBottom: "1px solid #D0D0CE",
   whiteSpace: "nowrap",
 };
 
 const tableCellStyle: CSSProperties = {
   padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
+  borderBottom: "1px solid #ECECE7",
+  color: "#000000",
   verticalAlign: "middle",
   fontSize: "13px",
   lineHeight: 1.45,

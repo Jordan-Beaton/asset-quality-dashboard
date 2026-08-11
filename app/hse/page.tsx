@@ -498,7 +498,6 @@ export default function HseDashboardPage() {
                 {availableYears.map((year) => <option key={year} value={year}>{year}</option>)}
               </select>
             </label>
-            <ImsButton onClick={() => void loadDashboard()} disabled={loading}>Refresh</ImsButton>
           </>
         }
         status={<><strong>Status:</strong> {loading ? "Loading..." : message}</>}
@@ -750,7 +749,7 @@ const commandScorePanelStyle: CSSProperties = {
   alignItems: "center",
   gap: "18px",
   color: "#ffffff",
-  background: `linear-gradient(135deg, ${imsColours.brand} 0%, #1f6769 58%, #174b56 100%)`,
+  background: `linear-gradient(135deg, ${imsColours.brand} 0%, #005670 58%, #005670 100%)`,
   boxShadow: imsShadows.hero,
 };
 
@@ -831,7 +830,7 @@ const signalCardStyle: CSSProperties = {
   minHeight: "108px",
   padding: "16px",
   borderRadius: "18px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderTop: "5px solid",
   background: "#ffffff",
   color: imsColours.ink,
@@ -891,8 +890,8 @@ const livePillStyle: CSSProperties = {
   alignItems: "center",
   borderRadius: "999px",
   padding: "6px 10px",
-  background: "#dcfce7",
-  color: "#166534",
+  background: "#ECECE7",
+  color: "#005670",
   fontSize: "12px",
   fontWeight: 950,
 };
@@ -911,7 +910,7 @@ const yearFilterStyle: CSSProperties = {
   padding: "0 10px",
   borderRadius: "10px",
   background: "#ffffff",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   color: imsColours.ink,
   fontWeight: 900,
 };
@@ -980,9 +979,9 @@ const chartPlaceholderStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   color: imsColours.slate,
-  background: "#f8fafc",
+  background: "#ECECE7",
   borderRadius: "14px",
-  border: "1px dashed #dbe3ef",
+  border: "1px dashed #D0D0CE",
   fontWeight: 800,
 };
 
@@ -998,16 +997,16 @@ const focusItemStyle: CSSProperties = {
   gap: "12px",
   padding: "12px",
   borderRadius: "14px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   color: imsColours.ink,
   textDecoration: "none",
 };
 
 const emptyStateStyle: CSSProperties = {
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   borderRadius: "14px",
   padding: "16px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   color: imsColours.slate,
 };

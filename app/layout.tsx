@@ -18,9 +18,9 @@ export default function RootLayout({
         suppressHydrationWarning
         style={{
           margin: 0,
-          fontFamily: "Arial, sans-serif",
-          background: "#eef2f5",
-          color: "#0f172a",
+          fontFamily: "\"Azo Sans\", \"Segoe UI\", Arial, Helvetica, sans-serif",
+          background: "#ECECE7",
+          color: "#000000",
         }}
       >
         <AppShell>{children}</AppShell>

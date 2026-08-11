@@ -75,7 +75,7 @@ const brandBarStyle: CSSProperties = {
 
 const summaryCardStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "18px",
   display: "grid",
@@ -96,12 +96,12 @@ const titleStyle: CSSProperties = {
   fontSize: "28px",
   lineHeight: 1.15,
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const introStyle: CSSProperties = {
   margin: 0,
-  color: "#475569",
+  color: "#53565A",
   fontSize: "14px",
   lineHeight: 1.45,
 };
@@ -113,13 +113,13 @@ const templateListStyle: CSSProperties = {
 
 const templateCardStyle: CSSProperties = {
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "16px",
   display: "grid",
   gap: "8px",
   textDecoration: "none",
-  color: "#0f172a",
+  color: "#000000",
   boxShadow: "0 10px 22px rgba(15, 23, 42, 0.05)",
 };
 
@@ -132,8 +132,8 @@ const docNumberStyle: CSSProperties = {
 
 const readyPillStyle: CSSProperties = {
   width: "fit-content",
-  background: "#dcfce7",
-  color: "#166534",
+  background: "#ECECE7",
+  color: "#005670",
   borderRadius: "999px",
   padding: "6px 10px",
   fontWeight: 800,
@@ -142,8 +142,8 @@ const readyPillStyle: CSSProperties = {
 
 const queuedPillStyle: CSSProperties = {
   width: "fit-content",
-  background: "#e2e8f0",
-  color: "#475569",
+  background: "#D0D0CE",
+  color: "#53565A",
   borderRadius: "999px",
   padding: "6px 10px",
   fontWeight: 800,

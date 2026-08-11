@@ -16,9 +16,9 @@ const tabs: Array<{ view: WaddenSeaView; href: string; label: string }> = [
 
 export function WaddenSeaWorkspaceNav({ active }: { active: WaddenSeaView }) {
   return (
-    <nav style={nav} aria-label="Wadden Sea workspace">
+    <nav className="ims-tabs" style={nav} aria-label="Wadden Sea workspace" role="tablist">
       {tabs.map((tab) => (
-        <Link key={tab.view} href={tab.href} style={tab.view === active ? activeTab : tabStyle}>
+        <Link key={tab.view} href={tab.href} role="tab" aria-selected={tab.view === active} data-active={tab.view === active ? "true" : "false"} style={tab.view === active ? activeTab : tabStyle}>
           {tab.label}
         </Link>
       ))}

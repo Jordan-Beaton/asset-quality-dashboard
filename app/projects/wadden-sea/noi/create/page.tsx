@@ -293,7 +293,7 @@ export default function NoiCreatorPage() {
         <div style={pointList}>{supplierPoints.map((point) => {
           const itp = itpById.get(point.itp_id);
           const checked = selectedIds.includes(point.id);
-          return <label key={point.id} style={{ ...pointRow, borderColor: checked ? "#005670" : "#dbe4ef", background: checked ? "#ECECE7" : "#fff" }}><input type="checkbox" checked={checked} onChange={() => toggle(point)} /><span style={pointIdentity}><strong>{point.section_number} · {point.activity_description}</strong><small>{itp?.document_number} · {point.planned_date ? displayDate(point.planned_date) : "Date TBC"}</small></span><span style={codeBadge}>{point.intervention_type}</span><span style={statusBadge}>{point.noi_number ? `NOI ${point.noi_number}` : point.status}</span></label>;
+          return <label key={point.id} style={{ ...pointRow, borderColor: checked ? "#005670" : "#D0D0CE", background: checked ? "#ECECE7" : "#fff" }}><input type="checkbox" checked={checked} onChange={() => toggle(point)} /><span style={pointIdentity}><strong>{point.section_number} · {point.activity_description}</strong><small>{itp?.document_number} · {point.planned_date ? displayDate(point.planned_date) : "Date TBC"}</small></span><span style={codeBadge}>{point.intervention_type}</span><span style={statusBadge}>{point.noi_number ? `NOI ${point.noi_number}` : point.status}</span></label>;
         })}{supplier && !supplierPoints.length ? <div style={empty}>No NOI requirements are registered for this supplier.</div> : null}</div>
       </section>
 
@@ -321,27 +321,27 @@ function Field({ label, children, wide }: { label: string; children: React.React
 
 const page: CSSProperties = { display: "grid", gap: 18 };
 const metrics: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 16 };
-const panel: CSSProperties = { background: "#fff", border: "1px solid #dbe4ef", borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,.07)" };
-const panelHeader: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "16px 18px", borderBottom: "1px solid #e5ebf1" };
+const panel: CSSProperties = { background: "#fff", border: "1px solid #D0D0CE", borderRadius: 18, overflow: "hidden", boxShadow: "0 1px 3px rgba(15,23,42,.07)" };
+const panelHeader: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "16px 18px", borderBottom: "1px solid #D0D0CE" };
 const kicker: CSSProperties = { color: "#005670", fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".1em" };
-const heading: CSSProperties = { margin: "3px 0 0", color: "#14263a", fontSize: 20 };
+const heading: CSSProperties = { margin: "3px 0 0", color: "#53565A", fontSize: 20 };
 const supplierBar: CSSProperties = { padding: "14px 18px", maxWidth: 420 };
-const field: CSSProperties = { display: "grid", gap: 6, color: "#475569", fontSize: 12, fontWeight: 800 };
-const input: CSSProperties = { width: "100%", minWidth: 0, boxSizing: "border-box", border: "1px solid #cbd5e1", borderRadius: 10, padding: "10px 12px", background: "#fff", color: "#0f172a", font: "inherit" };
+const field: CSSProperties = { display: "grid", gap: 6, color: "#53565A", fontSize: 12, fontWeight: 800 };
+const input: CSSProperties = { width: "100%", minWidth: 0, boxSizing: "border-box", border: "1px solid #D0D0CE", borderRadius: 10, padding: "10px 12px", background: "#fff", color: "#000000", font: "inherit" };
 const pointList: CSSProperties = { display: "grid", gap: 8, padding: "0 18px 18px", maxHeight: 460, overflowY: "auto" };
-const pointRow: CSSProperties = { display: "grid", gridTemplateColumns: "22px minmax(280px,1fr) 70px 110px", gap: 10, alignItems: "center", padding: 11, border: "1px solid #dbe4ef", borderRadius: 11, cursor: "pointer" };
-const pointIdentity: CSSProperties = { display: "grid", gap: 3, color: "#334155", fontSize: 12 };
-const codeBadge: CSSProperties = { padding: "5px 8px", borderRadius: 999, background: "#fef3c7", color: "#92400e", textAlign: "center", fontWeight: 900, fontSize: 11 };
+const pointRow: CSSProperties = { display: "grid", gridTemplateColumns: "22px minmax(280px,1fr) 70px 110px", gap: 10, alignItems: "center", padding: 11, border: "1px solid #D0D0CE", borderRadius: 11, cursor: "pointer" };
+const pointIdentity: CSSProperties = { display: "grid", gap: 3, color: "#53565A", fontSize: 12 };
+const codeBadge: CSSProperties = { padding: "5px 8px", borderRadius: 999, background: "#ECECE7", color: "#000000", textAlign: "center", fontWeight: 900, fontSize: 11 };
 const statusBadge: CSSProperties = { ...codeBadge, background: "#ECECE7", color: "#005670" };
-const empty: CSSProperties = { padding: 28, textAlign: "center", color: "#64748b" };
+const empty: CSSProperties = { padding: 28, textAlign: "center", color: "#53565A" };
 const formGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12, padding: 18 };
 const numberPill: CSSProperties = { padding: "7px 11px", borderRadius: 999, background: "#ECECE7", color: "#005670", fontWeight: 900 };
 const attendeeHeader: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "0 18px 10px" };
 const attendeeTitle: CSSProperties = { display: "grid", gap: 5 };
-const attendeeHint: CSSProperties = { color: "#475569", fontSize: 13, fontWeight: 700 };
+const attendeeHint: CSSProperties = { color: "#53565A", fontSize: 13, fontWeight: 700 };
 const attendeeList: CSSProperties = { display: "grid", gap: 8, padding: "0 18px 18px" };
 const attendeeRow: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 8 };
-const actions: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap", padding: 16, borderTop: "1px solid #e5ebf1" };
+const actions: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap", padding: 16, borderTop: "1px solid #D0D0CE" };
 const primaryButton: CSSProperties = { border: 0, borderRadius: 10, padding: "12px 17px", background: "#005670", color: "#fff", fontWeight: 900, cursor: "pointer" };
-const secondaryButton: CSSProperties = { ...primaryButton, padding: "8px 12px", background: "#e2e8f0", color: "#0f172a" };
-const deleteNoiButton: CSSProperties = { ...secondaryButton, background: "#fff1f2", color: "#b42318", border: "1px solid #fecaca" };
+const secondaryButton: CSSProperties = { ...primaryButton, padding: "8px 12px", background: "#D0D0CE", color: "#000000" };
+const deleteNoiButton: CSSProperties = { ...secondaryButton, background: "#ECECE7", color: "#F93822", border: "1px solid #ECECE7" };

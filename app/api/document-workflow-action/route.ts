@@ -111,7 +111,7 @@ function buildHtml({
   const title = buildSubject(eventType, document.document_number);
 
   return `
-    <div style="font-family: Arial, Helvetica, sans-serif; color: #0f172a; line-height: 1.5;">
+    <div style="font-family: 'Azo Sans', 'Segoe UI', Arial, Helvetica, sans-serif; color: #000000; line-height: 1.5;">
       <h2 style="margin-bottom: 12px;">${escapeHtml(title)}</h2>
       <p><strong>Document:</strong> ${escapeHtml(document.document_number || "-")}</p>
       <p><strong>Title:</strong> ${escapeHtml(document.title || "-")}</p>
@@ -121,9 +121,9 @@ function buildHtml({
         controlledFile
           ? `<p><strong>Controlled File:</strong> ${escapeHtml(controlledFile.fileName)}</p>
              <p>
-               <a href="${escapeHtml(controlledFile.url)}" style="display: inline-block; background: #e2e8f0; color: #0f172a; text-decoration: none; border-radius: 10px; padding: 10px 14px; font-weight: 700;">Open Controlled File</a>
+               <a href="${escapeHtml(controlledFile.url)}" style="display: inline-block; background: #D0D0CE; color: #000000; text-decoration: none; border-radius: 10px; padding: 10px 14px; font-weight: 700;">Open Controlled File</a>
              </p>
-             <p style="font-size: 12px; color: #64748b;">File links are secure signed URLs and may expire.</p>`
+             <p style="font-size: 12px; color: #53565A;">File links are secure signed URLs and may expire.</p>`
           : ""
       }
       ${
@@ -136,7 +136,7 @@ function buildHtml({
                 })
                 .join("")}
             </div>
-            <p style="font-size: 12px; color: #64748b;">These links open a secure confirmation page before the workflow is updated.</p>`
+            <p style="font-size: 12px; color: #53565A;">These links open a secure confirmation page before the workflow is updated.</p>`
           : ""
       }
       <br/>

@@ -220,17 +220,17 @@ function getStatusRank(status: DueStatus) {
 }
 
 function getDueTone(status: DueStatus) {
-  if (status === "Overdue") return { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
-  if (status === "Due Soon") return { bg: "#fef3c7", text: "#92400e", border: "#fde68a" };
-  if (status === "In Date") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
-  return { bg: "#e2e8f0", text: "#334155", border: "#cbd5e1" };
+  if (status === "Overdue") return { bg: "#ECECE7", text: "#F93822", border: "#ECECE7" };
+  if (status === "Due Soon") return { bg: "#ECECE7", text: "#000000", border: "#ECECE7" };
+  if (status === "In Date") return { bg: "#ECECE7", text: "#005670", border: "#ECECE7" };
+  return { bg: "#D0D0CE", text: "#53565A", border: "#D0D0CE" };
 }
 
 function getBoardTypeTone(type: AttentionBoardItem["type"]) {
-  if (type === "Calibration") return { bg: "#dcfce7", text: "#166534", border: "#bbf7d0" };
-  if (type === "Inspection") return { bg: "#fef3c7", text: "#92400e", border: "#fde68a" };
-  if (type === "Maintenance") return { bg: "#ede9fe", text: "#6d28d9", border: "#ddd6fe" };
-  return { bg: "#fee2e2", text: "#F93822", border: "#fecaca" };
+  if (type === "Calibration") return { bg: "#ECECE7", text: "#005670", border: "#ECECE7" };
+  if (type === "Inspection") return { bg: "#ECECE7", text: "#000000", border: "#ECECE7" };
+  if (type === "Maintenance") return { bg: "#ECECE7", text: "#53565A", border: "#ECECE7" };
+  return { bg: "#ECECE7", text: "#F93822", border: "#ECECE7" };
 }
 
 function buildAssetLabel(asset: Asset | null) {
@@ -601,7 +601,7 @@ function DashboardContent() {
 
   const assetStatusData = buildTopBuckets(assets, (asset) => asset.status, "Status not set", 6).map((item, index) => ({
     ...item,
-    colour: ["#005670", "#63B1BC", "#FFAD00", "#53565A", "#64748b", "#F93822"][index] || "#64748b",
+    colour: ["#005670", "#63B1BC", "#FFAD00", "#53565A", "#53565A", "#F93822"][index] || "#53565A",
     href: `/assets?status=${encodeURIComponent(item.label)}`,
   }));
 
@@ -753,7 +753,6 @@ function DashboardContent() {
       <ImsTopMetaRow
         backHref="/assets"
         backLabel="Open Asset Register"
-        actions={<ImsButton onClick={() => void loadDashboardData()}>Refresh</ImsButton>}
         status={
           <>
             <strong>Status:</strong> {message}
@@ -772,8 +771,8 @@ function DashboardContent() {
           </div>
           <div className="asset-mini-grid" style={miniGridStyle}>
             <MiniMetric label="Assets" value={assets.length} />
-            <MiniMetric label="Due Risk" value={dueWatchCount} tone={dueWatchCount ? "#fecaca" : "#bbf7d0"} />
-            <MiniMetric label="Actions" value={openAssetActions.length} tone="#fde68a" />
+            <MiniMetric label="Due Risk" value={dueWatchCount} tone={dueWatchCount ? "#ECECE7" : "#ECECE7"} />
+            <MiniMetric label="Actions" value={openAssetActions.length} tone="#ECECE7" />
             <MiniMetric label="Files" value={fileCoveragePercent} suffix="%" />
           </div>
           <Link
@@ -1292,7 +1291,7 @@ const commandEyebrowStyle: CSSProperties = {
   fontWeight: 900,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#d7f4f1",
+  color: "#ECECE7",
 };
 
 const commandTitleStyle: CSSProperties = {
@@ -1365,7 +1364,7 @@ const miniMetricLabelStyle: CSSProperties = {
   fontWeight: 900,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
-  color: "#d7f4f1",
+  color: "#ECECE7",
 };
 
 const miniMetricValueStyle: CSSProperties = {
@@ -1387,7 +1386,7 @@ const pressurePanelStyle: CSSProperties = {
   borderRadius: "18px",
   padding: "16px",
   color: "#ffffff",
-  background: "linear-gradient(135deg, #10202f 0%, #1f6f70 100%)",
+  background: "linear-gradient(135deg, #53565A 0%, #005670 100%)",
   boxShadow: "0 22px 42px rgba(15, 23, 42, 0.16)",
   display: "grid",
   gap: "10px",
@@ -1418,7 +1417,7 @@ const livePillStyle: CSSProperties = {
   padding: "6px 9px",
   background: "rgba(220,252,231,0.14)",
   border: "1px solid rgba(187,247,208,0.28)",
-  color: "#dcfce7",
+  color: "#ECECE7",
   fontSize: "11px",
   fontWeight: 900,
   textTransform: "uppercase",
@@ -1475,11 +1474,11 @@ const healthGridStyle: CSSProperties = {
 
 const healthCardStyle: CSSProperties = {
   textDecoration: "none",
-  color: "#0f172a",
+  color: "#000000",
   background: "#ffffff",
   borderRadius: "14px",
   padding: "12px",
-  border: "1px solid #e2e8f0",
+  border: "1px solid #D0D0CE",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
   display: "grid",
   gap: "10px",
@@ -1488,13 +1487,13 @@ const healthCardStyle: CSSProperties = {
 const healthLabelStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 900,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const healthHintStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.35,
 };
 
@@ -1508,7 +1507,7 @@ const healthGaugeStyle: CSSProperties = {
 const healthGaugeTrackStyle: CSSProperties = {
   height: "10px",
   borderRadius: "999px",
-  background: "#e2e8f0",
+  background: "#D0D0CE",
   overflow: "hidden",
 };
 
@@ -1533,10 +1532,10 @@ const metricGridStyle: CSSProperties = {
 };
 
 const controlMetricStyle: CSSProperties = {
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderTop: "4px solid #005670",
   borderRadius: "12px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   padding: "10px",
 };
 
@@ -1546,7 +1545,7 @@ const controlMetricTitleStyle: CSSProperties = {
   fontWeight: 900,
   letterSpacing: "0.05em",
   textTransform: "uppercase",
-  color: "#475569",
+  color: "#53565A",
 };
 
 const controlMetricValueStyle: CSSProperties = {
@@ -1554,14 +1553,14 @@ const controlMetricValueStyle: CSSProperties = {
   marginTop: "6px",
   fontSize: "22px",
   lineHeight: 1,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const controlMetricDetailStyle: CSSProperties = {
   display: "block",
   marginTop: "6px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const panelGridStyle: CSSProperties = {
@@ -1575,7 +1574,7 @@ const panelGridStyle: CSSProperties = {
 const panelStyle: CSSProperties = {
   background: "#ffffff",
   borderRadius: "14px",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
   padding: "16px",
   height: "100%",
@@ -1595,8 +1594,8 @@ const barLinkStyle: CSSProperties = {
 
 const barRowStyle: CSSProperties = {
   borderRadius: "12px",
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   padding: "9px 10px",
 };
 
@@ -1611,18 +1610,18 @@ const barRowHeaderStyle: CSSProperties = {
 const barLabelStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 900,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const barValueStyle: CSSProperties = {
   fontSize: "14px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const barTrackStyle: CSSProperties = {
   height: "8px",
   borderRadius: "999px",
-  background: "#e2e8f0",
+  background: "#D0D0CE",
   overflow: "hidden",
 };
 
@@ -1635,7 +1634,7 @@ const barDetailStyle: CSSProperties = {
   display: "block",
   marginTop: "5px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const donutStyle: CSSProperties = {
@@ -1657,7 +1656,7 @@ const donutInnerStyle: CSSProperties = {
   placeItems: "center",
   alignContent: "center",
   textAlign: "center",
-  color: "#0f172a",
+  color: "#000000",
   boxShadow: "0 6px 18px rgba(15,23,42,0.08)",
 };
 
@@ -1677,8 +1676,8 @@ const statusSplitLayoutStyle: CSSProperties = {
 
 const statusHeroStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "linear-gradient(180deg, #f8fafc 0%, #ECECE7 100%)",
-  border: "1px solid #dbe7f3",
+  background: "linear-gradient(180deg, #ECECE7 0%, #ECECE7 100%)",
+  border: "1px solid #D0D0CE",
   padding: "16px",
   display: "grid",
   justifyItems: "center",
@@ -1698,18 +1697,18 @@ const statusHeroLabelStyle: CSSProperties = {
   fontWeight: 900,
   letterSpacing: "0.06em",
   textTransform: "uppercase",
-  color: "#64748b",
+  color: "#53565A",
 };
 
 const statusHeroValueStyle: CSSProperties = {
   fontSize: "18px",
   lineHeight: 1.15,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const statusHeroDetailStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#475569",
+  color: "#53565A",
 };
 
 const statusBarGridStyle: CSSProperties = {
@@ -1720,8 +1719,8 @@ const statusBarGridStyle: CSSProperties = {
 
 const statusBarRowStyle: CSSProperties = {
   borderRadius: "12px",
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   padding: "12px",
   display: "grid",
   alignContent: "center",
@@ -1740,21 +1739,21 @@ const statusBarLabelStyle: CSSProperties = {
   alignItems: "center",
   gap: "8px",
   minWidth: 0,
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "12px",
   fontWeight: 900,
   lineHeight: 1.25,
 };
 
 const statusBarValueStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "16px",
 };
 
 const statusBarDetailStyle: CSSProperties = {
   display: "block",
   marginTop: "7px",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
 };
 
@@ -1768,10 +1767,10 @@ const attentionLinkItemStyle: CSSProperties = {
   display: "grid",
   gap: "5px",
   borderRadius: "12px",
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   padding: "10px 12px",
-  color: "#0f172a",
+  color: "#000000",
   textDecoration: "none",
 };
 
@@ -1784,14 +1783,14 @@ const attentionLinkTopStyle: CSSProperties = {
 
 const attentionDateStyle: CSSProperties = {
   fontSize: "12px",
-  color: "#334155",
+  color: "#53565A",
 };
 
 const attentionMetaRowStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(120px, 0.8fr) minmax(0, 1.2fr)",
   gap: "10px",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
   lineHeight: 1.35,
 };
@@ -1808,12 +1807,12 @@ const sectionHeaderRowStyle: CSSProperties = {
 const sectionTitleStyle: CSSProperties = {
   margin: 0,
   fontSize: "18px",
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const sectionSubtitleStyle: CSSProperties = {
   margin: "6px 0 0",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "13px",
   lineHeight: 1.4,
 };
@@ -1837,21 +1836,21 @@ const listItemStyle: CSSProperties = {
   alignItems: "flex-start",
   padding: "10px 12px",
   borderRadius: "12px",
-  border: "1px solid #e2e8f0",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
 };
 
 const itemTitleStyle: CSSProperties = {
   fontSize: "14px",
   fontWeight: 800,
-  color: "#0f172a",
+  color: "#000000",
   lineHeight: 1.4,
 };
 
 const itemMetaStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "12px",
-  color: "#64748b",
+  color: "#53565A",
   lineHeight: 1.5,
 };
 
@@ -1874,9 +1873,9 @@ const activityBadgeStyle: CSSProperties = {
 
 const emptyStateStyle: CSSProperties = {
   borderRadius: "12px",
-  border: "1px dashed #cbd5e1",
-  background: "#f8fafc",
-  color: "#64748b",
+  border: "1px dashed #D0D0CE",
+  background: "#ECECE7",
+  color: "#53565A",
   padding: "12px",
   fontSize: "13px",
 };

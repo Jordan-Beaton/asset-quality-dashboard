@@ -516,12 +516,12 @@ export default function ManagementReviewPage() {
       }
 
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.setFontSize(20);
       doc.text("Management Review Pack", pageWidth - margin, 17, { align: "right" });
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 24, { align: "right" });
       doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
@@ -532,9 +532,9 @@ export default function ManagementReviewPage() {
         head: [["Executive Signal", "Value", "CEO Note"]],
         body: executiveSignals.map((item) => [item.label, item.value, item.detail]),
         theme: "grid",
-        styles: { fontSize: 8.5, cellPadding: 2.4, lineColor: [226, 232, 240], valign: "middle" },
+        styles: { fontSize: 8.5, cellPadding: 2.4, lineColor: [208, 208, 206], valign: "middle" },
         headStyles: { fillColor: [0, 86, 112], textColor: 255, fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
+        alternateRowStyles: { fillColor: [236, 236, 231] },
         columnStyles: {
           0: { cellWidth: 56, fontStyle: "bold" },
           1: { cellWidth: 28, halign: "center" },
@@ -550,16 +550,16 @@ export default function ManagementReviewPage() {
         }
         doc.setFont("helvetica", "bold");
         doc.setFontSize(11);
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         doc.text(title, margin, startY);
         autoTable(doc, {
           startY: startY + 3,
           head: [["Metric", "Value", "Management Interpretation"]],
           body: rows.map(([metric, value, note]) => [metric, displayPdfValue(value), note]),
           theme: "grid",
-          styles: { fontSize: 8, cellPadding: 2.2, lineColor: [226, 232, 240], valign: "middle" },
-          headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: "bold" },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
+          styles: { fontSize: 8, cellPadding: 2.2, lineColor: [208, 208, 206], valign: "middle" },
+          headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [236, 236, 231] },
           columnStyles: {
             0: { cellWidth: 58, fontStyle: "bold" },
             1: { cellWidth: 24, halign: "center" },
@@ -599,11 +599,11 @@ export default function ManagementReviewPage() {
       const pageCount = doc.getNumberOfPages();
       for (let page = 1; page <= pageCount; page += 1) {
         doc.setPage(page);
-        doc.setDrawColor(226, 232, 240);
+        doc.setDrawColor(208, 208, 206);
         doc.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(83, 86, 90);
         doc.text("Enshore Subsea | Management Review Pack", margin, pageHeight - 6);
         doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6, { align: "right" });
       }
@@ -631,25 +631,25 @@ export default function ManagementReviewPage() {
       };
 
       const addTitle = (slide: ReturnType<typeof pptx.addSlide>, title: string, subtitle?: string) => {
-        slide.background = { color: "F8FAFC" };
+        slide.background = { color: "ECECE7" };
         slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.333, h: 0.16, fill: { color: "005670" }, line: { color: "005670" } });
-        slide.addText(title, { x: 0.55, y: 0.45, w: 8.7, h: 0.38, fontFace: "Calibri", fontSize: 23, bold: true, color: "0F172A", margin: 0 });
+        slide.addText(title, { x: 0.55, y: 0.45, w: 8.7, h: 0.38, fontFace: "Calibri", fontSize: 23, bold: true, color: "000000", margin: 0 });
         if (subtitle) {
-          slide.addText(subtitle, { x: 0.55, y: 0.86, w: 9.8, h: 0.26, fontFace: "Calibri", fontSize: 10.5, color: "475569", margin: 0 });
+          slide.addText(subtitle, { x: 0.55, y: 0.86, w: 9.8, h: 0.26, fontFace: "Calibri", fontSize: 10.5, color: "53565A", margin: 0 });
         }
         slide.addText("ENSHORE IMS", { x: 10.7, y: 0.48, w: 1.9, h: 0.25, fontFace: "Calibri", fontSize: 10, bold: true, color: "005670", align: "right", margin: 0 });
-        slide.addText(lastRefreshed || new Date().toLocaleString("en-GB"), { x: 10.4, y: 0.78, w: 2.2, h: 0.24, fontFace: "Calibri", fontSize: 8.5, color: "64748B", align: "right", margin: 0 });
+        slide.addText(lastRefreshed || new Date().toLocaleString("en-GB"), { x: 10.4, y: 0.78, w: 2.2, h: 0.24, fontFace: "Calibri", fontSize: 8.5, color: "53565A", align: "right", margin: 0 });
       };
 
       const addMetricCard = (slide: ReturnType<typeof pptx.addSlide>, x: number, y: number, label: string, value: string, colour: string) => {
         slide.addShape(pptx.ShapeType.roundRect, { x, y, w: 2.9, h: 1.05, rectRadius: 0.08, fill: { color: "FFFFFF" }, line: { color: "DBE7F3" } });
         slide.addShape(pptx.ShapeType.rect, { x, y, w: 2.9, h: 0.08, fill: { color: colour }, line: { color: colour } });
-        slide.addText(label, { x: x + 0.15, y: y + 0.17, w: 2.5, h: 0.22, fontFace: "Calibri", fontSize: 8.5, bold: true, color: "475569", margin: 0 });
-        slide.addText(value, { x: x + 0.15, y: y + 0.48, w: 2.5, h: 0.4, fontFace: "Calibri", fontSize: 21, bold: true, color: "0F172A", margin: 0 });
+        slide.addText(label, { x: x + 0.15, y: y + 0.17, w: 2.5, h: 0.22, fontFace: "Calibri", fontSize: 8.5, bold: true, color: "53565A", margin: 0 });
+        slide.addText(value, { x: x + 0.15, y: y + 0.48, w: 2.5, h: 0.4, fontFace: "Calibri", fontSize: 21, bold: true, color: "000000", margin: 0 });
       };
 
       const titleSlide = pptx.addSlide();
-      titleSlide.background = { color: "F8FAFC" };
+      titleSlide.background = { color: "ECECE7" };
       titleSlide.addShape(pptx.ShapeType.roundRect, { x: 0.5, y: 0.55, w: 12.35, h: 5.75, rectRadius: 0.16, fill: { color: "005670" }, line: { color: "005670" } });
       titleSlide.addText("MANAGEMENT REVIEW", { x: 0.95, y: 1.05, w: 4.6, h: 0.28, fontFace: "Calibri", fontSize: 11, bold: true, color: "D0D0CE", margin: 0 });
       titleSlide.addText("CEO Business Health Pack", { x: 0.95, y: 1.48, w: 6.7, h: 0.55, fontFace: "Calibri", fontSize: 30, bold: true, color: "FFFFFF", margin: 0 });
@@ -664,11 +664,11 @@ export default function ManagementReviewPage() {
       executiveSignals.forEach((item, index) => {
         addMetricCard(execSlide, 0.6 + (index % 4) * 3.05, 1.35, item.label, String(item.value), item.tone.replace("#", ""));
       });
-      execSlide.addText("Management Focus", { x: 0.6, y: 2.75, w: 3.5, h: 0.3, fontSize: 16, bold: true, color: "0F172A", margin: 0 });
+      execSlide.addText("Management Focus", { x: 0.6, y: 2.75, w: 3.5, h: 0.3, fontSize: 16, bold: true, color: "000000", margin: 0 });
       managementFocus.forEach((item, index) => {
         const y = 3.18 + index * 0.46;
-        execSlide.addShape(pptx.ShapeType.roundRect, { x: 0.6, y, w: 11.9, h: 0.34, rectRadius: 0.05, fill: { color: index % 2 ? "FFFFFF" : "F1F5F9" }, line: { color: "E2E8F0" } });
-        execSlide.addText(item.label, { x: 0.82, y: y + 0.08, w: 4.2, h: 0.16, fontSize: 9.5, bold: true, color: "0F172A", margin: 0 });
+        execSlide.addShape(pptx.ShapeType.roundRect, { x: 0.6, y, w: 11.9, h: 0.34, rectRadius: 0.05, fill: { color: index % 2 ? "FFFFFF" : "ECECE7" }, line: { color: "D0D0CE" } });
+        execSlide.addText(item.label, { x: 0.82, y: y + 0.08, w: 4.2, h: 0.16, fontSize: 9.5, bold: true, color: "000000", margin: 0 });
         execSlide.addText(displayPdfValue(item.value), { x: 10.8, y: y + 0.08, w: 1.2, h: 0.16, fontSize: 9.5, bold: true, color: item.tone.replace("#", ""), align: "right", margin: 0 });
       });
 
@@ -705,17 +705,17 @@ export default function ManagementReviewPage() {
         "Use the live IMS module links for drill-down rather than editing source data from this pack.",
       ].forEach((text, index) => {
         closeSlide.addShape(pptx.ShapeType.roundRect, { x: 0.75, y: 1.35 + index * 0.8, w: 11.7, h: 0.52, rectRadius: 0.06, fill: { color: index % 2 ? "FFFFFF" : "ECECE7" }, line: { color: "D0D0CE" } });
-        closeSlide.addText(text, { x: 1, y: 1.52 + index * 0.8, w: 10.9, h: 0.18, fontSize: 10.5, color: "0F172A", margin: 0 });
+        closeSlide.addText(text, { x: 1, y: 1.52 + index * 0.8, w: 10.9, h: 0.18, fontSize: 10.5, color: "000000", margin: 0 });
       });
 
       function addTableSlideRows(slide: ReturnType<typeof pptx.addSlide>, rows: ChartDatum[], x: number, y: number, title: string) {
-        slide.addText(title, { x, y: y - 0.42, w: 5, h: 0.25, fontSize: 15, bold: true, color: "0F172A", margin: 0 });
+        slide.addText(title, { x, y: y - 0.42, w: 5, h: 0.25, fontSize: 15, bold: true, color: "000000", margin: 0 });
         rows.forEach((row, index) => {
           const rowY = y + index * 0.52;
-          slide.addShape(pptx.ShapeType.roundRect, { x, y: rowY, w: 11.9, h: 0.4, rectRadius: 0.04, fill: { color: index % 2 ? "FFFFFF" : "F8FAFC" }, line: { color: "E2E8F0" } });
+          slide.addShape(pptx.ShapeType.roundRect, { x, y: rowY, w: 11.9, h: 0.4, rectRadius: 0.04, fill: { color: index % 2 ? "FFFFFF" : "ECECE7" }, line: { color: "D0D0CE" } });
           slide.addShape(pptx.ShapeType.rect, { x, y: rowY, w: 0.12, h: 0.4, fill: { color: (row.fill || chartColours.teal).replace("#", "") }, line: { color: (row.fill || chartColours.teal).replace("#", "") } });
-          slide.addText(row.name, { x: x + 0.28, y: rowY + 0.12, w: 4.8, h: 0.16, fontSize: 9.5, bold: true, color: "0F172A", margin: 0 });
-          slide.addText(String(row.value), { x: x + 10.75, y: rowY + 0.12, w: 0.9, h: 0.16, fontSize: 9.5, bold: true, color: "0F172A", align: "right", margin: 0 });
+          slide.addText(row.name, { x: x + 0.28, y: rowY + 0.12, w: 4.8, h: 0.16, fontSize: 9.5, bold: true, color: "000000", margin: 0 });
+          slide.addText(String(row.value), { x: x + 10.75, y: rowY + 0.12, w: 0.9, h: 0.16, fontSize: 9.5, bold: true, color: "000000", align: "right", margin: 0 });
         });
       }
 
@@ -739,7 +739,7 @@ export default function ManagementReviewPage() {
         .mr-signal:hover,
         .mr-focus-link:hover {
           transform: translateY(-3px);
-          box-shadow: 0 18px 34px rgba(15, 23, 42, 0.11);
+          box-shadow: 0 18px 34px rgba(0, 0, 0, 0.11);
           border-color: #D0D0CE;
         }
         .mr-live {
@@ -782,9 +782,6 @@ export default function ManagementReviewPage() {
         backLabel="Back to IMS Home"
         actions={
           <>
-            <ImsButton onClick={() => void loadSnapshot()} disabled={isLoading}>
-              Refresh
-            </ImsButton>
             <ImsButton onClick={() => void generateManagementReviewPdf()}>
               Export PDF
             </ImsButton>
@@ -1029,7 +1026,7 @@ const scoreTileStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   gap: "8px",
-  boxShadow: "inset 0 0 28px rgba(255,255,255,0.10), 0 14px 28px rgba(15, 23, 42, 0.16)",
+  boxShadow: "inset 0 0 28px rgba(255,255,255,0.10), 0 14px 28px rgba(0, 0, 0, 0.16)",
 };
 
 const scoreValueStyle: CSSProperties = {
@@ -1121,7 +1118,7 @@ const moduleGridStyle: CSSProperties = {
 const modulePanelStyle: CSSProperties = {
   ...imsPanelStyle,
   minHeight: "100%",
-  background: "linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
 };
 
 const moduleScoreRowStyle: CSSProperties = {
@@ -1166,7 +1163,7 @@ const metricCardStyle: CSSProperties = {
   minHeight: "78px",
   border: `1px solid ${imsColours.borderSoft}`,
   borderRadius: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   padding: "13px",
   overflow: "hidden",
 };
@@ -1208,7 +1205,7 @@ const chartWrapStyle: CSSProperties = {
   marginBottom: "14px",
   border: `1px solid ${imsColours.borderSoft}`,
   borderRadius: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   padding: "10px",
   boxSizing: "border-box",
 };
@@ -1216,9 +1213,9 @@ const chartWrapStyle: CSSProperties = {
 const emptyChartStyle: CSSProperties = {
   minHeight: "230px",
   marginBottom: "14px",
-  border: "1px dashed #cbd5e1",
+  border: "1px dashed #D0D0CE",
   borderRadius: "14px",
-  background: "#f8fafc",
+  background: "#ECECE7",
   color: imsColours.slate,
   display: "grid",
   placeItems: "center",
@@ -1234,5 +1231,5 @@ const panelStyle: CSSProperties = {
 const errorListStyle: CSSProperties = {
   margin: 0,
   paddingLeft: "20px",
-  color: "#92400e",
+  color: "#000000",
 };

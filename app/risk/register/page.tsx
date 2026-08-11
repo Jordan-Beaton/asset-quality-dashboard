@@ -235,19 +235,19 @@ function isOverdueReview(risk: RiskRow) {
 }
 
 function getRatingBadgeStyle(rating: RiskRating | null | undefined): CSSProperties {
-  if (rating === "Critical") return { ...badgeStyle, background: "#fee2e2", color: "#F93822" };
-  if (rating === "High") return { ...badgeStyle, background: "#ffedd5", color: "#9a3412" };
-  if (rating === "Medium") return { ...badgeStyle, background: "#fef3c7", color: "#92400e" };
-  return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
+  if (rating === "Critical") return { ...badgeStyle, background: "#ECECE7", color: "#F93822" };
+  if (rating === "High") return { ...badgeStyle, background: "#ECECE7", color: "#000000" };
+  if (rating === "Medium") return { ...badgeStyle, background: "#ECECE7", color: "#000000" };
+  return { ...badgeStyle, background: "#ECECE7", color: "#005670" };
 }
 
 function getStatusBadgeStyle(status: string | null | undefined): CSSProperties {
   const normalised = (status || "").trim().toLowerCase();
-  if (normalised === "closed" || normalised === "accepted") return { ...badgeStyle, background: "#dcfce7", color: "#166534" };
-  if (normalised === "treatment required") return { ...badgeStyle, background: "#fee2e2", color: "#F93822" };
-  if (normalised === "under review") return { ...badgeStyle, background: "#ede9fe", color: "#6d28d9" };
-  if (normalised === "archived") return { ...badgeStyle, background: "#e2e8f0", color: "#475569" };
-  return { ...badgeStyle, background: "#dbeafe", color: "#1d4ed8" };
+  if (normalised === "closed" || normalised === "accepted") return { ...badgeStyle, background: "#ECECE7", color: "#005670" };
+  if (normalised === "treatment required") return { ...badgeStyle, background: "#ECECE7", color: "#F93822" };
+  if (normalised === "under review") return { ...badgeStyle, background: "#ECECE7", color: "#53565A" };
+  if (normalised === "archived") return { ...badgeStyle, background: "#D0D0CE", color: "#53565A" };
+  return { ...badgeStyle, background: "#ECECE7", color: "#005670" };
 }
 
 function buildFormFromRisk(risk: RiskRow): RiskForm {
@@ -592,12 +592,12 @@ export default function RiskRegisterPage() {
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(17);
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text("Risk Register Report", pageWidth / 2, 16, { align: "center" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
-      doc.setTextColor(71, 85, 105);
+      doc.setTextColor(83, 86, 90);
       doc.text("Filtered Enshore project risk register for project risk review meetings.", pageWidth / 2, 22, {
         align: "center",
       });
@@ -618,7 +618,7 @@ export default function RiskRegisterPage() {
       ].join("  |  ");
 
       doc.setFontSize(8.2);
-      doc.setTextColor(51, 65, 85);
+      doc.setTextColor(83, 86, 90);
       doc.text(filterSummary, margin, 35, { maxWidth: pageWidth - margin * 2 });
 
       const reportRows = filteredRisks.map((risk) => ({
@@ -671,14 +671,14 @@ export default function RiskRegisterPage() {
           font: "helvetica",
           fontSize: 6.2,
           cellPadding: 1.1,
-          lineColor: [203, 213, 225],
+          lineColor: [208, 208, 206],
           lineWidth: 0.15,
-          textColor: [15, 23, 42],
+          textColor: [0, 0, 0],
           overflow: "linebreak",
           valign: "top",
         },
         headStyles: {
-          fillColor: [15, 23, 42],
+          fillColor: [0, 0, 0],
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
@@ -720,7 +720,7 @@ export default function RiskRegisterPage() {
         didDrawPage: () => {
           doc.setFont("helvetica", "normal");
           doc.setFontSize(8);
-          doc.setTextColor(100, 116, 139);
+          doc.setTextColor(83, 86, 90);
           doc.text("Enshore Risk Management System", margin, pageHeight - 6);
           doc.text(
             `Page ${doc.getCurrentPageInfo().pageNumber} of ${doc.getNumberOfPages()}`,
@@ -754,21 +754,15 @@ export default function RiskRegisterPage() {
         ]}
       />
 
-      <div style={topMetaRowStyle}>
+      <div className="ims-top-meta-row" style={topMetaRowStyle}>
         <Link href="/home" style={backLinkStyle}>
           ← Back to IMS Home
         </Link>
 
-        <div style={topMetaActionsStyle}>
-          <button type="button" style={secondaryButtonStyle} onClick={() => void loadData()} disabled={isLoading}>
-            Refresh
-          </button>
-          <div style={statusBannerStyle}>
-            <strong>Status:</strong> {message}
-          </div>
+        <div style={statusBannerStyle}>
+          <strong>Status:</strong> {message}
         </div>
       </div>
-
       <section style={statsGridStyle}>
         <QualityKpiCard title="Total Risks" value={risks.length} accent="#005670" />
         <QualityKpiCard title="Open Risks" value={openRisks} accent="#63B1BC" />
@@ -791,7 +785,7 @@ export default function RiskRegisterPage() {
           </button>
         </div>
 
-        <div style={filterGridStyle}>
+        <div className="ims-filter-panel" style={filterGridStyle}>
           <button
             type="button"
             style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
@@ -802,7 +796,7 @@ export default function RiskRegisterPage() {
         </div>
 
         {showRegisterFilters ? (
-        <div style={filterGridStyle}>
+        <div className="ims-filter-panel" style={filterGridStyle}>
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={inputStyle}>
             <option value="">All statuses</option>
             {statusOptions.map((option) => (
@@ -874,7 +868,7 @@ export default function RiskRegisterPage() {
                     <tr
                       key={risk.id}
                       onClick={() => selectRisk(risk)}
-                      style={{ ...tableRowStyle, background: active ? "#eff6ff" : "#ffffff" }}
+                      style={{ ...tableRowStyle, background: active ? "#eef7f8" : "#ffffff" }}
                     >
                       <td style={tableCellStyle}><div style={riskNumberStyle}>{risk.risk_number || "-"}</div></td>
                       <td style={tableCellStyle}>
@@ -1244,36 +1238,36 @@ const topMetaRowStyle: CSSProperties = {
   flexWrap: "wrap",
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   padding: "12px 14px",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 const topMetaActionsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
 const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
-const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#0f172a" };
+const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", color: "#000000" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
-const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: "20px" };
+const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", marginBottom: "20px" };
 const sectionHeaderRowStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", marginBottom: "16px", flexWrap: "wrap" };
-const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "20px", color: "#0f172a" };
-const sectionSubtitleStyle: CSSProperties = { margin: "6px 0 0", color: "#64748b", fontSize: "14px", lineHeight: 1.45 };
+const sectionTitleStyle: CSSProperties = { margin: 0, fontSize: "20px", color: "#000000" };
+const sectionSubtitleStyle: CSSProperties = { margin: "6px 0 0", color: "#53565A", fontSize: "14px", lineHeight: 1.45 };
 const registerActionRowStyle: CSSProperties = { display: "flex", justifyContent: "flex-start", marginBottom: "14px" };
-const formSectionStyle: CSSProperties = { border: "1px solid #e2e8f0", borderRadius: "16px", padding: "16px", marginBottom: "16px", background: "#ffffff" };
-const formSectionTitleStyle: CSSProperties = { margin: "0 0 14px", color: "#0f172a", fontSize: "16px" };
+const formSectionStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "16px", padding: "16px", marginBottom: "16px", background: "#ffffff" };
+const formSectionTitleStyle: CSSProperties = { margin: "0 0 14px", color: "#000000", fontSize: "16px" };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "14px" };
 const fieldWrapStyle: CSSProperties = { display: "grid", gap: "6px" };
-const fieldLabelStyle: CSSProperties = { fontSize: "13px", fontWeight: 700, color: "#334155" };
-const inputStyle: CSSProperties = { padding: "11px 12px", borderRadius: "10px", border: "1px solid #cbd5e1", background: "white", color: "#0f172a", width: "100%", boxSizing: "border-box" };
-const textAreaStyle: CSSProperties = { ...inputStyle, minHeight: "96px", resize: "vertical", fontFamily: "Arial, Helvetica, sans-serif" };
+const fieldLabelStyle: CSSProperties = { fontSize: "13px", fontWeight: 700, color: "#53565A" };
+const inputStyle: CSSProperties = { padding: "11px 12px", borderRadius: "10px", border: "1px solid #D0D0CE", background: "white", color: "#000000", width: "100%", boxSizing: "border-box" };
+const textAreaStyle: CSSProperties = { ...inputStyle, minHeight: "96px", resize: "vertical", fontFamily: "\"Azo Sans\", \"Segoe UI\", Arial, Helvetica, sans-serif" };
 const largeTextAreaStyle: CSSProperties = { ...textAreaStyle, minHeight: "124px" };
-const scoreCardStyle: CSSProperties = { borderRadius: "12px", border: "1px solid #e2e8f0", background: "#f8fafc", padding: "10px 12px", minHeight: "68px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
-const scoreLabelStyle: CSSProperties = { color: "#64748b", fontSize: "12px", fontWeight: 800 };
-const scoreValueStyle: CSSProperties = { color: "#0f172a", fontSize: "24px", lineHeight: 1 };
-const checkboxCardStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "10px", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px 14px", background: "#f8fafc", color: "#334155", fontWeight: 700 };
+const scoreCardStyle: CSSProperties = { borderRadius: "12px", border: "1px solid #D0D0CE", background: "#ECECE7", padding: "10px 12px", minHeight: "68px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
+const scoreLabelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 800 };
+const scoreValueStyle: CSSProperties = { color: "#000000", fontSize: "24px", lineHeight: 1 };
+const checkboxCardStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "10px", border: "1px solid #D0D0CE", borderRadius: "12px", padding: "12px 14px", background: "#ECECE7", color: "#53565A", fontWeight: 700 };
 const formFooterStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginTop: "16px" };
-const helperTextStyle: CSSProperties = { color: "#64748b", fontSize: "13px" };
+const helperTextStyle: CSSProperties = { color: "#53565A", fontSize: "13px" };
 const primaryButtonStyle: CSSProperties = { background: "#005670", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
-const secondaryButtonStyle: CSSProperties = { background: "#e2e8f0", color: "#0f172a", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
+const secondaryButtonStyle: CSSProperties = { background: "#D0D0CE", color: "#000000", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
 const deleteButtonStyle: CSSProperties = { background: "#F93822", color: "white", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
 const filterGridStyle: CSSProperties = {
   display: "grid",
@@ -1282,10 +1276,10 @@ const filterGridStyle: CSSProperties = {
   alignItems: "end",
   marginBottom: "14px",
   padding: "12px",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 const filterSummaryStyle: CSSProperties = {
   display: "flex",
@@ -1293,17 +1287,17 @@ const filterSummaryStyle: CSSProperties = {
   justifyContent: "flex-start",
   gap: "4px",
   flexWrap: "wrap",
-  color: "#475569",
+  color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
   margin: "12px 0",
 };
 const tableWrapStyle: CSSProperties = {
   overflowX: "auto",
-  border: "1px solid #dbe3ef",
+  border: "1px solid #D0D0CE",
   borderRadius: "16px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 const tableStyle: CSSProperties = {
   width: "100%",
@@ -1315,13 +1309,13 @@ const tableStyle: CSSProperties = {
 const tableHeadStyle: CSSProperties = {
   textAlign: "left",
   padding: "13px 14px",
-  background: "#f8fafc",
-  color: "#334155",
+  background: "#ECECE7",
+  color: "#53565A",
   fontSize: "12px",
   fontWeight: 900,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  borderBottom: "1px solid #dbe3ef",
+  borderBottom: "1px solid #D0D0CE",
   whiteSpace: "nowrap",
 };
 const tableRowStyle: CSSProperties = {
@@ -1330,8 +1324,8 @@ const tableRowStyle: CSSProperties = {
 };
 const tableCellStyle: CSSProperties = {
   padding: "13px 14px",
-  borderBottom: "1px solid #edf2f7",
-  color: "#0f172a",
+  borderBottom: "1px solid #ECECE7",
+  color: "#000000",
   verticalAlign: "middle",
   fontSize: "13px",
   lineHeight: 1.45,
@@ -1339,13 +1333,13 @@ const tableCellStyle: CSSProperties = {
 const emptyTableCellStyle: CSSProperties = {
   padding: "26px 14px",
   textAlign: "center",
-  color: "#64748b",
-  background: "#f8fafc",
-  borderBottom: "1px dashed #cbd5e1",
+  color: "#53565A",
+  background: "#ECECE7",
+  borderBottom: "1px dashed #D0D0CE",
 };
 const riskNumberStyle: CSSProperties = { fontSize: "12px", fontWeight: 800, color: "#005670", whiteSpace: "nowrap" };
-const primaryCellTextStyle: CSSProperties = { fontWeight: 700, color: "#0f172a" };
-const secondaryCellTextStyle: CSSProperties = { fontSize: "12px", color: "#64748b", marginTop: "4px" };
+const primaryCellTextStyle: CSSProperties = { fontWeight: 700, color: "#000000" };
+const secondaryCellTextStyle: CSSProperties = { fontSize: "12px", color: "#53565A", marginTop: "4px" };
 const badgeStyle: CSSProperties = { padding: "5px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 800, display: "inline-block", whiteSpace: "nowrap" };
 const detailHeaderStyle: CSSProperties = {
   display: "flex",
@@ -1355,7 +1349,7 @@ const detailHeaderStyle: CSSProperties = {
   flexWrap: "wrap",
   paddingBottom: "14px",
   marginBottom: "18px",
-  borderBottom: "1px solid #e2e8f0",
+  borderBottom: "1px solid #D0D0CE",
 };
-const detailTitleStyle: CSSProperties = { marginTop: "4px", fontSize: "22px", fontWeight: 800, color: "#0f172a" };
-const emptyTextStyle: CSSProperties = { color: "#64748b", margin: 0 };
+const detailTitleStyle: CSSProperties = { marginTop: "4px", fontSize: "22px", fontWeight: 800, color: "#000000" };
+const emptyTextStyle: CSSProperties = { color: "#53565A", margin: 0 };

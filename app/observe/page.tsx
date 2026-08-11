@@ -294,7 +294,7 @@ const pageStyle: CSSProperties = {
   minHeight: "100vh",
   margin: "-28px -24px -36px",
   padding: "16px",
-  background: "linear-gradient(180deg, #ECECE7 0%, #f8fafc 48%, #eef2f5 100%)",
+  background: "linear-gradient(180deg, #ECECE7 0%, #ECECE7 48%, #ECECE7 100%)",
   boxSizing: "border-box",
 };
 
@@ -313,7 +313,7 @@ const headerStyle: CSSProperties = {
   padding: "18px",
   borderRadius: "22px",
   background: "#ffffff",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   boxShadow: "0 14px 32px rgba(15, 23, 42, 0.08)",
 };
 
@@ -329,14 +329,14 @@ const titleStyle: CSSProperties = {
 };
 const subtitleStyle: CSSProperties = { margin: 0, color: imsColours.slate, lineHeight: 1.45, fontSize: "14px" };
 const formStyle: CSSProperties = { display: "grid", gap: "14px" };
-const cardStyle: CSSProperties = { background: "#ffffff", borderRadius: "18px", border: "1px solid #dbe7f3", boxShadow: "0 1px 3px rgba(15,23,42,0.08)", padding: "16px", display: "grid", gap: "12px" };
+const cardStyle: CSSProperties = { background: "#ffffff", borderRadius: "18px", border: "1px solid #D0D0CE", boxShadow: "0 1px 3px rgba(15,23,42,0.08)", padding: "16px", display: "grid", gap: "12px" };
 const sectionTitleStyle: CSSProperties = { margin: 0, color: imsColours.ink, fontSize: "18px", fontWeight: 900 };
 const choiceGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(126px, 1fr))", gap: "9px" };
-const choiceStyle: CSSProperties = { border: "1px solid #cbd5e1", borderRadius: "12px", background: "#f8fafc", color: imsColours.ink, minHeight: "46px", fontWeight: 900, cursor: "pointer" };
+const choiceStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "12px", background: "#ECECE7", color: imsColours.ink, minHeight: "46px", fontWeight: 900, cursor: "pointer" };
 const activeChoiceStyle: CSSProperties = { ...choiceStyle, background: imsColours.brand, borderColor: imsColours.brand, color: "#ffffff" };
 const responsiveGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" };
 const fieldStyle: CSSProperties = { display: "grid", gap: "6px" };
-const labelStyle: CSSProperties = { color: "#334155", fontSize: "12px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.04em" };
+const labelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.04em" };
 const inputStyle: CSSProperties = { ...imsInputStyle, minHeight: "48px", fontSize: "16px" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: "106px", resize: "vertical", lineHeight: 1.45 };
 const fileInputStyle: CSSProperties = { ...inputStyle, padding: "12px" };
@@ -345,5 +345,5 @@ const ghostButtonStyle: CSSProperties = { border: `1px solid ${imsColours.brandB
 const formHeaderRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" };
 const smallGhostButtonStyle: CSSProperties = { ...ghostButtonStyle, minHeight: "36px", padding: "8px 12px" };
 const submitButtonStyle: CSSProperties = { border: "none", borderRadius: "14px", minHeight: "56px", background: imsColours.brand, color: "#ffffff", fontSize: "17px", fontWeight: 900, cursor: "pointer", boxShadow: "0 16px 30px rgba(0,86,112,0.24)" };
-const statusStyle: CSSProperties = { borderRadius: "14px", background: "#ffffff", border: "1px solid #dbe7f3", padding: "13px 14px", color: imsColours.ink, boxShadow: "0 1px 3px rgba(15,23,42,0.08)" };
-const successStyle: CSSProperties = { ...statusStyle, background: "#ecfdf5", borderColor: "#bbf7d0", color: "#14532d" };
+const statusStyle: CSSProperties = { borderRadius: "14px", background: "#ffffff", border: "1px solid #D0D0CE", padding: "13px 14px", color: imsColours.ink, boxShadow: "0 1px 3px rgba(15,23,42,0.08)" };
+const successStyle: CSSProperties = { ...statusStyle, background: "#ECECE7", borderColor: "#ECECE7", color: "#005670" };

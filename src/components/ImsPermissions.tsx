@@ -59,10 +59,10 @@ export function ImsPermissionNotice() {
     <div
       style={{
         margin: "0 0 14px",
-        border: "1px solid #bfdbfe",
+        border: "1px solid #ECECE7",
         borderRadius: 14,
-        background: "#eff6ff",
-        color: "#1e3a8a",
+        background: "#ECECE7",
+        color: "#005670",
         padding: "10px 14px",
         fontSize: 14,
         fontWeight: 700,

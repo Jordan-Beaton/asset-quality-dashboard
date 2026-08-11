@@ -491,7 +491,7 @@ export default function CertificationPage() {
                   filteredRows.map((row) => {
                     const expiry = getExpiryState(row);
                     return (
-                      <tr key={row.id} style={selectedId === row.id ? selectedRowStyle : undefined} onClick={() => setSelectedId(row.id)}>
+                      <tr key={row.id} aria-selected={selectedId === row.id} data-selected={selectedId === row.id ? "true" : "false"} style={selectedId === row.id ? selectedRowStyle : undefined} onClick={() => setSelectedId(row.id)}>
                         <td style={imsTableCellStyle}>
                           <strong>{row.title || "Untitled certificate"}</strong>
                           <div style={mutedTextStyle}>{row.certificate_number || "No certificate number"}</div>
@@ -569,12 +569,12 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
 function getExpiryBadgeStyle(state: string): CSSProperties {
   const palette =
     state === "Expired"
-      ? { background: "#fee2e2", color: "#F93822" }
+      ? { background: "#ECECE7", color: "#F93822" }
       : state === "Due Soon"
-        ? { background: "#fef3c7", color: "#92400e" }
+        ? { background: "#ECECE7", color: "#000000" }
         : state === "Archived"
-          ? { background: "#f1f5f9", color: "#475569" }
-          : { background: "#dcfce7", color: "#166534" };
+          ? { background: "#ECECE7", color: "#53565A" }
+          : { background: "#ECECE7", color: "#005670" };
 
   return {
     ...palette,
@@ -608,9 +608,9 @@ const focusListStyle: CSSProperties = {
 const focusItemStyle: CSSProperties = {
   padding: "12px",
   borderRadius: "12px",
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  color: "#334155",
+  background: "#ECECE7",
+  border: "1px solid #D0D0CE",
+  color: "#53565A",
   fontSize: "14px",
 };
 
@@ -620,7 +620,7 @@ const watchListStyle: CSSProperties = {
 };
 
 const watchItemStyle: CSSProperties = {
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   borderRadius: "12px",
   background: "#ffffff",
   padding: "12px",
@@ -631,13 +631,13 @@ const watchItemStyle: CSSProperties = {
 const watchTitleStyle: CSSProperties = {
   display: "block",
   fontWeight: 900,
-  color: "#0f172a",
+  color: "#000000",
 };
 
 const watchMetaStyle: CSSProperties = {
   display: "block",
   marginTop: "5px",
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
 };
 
@@ -655,7 +655,7 @@ const fieldWrapStyle: CSSProperties = {
 const fieldLabelStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 900,
-  color: "#334155",
+  color: "#53565A",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
 };
@@ -682,15 +682,15 @@ const buttonRowStyle: CSSProperties = {
 const emptyStateStyle: CSSProperties = {
   padding: "14px",
   borderRadius: "12px",
-  border: "1px dashed #cbd5e1",
-  background: "#f8fafc",
-  color: "#64748b",
+  border: "1px dashed #D0D0CE",
+  background: "#ECECE7",
+  color: "#53565A",
 };
 
 const emptyCellStyle: CSSProperties = {
   ...imsTableCellStyle,
   textAlign: "center",
-  color: "#64748b",
+  color: "#53565A",
   padding: "24px",
 };
 
@@ -699,7 +699,7 @@ const selectedRowStyle: CSSProperties = {
 };
 
 const mutedTextStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "12px",
   marginTop: "4px",
 };
@@ -713,8 +713,8 @@ const rowActionsStyle: CSSProperties = {
 const detailPanelStyle: CSSProperties = {
   marginTop: "16px",
   borderRadius: "16px",
-  border: "1px solid #dbe7f3",
-  background: "#f8fafc",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
   padding: "16px",
   display: "grid",
   gap: "14px",
@@ -730,13 +730,13 @@ const detailEyebrowStyle: CSSProperties = {
 
 const detailTitleStyle: CSSProperties = {
   margin: "4px 0 0",
-  color: "#0f172a",
+  color: "#000000",
   fontSize: "22px",
 };
 
 const detailTextStyle: CSSProperties = {
   margin: "8px 0 0",
-  color: "#475569",
+  color: "#53565A",
   lineHeight: 1.55,
 };
 
@@ -748,13 +748,13 @@ const detailGridStyle: CSSProperties = {
 
 const detailItemStyle: CSSProperties = {
   borderRadius: "12px",
-  border: "1px solid #dbe7f3",
+  border: "1px solid #D0D0CE",
   background: "#ffffff",
   padding: "12px",
 };
 
 const detailItemLabelStyle: CSSProperties = {
-  color: "#64748b",
+  color: "#53565A",
   fontSize: "11px",
   fontWeight: 900,
   letterSpacing: "0.08em",
@@ -762,7 +762,7 @@ const detailItemLabelStyle: CSSProperties = {
 };
 
 const detailItemValueStyle: CSSProperties = {
-  color: "#0f172a",
+  color: "#000000",
   fontWeight: 800,
   marginTop: "5px",
 };
