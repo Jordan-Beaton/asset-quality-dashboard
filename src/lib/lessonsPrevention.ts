@@ -47,7 +47,7 @@ export const preventionResponseSchema = {
     cautions: {
       type: "array",
       minItems: 1,
-      maxItems: 8,
+      maxItems: 6,
       items: {
         type: "object",
         additionalProperties: false,
@@ -56,8 +56,8 @@ export const preventionResponseSchema = {
           title: { type: "string" },
           what_failed: { type: "string" },
           why_it_matters: { type: "string" },
-          prevention_controls: { type: "array", minItems: 1, maxItems: 6, items: { type: "string" } },
-          lesson_ids: { type: "array", minItems: 1, maxItems: 20, items: { type: "string" } },
+          prevention_controls: { type: "array", minItems: 1, maxItems: 5, items: { type: "string" } },
+          lesson_ids: { type: "array", minItems: 1, maxItems: 15, items: { type: "string" } },
           confidence: { type: "string", enum: ["High", "Medium", "Low"] },
         },
       },

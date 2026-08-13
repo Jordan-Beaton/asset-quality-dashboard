@@ -33,7 +33,7 @@ export async function retrievePreventionEvidence(supabase: SupabaseClient, apiKe
   try {
     const embedding = await createEmbedding(apiKey, question);
     if (embedding?.length) {
-      const { data, error } = await supabase.rpc("match_lessons_learned_prevention", { query_embedding: embedding, match_count: 70, minimum_similarity: 0.3 });
+      const { data, error } = await supabase.rpc("match_lessons_learned_prevention", { query_embedding: embedding, match_count: 45, minimum_similarity: 0.3 });
       if (!error && Array.isArray(data) && data.length) {
         const byId = new Map(lessons.map((lesson) => [lesson.id, lesson]));
         const matches = data.map((row: { lesson_id?: string }) => row.lesson_id ? byId.get(row.lesson_id) : undefined).filter(Boolean) as PreventionLesson[];
@@ -48,7 +48,7 @@ export async function retrievePreventionEvidence(supabase: SupabaseClient, apiKe
 
 export async function generatePreventionBrief(apiKey: string, question: string, candidates: PreventionLesson[], document?: { name: string; text: string }) {
   if (!candidates.length) throw new Error("No relevant failure records were found. Try a broader activity, equipment, phase, or risk description.");
-  const evidence = candidates.map((lesson) => ({
+  const buildEvidence = (rows: PreventionLesson[], characterLimit: number) => rows.map((lesson) => ({
     id: lesson.id,
     lesson_number: lesson.lesson_number,
     project: [lesson.project_code, lesson.project_name].filter(Boolean).join(" · "),
@@ -57,7 +57,7 @@ export async function generatePreventionBrief(apiKey: string, question: string, 
     asset: lesson.assets,
     phase: lesson.stage_phase,
     criticality: lesson.criticality,
-    evidence: lessonSearchText(lesson).slice(0, 2600),
+    evidence: lessonSearchText(lesson).slice(0, characterLimit),
   }));
   const system = [
     "You are Enshore Subsea's blame-free Lessons Learned prevention analyst.",
@@ -68,28 +68,44 @@ export async function generatePreventionBrief(apiKey: string, question: string, 
     "Every caution must cite one or more supplied lesson UUIDs. Confidence is High only when several clear records support the same pattern, Medium when evidence is smaller or mixed, and Low when historic wording is weak.",
     "Procedure review is advisory: identify apparent coverage and gaps without declaring the document approved or compliant.",
   ].join(" ");
-  const user = [
-    `User question: ${question}`,
-    document ? `Uploaded document: ${document.name}\nDocument text:\n${document.text.slice(0, 60000)}` : "No procedure was uploaded.",
-    `Retrieved failure evidence (${evidence.length} records):\n${JSON.stringify(evidence)}`,
-    "Return a short management-ready summary, the analysed scope, consolidated cautions, practical preventive controls, limitations, and the overall set of relevant lesson UUIDs.",
-  ].join("\n\n");
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: process.env.OPENAI_LESSONS_MODEL || "gpt-5-mini",
-      input: [{ role: "system", content: system }, { role: "user", content: user }],
-      text: { format: { type: "json_schema", name: "lessons_prevention_brief", strict: true, schema: preventionResponseSchema } },
-      max_output_tokens: 5000,
-      store: false,
-    }),
-  });
-  const payload = await response.json() as Record<string, unknown> & { error?: { message?: string } };
-  if (!response.ok) throw new Error(payload.error?.message || "The prevention analysis request failed.");
-  const text = extractOpenAiText(payload);
-  if (!text) throw new Error("The AI service returned no prevention briefing.");
-  const result = JSON.parse(text) as PreventionResult;
+  async function requestBrief(rows: PreventionLesson[], evidenceCharacterLimit: number, documentCharacterLimit: number) {
+    const evidence = buildEvidence(rows, evidenceCharacterLimit);
+    const user = [
+      `User question: ${question}`,
+      document ? `Uploaded document: ${document.name}\nDocument text:\n${document.text.slice(0, documentCharacterLimit)}` : "No procedure was uploaded.",
+      `Retrieved failure evidence (${evidence.length} records):\n${JSON.stringify(evidence)}`,
+      "Return a short management-ready summary, the analysed scope, 3-6 consolidated cautions, practical preventive controls, limitations, and the overall set of relevant lesson UUIDs.",
+    ].join("\n\n");
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: process.env.OPENAI_LESSONS_MODEL || "gpt-5-mini",
+        input: [{ role: "system", content: system }, { role: "user", content: user }],
+        reasoning: { effort: "low" },
+        text: { format: { type: "json_schema", name: "lessons_prevention_brief", strict: true, schema: preventionResponseSchema } },
+        max_output_tokens: 8000,
+        store: false,
+      }),
+    });
+    const payload = await response.json() as Record<string, unknown> & { error?: { message?: string }; status?: string; incomplete_details?: { reason?: string } };
+    if (!response.ok) throw new Error(payload.error?.message || "The prevention analysis request failed.");
+    const text = extractOpenAiText(payload);
+    if (!text) throw new Error(payload.status === "incomplete" ? `The AI response was incomplete (${payload.incomplete_details?.reason || "output limit"}).` : "The AI service returned no prevention briefing.");
+    try {
+      return JSON.parse(text) as PreventionResult;
+    } catch {
+      throw new Error(payload.status === "incomplete" ? "The AI response reached its output limit before completing the prevention briefing." : "The AI returned an invalid prevention briefing format.");
+    }
+  }
+  let result: PreventionResult;
+  try {
+    result = await requestBrief(candidates.slice(0, 40), 1800, 40000);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!/incomplete|output limit|invalid prevention briefing format/i.test(message)) throw error;
+    result = await requestBrief(candidates.slice(0, 24), 1200, 24000);
+  }
   const allowedIds = new Set(candidates.map((lesson) => lesson.id));
   result.cautions = (result.cautions || []).map((caution) => ({ ...caution, lesson_ids: caution.lesson_ids.filter((id) => allowedIds.has(id)) })).filter((caution) => caution.lesson_ids.length);
   result.matched_lesson_ids = [...new Set((result.matched_lesson_ids || []).filter((id) => allowedIds.has(id)))];
