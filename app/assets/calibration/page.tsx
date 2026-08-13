@@ -2133,6 +2133,8 @@ function CalibrationPageContent() {
                   return (
                     <tr
                       key={row.id}
+                      aria-selected={editForm?.id === row.id}
+                      data-selected={editForm?.id === row.id ? "true" : "false"}
                       style={editForm?.id === row.id ? selectedCalibrationTableRowStyle : calibrationTableRowStyle}
                       onClick={() => openEditCalibration(row)}
                     >
@@ -2888,7 +2890,7 @@ const topMetaRowStyle: CSSProperties = {
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
@@ -3736,7 +3738,7 @@ const secondaryButtonStyle: CSSProperties = {
 const compactTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
@@ -3750,7 +3752,6 @@ const calibrationTableRowStyle: CSSProperties = {
 const selectedCalibrationTableRowStyle: CSSProperties = {
   ...calibrationTableRowStyle,
   background: "#eef7f8",
-  boxShadow: "inset 4px 0 0 #005670",
 };
 
 const editPanelStyle: CSSProperties = {

@@ -29,6 +29,15 @@ export default function ProjectsPage() {
             <p style={copy}>ITP control, monthly report annexes, audit reporting, and the 8-week inspection lookahead.</p>
             <span style={cta}>Open project workspace →</span>
           </Link>
+          <Link href="/projects/baltic-power" style={card}>
+            <div style={cardTop}>
+              <span style={badge}>Active</span>
+              <span style={code}>BLP</span>
+            </div>
+            <h3 style={cardTitle}>Baltic Power</h3>
+            <p style={copy}>ITP control, NOI planning, and evidence-based phase sign-off with external approval.</p>
+            <span style={cta}>Open project workspace →</span>
+          </Link>
         </div>
       </section>
     </main>

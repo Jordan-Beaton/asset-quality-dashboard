@@ -32,6 +32,7 @@ export type PreventionResult = {
   limitations: string[];
   matched_lesson_ids: string[];
   evidence_count: number;
+  screened_count?: number;
   retrieval_mode: "semantic" | "keyword";
   sources?: Array<{ id: string; lesson_number: string; subject: string; project: string }>;
   analysis_id?: string;
@@ -84,7 +85,7 @@ export function lessonSearchText(lesson: PreventionLesson) {
 }
 
 function tokens(value: string) {
-  const stop = new Set(["about", "after", "again", "against", "apply", "could", "from", "have", "into", "lessons", "learnt", "learned", "procedure", "should", "tell", "that", "their", "there", "these", "they", "this", "what", "when", "where", "which", "with", "would", "your"]);
+  const stop = new Set(["about", "after", "again", "against", "apply", "could", "from", "have", "how", "into", "introduced", "many", "needs", "lessons", "learnt", "learned", "procedure", "prevent", "should", "tell", "that", "their", "there", "these", "they", "this", "what", "when", "where", "which", "with", "would", "your"]);
   return [...new Set(value.toLowerCase().match(/[a-z0-9]{3,}/g) || [])].filter((token) => !stop.has(token));
 }
 

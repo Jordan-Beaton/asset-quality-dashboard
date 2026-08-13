@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "lint:app": "eslint app src scripts/check-ims-ui-contract.mjs",
+    "check:ui": "node scripts/check-ims-ui-contract.mjs",
+    "check": "npm run check:ui && npm run lint:app && npm run build"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

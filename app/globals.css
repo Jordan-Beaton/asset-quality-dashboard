@@ -217,6 +217,31 @@ body {
   max-width: none !important;
 }
 
+/* Legacy register toolbars that still render the search and toggle directly
+ * inherit the same proportions as ImsFilterPanel: search grows, actions stay
+ * compact. This prevents the old half-width search / half-width button layout. */
+.ims-page-container .ims-filter-panel:has(> input:first-child):has(> button),
+.ims-page-container .ims-register-toolbar:has(> input:first-child):has(> button) {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+.ims-page-container .ims-filter-panel:has(> input:first-child):has(> button) > input:first-child,
+.ims-page-container .ims-register-toolbar:has(> input:first-child):has(> button) > input:first-child {
+  flex: 1 1 260px !important;
+  min-width: 0 !important;
+}
+
+.ims-page-container .ims-filter-panel:has(> input:first-child):has(> button) > button,
+.ims-page-container .ims-register-toolbar:has(> input:first-child):has(> button) > button {
+  flex: 0 0 132px !important;
+  width: 132px !important;
+  max-width: 132px !important;
+  min-width: 132px !important;
+}
+
 .ims-page-container input::placeholder,
 .ims-page-container textarea::placeholder {
   color: var(--enshore-muted);
@@ -428,6 +453,36 @@ textarea {
   font-size: 12px !important;
 }
 
+/* Observation Register is the permanent structural benchmark for register
+ * shells. MobileTableEnhancer applies the wrapper hook to semantic tables at
+ * runtime, including tables revealed by tabs or rendered after data loads. */
+.ims-register-table-wrap,
+.ims-register-shell {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-height: none !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--enshore-border) !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.ims-register-table-wrap > table {
+  width: calc(100% - 8px) !important;
+  margin: 4px !important;
+}
+
+/* Custom grid registers previously imposed page-specific vertical viewports.
+ * Keep horizontal containment, but let the page perform normal vertical
+ * scrolling exactly as the Observation Register does. */
+.ims-register-shell > .ims-register-head + div {
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+
 .ims-page-container table thead th:first-child {
   border-top-left-radius: 10px !important;
 }
@@ -462,12 +517,13 @@ textarea {
   font-weight: 400 !important;
   text-align: left !important;
   vertical-align: middle !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
-.ims-page-container table tbody td:not(:first-child) strong,
-.ims-page-container table tbody td:not(:first-child) b,
-.ims-page-container table tbody td:not(:first-child) span,
-.ims-page-container table tbody td:not(:first-child) a {
+.ims-page-container table tbody td:not(:first-child),
+.ims-page-container table tbody td:not(:first-child) *:not(button) {
   font-weight: 400 !important;
   text-align: left !important;
 }
@@ -487,9 +543,52 @@ textarea {
 }
 
 .ims-page-container table button {
-  min-height: 32px !important;
-  padding: 6px 10px !important;
+  min-height: 28px !important;
+  padding: 4px 9px !important;
   font-weight: 800 !important;
+}
+
+.ims-page-container table tbody input:not([type="checkbox"]):not([type="radio"]),
+.ims-page-container table tbody select {
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 5px 8px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+}
+
+/* Observation-style registers are summary views. Keep one primary display
+ * element per cell; secondary metadata belongs in the opened detail panel.
+ * This prevents filenames, descriptions and duplicate due/status notes from
+ * turning otherwise equivalent registers into tall card-like rows. */
+.ims-page-container .ims-data-table tbody td:not([colspan]) > :not(:first-child),
+.ims-page-container .ims-register-row > * > :not(:first-child) {
+  display: none !important;
+}
+
+.ims-page-container .ims-data-table tbody td:not([colspan]) > div:first-child,
+.ims-page-container .ims-register-row > * > div:first-child {
+  min-width: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ims-page-container .ims-data-table tbody td:last-child > div:first-child {
+  flex-wrap: nowrap !important;
+}
+
+/* Expanded table rows are detail surfaces, not compact register cells. Keep
+ * their full content visible even when an older compact-row rule is present
+ * in a long-running development browser session. */
+.ims-page-container .ims-data-table tbody td.ims-table-detail-cell {
+  overflow: visible !important;
+  white-space: normal !important;
+}
+
+.ims-page-container .ims-data-table tbody td.ims-table-detail-cell > .ims-table-detail-content {
+  display: grid !important;
 }
 
 /* Custom grid registers use these hooks so they follow the same inset header,
@@ -502,6 +601,8 @@ textarea {
 .ims-page-container .ims-register-head {
   overflow: hidden;
   border-radius: 10px 10px 0 0 !important;
+  gap: 0 !important;
+  padding: 0 !important;
   font-family: var(--ims-font-brand) !important;
   font-size: 10px !important;
   font-weight: 800 !important;
@@ -513,6 +614,8 @@ textarea {
 .ims-page-container .ims-register-head > * {
   justify-content: flex-start !important;
   text-align: left !important;
+  padding: 9px 10px !important;
+  box-sizing: border-box !important;
 }
 
 .ims-page-container .ims-register-head button {
@@ -523,21 +626,32 @@ textarea {
 .ims-page-container .ims-register-row {
   font-family: var(--ims-font-brand) !important;
   font-size: 12px !important;
+  font-weight: 400 !important;
   line-height: 1.35 !important;
+  gap: 0 !important;
+  padding: 0 !important;
 }
 
 .ims-page-container .ims-register-row > * {
   justify-content: flex-start !important;
   font-weight: 400 !important;
   text-align: left !important;
+  padding: 10px !important;
+  box-sizing: border-box !important;
+  font-size: 12px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
-.ims-page-container .ims-register-row > :not(:first-child) strong,
-.ims-page-container .ims-register-row > :not(:first-child) b,
-.ims-page-container .ims-register-row > :not(:first-child) span,
-.ims-page-container .ims-register-row > :not(:first-child) a {
+.ims-page-container .ims-register-row > :not(:first-child),
+.ims-page-container .ims-register-row > :not(:first-child) *:not(button) {
   font-weight: 400 !important;
   text-align: left !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 .ims-page-container .ims-register-row > :first-child,
@@ -549,6 +663,7 @@ textarea {
   text-align: left !important;
 }
 
+.ims-page-container .ims-register-row > * button,
 .ims-page-container .ims-register-row button {
   font-weight: 800 !important;
 }
@@ -564,6 +679,10 @@ textarea {
 .ims-page-container table tbody tr[aria-selected="true"] > td,
 .ims-page-container table tbody tr[data-selected="true"] > td {
   background: #eef7f8;
+}
+
+.ims-page-container table tbody tr[aria-selected="true"] > td:first-child,
+.ims-page-container table tbody tr[data-selected="true"] > td:first-child {
   box-shadow: inset 3px 0 0 #005670;
 }
 

@@ -3986,6 +3986,9 @@ function ActionsPageContent() {
               onChange={(e) => setSearch(e.target.value)}
               style={inputStyle}
             />
+            <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
+              Clear Filters
+            </button>
             <button
               type="button"
               onClick={() => setShowRegisterFilters((current) => !current)}
@@ -4176,12 +4179,14 @@ function ActionsPageContent() {
                   return (
                     <tr
                       key={action.id}
+                      aria-selected={selected}
+                      data-selected={selected ? "true" : "false"}
                       onClick={() => setSelectedEvidenceAction(action)}
                       style={{
                         ...tableRowStyle,
                         cursor: "pointer",
                         background: overdue
-                          ? "#ECECE7"
+                          ? "#eef7f8"
                           : selected
                           ? "#ECECE7"
                           : linkedMatch
@@ -5391,7 +5396,7 @@ const simpleFilterShellStyle: CSSProperties = {
 
 const simpleFilterTopRowStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "minmax(220px, 1fr) minmax(150px, 220px)",
+  gridTemplateColumns: "minmax(220px, 1fr) auto 132px",
   gap: "10px",
   alignItems: "center",
 };

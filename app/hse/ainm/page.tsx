@@ -27,8 +27,15 @@ import {
 } from "docx";
 import * as XLSX from "xlsx";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
+import { ImsButton, ImsFilterPanel, ImsPanel } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import {
+  imsTableCellStyle,
+  imsTableHeadStyle,
+  imsTableInfoRowStyle,
+  imsTableStyle,
+} from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -3173,35 +3180,41 @@ export default function HseAinmPage() {
 
       {activeView === "register" ? (
         <section style={registerLayoutStyle}>
-          <SectionCard title="AINM Register" subtitle="Tracker-style register with three-stage AINM workflow status.">
-            <div className="ims-filter-panel" style={toolbarStyle}>
-              <input style={searchStyle} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search AINM no., title, project, owner..." />
-              <button type="button" style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowRegisterFilters((current) => !current)}>
-                {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-              </button>
-            </div>
-            {showRegisterFilters ? (
-            <div className="ims-filter-panel" style={toolbarStyle}>
-              <select style={filterStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">All Status</option>
-                {overallStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
-              <select style={filterStyle} value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
-                <option value="">All Stage Status</option>
-                {stageStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
-              <select style={filterStyle} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as "" | AINMType)}>
-                <option value="">All Report Types</option>
-                <option value="Incident">Incident</option>
-                <option value="Accident">Accident</option>
-              </select>
-              <select style={filterStyle} value={classificationFilter} onChange={(e) => setClassificationFilter(e.target.value)}>
-                <option value="">All Classifications</option>
-                {eventClassifications.map((classification) => <option key={classification} value={classification}>{classification}</option>)}
-              </select>
-              <button type="button" style={secondaryButtonStyle} onClick={clearRegisterFilters}>Clear Filters</button>
-            </div>
-            ) : null}
+          <ImsPanel title="AINM Register" subtitle="Tracker-style register with three-stage AINM workflow status.">
+            <ImsFilterPanel
+              search={search}
+              onSearchChange={setSearch}
+              searchPlaceholder="Search AINM no., title, project, owner..."
+              showFilters={showRegisterFilters}
+              onToggleFilters={() => setShowRegisterFilters((current) => !current)}
+              actions={<ImsButton variant="secondary" onClick={clearRegisterFilters}>Clear Filters</ImsButton>}
+            >
+              <Field label="Status">
+                <select style={filterStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="">All statuses</option>
+                  {overallStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+              </Field>
+              <Field label="Stage Status">
+                <select style={filterStyle} value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
+                  <option value="">All stage statuses</option>
+                  {stageStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+              </Field>
+              <Field label="Report Type">
+                <select style={filterStyle} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as "" | AINMType)}>
+                  <option value="">All report types</option>
+                  <option value="Incident">Incident</option>
+                  <option value="Accident">Accident</option>
+                </select>
+              </Field>
+              <Field label="Classification">
+                <select style={filterStyle} value={classificationFilter} onChange={(e) => setClassificationFilter(e.target.value)}>
+                  <option value="">All classifications</option>
+                  {eventClassifications.map((classification) => <option key={classification} value={classification}>{classification}</option>)}
+                </select>
+              </Field>
+            </ImsFilterPanel>
             <div style={tableInfoRowStyle}>Showing {filteredRecords.length} of {records.length} AINMs</div>
             <div style={registerTableWrapStyle}>
               <table style={registerTableStyle}>
@@ -3237,7 +3250,7 @@ export default function HseAinmPage() {
                 </tbody>
               </table>
             </div>
-          </SectionCard>
+          </ImsPanel>
 
           {selected ? (
             <div ref={selectedDetailRef}>
@@ -3751,6 +3764,8 @@ export default function HseAinmPage() {
                   return (
                     <tr
                       key={group.key}
+                      aria-selected={selectedReportGroupKey === group.key}
+                      data-selected={selectedReportGroupKey === group.key ? "true" : "false"}
                       style={selectedReportGroupKey === group.key ? selectedRowStyle : trStyle}
                       onClick={() => setSelectedReportGroupKey(group.key)}
                     >
@@ -4023,7 +4038,7 @@ const topMetaRowStyle: CSSProperties = {
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
@@ -4137,53 +4152,21 @@ const toolbarStyle: CSSProperties = {
 };
 const searchStyle: CSSProperties = { ...inputStyle, minHeight: 44 };
 const filterStyle: CSSProperties = { ...inputStyle, minHeight: 44 };
-const tableInfoRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-start",
-  gap: "4px",
-  flexWrap: "wrap",
-  color: "#53565A",
-  fontSize: "13px",
-  fontWeight: 700,
-  margin: "12px 0",
-};
+const tableInfoRowStyle: CSSProperties = imsTableInfoRowStyle;
 const registerLayoutStyle: CSSProperties = { display: "grid", gap: 20 };
 const registerTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 const registerTableStyle: CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-  background: "#ffffff",
+  ...imsTableStyle,
   minWidth: 960,
-  fontSize: "13px",
 };
-const thStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "13px 14px",
-  background: "#ECECE7",
-  color: "#53565A",
-  fontSize: "12px",
-  fontWeight: 900,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  borderBottom: "1px solid #D0D0CE",
-  whiteSpace: "nowrap",
-};
-const tdStyle: CSSProperties = {
-  padding: "13px 14px",
-  borderBottom: "1px solid #ECECE7",
-  color: "#000000",
-  verticalAlign: "middle",
-  fontSize: "13px",
-  lineHeight: 1.45,
-};
-const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 900, color: "#005670" };
+const thStyle: CSSProperties = imsTableHeadStyle;
+const tdStyle: CSSProperties = imsTableCellStyle;
+const tdStrongStyle: CSSProperties = { ...tdStyle, fontWeight: 800, color: "#005670" };
 const reportHistoryPanelStyle: CSSProperties = {
   border: "1px solid #D0D0CE",
   borderRadius: 16,
@@ -4192,8 +4175,8 @@ const reportHistoryPanelStyle: CSSProperties = {
   background: "#ECECE7",
 };
 const trStyle: CSSProperties = { cursor: "pointer" };
-const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#eef7f8", boxShadow: "inset 4px 0 0 #005670" };
-const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 900 };
+const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#eef7f8" };
+const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 400, lineHeight: 1.35, whiteSpace: "nowrap" };
 const detailTabStyle: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 };
 const detailSectionStyle: CSSProperties = {
   border: "1px solid #D0D0CE",

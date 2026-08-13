@@ -2759,7 +2759,7 @@ const topMetaRowStyle: CSSProperties = {
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
@@ -2821,7 +2821,7 @@ const tableInfoStyle: CSSProperties = {
 const tableShellStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };

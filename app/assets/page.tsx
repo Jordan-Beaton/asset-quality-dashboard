@@ -2442,6 +2442,8 @@ function AssetsPageContent() {
                 filteredAssets.map((asset) => (
                   <tr
                     key={asset.id}
+                    aria-selected={selectedAssetId === asset.id}
+                    data-selected={selectedAssetId === asset.id ? "true" : "false"}
                     onClick={() => {
                       setSelectedAssetId(asset.id);
                       setIsDetailPanelOpen(true);
@@ -2455,7 +2457,6 @@ function AssetsPageContent() {
                     style={{
                       ...registerTableRowStyle,
                       background: selectedAssetId === asset.id ? "#eef7f8" : "#ffffff",
-                      boxShadow: selectedAssetId === asset.id ? "inset 4px 0 0 #005670" : "inset 4px 0 0 transparent",
                     }}
                   >
                     <td style={{ ...imsTableCellStyle, fontWeight: 900, color: "#005670" }}>{asset.asset_code || "-"}</td>
@@ -3946,7 +3947,7 @@ const miniMetricValueStyle: CSSProperties = {
 const compactTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };

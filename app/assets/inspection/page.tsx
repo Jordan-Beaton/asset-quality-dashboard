@@ -949,6 +949,8 @@ function InspectionPageContent() {
                     return (
                       <tr
                         key={record.id}
+                        aria-selected={selected}
+                        data-selected={selected ? "true" : "false"}
                         style={selected ? selectedRegisterRowStyle : registerRowStyle}
                         onClick={() => {
                           setSelectedRecordId(record.id);

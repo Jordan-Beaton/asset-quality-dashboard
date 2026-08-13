@@ -6,10 +6,10 @@ import * as XLSX from "xlsx";
 import { ImsTopMetaRow } from "../../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../../src/components/QualityPageHero";
-import { WaddenSeaWorkspaceNav } from "../../../../src/components/WaddenSeaWorkspaceNav";
+import { BalticPowerWorkspaceNav } from "../../../../src/components/BalticPowerWorkspaceNav";
 import { supabase } from "../../../../src/lib/supabase";
 
-const PROJECT_KEY = "wadden-sea";
+const PROJECT_KEY = "baltic-power";
 const STORAGE_BUCKET = "project-documents";
 
 type Revision = {
@@ -570,10 +570,10 @@ export default function WaddenSeaItpPage() {
 
   return (
     <main style={page}>
-      <QualityPageHero label="Wadden Sea · Document intelligence" title="ITP Tracker" description="One controlled record per ITP, automatic metadata capture, complete revision history, and live Enshore workflow visibility." />
+      <QualityPageHero label="Baltic Power Â· Document intelligence" title="ITP Tracker" description="One controlled record per ITP, automatic metadata capture, complete revision history, and live Enshore workflow visibility." />
 
-      <ImsTopMetaRow backHref="/projects/wadden-sea" backLabel="Back to Wadden Sea" status={<><strong>Status:</strong> {message || "Latest active ITP revisions loaded."}</>} />
-      <WaddenSeaWorkspaceNav active="itp" />
+      <ImsTopMetaRow backHref="/projects/baltic-power" backLabel="Back to Baltic Power" status={<><strong>Status:</strong> {message || "Latest active ITP revisions loaded."}</>} />
+      <BalticPowerWorkspaceNav active="itp" />
 
       <section className="quality-kpi-grid" style={metricsGrid}>
         <QualityKpiCard title="Total ITPs" value={metrics.total} accent="#63B1BC" />
@@ -589,7 +589,7 @@ export default function WaddenSeaItpPage() {
             <div style={sectionKicker}>Master register</div>
             <h2 style={sectionTitle}>Supplier ITP programme</h2>
           </div>
-          <button style={primaryButton} onClick={() => { setEditingRow(null); setFile(null); setDraft(emptyDraft); setDialogOpen(true); }}>＋ Upload ITP / revision</button>
+          <button style={primaryButton} onClick={() => { setEditingRow(null); setFile(null); setDraft(emptyDraft); setDialogOpen(true); }}>ï¼‹ Upload ITP / revision</button>
         </div>
         <div className="ims-tabs" style={viewTabs} role="tablist" aria-label="ITP register views">
           <button role="tab" aria-selected={registerView === "current"} data-active={registerView === "current" ? "true" : "false"} style={registerView === "current" ? activeViewTab : viewTab} onClick={() => setRegisterView("current")}>Current register ({rows.length})</button>
@@ -597,7 +597,7 @@ export default function WaddenSeaItpPage() {
         </div>
         {registerView === "current" ? <>
         <div style={filters}>
-          <input style={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search document, title, supplier or package…" />
+          <input style={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search document, title, supplier or packageâ€¦" />
           <select style={select} value={scope} onChange={(event) => setScope(event.target.value)}><option>All</option>{scopes.map((value) => <option key={value}>{value}</option>)}</select>
           <select style={select} value={stage} onChange={(event) => setStage(event.target.value)}><option>All</option>{stages.map((value) => <option key={value}>{value}</option>)}</select>
         </div>
@@ -621,14 +621,14 @@ export default function WaddenSeaItpPage() {
                     : {};
                 return [
                   <tr key={row.id}>
-                    <td style={td}><strong>{row.supplier || "—"}</strong><span style={secondary}>{row.package_name || ""}</span></td>
+                    <td style={td}><strong>{row.supplier || "â€”"}</strong><span style={secondary}>{row.package_name || ""}</span></td>
                     <td style={td}><select aria-label={`Scope for ${row.document_number}`} style={{ ...cellSelect, ...scopeTone }} value={row.scope || ""} onChange={(event) => void updateMaster(row, { scope: event.target.value || null })}><option value="">Select</option><option>Trencher</option><option>Barge</option></select></td>
                     <td style={td}><strong style={docNo}>{row.document_number}</strong><span style={compactTitle} title={row.title}>{row.title}</span></td>
-                    <td style={td}><strong>{revision?.revision || "—"}</strong><span style={secondary}>{revision?.revision_date ? new Date(`${revision.revision_date}T00:00:00`).toLocaleDateString("en-GB") : ""}</span></td>
+                    <td style={td}><strong>{revision?.revision || "â€”"}</strong><span style={secondary}>{revision?.revision_date ? new Date(`${revision.revision_date}T00:00:00`).toLocaleDateString("en-GB") : ""}</span></td>
                     <td style={td}><select aria-label={`Reviewer for ${row.document_number}`} style={cellSelect} value={row.enshore_reviewer || ""} onChange={(event) => void updateMaster(row, { enshore_reviewer: event.target.value || null })}>
                       <option value="">Assign</option>
                       {row.enshore_reviewer && !peopleOptions.some((person) => person.name === row.enshore_reviewer) && <option value={row.enshore_reviewer}>{row.enshore_reviewer}</option>}
-                      {peopleOptions.map((person) => <option key={person.id} value={person.name}>{person.name}{person.role ? ` — ${person.role}` : ""}</option>)}
+                      {peopleOptions.map((person) => <option key={person.id} value={person.name}>{person.name}{person.role ? ` â€” ${person.role}` : ""}</option>)}
                     </select></td>
                     <td style={td}><input aria-label={`Review date for ${row.document_number}`} style={cellInput} type="date" value={revision?.enshore_reviewed_at || ""} onChange={(event) => void updateRevision(row, revision, { enshore_reviewed_at: event.target.value || null })} /></td>
                     <td style={td}><select aria-label={`Decision for ${row.document_number}`} style={{ ...cellSelect, ...statusTone(revision?.enshore_decision || "Pending Review") }} value={revision?.enshore_decision || "Pending Review"} onChange={(event) => {
@@ -638,14 +638,14 @@ export default function WaddenSeaItpPage() {
                       if (decision === "Comments Issued") void updateMaster(row, { overall_stage: "Enshore Review", overall_status: "Comments Issued", next_action: "Await revised ITP" });
                     }}><option>Pending Review</option><option>Comments Issued</option><option>Approved</option><option>Rejected</option></select></td>
                     <td style={td}><select aria-label={`Status for ${row.document_number}`} style={{ ...cellSelect, ...statusTone(row.overall_status) }} value={row.overall_status} onChange={(event) => void updateMaster(row, { overall_status: event.target.value })}>{statuses.map((value) => <option key={value}>{value}</option>)}</select><input aria-label={`Next action for ${row.document_number}`} style={{ ...cellInput, marginTop: 5 }} value={row.next_action || ""} placeholder="Next action" onChange={(event) => setRows((current) => current.map((item) => item.id === row.id ? { ...item, next_action: event.target.value } : item))} onBlur={(event) => void updateMaster(row, { next_action: event.target.value || null })} /></td>
-                    <td style={td}><div style={rowActions}><button style={editButton} onClick={() => openEdit(row)}>Edit</button><button style={deleteButton} disabled={savingId === row.id} onClick={() => void deleteItp(row)}>Delete</button><button title={savingId === row.id ? "Saving" : "Revision history"} style={historyButton} onClick={() => setExpandedId(expanded ? null : row.id)}>{savingId === row.id ? "…" : expanded ? "×" : row.project_itp_revisions?.length || 0}</button></div></td>
+                    <td style={td}><div style={rowActions}><button style={editButton} onClick={() => openEdit(row)}>Edit</button><button style={deleteButton} disabled={savingId === row.id} onClick={() => void deleteItp(row)}>Delete</button><button title={savingId === row.id ? "Saving" : "Revision history"} style={historyButton} onClick={() => setExpandedId(expanded ? null : row.id)}>{savingId === row.id ? "â€¦" : expanded ? "Ã—" : row.project_itp_revisions?.length || 0}</button></div></td>
                   </tr>,
-                  expanded && <tr key={`${row.id}-history`}><td className="ims-table-detail-cell" colSpan={9} style={historyCell}>
+                  expanded && <tr key={`${row.id}-history`}><td colSpan={9} style={historyCell}>
                     <div style={historyHeader}><strong>Controlled revision history</strong><span>Every uploaded source file is retained.</span></div>
-                    <div className="ims-table-detail-content" style={historyList}>{[...(row.project_itp_revisions || [])].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at)).map((item) => (
+                    <div style={historyList}>{[...(row.project_itp_revisions || [])].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at)).map((item) => (
                       <div key={item.id} style={historyRow}>
                         <span style={revisionBadge}>Rev {item.revision}</span>
-                        <span><strong>{item.file_name}</strong><small style={small}>{item.revision_date ? new Date(`${item.revision_date}T00:00:00`).toLocaleDateString("en-GB") : "No revision date"} · {item.extraction_confidence || "Manual"} extraction</small></span>
+                        <span><strong>{item.file_name}</strong><small style={small}>{item.revision_date ? new Date(`${item.revision_date}T00:00:00`).toLocaleDateString("en-GB") : "No revision date"} Â· {item.extraction_confidence || "Manual"} extraction</small></span>
                         <span style={item.is_current ? currentPill : supersededPill}>{item.is_current ? "Current" : "Superseded"}</span>
                         <button style={linkButton} onClick={() => void openFile(item)}>Open file</button>
                       </div>
@@ -654,7 +654,7 @@ export default function WaddenSeaItpPage() {
                 ];
               })}
               {!loading && filtered.length === 0 && <tr><td colSpan={9} style={empty}>No ITPs match the current filters.</td></tr>}
-              {loading && <tr><td colSpan={9} style={empty}>Loading the controlled register…</td></tr>}
+              {loading && <tr><td colSpan={9} style={empty}>Loading the controlled registerâ€¦</td></tr>}
             </tbody>
           </table>
         </div>
@@ -675,9 +675,9 @@ export default function WaddenSeaItpPage() {
 
       {dialogOpen && <div style={overlay} onMouseDown={(event) => { if (event.target === event.currentTarget) { setDialogOpen(false); setEditingRow(null); } }}>
         <section style={dialog}>
-          <div style={dialogHeader}><div><div style={sectionKicker}>{editingRow ? "Record management" : "Document intake"}</div><h2 style={sectionTitle}>{editingRow ? "Edit current ITP" : "Upload ITP or new revision"}</h2></div><button style={closeButton} onClick={() => { setDialogOpen(false); setEditingRow(null); }}>×</button></div>
-          {!editingRow && <label style={dropzone}><input type="file" accept=".xlsx,.xls,.xlsm,.pdf,.docx" onChange={(event) => void chooseFile(event)} style={{ display: "none" }} /><strong>{file ? file.name : "Choose the ITP document"}</strong><span>{busy ? "Reading document metadata…" : "Excel, PDF, or Word · the original file will be retained"}</span></label>}
-          {file && !editingRow && <div style={confidence}>Extraction confidence: <strong>{draft.confidence}</strong> · Confirm the fields before saving.</div>}
+          <div style={dialogHeader}><div><div style={sectionKicker}>{editingRow ? "Record management" : "Document intake"}</div><h2 style={sectionTitle}>{editingRow ? "Edit current ITP" : "Upload ITP or new revision"}</h2></div><button style={closeButton} onClick={() => { setDialogOpen(false); setEditingRow(null); }}>Ã—</button></div>
+          {!editingRow && <label style={dropzone}><input type="file" accept=".xlsx,.xls,.xlsm,.pdf,.docx" onChange={(event) => void chooseFile(event)} style={{ display: "none" }} /><strong>{file ? file.name : "Choose the ITP document"}</strong><span>{busy ? "Reading document metadataâ€¦" : "Excel, PDF, or Word Â· the original file will be retained"}</span></label>}
+          {file && !editingRow && <div style={confidence}>Extraction confidence: <strong>{draft.confidence}</strong> Â· Confirm the fields before saving.</div>}
           {editingRow && <div style={confidence}>Editing the current register information. The stored source document and revision archive will not be replaced.</div>}
           <div style={formGrid}>
             <Field label="Document number *" value={draft.documentNumber} set={(value) => setDraft({ ...draft, documentNumber: value })} />
@@ -697,7 +697,7 @@ export default function WaddenSeaItpPage() {
               <Field label="Action due date" type="date" value={draft.dueDate} set={(value) => setDraft({ ...draft, dueDate: value })} />
             </>}
           </div>
-          <div style={dialogActions}><button style={secondaryButton} onClick={() => { setDialogOpen(false); setEditingRow(null); }}>Cancel</button><button style={primaryButton} disabled={busy} onClick={() => void saveUpload()}>{busy ? "Saving…" : editingRow ? "Save changes" : "Save controlled revision"}</button></div>
+          <div style={dialogActions}><button style={secondaryButton} onClick={() => { setDialogOpen(false); setEditingRow(null); }}>Cancel</button><button style={primaryButton} disabled={busy} onClick={() => void saveUpload()}>{busy ? "Savingâ€¦" : editingRow ? "Save changes" : "Save controlled revision"}</button></div>
         </section>
       </div>}
     </main>
@@ -763,3 +763,5 @@ const confidence: CSSProperties = { background: "#ECECE7", color: "#53565A", pad
 const formGrid: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 13 };
 const field: CSSProperties = { display: "grid", gap: 6, color: "#53565A", fontWeight: 800, fontSize: 12 };
 const dialogActions: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 10, borderTop: "1px solid #D0D0CE", paddingTop: 17 };
+
+

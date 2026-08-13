@@ -37,7 +37,7 @@ The approved visual reference for registers is Project Management > Wadden Sea >
 ### Corrected in this pass
 
 - Older registers used pale headers, 13px type, and `12px 14px` cells; Project ITP/NOI used a cleaner compact dark-header programme style.
-- A shared `ims-data-table` contract now applies the ITP-derived visual language to every secured table, including tables rendered dynamically after tab and filter changes.
+- A shared `ims-data-table` contract applies the Observation-derived register structure and the compact ITP typography to every secured table, including tables rendered dynamically after tab and filter changes.
 - A follow-up structural pass identified table-like registers built from CSS grid rows rather than semantic `<table>` elements. Audit Programme, Audit Open Findings, Document Register, NCR Register, MOC Register, and the HSE inspection checklist/action matrices now explicitly use the same compact dark-header language.
 - Shared table theme exports now match the same contract for pages already using `imsTheme` directly.
 - Table rows now use consistent restrained hover and selected states.
@@ -125,6 +125,8 @@ The approved visual reference for registers is Project Management > Wadden Sea >
 
 ## Final whole-system acceptance status
 
+Roadmap disposition: visual and structural standardisation is complete and must not remain an open recurring roadmap item. The checks below are deployment/browser/output acceptance checks for the implemented baseline, not another design pass. Any failure should be logged as a specific regression against a named route or output family.
+
 Structurally verified:
 
 - All 66 App Router page files and all 78 generated build routes.
@@ -140,6 +142,44 @@ Still required before declaring visual QA complete:
 - Generation, rendering and page-by-page inspection of representative PDF and Word outputs from each generator family using real records and long-content cases.
 
 Do not describe the complete IMS as visually signed off until these browser and rendered-output checks have been completed and any exceptions corrected.
+
+## Permanent regression controls
+
+- `npm run check:ui` scans `app` and `src` for unapproved six-digit colours and prohibited standalone Refresh text.
+- `npm run check` runs the UI contract, deployable-application ESLint, and the production build. `npm run lint` remains the separate whole-repository check, including standalone utility scripts.
+- `UI_STANDARDS.md` is the normative specification; this audit is the baseline evidence and acceptance matrix.
+- Future work should fix evidenced route-level regressions and must not create a generic recurring “standardise the IMS” backlog item.
+
+## Register benchmark clarification — 13 August 2026
+
+The earlier ITP-derived wording was too broad and allowed shell geometry and
+vertical scrolling to drift between implementations. The HSE Observation
+Register is now the explicit structural benchmark for semantic tables and
+custom-grid registers. Project and workflow registers retain their own
+semantic badge/decision colours, but share the Observation shell, inset,
+radius, density, alignment, first-column emphasis and selected-row treatment.
+
+The follow-up review found that matching only table typography was
+insufficient. AINM still used a legacy two-equal-column toolbar and local
+panel structure, while several semantic tables painted the selected marker on
+the complete table row. In collapsed-border tables this produced repeated
+blue vertical lines at cell boundaries. AINM Register now uses `ImsPanel` and
+`ImsFilterPanel` directly, matching Observation's title weight, search/action
+proportions, Clear Filters placement and expanded filter grid. Across the IMS,
+semantic selected rows now expose `aria-selected` / `data-selected`, receive
+the pale-blue row background, and draw the Enshore marker on the first cell
+only. Legacy direct search/toggle toolbars inherit the same flexible search
+and compact action proportions through the shared CSS contract.
+
+`check:ui` now rejects a selected semantic-row style that applies an inset
+shadow to the full row, preventing the repeated-column-line regression from
+returning.
+
+The shared table enhancer now marks semantic table parents with
+`ims-register-table-wrap`, so tables revealed after tab changes or data loads
+receive the same shell automatically. Custom `ims-register-shell` bodies no
+longer keep page-specific vertical height caps; normal page scrolling replaces
+nested vertical register scrollbars.
 
 ## Register acceptance matrix
 
@@ -176,3 +216,41 @@ Representative mobile checks passed for a standard register (Central Actions) an
 - Repeat the same route matrix against Vercel with representative real records and Full/Part/None permission profiles.
 - Complete physical-device checks at 320–360px, 390px, 430px, and phone landscape as defined in `MOBILE_COMPATIBILITY_HANDOVER.md`.
 - When individual legacy pages are next touched, replace their redundant local table constants with the shared theme exports; the global contract already prevents visual drift in the meantime.
+
+## Observation-master acceptance pass — 13 August 2026
+
+A further authenticated Edge pass used the rendered HSE Observation Register
+as the literal size and layout benchmark. It found that the earlier token-level
+alignment had left card-like secondary content and duplicate padding inside
+several semantic and custom-grid registers.
+
+Corrected in this pass:
+
+- Custom-grid headers and rows no longer apply parent padding/gaps in addition
+  to their cell padding. NCR, MOC, Audit Programme, Findings and Documents now
+  have the same single `9px 10px` header and `10px` body-cell inset as
+  Observation.
+- A custom-grid row is explicitly normal weight; only its first child remains
+  `800`. Nested title elements can no longer restore local 15px/bold styling.
+- Semantic tables apply the same nested-text rule: only the first column is
+  bold, with all other nested labels, links and badges normal weight.
+- Register summary rows show the primary value for each column. Secondary
+  filenames, descriptions, duplicate due-state text and other detail metadata
+  remain available in the opened detail panel instead of increasing register
+  row height.
+- Direct legacy search/filter toolbars now use an expanding search field and a
+  compact `132px` filter toggle. Central Actions also exposes Clear Filters in
+  the collapsed toolbar, matching Observation.
+- Full-row selection shadows were removed from semantic tables. Rendered Edge
+  checks confirmed pale-blue selection across every cell with the blue marker
+  only on the first cell; custom-grid registers retain one marker on the row
+  container without repeated column lines.
+
+Authenticated Edge coverage included MOC, NCR, Audit Programme, Findings,
+Central/Quality/HSE/Asset Actions, Quality/HSE Calendars, AINM Register and
+Reports, Observations, PTW, HSE Inspections, Asset Register, Calibration,
+Asset Inspection, Asset Maintenance, Document Register/Workflow/Archive,
+Risk Register, People, Admin Users & Access/Audit Log, Lessons Learned,
+Certification, Project ITP and Project NOI. Rendered console error review was
+clear. Empty-data states were accepted where the signed-in dataset returned no
+rows.

@@ -802,6 +802,8 @@ export default function QualityCalendarPage() {
                   {filteredEvents.map((event) => (
                     <tr
                       key={event.id}
+                      aria-selected={selectedId === event.id}
+                      data-selected={selectedId === event.id ? "true" : "false"}
                       onClick={() => openEvent(event)}
                       style={{ cursor: "pointer", background: selectedId === event.id ? imsColours.brandSoft : "white" }}
                     >

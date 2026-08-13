@@ -86,3 +86,14 @@ At phone widths the workspace inherits the whole-IMS bottom navigation, one-colu
 - Do not overwrite controlled template labels, footer identity, revision information or response/signature sections.
 - Do not reuse an NOI number that is still assigned to an issued record.
 - Preserve planned dates when deleting an NOI; deletion removes the notice, not the underlying inspection requirement.
+
+## Baltic Power
+
+- Entry route: `/projects/baltic-power`.
+- Tabs mirror the Wadden Sea operational workspace except Project Reports: Dashboard, ITP Tracker, NOI Tracker, NOI Creator, and ITP Sign-Off.
+- Baltic Power records use the separate `baltic-power` project key and storage paths; do not mix them with Wadden Sea records.
+- ITP Sign-Off detects every numbered phase heading in the standard ITP structure, presents unselected phase checkboxes, and retains only each task ID and activity description beneath the selected headings for a faster, focused workflow. Multiple selected phases are issued as separate auditable decisions to a free-entry recipient email.
+- The external confirmation records recipient email, confirmed full name, decision, reason where rejected, and exact decision timestamp. It deliberately does not collect a drawn signature.
+- The recipient must verify access to the intended mailbox with a six-digit, ten-minute one-time code before the decision is accepted. After the decision, the IMS generates an immutable PDF certificate, stores its SHA-256 hash and storage path, attaches it to a confirmation email sent to recipient and originator, and retains the request, verification and confirmation provider message IDs.
+- Database setup: `scripts/sql/project_itp_sign_off.sql`. Apply through the Supabase SQL editor before live testing; it has not been applied from the repository.
+- Validate extraction against the complete controlled Baltic Power ITP, especially continuation rows and surveillance columns, before relying on the issued phase record.

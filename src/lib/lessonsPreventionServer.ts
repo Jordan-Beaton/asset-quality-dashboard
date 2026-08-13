@@ -18,6 +18,13 @@ export async function loadAllPreventionLessons(supabase: SupabaseClient) {
   }
 }
 
+export async function loadPreventionLessonsByIds(supabase: SupabaseClient, lessonIds: string[]) {
+  if (!lessonIds.length) return [];
+  const { data, error } = await supabase.from("lessons_learned").select(LESSON_FIELDS).eq("outcome_type", "Failure").in("id", lessonIds);
+  if (error) throw error;
+  return (data || []) as PreventionLesson[];
+}
+
 async function createEmbedding(apiKey: string, input: string) {
   const response = await fetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
@@ -30,20 +37,24 @@ async function createEmbedding(apiKey: string, input: string) {
 }
 
 export async function retrievePreventionEvidence(supabase: SupabaseClient, apiKey: string, question: string, lessons: PreventionLesson[]) {
+  const keywordMatches = keywordCandidates(lessons, question, 250);
   try {
     const embedding = await createEmbedding(apiKey, question);
     if (embedding?.length) {
-      const { data, error } = await supabase.rpc("match_lessons_learned_prevention", { query_embedding: embedding, match_count: 45, minimum_similarity: 0.3 });
+      const { data, error } = await supabase.rpc("match_lessons_learned_prevention", { query_embedding: embedding, match_count: 200, minimum_similarity: 0.3 });
       if (!error && Array.isArray(data) && data.length) {
         const byId = new Map(lessons.map((lesson) => [lesson.id, lesson]));
         const matches = data.map((row: { lesson_id?: string }) => row.lesson_id ? byId.get(row.lesson_id) : undefined).filter(Boolean) as PreventionLesson[];
-        if (matches.length) return { candidates: matches, mode: "semantic" as const };
+        if (matches.length) {
+          const combined = new Map([...keywordMatches, ...matches].map((lesson) => [lesson.id, lesson]));
+          return { candidates: [...combined.values()].slice(0, 250), mode: "semantic" as const, screenedCount: lessons.length };
+        }
       }
     }
   } catch {
     // The keyword fallback keeps the assistant operational before the optional semantic migration/index is applied.
   }
-  return { candidates: keywordCandidates(lessons, question), mode: "keyword" as const };
+  return { candidates: keywordMatches, mode: "keyword" as const, screenedCount: lessons.length };
 }
 
 export async function generatePreventionBrief(apiKey: string, question: string, candidates: PreventionLesson[], document?: { name: string; text: string }) {
@@ -87,6 +98,7 @@ export async function generatePreventionBrief(apiKey: string, question: string, 
         max_output_tokens: 8000,
         store: false,
       }),
+      signal: AbortSignal.timeout(120000),
     });
     const payload = await response.json() as Record<string, unknown> & { error?: { message?: string }; status?: string; incomplete_details?: { reason?: string } };
     if (!response.ok) throw new Error(payload.error?.message || "The prevention analysis request failed.");
@@ -98,13 +110,52 @@ export async function generatePreventionBrief(apiKey: string, question: string, 
       throw new Error(payload.status === "incomplete" ? "The AI response reached its output limit before completing the prevention briefing." : "The AI returned an invalid prevention briefing format.");
     }
   }
+  async function synthesiseBrief(partials: PreventionResult[]) {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: process.env.OPENAI_LESSONS_MODEL || "gpt-5-mini",
+        input: [{ role: "system", content: system }, { role: "user", content: [
+          `User question: ${question}`,
+          `The relevance-ranked candidate population was analysed in ${partials.length} evidence batches. Consolidate these batch findings without losing recurring themes or inventing evidence. Do not describe the candidate count as an exact total of every related lesson unless the evidence explicitly supports that claim.`,
+          JSON.stringify(partials.map((item) => ({ summary: item.summary, scope: item.scope, cautions: item.cautions, limitations: item.limitations, matched_lesson_ids: item.matched_lesson_ids }))),
+          "Return one management-ready brief with 3-6 prioritised cautions. Retain supporting UUIDs from the batch findings only.",
+        ].join("\n\n") }],
+        reasoning: { effort: "low" },
+        text: { format: { type: "json_schema", name: "lessons_prevention_brief", strict: true, schema: preventionResponseSchema } },
+        max_output_tokens: 8000, store: false,
+      }),
+      signal: AbortSignal.timeout(120000),
+    });
+    const payload = await response.json() as Record<string, unknown> & { error?: { message?: string } };
+    if (!response.ok) throw new Error(payload.error?.message || "The prevention synthesis request failed.");
+    const text = extractOpenAiText(payload);
+    if (!text) throw new Error("The AI service returned no consolidated prevention briefing.");
+    return JSON.parse(text) as PreventionResult;
+  }
   let result: PreventionResult;
-  try {
-    result = await requestBrief(candidates.slice(0, 40), 1800, 40000);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (!/incomplete|output limit|invalid prevention briefing format/i.test(message)) throw error;
-    result = await requestBrief(candidates.slice(0, 24), 1200, 24000);
+  if (candidates.length > 40) {
+    const batches: PreventionLesson[][] = [];
+    for (let index = 0; index < candidates.length; index += 35) batches.push(candidates.slice(index, index + 35));
+    const partials: PreventionResult[] = new Array(batches.length);
+    let nextBatch = 0;
+    async function analyseBatches() {
+      while (nextBatch < batches.length) {
+        const index = nextBatch++;
+        partials[index] = await requestBrief(batches[index], 1200, document ? 12000 : 0);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(3, batches.length) }, () => analyseBatches()));
+    result = await synthesiseBrief(partials);
+  } else {
+    try {
+      result = await requestBrief(candidates, 1800, 40000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (!/incomplete|output limit|invalid prevention briefing format/i.test(message)) throw error;
+      result = await requestBrief(candidates.slice(0, 24), 1200, 24000);
+    }
   }
   const allowedIds = new Set(candidates.map((lesson) => lesson.id));
   result.cautions = (result.cautions || []).map((caution) => ({ ...caution, lesson_ids: caution.lesson_ids.filter((id) => allowedIds.has(id)) })).filter((caution) => caution.lesson_ids.length);
@@ -115,12 +166,19 @@ export async function generatePreventionBrief(apiKey: string, question: string, 
 
 export async function embedLessonBatch(supabase: SupabaseClient, apiKey: string, lessons: PreventionLesson[]) {
   if (!lessons.length) return 0;
-  const inputs = lessons.map(lessonSearchText);
-  const response = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: process.env.OPENAI_LESSONS_EMBEDDING_MODEL || "text-embedding-3-small", input: inputs }),
-  });
+  const inputs = lessons.map((lesson) => lessonSearchText(lesson).slice(0, 12000));
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: process.env.OPENAI_LESSONS_EMBEDDING_MODEL || "text-embedding-3-small", input: inputs }),
+      signal: AbortSignal.timeout(45000),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) throw new Error("The embedding service timed out. The batch is safe to retry.");
+    throw error;
+  }
   const payload = await response.json();
   if (!response.ok) throw new Error(payload?.error?.message || "Embedding batch failed.");
   const rows = lessons.map((lesson, index) => ({ lesson_id: lesson.id, content_hash: `${lesson.updated_at || ""}:${inputs[index].length}`, embedding: payload.data[index].embedding, embedded_at: new Date().toISOString() }));

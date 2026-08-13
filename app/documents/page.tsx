@@ -4235,7 +4235,7 @@ const topMetaRowStyle: CSSProperties = {
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
@@ -4977,7 +4977,7 @@ const tableInfoRowStyle: CSSProperties = {
 const registerTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
@@ -4998,8 +4998,7 @@ const registerHeadStyle: CSSProperties = {
 };
 
 const registerBodyStyle: CSSProperties = {
-  maxHeight: "980px",
-  overflowY: "auto",
+  overflowY: "visible",
 };
 
 const registerRowStyle: CSSProperties = {

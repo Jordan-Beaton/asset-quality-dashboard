@@ -2,7 +2,7 @@
 
 The IMS is now a broad internal management system covering Quality, HSE, Assets, Document Control, Actions, People, Admin/Settings, Management Review, and Risk. The core application shell, Supabase-backed data model, permission model, left workspace navigation, shared IMS visual primitives, and several module workflows are in place.
 
-The ITP-derived whole-IMS visual and structural baseline is complete. Quality remains the workflow benchmark, Project ITP is the register benchmark, and HSE is the mobile/field benchmark. The highest-value near-term work is production workflow and permission QA without destabilising document numbering, revision history, invite/auth flows, or the completed UI contract.
+The whole-IMS visual and structural baseline is complete. Quality remains the workflow benchmark, the HSE Observation Register is the register-structure benchmark, Project ITP remains the editable programme benchmark, and HSE inspections remain the mobile/field benchmark. The highest-value near-term work is production workflow and permission QA without destabilising document numbering, revision history, invite/auth flows, or the completed UI contract.
 
 # Completed
 
@@ -235,7 +235,7 @@ The ITP-derived whole-IMS visual and structural baseline is complete. Quality re
   - Test repeated-record drill-downs and all KPI/chart interactions.
   - Preserve fixed register columns and the five-second rotating learning insight.
   - Improve classifications progressively without overstating conclusions from poor historic narratives.
-  - Apply `scripts/sql/lessons_learned_prevention_ai.sql`, configure `OPENAI_BUSINESS_API_KEY` from the Enshore business OpenAI project in Vercel, build the complete failure index, and verify question/procedure results against known trenching, rigging, mobilisation and communication examples.
+  - Complete the one-off production failure-index backfill to the live failure total, then verify automatic incremental indexing after create, edit, outcome change and bulk import. The paginated resumable builder now uses missing-first batches, timeouts and retry; normal future lessons do not require a full rebuild.
   - Confirm every AI caution cites and opens its actual supporting lessons, weak evidence produces proportionate confidence/limitations, the keyword fallback is visibly labelled, and the Master Admin-only index rebuild remains server-enforced.
 
 ## Management Review

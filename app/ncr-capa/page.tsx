@@ -4076,7 +4076,6 @@ function NcrCapaPageContent() {
                       style={{
                         ...registerRowStyle,
                         background: active ? "#eef7f8" : "#ffffff",
-                        borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                       }}
                     >
                       <div style={registerSimpleTextStyle}>{row.number}</div>
@@ -5151,7 +5150,7 @@ const topMetaRowStyle: CSSProperties = {
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
@@ -5876,7 +5875,7 @@ const tableInfoRowStyle: CSSProperties = {
 const registerTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
@@ -5909,8 +5908,7 @@ const sortableHeaderButtonStyle: CSSProperties = {
 };
 
 const registerBodyStyle: CSSProperties = {
-  maxHeight: "760px",
-  overflowY: "auto",
+  overflowY: "visible",
 };
 
 const registerRowStyle: CSSProperties = {

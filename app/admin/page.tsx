@@ -1184,11 +1184,12 @@ export default function AdminDashboardPage() {
                     return (
                       <Fragment key={person.id}>
                         <tr
+                          aria-selected={isSelected}
+                          data-selected={isSelected ? "true" : "false"}
                           onClick={() => setSelectedOverridePersonId(isSelected ? "" : person.id)}
                           style={{
                             cursor: "pointer",
-                            background: isSelected ? "rgba(0, 86, 112, 0.08)" : "#ffffff",
-                            borderLeft: isSelected ? `4px solid ${imsColours.brand}` : "4px solid transparent",
+                            background: isSelected ? "#eef7f8" : "#ffffff",
                           }}
                         >
                           <td style={imsTableCellStyle}>

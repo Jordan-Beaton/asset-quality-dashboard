@@ -3628,7 +3628,6 @@ function MOCPageContent() {
                       style={{
                         ...mocRegisterRowStyle,
                         background: active ? "#eef7f8" : "#ffffff",
-                        borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                       }}
                       onClick={() => openBundle(report.id)}
                     >
@@ -5120,7 +5119,7 @@ const toolbarStyle: CSSProperties = {
   marginBottom: "14px",
   padding: "12px",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "rgba(248,250,252,0.92)",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
@@ -5157,7 +5156,7 @@ const tableInfoRowStyle: CSSProperties = {
 const registerTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
@@ -5178,8 +5177,7 @@ const mocRegisterHeadStyle: CSSProperties = {
 };
 
 const registerBodyStyle: CSSProperties = {
-  maxHeight: "760px",
-  overflowY: "auto",
+  overflowY: "visible",
 };
 
 const mocRegisterRowStyle: CSSProperties = {

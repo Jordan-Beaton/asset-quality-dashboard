@@ -4,6 +4,7 @@ import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import type { PreventionResult } from "../lib/lessonsPrevention";
 import { ImsButton, ImsPanel } from "./ImsPrimitives";
 import { imsColours, imsInputStyle } from "./imsTheme";
+import { supabase } from "../lib/supabase";
 
 type IndexStatus = { configured: boolean; migration_required: boolean; total: number; indexed: number };
 
@@ -25,19 +26,29 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
   async function ask(event: FormEvent) {
     event.preventDefault();
     setWorking(true); setResult(null); setMessage(file ? `Reviewing ${file.name} against historic failures...` : "Finding and consolidating relevant failure evidence...");
+    let temporaryStoragePath = "";
     try {
-      const response = file ? await fetch("/api/lessons-learned/procedure-review", {
-        method: "POST",
-        body: (() => { const form = new FormData(); form.set("question", question); form.set("file", file); return form; })(),
-      }) : await fetch("/api/lessons-learned/prevention-query", {
+      let response: Response;
+      if (file) {
+        if (file.size > 20 * 1024 * 1024) throw new Error("The document exceeds the 20 MB review limit.");
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+        const storagePath = `AI-REVIEW/${crypto.randomUUID()}-${safeName}`;
+        temporaryStoragePath = storagePath;
+        const { error: uploadError } = await supabase.storage.from("lessons-learned-evidence").upload(storagePath, file, { contentType: file.type || "application/octet-stream", upsert: false });
+        if (uploadError) throw new Error(`Document upload failed: ${uploadError.message}`);
+        response = await fetch("/api/lessons-learned/procedure-review", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, storagePath, fileName: file.name, contentType: file.type, fileSize: file.size }),
+        });
+      } else response = await fetch("/api/lessons-learned/prevention-query", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "The prevention review failed.");
       setResult(payload as PreventionResult);
-      setMessage(`Completed using ${payload.evidence_count} retrieved failure records.`);
+      setMessage(`Screened ${(payload.screened_count || payload.evidence_count).toLocaleString()} failure lessons; deeply analysed ${payload.evidence_count.toLocaleString()} relevance-ranked candidates.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "The prevention review failed."); }
-    finally { setWorking(false); }
+    finally { if (temporaryStoragePath) void supabase.storage.from("lessons-learned-evidence").remove([temporaryStoragePath]); setWorking(false); }
   }
 
   async function buildIndex() {
@@ -45,9 +56,22 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
     try {
       let remaining = 1; let indexed = 0; let total = 0;
       while (remaining > 0) {
-        const response = await fetch("/api/lessons-learned/prevention-index", { method: "POST" });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Semantic indexing failed.");
+        let payload: { remaining: number; indexed: number; total: number; error?: string } | null = null;
+        for (let attempt = 1; attempt <= 3 && !payload; attempt += 1) {
+          const controller = new AbortController();
+          const timeout = window.setTimeout(() => controller.abort(), 60000);
+          try {
+            const response = await fetch("/api/lessons-learned/prevention-index", { method: "POST", signal: controller.signal });
+            const next = await response.json();
+            if (!response.ok) throw new Error(next.error || "Semantic indexing failed.");
+            payload = next;
+          } catch (error) {
+            if (attempt === 3) throw error;
+            setMessage(`Index batch interrupted. Retrying automatically (${attempt + 1} of 3)...`);
+            await new Promise((resolve) => window.setTimeout(resolve, 1500 * attempt));
+          } finally { window.clearTimeout(timeout); }
+        }
+        if (!payload) throw new Error("Semantic indexing stopped after three retry attempts.");
         remaining = payload.remaining; indexed = payload.indexed; total = payload.total;
         setStatus((current) => ({ ...current, configured: true, migration_required: false, indexed, total }));
         setMessage(`Indexed ${indexed.toLocaleString()} of ${total.toLocaleString()} failure lessons...`);
@@ -65,7 +89,7 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
       <form onSubmit={ask} style={askFormStyle}>
         <label style={fieldStyle}><span style={labelStyle}>What do you need to prevent?</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="For example: What trenching failures should our procedure prevent?" style={questionStyle} maxLength={2000} /></label>
         <div style={suggestionStyle}><span>Try:</span>{["What should we check before mobilisation?", "What rigging failures must our lift plans prevent?", "What communication failures have repeated offshore?"].map((text) => <button type="button" key={text} style={suggestionButtonStyle} onClick={() => setQuestion(text)}>{text}</button>)}</div>
-        <label style={fieldStyle}><span style={labelStyle}>Optional procedure</span><input type="file" accept=".pdf,.docx,.txt" onChange={(event) => setFile(event.target.files?.[0] || null)} style={fileStyle} /><small style={helpStyle}>Upload a PDF or Word procedure to compare its controls against relevant historic failures. Maximum 20 MB.</small></label>
+        <label style={fieldStyle}><span style={labelStyle}>Optional procedure</span><input type="file" accept=".pdf,.doc,.docx,.txt" onChange={(event) => setFile(event.target.files?.[0] || null)} style={fileStyle} /><small style={helpStyle}>Upload a PDF or Word document to compare its controls against relevant historic failures. Text, tables and scanned PDF pages are supported. Maximum 20 MB.</small></label>
         <div style={actionRowStyle}><ImsButton type="submit" disabled={working || question.trim().length < 8}>{working ? "Analysing evidence..." : file ? "Review Procedure" : "Generate Prevention Brief"}</ImsButton>{file && <ImsButton type="button" variant="secondary" onClick={() => setFile(null)}>Remove Procedure</ImsButton>}</div>
       </form>
       <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
@@ -74,7 +98,7 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
     {result && <>
       <ImsPanel title="Prevention Brief" subtitle={`${result.scope} · ${result.retrieval_mode === "semantic" ? "Meaning-based retrieval" : "Keyword retrieval fallback"}`}>
         <p style={summaryStyle}>{result.summary}</p>
-        <div style={briefMetaStyle}><span>{result.cautions.length} prioritised cautions</span><span>{allIds.length} cited lessons</span><ImsButton variant="secondary" onClick={() => onOpenLessons(allIds, "AI Prevention Intelligence evidence")}>Open All Supporting Lessons</ImsButton></div>
+        <div style={briefMetaStyle}><span>{(result.screened_count || result.evidence_count).toLocaleString()} records screened</span><span>{result.evidence_count.toLocaleString()} candidate records analysed</span><span>{result.cautions.length} prioritised cautions</span><span>{allIds.length} strongest records cited</span><ImsButton variant="secondary" onClick={() => onOpenLessons(allIds, "AI Prevention Intelligence evidence")}>Open Cited Lessons</ImsButton></div>
       </ImsPanel>
       <section style={cautionGridStyle}>{result.cautions.map((caution, index) => <article key={`${caution.title}-${index}`} style={cautionCardStyle}>
         <div style={cautionHeadStyle}><span style={rankStyle}>{index + 1}</span><div><strong style={cautionTitleStyle}>{caution.title}</strong><small style={confidenceStyle}>{caution.confidence} confidence · {caution.lesson_ids.length} cited lessons</small></div></div>

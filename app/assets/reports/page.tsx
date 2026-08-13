@@ -1436,7 +1436,7 @@ const emptyTextStyle: CSSProperties = {
 const compactTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };

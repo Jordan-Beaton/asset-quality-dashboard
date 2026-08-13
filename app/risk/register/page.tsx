@@ -867,6 +867,8 @@ export default function RiskRegisterPage() {
                   return (
                     <tr
                       key={risk.id}
+                      aria-selected={active}
+                      data-selected={active ? "true" : "false"}
                       onClick={() => selectRisk(risk)}
                       style={{ ...tableRowStyle, background: active ? "#eef7f8" : "#ffffff" }}
                     >
@@ -1239,7 +1241,7 @@ const topMetaRowStyle: CSSProperties = {
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
@@ -1295,7 +1297,7 @@ const filterSummaryStyle: CSSProperties = {
 const tableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };

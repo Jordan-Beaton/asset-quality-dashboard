@@ -340,6 +340,8 @@ function PeoplePageContent() {
                     return (
                       <tr
                         key={person.id}
+                        aria-selected={selected}
+                        data-selected={selected ? "true" : "false"}
                         style={selected ? selectedTableRowStyle : registerTableRowStyle}
                         onClick={() => {
                           setSelectedPersonId(person.id);
@@ -633,7 +635,7 @@ const dangerButtonStyle: CSSProperties = {
 const compactTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
@@ -644,8 +646,7 @@ const registerTableRowStyle: CSSProperties = {
 
 const selectedTableRowStyle: CSSProperties = {
   cursor: "pointer",
-  background: "#ECECE7",
-  boxShadow: "inset 4px 0 0 #005670",
+  background: "#eef7f8",
 };
 
 const emptyTableCellStyle: CSSProperties = {

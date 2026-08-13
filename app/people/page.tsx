@@ -721,10 +721,11 @@ function PeoplePageContent() {
                     return (
                       <tr
                         key={person.id}
+                        aria-selected={selected}
+                        data-selected={selected ? "true" : "false"}
                         style={{
                           ...peopleRegisterRowStyle,
                           background: selected ? "#eef7f8" : "#ffffff",
-                          boxShadow: selected ? "inset 4px 0 0 #005670" : "inset 4px 0 0 transparent",
                         }}
                         onClick={selectPerson}
                       >
@@ -1117,6 +1118,9 @@ const deleteButtonStyle: CSSProperties = {
 const peopleRegisterWrapStyle: CSSProperties = {
   marginTop: "18px",
   overflowX: "auto",
+  border: "1px solid #D0D0CE",
+  borderRadius: "14px",
+  background: "#ffffff",
 };
 
 const importPanelStyle: CSSProperties = {
@@ -1146,7 +1150,7 @@ const importSummaryStyle: CSSProperties = {
 const peopleImportTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };

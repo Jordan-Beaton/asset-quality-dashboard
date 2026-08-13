@@ -76,6 +76,7 @@ Restricted colours:
 - `#78C57E` is reserved for HSE campaigns displayed alongside the approved 3Rs logo. It is not a general IMS success colour.
 - `#503488` is reserved for RapidScan and must not be used as a general IMS chart or module accent.
 - Do not introduce substitute blues, teals, greens, purples, oranges, or reds when an approved semantic token exists.
+- Specialist exception: in the Baltic Power ITP Sign-Off evidence register, only the literal `Approved` status word is green and only the literal `Rejected` status word is danger red. Do not extend these text colours to rows, cards, backgrounds, or other IMS approval workflows without an explicit requirement.
 
 Shared radii:
 
@@ -368,6 +369,11 @@ Do Not:
 
 Registers should be dense, scannable, and filterable.
 
+The HSE Observation Register is the permanent structural benchmark for every
+register. Module-specific status, priority, risk and workflow colours remain
+semantic to that register, but shell geometry, header treatment, typography,
+row density, alignment and selected-row behaviour must not vary.
+
 Standard filter panel:
 
 - Use `ImsFilterPanel`.
@@ -398,6 +404,15 @@ Filter accuracy contract:
 Standard table:
 
 - Wrap in horizontal overflow when needed.
+- The table shell uses a white background, `1px solid #D0D0CE` border and
+  `14px` radius. The table remains inset by `4px`, giving the header a clean
+  gap from the shell edge.
+- Do not impose an internal vertical scrollbar or page-specific register
+  height. The page performs normal vertical scrolling; horizontal scrolling
+  remains available where column count requires it.
+- Editable controls inside programme/register rows use the compact `32px`
+  table-control height. Normal Create/edit forms retain the standard `42px`
+  control height.
 - Inset the complete table by `4px` on every side of its shell; do not let the header touch the panel edge.
 - Width: `calc(100% - 8px)` for semantic tables. Custom grid registers use the `ims-register-shell` inset instead so header and row columns remain aligned.
 - Background: white.
@@ -413,6 +428,7 @@ Standard table:
 - Every first-column value is bold (`800`) to make the primary identifier consistently scannable.
 - All other body-cell text is normal weight (`400`), including nested spans, links, badges, numbers and status values. Column headers and interactive action buttons remain bold as controls.
 - Selected rows use pale brand tint `#eef7f8` with a `#005670` inset marker. Custom grid rows must expose `aria-selected` and `data-selected`; unselected rows remain white.
+- For semantic tables, the selected marker belongs to the first `td` only. Never apply an inset marker or left-border effect to the complete `tr`, because collapsed table rendering can repeat it at every column boundary.
 - Desktop row hover uses a restrained `#f7fafb`; selected rows use `#eef7f8` with an Enshore `#005670` inset marker.
 - Table info row: `Showing X of Y`, slate, `13px`, `700`, margin `12px 0`.
 

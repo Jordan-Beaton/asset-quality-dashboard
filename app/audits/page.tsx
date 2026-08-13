@@ -4274,7 +4274,6 @@ function AuditsPageContent() {
                           style={{
                             ...openFindingsRowStyle,
                             background: active ? "#eef7f8" : "#ffffff",
-                            borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                           }}
                         >
                           <div style={openFindingsPrimaryCellStyle}>{finding.reference}</div>
@@ -4751,7 +4750,6 @@ function AuditsPageContent() {
                     style={{
                       ...programmeRowStyle,
                       background: active ? "#eef7f8" : linkedMatch ? "#ECECE7" : "#ffffff",
-                      borderLeft: active ? "4px solid #005670" : "4px solid transparent",
                     }}
                   >
                     <div style={programmePrimaryStyle}>
@@ -6226,7 +6224,7 @@ const topMetaRowStyle: CSSProperties = {
   alignItems: "center",
   background: "rgba(255,255,255,0.92)",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
@@ -6374,7 +6372,7 @@ const openFindingsSummaryStyle: CSSProperties = {
 const openFindingsTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
@@ -6992,16 +6990,15 @@ const programmeInfoStyle: CSSProperties = {
 const programmeTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
-  borderRadius: "16px",
+  borderRadius: "14px",
   background: "#ffffff",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const programmeHeadStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 2.4fr 0.9fr 1.15fr 1fr 1fr 0.6fr 0.6fr 0.8fr 0.85fr 1fr 0.95fr",
-  gap: "8px",
-  padding: "9px 10px",
+  gap: 0,
+  padding: 0,
   background: "#005670",
   borderBottom: "1px solid #005670",
   fontSize: "10px",
@@ -7014,8 +7011,7 @@ const programmeHeadStyle: CSSProperties = {
 };
 
 const programmeBodyStyle: CSSProperties = {
-  maxHeight: "980px",
-  overflowY: "auto",
+  overflowY: "visible",
 };
 
 const programmeRowStyle: CSSProperties = {
@@ -7023,8 +7019,8 @@ const programmeRowStyle: CSSProperties = {
   textAlign: "left",
   display: "grid",
   gridTemplateColumns: "1fr 2.4fr 0.9fr 1.15fr 1fr 1fr 0.6fr 0.6fr 0.8fr 0.85fr 1fr 0.95fr",
-  gap: "8px",
-  padding: "10px",
+  gap: 0,
+  padding: 0,
   borderTop: "none",
   borderRight: "none",
   borderBottom: "1px solid #D0D0CE",
@@ -7034,6 +7030,7 @@ const programmeRowStyle: CSSProperties = {
 };
 
 const programmePrimaryStyle: CSSProperties = {
+  padding: "10px",
   fontSize: "12px",
   fontWeight: 800,
   color: "#005670",
@@ -7042,6 +7039,7 @@ const programmePrimaryStyle: CSSProperties = {
 };
 
 const programmeTitleCellStyle: CSSProperties = {
+  padding: "10px",
   minWidth: 0,
   overflow: "hidden",
 };
@@ -7057,6 +7055,7 @@ const programmeTitleStyle: CSSProperties = {
 };
 
 const programmeTypeCellStyle: CSSProperties = {
+  padding: "10px",
   fontSize: "12px",
   color: "#000000",
   fontWeight: 700,
@@ -7064,12 +7063,14 @@ const programmeTypeCellStyle: CSSProperties = {
 };
 
 const programmeCellMutedStyle: CSSProperties = {
+  padding: "10px",
   fontSize: "12px",
   color: "#53565A",
   lineHeight: 1.35,
 };
 
 const programmeLeadCellStyle: CSSProperties = {
+  padding: "10px",
   fontSize: "12px",
   color: "#000000",
   lineHeight: 1.35,
@@ -7078,6 +7079,7 @@ const programmeLeadCellStyle: CSSProperties = {
 };
 
 const programmeFindingsStyle: CSSProperties = {
+  padding: "10px",
   fontSize: "12px",
   color: "#000000",
   fontWeight: 700,
@@ -7085,6 +7087,7 @@ const programmeFindingsStyle: CSSProperties = {
 };
 
 const programmeRiskCellStyle: CSSProperties = {
+  padding: "10px",
   fontSize: "13px",
   fontWeight: 800,
   color: "#000000",

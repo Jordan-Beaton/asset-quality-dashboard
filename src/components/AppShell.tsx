@@ -107,6 +107,7 @@ const projectNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/projects", label: "Projects", icon: "dashboard" },
   { href: "/projects/wadden-sea", label: "Wadden Sea", icon: "assets" },
+  { href: "/projects/baltic-power", label: "Baltic Power", icon: "assets" },
 ];
 
 const qualityNavItems: NavItem[] = [
@@ -693,6 +694,8 @@ export default function AppShell({ children }: AppShellProps) {
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const isLoginPage = pathname === "/login";
   const isPublicObservationPage = pathname === "/observe";
+  const isPublicItpSignOffPage = pathname === "/projects/itp-sign-off-action";
+  const isPublicStandalonePage = isPublicObservationPage || isPublicItpSignOffPage;
   const isHomePage = pathname === "/home";
   const isFieldToolsPage = pathname === "/field-tools";
   const isAssetModule = pathname.startsWith("/assets");
@@ -717,7 +720,7 @@ export default function AppShell({ children }: AppShellProps) {
         : isLessonsFieldMode
           ? "Capture a Lesson"
           : "HSE Field Inspection";
-  const showLogo = !isLoginPage && !isPublicObservationPage;
+  const showLogo = !isLoginPage && !isPublicStandalonePage;
   const moduleTitle = isFieldToolsPage
     ? "Field Tools"
     : isHomePage
@@ -784,11 +787,11 @@ export default function AppShell({ children }: AppShellProps) {
     ? lessonsNavItems
     : qualityNavItems;
   const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess, signedInTabPermissions);
-  const showSideRail = !isLoginPage && !isPublicObservationPage && !isHomePage && !isFieldToolsPage && !isFieldInspectionMode;
+  const showSideRail = !isLoginPage && !isPublicStandalonePage && !isHomePage && !isFieldToolsPage && !isFieldInspectionMode;
   const railOpen = isRailExpanded || isRailPinned;
   const currentAccessArea: AccessArea = isLoginPage
     ? "login"
-    : isPublicObservationPage
+    : isPublicStandalonePage
     ? "public"
     : isHomePage || isFieldToolsPage
     ? "home"
@@ -804,7 +807,7 @@ export default function AppShell({ children }: AppShellProps) {
   });
   const pageAccessAllowed =
     isLoginPage ||
-    isPublicObservationPage ||
+    isPublicStandalonePage ||
     !permissionsLoaded ||
     (currentPermissionTarget ? activePermission.canView : isAreaAllowed(currentAccessArea, signedInRole, signedInModuleAccess));
 
@@ -957,7 +960,7 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   const handlePermissionClickCapture = (event: MouseEvent<HTMLDivElement>) => {
-    if (!permissionsLoaded || activePermission.fullAccess || activePermission.isMasterAdmin || isLoginPage || isPublicObservationPage) return;
+    if (!permissionsLoaded || activePermission.fullAccess || activePermission.isMasterAdmin || isLoginPage || isPublicStandalonePage) return;
     const target = event.target as HTMLElement | null;
     const actionElement = target?.closest("button, a, input[type='button'], input[type='submit']") as HTMLElement | null;
     if (!actionElement) return;
@@ -1003,7 +1006,7 @@ export default function AppShell({ children }: AppShellProps) {
       onSubmitCapture={handlePermissionSubmitCapture}
       onChangeCapture={handlePermissionChangeCapture}
     >
-      {!isPublicObservationPage ? <header
+      {!isPublicStandalonePage ? <header
         className={isFieldInspectionMode ? "ims-app-header ims-app-header--field" : "ims-app-header"}
         style={{
           position: "sticky",
@@ -1390,7 +1393,7 @@ export default function AppShell({ children }: AppShellProps) {
           className={
             isFieldInspectionMode
               ? "ims-page-container ims-responsive-contract ims-page-container--field"
-              : isPublicObservationPage
+              : isPublicStandalonePage
               ? "ims-page-container ims-responsive-contract ims-page-container--public"
               : "ims-page-container ims-responsive-contract"
           }

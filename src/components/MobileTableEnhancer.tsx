@@ -64,6 +64,10 @@ export function MobileTableEnhancer({ routeKey }: { routeKey: string }) {
       const tables = document.querySelectorAll<HTMLTableElement>(".ims-page-container table");
       tables.forEach((table) => {
         table.classList.add("ims-data-table");
+        const wrapper = table.parentElement;
+        if (wrapper && !wrapper.matches("td, th")) {
+          wrapper.classList.add("ims-register-table-wrap");
+        }
         if (media.matches) enhanceTable(table);
         else clearTable(table);
       });
