@@ -28,6 +28,11 @@ Implemented and live. Production QA and continued data-quality improvement remai
 - Repeat groups link recurring lessons and should open the complete linked dataset, not only the source record.
 - “What We’ve Learned” uses a single interactive rotating insight card on a five-second cycle.
 - Historic imports and KPI counts must support substantially more than 1,000 rows.
+- `Prevention Intelligence` provides an evidence-grounded free-text question workspace. It consolidates historic failures into a short prevention brief instead of listing every matching record, and every caution links back to its supporting Lessons Learned records.
+- The same workspace accepts PDF, DOCX and TXT procedures (20 MB maximum), compares their readable content with relevant historic failures, and returns advisory control gaps/cautions without declaring the document approved or compliant.
+- Prevention Intelligence deliberately uses `OPENAI_BUSINESS_API_KEY`; it must not fall back to the older `OPENAI_API_KEY`. The key remains server-side in the secured route handlers.
+- Semantic retrieval uses `text-embedding-3-small` by default and the Supabase pgvector index defined in `scripts/sql/lessons_learned_prevention_ai.sql`. Before the migration/index is ready, question and procedure reviews retain a keyword-retrieval fallback and clearly label it.
+- The Master Admin-only `Build / Refresh Index` operation runs in batches of 50 and refreshes records whose indexed content no longer matches the current lesson. Question and procedure results are written to `lessons_learned_ai_analyses` when the migration is available.
 
 ## Analytics direction
 
@@ -35,6 +40,17 @@ Implemented and live. Production QA and continued data-quality improvement remai
 - Historic narrative quality varies; avoid overstating automated conclusions where source descriptions are vague or inconsistent.
 - Preserve blame-free language and focus findings on processes, controls and prevention.
 - Use the rotating learning panel for concise, positive prevention messages derived from actual records.
+- Prefer Prevention Intelligence semantic recurrence over user-entered repeat-group equality when evaluating systemic recurrence. AI findings must consolidate repeated evidence into practical cautions and cite only lesson UUIDs supplied to the model.
+- AI is decision support, not an approval authority. Preserve confidence labels and explicit evidence limitations, especially where historic wording is weak.
+
+## Prevention Intelligence deployment
+
+1. Apply `scripts/sql/lessons_learned_prevention_ai.sql` in the live Supabase SQL editor.
+2. In the OpenAI business project, create a project-scoped API key and configure an appropriate project budget/usage alert.
+3. In Vercel Project Settings -> Environment Variables, add the secret as `OPENAI_BUSINESS_API_KEY` for Production (and Preview only if required). Never paste the key into source, Supabase, GitHub, documentation or Codex chat.
+4. Optional model overrides are `OPENAI_LESSONS_MODEL` and `OPENAI_LESSONS_EMBEDDING_MODEL`; defaults are `gpt-5-mini` and `text-embedding-3-small`.
+5. Redeploy, open Lessons Learned -> Prevention Intelligence, confirm the business connection status, then run `Build / Refresh Index` as Master Admin until the indexed and failure totals match.
+6. Validate a known question such as trenching and one controlled Word/PDF procedure. Confirm every displayed caution opens only its cited supporting lessons.
 
 ## Guardrails
 

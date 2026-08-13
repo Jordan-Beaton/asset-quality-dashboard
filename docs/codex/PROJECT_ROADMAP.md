@@ -228,13 +228,15 @@ The ITP-derived whole-IMS visual and structural baseline is complete. Quality re
 ## Lessons Learned
 
 - Status: In Progress
-- Summary: The central repository, import, analytics, repeat-theme linking, controlled dropdowns, evidence and interactive register behavior are implemented. Historic data quality and production-scale reconciliation remain the main risks.
+- Summary: The central repository, import, analytics, repeat-theme linking, controlled dropdowns, evidence and interactive register behavior are implemented. Prevention Intelligence now adds free-text evidence-grounded caution briefings, semantic recurrence retrieval, procedure review, supporting-lesson drill-down and analysis audit storage. Historic data quality and production-scale reconciliation remain the main risks.
 - Outstanding Actions:
   - Reconcile the 2,990-row source workbook against imported, rejected and duplicate totals.
   - Verify uncapped KPI counts and cumulative filter option behavior on Vercel.
   - Test repeated-record drill-downs and all KPI/chart interactions.
   - Preserve fixed register columns and the five-second rotating learning insight.
   - Improve classifications progressively without overstating conclusions from poor historic narratives.
+  - Apply `scripts/sql/lessons_learned_prevention_ai.sql`, configure `OPENAI_BUSINESS_API_KEY` from the Enshore business OpenAI project in Vercel, build the complete failure index, and verify question/procedure results against known trenching, rigging, mobilisation and communication examples.
+  - Confirm every AI caution cites and opens its actual supporting lessons, weak evidence produces proportionate confidence/limitations, the keyword fallback is visibly labelled, and the Master Admin-only index rebuild remains server-enforced.
 
 ## Management Review
 

@@ -8,11 +8,12 @@ import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { LessonsPreventionIntelligence } from "../../src/components/LessonsPreventionIntelligence";
 import { imsColours, imsInputStyle } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
 
-type View = "dashboard" | "register" | "create" | "import" | "trends";
-type AnalysisFilter = "all" | "open-actions" | "high-critical" | "repeat-lessons" | "unowned-actions" | "cross-project-repeats" | "with-evidence" | "missing-root-cause";
+type View = "dashboard" | "register" | "create" | "import" | "trends" | "intelligence";
+type AnalysisFilter = "all" | "open-actions" | "high-critical" | "repeat-lessons" | "unowned-actions" | "cross-project-repeats" | "with-evidence" | "missing-root-cause" | "ai-results";
 type ChartSelection = { activeLabel?: string | number } | null | undefined;
 type Lesson = {
   id: string; lesson_number: string; legacy_number: number | null; project_code: string | null; project_name: string;
@@ -33,7 +34,7 @@ const ReferenceContext = createContext<ReferenceContextValue | null>(null);
 
 const tabs: Array<{ value: View; label: string }> = [
   { value: "dashboard", label: "Dashboard" }, { value: "register", label: "Register" },
-  { value: "create", label: "Create" }, { value: "import", label: "Import" }, { value: "trends", label: "Trend Analysis" },
+  { value: "intelligence", label: "Prevention Intelligence" }, { value: "create", label: "Create" }, { value: "import", label: "Import" }, { value: "trends", label: "Trend Analysis" },
 ];
 const emptyForm = {
   project_code: "", project_name: "", report_date: "", incident_date: "", vessel_office: "", assets: "", department: "",
@@ -103,6 +104,7 @@ export default function LessonsLearnedPage() {
   const [departmentFilter, setDepartmentFilter] = useState(""); const [statusFilter, setStatusFilter] = useState("");
   const [criticalityFilter, setCriticalityFilter] = useState(""); const [outcomeFilter, setOutcomeFilter] = useState("");
   const [analysisFilter, setAnalysisFilter] = useState<AnalysisFilter>("all"); const [analysisLabel, setAnalysisLabel] = useState("All lessons");
+  const [aiLessonIds, setAiLessonIds] = useState<Set<string>>(new Set());
   const [repeatGroupFilter, setRepeatGroupFilter] = useState("");
   const [yearFilter, setYearFilter] = useState(""); const [importRows, setImportRows] = useState<ImportRow[]>([]);
   const [importName, setImportName] = useState(""); const [importing, setImporting] = useState(false); const [files, setFiles] = useState<File[]>([]);
@@ -209,10 +211,11 @@ export default function LessonsLearnedPage() {
       (analysisFilter === "repeat-lessons" && repeatedLessonIds.has(item.id)) ||
       (analysisFilter === "cross-project-repeats" && crossProjectLessonIds.has(item.id)) ||
       (analysisFilter === "unowned-actions" && lessonHasOpenAction(item) && !clean(item.action_owner)) ||
+      (analysisFilter === "ai-results" && aiLessonIds.has(item.id)) ||
       (analysisFilter === "with-evidence" && (evidenceCounts.get(item.id) || 0) > 0) ||
       (analysisFilter === "missing-root-cause" && !clean(item.root_cause));
     return (!search || haystack.includes(search.toLowerCase())) && (!departmentFilter || (departmentFilter === "Unassigned" ? !clean(item.department) : item.department === departmentFilter)) && (!statusFilter || item.status === statusFilter) && (!criticalityFilter || item.criticality === criticalityFilter) && (!outcomeFilter || item.outcome_type === outcomeFilter) && (!yearFilter || item.report_date?.startsWith(yearFilter)) && (!repeatGroupFilter || clean(item.repeat_group).toLowerCase() === repeatGroupFilter.toLowerCase()) && matchesAnalysis;
-  }).map((item) => item.project_name).filter(Boolean))].sort(), [lessons, search, departmentFilter, statusFilter, criticalityFilter, outcomeFilter, yearFilter, repeatGroupFilter, analysisFilter, repeatedLessonIds, crossProjectLessonIds, evidenceCounts]);
+  }).map((item) => item.project_name).filter(Boolean))].sort(), [lessons, search, departmentFilter, statusFilter, criticalityFilter, outcomeFilter, yearFilter, repeatGroupFilter, analysisFilter, repeatedLessonIds, crossProjectLessonIds, evidenceCounts, aiLessonIds]);
   useEffect(() => { if (projectFilter && !availableProjects.includes(projectFilter)) setProjectFilter(""); }, [availableProjects, projectFilter]);
   const filtered = useMemo(() => lessons.filter((item) => {
     const haystack = [item.lesson_number, item.project_code, item.project_name, item.department, item.subject, item.issue_description, item.root_cause, item.lesson_learned, item.recommended_action, item.keywords?.join(" ")].join(" ").toLowerCase();
@@ -222,13 +225,14 @@ export default function LessonsLearnedPage() {
       (analysisFilter === "repeat-lessons" && repeatedLessonIds.has(item.id)) ||
       (analysisFilter === "cross-project-repeats" && crossProjectLessonIds.has(item.id)) ||
       (analysisFilter === "unowned-actions" && lessonHasOpenAction(item) && !clean(item.action_owner)) ||
+      (analysisFilter === "ai-results" && aiLessonIds.has(item.id)) ||
       (analysisFilter === "with-evidence" && (evidenceCounts.get(item.id) || 0) > 0) ||
       (analysisFilter === "missing-root-cause" && !clean(item.root_cause));
     return (!search || haystack.includes(search.toLowerCase())) && (!projectFilter || item.project_name === projectFilter) &&
       (!departmentFilter || (departmentFilter === "Unassigned" ? !clean(item.department) : item.department === departmentFilter)) && (!statusFilter || item.status === statusFilter) &&
       (!criticalityFilter || item.criticality === criticalityFilter) && (!outcomeFilter || item.outcome_type === outcomeFilter) &&
       (!yearFilter || item.report_date?.startsWith(yearFilter)) && (!repeatGroupFilter || clean(item.repeat_group).toLowerCase() === repeatGroupFilter.toLowerCase()) && matchesAnalysis;
-  }), [lessons, search, projectFilter, departmentFilter, statusFilter, criticalityFilter, outcomeFilter, yearFilter, repeatGroupFilter, analysisFilter, repeatedLessonIds, crossProjectLessonIds, evidenceCounts]);
+  }), [lessons, search, projectFilter, departmentFilter, statusFilter, criticalityFilter, outcomeFilter, yearFilter, repeatGroupFilter, analysisFilter, repeatedLessonIds, crossProjectLessonIds, evidenceCounts, aiLessonIds]);
   const kpis = useMemo(() => ({ total: lessons.length, open: lessons.filter(lessonHasOpenAction).length,
     high: lessons.filter((x) => ["High", "Critical"].includes(x.criticality)).length, repeats: repeatedLessonIds.size,
     unowned: lessons.filter((x) => lessonHasOpenAction(x) && !clean(x.action_owner)).length, crossProject: crossProjectLessonIds.size,
@@ -270,10 +274,14 @@ export default function LessonsLearnedPage() {
 
   function clearAllFilters() {
     setSearch(""); setProjectFilter(""); setDepartmentFilter(""); setStatusFilter(""); setCriticalityFilter("");
-    setOutcomeFilter(""); setYearFilter(""); setRepeatGroupFilter(""); setAnalysisFilter("all"); setAnalysisLabel("All lessons");
+    setOutcomeFilter(""); setYearFilter(""); setRepeatGroupFilter(""); setAiLessonIds(new Set()); setAnalysisFilter("all"); setAnalysisLabel("All lessons");
   }
   function openAnalysis(filter: AnalysisFilter, label: string) {
     setAnalysisFilter(filter); setAnalysisLabel((current) => current === "All lessons" ? label : `${current} · ${label}`); setView("register");
+  }
+  function openAiEvidence(ids: string[], label: string) {
+    setSearch(""); setProjectFilter(""); setDepartmentFilter(""); setStatusFilter(""); setCriticalityFilter(""); setOutcomeFilter(""); setYearFilter(""); setRepeatGroupFilter("");
+    setAiLessonIds(new Set(ids)); setAnalysisFilter("ai-results"); setAnalysisLabel(label); setView("register");
   }
   function selectDepartment(selection: ChartSelection) {
     const value = clean(selection?.activeLabel); if (!value) return; setDepartmentFilter(value); setAnalysisLabel((current) => current === "All lessons" ? `Department: ${value}` : `${current} · Department: ${value}`); setView("register");
@@ -437,6 +445,8 @@ export default function LessonsLearnedPage() {
       <ImsPanel title="Continuous Failings" subtitle="Most common repeat groups across the repository. Click a bar to isolate the theme."><ChartFrame><BarChart data={subjectTrend} layout="vertical" margin={{ left: 40, right: 12 }} onClick={(state) => selectTheme(state as ChartSelection)} style={{ cursor: "pointer" }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis dataKey="name" type="category" width={145} tick={{ fontSize: 10 }} /><Tooltip {...chartTooltip} /><Bar dataKey="count" name="Lessons" fill={imsColours.danger} radius={[0, 6, 6, 0]} /></BarChart></ChartFrame></ImsPanel>
       <ImsPanel title="Repeat-Failure Watchlist" subtitle="Themes affecting multiple projects. Click a row to open the underlying records."><div style={watchList}>{crossProjectGroups.slice(0, 15).map(([group, rows]) => <button key={group} style={watchRow} onClick={() => selectTheme(rows[0].repeat_group || group)}><span><strong>{rows[0].repeat_group}</strong><small>{new Set(rows.map((x) => x.project_name)).size} projects</small></span><b>{rows.length}</b></button>)}</div></ImsPanel>
     </div>}
+
+    {view === "intelligence" && <LessonsPreventionIntelligence canManage={permission.fullAccess || permission.isMasterAdmin} onOpenLessons={openAiEvidence} />}
 
     {view === "register" && <>
       <ImsPanel title="Lessons Learned Register" subtitle="Search the full knowledge base by project, department, subject, issue, lesson, root cause, owner, or keyword.">

@@ -66,3 +66,4 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 ## Latest Workflow Note
 
 - HSE AINM Part 1/Part 2 now supports inline department-controlled central Action creation, Part 1 containment terminology and attachment `Other` detail, and fuller labelled Word/compiled PDF outputs. See `HSE_HANDOVER.md` and `ACTION_MANAGEMENT_HANDOVER.md` before changing this flow.
+- Lessons Learned Prevention Intelligence now supports free-text failure-prevention questions, evidence-linked caution briefings, semantic recurrence retrieval and procedure-to-lessons review. It uses the dedicated server-side `OPENAI_BUSINESS_API_KEY`; see `LESSONS_LEARNED_HANDOVER.md` and apply `scripts/sql/lessons_learned_prevention_ai.sql` before building the semantic index.
