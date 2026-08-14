@@ -77,7 +77,8 @@ export async function generatePreventionBrief(apiKey: string, question: string, 
     "Explain what not to repeat and the concrete control, check, hold point, responsibility, verification, or communication step that should be considered.",
     "Never invent events, causes, requirements, people, procedure clauses, or lesson identifiers.",
     "Every caution must cite one or more supplied lesson UUIDs. Confidence is High only when several clear records support the same pattern, Medium when evidence is smaller or mixed, and Low when historic wording is weak.",
-    "Procedure review is advisory: identify apparent coverage and gaps without declaring the document approved or compliant.",
+    "In lesson_ids use the exact supplied id values, never lesson_number values, project codes, or procedure clauses.",
+    "Procedure review is advisory: identify apparent coverage and gaps without declaring the document approved or compliant. Every procedure-review caution must be grounded in at least one supplied historic lesson; do not return generic document-only observations as Lessons Learned findings.",
   ].join(" ");
   async function requestBrief(rows: PreventionLesson[], evidenceCharacterLimit: number, documentCharacterLimit: number) {
     const evidence = buildEvidence(rows, evidenceCharacterLimit);
@@ -85,7 +86,9 @@ export async function generatePreventionBrief(apiKey: string, question: string, 
       `User question: ${question}`,
       document ? `Uploaded document: ${document.name}\nDocument text:\n${document.text.slice(0, documentCharacterLimit)}` : "No procedure was uploaded.",
       `Retrieved failure evidence (${evidence.length} records):\n${JSON.stringify(evidence)}`,
-      "Return a short management-ready summary, the analysed scope, 3-6 consolidated cautions, practical preventive controls, limitations, and the overall set of relevant lesson UUIDs.",
+      document
+        ? "Return the same evidence-linked prevention brief used for a normal Lessons Learned question: a short management-ready summary, 3-6 caution cards, practical controls, limitations, and supporting historic lesson UUIDs for every caution. Compare the procedure against the lessons; do not replace the cited lessons with procedure clause references."
+        : "Return a short management-ready summary, the analysed scope, 3-6 consolidated cautions, practical preventive controls, limitations, and the overall set of relevant lesson UUIDs.",
     ].join("\n\n");
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -158,9 +161,16 @@ export async function generatePreventionBrief(apiKey: string, question: string, 
     }
   }
   const allowedIds = new Set(candidates.map((lesson) => lesson.id));
-  result.cautions = (result.cautions || []).map((caution) => ({ ...caution, lesson_ids: caution.lesson_ids.filter((id) => allowedIds.has(id)) })).filter((caution) => caution.lesson_ids.length);
-  result.matched_lesson_ids = [...new Set((result.matched_lesson_ids || []).filter((id) => allowedIds.has(id)))];
+  const citationLookup = new Map<string, string>();
+  candidates.forEach((lesson) => {
+    citationLookup.set(lesson.id.toLowerCase(), lesson.id);
+    citationLookup.set(lesson.lesson_number.toLowerCase(), lesson.id);
+  });
+  const resolveCitations = (values: string[]) => [...new Set(values.map((value) => citationLookup.get(String(value).trim().toLowerCase())).filter((id): id is string => Boolean(id && allowedIds.has(id))))];
+  result.cautions = (result.cautions || []).map((caution) => ({ ...caution, lesson_ids: resolveCitations(caution.lesson_ids || []) })).filter((caution) => caution.lesson_ids.length);
+  result.matched_lesson_ids = resolveCitations(result.matched_lesson_ids || []);
   if (!result.matched_lesson_ids.length) result.matched_lesson_ids = [...new Set(result.cautions.flatMap((caution) => caution.lesson_ids))];
+  if (!result.cautions.length) throw new Error(document ? "The procedure review did not return verifiable Lessons Learned citations. Please retry the review." : "The prevention brief did not return verifiable Lessons Learned citations.");
   return result;
 }
 
