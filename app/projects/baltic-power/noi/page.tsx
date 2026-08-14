@@ -114,7 +114,7 @@ export default function NoiTrackerPage() {
     }
     setBusy(true);
     setCandidates([]);
-    setMessage(`Reading ${revision.file_name}â€¦ Structured tables will be checked first; scanned pages will use OCR automatically.`);
+    setMessage(`Reading ${revision.file_name}... Structured tables will be checked first; scanned pages will use OCR automatically.`);
     try {
       const signed = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(revision.file_path, 300);
       if (signed.error) throw signed.error;
@@ -213,7 +213,7 @@ export default function NoiTrackerPage() {
       intervention_type: interventionType,
       party_heading: manualPoint.partyHeading.trim() || "Enshore / Contractor",
       extraction_confidence: "Manual",
-      source_location: sourceReference ? `Manual entry Â· ${sourceReference}` : "Manual entry",
+      source_location: sourceReference ? `Manual entry · ${sourceReference}` : "Manual entry",
       status: manualPoint.status,
       planned_date: manualPoint.plannedDate || null,
       noi_number: manualPoint.noiNumber.trim() || null,
@@ -248,7 +248,7 @@ export default function NoiTrackerPage() {
   }
 
   async function deletePoint(point: NoiPoint) {
-    if (!window.confirm(`Delete section ${point.section_number} â€” ${point.activity_description}?`)) return;
+    if (!window.confirm(`Delete section ${point.section_number} — ${point.activity_description}?`)) return;
     const { error } = await supabase.from("project_noi_points").delete().eq("id", point.id);
     if (error) setMessage(error.message);
     else setPoints((current) => current.filter((item) => item.id !== point.id));
@@ -266,10 +266,10 @@ export default function NoiTrackerPage() {
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("WADDEN SEA PROJECT Â· NOI REQUIREMENTS", 10, 10);
+    doc.text("BALTIC POWER PROJECT · NOI REQUIREMENTS", 10, 10);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Generated ${generatedAt.toLocaleDateString("en-GB")} Â· ${pointRows.length} requirement${pointRows.length === 1 ? "" : "s"}`, 10, 17);
+    doc.text(`Generated ${generatedAt.toLocaleDateString("en-GB")} · ${pointRows.length} requirement${pointRows.length === 1 ? "" : "s"}`, 10, 17);
     doc.setTextColor(40, 55, 70);
     doc.setFontSize(8);
     const activeFilters = [
@@ -278,7 +278,7 @@ export default function NoiTrackerPage() {
       supplierFilter !== "All" ? `Supplier: ${supplierFilter}` : "",
       typeFilter !== "All" ? `Point: ${typeFilter}` : "",
       statusFilter !== "All" ? `Status: ${statusFilter}` : "",
-    ].filter(Boolean).join(" Â· ") || "All project NOI requirements";
+    ].filter(Boolean).join(" · ") || "All project NOI requirements";
     doc.text(activeFilters, 10, 29);
     autoTable(doc, {
       startY: 34,
@@ -286,9 +286,9 @@ export default function NoiTrackerPage() {
       body: pointRows.map(({ point, itp }) => {
         const revision = itp?.project_itp_revisions?.find((item) => item.id === point.revision_id);
         return [
-          `${itp?.document_number || "Unknown"}\nRev ${revision?.revision || "â€”"}`,
-          itp?.title || "â€”",
-          `${itp?.supplier || "â€”"}\n${itp?.scope || "No scope"}`,
+          `${itp?.document_number || "Unknown"}\nRev ${revision?.revision || "—"}`,
+          itp?.title || "—",
+          `${itp?.supplier || "—"}\n${itp?.scope || "No scope"}`,
           point.section_number,
           point.activity_description,
           point.intervention_type,
@@ -314,14 +314,14 @@ export default function NoiTrackerPage() {
       doc.setPage(pageNumber);
       doc.setFontSize(7);
       doc.setTextColor(83, 86, 90);
-      doc.text(`Baltic Power Â· Project NOI Requirements Â· Page ${pageNumber} of ${pageCount}`, 10, 204);
+      doc.text(`Baltic Power · Project NOI Requirements · Page ${pageNumber} of ${pageCount}`, 10, 204);
     }
     doc.save(`baltic-power-noi-requirements-${generatedAt.toISOString().slice(0, 10)}.pdf`);
   }
 
   return (
     <main style={page}>
-      <QualityPageHero label="Baltic Power Â· Inspection intelligence" title="NOI Tracker" description="Controlled witness and hold-point register extracted from current Supplier ITP revisions." />
+      <QualityPageHero label="Baltic Power · Inspection intelligence" title="NOI Tracker" description="Controlled witness and hold-point register extracted from current Supplier ITP revisions." />
       <ImsTopMetaRow backHref="/projects/baltic-power" backLabel="Back to Baltic Power" status={<><strong>Status:</strong> {message || "Client, Enshore and Contractor W/H requirements loaded."}</>} />
       <BalticPowerWorkspaceNav active="noi" />
 
@@ -338,9 +338,9 @@ export default function NoiTrackerPage() {
         <div style={scanner}>
           <label style={field}><span>Current ITP</span><select style={input} value={selectedItpId} onChange={(event) => { setSelectedItpId(event.target.value); setCandidates([]); }}>{itps.map((itp) => {
             const revision = currentRevision(itp);
-            return <option key={itp.id} value={itp.id}>{itp.document_number} Â· Rev {revision?.revision || "â€”"} Â· {itp.supplier || "No supplier"}</option>;
+            return <option key={itp.id} value={itp.id}>{itp.document_number} · Rev {revision?.revision || "—"} · {itp.supplier || "No supplier"}</option>;
           })}</select></label>
-          <button style={primaryButton} disabled={busy || !selectedItp} onClick={() => void scanSelectedItp()}>{busy ? "Scanningâ€¦" : "Scan current revision"}</button>
+          <button style={primaryButton} disabled={busy || !selectedItp} onClick={() => void scanSelectedItp()}>{busy ? "Scanning..." : "Scan current revision"}</button>
           <button style={secondaryButton} disabled={busy || !selectedItp} onClick={() => setShowManualEntry((current) => !current)}>{showManualEntry ? "Close manual entry" : "Add manual point"}</button>
         </div>
         {message && <div style={notice}>{message}</div>}
@@ -357,7 +357,7 @@ export default function NoiTrackerPage() {
             <label style={field}><span>Status</span><select style={input} value={manualPoint.status} onChange={(event) => setManualPoint((current) => ({ ...current, status: event.target.value }))}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label>
             <label style={{ ...field, gridColumn: "span 2" }}><span>Notes</span><input style={input} value={manualPoint.notes} onChange={(event) => setManualPoint((current) => ({ ...current, notes: event.target.value }))} placeholder="Reason for manual entry or supporting note" /></label>
           </div>
-          <div style={candidateActions}><button type="button" style={secondaryButton} onClick={() => { setManualPoint(emptyManualPoint); setShowManualEntry(false); }}>Cancel</button><button type="submit" style={primaryButton} disabled={busy}>{busy ? "Savingâ€¦" : "Add point to register"}</button></div>
+          <div style={candidateActions}><button type="button" style={secondaryButton} onClick={() => { setManualPoint(emptyManualPoint); setShowManualEntry(false); }}>Cancel</button><button type="submit" style={primaryButton} disabled={busy}>{busy ? "Saving..." : "Add point to register"}</button></div>
         </form>}
         {candidates.length > 0 && <div style={candidatePanel}>
           <div style={candidateHeader}><strong>Review extracted points</strong><span>Untick anything that is not applicable and edit the description if needed.</span></div>
@@ -366,7 +366,7 @@ export default function NoiTrackerPage() {
             <input style={compactInput} value={candidate.sectionNumber} onChange={(event) => setCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, sectionNumber: event.target.value } : item))} />
             <input style={wideInput} value={candidate.activityDescription} onChange={(event) => setCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, activityDescription: event.target.value } : item))} />
             <input list="noi-intervention-codes" style={{ ...compactInput, ...typeTone(candidate.interventionType) }} value={candidate.interventionType} onChange={(event) => setCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, interventionType: event.target.value.toUpperCase() } : item))} />
-            <span style={source}><strong>{candidate.partyHeading}</strong><small>{candidate.sourceLocation} Â· {candidate.confidence}</small></span>
+            <span style={source}><strong>{candidate.partyHeading}</strong><small>{candidate.sourceLocation} · {candidate.confidence}</small></span>
           </div>)}
           <div style={candidateActions}><button style={secondaryButton} onClick={() => setCandidates([])}>Discard</button><button style={primaryButton} disabled={busy} onClick={() => void saveCandidates()}>Add selected points to register</button></div>
         </div>}
@@ -376,7 +376,7 @@ export default function NoiTrackerPage() {
         <div style={sectionHeader}><div><div style={kicker}>Controlled register</div><h2 style={title}>Project NOI requirements</h2></div><button style={primaryButton} onClick={exportPdf}>Download PDF</button></div>
         <datalist id="noi-intervention-codes"><option value="W" /><option value="H" /><option value="W/H" /><option value="R/W" /><option value="M/W" /><option value="H/R" /></datalist>
         <div style={filterGrid}>
-          <input style={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search section, activity, NOI or notesâ€¦" />
+          <input style={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search section, activity, NOI or notes..." />
           <select aria-label="Filter by ITP number" style={input} value={itpNumberFilter} onChange={(event) => setItpNumberFilter(event.target.value)}><option value="All">All ITP numbers</option>{[...new Set(itps.map((itp) => itp.document_number))].sort().map((value) => <option key={value}>{value}</option>)}</select>
           <select aria-label="Filter by ITP title" style={input} value={itpTitleFilter} onChange={(event) => setItpTitleFilter(event.target.value)}><option value="All">All ITP titles</option>{[...new Set(itps.map((itp) => itp.title))].sort().map((value) => <option key={value}>{value}</option>)}</select>
           <select aria-label="Filter by supplier" style={input} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option value="All">All suppliers</option>{[...new Set(itps.map((itp) => itp.supplier || "No supplier"))].sort().map((value) => <option key={value}>{value}</option>)}</select>
@@ -385,7 +385,7 @@ export default function NoiTrackerPage() {
         </div>
         <div style={tableWrap}><table style={table}><thead><tr>{["ITP / supplier", "Section", "Activity", "Point", "Planned date", "NOI number", "Status", "Notes", ""].map((heading) => <th key={heading} style={th}>{heading}</th>)}</tr></thead><tbody>
           {pointRows.map(({ point, itp }) => <tr key={point.id}>
-            <td style={td}><strong style={teal}>{itp?.document_number || "Unknown ITP"}</strong><small style={small}>{itp?.supplier || "â€”"} Â· {itp?.scope || "No scope"}</small></td>
+            <td style={td}><strong style={teal}>{itp?.document_number || "Unknown ITP"}</strong><small style={small}>{itp?.supplier || "—"} · {itp?.scope || "No scope"}</small></td>
             <td style={td}><strong>{point.section_number}</strong><small style={small}>{point.source_location || point.party_heading}</small></td>
             <td style={td}><input style={wideInput} value={point.activity_description} onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, activity_description: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { activity_description: event.target.value })} /></td>
             <td style={td}><input list="noi-intervention-codes" style={{ ...compactInput, ...typeTone(point.intervention_type) }} value={point.intervention_type} onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, intervention_type: event.target.value.toUpperCase() } : item))} onBlur={(event) => {
@@ -397,7 +397,7 @@ export default function NoiTrackerPage() {
             <td style={td}><input style={compactInput} value={point.noi_number || ""} placeholder="TBC" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, noi_number: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { noi_number: event.target.value || null })} /></td>
             <td style={td}><select style={compactInput} value={point.status} onChange={(event) => void updatePoint(point, { status: event.target.value })}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></td>
             <td style={td}><input style={wideInput} value={point.notes || ""} placeholder="Notes" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, notes: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { notes: event.target.value || null })} /></td>
-            <td style={td}><div style={rowActions}>{point.noi_number ? <Link style={noiButton} href={`/projects/baltic-power/noi/create?noi=${encodeURIComponent(point.noi_number)}`}>NOI</Link> : null}<button style={deleteButton} disabled={savingId === point.id} onClick={() => void deletePoint(point)}>{savingId === point.id ? "â€¦" : "Delete"}</button></div></td>
+            <td style={td}><div style={rowActions}>{point.noi_number ? <Link style={noiButton} href={`/projects/baltic-power/noi/create?noi=${encodeURIComponent(point.noi_number)}`}>NOI</Link> : null}<button style={deleteButton} disabled={savingId === point.id} onClick={() => void deletePoint(point)}>{savingId === point.id ? "..." : "Delete"}</button></div></td>
           </tr>)}
           {pointRows.length === 0 && <tr><td colSpan={9} style={empty}>No NOI points match the current filters.</td></tr>}
         </tbody></table></div>
@@ -438,5 +438,4 @@ const deleteButton: CSSProperties = { border: "1px solid #ECECE7", borderRadius:
 const rowActions: CSSProperties = { display: "flex", gap: 5, alignItems: "center" };
 const noiButton: CSSProperties = { borderRadius: 6, background: "#ECECE7", color: "#005670", padding: "6px 8px", fontWeight: 900, fontSize: 10, textDecoration: "none" };
 const empty: CSSProperties = { padding: 30, textAlign: "center", color: "#53565A" };
-
 

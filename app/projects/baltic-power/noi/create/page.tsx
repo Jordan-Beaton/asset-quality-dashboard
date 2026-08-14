@@ -54,7 +54,7 @@ export default function NoiCreatorPage() {
   const [points, setPoints] = useState<NoiPoint[]>([]);
   const [supplier, setSupplier] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [message, setMessage] = useState("Loading NOI requirementsÃ¢â‚¬Â¦");
+  const [message, setMessage] = useState("Loading NOI requirements...");
   const [busy, setBusy] = useState(false);
   const [projectDetails, setProjectDetails] = useState("Baltic Power Project");
   const [inspectionDate, setInspectionDate] = useState("");
@@ -109,7 +109,7 @@ export default function NoiCreatorPage() {
   const selected = useMemo(() => supplierPoints.filter((point) => selectedIds.includes(point.id)), [selectedIds, supplierPoints]);
   const nextSequence = useMemo(() => {
     const used = points.map((point) => Number(String(point.noi_number || "").match(/\d+/)?.[0])).filter(Number.isFinite);
-    return String(Math.max(3, ...used) + 1).padStart(3, "0");
+    return String(Math.max(0, ...used) + 1).padStart(3, "0");
   }, [points]);
   const noiNumber = editingNumber || nextSequence;
   const selectedItps = useMemo(() => [...new Set(selected.map((point) => itpById.get(point.itp_id)?.document_number).filter(Boolean) as string[])], [itpById, selected]);
@@ -141,7 +141,7 @@ export default function NoiCreatorPage() {
     if (!editingNumber) return;
     if (!window.confirm(`Delete NOI ${editingNumber}?\n\nIts saved Word, PDF and editable details will be removed. Linked inspection points will return to Planned.`)) return;
     setBusy(true);
-    setMessage(`Deleting NOI ${editingNumber}Ã¢â‚¬Â¦`);
+    setMessage(`Deleting NOI ${editingNumber}...`);
     try {
       const linkedIds = points.filter((point) => point.noi_number === editingNumber).map((point) => point.id);
       if (linkedIds.length) {
@@ -230,7 +230,7 @@ export default function NoiCreatorPage() {
     if (!selected.length) { setMessage("Select at least one inspection point."); return; }
     if (!projectDetails || !inspectionDate || !duration || !location) { setMessage("Complete the project details, inspection date, time/duration and location."); return; }
     setBusy(true);
-    setMessage(`${editingNumber ? "Updating" : "Generating"} NOI ${noiNumber}Ã¢â‚¬Â¦`);
+    setMessage(`${editingNumber ? "Updating" : "Generating"} NOI ${noiNumber}...`);
     const payload = {
       noiNumber,
       projectDetails,
@@ -277,7 +277,7 @@ export default function NoiCreatorPage() {
 
   return (
     <main style={page}>
-      <QualityPageHero label="Baltic Power Ã‚Â· Inspection control" title="NOI Creator" description="Create controlled Notices of Inspection directly from the Project NOI requirements register." />
+      <QualityPageHero label="Baltic Power · Inspection control" title="NOI Creator" description="Create controlled Notices of Inspection directly from the Project NOI requirements register." />
       <ImsTopMetaRow backHref="/projects/baltic-power" backLabel="Back to Baltic Power" status={<><strong>Status:</strong> {message}</>} />
       <BalticPowerWorkspaceNav active="noi-creator" />
       <section style={metrics} className="quality-kpi-grid">
@@ -293,7 +293,7 @@ export default function NoiCreatorPage() {
         <div style={pointList}>{supplierPoints.map((point) => {
           const itp = itpById.get(point.itp_id);
           const checked = selectedIds.includes(point.id);
-          return <label key={point.id} style={{ ...pointRow, borderColor: checked ? "#005670" : "#D0D0CE", background: checked ? "#ECECE7" : "#fff" }}><input type="checkbox" checked={checked} onChange={() => toggle(point)} /><span style={pointIdentity}><strong>{point.section_number} Ã‚Â· {point.activity_description}</strong><small>{itp?.document_number} Ã‚Â· {point.planned_date ? displayDate(point.planned_date) : "Date TBC"}</small></span><span style={codeBadge}>{point.intervention_type}</span><span style={statusBadge}>{point.noi_number ? `NOI ${point.noi_number}` : point.status}</span></label>;
+          return <label key={point.id} style={{ ...pointRow, borderColor: checked ? "#005670" : "#D0D0CE", background: checked ? "#ECECE7" : "#fff" }}><input type="checkbox" checked={checked} onChange={() => toggle(point)} /><span style={pointIdentity}><strong>{point.section_number} · {point.activity_description}</strong><small>{itp?.document_number} · {point.planned_date ? displayDate(point.planned_date) : "Date TBC"}</small></span><span style={codeBadge}>{point.intervention_type}</span><span style={statusBadge}>{point.noi_number ? `NOI ${point.noi_number}` : point.status}</span></label>;
         })}{supplier && !supplierPoints.length ? <div style={empty}>No NOI requirements are registered for this supplier.</div> : null}</div>
       </section>
 
@@ -311,7 +311,7 @@ export default function NoiCreatorPage() {
         </div>
         <div style={attendeeHeader}><div style={attendeeTitle}><span style={kicker}>Attendees</span><span style={attendeeHint}>Add up to five Enshore or client representatives</span></div>{attendees.length < 5 ? <button type="button" style={secondaryButton} onClick={() => setAttendees((current) => [...current, blankAttendee()])}>Add attendee</button> : null}</div>
         <div style={attendeeList}>{attendees.map((person, index) => <div key={index} style={attendeeRow}><input style={input} value={person.name} onChange={(event) => updateAttendee(index, { name: event.target.value })} placeholder="Contact name" /><input style={input} value={person.company} onChange={(event) => updateAttendee(index, { company: event.target.value })} placeholder="Company" /><input style={input} value={person.contact} onChange={(event) => updateAttendee(index, { contact: event.target.value })} placeholder="Contact number" /><input style={input} type="email" value={person.email} onChange={(event) => updateAttendee(index, { email: event.target.value })} placeholder="Email" /></div>)}</div>
-        <div style={actions}>{editingNumber ? <><button type="button" style={deleteNoiButton} disabled={busy} onClick={() => void deleteNoi()}>Delete NOI</button><button type="button" style={secondaryButton} disabled={busy} onClick={() => void downloadSaved("docx")}>Open saved Word</button><button type="button" style={secondaryButton} disabled={busy} onClick={() => void downloadSaved("pdf")}>Open saved PDF</button></> : null}<button type="submit" style={primaryButton} disabled={busy || !selected.length}>{busy ? "WorkingÃ¢â‚¬Â¦" : `${editingNumber ? "Save changes to" : "Generate"} NOI ${noiNumber} Ã‚Â· Word & PDF`}</button></div>
+        <div style={actions}>{editingNumber ? <><button type="button" style={deleteNoiButton} disabled={busy} onClick={() => void deleteNoi()}>Delete NOI</button><button type="button" style={secondaryButton} disabled={busy} onClick={() => void downloadSaved("docx")}>Open saved Word</button><button type="button" style={secondaryButton} disabled={busy} onClick={() => void downloadSaved("pdf")}>Open saved PDF</button></> : null}<button type="submit" style={primaryButton} disabled={busy || !selected.length}>{busy ? "Working..." : `${editingNumber ? "Save changes to" : "Generate"} NOI ${noiNumber} · Word & PDF`}</button></div>
       </form>
     </main>
   );
@@ -345,7 +345,6 @@ const actions: CSSProperties = { display: "flex", justifyContent: "flex-end", ga
 const primaryButton: CSSProperties = { border: 0, borderRadius: 10, padding: "12px 17px", background: "#005670", color: "#fff", fontWeight: 900, cursor: "pointer" };
 const secondaryButton: CSSProperties = { ...primaryButton, padding: "8px 12px", background: "#D0D0CE", color: "#000000" };
 const deleteNoiButton: CSSProperties = { ...secondaryButton, background: "#ECECE7", color: "#F93822", border: "1px solid #ECECE7" };
-
 
 
 

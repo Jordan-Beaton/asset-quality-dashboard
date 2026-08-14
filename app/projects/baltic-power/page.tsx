@@ -46,7 +46,7 @@ export default function WaddenSeaPage() {
   const [itps, setItps] = useState<ItpRow[]>([]);
   const [noiPoints, setNoiPoints] = useState<NoiRow[]>([]);
   const [dashboardView, setDashboardView] = useState<"overview" | "planning" | "controls">("overview");
-  const [message, setMessage] = useState("Loading Baltic Power project controlsÃ¢â‚¬Â¦");
+  const [message, setMessage] = useState("Loading Baltic Power project controls...");
 
   useEffect(() => {
     void (async () => {
@@ -103,7 +103,7 @@ export default function WaddenSeaPage() {
         @keyframes projectViewEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 720px) { .project-dashboard-grid, .project-dashboard-kpis, .project-dashboard-quick { grid-template-columns: 1fr !important; } }
       `}</style>
-      <QualityPageHero label="Project workspace Ã‚Â· BLP" title="Baltic Power" description="Live project controls, upcoming inspections, document reviews, and monthly reporting in one workspace." />
+      <QualityPageHero label="Project workspace · BLP" title="Baltic Power" description="Live project controls, upcoming inspections, document reviews, and monthly reporting in one workspace." />
 
       <ImsTopMetaRow backHref="/projects" backLabel="Back to Project Management" status={<><strong>Status:</strong> {message}</>} />
 
@@ -121,7 +121,8 @@ export default function WaddenSeaPage() {
         <QualityKpiCard title="NOI Outstanding" value={noiOutstanding} accent="#FFAD00" href="/projects/baltic-power/noi" />
         <QualityKpiCard title="Overdue Inspections" value={overdue.length} accent="#F93822" href="/projects/baltic-power/noi" />
         <QualityKpiCard title="NOI Requirements" value={noiPoints.length} accent="#005670" href="/projects/baltic-power/noi" />
-        <QualityKpiCard title="NOI Creator" value="Create" accent="#005670" href="/projects/baltic-power/noi/create" />\n        <QualityKpiCard title="ITP Sign-Off" value="Issue" accent="#005670" href="/projects/baltic-power/itp-sign-off" />
+        <QualityKpiCard title="NOI Creator" value="Create" accent="#005670" href="/projects/baltic-power/noi/create" />
+        <QualityKpiCard title="ITP Sign-Off" value="Issue" accent="#005670" href="/projects/baltic-power/itp-sign-off" />
       </section>
       </div> : null}
 
@@ -130,7 +131,7 @@ export default function WaddenSeaPage() {
         <div style={panel}>
           <div style={panelHeader}>
             <div><span style={kicker}>Next 8 weeks</span><h2 style={heading}>Upcoming inspections</h2></div>
-            <Link href="/projects/baltic-power/reports" style={actionLink}>Open lookahead Ã¢â€ â€™</Link>
+            <Link href="/projects/baltic-power/reports" style={actionLink}>Open lookahead →</Link>
           </div>
           <div style={list}>
             {upcoming.length ? upcoming.slice(0, 10).map((point) => {
@@ -138,7 +139,7 @@ export default function WaddenSeaPage() {
               return (
                 <div key={point.id} style={row}>
                   <span style={point.intervention_type.includes("H") ? hold : witness}>{point.intervention_type}</span>
-                  <span style={identity}><strong>{itp?.supplier || "Supplier TBC"} Ã‚Â· {point.section_number}</strong><small>{point.activity_description}</small></span>
+                  <span style={identity}><strong>{itp?.supplier || "Supplier TBC"} · {point.section_number}</strong><small>{point.activity_description}</small></span>
                   <span style={dateBlock}><strong>{formatDate(point.planned_date)}</strong><small>{point.noi_number ? `NOI ${point.noi_number}` : "NOI required"}</small></span>
                 </div>
               );
@@ -149,13 +150,13 @@ export default function WaddenSeaPage() {
         <div style={panel}>
           <div style={panelHeader}>
             <div><span style={kicker}>Action required</span><h2 style={heading}>ITP review priorities</h2></div>
-            <Link href="/projects/baltic-power/itp" style={actionLink}>Open ITP tracker Ã¢â€ â€™</Link>
+            <Link href="/projects/baltic-power/itp" style={actionLink}>Open ITP tracker →</Link>
           </div>
           <div style={list}>
             {itpAttention.length ? itpAttention.slice(0, 10).map((itp) => (
               <div key={itp.id} style={row}>
                 <span style={reviewBadge}>{itp.overall_status}</span>
-                <span style={identity}><strong>{itp.document_number} Ã‚Â· {itp.supplier || "Supplier TBC"}</strong><small>{itp.title}</small></span>
+                <span style={identity}><strong>{itp.document_number} · {itp.supplier || "Supplier TBC"}</strong><small>{itp.title}</small></span>
                 <span style={dateBlock}><strong>{itp.due_date ? formatDate(itp.due_date) : "No due date"}</strong><small>{itp.next_action || itp.overall_stage}</small></span>
               </div>
             )) : <div style={empty}>No ITP review actions currently require attention.</div>}
@@ -197,7 +198,6 @@ const empty: CSSProperties = { padding: 30, color: "#53565A", textAlign: "center
 const quickPanel: CSSProperties = { ...panel, padding: 18, display: "grid", gap: 14 };
 const quickGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12 };
 const quickLink: CSSProperties = { display: "grid", gap: 5, padding: 14, borderRadius: 12, border: "1px solid #D0D0CE", background: "#ECECE7", color: "#53565A", textDecoration: "none", fontSize: 12 };
-
 
 
 

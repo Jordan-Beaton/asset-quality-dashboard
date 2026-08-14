@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { BalticPowerWorkspaceNav } from "../../../../src/components/BalticPowerWorkspaceNav";
 import { ImsButton, ImsPanel, ImsTopMetaRow } from "../../../../src/components/ImsPrimitives";
@@ -32,9 +32,11 @@ function decisionStatusStyle(status: string): CSSProperties {
 export default function BalticPowerItpSignOffPage() {
   const [message, setMessage] = useState("Loading ITP sign-off register...");
   const [records, setRecords] = useState<SignOff[]>([]);
+  const [expandedRecordIds, setExpandedRecordIds] = useState<string[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [phases, setPhases] = useState<Phase[]>([]);
   const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
+  const [selectedTasks, setSelectedTasks] = useState<Record<number, number[]>>({});
   const [recipientEmail, setRecipientEmail] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [sending, setSending] = useState(false);
@@ -47,14 +49,20 @@ export default function BalticPowerItpSignOffPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
-  const selectedPhases = selectedIndexes.map((index) => phases[index]).filter(Boolean);
+  const selectedPhases = selectedIndexes.map((phaseIndex) => {
+    const phase = phases[phaseIndex];
+    if (!phase) return null;
+    const taskIndexes = selectedTasks[phaseIndex] || [];
+    return { ...phase, items: phase.items.filter((_, itemIndex) => taskIndexes.includes(itemIndex)) };
+  }).filter((phase): phase is Phase => Boolean(phase));
+  const selectedTaskCount = selectedPhases.reduce((total, phase) => total + phase.items.length, 0);
   const pending = records.filter((row) => row.status === "Pending").length;
   const approved = records.filter((row) => row.status === "Approved").length;
   const rejected = records.filter((row) => row.status === "Rejected").length;
 
   async function extract(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0] || null;
-    setFile(selected); setPhases([]); setSelectedIndexes([]);
+    setFile(selected); setPhases([]); setSelectedIndexes([]); setSelectedTasks({});
     if (!selected) return;
     setExtracting(true); setMessage("Detecting numbered phase headings and extracting their activity rows...");
     try {
@@ -70,11 +78,34 @@ export default function BalticPowerItpSignOffPage() {
   }
 
   function togglePhase(index: number) {
-    setSelectedIndexes((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index]);
+    const isSelected = selectedIndexes.includes(index);
+    setSelectedIndexes((current) => isSelected ? current.filter((value) => value !== index) : [...current, index]);
+    if (isSelected) {
+      setSelectedTasks((current) => Object.fromEntries(Object.entries(current).filter(([key]) => Number(key) !== index)));
+    } else {
+      setSelectedTasks((current) => ({ ...current, [index]: [] }));
+    }
+  }
+
+  function toggleTask(phaseIndex: number, taskIndex: number) {
+    setSelectedTasks((current) => {
+      const selected = current[phaseIndex] || [];
+      return { ...current, [phaseIndex]: selected.includes(taskIndex) ? selected.filter((value) => value !== taskIndex) : [...selected, taskIndex] };
+    });
+  }
+
+  function setAllTasks(phaseIndex: number, count: number, selected: boolean) {
+    setSelectedTasks((current) => ({ ...current, [phaseIndex]: selected ? Array.from({ length: count }, (_, index) => index) : [] }));
+  }
+
+  function toggleRecordItems(id: string) {
+    setExpandedRecordIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   }
 
   async function send() {
-    if (!file || !selectedPhases.length || !recipientEmail.trim()) { setMessage("Choose an ITP, select at least one phase heading, and enter the recipient email."); return; }
+    if (!file || !selectedIndexes.length || !recipientEmail.trim()) { setMessage("Choose an ITP, select at least one phase heading, and enter the recipient email."); return; }
+    const emptyPhaseIndex = selectedIndexes.find((phaseIndex) => !(selectedTasks[phaseIndex] || []).length);
+    if (emptyPhaseIndex !== undefined) { setMessage(`Select at least one task within Phase ${phases[emptyPhaseIndex]?.phaseNumber || "-"}.`); return; }
     setSending(true); setMessage(`Sending ${selectedPhases.length} phase sign-off request${selectedPhases.length === 1 ? "" : "s"}...`);
     let path = "";
     const requestIds: string[] = [];
@@ -94,7 +125,7 @@ export default function BalticPowerItpSignOffPage() {
         if (!response.ok) throw new Error(payload?.error || "An email could not be sent.");
       }
       const count = selectedPhases.length;
-      setFile(null); setPhases([]); setSelectedIndexes([]); setRecipientEmail("");
+      setFile(null); setPhases([]); setSelectedIndexes([]); setSelectedTasks({}); setRecipientEmail("");
       await load();
       setMessage(`${count} phase sign-off request${count === 1 ? "" : "s"} sent to ${recipientEmail.trim()}.`);
     } catch (error) {
@@ -134,22 +165,27 @@ export default function BalticPowerItpSignOffPage() {
         <div style={choiceHeader}><strong>Detected phase headings</strong><span style={muted}>Select only what is appropriate. Each selected phase receives its own auditable decision.</span></div>
         {phases.map((phase, index) => {
           const checked = selectedIndexes.includes(index);
+          const selectedCount = (selectedTasks[index] || []).length;
           return <div key={`${phase.phaseNumber}-${index}`} style={phaseChoice}>
-            <label style={phaseCheck}><input type="checkbox" checked={checked} onChange={() => togglePhase(index)} /><span><strong>Phase {phase.phaseNumber}</strong><br/>{phase.phaseTitle}</span><span style={itemCount}>{phase.items.length} items</span></label>
-            {checked ? <PhaseTable phase={phase} /> : null}
+            <label style={phaseCheck}><input type="checkbox" checked={checked} onChange={() => togglePhase(index)} /><span><strong>Phase {phase.phaseNumber}</strong><br/>{phase.phaseTitle}</span><span style={itemCount}>{checked ? `${selectedCount} of ${phase.items.length} selected` : `${phase.items.length} items`}</span></label>
+            {checked ? <PhaseTable phase={phase} selectedTaskIndexes={selectedTasks[index] || []} onToggleTask={(taskIndex) => toggleTask(index, taskIndex)} onSelectAll={() => setAllTasks(index, phase.items.length, true)} onClear={() => setAllTasks(index, phase.items.length, false)} /> : null}
           </div>;
         })}
       </div> : null}
-      <div style={actions}><ImsButton onClick={() => void send()} disabled={sending || extracting || !selectedPhases.length}>{sending ? "Sending..." : selectedPhases.length ? `Send ${selectedPhases.length} for approval` : "Send for approval"}</ImsButton></div>
+      <div style={actions}><ImsButton onClick={() => void send()} disabled={sending || extracting || !selectedIndexes.length || !selectedTaskCount}>{sending ? "Sending..." : selectedTaskCount ? `Send ${selectedTaskCount} task${selectedTaskCount === 1 ? "" : "s"} in ${selectedPhases.length} phase${selectedPhases.length === 1 ? "" : "s"}` : "Send for approval"}</ImsButton></div>
     </ImsPanel>
     <ImsPanel style={containedPanel} title="Sign-off evidence register" subtitle="The decision record stores the recipient email, confirmed name, decision, and exact date/time.">
-      <div style={tableWrap}><table className="ims-data-table" style={table}><colgroup><col style={{ width: "23%" }} /><col style={{ width: "14%" }} /><col style={{ width: "4%" }} /><col style={{ width: "12%" }} /><col style={{ width: "7%" }} /><col style={{ width: "12%" }} /><col style={{ width: "8%" }} /><col style={{ width: "8%" }} /><col style={{ width: "12%" }} /></colgroup><thead><tr><th>ITP title</th><th>Phase</th><th>Items</th><th>Recipient</th><th>Status</th><th>Decision evidence</th><th>Decision date</th><th>Decision time</th><th style={sourceColumn}>Documents</th></tr></thead><tbody>{records.map((row) => <tr key={row.id}><td><strong>{row.document_name}</strong></td><td><strong>Phase {row.phase_number}</strong><br/>{row.phase_title}</td><td>{row.phase_items?.length || 0}</td><td>{row.recipient_email}<br/><span style={muted}>Sent {new Date(row.sent_at).toLocaleString()}</span></td><td><span data-status={row.status} style={decisionStatusStyle(row.status)}>{row.status}</span></td><td>{row.decided_at ? <>{row.decision_name}<br/>{row.decision_email}{row.decision_note ? <><br/>{row.decision_note}</> : null}{row.certificate_sha256 ? <><br/><span style={hashText}>SHA-256: {row.certificate_sha256}</span></> : null}</> : "Awaiting response"}</td><td>{decisionDate(row.decided_at)}</td><td>{decisionTime(row.decided_at)}</td><td style={sourceColumn}><div style={documentLinks}><button style={linkButton} onClick={() => void openSource(row.document_path)}>Open ITP</button>{row.certificate_path ? <button style={linkButton} onClick={() => void openCertificate(row.certificate_path)}>Certificate PDF</button> : null}</div></td></tr>)}</tbody></table>{!records.length ? <div style={empty}>No sign-off requests have been issued.</div> : null}</div>
+      <div style={tableWrap}><table className="ims-data-table" style={table}><colgroup><col style={{ width: "23%" }} /><col style={{ width: "14%" }} /><col style={{ width: "4%" }} /><col style={{ width: "12%" }} /><col style={{ width: "7%" }} /><col style={{ width: "12%" }} /><col style={{ width: "8%" }} /><col style={{ width: "8%" }} /><col style={{ width: "12%" }} /></colgroup><thead><tr><th>ITP title</th><th>Phase</th><th>Items</th><th>Recipient</th><th>Status</th><th>Decision evidence</th><th>Decision date</th><th>Decision time</th><th style={sourceColumn}>Documents</th></tr></thead><tbody>{records.map((row) => {
+        const expanded = expandedRecordIds.includes(row.id);
+        const rowItemCount = row.phase_items?.length || 0;
+        return <Fragment key={row.id}><tr><td><strong>{row.document_name}</strong></td><td><strong>Phase {row.phase_number}</strong><br/>{row.phase_title}</td><td><button type="button" style={itemCountButton} onClick={() => toggleRecordItems(row.id)} aria-expanded={expanded} aria-controls={`sign-off-items-${row.id}`} disabled={!rowItemCount} title={rowItemCount ? `${expanded ? "Hide" : "Show"} signed-off items` : "No items recorded"}>{rowItemCount}<span aria-hidden="true" style={itemChevron}>{expanded ? "▴" : "▾"}</span></button></td><td>{row.recipient_email}<br/><span style={muted}>Sent {new Date(row.sent_at).toLocaleString()}</span></td><td><span data-status={row.status} style={decisionStatusStyle(row.status)}>{row.status}</span></td><td>{row.decided_at ? <>{row.decision_name}<br/>{row.decision_email}{row.decision_note ? <><br/>{row.decision_note}</> : null}{row.certificate_sha256 ? <><br/><span style={hashText}>SHA-256: {row.certificate_sha256}</span></> : null}</> : "Awaiting response"}</td><td>{decisionDate(row.decided_at)}</td><td>{decisionTime(row.decided_at)}</td><td style={sourceColumn}><div style={documentLinks}><button style={linkButton} onClick={() => void openSource(row.document_path)}>Open ITP</button>{row.certificate_path ? <button style={linkButton} onClick={() => void openCertificate(row.certificate_path)}>Certificate PDF</button> : null}</div></td></tr>{expanded ? <tr id={`sign-off-items-${row.id}`}><td colSpan={9} style={expandedItemsCell}><div style={expandedItems}><strong>Tasks included in this sign-off</strong><div style={tableWrap}><table style={itemDetailTable}><colgroup><col style={{ width: "120px" }} /><col /></colgroup><thead><tr><th style={itemDetailHeader}>Task ID</th><th style={itemDetailHeader}>Activity description</th></tr></thead><tbody>{row.phase_items.map((item, index) => <tr key={`${item.taskNumber}-${index}`}><td style={itemDetailCell}><strong>{item.taskNumber || "-"}</strong></td><td style={itemDetailCell}>{item.activityDescription || "-"}</td></tr>)}</tbody></table></div></div></td></tr> : null}</Fragment>;
+      })}</tbody></table>{!records.length ? <div style={empty}>No sign-off requests have been issued.</div> : null}</div>
     </ImsPanel>
   </main>;
 }
 
-function PhaseTable({ phase }: { phase: Phase }) {
-  return <div style={preview}><div style={tableWrap}><table className="ims-data-table" style={table}><colgroup><col style={{ width: "120px" }} /><col /></colgroup><thead><tr><th>Task ID</th><th>Activity description</th></tr></thead><tbody>{phase.items.map((item, index) => <tr key={`${item.taskNumber}-${index}`}><td>{item.taskNumber || "-"}</td><td>{item.activityDescription || "-"}</td></tr>)}</tbody></table></div></div>;
+function PhaseTable({ phase, selectedTaskIndexes, onToggleTask, onSelectAll, onClear }: { phase: Phase; selectedTaskIndexes: number[]; onToggleTask: (index: number) => void; onSelectAll: () => void; onClear: () => void }) {
+  return <div style={preview}><div style={taskActions}><span style={muted}>Choose the individual tasks to include in this sign-off.</span><div style={taskActionButtons}><button type="button" style={taskActionButton} onClick={onSelectAll}>Select all</button><button type="button" style={taskActionButton} onClick={onClear}>Clear</button></div></div><div style={tableWrap}><table className="ims-data-table" style={table}><colgroup><col style={{ width: "58px" }} /><col style={{ width: "120px" }} /><col /></colgroup><thead><tr><th>Select</th><th>Task ID</th><th>Activity description</th></tr></thead><tbody>{phase.items.map((item, index) => <tr key={`${item.taskNumber}-${index}`}><td><input type="checkbox" checked={selectedTaskIndexes.includes(index)} onChange={() => onToggleTask(index)} aria-label={`Select task ${item.taskNumber || index + 1}`} /></td><td>{item.taskNumber || "-"}</td><td>{item.activityDescription || "-"}</td></tr>)}</tbody></table></div></div>;
 }
 
 const page: CSSProperties = { display: "grid", gap: 18, width: "100%", maxWidth: "100%", minWidth: 0 };
@@ -164,6 +200,9 @@ const phaseChoice: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: 
 const phaseCheck: CSSProperties = { display: "grid", gridTemplateColumns: "auto minmax(0,1fr) auto", alignItems: "center", gap: 12, color: "#53565A", cursor: "pointer" };
 const itemCount: CSSProperties = { padding: "5px 9px", borderRadius: 999, background: "#ECECE7", color: "#005670", fontSize: 11, fontWeight: 900, whiteSpace: "nowrap" };
 const preview: CSSProperties = { display: "grid", gap: 12, marginTop: 12, minWidth: 0 };
+const taskActions: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" };
+const taskActionButtons: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap" };
+const taskActionButton: CSSProperties = { minHeight: 42, border: "1px solid #D0D0CE", borderRadius: 10, padding: "8px 12px", background: "#EEF7F8", color: "#005670", fontWeight: 800, cursor: "pointer" };
 const tableWrap: CSSProperties = { width: "100%", maxWidth: "100%", minWidth: 0, overflowX: "auto", boxSizing: "border-box" };
 const table: CSSProperties = { width: "100%", maxWidth: "100%", tableLayout: "fixed", borderCollapse: "collapse", fontSize: 12, overflowWrap: "anywhere", wordBreak: "break-word" };
 const muted: CSSProperties = { color: "#53565A", fontSize: 11 };
@@ -171,5 +210,12 @@ const actions: CSSProperties = { display: "flex", justifyContent: "flex-end", ma
 const linkButton: CSSProperties = { border: 0, background: "transparent", color: "#005670", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap", padding: 0 };
 const sourceColumn: CSSProperties = { borderLeft: "1px solid #D0D0CE", paddingLeft: 14 };
 const documentLinks: CSSProperties = { display: "grid", justifyItems: "start", gap: 8 };
+const itemCountButton: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4, width: "100%", minWidth: 0, minHeight: 42, padding: 0, border: 0, background: "transparent", color: "#005670", fontWeight: 900, cursor: "pointer" };
+const itemChevron: CSSProperties = { fontSize: 10 };
+const expandedItemsCell: CSSProperties = { padding: "0 12px 14px", background: "#ECECE7" };
+const expandedItems: CSSProperties = { display: "grid", gap: 10, padding: 14, border: "1px solid #D0D0CE", borderRadius: 10, background: "#fff" };
+const itemDetailTable: CSSProperties = { width: "100%", borderCollapse: "collapse", tableLayout: "fixed", fontSize: 12 };
+const itemDetailHeader: CSSProperties = { padding: "8px 10px", textAlign: "left", background: "#EEF7F8", color: "#005670", borderBottom: "1px solid #D0D0CE" };
+const itemDetailCell: CSSProperties = { padding: "9px 10px", textAlign: "left", verticalAlign: "top", borderBottom: "1px solid #D0D0CE", overflowWrap: "anywhere" };
 const hashText: CSSProperties = { ...muted, display: "block", marginTop: 4, fontFamily: "monospace" };
 const empty: CSSProperties = { padding: 28, textAlign: "center", color: "#53565A" };
