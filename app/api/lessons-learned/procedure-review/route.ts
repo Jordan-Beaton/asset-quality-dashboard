@@ -67,11 +67,12 @@ export async function POST(request: Request) {
     const lessons = await loadAllPreventionLessons(supabase);
     const retrievalQuery = `${question}\nProcedure content: ${documentText.slice(0, 12000)}`;
     const retrieval = await retrievePreventionEvidence(supabase, apiKey, retrievalQuery, lessons);
-    const result = await generatePreventionBrief(apiKey, question, retrieval.candidates, { name: fileName, text: documentText });
-    result.evidence_count = retrieval.candidates.length;
+    const procedureCandidates = retrieval.candidates.slice(0, 80);
+    const result = await generatePreventionBrief(apiKey, question, procedureCandidates, { name: fileName, text: documentText });
+    result.evidence_count = procedureCandidates.length;
     result.screened_count = retrieval.screenedCount;
     result.retrieval_mode = retrieval.mode;
-    result.sources = retrieval.candidates.filter((lesson) => result.matched_lesson_ids.includes(lesson.id)).map((lesson) => ({ id: lesson.id, lesson_number: lesson.lesson_number, subject: lesson.subject, project: [lesson.project_code, lesson.project_name].filter(Boolean).join(" · ") }));
+    result.sources = procedureCandidates.filter((lesson) => result.matched_lesson_ids.includes(lesson.id)).map((lesson) => ({ id: lesson.id, lesson_number: lesson.lesson_number, subject: lesson.subject, project: [lesson.project_code, lesson.project_name].filter(Boolean).join(" · ") }));
     const { data: audit } = await supabase.from("lessons_learned_ai_analyses").insert({
       analysis_type: "procedure_review",
       question,

@@ -8,6 +8,16 @@ import { supabase } from "../lib/supabase";
 
 type IndexStatus = { configured: boolean; migration_required: boolean; total: number; indexed: number };
 
+async function readApiPayload<T>(response: Response): Promise<T> {
+  const text = await response.text();
+  try { return JSON.parse(text) as T; }
+  catch {
+    if (response.status === 504 || response.status === 408) throw new Error("The AI review exceeded the server time limit. Please retry; the document remains supported.");
+    if (response.status === 413) throw new Error("The uploaded document exceeded the server upload limit.");
+    throw new Error(`The AI review service returned an invalid response (HTTP ${response.status}). Please retry.`);
+  }
+}
+
 export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { canManage: boolean; onOpenLessons: (ids: string[], label: string) => void }) {
   const [question, setQuestion] = useState("Tell me the most important lessons from trenching failures that we should apply in our procedures.");
   const [file, setFile] = useState<File | null>(null);
@@ -43,7 +53,7 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
       } else response = await fetch("/api/lessons-learned/prevention-query", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }),
       });
-      const payload = await response.json();
+      const payload = await readApiPayload<PreventionResult & { error?: string }>(response);
       if (!response.ok) throw new Error(payload.error || "The prevention review failed.");
       setResult(payload as PreventionResult);
       setMessage(`Screened ${(payload.screened_count || payload.evidence_count).toLocaleString()} failure lessons; deeply analysed ${payload.evidence_count.toLocaleString()} relevance-ranked candidates.`);
@@ -62,7 +72,7 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
           const timeout = window.setTimeout(() => controller.abort(), 60000);
           try {
             const response = await fetch("/api/lessons-learned/prevention-index", { method: "POST", signal: controller.signal });
-            const next = await response.json();
+            const next = await readApiPayload<{ remaining: number; indexed: number; total: number; error?: string }>(response);
             if (!response.ok) throw new Error(next.error || "Semantic indexing failed.");
             payload = next;
           } catch (error) {
