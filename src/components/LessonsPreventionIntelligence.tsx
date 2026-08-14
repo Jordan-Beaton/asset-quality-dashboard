@@ -7,6 +7,7 @@ import { imsColours, imsInputStyle } from "./imsTheme";
 import { supabase } from "../lib/supabase";
 
 type IndexStatus = { configured: boolean; migration_required: boolean; total: number; indexed: number };
+const MAX_REVIEW_FILE_BYTES = 50 * 1024 * 1024;
 
 async function readApiPayload<T>(response: Response): Promise<T> {
   const text = await response.text();
@@ -40,15 +41,23 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
     try {
       let response: Response;
       if (file) {
-        if (file.size > 20 * 1024 * 1024) throw new Error("The document exceeds the 20 MB review limit.");
+        if (file.size > MAX_REVIEW_FILE_BYTES) throw new Error("The document exceeds the 50 MB review limit.");
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
         const storagePath = `AI-REVIEW/${crypto.randomUUID()}-${safeName}`;
         temporaryStoragePath = storagePath;
         const { error: uploadError } = await supabase.storage.from("lessons-learned-evidence").upload(storagePath, file, { contentType: file.type || "application/octet-stream", upsert: false });
         if (uploadError) throw new Error(`Document upload failed: ${uploadError.message}`);
+        setMessage(`Extracting the complete contents of ${file.name}...`);
+        const extractResponse = await fetch("/api/lessons-learned/procedure-extract", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ storagePath, fileName: file.name, fileSize: file.size }),
+        });
+        const extracted = await readApiPayload<{ extractedPath: string; characters: number; error?: string }>(extractResponse);
+        if (!extractResponse.ok) throw new Error(extracted.error || "The document could not be extracted.");
+        setMessage(`Document extracted (${extracted.characters.toLocaleString()} characters). Comparing it with relevant lessons...`);
         response = await fetch("/api/lessons-learned/procedure-review", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question, storagePath, fileName: file.name, contentType: file.type, fileSize: file.size }),
+          body: JSON.stringify({ question, extractedPath: extracted.extractedPath, fileName: file.name }),
         });
       } else response = await fetch("/api/lessons-learned/prevention-query", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }),
@@ -99,7 +108,7 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
       <form onSubmit={ask} style={askFormStyle}>
         <label style={fieldStyle}><span style={labelStyle}>What do you need to prevent?</span><textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="For example: What trenching failures should our procedure prevent?" style={questionStyle} maxLength={2000} /></label>
         <div style={suggestionStyle}><span>Try:</span>{["What should we check before mobilisation?", "What rigging failures must our lift plans prevent?", "What communication failures have repeated offshore?"].map((text) => <button type="button" key={text} style={suggestionButtonStyle} onClick={() => setQuestion(text)}>{text}</button>)}</div>
-        <label style={fieldStyle}><span style={labelStyle}>Optional procedure</span><input type="file" accept=".pdf,.doc,.docx,.txt" onChange={(event) => setFile(event.target.files?.[0] || null)} style={fileStyle} /><small style={helpStyle}>Upload a PDF or Word document to compare its controls against relevant historic failures. Text, tables and scanned PDF pages are supported. Maximum 20 MB.</small></label>
+        <label style={fieldStyle}><span style={labelStyle}>Optional procedure</span><input type="file" accept=".pdf,.doc,.docx,.txt" onChange={(event) => setFile(event.target.files?.[0] || null)} style={fileStyle} /><small style={helpStyle}>Upload a PDF or Word document to compare its controls against relevant historic failures. Text, tables and scanned PDF pages are supported. Maximum 50 MB.</small></label>
         <div style={actionRowStyle}><ImsButton type="submit" disabled={working || question.trim().length < 8}>{working ? "Analysing evidence..." : file ? "Review Procedure" : "Generate Prevention Brief"}</ImsButton>{file && <ImsButton type="button" variant="secondary" onClick={() => setFile(null)}>Remove Procedure</ImsButton>}</div>
       </form>
       <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>

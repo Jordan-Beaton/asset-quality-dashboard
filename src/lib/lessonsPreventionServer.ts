@@ -150,7 +150,7 @@ export async function generatePreventionBrief(apiKey: string, question: string, 
     result = await synthesiseBrief(partials);
   } else {
     try {
-      result = await requestBrief(candidates, 1800, 40000);
+      result = await requestBrief(candidates, 1800, document ? 180000 : 40000);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (!/incomplete|output limit|invalid prevention briefing format/i.test(message)) throw error;
