@@ -4,6 +4,16 @@ import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
+import {
+  buildExtractionDiagnostics,
+  emptyExtractionMapping,
+  isActivityHeading,
+  isCoordinateTargetAuthorityHeading,
+  isExcludedAuthorityHeading,
+  isIdentifierHeading,
+  isTargetAuthorityHeading,
+  type ExtractionMapping,
+} from "../../../../src/lib/noiExtractionRules";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -21,23 +31,6 @@ function clean(value: unknown) {
   return String(value ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/\s+/g, " ").trim();
 }
 
-function isTargetHeading(value: string) {
-  const heading = clean(value);
-  return /^(?:contr|contr\.?)$/i.test(heading)
-    || /\b(client|enshore|contractor|customer\s*(?:evaluation|inspection|involvement)?|purchaser|buyer)\b/i.test(heading);
-}
-
-function isCoordinateTargetHeading(value: string) {
-  return /^(?:client|enshore(?:\s+subsea(?:\s+limited)?)?|contractor|customer(?:\s+(?:evaluation|inspection|involvement))?|purchaser|buyer|contr\.?)\s*:?\s*$/i.test(clean(value));
-}
-
-function isExcludedAuthorityHeading(value: string, supplierName = "") {
-  const heading = clean(value);
-  const supplier = clean(supplierName);
-  return /\b(nominated\s+supplier|supplier|vendor|subcontractor|third\s*party|tpi|class|hsg)\b/i.test(heading)
-    || Boolean(supplier && heading.toLowerCase().includes(supplier.toLowerCase()));
-}
-
 function validSectionNumber(value: unknown) {
   const section = clean(value);
   return /^(?:[A-Z]{0,4}[-.]?)?\d+(?:\.\d+)*(?:[A-Z])?$/i.test(section) ? section : "";
@@ -51,7 +44,7 @@ function intervention(value: unknown) {
   return normalised === "H/W" ? "W/H" : normalised;
 }
 
-function findColumn(rows: unknown[][], headerRow: number, patterns: RegExp[]) {
+function findColumn(rows: unknown[][], headerRow: number, patterns: Array<{ test(value: string): boolean }>) {
   for (let row = headerRow; row >= Math.max(0, headerRow - 3); row -= 1) {
     for (let column = 0; column < (rows[row]?.length || 0); column += 1) {
       if (patterns.some((pattern) => pattern.test(clean(rows[row][column])))) return column;
@@ -60,11 +53,11 @@ function findColumn(rows: unknown[][], headerRow: number, patterns: RegExp[]) {
   return -1;
 }
 
-function targetColumnsForHeader(rows: unknown[][], headerRow: number, supplierName = "") {
+function targetColumnsForHeader(rows: unknown[][], headerRow: number, supplierName = "", mapping: ExtractionMapping = emptyExtractionMapping()) {
   const row = rows[headerRow] || [];
   const direct = row.map((cell, index) => {
     const heading = clean(cell);
-    return isTargetHeading(heading) && !isExcludedAuthorityHeading(heading, supplierName) ? { column: index, heading } : null;
+    return isTargetAuthorityHeading(heading, mapping.authorityHeadings) && !isExcludedAuthorityHeading(heading, supplierName) ? { column: index, heading } : null;
   }).filter(Boolean) as Array<{ column: number; heading: string }>;
   const hierarchical: Array<{ column: number; heading: string }> = [];
   row.forEach((cell, column) => {
@@ -73,7 +66,7 @@ function targetColumnsForHeader(rows: unknown[][], headerRow: number, supplierNa
       const parentCells = rows[parentRow] || [];
       const candidates = [column, column - 1, column - 2].filter((candidate) => candidate >= 0);
       const parent = candidates.map((candidate) => clean(parentCells[candidate]))
-        .find((heading) => isTargetHeading(heading) && !isExcludedAuthorityHeading(heading, supplierName));
+        .find((heading) => isTargetAuthorityHeading(heading, mapping.authorityHeadings) && !isExcludedAuthorityHeading(heading, supplierName));
       if (parent) {
         hierarchical.push({ column, heading: `${parent} — Intervention` });
         break;
@@ -84,14 +77,14 @@ function targetColumnsForHeader(rows: unknown[][], headerRow: number, supplierNa
   return merged.filter((target, index) => merged.findIndex((candidate) => candidate.column === target.column) === index);
 }
 
-function extractFromRows(rows: unknown[][], source: string, supplierName = "") {
+function extractFromRows(rows: unknown[][], source: string, supplierName = "", mapping: ExtractionMapping = emptyExtractionMapping()) {
   const candidates: Candidate[] = [];
   for (let headerRow = 0; headerRow < Math.min(rows.length, 80); headerRow += 1) {
     const row = rows[headerRow] || [];
-    const targets = targetColumnsForHeader(rows, headerRow, supplierName);
+    const targets = targetColumnsForHeader(rows, headerRow, supplierName, mapping);
     if (!targets.length) continue;
-    const sectionColumn = findColumn(rows, headerRow, [/\bsection\b/i, /insp(?:ection)?\s*(?:point)?\s*(?:no)?/i, /^item\s*(?:no)?/i, /^#$/]);
-    const activityColumn = findColumn(rows, headerRow, [/inspection\s*activity/i, /phase.*activity/i, /^activity/i]);
+    const sectionColumn = findColumn(rows, headerRow, [{ test: (value: string) => isIdentifierHeading(value, mapping.identifierHeadings) }]);
+    const activityColumn = findColumn(rows, headerRow, [{ test: (value: string) => isActivityHeading(value, mapping.activityHeadings) }]);
     const componentColumn = findColumn(rows, headerRow, [/component|assembly|operation|description|work\s*step/i]);
     let carriedSection = "";
     for (let dataRow = headerRow + 1; dataRow < rows.length; dataRow += 1) {
@@ -131,10 +124,10 @@ function htmlTables(html: string) {
   );
 }
 
-async function extractDocxCandidates(buffer: Buffer, supplierName = "") {
+async function extractDocxCandidates(buffer: Buffer, supplierName = "", mapping: ExtractionMapping = emptyExtractionMapping()) {
   const html = (await mammoth.convertToHtml({ buffer })).value;
   const tables = htmlTables(html);
-  const candidates = tables.flatMap((rows, index) => extractFromRows(rows, `Table ${index + 1}`, supplierName));
+  const candidates = tables.flatMap((rows, index) => extractFromRows(rows, `Table ${index + 1}`, supplierName, mapping));
 
   const archive = await JSZip.loadAsync(buffer);
   const headerFiles = Object.keys(archive.files).filter((name) => /^word\/header\d+\.xml$/i.test(name));
@@ -149,17 +142,17 @@ async function extractDocxCandidates(buffer: Buffer, supplierName = "") {
       const width = Math.max(0, ...rows.map((row) => row.length));
       const openingRowsContainAuthorityHeader = rows
         .slice(0, 3)
-        .some((row) => row.some((cell) => isTargetHeading(clean(cell))));
+        .some((row) => row.some((cell) => isTargetAuthorityHeading(clean(cell), mapping.authorityHeadings)));
       if (width < 4 || openingRowsContainAuthorityHeader) continue;
       const syntheticHeader = Array.from({ length: width }, () => "");
       syntheticHeader[0] = "Section";
       syntheticHeader[1] = "Process / operation description";
       syntheticHeader[width - 2] = "Contractor [Enshore]";
-      candidates.push(...extractFromRows([syntheticHeader, ...rows], `Table ${index + 1} · Word repeating header`, supplierName));
+      candidates.push(...extractFromRows([syntheticHeader, ...rows], `Table ${index + 1} · Word repeating header`, supplierName, mapping));
     }
   }
 
-  return deduplicate(candidates);
+  return { candidates: deduplicate(candidates), tables };
 }
 
 function deduplicate(candidates: Candidate[]) {
@@ -211,7 +204,7 @@ function applyCoordinateAuthority(candidates: Candidate[], coordinateCandidates:
   return deduplicate([...candidatesFromOtherPages, ...coordinateCandidates]);
 }
 
-async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "") {
+async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "", mapping: ExtractionMapping = emptyExtractionMapping()) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const document = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
   const candidates: Candidate[] = [];
@@ -236,7 +229,7 @@ async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "")
         }];
       });
       const detectedTargetHeaders = items.filter((item) =>
-        isCoordinateTargetHeading(item.text) && !isExcludedAuthorityHeading(item.text, supplierName)
+        isCoordinateTargetAuthorityHeading(item.text, mapping.authorityHeadings) && !isExcludedAuthorityHeading(item.text, supplierName)
       );
       const pageSignature = `${page.rotate}:${Math.round(viewport.width)}:${Math.round(viewport.height)}`;
       const targetHeaders = detectedTargetHeaders.length
@@ -325,6 +318,7 @@ async function extractPdfVisualChunk(
   firstOriginalPage: number,
   lastOriginalPage: number,
   extractedText: string,
+  mapping: ExtractionMapping,
 ) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OCR is not configured on this environment.");
@@ -332,14 +326,16 @@ async function extractPdfVisualChunk(
   const supplierInstruction = supplierName
     ? `The ITP supplier is "${supplierName}". Any column headed with that supplier's name is supplier-side and MUST be ignored.`
     : "Any column headed with the supplier's name is supplier-side and MUST be ignored.";
+  const configuredAuthorities = mapping.authorityHeadings.length ? ` Additional confirmed client-side authority headings are: ${mapping.authorityHeadings.join(", ")}.` : "";
+  const configuredIdentifiers = mapping.identifierHeadings.length ? ` Confirmed task/item identifier headings include: ${mapping.identifierHeadings.join(", ")}.` : "";
   const prompt = `Perform a page-by-page completeness audit of this excerpt from an Inspection and Test Plan (ITP). This excerpt contains original document pages ${firstOriginalPage}-${lastOriginalPage}. Visually inspect every supplied page image and every table even when the PDF also contains searchable text. Return pageNumber using the ORIGINAL document page number in that ${firstOriginalPage}-${lastOriginalPage} range.
 
 Find ONLY rows where the customer's involvement code contains W (Witness) or H (Hold), either alone or as part of a slash-separated code. Examples to capture include W, H, W/H, R/W, M/W, W/R, and H/R. Relevant layouts include:
-- a column headed Client, Enshore, Contractor, Customer, Purchaser, or Buyer;
+- a column headed Client, Enshore, Contractor, Employer, Employer Surveillance, Customer, Purchaser, Buyer, or Owner;
 - an "Inspection Authority" group with a standalone "Contr" sub-column, where Contr means Contractor;
 - a grouped parent heading such as "Customer Evaluation" with W/H values beneath its "Intervention" sub-column.
 
-Treat those customer-side labels as the same relevant party. ${supplierInstruction}
+Treat those customer-side labels as the same relevant party.${configuredAuthorities}${configuredIdentifiers} ${supplierInstruction}
 
 Authority ownership is decisive. When an Inspection Authority group contains columns such as the supplier name, Nominated Supplier, and Enshore Subsea, read ONLY the Enshore Subsea column. Never copy a W or H horizontally from another authority column into the client column. In other Inspection Authority tables, read only the client/contractor column and ignore Sub and TPI.
 
@@ -389,7 +385,7 @@ ${extractedText.slice(0, 30000)}
     const party = clean(point.partyHeading);
     const sectionNumber = validSectionNumber(point.sectionNumber);
     const description = clean(point.activityDescription).slice(0, 300);
-    if (!type || !isTargetHeading(party) || isExcludedAuthorityHeading(party, supplierName) || !sectionNumber || description.length < 4) return [];
+    if (!type || !isTargetAuthorityHeading(party, mapping.authorityHeadings) || isExcludedAuthorityHeading(party, supplierName) || !sectionNumber || description.length < 4) return [];
     const confidence = clean(point.confidence);
     const page = Number(point.pageNumber);
     return [{
@@ -408,6 +404,7 @@ async function extractPdfVisualAudit(
   fileName: string,
   supplierName = "",
   pageTexts: Array<{ num: number; text: string }> = [],
+  mapping: ExtractionMapping = emptyExtractionMapping(),
 ) {
   if (buffer.length > 25 * 1024 * 1024) throw new Error("The scanned PDF exceeds the 25 MB OCR limit. Split it into smaller ITP files and retry.");
   const source = await PDFDocument.load(buffer, { ignoreEncryption: true });
@@ -434,6 +431,7 @@ async function extractPdfVisualAudit(
         start + 1,
         end,
         extractedText,
+        mapping,
       ));
     } catch (error) {
       warnings.push(`Pages ${start + 1}-${end}: ${error instanceof Error ? error.message : "visual audit failed"}`);
@@ -450,21 +448,36 @@ export async function POST(request: Request) {
     const file = form.get("file");
     const allowVisualAudit = form.get("allowVisualAudit") === "true";
     const supplierName = clean(form.get("supplierName"));
+    let mapping = emptyExtractionMapping();
+    try {
+      const supplied = JSON.parse(clean(form.get("extractionMapping")) || "{}") as Partial<ExtractionMapping>;
+      mapping = {
+        authorityHeadings: Array.isArray(supplied.authorityHeadings) ? supplied.authorityHeadings.map(clean).filter(Boolean).slice(0, 20) : [],
+        identifierHeadings: Array.isArray(supplied.identifierHeadings) ? supplied.identifierHeadings.map(clean).filter(Boolean).slice(0, 20) : [],
+        activityHeadings: Array.isArray(supplied.activityHeadings) ? supplied.activityHeadings.map(clean).filter(Boolean).slice(0, 20) : [],
+      };
+    } catch {
+      return NextResponse.json({ error: "The saved extraction mapping is invalid." }, { status: 400 });
+    }
     if (!(file instanceof File)) return NextResponse.json({ error: "No ITP supplied." }, { status: 400 });
     if (file.size > 40 * 1024 * 1024) return NextResponse.json({ error: "The ITP exceeds the 40 MB scanning limit." }, { status: 413 });
     const buffer = Buffer.from(await file.arrayBuffer());
     const extension = file.name.split(".").pop()?.toLowerCase();
     let candidates: Candidate[] = [];
+    const diagnosticTables: unknown[][][] = [];
     let pdfPageTexts: Array<{ num: number; text: string }> = [];
     let pdfCoordinateCandidates: Candidate[] = [];
     if (["xlsx", "xls", "xlsm"].includes(extension || "")) {
       const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
       candidates = workbook.SheetNames.flatMap((name) => {
         const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[name], { header: 1, raw: false, defval: "" });
-        return extractFromRows(rows, `Sheet ${name}`, supplierName);
+        diagnosticTables.push(rows);
+        return extractFromRows(rows, `Sheet ${name}`, supplierName, mapping);
       });
     } else if (extension === "docx") {
-      candidates = await extractDocxCandidates(buffer, supplierName);
+      const word = await extractDocxCandidates(buffer, supplierName, mapping);
+      candidates = word.candidates;
+      diagnosticTables.push(...word.tables);
     } else if (extension === "pdf") {
       parser = new PDFParse({ data: new Uint8Array(buffer) });
       const tables = await parser.getTable({ first: 30 });
@@ -472,10 +485,12 @@ export async function POST(request: Request) {
       pdfPageTexts = text.pages.map((page) => ({ num: page.num, text: page.text }));
       for (const page of tables.pages) {
         for (let index = 0; index < page.tables.length; index += 1) {
-          candidates.push(...extractFromRows(page.tables[index] as unknown[][], `Page ${page.num}, table ${index + 1}`, supplierName));
+          const rows = page.tables[index] as unknown[][];
+          diagnosticTables.push(rows);
+          candidates.push(...extractFromRows(rows, `Page ${page.num}, table ${index + 1}`, supplierName, mapping));
         }
       }
-      pdfCoordinateCandidates = await extractPdfCoordinateCandidates(buffer, supplierName);
+      pdfCoordinateCandidates = await extractPdfCoordinateCandidates(buffer, supplierName, mapping);
       candidates = applyCoordinateAuthority(candidates, pdfCoordinateCandidates);
     } else {
       return NextResponse.json({ error: "Use an Excel, Word, or searchable PDF ITP." }, { status: 415 });
@@ -484,7 +499,7 @@ export async function POST(request: Request) {
     let ocrWarning: string | null = null;
     if (extension === "pdf" && allowVisualAudit) {
       try {
-        const visualAudit = await extractPdfVisualAudit(buffer, file.name, supplierName, pdfPageTexts);
+        const visualAudit = await extractPdfVisualAudit(buffer, file.name, supplierName, pdfPageTexts, mapping);
         candidates = reconcilePdfCandidates(candidates, visualAudit.candidates);
         extractionMode = visualAudit.candidates.length && candidates.length > visualAudit.candidates.length ? "Hybrid" : "Visual";
         if (visualAudit.warnings.length) {
@@ -500,9 +515,11 @@ export async function POST(request: Request) {
       candidates = applyCoordinateAuthority(candidates, pdfCoordinateCandidates);
     }
     const unique = deduplicate(candidates);
+    const diagnostics = buildExtractionDiagnostics(diagnosticTables, supplierName, mapping);
     return NextResponse.json({
       candidates: unique,
       extractionMode,
+      diagnostics,
       summary: {
         points: unique.length,
         witness: unique.filter((point) => point.interventionType.split("/").includes("W")).length,
@@ -516,7 +533,7 @@ export async function POST(request: Request) {
         ? extractionMode === "Visual" || extractionMode === "Hybrid"
           ? ocrWarning || "Every PDF page was visually audited and reconciled with structured extraction. Confirm every extracted point before saving."
           : ocrWarning ? `Structured results were found, but the visual completeness audit could not run: ${ocrWarning}` : null
-        : ocrWarning || "No Client, Enshore, or Contractor W/H points were identified by structured extraction or OCR.",
+        : ocrWarning || `No qualifying W/H points were identified. ${diagnostics.explanation.join(" ")}`,
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "The ITP could not be scanned." }, { status: 422 });

@@ -38,6 +38,20 @@ At phone widths the workspace inherits the whole-IMS bottom navigation, one-colu
 - Issued rows expose an NOI link that opens the saved record in the Creator.
 - People-assignment controls should continue to use People Management as their source.
 
+## ITP Extraction Mapping Framework
+
+- Core rules: `src/lib/noiExtractionRules.ts`.
+- Regression check: `scripts/check-noi-extraction-rules.ts`.
+- The scanner classifies authority, identifier, and activity-description columns rather than relying on one supplier's exact wording.
+- Built-in client-side authority terminology includes Client, Enshore, Contractor, Employer, Employer Surveillance, Customer, Purchaser, Buyer, and Owner.
+- Built-in identifier terminology includes Task, Task #, Step, Item, Point, Section, and Inspection Point variants.
+- Supplier, Vendor, Subcontractor, TPI, Class, HSG, and MWS authority columns are explicitly excluded unless future controlled requirements say otherwise.
+- Every scan returns diagnostics explaining the recognised NOI authority, row identifier, activity column, and excluded authority columns.
+- The Baltic Power NOI page exposes a mapping review when a layout is unresolved. A user can confirm the client/NOI authority, task/item identifier, and activity columns, then save and rescan.
+- Confirmed mappings are stored in `project-documents/{project-key}/extraction-mappings/{template-fingerprint}.json` and automatically reused when later revisions have the same header structure.
+- Visual/OCR instructions and final validation use the same configured authority mapping as structured and coordinate extraction; a heading cannot be accepted by OCR and then silently rejected by a different rule layer.
+- The Baltic Power pattern `Task # / Activity Description / ENS Surveillance / Employer Surveillance / MWS` is covered by regression checks: Employer Surveillance is the NOI authority, Task # is the identifier, and MWS is excluded.
+
 ## NOI Creator
 
 - Controlled source template: `assets/templates/ENS-HSEQ-FRM-074-Notice-of-Inspection.docx`.
@@ -73,6 +87,7 @@ At phone widths the workspace inherits the whole-IMS bottom navigation, one-colu
 
 1. Upload a new Supplier ITP revision and confirm current/archive revision behavior.
 2. Scan representative PDF, image-based and Word ITP layouts and verify party-column targeting.
+   - Include the Baltic Power Employer Surveillance layout and confirm Task # is retained.
 3. Create a multi-point NOI, verify its planned dates in the tracker, and compare Word/PDF output.
 4. Reopen the NOI from the tracker in a separate authenticated session, edit it, and confirm stored files are replaced.
 5. Delete the latest trial NOI and confirm linked points return to Planned and the next number recalculates correctly.

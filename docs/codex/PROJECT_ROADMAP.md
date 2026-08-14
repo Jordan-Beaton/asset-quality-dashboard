@@ -58,6 +58,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - The Project NOI register supports structured/OCR extraction of Client, Enshore, Contractor and equivalent W/H points across varied supplier ITP layouts, manual point entry, supplier/ITP/title/type/status filtering, planned dates, assigned people, and filtered PDF output.
 - NOI Creator generates multi-point controlled ENS-HSEQ-FRM-074 Word and matching one-page PDF outputs, assigns sequential NOI numbers, stores editable form data and generated files, synchronises inspection dates with tracker planned dates, and supports reopen/edit/download/delete workflows.
 - Wadden Sea Project Reports consolidate Audit NCR, Audit Programme, and eight-week lookahead outputs, with the NOI register retained as the primary lookahead data source and Excel upload retained as a fallback.
+- Project ITP extraction now uses shared authority/identifier/activity rules, recognises Baltic Power Employer Surveillance and Task # layouts, excludes MWS and supplier-side columns, returns transparent scan diagnostics, and supports saved template-fingerprint mappings for unfamiliar future layouts.
 - Lessons Learned is live as a central searchable knowledge repository with controlled Project/People/Asset references, repeat-theme linkage, interactive analytics, cumulative filters, evidence, large-register support and a rotating “What We’ve Learned” insight.
 - Field Tools now provides a permission-aware `Capture a Lesson` launcher into a compact Lessons Learned field mode with essential-first entry, expandable optional detail, photo/file evidence and repeat-capture behavior; the desktop workspace remains unchanged.
 - Wadden Sea Project Reports now include a dedicated Open Points dashboard/register aligned to `CA_Act_1699`, with simplified entry, People-linked raiser/owner fields, controlled phase creation/history, NCR linkage, evidence, client-copy tracking, deadline/closure controls and aligned Excel/Word/PDF outputs.
@@ -78,6 +79,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Production/device QA of the shared whole-IMS mobile card, panel, bottom-navigation, upload, and form behavior across the device and module matrix in `MOBILE_COMPATIBILITY_HANDOVER.md`.
 - Risk Management shell and workflows.
 - Project Management production QA for saved NOI reopen/edit/delete, controlled document storage, sequential numbering, planned-date synchronisation, and mobile responsiveness.
+- Cross-project ITP extraction QA using real supplier revisions to expand the regression fixture library only where evidence shows a genuinely new table role or continuation pattern.
 - Lessons Learned production QA for the 2,990-row import, uncapped KPI totals, cumulative filters, controlled dropdowns, repeat-record drill-downs and the new Field Tools capture workflow.
 - Open Points production QA and confirmation that `scripts/sql/project_open_points.sql` has been applied to the live Supabase project.
 - IMS Home production/browser QA for synchronized video playback, persisted desktop preference, all six desktop layouts, permission-restricted cards, and the fixed phone workspace list.
@@ -268,6 +270,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
   - Confirm deleting the latest NOI returns linked points to Planned and makes the deleted latest sequence number available again without reusing numbers that remain issued.
   - Verify mobile layouts for the Wadden Sea dashboard, NOI register, and NOI Creator.
   - Continue improving varied supplier ITP extraction only against evidenced layout failures; preserve party-column targeting so supplier columns are not mistaken for Enshore/Client/Contractor columns.
+  - Verify Baltic Power Employer Surveillance extraction and saved mapping reuse on Vercel, including later revisions of the same header template.
   - Keep the NOI register as the primary eight-week-lookahead source while retaining Excel upload as a fallback.
   - Apply and verify the latest Open Points SQL migration, including People-linked raiser and phase-settings history.
   - Verify Open Points filters, fixed register, phase creation, NCR dropdown, evidence, deadline/closure workflow and aligned Excel/Word/PDF outputs.

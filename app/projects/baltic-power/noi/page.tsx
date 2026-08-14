@@ -18,6 +18,8 @@ type Revision = { id: string; revision: string; file_name: string; file_path: st
 type Itp = { id: string; document_number: string; title: string; supplier: string | null; scope: string | null; project_itp_revisions?: Revision[] };
 type InterventionType = string;
 type Candidate = { sectionNumber: string; activityDescription: string; interventionType: InterventionType; partyHeading: string; confidence: string; sourceLocation: string; selected: boolean };
+type ExtractionMapping = { authorityHeadings: string[]; identifierHeadings: string[]; activityHeadings: string[] };
+type ExtractionDiagnostics = { templateFingerprint: string; detectedHeadings: string[]; targetAuthorityHeadings: string[]; excludedAuthorityHeadings: string[]; unresolvedAuthorityHeadings: string[]; identifierHeadings: string[]; activityHeadings: string[]; explanation: string[] };
 type NoiPoint = {
   id: string; itp_id: string; revision_id: string; section_number: string; activity_description: string;
   intervention_type: InterventionType; party_heading: string; extraction_confidence: string; source_location: string | null;
@@ -25,6 +27,7 @@ type NoiPoint = {
 };
 
 const statuses = ["Planned", "NOI Required", "NOI Issued", "Completed", "Cancelled"];
+const emptyMapping = (): ExtractionMapping => ({ authorityHeadings: [], identifierHeadings: [], activityHeadings: [] });
 const emptyManualPoint = {
   sectionNumber: "",
   activityDescription: "",
@@ -69,6 +72,9 @@ export default function NoiTrackerPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualPoint, setManualPoint] = useState(emptyManualPoint);
+  const [diagnostics, setDiagnostics] = useState<ExtractionDiagnostics | null>(null);
+  const [mapping, setMapping] = useState<ExtractionMapping>(emptyMapping);
+  const [showMapping, setShowMapping] = useState(false);
 
   const load = useCallback(async () => {
     const [itpResult, pointResult] = await Promise.all([
@@ -105,7 +111,7 @@ export default function NoiTrackerPage() {
     outstanding: points.filter((point) => !["Completed", "Cancelled"].includes(point.status)).length,
   }), [points]);
 
-  async function scanSelectedItp() {
+  async function scanSelectedItp(mappingOverride?: ExtractionMapping, saveConfirmedMapping = false) {
     if (!selectedItp) return;
     const revision = currentRevision(selectedItp);
     if (!revision) {
@@ -122,19 +128,46 @@ export default function NoiTrackerPage() {
       if (!fileResponse.ok) throw new Error("The stored ITP could not be downloaded for scanning.");
       const blob = await fileResponse.blob();
       const file = new File([blob], revision.file_name, { type: blob.type });
-      const form = new FormData();
-      form.append("file", file);
-      form.append("supplierName", selectedItp.supplier || "");
       const isPdf = revision.file_name.toLowerCase().endsWith(".pdf");
       const allowVisualAudit = !isPdf || window.confirm(
         "For a complete page-by-page visual/OCR audit, this ITP PDF will be securely sent to the configured OpenAI vision service for document analysis. Continue with visual audit?\n\nChoose Cancel to run local structured extraction only.",
       );
-      form.append("allowVisualAudit", String(allowVisualAudit));
-      const response = await fetch("/api/projects/noi-extract", { method: "POST", body: form });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "The ITP could not be scanned.");
+      const requestScan = async (activeMapping: ExtractionMapping) => {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("supplierName", selectedItp.supplier || "");
+        form.append("allowVisualAudit", String(allowVisualAudit));
+        form.append("extractionMapping", JSON.stringify(activeMapping));
+        const response = await fetch("/api/projects/noi-extract", { method: "POST", body: form });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "The ITP could not be scanned.");
+        return result;
+      };
+      let activeMapping = mappingOverride || mapping;
+      let result = await requestScan(activeMapping);
+      const firstDiagnostics = result.diagnostics as ExtractionDiagnostics | undefined;
+      if (!mappingOverride && !activeMapping.authorityHeadings.length && firstDiagnostics?.templateFingerprint) {
+        const stored = await supabase.storage.from(STORAGE_BUCKET).download(`${PROJECT_KEY}/extraction-mappings/${firstDiagnostics.templateFingerprint}.json`);
+        if (!stored.error) {
+          activeMapping = JSON.parse(await stored.data.text()) as ExtractionMapping;
+          result = await requestScan(activeMapping);
+        }
+      }
+      const nextDiagnostics = result.diagnostics as ExtractionDiagnostics;
+      const recommended = {
+        authorityHeadings: activeMapping.authorityHeadings.length ? activeMapping.authorityHeadings : nextDiagnostics.targetAuthorityHeadings.slice(0, 1),
+        identifierHeadings: activeMapping.identifierHeadings.length ? activeMapping.identifierHeadings : nextDiagnostics.identifierHeadings.slice(0, 1),
+        activityHeadings: activeMapping.activityHeadings.length ? activeMapping.activityHeadings : nextDiagnostics.activityHeadings.slice(0, 1),
+      };
+      setDiagnostics(nextDiagnostics);
+      setMapping(recommended);
+      if (saveConfirmedMapping && nextDiagnostics.templateFingerprint) {
+        const saved = await supabase.storage.from(STORAGE_BUCKET).upload(`${PROJECT_KEY}/extraction-mappings/${nextDiagnostics.templateFingerprint}.json`, new Blob([JSON.stringify(recommended)], { type: "application/json" }), { upsert: true, contentType: "application/json" });
+        if (saved.error) throw saved.error;
+      }
       setCandidates((result.candidates || []).map((candidate: Omit<Candidate, "selected">) => ({ ...candidate, selected: true })));
-      setMessage(result.warning || `${result.summary.points} Client/Enshore/Contractor W/H point${result.summary.points === 1 ? "" : "s"} found using ${String(result.extractionMode || "structured").toLowerCase()} extraction. Review before adding them.`);
+      setShowMapping(!result.summary.points || Boolean(nextDiagnostics.unresolvedAuthorityHeadings.length));
+      setMessage(result.warning || `${result.summary.points} configured client-side W/H point${result.summary.points === 1 ? "" : "s"} found using ${String(result.extractionMode || "structured").toLowerCase()} extraction. Review before adding them.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The ITP could not be scanned.");
     } finally {
@@ -336,7 +369,7 @@ export default function NoiTrackerPage() {
       <section style={surface}>
         <div style={sectionHeader}><div><div style={kicker}>ITP scanner</div><h2 style={title}>Extract W/H involvement points</h2></div></div>
         <div style={scanner}>
-          <label style={field}><span>Current ITP</span><select style={input} value={selectedItpId} onChange={(event) => { setSelectedItpId(event.target.value); setCandidates([]); }}>{itps.map((itp) => {
+          <label style={field}><span>Current ITP</span><select style={input} value={selectedItpId} onChange={(event) => { setSelectedItpId(event.target.value); setCandidates([]); setDiagnostics(null); setMapping(emptyMapping()); setShowMapping(false); }}>{itps.map((itp) => {
             const revision = currentRevision(itp);
             return <option key={itp.id} value={itp.id}>{itp.document_number} · Rev {revision?.revision || "—"} · {itp.supplier || "No supplier"}</option>;
           })}</select></label>
@@ -344,6 +377,16 @@ export default function NoiTrackerPage() {
           <button style={secondaryButton} disabled={busy || !selectedItp} onClick={() => setShowManualEntry((current) => !current)}>{showManualEntry ? "Close manual entry" : "Add manual point"}</button>
         </div>
         {message && <div style={notice}>{message}</div>}
+        {diagnostics && <div style={mappingSummary}>
+          <div style={mappingSummaryHeader}><div><strong>Scanner interpretation</strong><span>{diagnostics.explanation.join(" ")}</span></div><button type="button" style={secondaryButton} onClick={() => setShowMapping((current) => !current)}>{showMapping ? "Hide mapping" : "Review mapping"}</button></div>
+          {showMapping && <div style={mappingPanel}>
+            <label style={field}><span>Client / NOI authority column</span><select style={input} value={mapping.authorityHeadings[0] || ""} onChange={(event) => setMapping((current) => ({ ...current, authorityHeadings: event.target.value ? [event.target.value] : [] }))}><option value="">Select authority column</option>{diagnostics.detectedHeadings.map((heading) => <option key={heading}>{heading}</option>)}</select></label>
+            <label style={field}><span>Task / item number column</span><select style={input} value={mapping.identifierHeadings[0] || ""} onChange={(event) => setMapping((current) => ({ ...current, identifierHeadings: event.target.value ? [event.target.value] : [] }))}><option value="">Select identifier column</option>{diagnostics.detectedHeadings.map((heading) => <option key={heading}>{heading}</option>)}</select></label>
+            <label style={field}><span>Activity description column</span><select style={input} value={mapping.activityHeadings[0] || ""} onChange={(event) => setMapping((current) => ({ ...current, activityHeadings: event.target.value ? [event.target.value] : [] }))}><option value="">Select activity column</option>{diagnostics.detectedHeadings.map((heading) => <option key={heading}>{heading}</option>)}</select></label>
+            <button type="button" style={primaryButton} disabled={busy || !mapping.authorityHeadings.length || !mapping.identifierHeadings.length || !mapping.activityHeadings.length} onClick={() => void scanSelectedItp(mapping, true)}>Save mapping and rescan</button>
+            <small style={mappingHelp}>This mapping is stored against the detected table template and reused automatically for later revisions with the same headers. Supplier and third-party columns remain excluded.</small>
+          </div>}
+        </div>}
         {showManualEntry && <form style={manualPanel} onSubmit={(event) => void saveManualPoint(event)}>
           <div style={candidateHeader}><strong>Add manual NOI point</strong><span>Saved against the selected current ITP revision and labelled as a manual entry.</span></div>
           <div style={manualGrid}>
@@ -418,6 +461,10 @@ const input: CSSProperties = { width: "100%", boxSizing: "border-box", border: "
 const primaryButton: CSSProperties = { border: 0, borderRadius: 9, background: "#005670", color: "#fff", padding: "10px 14px", fontWeight: 900, cursor: "pointer" };
 const secondaryButton: CSSProperties = { ...primaryButton, background: "#D0D0CE", color: "#53565A" };
 const notice: CSSProperties = { margin: "0 18px 14px", padding: "10px 12px", borderRadius: 9, background: "#ECECE7", color: "#000000", fontSize: 12 };
+const mappingSummary: CSSProperties = { margin: "0 18px 14px", border: "1px solid #D0D0CE", borderRadius: 10, background: "#fff", overflow: "hidden" };
+const mappingSummaryHeader: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: 12, color: "#53565A", fontSize: 11 };
+const mappingPanel: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3,minmax(150px,1fr)) auto", alignItems: "end", gap: 9, padding: 12, borderTop: "1px solid #D0D0CE", background: "#ECECE7" };
+const mappingHelp: CSSProperties = { gridColumn: "1 / -1", color: "#53565A", lineHeight: 1.4 };
 const candidatePanel: CSSProperties = { borderTop: "1px solid #D0D0CE", background: "#ECECE7", padding: 16, display: "grid", gap: 7 };
 const manualPanel: CSSProperties = { ...candidatePanel, background: "#ECECE7" };
 const manualGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(130px,1fr))", gap: 9 };
@@ -438,4 +485,3 @@ const deleteButton: CSSProperties = { border: "1px solid #ECECE7", borderRadius:
 const rowActions: CSSProperties = { display: "flex", gap: 5, alignItems: "center" };
 const noiButton: CSSProperties = { borderRadius: 6, background: "#ECECE7", color: "#005670", padding: "6px 8px", fontWeight: 900, fontSize: 10, textDecoration: "none" };
 const empty: CSSProperties = { padding: 30, textAlign: "center", color: "#53565A" };
-

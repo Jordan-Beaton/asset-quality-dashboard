@@ -99,6 +99,8 @@ If unsure, stop and ask which Quality Management tab should be used as the maste
 - app/projects/wadden-sea/noi/create/page.tsx
 - app/projects/wadden-sea/reports/page.tsx
 - app/api/projects/noi-create/route.ts
+- app/api/projects/noi-extract/route.ts
+- src/lib/noiExtractionRules.ts
 - src/components/AppShell.tsx
 - app/api/document-notifications/route.ts
 
