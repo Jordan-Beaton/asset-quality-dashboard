@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   // relocating that worker into a server chunk where it cannot be found.
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
   outputFileTracingIncludes: {
+    "/api/lessons-learned/procedure-extract": [
+      "./node_modules/pdf-parse/dist/pdf-parse/esm/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+    ],
     "/api/projects/noi-extract": [
       "./node_modules/pdf-parse/dist/pdf-parse/esm/pdf.worker.mjs",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",

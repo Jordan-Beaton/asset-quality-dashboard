@@ -1,11 +1,13 @@
-import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 import { extractOpenAiText } from "./lessonsPrevention";
 
 export async function extractLessonDocument(buffer: Buffer, fileName: string) {
   const name = fileName.toLowerCase();
-  if (name.endsWith(".docx")) return (await mammoth.extractRawText({ buffer })).value;
+  if (name.endsWith(".docx")) {
+    const mammoth = await import("mammoth");
+    return (await mammoth.extractRawText({ buffer })).value;
+  }
   if (name.endsWith(".pdf")) {
+    const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: new Uint8Array(buffer) });
     try { return (await parser.getText()).text; } finally { await parser.destroy(); }
   }
