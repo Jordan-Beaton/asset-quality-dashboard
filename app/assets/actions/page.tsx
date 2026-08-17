@@ -146,7 +146,7 @@ const viewTabs: Array<{ id: AssetActionView; label: string }> = [
 ];
 
 const priorityOptions = ["Low", "Medium", "High"];
-const statusOptions = ["Open", "In Progress", "Closed", "Complete"];
+const statusOptions = ["Open", "In Progress", "Closed"];
 const sourceOptions = [
   "Manual",
   "Audit Finding",
@@ -400,7 +400,7 @@ export default function AssetActionsPage() {
 
   const ownerRows = useMemo(() => countByOwner(actions.filter((action) => !isClosedLikeStatus(action.status))), [actions]);
   const statusRows = useMemo(() => {
-    return ["Open", "In Progress", "Closed", "Complete"].map((status) => ({
+    return ["Open", "In Progress", "Closed"].map((status) => ({
       label: status,
       value: actions.filter((action) => (action.status || "") === status).length,
     })).filter((row) => row.value > 0);
