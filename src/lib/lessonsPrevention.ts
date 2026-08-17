@@ -34,7 +34,15 @@ export type PreventionResult = {
   evidence_count: number;
   screened_count?: number;
   retrieval_mode: "semantic" | "keyword";
-  sources?: Array<{ id: string; lesson_number: string; subject: string; project: string }>;
+  sources?: Array<{
+    id: string;
+    lesson_number: string;
+    subject: string;
+    project: string;
+    issue_description: string;
+    lesson_learned: string;
+    recommended_action: string;
+  }>;
   analysis_id?: string;
 };
 

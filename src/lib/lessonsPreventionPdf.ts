@@ -23,7 +23,7 @@ export function createLessonsPreventionPdf(result: PreventionResult) {
   const contentWidth = pageWidth - MARGIN * 2;
   const citedIds = new Set(result.cautions.flatMap((caution) => caution.lesson_ids));
   const sourceById = new Map((result.sources || []).map((source) => [source.id, source]));
-  const additionalSources = (result.sources || []).filter((source) => !citedIds.has(source.id));
+  const relevantSources = result.sources || [];
   const generatedAt = new Date().toLocaleString("en-GB", { timeZone: "Europe/London" });
 
   function addPage() {
@@ -55,17 +55,38 @@ export function createLessonsPreventionPdf(result: PreventionResult) {
     return y + 5;
   }
 
+  function writeContentBox(label: string, content: string | string[], y: number) {
+    const paragraphs = Array.isArray(content) ? content.map((item) => `- ${item}`) : [content];
+    const lines = paragraphs.flatMap((paragraph) => pdf.splitTextToSize(printable(paragraph) || "-", contentWidth - 12));
+    const height = 12 + lines.length * 4.1;
+    y = ensureSpace(y, height + 3);
+    pdf.setFillColor(...exportRgb.page);
+    pdf.setDrawColor(...exportRgb.border);
+    pdf.roundedRect(MARGIN, y, contentWidth, height, 2.5, 2.5, "FD");
+    pdf.setFillColor(...exportRgb.accent);
+    pdf.roundedRect(MARGIN, y, 3, height, 1.5, 1.5, "F");
+    pdf.setTextColor(...exportRgb.brand);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9.5);
+    pdf.text(label, MARGIN + 6, y + 6);
+    pdf.setTextColor(...exportRgb.ink);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8.8);
+    pdf.text(lines, MARGIN + 6, y + 11);
+    return y + height + 4;
+  }
+
   function wrappedLineCount(text: string, width = contentWidth) {
     return pdf.splitTextToSize(printable(text) || "-", width).length;
   }
 
   function estimatedCautionHeight(caution: PreventionResult["cautions"][number]) {
     const titleHeight = Math.max(12, wrappedLineCount(caution.title, contentWidth - 14) * 5 + 3);
-    const narrativeHeight = (wrappedLineCount(caution.what_failed) + wrappedLineCount(caution.why_it_matters)) * 4.2;
+    const narrativeHeight = (wrappedLineCount(caution.what_failed, contentWidth - 12) + wrappedLineCount(caution.why_it_matters, contentWidth - 12)) * 4.2;
     const controlsHeight = caution.prevention_controls.reduce((total, control) => total + wrappedLineCount(`- ${control}`, contentWidth - 2) * 4.2 + 1, 0);
     const references = caution.lesson_ids.map((id) => sourceById.get(id)?.lesson_number || id).join(", ");
     const referenceHeight = Math.max(10, wrappedLineCount(`Supporting lessons: ${references}`, contentWidth - 8) * 3.8 + 5);
-    return titleHeight + narrativeHeight + controlsHeight + referenceHeight + 49;
+    return titleHeight + narrativeHeight + controlsHeight + referenceHeight + 63;
   }
 
   pdf.setFillColor(...exportRgb.brand);
@@ -119,14 +140,9 @@ export function createLessonsPreventionPdf(result: PreventionResult) {
     pdf.text(`${caution.confidence} confidence - ${caution.lesson_ids.length} cited lessons`, MARGIN, y);
     y += 7;
 
-    y = sectionLabel("What failed", y);
-    y = writeWrapped(caution.what_failed, y) + 3;
-    y = sectionLabel("Why it matters", y);
-    y = writeWrapped(caution.why_it_matters, y) + 3;
-    y = sectionLabel("Controls to consider", y);
-    caution.prevention_controls.forEach((control) => {
-      y = writeWrapped(`- ${control}`, y, { indent: 2 }) + 1;
-    });
+    y = writeContentBox("What failed", caution.what_failed, y);
+    y = writeContentBox("Why it matters", caution.why_it_matters, y);
+    y = writeContentBox("Controls to consider", caution.prevention_controls, y);
 
     const references = caution.lesson_ids
       .map((id) => sourceById.get(id)?.lesson_number || id)
@@ -144,25 +160,33 @@ export function createLessonsPreventionPdf(result: PreventionResult) {
     y += boxHeight + 8;
   });
 
-  if (additionalSources.length) {
-    y = ensureSpace(y, 28);
+  if (relevantSources.length) {
+    pdf.addPage("a4", "landscape");
+    const appendixWidth = pdf.internal.pageSize.getWidth();
+    y = 20;
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(13);
     pdf.setTextColor(...exportRgb.brand);
-    pdf.text("Additional relevant lessons", MARGIN, y);
+    pdf.text("Relevant Lessons Appendix", MARGIN, y);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(8.5);
     pdf.setTextColor(...exportRgb.muted);
-    pdf.text("Relevant evidence considered by the analysis but not repeated in the prioritised caution summaries.", MARGIN, y + 5);
+    pdf.text("Every historic lesson identified as relevant evidence for this prevention brief, including the strongest records cited in the prioritised cautions.", MARGIN, y + 5);
     autoTable(pdf, {
       startY: y + 9,
       theme: "grid",
-      head: [["Lesson", "Project", "Subject"]],
-      body: additionalSources.map((source) => [printable(source.lesson_number), printable(source.project), printable(source.subject)]),
-      headStyles: { fillColor: [...exportRgb.brand], textColor: [...exportRgb.white], fontStyle: "bold", font: "helvetica", fontSize: 8 },
-      bodyStyles: { textColor: [...exportRgb.ink], lineColor: [...exportRgb.border], font: "helvetica", fontSize: 7.5, cellPadding: 2, overflow: "linebreak" },
+      head: [["LL number", "Title / project", "Historic description and learning", "Controls / recommended action"]],
+      body: relevantSources.map((source) => [
+        printable(source.lesson_number),
+        [printable(source.subject), printable(source.project)].filter(Boolean).join("\n"),
+        [printable(source.issue_description), printable(source.lesson_learned)].filter(Boolean).join("\n\n"),
+        printable(source.recommended_action) || "No specific historic action recorded - apply the prioritised controls in this brief.",
+      ]),
+      headStyles: { fillColor: [...exportRgb.brand], textColor: [...exportRgb.white], fontStyle: "bold", font: "helvetica", fontSize: 7.5, valign: "middle" },
+      bodyStyles: { textColor: [...exportRgb.ink], lineColor: [...exportRgb.border], font: "helvetica", fontSize: 6.8, cellPadding: 2, overflow: "linebreak", valign: "top" },
       alternateRowStyles: { fillColor: [...exportRgb.page] },
-      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 58 }, 2: { cellWidth: 97 } },
+      rowPageBreak: "avoid",
+      columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 52 }, 2: { cellWidth: 100 }, 3: { cellWidth: appendixWidth - MARGIN * 2 - 174 } },
       margin: { left: MARGIN, right: MARGIN, bottom: 20 },
     });
     y = ((pdf as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y + 20) + 8;
@@ -183,13 +207,17 @@ export function createLessonsPreventionPdf(result: PreventionResult) {
   const pages = pdf.getNumberOfPages();
   for (let page = 1; page <= pages; page += 1) {
     pdf.setPage(page);
+    const currentPageWidth = pdf.internal.pageSize.getWidth();
+    const currentPageHeight = pdf.internal.pageSize.getHeight();
+    const footerLineY = currentPageHeight - 13;
+    const footerTextY = currentPageHeight - 8;
     pdf.setDrawColor(...exportRgb.border);
-    pdf.line(MARGIN, 284, pageWidth - MARGIN, 284);
+    pdf.line(MARGIN, footerLineY, currentPageWidth - MARGIN, footerLineY);
     pdf.setTextColor(...exportRgb.muted);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7.5);
-    pdf.text("Enshore IMS - Lessons Learned Prevention Intelligence", MARGIN, 289);
-    pdf.text(`Page ${page} of ${pages}`, pageWidth - MARGIN, 289, { align: "right" });
+    pdf.text("Enshore IMS - Lessons Learned Prevention Intelligence", MARGIN, footerTextY);
+    pdf.text(`Page ${page} of ${pages}`, currentPageWidth - MARGIN, footerTextY, { align: "right" });
   }
 
   return pdf;

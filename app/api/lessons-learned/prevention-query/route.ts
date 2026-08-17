@@ -22,7 +22,15 @@ export async function POST(request: Request) {
     result.evidence_count = retrieval.candidates.length;
     result.screened_count = retrieval.screenedCount;
     result.retrieval_mode = retrieval.mode;
-    result.sources = retrieval.candidates.filter((lesson) => result.matched_lesson_ids.includes(lesson.id)).map((lesson) => ({ id: lesson.id, lesson_number: lesson.lesson_number, subject: lesson.subject, project: [lesson.project_code, lesson.project_name].filter(Boolean).join(" · ") }));
+    result.sources = retrieval.candidates.filter((lesson) => result.matched_lesson_ids.includes(lesson.id)).map((lesson) => ({
+      id: lesson.id,
+      lesson_number: lesson.lesson_number,
+      subject: lesson.subject,
+      project: [lesson.project_code, lesson.project_name].filter(Boolean).join(" · "),
+      issue_description: lesson.issue_description,
+      lesson_learned: lesson.lesson_learned,
+      recommended_action: lesson.recommended_action || "",
+    }));
     const { data: audit } = await supabase.from("lessons_learned_ai_analyses").insert({
       analysis_type: "question",
       question,
