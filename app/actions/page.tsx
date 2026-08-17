@@ -3361,7 +3361,6 @@ function ActionsPageContent() {
                   <option value="Open">Open</option>
                   <option value="In Progress">In Progress</option>
                   <option value="Closed">Closed</option>
-                  <option value="Complete">Complete</option>
                 </select>
               </Field>
 
@@ -3926,7 +3925,6 @@ function ActionsPageContent() {
             <option value="Open">Open</option>
             <option value="In Progress">In Progress</option>
             <option value="Closed">Closed</option>
-            <option value="Complete">Complete</option>
           </select>
 
           <select
@@ -4318,7 +4316,6 @@ function ActionsPageContent() {
                     <option value="Open">Open</option>
                     <option value="In Progress">In Progress</option>
                     <option value="Closed">Closed</option>
-                    <option value="Complete">Complete</option>
                   </select>
                 </Field>
 
