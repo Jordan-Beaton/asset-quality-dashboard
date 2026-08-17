@@ -8,12 +8,14 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - Branch normally used: `main`
 - Stack: Next.js App Router, React, TypeScript, Supabase, Vercel
 - Application shell: `src/components/AppShell.tsx`
-- Local development uses Node's system certificate store via `npm run dev`; preserve the `--use-system-ca` flag because Enshore's corporate TLS inspection otherwise prevents server-side Supabase session validation and causes a localhost login redirect loop. Authentication interception uses the Next.js 16 Node-runtime `proxy.ts` convention rather than deprecated Edge `middleware.ts`, so local Supabase validation inherits that certificate trust.
+- Local Windows development sets `NODE_OPTIONS=--use-system-ca` for the complete `npm run dev` process tree; preserve this form because every Next.js child authentication/proxy worker must start with Node's Windows system-CA support enabled. Without it, Enshore's corporate TLS inspection prevents server-side Supabase session validation and causes `Failed to fetch` or a localhost login redirect loop. Authentication interception uses the Next.js 16 Node-runtime `proxy.ts` convention rather than deprecated Edge `middleware.ts`.
 
 ## Permanent Rules
 
 - Do not modify application code unless the user explicitly asks for implementation work.
 - Do not commit, push, or run deployment commands unless the user explicitly approves.
+- When the user explicitly says `push all changes`, `push changes live`, or equivalent, treat that as approval to stage the entire current worktree, create one appropriate commit, and push directly to `origin/main` using the repository's existing Git credentials. Do not require GitHub CLI, create a branch, or open a pull request unless the user specifically requests that workflow. Inspect the full scope first, report any unusually large or sensitive-looking files, and run the handover-required validation before pushing meaningful implementation changes.
+- A request to commit or push does not authorize database migrations or separate deployment commands. A successful push to `main` may trigger the repository's existing Vercel deployment integration; do not add an additional manual deployment unless explicitly requested.
 - Do not expose, print, log, or summarize secrets.
 - If SQL is required, provide exact SQL for the Supabase editor.
 - For meaningful code changes, run `npm run lint` and `npm run build` unless the user tells you not to.

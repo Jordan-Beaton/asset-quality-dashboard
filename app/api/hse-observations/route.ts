@@ -113,9 +113,9 @@ export async function POST(request: Request) {
     }
 
     const evidenceRows = [];
-    for (const file of files) {
+    for (const [fileIndex, file] of files.entries()) {
       const fileName = safeFileName(file.name || "observation-evidence");
-      const filePath = `hse-observations/${observationId}/${Date.now()}-${fileName}`;
+      const filePath = `hse-observations/${observationId}/${Date.now()}-${fileIndex}-${fileName}`;
       const upload = await supabase.storage.from(evidenceBucket).upload(filePath, file, {
         upsert: false,
         contentType: file.type || undefined,

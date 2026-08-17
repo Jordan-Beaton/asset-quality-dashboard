@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import type { CSSProperties, FormEvent } from "react";
+import type { ChangeEvent, CSSProperties, FormEvent } from "react";
 import { imsColours, imsInputStyle } from "../../src/components/imsTheme";
 
 const reporterTypes = ["Employee", "Contractor", "Client", "Visitor", "Quick Fill"];
@@ -25,6 +25,7 @@ export default function PublicObservationPage() {
   const [submittedNumber, setSubmittedNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
 
   const isQuickFill = reporterType === "Quick Fill";
   const hasSelectedReporterType = reporterType.length > 0;
@@ -41,6 +42,22 @@ export default function PublicObservationPage() {
     }
   }
 
+  function addEvidenceFiles(event: ChangeEvent<HTMLInputElement>) {
+    const addedFiles = Array.from(event.target.files || []);
+    if (!addedFiles.length) return;
+
+    setEvidenceFiles((current) => {
+      const existing = new Set(current.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+      return [
+        ...current,
+        ...addedFiles.filter((file) => !existing.has(`${file.name}:${file.size}:${file.lastModified}`)),
+      ];
+    });
+
+    // Let phone users take or select another photo without replacing the files already added.
+    event.target.value = "";
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -51,6 +68,8 @@ export default function PublicObservationPage() {
     try {
       const formData = new FormData(form);
       formData.set("reporter_type", reporterType);
+      formData.delete("evidence");
+      evidenceFiles.forEach((file) => formData.append("evidence", file, file.name));
 
       const response = await fetch("/api/hse-observations", {
         method: "POST",
@@ -67,6 +86,7 @@ export default function PublicObservationPage() {
       setMessage(`Thank you. Your observation has been logged${result.observationNumber ? ` as ${result.observationNumber}` : ""}.`);
       form.reset();
       setShowContact(false);
+      setEvidenceFiles([]);
     } catch (error) {
       setMessage(`Observation could not be submitted: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
@@ -258,8 +278,26 @@ export default function PublicObservationPage() {
 
           <section className="observe-card" style={cardStyle}>
             <h2 style={sectionTitleStyle}>Photos or supporting evidence</h2>
-            <p style={helperTextStyle}>Optional. Add photos or files that help HSE understand the observation.</p>
-            <input className="observe-control" name="evidence" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={fileInputStyle} />
+            <p style={helperTextStyle}>Optional. Add several photos or files, including one at a time from your phone camera.</p>
+            <input className="observe-control" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={fileInputStyle} onChange={addEvidenceFiles} />
+            {evidenceFiles.length ? (
+              <div style={selectedEvidenceListStyle} aria-live="polite">
+                <strong>{evidenceFiles.length} attachment{evidenceFiles.length === 1 ? "" : "s"} ready to upload</strong>
+                {evidenceFiles.map((file, index) => (
+                  <div key={`${file.name}:${file.size}:${file.lastModified}`} style={selectedEvidenceItemStyle}>
+                    <span style={selectedEvidenceNameStyle}>{file.name}</span>
+                    <button
+                      type="button"
+                      style={removeEvidenceButtonStyle}
+                      onClick={() => setEvidenceFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </section>
 
           <button
@@ -340,6 +378,10 @@ const labelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeig
 const inputStyle: CSSProperties = { ...imsInputStyle, minHeight: "48px", fontSize: "16px" };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: "106px", resize: "vertical", lineHeight: 1.45 };
 const fileInputStyle: CSSProperties = { ...inputStyle, padding: "12px" };
+const selectedEvidenceListStyle: CSSProperties = { display: "grid", gap: "8px", color: imsColours.ink, fontSize: "13px" };
+const selectedEvidenceItemStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "9px 10px", border: "1px solid #D0D0CE", borderRadius: "10px", background: "#ECECE7" };
+const selectedEvidenceNameStyle: CSSProperties = { minWidth: 0, overflowWrap: "anywhere" };
+const removeEvidenceButtonStyle: CSSProperties = { flex: "0 0 auto", minHeight: "36px", padding: "7px 10px", border: `1px solid ${imsColours.brandBorder}`, borderRadius: "9px", background: "#ffffff", color: imsColours.brandDark, fontWeight: 800, cursor: "pointer" };
 const helperTextStyle: CSSProperties = { margin: 0, color: imsColours.slate, fontSize: "13px", lineHeight: 1.45 };
 const ghostButtonStyle: CSSProperties = { border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft, color: imsColours.brandDark, minHeight: "44px", borderRadius: "12px", fontWeight: 900, cursor: "pointer" };
 const formHeaderRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" };

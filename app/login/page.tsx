@@ -95,10 +95,15 @@ function LoginPageContent() {
     setMessage(null);
 
     if (mode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const result = (await response.json()) as { error?: string };
 
-      if (error) {
-        setMessage(error.message);
+      if (!response.ok) {
+        setMessage(result.error || "Sign in failed. Please retry.");
         setLoading(false);
         return;
       }

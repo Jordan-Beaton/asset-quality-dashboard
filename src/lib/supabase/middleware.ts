@@ -36,6 +36,7 @@ export async function updateSession(request: NextRequest) {
   const isLoginPage = request.nextUrl.pathname === "/login";
   const isPublicAccessRequestApi =
     request.nextUrl.pathname === "/api/access-requests";
+  const isPublicAuthApi = request.nextUrl.pathname === "/api/auth/login";
   const isPublicObservationPage = request.nextUrl.pathname === "/observe";
   const isPublicObservationApi = request.nextUrl.pathname === "/api/hse-observations";
   const requestedPath =
@@ -47,6 +48,7 @@ export async function updateSession(request: NextRequest) {
 
   if (
     isPublicAsset ||
+    isPublicAuthApi ||
     isPublicAccessRequestApi ||
     isPublicObservationPage ||
     isPublicObservationApi
