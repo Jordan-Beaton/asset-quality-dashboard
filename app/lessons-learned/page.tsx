@@ -438,9 +438,7 @@ export default function LessonsLearnedPage() {
       <QualityKpiCard title="Total Lessons" value={kpis.total} accent={imsColours.brand} active={analysisFilter === "all" && analysisLabel === "All lessons"} onClick={() => { clearAllFilters(); setView("register"); }} />
       <QualityKpiCard title="Open Actions" value={kpis.open} accent={imsColours.warning} active={analysisFilter === "open-actions"} onClick={() => openAnalysis("open-actions", "Open actions requiring follow-up")} />
       <QualityKpiCard title="High / Critical" value={kpis.high} accent={imsColours.danger} active={analysisFilter === "high-critical"} onClick={() => openAnalysis("high-critical", "High and critical lessons")} />
-      <QualityKpiCard title="Repeated Lessons" value={kpis.repeats} accent={imsColours.purple} active={analysisFilter === "repeat-lessons"} onClick={() => openAnalysis("repeat-lessons", "Lessons in repeated themes")} />
       <QualityKpiCard title="Unowned Actions" value={kpis.unowned} accent={imsColours.blue} active={analysisFilter === "unowned-actions"} onClick={() => openAnalysis("unowned-actions", "Open actions without an owner")} />
-      <QualityKpiCard title="Cross-Project Repeats" value={kpis.crossProject} accent={imsColours.success} active={analysisFilter === "cross-project-repeats"} onClick={() => openAnalysis("cross-project-repeats", "Repeat lessons affecting multiple projects")} />
     </section> : null}
 
     {view === "dashboard" && <div style={twoColumn}>

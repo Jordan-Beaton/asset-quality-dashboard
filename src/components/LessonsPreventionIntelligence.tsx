@@ -5,6 +5,7 @@ import type { PreventionResult } from "../lib/lessonsPrevention";
 import { ImsButton, ImsPanel } from "./ImsPrimitives";
 import { imsColours, imsInputStyle } from "./imsTheme";
 import { supabase } from "../lib/supabase";
+import { downloadLessonsPreventionPdf } from "../lib/lessonsPreventionPdf";
 
 type IndexStatus = { configured: boolean; migration_required: boolean; total: number; indexed: number };
 const MAX_REVIEW_FILE_BYTES = 50 * 1024 * 1024;
@@ -117,7 +118,7 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
     {result && <>
       <ImsPanel title="Prevention Brief" subtitle={`${result.scope} · ${result.retrieval_mode === "semantic" ? "Meaning-based retrieval" : "Keyword retrieval fallback"}`}>
         <p style={summaryStyle}>{result.summary}</p>
-        <div style={briefMetaStyle}><span>{(result.screened_count || result.evidence_count).toLocaleString()} records screened</span><span>{result.evidence_count.toLocaleString()} candidate records analysed</span><span>{result.cautions.length} prioritised cautions</span><span>{allIds.length} strongest records cited</span><ImsButton variant="secondary" onClick={() => onOpenLessons(allIds, "AI Prevention Intelligence evidence")}>Open Cited Lessons</ImsButton></div>
+        <div style={briefMetaStyle}><span>{(result.screened_count || result.evidence_count).toLocaleString()} records screened</span><span>{result.evidence_count.toLocaleString()} candidate records analysed</span><span>{result.cautions.length} prioritised cautions</span><span>{allIds.length} strongest records cited</span><ImsButton variant="secondary" onClick={() => onOpenLessons(allIds, "AI Prevention Intelligence evidence")}>Open Cited Lessons</ImsButton><ImsButton variant="secondary" onClick={() => downloadLessonsPreventionPdf(result)}>Generate PDF</ImsButton></div>
       </ImsPanel>
       <section style={cautionGridStyle}>{result.cautions.map((caution, index) => <article key={`${caution.title}-${index}`} style={cautionCardStyle}>
         <div style={cautionHeadStyle}><span style={rankStyle}>{index + 1}</span><div><strong style={cautionTitleStyle}>{caution.title}</strong><small style={confidenceStyle}>{caution.confidence} confidence · {caution.lesson_ids.length} cited lessons</small></div></div>
