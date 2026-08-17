@@ -314,7 +314,7 @@ export async function POST(request: Request) {
               updated_at: new Date().toISOString(),
             };
           })
-          .filter(Boolean);
+          .filter((row): row is NonNullable<typeof row> => row !== null);
 
         if (permissionRows.length > 0) {
           const insertPermissionResult = await service.from("ims_tab_permissions").insert(permissionRows);
@@ -644,7 +644,7 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           };
         })
-        .filter(Boolean);
+        .filter((row): row is NonNullable<typeof row> => row !== null);
 
       if (rows.length) {
         const { error: insertError } = await service.from("ims_tab_permissions").insert(rows);
@@ -737,12 +737,9 @@ export async function POST(request: Request) {
       const name = cleanText(payload.name);
       if (!name) return NextResponse.json({ error: "Name is required." }, { status: 400 });
 
-      const insertPayload =
-        action === "addDepartment"
-          ? { name, code: cleanText(payload.code) || null, active: true }
-          : { name, code: cleanText(payload.code) || null, type: cleanText(payload.type) || "Project", active: true };
-
-      const { error } = await service.from(table).insert(insertPayload);
+      const { error } = action === "addDepartment"
+        ? await service.from("ims_reference_departments").insert({ name, code: cleanText(payload.code) || null, active: true })
+        : await service.from("ims_reference_projects").insert({ name, code: cleanText(payload.code) || null, type: cleanText(payload.type) || "Project", active: true });
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
       await writeAuditLog(service, actorEmail, action, table, name, `${name} added.`);
@@ -754,12 +751,9 @@ export async function POST(request: Request) {
       const id = cleanText(payload.id);
       if (!id) return NextResponse.json({ error: "Reference id is required." }, { status: 400 });
 
-      const updatePayload =
-        action === "updateDepartment"
-          ? { name: cleanText(payload.name), code: cleanText(payload.code) || null, active: Boolean(payload.active) }
-          : { name: cleanText(payload.name), code: cleanText(payload.code) || null, type: cleanText(payload.type) || "Project", active: Boolean(payload.active) };
-
-      const { error } = await service.from(table).update(updatePayload).eq("id", id);
+      const { error } = action === "updateDepartment"
+        ? await service.from("ims_reference_departments").update({ name: cleanText(payload.name), code: cleanText(payload.code) || null, active: Boolean(payload.active) }).eq("id", id)
+        : await service.from("ims_reference_projects").update({ name: cleanText(payload.name), code: cleanText(payload.code) || null, type: cleanText(payload.type) || "Project", active: Boolean(payload.active) }).eq("id", id);
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
       await writeAuditLog(service, actorEmail, action, table, cleanText(payload.name), `${cleanText(payload.name)} updated.`);
