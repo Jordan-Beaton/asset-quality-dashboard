@@ -114,6 +114,8 @@ export default function LessonsLearnedPage() {
   const [peopleOptions, setPeopleOptions] = useState<PersonOption[]>([]); const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]); const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
   const [showNewProject, setShowNewProject] = useState(false); const [newProjectCode, setNewProjectCode] = useState(""); const [newProjectName, setNewProjectName] = useState("");
   const [isFieldMode, setIsFieldMode] = useState(false);
+  const [intelligenceDrilldown, setIntelligenceDrilldown] = useState(false);
+  const intelligenceScrollPosition = useRef(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -280,8 +282,15 @@ export default function LessonsLearnedPage() {
     setAnalysisFilter(filter); setAnalysisLabel((current) => current === "All lessons" ? label : `${current} · ${label}`); setView("register");
   }
   function openAiEvidence(ids: string[], label: string) {
+    intelligenceScrollPosition.current = window.scrollY;
     setSearch(""); setProjectFilter(""); setDepartmentFilter(""); setStatusFilter(""); setCriticalityFilter(""); setOutcomeFilter(""); setYearFilter(""); setRepeatGroupFilter("");
-    setAiLessonIds(new Set(ids)); setAnalysisFilter("ai-results"); setAnalysisLabel(label); setView("register");
+    setAiLessonIds(new Set(ids)); setAnalysisFilter("ai-results"); setAnalysisLabel(label); setIntelligenceDrilldown(true); setView("register");
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
+  }
+  function returnToPreventionBrief() {
+    setView("intelligence");
+    setIntelligenceDrilldown(false);
+    window.requestAnimationFrame(() => window.scrollTo({ top: intelligenceScrollPosition.current, behavior: "smooth" }));
   }
   function selectDepartment(selection: ChartSelection) {
     const value = clean(selection?.activeLabel); if (!value) return; setDepartmentFilter(value); setAnalysisLabel((current) => current === "All lessons" ? `Department: ${value}` : `${current} · Department: ${value}`); setView("register");
@@ -424,7 +433,7 @@ export default function LessonsLearnedPage() {
   return <ReferenceContext.Provider value={{ projects: referenceProjects, people: peopleOptions, assets: assetOptions, departments: departmentOptions, onSelectProject: selectProjectReference, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject: addProjectReference }}><main className={isFieldMode ? "lessons-field-mode" : undefined}>
     {isFieldMode ? <section style={fieldIntroStyle}><span style={fieldIntroIconStyle}><LearningFieldIcon /></span><span><strong style={fieldIntroTitleStyle}>Capture a Lesson</strong><small style={fieldIntroTextStyle}>Record the learning now; optional detail can be added or refined later.</small></span></section> : <QualityPageHero label="LESSONS LEARNED" title="Lessons Learned" description="Central repository for searchable project knowledge, repeat-failure prevention, evidence, actions, and trend analysis." />}
     <ImsTopMetaRow backHref={isFieldMode ? "/field-tools" : "/home"} backLabel={isFieldMode ? "Back to Field Tools" : "Back to IMS Home"} status={<><strong>Status:</strong> {message}</>} />
-    {!isFieldMode ? <ImsTabs tabs={tabs} active={view} onChange={(next) => { setView(next); if (next === "create") { setSelected(null); setForm(emptyForm); } }} ariaLabel="Lessons Learned views" /> : null}
+    {!isFieldMode ? <ImsTabs tabs={tabs} active={view} onChange={(next) => { setView(next); setIntelligenceDrilldown(false); if (next === "create") { setSelected(null); setForm(emptyForm); } }} ariaLabel="Lessons Learned views" /> : null}
     {!isFieldMode ? <section className="quality-kpi-grid" style={kpiGrid}>
       <QualityKpiCard title="Total Lessons" value={kpis.total} accent={imsColours.brand} active={analysisFilter === "all" && analysisLabel === "All lessons"} onClick={() => { clearAllFilters(); setView("register"); }} />
       <QualityKpiCard title="Open Actions" value={kpis.open} accent={imsColours.warning} active={analysisFilter === "open-actions"} onClick={() => openAnalysis("open-actions", "Open actions requiring follow-up")} />
@@ -454,11 +463,13 @@ export default function LessonsLearnedPage() {
       <ImsPanel title="Repeat-Failure Watchlist" subtitle="Themes affecting multiple projects. Click a row to open the underlying records."><div style={watchList}>{crossProjectGroups.slice(0, 15).map(([group, rows]) => <button key={group} style={watchRow} onClick={() => selectTheme(rows[0].repeat_group || group)}><span><strong>{rows[0].repeat_group}</strong><small>{new Set(rows.map((x) => x.project_name)).size} projects</small></span><b>{rows.length}</b></button>)}</div></ImsPanel>
     </div>}
 
-    {view === "intelligence" && <LessonsPreventionIntelligence canManage={permission.fullAccess || permission.isMasterAdmin} onOpenLessons={openAiEvidence} />}
+    <div style={{ display: view === "intelligence" ? "block" : "none" }} aria-hidden={view !== "intelligence"}>
+      <LessonsPreventionIntelligence canManage={permission.fullAccess || permission.isMasterAdmin} onOpenLessons={openAiEvidence} />
+    </div>
 
     {view === "register" && <>
       <ImsPanel title="Lessons Learned Register" subtitle="Search the full knowledge base by project, department, subject, issue, lesson, root cause, owner, or keyword.">
-        <div style={activeAnalysisStyle}><span><strong>Active dataset:</strong> {analysisLabel}</span><span>{filtered.length.toLocaleString()} matching lessons</span><ImsButton variant="ghost" onClick={clearAllFilters}>Reset Dataset</ImsButton></div>
+        <div style={activeAnalysisStyle}><span><strong>Active dataset:</strong> {analysisLabel}</span><span>{filtered.length.toLocaleString()} matching lessons</span><div style={datasetActionsStyle}>{intelligenceDrilldown && <ImsButton variant="secondary" onClick={returnToPreventionBrief}>Back to Prevention Brief</ImsButton>}<ImsButton variant="ghost" onClick={clearAllFilters}>Reset Dataset</ImsButton></div></div>
         <ImsFilterPanel search={search} onSearchChange={setSearch} searchPlaceholder="Search within the active dataset" showFilters={showFilters} onToggleFilters={() => setShowFilters((x) => !x)} actions={<ImsButton variant="secondary" onClick={clearAllFilters}>Clear Filters</ImsButton>}>
           <Select label="Project" value={projectFilter} onChange={setProjectFilter} options={availableProjects} /><Select label="Department" value={departmentFilter} onChange={setDepartmentFilter} options={["Unassigned", ...departments]} />
           <Select label="Status" value={statusFilter} onChange={setStatusFilter} options={["Open", "In Progress", "Implemented", "Shared", "Closed"]} /><Select label="Criticality" value={criticalityFilter} onChange={setCriticalityFilter} options={["Low", "Medium", "High", "Critical"]} />
@@ -588,6 +599,7 @@ const actionRow: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 10, m
 const evidenceCard: CSSProperties = { display: "grid", gap: 5, padding: 12, textAlign: "left", background: imsColours.brandSoft, border: `1px solid ${imsColours.brandBorder}`, borderRadius: 12, cursor: "pointer" };
 const importSummary: CSSProperties = { display: "grid", gap: 7, alignContent: "center", padding: 12, background: imsColours.panelAlt, borderRadius: 12, color: imsColours.slate };
 const activeAnalysisStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12, padding: "10px 12px", borderRadius: 12, background: imsColours.brandSoft, border: `1px solid ${imsColours.brandBorder}`, color: imsColours.brandDark, fontSize: 13 };
+const datasetActionsStyle: CSSProperties = { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 };
 const loadingOverlay: CSSProperties = { position: "fixed", right: 24, bottom: 24, padding: "12px 16px", background: imsColours.ink, color: "white", borderRadius: 12, boxShadow: "0 14px 28px rgba(15,23,42,.2)", zIndex: 20 };
 const fieldIntroStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: 14, borderRadius: 16, border: `1px solid ${imsColours.brandBorder}`, background: "#ffffff", boxShadow: "0 1px 3px rgba(15,23,42,.08)" };
 const fieldIntroIconStyle: CSSProperties = { flex: "0 0 auto", width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 13, background: imsColours.brand, color: "#ffffff" };

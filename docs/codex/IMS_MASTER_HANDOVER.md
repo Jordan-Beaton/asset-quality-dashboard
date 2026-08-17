@@ -8,6 +8,7 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - Branch normally used: `main`
 - Stack: Next.js App Router, React, TypeScript, Supabase, Vercel
 - Application shell: `src/components/AppShell.tsx`
+- Local development uses Node's system certificate store via `npm run dev`; preserve the `--use-system-ca` flag because Enshore's corporate TLS inspection otherwise prevents server-side Supabase session validation and causes a localhost login redirect loop. Authentication interception uses the Next.js 16 Node-runtime `proxy.ts` convention rather than deprecated Edge `middleware.ts`, so local Supabase validation inherits that certificate trust.
 
 ## Permanent Rules
 

@@ -34,6 +34,8 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname === "/login";
+  const isPublicAccessRequestApi =
+    request.nextUrl.pathname === "/api/access-requests";
   const isPublicObservationPage = request.nextUrl.pathname === "/observe";
   const isPublicObservationApi = request.nextUrl.pathname === "/api/hse-observations";
   const requestedPath =
@@ -43,7 +45,12 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === "/favicon.ico" ||
     /\.(svg|png|jpg|jpeg|gif|webp)$/.test(request.nextUrl.pathname);
 
-  if (isPublicAsset || isPublicObservationPage || isPublicObservationApi) {
+  if (
+    isPublicAsset ||
+    isPublicAccessRequestApi ||
+    isPublicObservationPage ||
+    isPublicObservationApi
+  ) {
     return response;
   }
 
