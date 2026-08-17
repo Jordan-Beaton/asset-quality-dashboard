@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     result.evidence_count = procedureCandidates.length;
     result.screened_count = retrieval.screenedCount;
     result.retrieval_mode = retrieval.mode;
-    result.sources = procedureCandidates.filter((lesson) => result.matched_lesson_ids.includes(lesson.id)).map((lesson) => ({
+    result.sources = procedureCandidates.map((lesson) => ({
       id: lesson.id,
       lesson_number: lesson.lesson_number,
       subject: lesson.subject,

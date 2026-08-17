@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     result.evidence_count = retrieval.candidates.length;
     result.screened_count = retrieval.screenedCount;
     result.retrieval_mode = retrieval.mode;
-    result.sources = retrieval.candidates.filter((lesson) => result.matched_lesson_ids.includes(lesson.id)).map((lesson) => ({
+    result.sources = retrieval.candidates.map((lesson) => ({
       id: lesson.id,
       lesson_number: lesson.lesson_number,
       subject: lesson.subject,

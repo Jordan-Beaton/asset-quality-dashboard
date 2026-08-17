@@ -160,6 +160,18 @@ export function createLessonsPreventionPdf(result: PreventionResult) {
     y += boxHeight + 8;
   });
 
+  if (result.limitations.length) {
+    y = ensureSpace(y, 22);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.setTextColor(...exportRgb.brand);
+    pdf.text("Evidence limitations", MARGIN, y);
+    y += 6;
+    result.limitations.forEach((limitation) => {
+      y = writeWrapped(`- ${limitation}`, y, { size: 8.5, indent: 2 }) + 1;
+    });
+  }
+
   if (relevantSources.length) {
     pdf.addPage("a4", "landscape");
     const appendixWidth = pdf.internal.pageSize.getWidth();
@@ -171,7 +183,7 @@ export function createLessonsPreventionPdf(result: PreventionResult) {
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(8.5);
     pdf.setTextColor(...exportRgb.muted);
-    pdf.text("Every historic lesson identified as relevant evidence for this prevention brief, including the strongest records cited in the prioritised cautions.", MARGIN, y + 5);
+    pdf.text(`All ${relevantSources.length} historic lessons retrieved as relevant evidence for this prevention brief, including the strongest records cited in the prioritised cautions.`, MARGIN, y + 5);
     autoTable(pdf, {
       startY: y + 9,
       theme: "grid",
@@ -188,19 +200,6 @@ export function createLessonsPreventionPdf(result: PreventionResult) {
       rowPageBreak: "avoid",
       columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 52 }, 2: { cellWidth: 100 }, 3: { cellWidth: appendixWidth - MARGIN * 2 - 174 } },
       margin: { left: MARGIN, right: MARGIN, bottom: 20 },
-    });
-    y = ((pdf as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y + 20) + 8;
-  }
-
-  if (result.limitations.length) {
-    y = ensureSpace(y, 22);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
-    pdf.setTextColor(...exportRgb.brand);
-    pdf.text("Evidence limitations", MARGIN, y);
-    y += 6;
-    result.limitations.forEach((limitation) => {
-      y = writeWrapped(`- ${limitation}`, y, { size: 8.5, indent: 2 }) + 1;
     });
   }
 
