@@ -14,8 +14,9 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 
 - Do not modify application code unless the user explicitly asks for implementation work.
 - Do not commit, push, or run deployment commands unless the user explicitly approves.
-- When the user explicitly says `push all changes`, `push changes live`, or equivalent, treat that as approval to stage the entire current worktree, create one appropriate commit, and push directly to `origin/main` using the repository's existing Git credentials. Do not require GitHub CLI, create a branch, or open a pull request unless the user specifically requests that workflow. Inspect the full scope first, report any unusually large or sensitive-looking files, and run the handover-required validation before pushing meaningful implementation changes.
-- A request to commit or push does not authorize database migrations or separate deployment commands. A successful push to `main` may trigger the repository's existing Vercel deployment integration; do not add an additional manual deployment unless explicitly requested.
+- When the user explicitly says `push changes`, `push all changes`, `push changes live`, or equivalent, treat that as approval to inspect the complete worktree, run the handover-required validation, stage all safe current changes, create one appropriate commit on `main`, and push directly to `origin/main` using the repository's existing Git credentials. Do not require GitHub CLI, create a branch, or open a pull request unless the user specifically requests that workflow. Stop only for an evidenced secret, generated artifact, unexpectedly large file, database migration, or another materially risky change.
+- A successful push to `origin/main` is the established deployment workflow and the existing GitHub-to-Vercel integration handles deployment automatically. Do not propose or install deployment plugins, create a Vercel CLI link, or switch deployment methods unless the user explicitly requests an alternative. Retry the same normal push workflow after a transient network or DNS failure before reporting it as blocked.
+- A request to commit or push does not authorize database migrations or a separate manual deployment.
 - Do not expose, print, log, or summarize secrets.
 - If SQL is required, provide exact SQL for the Supabase editor.
 - For meaningful code changes, run `npm run lint` and `npm run build` unless the user tells you not to.
@@ -68,5 +69,6 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 
 ## Latest Workflow Note
 
+- Public HSE Observations now accumulate multiple photographic/supporting attachments across repeated file-picker or phone-camera selections, show the queued files with individual removal controls, and upload every queued file as a separate evidence record. See `HSE_HANDOVER.md` and `MOBILE_COMPATIBILITY_HANDOVER.md` before changing this flow.
 - HSE AINM Part 1/Part 2 now supports inline department-controlled central Action creation, Part 1 containment terminology and attachment `Other` detail, and fuller labelled Word/compiled PDF outputs. See `HSE_HANDOVER.md` and `ACTION_MANAGEMENT_HANDOVER.md` before changing this flow.
 - Lessons Learned Prevention Intelligence now supports free-text failure-prevention questions, evidence-linked caution briefings, semantic recurrence retrieval and procedure-to-lessons review. It uses the dedicated server-side `OPENAI_BUSINESS_API_KEY`; see `LESSONS_LEARNED_HANDOVER.md` and apply `scripts/sql/lessons_learned_prevention_ai.sql` before building the semantic index.

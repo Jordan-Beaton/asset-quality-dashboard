@@ -2538,8 +2538,6 @@ function LinkedActionsPanel({
   const createHref = `/hse/actions?view=create&prefill_source=${encodeURIComponent("HSE Inspection")}` +
     `&prefill_department=HSEQ` +
     `&prefill_project=${encodeURIComponent(inspection.project_work_scope || inspection.vessel_spread || "")}` +
-    `&prefill_title=${encodeURIComponent(`${inspection.inspection_number} - ${inspection.title}`)}` +
-    `&prefill_description=${encodeURIComponent(`Linked HSE inspection: ${inspection.form_number} ${inspection.form_title}\nArea / Zone: ${inspection.area_zone || ""}\nInspection date: ${displayDate(inspection.inspection_date)}`)}` +
     `&linked_hse_inspection_id=${encodeURIComponent(inspection.id)}` +
     `&linked_hse_inspection_number=${encodeURIComponent(inspection.inspection_number)}`;
 

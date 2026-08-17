@@ -164,7 +164,7 @@ type ActionPerson = {
 
 type QuickFilter = "" | "my" | "overdue" | "dueWeek" | "highPriority";
 
-type ActionView = "dashboard" | "register" | "create" | "my" | "priority" | "bulk" | "reports";
+type ActionView = "dashboard" | "register" | "create" | "my" | "priority" | "bulk";
 type MyActionFilter = "all" | "open" | "closed" | "overdue" | "dueWeek";
 
 type ActionImportRow = {
@@ -353,7 +353,6 @@ const actionViews: Array<{ id: ActionView; label: string }> = [
   { id: "my", label: "My Actions" },
   { id: "priority", label: "Overdue / Priority" },
   { id: "bulk", label: "Bulk Upload" },
-  { id: "reports", label: "Reports" },
 ];
 
 function isActionView(value: string): value is ActionView {
@@ -2865,31 +2864,7 @@ function ActionsPageContent() {
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 12;
       const generatedAt = new Date().toLocaleString("en-GB");
-      const filterSummaryRows = [
-        ["Search", search.trim() || "None"],
-        ["Status", statusFilter || "All"],
-        ["Priority", priorityFilter || "All"],
-        ["Owner", ownerFilter || "All"],
-        ["Project", projectFilter || "All"],
-        ["Source", sourceFilter || "All"],
-        ["Department", departmentFilter || "All"],
-        ["Overdue Only", showOverdueOnly ? "Yes" : "No"],
-        ["Open / Non-Closed Only", showOpenOnly ? "Yes" : "No"],
-        ["Closed / Complete Only", showClosedOnly ? "Yes" : "No"],
-        ["Evidence Attached Only", showEvidenceOnly ? "Yes" : "No"],
-        ["Linked Record Issues Only", showLinkedIssuesOnly ? "Yes" : "No"],
-        [
-          "Due Window",
-          dueWindowFilter > 0
-            ? `${dueStartFilter > 0 ? `${dueStartFilter}-` : "0-"}${dueWindowFilter} days`
-            : "All",
-        ],
-        ["No Due Date Only", showNoDueDateOnly ? "Yes" : "No"],
-        ["Created Month", createdMonthFilter || "All"],
-        ["Closed Month", closedMonthFilter || "All"],
-        ["Quick Filter", quickFilter || "None"],
-      ];
-
+  
       try {
         const logoResponse = await fetch("/enshore-primary-logo-colour.png");
         if (logoResponse.ok) {
@@ -2909,39 +2884,18 @@ function ActionsPageContent() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(17);
       doc.setTextColor(0, 0, 0);
-      doc.text("Filtered Action Register PDF", pageWidth / 2, 17, { align: "center" });
+      doc.text("Action Register", pageWidth / 2, 17, { align: "center" });
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
       doc.setTextColor(83, 86, 90);
-      doc.text("Central Action Management register filtered to the current view.", pageWidth / 2, 23, {
-        align: "center",
-      });
+      doc.text("Enshore IMS — Central Action Management", pageWidth / 2, 23, { align: "center" });
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 17, { align: "right" });
       doc.text(`Actions: ${filteredActions.length}`, pageWidth - margin, 23, { align: "right" });
 
       doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 31, pageWidth - margin, 31);
-
-      autoTable(doc, {
-        startY: 35,
-        theme: "grid",
-        margin: { left: margin, right: margin },
-        body: filterSummaryRows,
-        styles: {
-          font: "helvetica",
-          fontSize: 8.2,
-          cellPadding: 1.6,
-          lineColor: [208, 208, 206],
-          lineWidth: 0.2,
-          textColor: [0, 0, 0],
-        },
-        columnStyles: {
-          0: { cellWidth: 30, fontStyle: "bold", fillColor: [236, 236, 231] },
-          1: { cellWidth: 72 },
-        },
-      });
 
       const reportRows = filteredActions.map((action) => ({
         action_number: action.action_number || "-",
@@ -2958,7 +2912,7 @@ function ActionsPageContent() {
       }));
 
       autoTable(doc, {
-        startY: ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 35) + 5,
+        startY: 35,
         theme: "grid",
         margin: { left: margin, right: margin, bottom: 14 },
         tableWidth: "auto",
@@ -3938,40 +3892,6 @@ function ActionsPageContent() {
         </SectionCard>
       ) : null}
 
-      {activeView === "reports" ? (
-        <SectionCard
-          title="Action Reports"
-          subtitle="Generate operational action reports from the current register filter state."
-          action={
-            <button type="button" onClick={() => void generateFilteredActionRegisterPdf()} style={primaryButtonStyle}>
-              Filtered Action Register PDF
-            </button>
-          }
-        >
-          <div style={reportSummaryGridStyle}>
-            <div style={reportSummaryCardStyle}>
-              <div style={reportSummaryLabelStyle}>Filtered Actions</div>
-              <div style={reportSummaryValueStyle}>{filteredActions.length}</div>
-            </div>
-            <div style={reportSummaryCardStyle}>
-              <div style={reportSummaryLabelStyle}>Status Filter</div>
-              <div style={reportSummaryTextStyle}>{statusFilter || "All"}</div>
-            </div>
-            <div style={reportSummaryCardStyle}>
-              <div style={reportSummaryLabelStyle}>Source Filter</div>
-              <div style={reportSummaryTextStyle}>{sourceFilter || "All"}</div>
-            </div>
-            <div style={reportSummaryCardStyle}>
-              <div style={reportSummaryLabelStyle}>Owner Filter</div>
-              <div style={reportSummaryTextStyle}>{ownerFilter || "All"}</div>
-            </div>
-          </div>
-          <p style={helperTextStyle}>
-            The PDF export uses the same filtered action set as the Action Register. Use the Action Register view to adjust filters, then return here to export.
-          </p>
-        </SectionCard>
-      ) : null}
-
       {activeView === "register" ? (
         <>
           <SectionCard
@@ -4082,6 +4002,13 @@ function ActionsPageContent() {
           </button>
           <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
             Clear Filters
+          </button>
+          <button
+            type="button"
+            onClick={() => void generateFilteredActionRegisterPdf()}
+            style={primaryButtonStyle}
+          >
+            Generate PDF Report
           </button>
         </div>
           ) : null}
@@ -5557,39 +5484,6 @@ const myActionsNoticeStyle: CSSProperties = {
   fontSize: "13px",
 };
 
-const reportSummaryGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-  gap: "14px",
-  marginBottom: "14px",
-};
-
-const reportSummaryCardStyle: CSSProperties = {
-  border: "1px solid #D0D0CE",
-  borderRadius: "14px",
-  background: "#ECECE7",
-  padding: "14px",
-};
-
-const reportSummaryLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 800,
-  color: "#53565A",
-  textTransform: "uppercase",
-  marginBottom: "8px",
-};
-
-const reportSummaryValueStyle: CSSProperties = {
-  fontSize: "28px",
-  fontWeight: 800,
-  color: "#005670",
-};
-
-const reportSummaryTextStyle: CSSProperties = {
-  fontSize: "16px",
-  fontWeight: 800,
-  color: "#000000",
-};
 
 const miniListCardStyle: CSSProperties = {
   background: "#ECECE7",

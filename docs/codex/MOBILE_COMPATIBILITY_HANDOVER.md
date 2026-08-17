@@ -60,6 +60,7 @@ This foundation reduces retrofit work but does not replace the device QA matrix.
 - Reporter types use two columns; the odd final `Quick Fill` option spans both columns.
 - Cards and controls use the full available width with compact padding.
 - The Enshore and approved 3Rs campaign logos retain their supplied aspect ratios.
+- Photograph/supporting-evidence selection uses an accumulating queue: taking or selecting another file must preserve earlier selections, show the complete queued list, allow individual removal, and submit every remaining file through the authoritative Observation API.
 - Local QA at a `390px × 844px` viewport confirmed no horizontal overflow and correctly contained controls. Production submission/evidence linkage still requires physical-phone testing.
 
 ## Device QA Matrix
@@ -85,7 +86,7 @@ For each tested route confirm:
 
 ## Module QA Sequence
 
-1. Public HSE Observation: submit, photograph upload, success number, register evidence and linked Action.
+1. Public HSE Observation: add at least two photographs one at a time, remove/re-add one file, submit, confirm the success number, verify every register evidence file, and create the linked Action.
 2. HSE Inspections and AINM: checklist entry, evidence, staged/saved forms and generated PDFs.
 3. Assets: Register, Calibration, Inspection and Maintenance, including row detail and linked Actions.
 4. Quality: NCR, Audits, MOC, Actions and Reports.

@@ -26,6 +26,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - HSE inspections have a mobile-friendly flow, QR flow, item evidence upload, and multiple inspection forms staged/completed.
 - Public HSE observation route `/observe` exists without login and links observations to Action Management.
 - The public HSE Observation Card now has an explicit phone layout: full-width public container, corrected page margins, compact header/cards, two-column reporter choices, full-width form controls, and no horizontal overflow at the tested `390px` viewport. Desktop behavior remains unchanged.
+- The public HSE Observation Card now accumulates multiple photos/supporting files across repeated picker or phone-camera selections, displays the queued attachments with individual removal, and submits every queued file as a separate evidence record with collision-safe batch storage paths.
 - Quality/HSE module-specific actions feed central Action Management.
 - Document Control is established as a central hub with asset-specific numbering support and document workflow foundations.
 - Admin/Settings is simplified to Users & Access, Reference Data, and Audit Log.
@@ -46,7 +47,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Quality Actions, Quality Reports, NCR/CAPA, Audits, and MOC now have explicit page-level create/edit permission guards on core write paths, including create/import, edit/delete, evidence/file changes, workflow progression, and saved-report/PDF metadata writes where applicable.
 - HSE Actions and HSE Reports now have explicit page-level create/edit permission guards for direct action/report creation, import, edits, and deletes.
 - HSE AINM now has explicit page-level create/edit permission guards for internal/external AINM creation/import, saves/deletes, evidence upload/delete, reviewer creation, and saved compiled PDF history writes.
-- HSE Observations public submit handling now exits the `Submitting` state on failed requests, and the secured observation review/delete/action-generation controls have page-level create/edit guards.
+- HSE Observations public submit handling now exits the `Submitting` state on failed requests, supports repeated multi-photo selection without replacing earlier camera captures, and retains secured review/delete/action-generation permission guards.
 - HSE Inspections now have explicit page-level create/edit permission guards for inspection creation, saves/deletes, existing and staged evidence changes, and linked HSE Action creation shortcuts.
 - HSE Reports now aligns more closely with Quality Reports, including shared hero/context cards, saved-report search and year filtering, snapshot-based saved report period editing, and executive summary output in PDFs.
 - HSE Inspection PDFs now reserve header/footer space for generated tables and apply consistent Enshore header, revision reference, and page numbering across completed and blank PDFs.
@@ -115,7 +116,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 6. Verify Asset Management on Vercel with real data: Dashboard drill-downs, Register detail scroll, Calibration item status/exclusion behavior, lifecycle history, supplier dropdown persistence, register export, compact Inspection/Maintenance registers, Reports, uploads, PDFs, central Action links, and role-based permission behavior.
 7. Verify HSE Reports on Vercel after the Quality-parity pass: saved reports behavior, year filters, snapshot-period editing, permissions, and executive summary in PDFs.
 8. Verify the complete AINM workflow on Vercel: register/type/filter/detail behavior, attachment `Other` text, containment wording, inline department-controlled actions, linked Action navigation, and Part 1/Part 2/compiled report content.
-9. Verify the corrected HSE Observation Card on a physical phone: public submission, evidence upload, saved register record, and linkage to Action Management.
+9. Verify the corrected HSE Observation Card on a physical phone: add at least two photographs one at a time, remove/re-add one, submit, confirm every evidence file and the saved register record, and verify linkage to Action Management.
 10. Preserve the completed UI baseline when touching pages; migrate local styles only where it is low-risk and directly relevant to the active change.
 11. Review Risk Management pages for route completeness, visual consistency, and demo readiness.
 12. Verify Lessons Learned and the complete Wadden Sea workflow on Vercel, including Open Points database migration, phase history, NCR linking, evidence and register outputs.
@@ -163,10 +164,10 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 ## HSE Management
 
 - Status: In Progress
-- Summary: HSE has broad coverage: Dashboard, AINM, Inspections, Observations, PTW, Actions, Calendar, and Reports. HSE inspections are the strongest mobile/field benchmark. The public Observation Card now has a dedicated overflow-free phone layout. AINM now supports Part 1 containment terminology, attachment `Other` detail, inline department-controlled central actions in Part 1/Part 2, compact evidence/action rows, full action links without forced title/description/department values, and linked action title/description output in Part 2 Word and compiled PDF reports. AINM and the other main HSE routes retain direct write permission guards; PTW is parked.
+- Summary: HSE has broad coverage: Dashboard, AINM, Inspections, Observations, PTW, Actions, Calendar, and Reports. HSE inspections are the strongest mobile/field benchmark. The public Observation Card has a dedicated overflow-free phone layout and an accumulating multi-photo queue for repeated camera/file-picker selections. AINM supports Part 1 containment terminology, attachment `Other` detail, inline department-controlled central actions in Part 1/Part 2, compact evidence/action rows, full action links without forced title/description/department values, and linked action title/description output in Part 2 Word and compiled PDF reports. AINM and the other main HSE routes retain direct write permission guards; PTW is parked.
 - Outstanding Actions:
   - Verify AINM register filters, Classification column, Accident/Incident filter, Select Type placeholder, detail-panel scroll, inline action creation, attachment `Other` text, report headings/content, and create/edit/read-only behavior on Vercel.
-  - Verify the corrected Observation Card layout, submit state, evidence upload, register creation and action linkage on Vercel and a physical phone.
+  - Verify the corrected Observation Card layout, repeated one-at-a-time multi-photo selection, submit state, complete evidence upload, register creation and action linkage on Vercel and a physical phone.
   - Verify HSE Reports on Vercel with real saved reports, year filtering, snapshot-period editing, PDF output, and create/edit/read-only behavior.
   - Verify HSE Actions/Reports, AINM, Observations, and Inspections create/edit/read-only behavior on Vercel after the permission hardening pass.
   - Verify HSE inspection PDFs on Vercel with longer forms and evidence photos after the local header/footer/table-margin pass.

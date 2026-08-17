@@ -81,15 +81,16 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, appr
 - Register has Show Filters, detail panel, delete, and OBS-001 numbering.
 - Observations link to Action Management.
 - Public `/observe` submit handling is hardened so failed network/API paths leave the `Submitting` state; successful submissions show the submitted observation number.
+- Public `/observe` supports multiple photographic/supporting attachments. Repeated file-picker or phone-camera selections accumulate in a client-side queue instead of replacing earlier photos; the queue shows every file, supports individual removal, and appends all files to the multipart submission. The API stores each successful upload as its own `hse_observation_evidence` record and uses collision-safe paths within a batch.
 - Public `/observe` has a dedicated phone layout at `520px` and below: public AppShell padding is removed, page/card spacing is compact, reporter choices use two columns with `Quick Fill` full-width, all entry controls remain within the card, and the tested `390px` viewport has no horizontal overflow.
 - Preserve the public Observation Card desktop layout. Do not restore the former desktop negative margins at phone widths and do not allow whole-IMS grid rules to collapse the reporter choices back to one oversized button per row.
 - Secured HSE Observations review save/delete and central action generation controls now use page-level create/edit permission guards.
 
 ### Observation QA still required
 
-- Submit a real card from a physical phone on Vercel, including at least one photograph.
+- Submit a real card from a physical phone on Vercel, adding at least two photographs one at a time through the camera/file picker.
 - Confirm the success state returns the OBS number and does not remain on `Submitting`.
-- Confirm the record and evidence appear in the secured Observation Register.
+- Confirm the record and every queued evidence file appear in the secured Observation Register and each file opens correctly.
 - Create a linked central Action and verify its source chip and return path.
 
 ## PTW
