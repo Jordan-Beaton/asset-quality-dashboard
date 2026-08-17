@@ -204,21 +204,10 @@ function formatDate(value: string | null | undefined) {
 }
 
 function buildNcrLinkedActionHref(row: CombinedRow) {
-  const descriptionSections = [
-    row.description ? `NCR Description:\n${row.description}` : "",
-    row.containment_action ? `Containment Action:\n${row.containment_action}` : "",
-    row.corrective_action ? `Corrective Action:\n${row.corrective_action}` : "",
-    row.root_cause_category || row.root_cause_description
-      ? `Root Cause Summary:\n${[row.root_cause_category, row.root_cause_description].filter(Boolean).join(" - ")}`
-      : "",
-  ].filter(Boolean);
-
   const params = new URLSearchParams({
     prefill_source: "NCR/CAPA",
     prefill_department: "HSEQ",
     prefill_project: row.project || "",
-    prefill_title: `${row.number} - ${row.title || "Untitled NCR"}`,
-    prefill_description: descriptionSections.join("\n\n"),
     prefill_owner: row.owner || "",
     linked_ncr_id: row.id,
     linked_ncr_number: row.number,

@@ -518,17 +518,9 @@ function InspectionPageContent() {
     if (!requireCreateAccess("generate linked Asset actions")) return;
 
     const asset = assetMap.get(record.asset_id) || null;
-    const assetLabel = asset?.asset_code || asset?.name || "Asset inspection";
-    const title = `Inspection follow-up - ${record.inspection_number || assetLabel}`;
-    const descriptionParts = [
-      record.findings ? `Findings: ${record.findings}` : "",
-      record.actions_required ? `Actions required: ${record.actions_required}` : "",
-    ].filter(Boolean);
     const query = new URLSearchParams({
       prefill_source: "Asset Inspection",
       prefill_department: "Assets",
-      prefill_title: title,
-      prefill_description: descriptionParts.join("\n\n") || title,
       linked_asset_id: record.asset_id,
       linked_asset_code: asset?.asset_code || "",
       linked_inspection_id: record.id,

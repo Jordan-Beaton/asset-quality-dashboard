@@ -334,11 +334,7 @@ export default function HseObservationsPage() {
   }
 
   const createActionHref = selectedRecord
-    ? `/actions?view=create&prefill_source=Observation&prefill_department=HSE&prefill_project=${encodeURIComponent(selectedRecord.project || "")}&prefill_title=${encodeURIComponent(`${selectedRecord.observation_number} - ${selectedRecord.title || selectedRecord.observation_type || "Observation"}`)}&prefill_description=${encodeURIComponent([
-        selectedRecord.description ? `Observation: ${selectedRecord.description}` : "",
-        selectedRecord.immediate_action ? `Immediate action: ${selectedRecord.immediate_action}` : "",
-        selectedRecord.suggested_action ? `Suggested action: ${selectedRecord.suggested_action}` : "",
-      ].filter(Boolean).join("\n\n"))}&linked_observation_id=${encodeURIComponent(selectedRecord.id)}&linked_observation_number=${encodeURIComponent(selectedRecord.observation_number)}`
+    ? `/actions?view=create&prefill_source=Observation&prefill_department=HSE&prefill_project=${encodeURIComponent(selectedRecord.project || "")}&linked_observation_id=${encodeURIComponent(selectedRecord.id)}&linked_observation_number=${encodeURIComponent(selectedRecord.observation_number)}`
     : "/actions?view=create&prefill_source=Observation&prefill_department=HSE";
 
   return (

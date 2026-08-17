@@ -289,20 +289,10 @@ function normaliseActionPlanStatus(value: string | null | undefined) {
 }
 
 function buildMocLinkedActionHref(report: MocReport) {
-  const descriptionSections = [
-    report.proposed_change_description ? `Proposed Change:\n${report.proposed_change_description}` : "",
-    report.reason_for_change ? `Reason for Change:\n${report.reason_for_change}` : "",
-    report.implementation_plan ? `Implementation Plan:\n${report.implementation_plan}` : "",
-    report.hazard_risks_description ? `Risk / Impact Summary:\n${report.hazard_risks_description}` : "",
-    report.proposed_risk_mitigations ? `Mitigation Summary:\n${report.proposed_risk_mitigations}` : "",
-  ].filter(Boolean);
-
   const params = new URLSearchParams({
     prefill_source: "MOC",
     prefill_department: "HSEQ",
     prefill_project: report.project_worksite_address || "",
-    prefill_title: `${report.moc_report_no} - ${report.moc_report_title || "Untitled MOC"}`,
-    prefill_description: descriptionSections.join("\n\n"),
     prefill_owner: report.responsible_manager_name || report.moc_coordinator_name || "",
     linked_moc_id: report.id,
     linked_moc_number: report.moc_report_no,
@@ -312,24 +302,10 @@ function buildMocLinkedActionHref(report: MocReport) {
 }
 
 function buildMocActionPlanLinkedActionHref(report: MocReport, row: MocActionPlanItem) {
-  const actionSummary = row.description.trim();
-  const actionTitle = actionSummary
-    ? actionSummary.split(/\s+/).slice(0, 12).join(" ")
-    : report.moc_report_title || "MOC action";
-  const descriptionSections = [
-    `MOC Action Plan Item:\n${actionSummary || "No action description entered."}`,
-    report.proposed_change_description ? `MOC Proposed Change:\n${report.proposed_change_description}` : "",
-    report.reason_for_change ? `Reason for Change:\n${report.reason_for_change}` : "",
-    report.hazard_risks_description ? `Risk / Impact Summary:\n${report.hazard_risks_description}` : "",
-    report.proposed_risk_mitigations ? `Mitigation Summary:\n${report.proposed_risk_mitigations}` : "",
-  ].filter(Boolean);
-
   const params = new URLSearchParams({
     prefill_source: "MOC",
     prefill_department: "HSEQ",
     prefill_project: report.project_worksite_address || "",
-    prefill_title: `${report.moc_report_no} ${row.action_no || "Action"} - ${actionTitle}`,
-    prefill_description: descriptionSections.join("\n\n"),
     prefill_owner: row.responsible_person || report.responsible_manager_name || report.moc_coordinator_name || "",
     prefill_due_date: row.target_date || "",
     linked_moc_id: report.id,

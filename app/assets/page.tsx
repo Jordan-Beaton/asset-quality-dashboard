@@ -904,12 +904,6 @@ function AssetsPageContent() {
       prefill_department: "Assets",
       linked_asset_id: selectedAsset.id,
       linked_asset_code: selectedAsset.asset_code?.trim() || "",
-      prefill_title: selectedAsset.asset_code?.trim()
-        ? `Asset action - ${selectedAsset.asset_code.trim()}`
-        : `Asset action - ${selectedAsset.name || selectedAsset.id}`,
-      prefill_description: selectedAsset.name
-        ? `Raised from asset record ${selectedAsset.name}.`
-        : "Raised from asset record.",
     });
 
     return `/actions?${params.toString()}`;

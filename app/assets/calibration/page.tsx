@@ -1350,20 +1350,9 @@ function CalibrationPageContent() {
   function generateActionFromCalibration(row: CalibrationRow) {
     if (!requireCreateAccess("generate linked Asset actions")) return;
 
-    const subject = buildCalibrationSubject(row);
-    const itemDescription = getCalibrationItemDescription(row.record);
-    const reference = row.record.certificate_number || row.record.reference || subject.title;
-    const title = `Calibration follow-up - ${reference}`;
-    const descriptionParts = [
-      `Calibration item: ${subject.title}`,
-      itemDescription && itemDescription !== subject.title ? `Description: ${itemDescription}` : "",
-      row.record.calibration_due_date ? `Due date: ${formatDate(row.record.calibration_due_date)}` : "",
-    ].filter(Boolean);
     const query = new URLSearchParams({
       prefill_source: "Asset Calibration",
       prefill_department: "Assets",
-      prefill_title: title,
-      prefill_description: descriptionParts.join("\n\n") || title,
       prefill_due_date: row.record.calibration_due_date || "",
       linked_asset_id: row.record.asset_id || "",
       linked_asset_code: row.asset?.asset_code || "",
