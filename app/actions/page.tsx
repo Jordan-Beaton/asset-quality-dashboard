@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -979,6 +979,7 @@ function ActionsPageContent() {
 
   const [editForm, setEditForm] = useState<ActionForm>(emptyForm);
 
+  const actionDetailRef = useRef<HTMLDivElement | null>(null);
   const [selectedEvidenceAction, setSelectedEvidenceAction] = useState<ActionItem | null>(null);
   const [selectedEvidenceFiles, setSelectedEvidenceFiles] = useState<File[]>([]);
   const [selectedEvidenceNotes, setSelectedEvidenceNotes] = useState("");
@@ -1852,6 +1853,12 @@ function ActionsPageContent() {
   }, [ainmOptions, editForm.linked_ainm_id, editForm.linked_ainm_number, editForm.source]);
 
   useEffect(() => {
+    if (selectedEvidenceAction && actionDetailRef.current) {
+      actionDetailRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedEvidenceAction]);
+
+  useEffect(() => {
     if (editForm.source !== "Observation") return;
     if (editForm.linked_observation_id || !editForm.linked_observation_number) return;
 
@@ -2689,6 +2696,25 @@ function ActionsPageContent() {
     setCreateEvidenceNotes("");
     setIsSaving(false);
     setMessage(`Action ${actionNumberToUse} added successfully.`);
+
+    if (form.owner.trim()) {
+      const ownerRecord = people.find((p) => p.name.toLowerCase() === form.owner.trim().toLowerCase());
+      if (ownerRecord?.email) {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientEmail: ownerRecord.email,
+            recipientName: ownerRecord.name,
+            itemType: "Action",
+            itemRef: `Action ${actionNumberToUse}`,
+            itemTitle: form.title.trim(),
+            dueDate: form.due_date || undefined,
+          }),
+        });
+      }
+    }
+
     await loadActions(false);
   }
 
@@ -2749,6 +2775,26 @@ function ActionsPageContent() {
     }
 
     setMessage("Action updated successfully.");
+
+    if (editForm.owner.trim()) {
+      const ownerRecord = people.find((p) => p.name.toLowerCase() === editForm.owner.trim().toLowerCase());
+      if (ownerRecord?.email) {
+        const actionRecord = actions.find((a) => a.id === id);
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientEmail: ownerRecord.email,
+            recipientName: ownerRecord.name,
+            itemType: "Action",
+            itemRef: actionRecord?.action_number ? `Action ${actionRecord.action_number}` : "Action",
+            itemTitle: editForm.title.trim(),
+            dueDate: editForm.due_date || undefined,
+          }),
+        });
+      }
+    }
+
     await loadActions(false);
   }
 
@@ -4187,6 +4233,7 @@ function ActionsPageContent() {
         </div>
       </SectionCard>
 
+      <div ref={actionDetailRef}>
       <SectionCard
         title={
           selectedEvidenceAction
@@ -4783,6 +4830,7 @@ function ActionsPageContent() {
           </div>
         )}
       </SectionCard>
+      </div>
         </>
       ) : null}
     </main>

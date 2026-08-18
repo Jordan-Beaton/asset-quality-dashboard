@@ -1732,6 +1732,25 @@ function NcrCapaPageContent() {
     setNewRootCauseOther("");
     setSaving(false);
     setMessage(`${nextNumber} created successfully.`);
+
+    if (newNcr.owner.trim()) {
+      const ownerRecord = people.find((p) => (p.name ?? "").toLowerCase() === newNcr.owner.trim().toLowerCase());
+      if (ownerRecord?.email) {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientEmail: ownerRecord.email,
+            recipientName: ownerRecord.name,
+            itemType: "NCR",
+            itemRef: nextNumber,
+            itemTitle: newNcr.title.trim(),
+            dueDate: newNcr.due_date || undefined,
+          }),
+        });
+      }
+    }
+
     await loadData();
     await loadNcrOptions();
   }
@@ -1914,6 +1933,25 @@ function NcrCapaPageContent() {
 
     setSaving(false);
     setMessage(`${editRow.number} updated successfully.`);
+
+    if (editRow.owner?.trim()) {
+      const ownerRecord = people.find((p) => (p.name ?? "").toLowerCase() === (editRow.owner ?? "").trim().toLowerCase());
+      if (ownerRecord?.email) {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientEmail: ownerRecord.email,
+            recipientName: ownerRecord.name,
+            itemType: editRow.type === "NCR" ? "NCR" : "CAPA",
+            itemRef: editRow.number,
+            itemTitle: editRow.title,
+            dueDate: editRow.due_date || undefined,
+          }),
+        });
+      }
+    }
+
     await loadData();
     await loadNcrOptions();
   }

@@ -1907,6 +1907,26 @@ function AuditsPageContent() {
     }
 
     setShowFindingForm(false);
+
+    const ownerName = findingForm.owner.trim() || selectedAudit.auditee;
+    if (ownerName) {
+      const ownerRecord = peopleOptions.find((p) => p.name.toLowerCase() === ownerName.toLowerCase());
+      if (ownerRecord?.email) {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientEmail: ownerRecord.email,
+            recipientName: ownerRecord.name,
+            itemType: "Audit Finding",
+            itemRef: reference,
+            itemTitle: findingForm.description.trim().slice(0, 120) || undefined,
+            dueDate: findingForm.due_date || undefined,
+          }),
+        });
+      }
+    }
+
     setFindingForm(createEmptyFinding());
     await loadAudits(false);
     setMessage(`${reference} raised against ${selectedAudit.audit_number}.`);
@@ -1964,6 +1984,24 @@ function AuditsPageContent() {
           return;
         }
 
+        if (field === "owner" && value.trim()) {
+          const ownerRecord = peopleOptions.find((p) => p.name.toLowerCase() === value.trim().toLowerCase());
+          if (ownerRecord?.email) {
+            void fetch("/api/notify-assignment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                recipientEmail: ownerRecord.email,
+                recipientName: ownerRecord.name,
+                itemType: "Audit Finding",
+                itemRef: current.reference,
+                itemTitle: current.description?.slice(0, 120) || undefined,
+                dueDate: current.due_date || undefined,
+              }),
+            });
+          }
+        }
+
         setMessage("Finding changes saved.");
       })();
     }, field === "category" || field === "status" || field === "due_date" || field === "closure_date" ? 150 : 700);
@@ -1994,6 +2032,24 @@ function AuditsPageContent() {
     if (error) {
       setMessage(`Finding update failed: ${error.message}`);
       return;
+    }
+
+    if (openFindingForm.owner.trim()) {
+      const ownerRecord = peopleOptions.find((p) => p.name.toLowerCase() === openFindingForm.owner.trim().toLowerCase());
+      if (ownerRecord?.email) {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientEmail: ownerRecord.email,
+            recipientName: ownerRecord.name,
+            itemType: "Audit Finding",
+            itemRef: openFindingForm.reference,
+            itemTitle: openFindingForm.description?.slice(0, 120) || undefined,
+            dueDate: openFindingForm.due_date || undefined,
+          }),
+        });
+      }
     }
 
     await loadAudits(false);
@@ -4453,13 +4509,18 @@ function AuditsPageContent() {
                     </Field>
 
                     <Field label="Owner">
-                      <input
+                      <select
                         value={openFindingForm.owner}
                         onChange={(e) =>
                           setOpenFindingForm((prev) => (prev ? { ...prev, owner: e.target.value } : prev))
                         }
                         style={inputStyle}
-                      />
+                      >
+                        <option value="">— Select owner —</option>
+                        {peopleOptions.map((p) => (
+                          <option key={p.id} value={p.name}>{p.name}</option>
+                        ))}
+                      </select>
                     </Field>
 
                     <Field label="Due Date">
@@ -5245,11 +5306,16 @@ function AuditsPageContent() {
                       </Field>
 
                       <Field label="Owner">
-                        <input
+                        <select
                           value={findingForm.owner}
                           onChange={(e) => setFindingForm((prev) => ({ ...prev, owner: e.target.value }))}
                           style={inputStyle}
-                        />
+                        >
+                          <option value="">— Select owner —</option>
+                          {peopleOptions.map((p) => (
+                            <option key={p.id} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
                       </Field>
 
                       <Field label="Status">
@@ -5414,11 +5480,16 @@ function AuditsPageContent() {
                             </Field>
 
                             <Field label="Owner">
-                              <input
+                              <select
                                 value={finding.owner}
                                 onChange={(e) => void updateFindingField(finding.id, "owner", e.target.value)}
                                 style={inputStyle}
-                              />
+                              >
+                                <option value="">— Select owner —</option>
+                                {peopleOptions.map((p) => (
+                                  <option key={p.id} value={p.name}>{p.name}</option>
+                                ))}
+                              </select>
                             </Field>
 
                             <Field label="Due Date">
