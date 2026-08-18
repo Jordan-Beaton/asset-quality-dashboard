@@ -3796,7 +3796,7 @@ function DocumentsPageContent() {
                       )}
 
                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                        <label style={{ ...uploadButtonStyle, color: "#ffffff" }}>
+                        <label className="audit-upload-label" style={uploadButtonStyle}>
                           {isUploadingFile ? "Uploading..." : "Upload new version"}
                           <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" onChange={handleControlledFileUpload} style={{ display: "none" }} disabled={isUploadingFile || !canEditDocument} />
                         </label>
