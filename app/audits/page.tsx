@@ -3839,6 +3839,95 @@ function AuditsPageContent() {
     }
   }
 
+  function generateProgrammePdf() {
+    if (filteredAudits.length === 0) {
+      setMessage("There are no audits in the current filtered view to export.");
+      return;
+    }
+    try {
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 10;
+
+      doc.setFillColor(0, 86, 112);
+      doc.rect(0, 0, pageWidth, 24, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text("ENSHORE SUBSEA", margin, 11);
+      doc.setFontSize(10);
+      doc.text("Audit Programme", margin, 18);
+      doc.setFontSize(15);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Audit Programme", margin, 34);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(83, 86, 90);
+      doc.text(`${filteredAudits.length} audit${filteredAudits.length !== 1 ? "s" : ""}`, margin, 41);
+      doc.text(`Generated: ${formatDateTime(new Date().toISOString())}`, pageWidth - margin, 41, { align: "right" });
+
+      autoTable(doc, {
+        startY: 47,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 15 },
+        head: [["Audit No.", "Title / Function", "Type", "Scheduled", "Audit Date", "Lead Auditor", "Major", "Minor", "OFI/OBS", "Status"]],
+        body: filteredAudits.map((audit) => [
+          audit.audit_number,
+          audit.title,
+          audit.audit_type,
+          formatMonth(audit.audit_month),
+          formatDate(audit.audit_date),
+          audit.lead_auditor || "-",
+          audit.findings.major,
+          audit.findings.minor,
+          audit.findings.ofi + audit.findings.obs,
+          getEffectiveAuditStatus(audit),
+        ]),
+        headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          textColor: [0, 0, 0],
+          lineColor: [208, 208, 206],
+          lineWidth: 0.2,
+          valign: "middle",
+          overflow: "linebreak",
+        },
+        alternateRowStyles: { fillColor: [236, 236, 231] },
+        columnStyles: {
+          0: { cellWidth: 20 },
+          1: { cellWidth: 60 },
+          2: { cellWidth: 18 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 22 },
+          5: { cellWidth: 36 },
+          6: { cellWidth: 14, halign: "center" },
+          7: { cellWidth: 14, halign: "center" },
+          8: { cellWidth: 16, halign: "center" },
+          9: { cellWidth: 24 },
+        },
+      });
+
+      const pageCount = doc.getNumberOfPages();
+      for (let page = 1; page <= pageCount; page += 1) {
+        doc.setPage(page);
+        doc.setDrawColor(208, 208, 206);
+        doc.line(margin, pageHeight - 11, pageWidth - margin, pageHeight - 11);
+        doc.setFontSize(8);
+        doc.setTextColor(83, 86, 90);
+        doc.text("Enshore Subsea | Audit Programme", margin, pageHeight - 6);
+        doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6, { align: "right" });
+      }
+
+      doc.save(`audit-programme-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setMessage(`Audit Programme PDF generated with ${filteredAudits.length} audit${filteredAudits.length !== 1 ? "s" : ""}.`);
+    } catch (error) {
+      const err = error as Error;
+      setMessage(`Audit Programme PDF generation failed: ${err.message}`);
+    }
+  }
+
   function generateProgrammeSnapshotPdf() {
     const selectedAudits = getSelectedProgrammeSnapshotAudits();
     if (selectedAudits.length === 0) {
@@ -4710,7 +4799,10 @@ function AuditsPageContent() {
           </div>
 
           <div style={programmeInfoStyle}>
-            Showing <strong>{filteredAudits.length}</strong> of <strong>{audits.length}</strong> audits
+            <span>Showing <strong>{filteredAudits.length}</strong> of <strong>{audits.length}</strong> audits</span>
+            <button type="button" onClick={generateProgrammePdf} style={pdfButtonStyle}>
+              Download PDF
+            </button>
           </div>
 
           <div ref={programmeSectionRef} tabIndex={-1} className="ims-register-shell" style={programmeTableWrapStyle}>
@@ -6962,6 +7054,7 @@ const sortChipRowStyle: CSSProperties = {
   display: "flex",
   gap: "8px",
   flexWrap: "wrap",
+  marginTop: "14px",
   marginBottom: "12px",
 };
 
@@ -6977,13 +7070,25 @@ const sortChipStyle: CSSProperties = {
 const programmeInfoStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  justifyContent: "flex-start",
-  gap: "4px",
+  justifyContent: "space-between",
+  gap: "8px",
   flexWrap: "wrap",
   color: "#53565A",
   fontSize: "13px",
   fontWeight: 700,
-  margin: "12px 0",
+  margin: "0 0 12px",
+};
+
+const pdfButtonStyle: CSSProperties = {
+  padding: "6px 14px",
+  borderRadius: 999,
+  border: "none",
+  background: "#005670",
+  color: "#fff",
+  fontWeight: 700,
+  fontSize: "12px",
+  cursor: "pointer",
+  flexShrink: 0,
 };
 
 const programmeTableWrapStyle: CSSProperties = {
