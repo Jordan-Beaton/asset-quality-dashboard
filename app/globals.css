@@ -102,6 +102,11 @@ body {
   font-weight: 800;
 }
 
+.audit-upload-label {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
 .ims-page-container textarea {
   width: 100%;
   min-height: 96px;

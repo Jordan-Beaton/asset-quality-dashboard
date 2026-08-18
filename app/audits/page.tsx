@@ -1628,13 +1628,6 @@ function AuditsPageContent() {
     if (!targetForm.lead_auditor.trim()) return "Lead auditor is required.";
     if (targetForm.standards.length === 0) return "Select at least one standard.";
 
-    if (targetForm.audit_type === "Internal" && !targetForm.procedure_reference.trim()) {
-      return "Procedure reference is required for internal audits.";
-    }
-
-    if (targetForm.audit_type === "External" && !targetForm.certification_body.trim()) {
-      return "Certification body is required for external audits.";
-    }
 
     return "";
   }
@@ -4932,7 +4925,7 @@ function AuditsPageContent() {
                 </div>
 
                 <div style={topUploadButtonsStyle}>
-                  <label style={uploadButtonStyle}>
+                  <label style={uploadButtonStyle} className="audit-upload-label">
                     {isUploadingReport ? "Uploading..." : "Upload document"}
                     <input
                       type="file"
