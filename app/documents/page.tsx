@@ -602,6 +602,7 @@ function DocumentsPageContent() {
   const [approvalFilter, setApprovalFilter] = useState(linkedApproval);
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [showDetailPanel, setShowDetailPanel] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<"details" | "file" | "history">("details");
   const detailPanelRef = useRef<HTMLElement | null>(null);
   const shouldScrollToDetailRef = useRef(false);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
@@ -3328,592 +3329,533 @@ function DocumentsPageContent() {
         </section>
       ) : null}
 
-      {["register", "workflow", "archive"].includes(activeView) && showDetailPanel && selectedDocument ? (
-        <section id="document-detail-panel" ref={detailPanelRef} style={{ marginTop: "20px" }}>
-          <SectionCard
-            title="Document Detail"
-            subtitle="Workflow-controlled record with view/download-only controlled files."
-          >
-            <div style={detailWorkspaceStyle}>
-              <div style={detailTopBarStyle}>
-                <div>
-                  <div style={detailEyebrowStyle}>Document Detail</div>
-                  <h3 style={detailTitleStyle}>{selectedDocument.document_number}</h3>
-                </div>
+      {["register", "workflow", "archive"].includes(activeView) && showDetailPanel && selectedDocument ? (() => {
+        const STAGES = ["Draft", "Review", "Approval", "Live"] as const;
+        const stageIndex = ((): number => {
+          if (selectedWorkflowStatus === "Draft" || selectedWorkflowStatus === "Rejected") return 0;
+          if (selectedWorkflowStatus === "Pending Review" || selectedWorkflowStatus === "Reviewed") return 1;
+          if (selectedWorkflowStatus === "Pending Approval") return 2;
+          return 3;
+        })();
 
-                <div style={detailTopActionsStyle}>
-                  <span
-                    style={{
-                      ...badgeStyle,
-                      background: getWorkflowTone(selectedWorkflowStatus).bg,
-                      color: getWorkflowTone(selectedWorkflowStatus).color,
-                    }}
-                  >
+        return (
+          <section id="document-detail-panel" ref={detailPanelRef} style={{ marginTop: "20px" }}>
+            <div style={drNewPanelStyle}>
+
+              {/* Doc header */}
+              <div style={drDocHeaderStyle}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={drDocNumberStyle}>{selectedDocument.document_number}</div>
+                  <h3 style={drDocTitleStyle}>{selectedDocument.title || "Untitled"}</h3>
+                  <div style={drDocSubStyle}>
+                    {[selectedDocument.department_owner, selectedDocument.document_type].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+                <div style={drDocHeaderRightStyle}>
+                  {selectedDocument.current_revision ? (
+                    <span style={drRevChipStyle}>Rev {selectedDocument.current_revision}</span>
+                  ) : null}
+                  <span style={{ ...badgeStyle, background: getWorkflowTone(selectedWorkflowStatus).bg, color: getWorkflowTone(selectedWorkflowStatus).color }}>
                     {selectedWorkflowStatus}
                   </span>
-
-                  <button
-                    type="button"
-                    style={secondaryButtonStyle}
-                    onClick={() => setShowDetailPanel(false)}
-                  >
-                    Hide Panel
+                  <button type="button" style={secondaryButtonStyle} onClick={() => setShowDetailPanel(false)}>
+                    Hide
                   </button>
                 </div>
               </div>
 
-              <div style={workflowActionPanelStyle}>
-                <div>
-                  <div style={detailEyebrowStyle}>Next Step</div>
-                  <h4 style={workflowActionTitleStyle}>{workflowActionTitle}</h4>
-                  <p style={workflowActionHintStyle}>{workflowActionHint}</p>
-                </div>
-
-                {["Draft", "Rejected"].includes(selectedWorkflowStatus) ? (
-                  <div style={workflowActionGridStyle}>
-                    <Field label="Reviewer">
-                      <PeopleSelector
-                        inputId="document-workflow-reviewer"
-                        value={detailPeopleSearch.reviewed_by}
-                        selectedName={detailForm.reviewed_by}
-                        people={people}
-                        placeholder="Start typing reviewer name"
-                        onChange={(value) => createPersonSearchHandler("detail", "reviewed_by", value)}
-                        onSelect={(person) => setDetailPersonField("reviewed_by", person)}
-                        onBlur={() => handlePersonSearchBlur("detail", "reviewed_by")}
-                        resolvedEmail={detailForm.reviewer_email}
-                        warning={
-                          detailPeopleSearch.reviewed_by.trim() && !detailReviewerPerson
-                            ? "Reviewer must be selected from People."
-                            : detailReviewerPerson && !detailForm.reviewer_email.trim()
-                            ? "Reviewer has no email in People."
-                            : ""
-                        }
-                      />
-                    </Field>
-
-                    <Field label="Approver">
-                      <PeopleSelector
-                        inputId="document-workflow-initial-approver"
-                        value={detailPeopleSearch.approved_by}
-                        selectedName={detailForm.approved_by}
-                        people={people}
-                        placeholder="Start typing approver name"
-                        onChange={(value) => createPersonSearchHandler("detail", "approved_by", value)}
-                        onSelect={(person) => setDetailPersonField("approved_by", person)}
-                        onBlur={() => handlePersonSearchBlur("detail", "approved_by")}
-                        resolvedEmail={detailForm.approver_email}
-                        warning={
-                          detailPeopleSearch.approved_by.trim() && !detailApproverPerson
-                            ? "Approver must be selected from People."
-                            : detailApproverPerson && !detailForm.approver_email.trim()
-                            ? "Approver has no email in People."
-                            : ""
-                        }
-                      />
-                    </Field>
-
-                    <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={primaryButtonStyle} onClick={submitForReview} disabled={!canEditDocument}>
-                        Send to Reviewer
-                      </button>
+              {/* Stage rail */}
+              <div style={drStageRailStyle}>
+                {STAGES.map((stage, i) => (
+                  <div key={stage} style={{ display: "flex", alignItems: "center", flex: i < STAGES.length - 1 ? "1 1 0" : undefined }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", flexShrink: 0 }}>
+                      <div style={{
+                        width: "28px", height: "28px", borderRadius: "50%",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "11px", fontWeight: 700,
+                        background: i < stageIndex ? "#63B1BC" : i === stageIndex ? "#005670" : "#F4F3F0",
+                        color: i <= stageIndex ? "#ffffff" : "#8A8E91",
+                        border: i > stageIndex ? "1px solid #D0D0CE" : "none",
+                        boxShadow: i === stageIndex ? "0 0 0 4px #EAF3F6" : "none",
+                      }}>
+                        {i < stageIndex ? "✓" : i + 1}
+                      </div>
+                      <div style={{
+                        fontSize: "10.5px", fontWeight: i === stageIndex ? 700 : 600,
+                        color: i < stageIndex ? "#63B1BC" : i === stageIndex ? "#005670" : "#8A8E91",
+                        whiteSpace: "nowrap",
+                      }}>
+                        {stage}
+                      </div>
                     </div>
+                    {i < STAGES.length - 1 ? (
+                      <div style={{ flex: 1, height: "2px", marginBottom: "15px", background: i < stageIndex ? "#63B1BC" : "#D0D0CE" }} />
+                    ) : null}
                   </div>
-                ) : null}
-
-                {selectedWorkflowStatus === "Pending Review" ? (
-                  <div style={workflowActionGridStyle}>
-                    <div style={workflowParticipantCardStyle}>
-                      <span style={workflowParticipantLabelStyle}>Reviewer</span>
-                      <strong>{detailForm.reviewed_by || selectedDocument.workflow_reviewer_name || "Reviewer not selected"}</strong>
-                      <span>{detailForm.reviewer_email || selectedDocument.workflow_reviewer_email || ""}</span>
-                    </div>
-
-                    <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={primaryButtonStyle} onClick={markReviewed} disabled={!canEditDocument}>
-                        Accept Review
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {selectedWorkflowStatus === "Reviewed" ? (
-                  <div style={workflowActionGridStyle}>
-                    <Field label="Approver">
-                      <PeopleSelector
-                        inputId="document-workflow-approver"
-                        value={detailPeopleSearch.approved_by}
-                        selectedName={detailForm.approved_by}
-                        people={people}
-                        placeholder="Start typing approver name"
-                        onChange={(value) => createPersonSearchHandler("detail", "approved_by", value)}
-                        onSelect={(person) => setDetailPersonField("approved_by", person)}
-                        onBlur={() => handlePersonSearchBlur("detail", "approved_by")}
-                        resolvedEmail={detailForm.approver_email}
-                        warning={
-                          detailPeopleSearch.approved_by.trim() && !detailApproverPerson
-                            ? "Approver must be selected from People."
-                            : detailApproverPerson && !detailForm.approver_email.trim()
-                            ? "Approver has no email in People."
-                            : ""
-                        }
-                      />
-                    </Field>
-
-                    <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={primaryButtonStyle} onClick={sendToApprover} disabled={!canEditDocument}>
-                        Send to Approver
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {selectedWorkflowStatus === "Pending Approval" ? (
-                  <div style={workflowActionGridStyle}>
-                    <div style={workflowParticipantCardStyle}>
-                      <span style={workflowParticipantLabelStyle}>Approver</span>
-                      <strong>{detailForm.approved_by || selectedDocument.workflow_approver_name || "Approver not selected"}</strong>
-                      <span>{detailForm.approver_email || selectedDocument.workflow_approver_email || ""}</span>
-                    </div>
-
-                    <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={approveButtonStyle} onClick={approveDocument} disabled={!canEditDocument}>
-                        Approve Document
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {["Pending Review", "Pending Approval"].includes(selectedWorkflowStatus) ? (
-                  <div style={workflowRejectGridStyle}>
-                    <Field label="Rejected By">
-                      <PeopleSelector
-                        inputId="document-workflow-rejected-by"
-                        value={detailPeopleSearch.rejected_by}
-                        selectedName={detailForm.rejected_by}
-                        people={people}
-                        placeholder="Start typing rejector name"
-                        onChange={(value) => createPersonSearchHandler("detail", "rejected_by", value)}
-                        onSelect={(person) => setDetailPersonField("rejected_by", person)}
-                        onBlur={() => handlePersonSearchBlur("detail", "rejected_by")}
-                        resolvedEmail={detailForm.rejected_by.trim() ? detailForm.approver_email : ""}
-                        warning={
-                          detailPeopleSearch.rejected_by.trim() && !detailRejectorPerson
-                            ? "Rejected By must be selected from People."
-                            : detailRejectorPerson && !detailForm.approver_email.trim()
-                            ? "Rejected By has no email in People."
-                            : ""
-                        }
-                      />
-                    </Field>
-
-                    <Field label="Rejection Reason">
-                      <textarea
-                        value={detailForm.rejection_reason}
-                        onChange={(e) => setDetailForm({ ...detailForm, rejection_reason: e.target.value })}
-                        style={compactTextareaStyle}
-                        placeholder="Required only if rejecting"
-                      />
-                    </Field>
-
-                    <div style={workflowActionButtonWrapStyle}>
-                      <button type="button" style={rejectButtonStyle} onClick={rejectDocument} disabled={!canEditDocument}>
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {selectedWorkflowStatus === "Approved" ? (
-                  <div style={workflowActionButtonWrapStyle}>
-                    <button type="button" style={secondaryButtonStyle} onClick={supersedeAndCreateNew} disabled={!canEditDocument || !canCreateDocument}>
-                      Supersede & Create New
-                    </button>
-                  </div>
-                ) : null}
+                ))}
               </div>
 
-              <div style={{ ...fileStripStyle, display: "none" }}>
-                <div style={fileMetaWrapStyle}>
-                  <div style={fileMetaTitleStyle}>Current controlled file</div>
-                  <div style={fileMetaFileStyle}>
-                    {selectedDocument.file_name || "No file uploaded for current revision"}
-                  </div>
-                  <div style={fileMetaSubStyle}>
-                    Revision {selectedDocument.current_revision || "-"} •{" "}
-                    {selectedDocument.file_name
-                      ? `${formatFileSize(selectedDocument.file_size)} • Uploaded ${formatDateTime(
-                          selectedDocument.uploaded_at
-                        )} • View / download only`
-                      : "Upload the current controlled copy here. Files are view / download only in the system."}
-                  </div>
-                </div>
+              {/* Body: sidebar + tabbed main */}
+              <div style={drBodyStyle}>
 
-                <div style={fileButtonsWrapStyle}>
-                  <label style={uploadButtonStyle}>
-                    {isUploadingFile ? "Uploading..." : "Upload controlled copy"}
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                      onChange={handleControlledFileUpload}
-                      style={{ display: "none" }}
-                      disabled={isUploadingFile || !canEditDocument}
-                    />
-                  </label>
+                {/* Sidebar */}
+                <div style={drSidebarStyle}>
 
-                  {selectedDocument.file_path ? (
-                    <button
-                      type="button"
-                      style={reportLinkButtonStyle}
-                      onClick={() => void openDocumentFile(selectedDocument.file_path || "")}
-                    >
-                      Open / Download
-                    </button>
-                  ) : null}
+                  {/* Workflow action — compact, contextual */}
+                  <div style={drActionBoxStyle}>
+                    <div style={drActionLabelStyle}>{workflowActionTitle}</div>
 
-                  <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={issueNextRevision} disabled={!canEditDocument}>
-                    Up-rev to {getNextRevision(selectedDocument.current_revision || "A")}
-                  </button>
-
-                  {selectedDocument.file_name ? (
-                    <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={removeControlledFile} disabled={!canEditDocument}>
-                      Remove file
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              <div style={detailSectionStyle}>
-                <ModuleSectionHeader title="Document Control Record" />
-                <div style={detailContentGridStyle}>
-                  <div style={formLayoutStyle}>
-                    <FormSection title="A. Document Details">
-                    {detailForm.document_scope === "Asset" ? (
-                      <>
-                        <Field label="Linked Asset">
-                          <input
-                            value={getDocumentAssetContext({
-                              asset_name: detailForm.asset_name,
-                              asset_code: detailForm.asset_code,
-                              asset_document_id_code: detailForm.asset_document_id_code,
-                            })}
-                            readOnly
-                            style={readOnlyInputStyle}
+                    {["Draft", "Rejected"].includes(selectedWorkflowStatus) ? (
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        <Field label="Reviewer">
+                          <PeopleSelector
+                            inputId="document-workflow-reviewer"
+                            value={detailPeopleSearch.reviewed_by}
+                            selectedName={detailForm.reviewed_by}
+                            people={people}
+                            placeholder="Select reviewer"
+                            onChange={(value) => createPersonSearchHandler("detail", "reviewed_by", value)}
+                            onSelect={(person) => setDetailPersonField("reviewed_by", person)}
+                            onBlur={() => handlePersonSearchBlur("detail", "reviewed_by")}
+                            resolvedEmail={detailForm.reviewer_email}
+                            warning={
+                              detailPeopleSearch.reviewed_by.trim() && !detailReviewerPerson
+                                ? "Must be selected from People."
+                                : detailReviewerPerson && !detailForm.reviewer_email.trim()
+                                ? "Reviewer has no email."
+                                : ""
+                            }
                           />
                         </Field>
-
-                        <Field label="Asset Document ID Code">
-                          <input value={detailForm.asset_document_id_code || "-"} readOnly style={readOnlyInputStyle} />
+                        <Field label="Approver">
+                          <PeopleSelector
+                            inputId="document-workflow-initial-approver"
+                            value={detailPeopleSearch.approved_by}
+                            selectedName={detailForm.approved_by}
+                            people={people}
+                            placeholder="Select approver"
+                            onChange={(value) => createPersonSearchHandler("detail", "approved_by", value)}
+                            onSelect={(person) => setDetailPersonField("approved_by", person)}
+                            onBlur={() => handlePersonSearchBlur("detail", "approved_by")}
+                            resolvedEmail={detailForm.approver_email}
+                            warning={
+                              detailPeopleSearch.approved_by.trim() && !detailApproverPerson
+                                ? "Must be selected from People."
+                                : detailApproverPerson && !detailForm.approver_email.trim()
+                                ? "Approver has no email."
+                                : ""
+                            }
+                          />
                         </Field>
-                      </>
+                        <button type="button" style={{ ...primaryButtonStyle, width: "100%", justifyContent: "center" }} onClick={submitForReview} disabled={!canEditDocument}>
+                          Send to Reviewer
+                        </button>
+                      </div>
                     ) : null}
 
-                    <Field label="Document Number">
-                      <input value={detailForm.document_number} readOnly style={readOnlyInputStyle} />
-                    </Field>
-
-                    <Field label="Title">
-                      <input
-                        value={detailForm.title}
-                        onChange={(e) => setDetailForm({ ...detailForm, title: e.target.value })}
-                        style={inputStyle}
-                      />
-                    </Field>
-
-                    <Field label="Document Type">
-                      <select
-                        value={detailForm.document_type}
-                        onChange={(e) =>
-                          setDetailForm({
-                            ...detailForm,
-                            document_type: e.target.value as DocumentTypeOption | "",
-                          })
-                        }
-                        style={inputStyle}
-                      >
-                        <option value="">Select type</option>
-                        {DOCUMENT_TYPE_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    <Field label="Department">
-                      <select
-                        value={detailForm.department_owner}
-                        onChange={(e) =>
-                          setDetailForm({
-                            ...detailForm,
-                            department_owner: e.target.value as DepartmentOwnerOption | "",
-                          })
-                        }
-                        style={detailForm.document_scope === "Asset" ? disabledInputStyle : inputStyle}
-                        disabled={detailForm.document_scope === "Asset"}
-                      >
-                        <option value="">Select department</option>
-                        {DEPARTMENT_OWNER_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    <Field label="Document Status">
-                      <input value={getLegacyStatusForWorkflow(detailForm.workflow_status)} readOnly style={readOnlyInputStyle} />
-                    </Field>
-
-                    <Field label="Current Revision">
-                      <input
-                        value={detailForm.current_revision}
-                        onChange={(e) =>
-                          setDetailForm({
-                            ...detailForm,
-                            current_revision: e.target.value.toUpperCase().slice(0, 1),
-                          })
-                        }
-                        style={inputStyle}
-                      />
-                    </Field>
-                    </FormSection>
-
-                    <FormSection title="B. Review Control">
-                    <Field label="Review Cycle">
-                      <select
-                        value={detailForm.review_cycle_years}
-                        onChange={(e) =>
-                          setDetailForm({
-                            ...detailForm,
-                            review_cycle_years: Number(e.target.value) as 1 | 2 | 3,
-                          })
-                        }
-                        style={inputStyle}
-                      >
-                        <option value={1}>1 year</option>
-                        <option value={2}>2 years</option>
-                        <option value={3}>3 years</option>
-                      </select>
-                    </Field>
-
-                    <Field label="Issue Date">
-                      <input
-                        type="date"
-                        value={detailForm.issue_date}
-                        onChange={(e) => setDetailForm({ ...detailForm, issue_date: e.target.value })}
-                        style={inputStyle}
-                      />
-                    </Field>
-
-                    <Field label="Next Review Date">
-                      <input
-                        value={
-                          detailReviewDatePreview
-                            ? formatDate(detailReviewDatePreview)
-                            : selectedDocument.next_review_date
-                            ? formatDate(selectedDocument.next_review_date)
-                            : "-"
-                        }
-                        readOnly
-                        style={readOnlyInputStyle}
-                      />
-                    </Field>
-
-                    <Field label="Workflow Status">
-                      <input value={detailForm.workflow_status} readOnly style={readOnlyInputStyle} />
-                    </Field>
-
-                    <Field label="Reviewed Date">
-                      <input
-                        type="date"
-                        value={detailForm.reviewed_at}
-                        readOnly
-                        style={readOnlyInputStyle}
-                      />
-                    </Field>
-
-                    <Field label="Approved Date">
-                      <input
-                        type="date"
-                        value={detailForm.approved_at}
-                        readOnly
-                        style={readOnlyInputStyle}
-                      />
-                    </Field>
-                    </FormSection>
-
-                    <FormSection title="C. People">
-                      <Field label="Originator">
-                      <PeopleSelector
-                        inputId="document-detail-originator"
-                        value={detailPeopleSearch.originator_name}
-                        selectedName={detailForm.originator_name}
-                        people={people}
-                        placeholder="Start typing a name"
-                        onChange={(value) => createPersonSearchHandler("detail", "originator_name", value)}
-                        onSelect={(person) => setDetailPersonField("originator_name", person)}
-                        onBlur={() => handlePersonSearchBlur("detail", "originator_name")}
-                        resolvedEmail={detailForm.originator_email}
-                        warning={
-                          detailPeopleSearch.originator_name.trim() && !detailOriginatorPerson
-                            ? "Originator must be selected from People."
-                            : detailOriginatorPerson && !detailForm.originator_email.trim()
-                            ? "Originator has no email in People."
-                            : ""
-                        }
-                      />
-                      </Field>
-
-                      <div style={workflowRoutingSummaryStyle}>
-                        <div style={workflowParticipantCardStyle}>
-                          <span style={workflowParticipantLabelStyle}>Reviewer</span>
-                          <strong>{detailForm.reviewed_by || selectedDocument.workflow_reviewer_name || "Not selected yet"}</strong>
-                          <span>{detailForm.reviewer_email || selectedDocument.workflow_reviewer_email || ""}</span>
-                        </div>
-
-                        <div style={workflowParticipantCardStyle}>
-                          <span style={workflowParticipantLabelStyle}>Approver</span>
-                          <strong>{detailForm.approved_by || selectedDocument.workflow_approver_name || "Not selected yet"}</strong>
-                          <span>{detailForm.approver_email || selectedDocument.workflow_approver_email || ""}</span>
-                        </div>
-                      </div>
-                    </FormSection>
-
-                    <FormSection title="D. File / General Notes">
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <Field label="Description">
-                          <textarea
-                            value={detailForm.description}
-                            onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })}
-                            style={textareaStyle}
+                    {selectedWorkflowStatus === "Pending Review" ? (
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        <button type="button" style={{ ...primaryButtonStyle, width: "100%", justifyContent: "center" }} onClick={markReviewed} disabled={!canEditDocument}>
+                          Accept Review
+                        </button>
+                        <div style={drSidebarDividerStyle} />
+                        <Field label="Rejected By">
+                          <PeopleSelector
+                            inputId="document-workflow-rejected-by"
+                            value={detailPeopleSearch.rejected_by}
+                            selectedName={detailForm.rejected_by}
+                            people={people}
+                            placeholder="Select person"
+                            onChange={(value) => createPersonSearchHandler("detail", "rejected_by", value)}
+                            onSelect={(person) => setDetailPersonField("rejected_by", person)}
+                            onBlur={() => handlePersonSearchBlur("detail", "rejected_by")}
+                            resolvedEmail={detailForm.rejected_by.trim() ? detailForm.approver_email : ""}
+                            warning={
+                              detailPeopleSearch.rejected_by.trim() && !detailRejectorPerson
+                                ? "Must be selected from People."
+                                : ""
+                            }
                           />
                         </Field>
-                      </div>
-
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <Field label="General Comments">
+                        <Field label="Rejection Reason">
                           <textarea
-                            value={detailForm.comments}
-                            onChange={(e) => setDetailForm({ ...detailForm, comments: e.target.value })}
-                            style={textareaStyle}
+                            value={detailForm.rejection_reason}
+                            onChange={(e) => setDetailForm({ ...detailForm, rejection_reason: e.target.value })}
+                            style={{ ...compactTextareaStyle, minHeight: "52px" }}
+                            placeholder="Required if rejecting"
                           />
                         </Field>
+                        <button type="button" style={{ ...rejectButtonStyle, width: "100%", justifyContent: "center" }} onClick={rejectDocument} disabled={!canEditDocument}>
+                          Reject
+                        </button>
                       </div>
+                    ) : null}
 
-                      {selectedWorkflowStatus === "Rejected" && detailForm.rejection_reason.trim() ? (
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <Field label="Rejection Reason">
-                            <textarea value={detailForm.rejection_reason} readOnly style={textareaStyle} />
-                          </Field>
-                        </div>
-                      ) : null}
-                    </FormSection>
-                  </div>
-
-                  <div style={detailSidebarStyle}>
-                    <div style={fileStripStyle}>
-                      <div style={fileMetaWrapStyle}>
-                        <div style={fileMetaTitleStyle}>Current controlled file</div>
-                        <div style={fileMetaFileStyle}>
-                          {selectedDocument.file_name || "No file uploaded for current revision"}
-                        </div>
-                        <div style={fileMetaSubStyle}>
-                          Revision {selectedDocument.current_revision || "-"} •{" "}
-                          {selectedDocument.file_name
-                            ? `${formatFileSize(selectedDocument.file_size)} • Uploaded ${formatDateTime(
-                                selectedDocument.uploaded_at
-                              )} • View / download only`
-                            : "Upload the current controlled copy here. Files are view / download only in the system."}
-                        </div>
-                      </div>
-
-                      <div style={fileButtonsWrapStyle}>
-                        <label style={uploadButtonStyle}>
-                          {isUploadingFile ? "Uploading..." : "Upload controlled copy"}
-                          <input
-                            type="file"
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                            onChange={handleControlledFileUpload}
-                            style={{ display: "none" }}
-                            disabled={isUploadingFile || !canEditDocument}
+                    {selectedWorkflowStatus === "Reviewed" ? (
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        <Field label="Approver">
+                          <PeopleSelector
+                            inputId="document-workflow-approver"
+                            value={detailPeopleSearch.approved_by}
+                            selectedName={detailForm.approved_by}
+                            people={people}
+                            placeholder="Select approver"
+                            onChange={(value) => createPersonSearchHandler("detail", "approved_by", value)}
+                            onSelect={(person) => setDetailPersonField("approved_by", person)}
+                            onBlur={() => handlePersonSearchBlur("detail", "approved_by")}
+                            resolvedEmail={detailForm.approver_email}
+                            warning={
+                              detailPeopleSearch.approved_by.trim() && !detailApproverPerson
+                                ? "Must be selected from People."
+                                : detailApproverPerson && !detailForm.approver_email.trim()
+                                ? "Approver has no email."
+                                : ""
+                            }
                           />
-                        </label>
+                        </Field>
+                        <button type="button" style={{ ...primaryButtonStyle, width: "100%", justifyContent: "center" }} onClick={sendToApprover} disabled={!canEditDocument}>
+                          Send to Approver
+                        </button>
+                      </div>
+                    ) : null}
 
-                        {selectedDocument.file_path ? (
-                          <button
-                            type="button"
-                            style={reportLinkButtonStyle}
-                            onClick={() => void openDocumentFile(selectedDocument.file_path || "")}
-                          >
-                            Open / Download
+                    {selectedWorkflowStatus === "Pending Approval" ? (
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        <button type="button" style={{ ...approveButtonStyle, width: "100%", justifyContent: "center" }} onClick={approveDocument} disabled={!canEditDocument}>
+                          Approve Document
+                        </button>
+                        <div style={drSidebarDividerStyle} />
+                        <Field label="Rejected By">
+                          <PeopleSelector
+                            inputId="document-workflow-rejected-by"
+                            value={detailPeopleSearch.rejected_by}
+                            selectedName={detailForm.rejected_by}
+                            people={people}
+                            placeholder="Select person"
+                            onChange={(value) => createPersonSearchHandler("detail", "rejected_by", value)}
+                            onSelect={(person) => setDetailPersonField("rejected_by", person)}
+                            onBlur={() => handlePersonSearchBlur("detail", "rejected_by")}
+                            resolvedEmail={detailForm.rejected_by.trim() ? detailForm.approver_email : ""}
+                            warning={
+                              detailPeopleSearch.rejected_by.trim() && !detailRejectorPerson
+                                ? "Must be selected from People."
+                                : ""
+                            }
+                          />
+                        </Field>
+                        <Field label="Rejection Reason">
+                          <textarea
+                            value={detailForm.rejection_reason}
+                            onChange={(e) => setDetailForm({ ...detailForm, rejection_reason: e.target.value })}
+                            style={{ ...compactTextareaStyle, minHeight: "52px" }}
+                            placeholder="Required if rejecting"
+                          />
+                        </Field>
+                        <button type="button" style={{ ...rejectButtonStyle, width: "100%", justifyContent: "center" }} onClick={rejectDocument} disabled={!canEditDocument}>
+                          Reject
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {selectedWorkflowStatus === "Approved" || selectedWorkflowStatus === "Superseded" || selectedWorkflowStatus === "Archived" ? (
+                      <div style={{ display: "grid", gap: "8px" }}>
+                        <p style={{ fontSize: "12px", color: "#53565A", lineHeight: 1.5, margin: 0 }}>{workflowActionHint}</p>
+                        {selectedWorkflowStatus === "Approved" ? (
+                          <button type="button" style={{ ...secondaryButtonStyle, width: "100%", justifyContent: "center" }} onClick={supersedeAndCreateNew} disabled={!canEditDocument || !canCreateDocument}>
+                            Supersede &amp; Create New
                           </button>
                         ) : null}
+                      </div>
+                    ) : null}
+                  </div>
 
-                        <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={issueNextRevision} disabled={!canEditDocument}>
+                  <div style={drSidebarDividerStyle} />
+
+                  {/* Reviewer + Approver people cards */}
+                  <div style={{ display: "grid", gap: "12px" }}>
+                    <div>
+                      <div style={drSbStatLabelStyle}>Reviewer</div>
+                      <div style={drPersonRowStyle}>
+                        <div style={{ ...drAvatarStyle, background: "#63B1BC" }}>
+                          {(detailForm.reviewed_by || selectedDocument.workflow_reviewer_name || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={drPersonNameStyle}>{detailForm.reviewed_by || selectedDocument.workflow_reviewer_name || "Not set"}</div>
+                          <div style={drPersonRoleStyle}>{detailForm.reviewer_email || selectedDocument.workflow_reviewer_email || ""}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={drSbStatLabelStyle}>Approver</div>
+                      <div style={drPersonRowStyle}>
+                        <div style={{ ...drAvatarStyle, background: "#53565A" }}>
+                          {(detailForm.approved_by || selectedDocument.workflow_approver_name || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={drPersonNameStyle}>{detailForm.approved_by || selectedDocument.workflow_approver_name || "Not set"}</div>
+                          <div style={drPersonRoleStyle}>{detailForm.approver_email || selectedDocument.workflow_approver_email || ""}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={drSidebarDividerStyle} />
+
+                  {/* Key metadata */}
+                  <div style={{ display: "grid", gap: "12px" }}>
+                    <div>
+                      <div style={drSbStatLabelStyle}>Originator</div>
+                      <div style={drSbStatValStyle}>{selectedDocument.originator_name || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={drSbStatLabelStyle}>Issue Date</div>
+                      <div style={drSbStatValStyle}>{formatDate(selectedDocument.issue_date) || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={drSbStatLabelStyle}>Next Review</div>
+                      <div style={drSbStatValStyle}>{formatDate(selectedDocument.next_review_date) || "—"}</div>
+                    </div>
+                    <div>
+                      <div style={drSbStatLabelStyle}>Controlled File</div>
+                      {selectedDocument.file_name ? (
+                        <div style={drFileChipStyle}>
+                          <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#065F46", flexShrink: 0, marginTop: "2px" }} />
+                          <span style={{ flex: 1, fontSize: "12px", color: "#53565A", wordBreak: "break-all", overflowWrap: "anywhere" }}>
+                            {selectedDocument.file_name}
+                          </span>
+                          {selectedDocument.file_path ? (
+                            <button type="button" style={{ ...drFileOpenBtnStyle, alignSelf: "flex-start" }} onClick={() => void openDocumentFile(selectedDocument.file_path || "")}>
+                              Open
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: "12px", color: "#8A8E91" }}>No file uploaded</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabbed main panel */}
+                <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                  <div style={drTabBarStyle}>
+                    {(["details", "file", "history"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setActiveDetailTab(tab)}
+                        style={{
+                          ...drTabStyle,
+                          color: activeDetailTab === tab ? "#005670" : "#53565A",
+                          borderBottom: activeDetailTab === tab ? "2px solid #005670" : "2px solid transparent",
+                          fontWeight: activeDetailTab === tab ? 700 : 500,
+                        }}
+                      >
+                        {tab === "details" ? "Details" : tab === "file" ? "File" : (
+                          <>History {selectedRevisions.length > 0 ? <span style={drTabCountStyle}>{selectedRevisions.length}</span> : null}</>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Details tab */}
+                  {activeDetailTab === "details" ? (
+                    <div style={drPaneStyle}>
+                      {detailForm.document_scope === "Asset" ? (
+                        <>
+                          <Field label="Linked Asset">
+                            <input
+                              value={getDocumentAssetContext({ asset_name: detailForm.asset_name, asset_code: detailForm.asset_code, asset_document_id_code: detailForm.asset_document_id_code })}
+                              readOnly style={readOnlyInputStyle}
+                            />
+                          </Field>
+                          <Field label="Asset Document ID Code">
+                            <input value={detailForm.asset_document_id_code || "-"} readOnly style={readOnlyInputStyle} />
+                          </Field>
+                        </>
+                      ) : null}
+
+                      <Field label="Document Number">
+                        <input value={detailForm.document_number} readOnly style={readOnlyInputStyle} />
+                      </Field>
+
+                      <Field label="Title">
+                        <input value={detailForm.title} onChange={(e) => setDetailForm({ ...detailForm, title: e.target.value })} style={inputStyle} />
+                      </Field>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        <Field label="Document Type">
+                          <select value={detailForm.document_type} onChange={(e) => setDetailForm({ ...detailForm, document_type: e.target.value as DocumentTypeOption | "" })} style={inputStyle}>
+                            <option value="">Select type</option>
+                            {DOCUMENT_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="Department">
+                          <select
+                            value={detailForm.department_owner}
+                            onChange={(e) => setDetailForm({ ...detailForm, department_owner: e.target.value as DepartmentOwnerOption | "" })}
+                            style={detailForm.document_scope === "Asset" ? disabledInputStyle : inputStyle}
+                            disabled={detailForm.document_scope === "Asset"}
+                          >
+                            <option value="">Select department</option>
+                            {DEPARTMENT_OWNER_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </Field>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        <Field label="Current Revision">
+                          <input
+                            value={detailForm.current_revision}
+                            onChange={(e) => setDetailForm({ ...detailForm, current_revision: e.target.value.toUpperCase().slice(0, 1) })}
+                            style={inputStyle}
+                          />
+                        </Field>
+                        <Field label="Review Cycle">
+                          <select value={detailForm.review_cycle_years} onChange={(e) => setDetailForm({ ...detailForm, review_cycle_years: Number(e.target.value) as 1 | 2 | 3 })} style={inputStyle}>
+                            <option value={1}>1 year</option>
+                            <option value={2}>2 years</option>
+                            <option value={3}>3 years</option>
+                          </select>
+                        </Field>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        <Field label="Issue Date">
+                          <input type="date" value={detailForm.issue_date} onChange={(e) => setDetailForm({ ...detailForm, issue_date: e.target.value })} style={inputStyle} />
+                        </Field>
+                        <Field label="Next Review Date">
+                          <input
+                            value={detailReviewDatePreview ? formatDate(detailReviewDatePreview) : selectedDocument.next_review_date ? formatDate(selectedDocument.next_review_date) : "-"}
+                            readOnly style={readOnlyInputStyle}
+                          />
+                        </Field>
+                      </div>
+
+                      <Field label="Originator">
+                        <PeopleSelector
+                          inputId="document-detail-originator"
+                          value={detailPeopleSearch.originator_name}
+                          selectedName={detailForm.originator_name}
+                          people={people}
+                          placeholder="Start typing a name"
+                          onChange={(value) => createPersonSearchHandler("detail", "originator_name", value)}
+                          onSelect={(person) => setDetailPersonField("originator_name", person)}
+                          onBlur={() => handlePersonSearchBlur("detail", "originator_name")}
+                          resolvedEmail={detailForm.originator_email}
+                          warning={
+                            detailPeopleSearch.originator_name.trim() && !detailOriginatorPerson
+                              ? "Originator must be selected from People."
+                              : detailOriginatorPerson && !detailForm.originator_email.trim()
+                              ? "Originator has no email in People."
+                              : ""
+                          }
+                        />
+                      </Field>
+
+                      <Field label="Description">
+                        <textarea value={detailForm.description} onChange={(e) => setDetailForm({ ...detailForm, description: e.target.value })} style={textareaStyle} />
+                      </Field>
+
+                      <Field label="General Comments">
+                        <textarea value={detailForm.comments} onChange={(e) => setDetailForm({ ...detailForm, comments: e.target.value })} style={textareaStyle} />
+                      </Field>
+
+                      {selectedWorkflowStatus === "Rejected" && detailForm.rejection_reason.trim() ? (
+                        <Field label="Rejection Reason">
+                          <textarea value={detailForm.rejection_reason} readOnly style={textareaStyle} />
+                        </Field>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {/* File tab */}
+                  {activeDetailTab === "file" ? (
+                    <div style={drPaneStyle}>
+                      {selectedDocument.file_name ? (
+                        <div style={drCurFileStyle}>
+                          <div style={drFileIconStyle}>📄</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "13px", fontWeight: 700, color: "#000000", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {selectedDocument.file_name}
+                            </div>
+                            <div style={{ fontSize: "11px", color: "#53565A", marginTop: "2px" }}>
+                              Rev {selectedDocument.current_revision || "—"} · {formatFileSize(selectedDocument.file_size)} · Uploaded {formatDateTime(selectedDocument.uploaded_at)}
+                            </div>
+                          </div>
+                          {selectedDocument.file_path ? (
+                            <button type="button" style={secondaryButtonStyle} onClick={() => void openDocumentFile(selectedDocument.file_path || "")}>
+                              Open ↗
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div style={{ padding: "14px", border: "1px dashed #D0D0CE", borderRadius: "8px", color: "#53565A", fontSize: "13px" }}>
+                          No controlled file uploaded yet for this revision.
+                        </div>
+                      )}
+
+                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                        <label style={uploadButtonStyle}>
+                          {isUploadingFile ? "Uploading..." : "Upload new version"}
+                          <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" onChange={handleControlledFileUpload} style={{ display: "none" }} disabled={isUploadingFile || !canEditDocument} />
+                        </label>
+                        <button type="button" style={secondaryButtonStyle} onClick={issueNextRevision} disabled={!canEditDocument}>
                           Up-rev to {getNextRevision(selectedDocument.current_revision || "A")}
                         </button>
-
                         {selectedDocument.file_name ? (
-                          <button type="button" style={{ ...secondaryButtonStyle, ...fileActionButtonStyle }} onClick={removeControlledFile} disabled={!canEditDocument}>
+                          <button type="button" style={{ ...secondaryButtonStyle, color: "#B83232", borderColor: "#E4AEAE" }} onClick={removeControlledFile} disabled={!canEditDocument}>
                             Remove file
                           </button>
                         ) : null}
                       </div>
+
+                      <div style={{ fontSize: "12px", color: "#8A8E91", lineHeight: 1.5 }}>
+                        Files are view / download only — no editing in the system. Upload new version to replace the current file on this revision. Up-rev creates a new formal revision and resets the workflow.
+                      </div>
                     </div>
+                  ) : null}
+
+                  {/* History tab */}
+                  {activeDetailTab === "history" ? (
+                    <div style={drPaneStyle}>
+                      {selectedRevisions.length === 0 ? (
+                        <div style={emptyRevisionStyle}>No revision history files uploaded yet.</div>
+                      ) : (
+                        <div style={revisionListStyle}>
+                          {selectedRevisions.map((revision) => (
+                            <RevisionRow
+                              key={revision.id}
+                              revision={revision}
+                              fallbackReviewedBy={revision.is_current ? selectedDocument.reviewed_by || selectedDocument.workflow_reviewer_name || "" : ""}
+                              fallbackReviewedAt={revision.is_current ? selectedDocument.reviewed_at || "" : ""}
+                              fallbackApprovedBy={revision.is_current ? selectedDocument.approved_by || selectedDocument.workflow_approver_name || "" : ""}
+                              fallbackApprovedAt={revision.is_current ? selectedDocument.approved_at || "" : ""}
+                              fallbackIssueDate={selectedDocument.issue_date || ""}
+                              onOpenFile={(path) => void openDocumentFile(path)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {/* Panel footer — always visible, outside the scrollable pane */}
+                  <div style={drPanelFooterStyle}>
+                    <button type="button" style={primaryButtonStyle} onClick={saveDocumentChanges} disabled={isSaving || !canEditDocument}>
+                      {isSaving ? "Saving..." : "Save Changes"}
+                    </button>
+                    <div style={{ flex: 1 }} />
+                    <button type="button" style={dangerButtonStyle} onClick={deleteSelectedDocument} disabled={!canEditDocument}>
+                      Delete Document
+                    </button>
                   </div>
                 </div>
-
-                <div style={buttonRowStyle}>
-                  <button
-                    type="button"
-                    style={primaryButtonStyle}
-                    onClick={saveDocumentChanges}
-                    disabled={isSaving || !canEditDocument}
-                  >
-                    {isSaving ? "Saving..." : "Save Document Changes"}
-                  </button>
-
-                  <button type="button" style={dangerButtonStyle} onClick={deleteSelectedDocument} disabled={!canEditDocument}>
-                    Delete Document
-                  </button>
-                </div>
-              </div>
-
-              <div style={detailSectionStyle}>
-                <ModuleSectionHeader title="Revision History" />
-
-                {selectedRevisions.length === 0 ? (
-                  <div style={emptyRevisionStyle}>No revision history files uploaded yet.</div>
-                ) : (
-                  <div style={revisionListStyle}>
-                    {selectedRevisions.map((revision) => (
-                      <RevisionRow
-                        key={revision.id}
-                        revision={revision}
-                        fallbackReviewedBy={
-                          revision.is_current
-                            ? selectedDocument.reviewed_by || selectedDocument.workflow_reviewer_name || ""
-                            : ""
-                        }
-                        fallbackReviewedAt={revision.is_current ? selectedDocument.reviewed_at || "" : ""}
-                        fallbackApprovedBy={
-                          revision.is_current
-                            ? selectedDocument.approved_by || selectedDocument.workflow_approver_name || ""
-                            : ""
-                        }
-                        fallbackApprovedAt={revision.is_current ? selectedDocument.approved_at || "" : ""}
-                        fallbackIssueDate={selectedDocument.issue_date || ""}
-                        onOpenFile={(path) => void openDocumentFile(path)}
-                      />
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
-          </SectionCard>
-        </section>
-      ) : null}
+          </section>
+        );
+      })() : null}
     </main>
   );
 }
@@ -5241,6 +5183,259 @@ const revisionNoteStyle: CSSProperties = {
   fontSize: "13px",
   color: "#53565A",
   lineHeight: 1.5,
+};
+
+/* ── Document Record: new combined layout ── */
+const drNewPanelStyle: CSSProperties = {
+  border: "1px solid #D0D0CE",
+  borderRadius: "14px",
+  background: "#ffffff",
+  overflow: "hidden",
+  boxShadow: "0 4px 14px rgba(0,0,0,.07)",
+};
+
+const drDocHeaderStyle: CSSProperties = {
+  padding: "18px 22px",
+  borderBottom: "1px solid #D0D0CE",
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: "16px",
+};
+
+const drDocNumberStyle: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 700,
+  letterSpacing: ".09em",
+  color: "#8A8E91",
+  marginBottom: "3px",
+  fontVariantNumeric: "tabular-nums",
+};
+
+const drDocTitleStyle: CSSProperties = {
+  fontSize: "17px",
+  fontWeight: 800,
+  color: "#000000",
+  lineHeight: 1.3,
+  margin: 0,
+};
+
+const drDocSubStyle: CSSProperties = {
+  fontSize: "12px",
+  color: "#53565A",
+  marginTop: "4px",
+};
+
+const drDocHeaderRightStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  flexShrink: 0,
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
+};
+
+const drRevChipStyle: CSSProperties = {
+  background: "#F4F3F0",
+  border: "1px solid #D0D0CE",
+  borderRadius: "5px",
+  padding: "3px 9px",
+  fontSize: "12px",
+  fontWeight: 700,
+  color: "#53565A",
+  whiteSpace: "nowrap",
+};
+
+const drStageRailStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  padding: "16px 28px",
+  borderBottom: "1px solid #D0D0CE",
+  background: "#F4F3F0",
+};
+
+const drBodyStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "220px minmax(0, 1fr)",
+  minHeight: "460px",
+  overflow: "hidden",
+};
+
+const drSidebarStyle: CSSProperties = {
+  borderRight: "1px solid #D0D0CE",
+  background: "#F9F8F6",
+  padding: "18px 16px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "16px",
+  overflowY: "auto",
+  overflowX: "hidden",
+  minWidth: 0,
+};
+
+const drSidebarDividerStyle: CSSProperties = {
+  height: "1px",
+  background: "#D0D0CE",
+};
+
+const drActionBoxStyle: CSSProperties = {
+  background: "#EAF3F6",
+  border: "1px solid #63B1BC",
+  borderLeft: "3px solid #005670",
+  borderRadius: "7px",
+  padding: "12px",
+};
+
+const drActionLabelStyle: CSSProperties = {
+  fontSize: "10px",
+  fontWeight: 700,
+  letterSpacing: ".09em",
+  textTransform: "uppercase",
+  color: "#005670",
+  marginBottom: "10px",
+};
+
+const drSbStatLabelStyle: CSSProperties = {
+  fontSize: "10px",
+  fontWeight: 700,
+  letterSpacing: ".09em",
+  textTransform: "uppercase",
+  color: "#8A8E91",
+  marginBottom: "4px",
+};
+
+const drSbStatValStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "#000000",
+};
+
+const drPersonRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+};
+
+const drAvatarStyle: CSSProperties = {
+  width: "26px",
+  height: "26px",
+  borderRadius: "50%",
+  color: "#ffffff",
+  fontWeight: 700,
+  fontSize: "11px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+};
+
+const drPersonNameStyle: CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 600,
+  color: "#000000",
+};
+
+const drPersonRoleStyle: CSSProperties = {
+  fontSize: "11px",
+  color: "#53565A",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  maxWidth: "148px",
+};
+
+const drFileChipStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "7px",
+  background: "#ffffff",
+  border: "1px solid #D0D0CE",
+  borderRadius: "6px",
+  padding: "6px 10px",
+  marginTop: "2px",
+};
+
+const drFileOpenBtnStyle: CSSProperties = {
+  background: "none",
+  border: "none",
+  color: "#005670",
+  fontSize: "11px",
+  fontWeight: 700,
+  cursor: "pointer",
+  padding: 0,
+  flexShrink: 0,
+};
+
+const drTabBarStyle: CSSProperties = {
+  display: "flex",
+  borderBottom: "1px solid #D0D0CE",
+  padding: "0 18px",
+};
+
+const drTabStyle: CSSProperties = {
+  padding: "11px 13px",
+  fontSize: "13px",
+  border: "none",
+  background: "transparent",
+  cursor: "pointer",
+  marginBottom: "-1px",
+  fontFamily: "inherit",
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+};
+
+const drTabCountStyle: CSSProperties = {
+  fontSize: "10.5px",
+  fontWeight: 600,
+  background: "#F4F3F0",
+  border: "1px solid #D0D0CE",
+  borderRadius: "999px",
+  padding: "0 6px",
+  color: "#53565A",
+};
+
+const drPaneStyle: CSSProperties = {
+  padding: "18px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "13px",
+  overflowY: "auto",
+  overflowX: "hidden",
+  minWidth: 0,
+};
+
+const drCurFileStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  background: "#F4F3F0",
+  border: "1px solid #D0D0CE",
+  borderRadius: "8px",
+  padding: "12px 14px",
+};
+
+const drFileIconStyle: CSSProperties = {
+  width: "36px",
+  height: "36px",
+  borderRadius: "7px",
+  background: "#EAF3F6",
+  color: "#005670",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: "17px",
+  flexShrink: 0,
+};
+
+const drPanelFooterStyle: CSSProperties = {
+  padding: "12px 18px",
+  borderTop: "1px solid #D0D0CE",
+  background: "#F4F3F0",
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  flexShrink: 0,
 };
 export default function DocumentsPage() {
   return (
