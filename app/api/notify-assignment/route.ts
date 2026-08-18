@@ -103,10 +103,22 @@ export async function POST(req: NextRequest) {
   }
 
   const ctaRow = itemUrl
-    ? `<!-- CTA button -->
+    ? `<!-- CTA button — VML rounded rect for Outlook, CSS for all others -->
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:28px;">
         <tr>
           <td align="center">
+            <!--[if mso]>
+            <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
+              href="${itemUrl}"
+              style="height:48px;v-text-anchor:middle;width:240px;"
+              arcsize="18%"
+              strokecolor="#005670"
+              fillcolor="#005670">
+              <w:anchorlock/>
+              <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;">View ${itemType} in IMS &#8594;</center>
+            </v:roundrect>
+            <![endif]-->
+            <!--[if !mso]><!-->
             <table cellpadding="0" cellspacing="0" role="presentation">
               <tr>
                 <td style="background:#005670;border-radius:10px;">
@@ -117,6 +129,7 @@ export async function POST(req: NextRequest) {
                 </td>
               </tr>
             </table>
+            <!--<![endif]-->
           </td>
         </tr>
       </table>`
@@ -143,19 +156,9 @@ export async function POST(req: NextRequest) {
 
         <!-- ── HEADER ── -->
         <tr>
-          <td style="background-color:#005670;border-radius:14px 14px 0 0;padding:20px 28px;">
-            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-              <tr>
-                <td style="vertical-align:middle;">
-                  <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;color:#63B1BC;letter-spacing:0.16em;text-transform:uppercase;line-height:1;">Integrated Management System</p>
-                </td>
-                <td style="vertical-align:middle;text-align:right;width:180px;">
-                  <img src="${siteUrl}/enshore-logo-email.png"
-                    alt="Enshore" width="160" height="80"
-                    style="display:block;border:0;outline:none;text-decoration:none;margin-left:auto;" />
-                </td>
-              </tr>
-            </table>
+          <td style="background-color:#005670;border-radius:14px 14px 0 0;padding:24px 32px 20px;">
+            <p style="margin:0 0 5px;font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:700;color:#ffffff;letter-spacing:0.06em;text-transform:uppercase;line-height:1;">ENSHORE</p>
+            <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:700;color:#63B1BC;letter-spacing:0.16em;text-transform:uppercase;line-height:1;">Integrated Management System</p>
           </td>
         </tr>
 
