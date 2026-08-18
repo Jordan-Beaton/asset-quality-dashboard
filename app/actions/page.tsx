@@ -2714,7 +2714,7 @@ function ActionsPageContent() {
             recipientEmail: ownerRecord.email,
             recipientName: ownerRecord.name,
             itemType: "Action",
-            itemRef: `Action ${actionNumberToUse}`,
+            itemRef: String(actionNumberToUse),
             itemTitle: form.title.trim(),
             status: form.status,
             dueDate: form.due_date || undefined,
@@ -2794,7 +2794,7 @@ function ActionsPageContent() {
     setMessage("Action updated successfully.");
 
     const actionRecord = actions.find((a) => a.id === id);
-    const actionRef = actionRecord?.action_number ? `Action ${actionRecord.action_number}` : "Action";
+    const actionRef = actionRecord?.action_number ? String(actionRecord.action_number) : "";
     const actionUrl = actionRecord?.action_number
       ? `${window.location.origin}/actions?action=${encodeURIComponent(String(actionRecord.action_number))}`
       : undefined;
@@ -2827,6 +2827,7 @@ function ActionsPageContent() {
 
     // Notify raiser when status changes
     const raiserEmail = actionRecord?.raised_by_email;
+    const raiserName = raiserEmail ? (people.find((p) => p.email === raiserEmail)?.name ?? undefined) : undefined;
     if (raiserEmail && editForm.status !== prevStatus) {
       void fetch("/api/notify-assignment", {
         method: "POST",
@@ -2834,6 +2835,7 @@ function ActionsPageContent() {
         body: JSON.stringify({
           kind: "status-changed",
           recipientEmail: raiserEmail,
+          recipientName: raiserName,
           itemType: "Action",
           itemRef: actionRef,
           itemTitle: editForm.title.trim(),
@@ -2853,6 +2855,7 @@ function ActionsPageContent() {
         body: JSON.stringify({
           kind: "closed-out",
           recipientEmail: raiserEmail,
+          recipientName: raiserName,
           itemType: "Action",
           itemRef: actionRef,
           itemTitle: editForm.title.trim(),

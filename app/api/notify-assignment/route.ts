@@ -144,6 +144,13 @@ export async function POST(req: NextRequest) {
         <!-- ── HEADER ── -->
         <tr>
           <td style="background-color:#005670;border-radius:14px 14px 0 0;padding:20px 28px;">
+            <!--[if mso]>
+            <table width="100%" cellpadding="0" cellspacing="0"><tr><td valign="middle">
+            <p style="margin:0 0 5px;font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:700;color:#ffffff;letter-spacing:4px;text-transform:uppercase;line-height:1;">ENSHORE</p>
+            <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:700;color:#63B1BC;letter-spacing:6px;text-transform:uppercase;line-height:1;">INTEGRATED MANAGEMENT SYSTEM</p>
+            </td></tr></table>
+            <![endif]-->
+            <!--[if !mso]><!-->
             <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
               <tr>
                 <td style="vertical-align:middle;">
@@ -160,6 +167,7 @@ export async function POST(req: NextRequest) {
                 </td>
               </tr>
             </table>
+            <!--<![endif]-->
           </td>
         </tr>
 
