@@ -40,7 +40,7 @@ const moduleCards = [
     cta: "Enter",
   },
   {
-    title: "Lessons Learned",
+    title: "Lessons Learnt",
     short: "Lessons",
     icon: "lessons",
     description: "Searchable project knowledge, repeat-failure links, photo evidence, action ownership, and trend analysis.",

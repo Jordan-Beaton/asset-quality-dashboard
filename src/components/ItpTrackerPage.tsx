@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ChangeEvent } from "react";
 import * as XLSX from "xlsx";
-import { ImsTopMetaRow } from "../../../../src/components/ImsPrimitives";
-import { QualityKpiCard } from "../../../../src/components/QualityKpiCard";
-import { QualityPageHero } from "../../../../src/components/QualityPageHero";
-import { BalticPowerWorkspaceNav } from "../../../../src/components/BalticPowerWorkspaceNav";
-import { supabase } from "../../../../src/lib/supabase";
+import { ImsTopMetaRow } from "./ImsPrimitives";
+import { QualityKpiCard } from "./QualityKpiCard";
+import { QualityPageHero } from "./QualityPageHero";
+import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
+import { supabase } from "../lib/supabase";
+import { getProject } from "../lib/projectRegistry";
 
-const PROJECT_KEY = "baltic-power";
 const STORAGE_BUCKET = "project-documents";
 
 type Revision = {
@@ -240,7 +240,8 @@ function statusTone(status: string) {
   return { background: "#ECECE7", color: "#53565A" };
 }
 
-export default function WaddenSeaItpPage() {
+export function ItpTrackerPage({ projectKey }: { projectKey: string }) {
+  const config = getProject(projectKey);
   const [rows, setRows] = useState<Itp[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -263,7 +264,7 @@ export default function WaddenSeaItpPage() {
       supabase
         .from("project_itps")
         .select("*, project_itp_revisions(*)")
-        .eq("project_key", PROJECT_KEY)
+        .eq("project_key", projectKey)
         .order("updated_at", { ascending: false }),
       supabase
         .from("people")
@@ -278,7 +279,7 @@ export default function WaddenSeaItpPage() {
     }
     if (!peopleResult.error) setPeopleOptions((peopleResult.data || []) as PersonOption[]);
     setLoading(false);
-  }, []);
+  }, [projectKey]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -404,7 +405,7 @@ export default function WaddenSeaItpPage() {
       const { data: auth } = await supabase.auth.getUser();
       let itpId = existing?.id;
       const masterPayload = {
-        project_key: PROJECT_KEY,
+        project_key: projectKey,
         document_number: draft.documentNumber.trim(),
         title: draft.title.trim(),
         supplier: draft.supplier.trim() || null,
@@ -426,7 +427,7 @@ export default function WaddenSeaItpPage() {
       }
       const sourceFile = file as File;
       const safeName = sourceFile.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
-      uploadedPath = `${PROJECT_KEY}/${itpId}/${Date.now()}-${safeName}`;
+      uploadedPath = `${projectKey}/${itpId}/${Date.now()}-${safeName}`;
       const upload = await supabase.storage.from(STORAGE_BUCKET).upload(uploadedPath, sourceFile, { contentType: sourceFile.type || undefined, upsert: false });
       if (upload.error) throw upload.error;
       const { data: insertedRevision, error: revisionError } = await supabase.from("project_itp_revisions").insert({
@@ -570,10 +571,10 @@ export default function WaddenSeaItpPage() {
 
   return (
     <main style={page}>
-      <QualityPageHero label="Baltic Power · Document intelligence" title="ITP Tracker" description="One controlled record per ITP, automatic metadata capture, complete revision history, and live Enshore workflow visibility." />
+      <QualityPageHero label={`${config.label} · Document intelligence`} title="ITP Tracker" description="One controlled record per ITP, automatic metadata capture, complete revision history, and live Enshore workflow visibility." />
 
-      <ImsTopMetaRow backHref="/projects/baltic-power" backLabel="Back to Baltic Power" status={<><strong>Status:</strong> {message || "Latest active ITP revisions loaded."}</>} />
-      <BalticPowerWorkspaceNav active="itp" />
+      <ImsTopMetaRow backHref={`/projects/${projectKey}`} backLabel={`Back to ${config.label}`} status={<><strong>Status:</strong> {message || "Latest active ITP revisions loaded."}</>} />
+      <ProjectWorkspaceNav projectKey={projectKey} active="itp" />
 
       <section className="quality-kpi-grid" style={metricsGrid}>
         <QualityKpiCard title="Total ITPs" value={metrics.total} accent="#63B1BC" />
@@ -622,7 +623,7 @@ export default function WaddenSeaItpPage() {
                 return [
                   <tr key={row.id}>
                     <td style={td}><strong>{row.supplier || "—"}</strong><span style={secondary}>{row.package_name || ""}</span></td>
-                    <td style={td}><select aria-label={`Scope for ${row.document_number}`} style={{ ...cellSelect, ...scopeTone }} value={row.scope || ""} onChange={(event) => void updateMaster(row, { scope: event.target.value || null })}><option value="">Select</option><option>Trencher</option><option>Barge</option></select></td>
+                    <td style={td}><select aria-label={`Scope for ${row.document_number}`} style={{ ...cellSelect, ...scopeTone }} value={row.scope || ""} onChange={(event) => void updateMaster(row, { scope: event.target.value || null })}><option value="">Select</option>{config.scopeOptions.map((opt) => <option key={opt}>{opt}</option>)}</select></td>
                     <td style={td}><strong style={docNo}>{row.document_number}</strong><span style={compactTitle} title={row.title}>{row.title}</span></td>
                     <td style={td}><strong>{revision?.revision || "—"}</strong><span style={secondary}>{revision?.revision_date ? new Date(`${revision.revision_date}T00:00:00`).toLocaleDateString("en-GB") : ""}</span></td>
                     <td style={td}><select aria-label={`Reviewer for ${row.document_number}`} style={cellSelect} value={row.enshore_reviewer || ""} onChange={(event) => void updateMaster(row, { enshore_reviewer: event.target.value || null })}>
@@ -680,21 +681,21 @@ export default function WaddenSeaItpPage() {
           {file && !editingRow && <div style={confidence}>Extraction confidence: <strong>{draft.confidence}</strong> · Confirm the fields before saving.</div>}
           {editingRow && <div style={confidence}>Editing the current register information. The stored source document and revision archive will not be replaced.</div>}
           <div style={formGrid}>
-            <Field label="Document number *" value={draft.documentNumber} set={(value) => setDraft({ ...draft, documentNumber: value })} />
-            <Field label="Revision *" value={draft.revision} set={(value) => setDraft({ ...draft, revision: value })} />
-            <Field label="ITP title *" value={draft.title} set={(value) => setDraft({ ...draft, title: value })} wide />
-            <Field label="Supplier" value={draft.supplier} set={(value) => setDraft({ ...draft, supplier: value })} />
-            <SelectField label="Scope" value={draft.scope} options={["", "Trencher", "Barge"]} set={(value) => setDraft({ ...draft, scope: value })} />
-            <Field label="Revision date" type="date" value={draft.revisionDate} set={(value) => setDraft({ ...draft, revisionDate: value })} />
+            <FieldInput label="Document number *" value={draft.documentNumber} set={(value) => setDraft({ ...draft, documentNumber: value })} />
+            <FieldInput label="Revision *" value={draft.revision} set={(value) => setDraft({ ...draft, revision: value })} />
+            <FieldInput label="ITP title *" value={draft.title} set={(value) => setDraft({ ...draft, title: value })} wide />
+            <FieldInput label="Supplier" value={draft.supplier} set={(value) => setDraft({ ...draft, supplier: value })} />
+            <SelectField label="Scope" value={draft.scope} options={["", ...config.scopeOptions]} set={(value) => setDraft({ ...draft, scope: value })} />
+            <FieldInput label="Revision date" type="date" value={draft.revisionDate} set={(value) => setDraft({ ...draft, revisionDate: value })} />
             {editingRow && <>
-              <Field label="Package" value={draft.packageName} set={(value) => setDraft({ ...draft, packageName: value })} />
-              <Field label="Discipline" value={draft.discipline} set={(value) => setDraft({ ...draft, discipline: value })} />
-              <Field label="Enshore reviewer" value={draft.reviewer} set={(value) => setDraft({ ...draft, reviewer: value })} />
+              <FieldInput label="Package" value={draft.packageName} set={(value) => setDraft({ ...draft, packageName: value })} />
+              <FieldInput label="Discipline" value={draft.discipline} set={(value) => setDraft({ ...draft, discipline: value })} />
+              <FieldInput label="Enshore reviewer" value={draft.reviewer} set={(value) => setDraft({ ...draft, reviewer: value })} />
               <SelectField label="Enshore decision" value={draft.enshoreDecision} options={["Pending Review", "Comments Issued", "Approved", "Rejected"]} set={(value) => setDraft({ ...draft, enshoreDecision: value })} />
               <SelectField label="Overall stage" value={draft.overallStage} options={stages} set={(value) => setDraft({ ...draft, overallStage: value })} />
               <SelectField label="Overall status" value={draft.overallStatus} options={statuses} set={(value) => setDraft({ ...draft, overallStatus: value })} />
-              <Field label="Next action" value={draft.nextAction} set={(value) => setDraft({ ...draft, nextAction: value })} />
-              <Field label="Action due date" type="date" value={draft.dueDate} set={(value) => setDraft({ ...draft, dueDate: value })} />
+              <FieldInput label="Next action" value={draft.nextAction} set={(value) => setDraft({ ...draft, nextAction: value })} />
+              <FieldInput label="Action due date" type="date" value={draft.dueDate} set={(value) => setDraft({ ...draft, dueDate: value })} />
             </>}
           </div>
           <div style={dialogActions}><button style={secondaryButton} onClick={() => { setDialogOpen(false); setEditingRow(null); }}>Cancel</button><button style={primaryButton} disabled={busy} onClick={() => void saveUpload()}>{busy ? "Saving..." : editingRow ? "Save changes" : "Save controlled revision"}</button></div>
@@ -704,7 +705,7 @@ export default function WaddenSeaItpPage() {
   );
 }
 
-function Field({ label, value, set, wide, type = "text", placeholder }: { label: string; value: string; set: (value: string) => void; wide?: boolean; type?: string; placeholder?: string }) {
+function FieldInput({ label, value, set, wide, type = "text", placeholder }: { label: string; value: string; set: (value: string) => void; wide?: boolean; type?: string; placeholder?: string }) {
   return <label style={{ ...field, gridColumn: wide ? "1 / -1" : undefined }}><span>{label}</span><input style={input} type={type} value={value} placeholder={placeholder} onChange={(event) => set(event.target.value)} /></label>;
 }
 

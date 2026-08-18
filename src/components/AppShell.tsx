@@ -123,7 +123,7 @@ const qualityNavItems: NavItem[] = [
 
 const lessonsNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
-  { href: "/lessons-learned", label: "Lessons Learned", icon: "lessons" },
+  { href: "/lessons-learned", label: "Lessons Learnt", icon: "lessons" },
 ];
 
 const documentNavItems: NavItem[] = [
@@ -728,7 +728,7 @@ export default function AppShell({ children }: AppShellProps) {
     : isActionModule
     ? "Action Management"
     : isLessonsModule
-    ? "Lessons Learned"
+    ? "Lessons Learnt"
     : isProjectModule
     ? "Project Management"
     : isDocumentModule

@@ -5,13 +5,14 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { ImsTopMetaRow } from "../../../../src/components/ImsPrimitives";
-import { QualityKpiCard } from "../../../../src/components/QualityKpiCard";
-import { QualityPageHero } from "../../../../src/components/QualityPageHero";
-import { BalticPowerWorkspaceNav } from "../../../../src/components/BalticPowerWorkspaceNav";
-import { supabase } from "../../../../src/lib/supabase";
+import XLSXStyle from "xlsx-js-style";
+import { ImsTopMetaRow } from "./ImsPrimitives";
+import { QualityKpiCard } from "./QualityKpiCard";
+import { QualityPageHero } from "./QualityPageHero";
+import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
+import { supabase } from "../lib/supabase";
+import { getProject } from "../lib/projectRegistry";
 
-const PROJECT_KEY = "baltic-power";
 const STORAGE_BUCKET = "project-documents";
 
 type Revision = { id: string; revision: string; file_name: string; file_path: string; is_current: boolean; uploaded_at: string };
@@ -56,7 +57,8 @@ function validIntervention(value: string) {
   return /^[A-Z](?:\/[A-Z])*$/.test(normalised) && normalised.split("/").some((part) => part === "W" || part === "H");
 }
 
-export default function NoiTrackerPage() {
+export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
+  const config = getProject(projectKey);
   const [itps, setItps] = useState<Itp[]>([]);
   const [points, setPoints] = useState<NoiPoint[]>([]);
   const [selectedItpId, setSelectedItpId] = useState("");
@@ -78,8 +80,8 @@ export default function NoiTrackerPage() {
 
   const load = useCallback(async () => {
     const [itpResult, pointResult] = await Promise.all([
-      supabase.from("project_itps").select("id,document_number,title,supplier,scope,project_itp_revisions(id,revision,file_name,file_path,is_current,uploaded_at)").eq("project_key", PROJECT_KEY).order("document_number"),
-      supabase.from("project_noi_points").select("*").eq("project_key", PROJECT_KEY).order("created_at"),
+      supabase.from("project_itps").select("id,document_number,title,supplier,scope,project_itp_revisions(id,revision,file_name,file_path,is_current,uploaded_at)").eq("project_key", projectKey).order("document_number"),
+      supabase.from("project_noi_points").select("*").eq("project_key", projectKey).order("created_at"),
     ]);
     if (itpResult.error) setMessage(itpResult.error.message);
     else {
@@ -89,7 +91,7 @@ export default function NoiTrackerPage() {
     }
     if (pointResult.error) setMessage(pointResult.error.message.includes("project_noi_points") ? "The NOI register database setup is not live yet. Apply scripts/sql/project_itp_tracker.sql in Supabase." : pointResult.error.message);
     else setPoints((pointResult.data || []) as NoiPoint[]);
-  }, []);
+  }, [projectKey]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -147,7 +149,7 @@ export default function NoiTrackerPage() {
       let result = await requestScan(activeMapping);
       const firstDiagnostics = result.diagnostics as ExtractionDiagnostics | undefined;
       if (!mappingOverride && !activeMapping.authorityHeadings.length && firstDiagnostics?.templateFingerprint) {
-        const stored = await supabase.storage.from(STORAGE_BUCKET).download(`${PROJECT_KEY}/extraction-mappings/${firstDiagnostics.templateFingerprint}.json`);
+        const stored = await supabase.storage.from(STORAGE_BUCKET).download(`${projectKey}/extraction-mappings/${firstDiagnostics.templateFingerprint}.json`);
         if (!stored.error) {
           activeMapping = JSON.parse(await stored.data.text()) as ExtractionMapping;
           result = await requestScan(activeMapping);
@@ -162,7 +164,7 @@ export default function NoiTrackerPage() {
       setDiagnostics(nextDiagnostics);
       setMapping(recommended);
       if (saveConfirmedMapping && nextDiagnostics.templateFingerprint) {
-        const saved = await supabase.storage.from(STORAGE_BUCKET).upload(`${PROJECT_KEY}/extraction-mappings/${nextDiagnostics.templateFingerprint}.json`, new Blob([JSON.stringify(recommended)], { type: "application/json" }), { upsert: true, contentType: "application/json" });
+        const saved = await supabase.storage.from(STORAGE_BUCKET).upload(`${projectKey}/extraction-mappings/${nextDiagnostics.templateFingerprint}.json`, new Blob([JSON.stringify(recommended)], { type: "application/json" }), { upsert: true, contentType: "application/json" });
         if (saved.error) throw saved.error;
       }
       setCandidates((result.candidates || []).map((candidate: Omit<Candidate, "selected">) => ({ ...candidate, selected: true })));
@@ -191,7 +193,7 @@ export default function NoiTrackerPage() {
     setBusy(true);
     const { data: auth } = await supabase.auth.getUser();
     const payload = selected.map((candidate) => ({
-      project_key: PROJECT_KEY,
+      project_key: projectKey,
       itp_id: selectedItp.id,
       revision_id: revision.id,
       section_number: candidate.sectionNumber.trim(),
@@ -238,7 +240,7 @@ export default function NoiTrackerPage() {
     const { data: auth } = await supabase.auth.getUser();
     const sourceReference = manualPoint.sourceReference.trim();
     const payload = {
-      project_key: PROJECT_KEY,
+      project_key: projectKey,
       itp_id: selectedItp.id,
       revision_id: revision.id,
       section_number: sectionNumber,
@@ -299,7 +301,7 @@ export default function NoiTrackerPage() {
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("BALTIC POWER PROJECT · NOI REQUIREMENTS", 10, 10);
+    doc.text(`${config.label.toUpperCase()} PROJECT · NOI REQUIREMENTS`, 10, 10);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.text(`Generated ${generatedAt.toLocaleDateString("en-GB")} · ${pointRows.length} requirement${pointRows.length === 1 ? "" : "s"}`, 10, 17);
@@ -347,16 +349,81 @@ export default function NoiTrackerPage() {
       doc.setPage(pageNumber);
       doc.setFontSize(7);
       doc.setTextColor(83, 86, 90);
-      doc.text(`Baltic Power · Project NOI Requirements · Page ${pageNumber} of ${pageCount}`, 10, 204);
+      doc.text(`${config.label} · Project NOI Requirements · Page ${pageNumber} of ${pageCount}`, 10, 204);
     }
-    doc.save(`baltic-power-noi-requirements-${generatedAt.toISOString().slice(0, 10)}.pdf`);
+    doc.save(`${projectKey}-noi-requirements-${generatedAt.toISOString().slice(0, 10)}.pdf`);
+  }
+
+  function exportExcel() {
+    if (!pointRows.length) {
+      setMessage("There are no NOI requirements in the current filtered view to export.");
+      return;
+    }
+
+    const HEADERS = [
+      "ITP Number", "Revision", "ITP Title", "Supplier", "Scope",
+      "Section", "Activity Description", "W/H Code", "Party / Source",
+      "Planned Date", "NOI Number", "Status", "Notes",
+    ];
+    const COL_WIDTHS = [14, 8, 28, 20, 10, 10, 50, 9, 22, 14, 11, 14, 30];
+
+    const headerStyle = {
+      fill: { patternType: "solid", fgColor: { rgb: "005670" } },
+      font: { bold: true, color: { rgb: "FFFFFF" }, sz: 9, name: "Arial" },
+      alignment: { vertical: "center", wrapText: false },
+    };
+    const cellStyle = (alt: boolean) => ({
+      fill: alt ? { patternType: "solid", fgColor: { rgb: "ECECE7" } } : { patternType: "none" },
+      font: { color: { rgb: "53565A" }, sz: 9, name: "Arial" },
+      alignment: { vertical: "top" },
+    });
+
+    const dataRows = pointRows.map(({ point, itp }) => {
+      const revision = itp?.project_itp_revisions?.find((item) => item.id === point.revision_id);
+      return [
+        itp?.document_number || "",
+        revision?.revision || "",
+        itp?.title || "",
+        itp?.supplier || "",
+        itp?.scope || "",
+        point.section_number,
+        point.activity_description,
+        point.intervention_type,
+        point.party_heading,
+        point.planned_date ? new Date(`${point.planned_date}T00:00:00`).toLocaleDateString("en-GB") : "",
+        point.noi_number || "",
+        point.status,
+        point.notes || "",
+      ];
+    });
+
+    const ws = XLSXStyle.utils.aoa_to_sheet([HEADERS, ...dataRows]);
+
+    HEADERS.forEach((_, c) => {
+      const ref = XLSXStyle.utils.encode_cell({ r: 0, c });
+      ws[ref].s = headerStyle;
+    });
+    dataRows.forEach((_, r) => {
+      HEADERS.forEach((_, c) => {
+        const ref = XLSXStyle.utils.encode_cell({ r: r + 1, c });
+        if (ws[ref]) ws[ref].s = cellStyle(r % 2 === 1);
+      });
+    });
+
+    ws["!cols"] = COL_WIDTHS.map((wch) => ({ wch }));
+    ws["!autofilter"] = { ref: XLSXStyle.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: dataRows.length, c: HEADERS.length - 1 } }) };
+    ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+
+    const wb = XLSXStyle.utils.book_new();
+    XLSXStyle.utils.book_append_sheet(wb, ws, "NOI Requirements");
+    XLSXStyle.writeFile(wb, `${projectKey}-noi-requirements-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   return (
     <main style={page}>
-      <QualityPageHero label="Baltic Power · Inspection intelligence" title="NOI Tracker" description="Controlled witness and hold-point register extracted from current Supplier ITP revisions." />
-      <ImsTopMetaRow backHref="/projects/baltic-power" backLabel="Back to Baltic Power" status={<><strong>Status:</strong> {message || "Client, Enshore and Contractor W/H requirements loaded."}</>} />
-      <BalticPowerWorkspaceNav active="noi" />
+      <QualityPageHero label={`${config.label} · Inspection intelligence`} title="NOI Tracker" description="Controlled witness and hold-point register extracted from current Supplier ITP revisions." />
+      <ImsTopMetaRow backHref={`/projects/${projectKey}`} backLabel={`Back to ${config.label}`} status={<><strong>Status:</strong> {message || "Client, Enshore and Contractor W/H requirements loaded."}</>} />
+      <ProjectWorkspaceNav projectKey={projectKey} active="noi" />
 
       <section className="quality-kpi-grid" style={metricsGrid}>
         <QualityKpiCard title="Total Points" value={metrics.total} accent="#005670" />
@@ -416,7 +483,7 @@ export default function NoiTrackerPage() {
       </section>
 
       <section style={surface}>
-        <div style={sectionHeader}><div><div style={kicker}>Controlled register</div><h2 style={title}>Project NOI requirements</h2></div><button style={primaryButton} onClick={exportPdf}>Download PDF</button></div>
+        <div style={sectionHeader}><div><div style={kicker}>Controlled register</div><h2 style={title}>Project NOI requirements</h2></div><div style={exportButtons}><button style={secondaryButton} onClick={exportExcel}>Download Excel</button><button style={primaryButton} onClick={exportPdf}>Download PDF</button></div></div>
         <datalist id="noi-intervention-codes"><option value="W" /><option value="H" /><option value="W/H" /><option value="R/W" /><option value="M/W" /><option value="H/R" /></datalist>
         <div style={filterGrid}>
           <input style={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search section, activity, NOI or notes..." />
@@ -440,7 +507,7 @@ export default function NoiTrackerPage() {
             <td style={td}><input style={compactInput} value={point.noi_number || ""} placeholder="TBC" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, noi_number: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { noi_number: event.target.value || null })} /></td>
             <td style={td}><select style={compactInput} value={point.status} onChange={(event) => void updatePoint(point, { status: event.target.value })}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></td>
             <td style={td}><input style={wideInput} value={point.notes || ""} placeholder="Notes" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, notes: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { notes: event.target.value || null })} /></td>
-            <td style={td}><div style={rowActions}>{point.noi_number ? <Link style={noiButton} href={`/projects/baltic-power/noi/create?noi=${encodeURIComponent(point.noi_number)}`}>NOI</Link> : null}<button style={deleteButton} disabled={savingId === point.id} onClick={() => void deletePoint(point)}>{savingId === point.id ? "..." : "Delete"}</button></div></td>
+            <td style={td}><div style={rowActions}>{point.noi_number ? <Link style={noiButton} href={`/projects/${projectKey}/noi/create?noi=${encodeURIComponent(point.noi_number)}`}>NOI</Link> : null}<button style={deleteButton} disabled={savingId === point.id} onClick={() => void deletePoint(point)}>{savingId === point.id ? "..." : "Delete"}</button></div></td>
           </tr>)}
           {pointRows.length === 0 && <tr><td colSpan={9} style={empty}>No NOI points match the current filters.</td></tr>}
         </tbody></table></div>
@@ -453,6 +520,7 @@ const page: CSSProperties = { display: "grid", gap: 16 };
 const metricsGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 16, marginBottom: 4 };
 const surface: CSSProperties = { background: "#fff", border: "1px solid #D0D0CE", borderRadius: 18, overflow: "hidden" };
 const sectionHeader: CSSProperties = { padding: "16px 18px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 };
+const exportButtons: CSSProperties = { display: "flex", gap: 8 };
 const kicker: CSSProperties = { color: "#005670", fontWeight: 900, fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase" };
 const title: CSSProperties = { margin: "3px 0 0", color: "#53565A", fontSize: 20 };
 const scanner: CSSProperties = { padding: "4px 18px 14px", display: "grid", gridTemplateColumns: "1fr auto auto", alignItems: "end", gap: 10 };

@@ -27,7 +27,7 @@ import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { WaddenSeaOpenPoints } from "../../../src/components/WaddenSeaOpenPoints";
-import { WaddenSeaWorkspaceNav } from "../../../src/components/WaddenSeaWorkspaceNav";
+import { ProjectWorkspaceNav } from "../../../src/components/ProjectWorkspaceNav";
 import { supabase } from "../../../src/lib/supabase";
 
 type RawCell = string | number | boolean | Date | null | undefined;
@@ -1175,7 +1175,7 @@ export default function ProjectReportsPage() {
 
       <ImsTopMetaRow backHref="/projects/wadden-sea" backLabel="Back to Wadden Sea" status={<><strong>Status:</strong> {message}</>} />
 
-      <WaddenSeaWorkspaceNav active="reports" />
+      <ProjectWorkspaceNav projectKey="wadden-sea" active="reports" />
 
       <nav className="ims-tabs" style={reportWorkspaceTabsStyle} aria-label="Project report annexes" role="tablist">
         {[

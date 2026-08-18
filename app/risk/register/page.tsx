@@ -1122,7 +1122,7 @@ function RiskFormFields({
           </Field>
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <Field label="Lesson Learned">
+          <Field label="Lesson Learnt">
             <textarea value={form.lesson_learned} onChange={(event) => setForm({ ...form, lesson_learned: event.target.value })} style={textAreaStyle} />
           </Field>
         </div>

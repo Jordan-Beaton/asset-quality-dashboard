@@ -215,7 +215,7 @@ export function createLessonsPreventionPdf(result: PreventionResult) {
     pdf.setTextColor(...exportRgb.muted);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7.5);
-    pdf.text("Enshore IMS - Lessons Learned Prevention Intelligence", MARGIN, footerTextY);
+    pdf.text("Enshore IMS - Lessons Learnt Prevention Intelligence", MARGIN, footerTextY);
     pdf.text(`Page ${page} of ${pages}`, currentPageWidth - MARGIN, footerTextY, { align: "right" });
   }
 

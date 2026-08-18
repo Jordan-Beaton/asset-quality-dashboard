@@ -21,7 +21,7 @@ This file is the permanent implementation and QA reference for phone compatibili
 - `src/components/ImsPrimitives.tsx`: shared panels, filters, tabs, buttons and mobile panel controls.
 - `app/globals.css`: shared breakpoints, bottom navigation, grid/form constraints, register cards and specialist Observation Register cards.
 - `app/observe/page.tsx`: public QR Observation Card and its narrower phone-specific rules.
-- `app/field-tools/page.tsx`: permission-aware direct launchers, including Lessons Learned field capture.
+- `app/field-tools/page.tsx`: permission-aware direct launchers, including Lessons Learnt field capture.
 - `app/lessons-learned/page.tsx`: shared full workspace plus the query-driven compact field-entry mode.
 
 ## Mandatory Rules
@@ -93,17 +93,17 @@ For each tested route confirm:
 5. Central Actions: filters, linked-source chips, detail editing and evidence.
 6. Documents and Certification: registers, workflow actions, uploads and revision history.
 7. Projects: Wadden Sea Dashboard, ITP, NOI, Creator, Reports and Open Points.
-8. Lessons Learned: register expansion, repeat drill-down and evidence.
+8. Lessons Learnt: register expansion, repeat drill-down and evidence.
 9. Risk, People, Management Review and Admin: registers, forms, permissions and outputs.
 10. IMS Home and Field Tools: phone list, module access, QR destinations and permission-aware navigation.
 
-### Lessons Learned field entry
+### Lessons Learnt field entry
 
-- Field Tools shows `Capture a Lesson` only when the user can access the Lessons Learned module.
+- Field Tools shows `Capture a Lesson` only when the user can access the Lessons Learnt module.
 - Destination: `/lessons-learned?view=create&mode=field`.
 - The field mode uses the compact AppShell field header, hides workspace tabs/KPIs, returns to Field Tools, and reuses the normal secured save/evidence workflow.
 - Essential fields remain visible; ownership, contributing factors, dates, repeat grouping and other secondary data sit inside `Optional detail`.
-- Saving clears the form and leaves field mode ready for another capture. The normal desktop Lessons Learned route and layout remain unchanged.
+- Saving clears the form and leaves field mode ready for another capture. The normal desktop Lessons Learnt route and layout remain unchanged.
 
 ## Current Remaining Work
 

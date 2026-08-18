@@ -1,4 +1,4 @@
-# Lessons Learned Codex Handover
+# Lessons Learnt Codex Handover
 
 ## Status
 
@@ -24,11 +24,11 @@ Implemented and live. Production QA and continued data-quality improvement remai
 - J and B project records are treated as historic/closed; ENS project records can remain open.
 - Evidence supports photographs and supporting files.
 - Field Tools now includes permission-aware `Capture a Lesson`, linking to `/lessons-learned?view=create&mode=field`.
-- Field mode uses the existing Lessons Learned record, numbering, permission, reference-data and evidence workflows. It shows essential capture fields first, keeps additional classification/ownership fields in expandable `Optional detail`, returns to Field Tools, and stays ready for another capture after save.
+- Field mode uses the existing Lessons Learnt record, numbering, permission, reference-data and evidence workflows. It shows essential capture fields first, keeps additional classification/ownership fields in expandable `Optional detail`, returns to Field Tools, and stays ready for another capture after save.
 - Repeat groups link recurring lessons and should open the complete linked dataset, not only the source record.
 - “What We’ve Learned” uses a single interactive rotating insight card on a five-second cycle.
 - Historic imports and KPI counts must support substantially more than 1,000 rows.
-- `Prevention Intelligence` provides an evidence-grounded free-text question workspace. It consolidates historic failures into a short prevention brief instead of listing every matching record, and every caution links back to its supporting Lessons Learned records.
+- `Prevention Intelligence` provides an evidence-grounded free-text question workspace. It consolidates historic failures into a short prevention brief instead of listing every matching record, and every caution links back to its supporting Lessons Learnt records.
 - Prevention questions screen the complete Failure repository, combine keyword and semantic retrieval, and deeply analyse up to 250 relevance-ranked candidates in controlled batches of 35 with three-way parallel processing before a final synthesis. The UI must separately report total records screened, candidate records analysed and strongest records cited. Never present a retrieval ceiling as the exact number of matching lessons; historic wording requires controlled categorisation for an auditable exact count.
 - The same workspace accepts PDF, DOC/DOCX and TXT procedures (50 MB maximum), compares their readable content with relevant historic failures, and returns advisory control gaps/cautions without declaring the document approved or compliant.
 - Prevention Intelligence deliberately uses `OPENAI_BUSINESS_API_KEY`; it must not fall back to the older `OPENAI_API_KEY`. The key remains server-side in the secured route handlers.
@@ -56,7 +56,7 @@ Implemented and live. Production QA and continued data-quality improvement remai
 2. In the OpenAI business project, create a project-scoped API key and configure an appropriate project budget/usage alert.
 3. In Vercel Project Settings -> Environment Variables, add the secret as `OPENAI_BUSINESS_API_KEY` for Production (and Preview only if required). Never paste the key into source, Supabase, GitHub, documentation or Codex chat.
 4. Optional model overrides are `OPENAI_LESSONS_MODEL` and `OPENAI_LESSONS_EMBEDDING_MODEL`; defaults are `gpt-5-mini` and `text-embedding-3-small`.
-5. Redeploy, open Lessons Learned -> Prevention Intelligence, confirm the business connection status, then run `Build / Refresh Index` as Master Admin until the indexed and failure totals match.
+5. Redeploy, open Lessons Learnt -> Prevention Intelligence, confirm the business connection status, then run `Build / Refresh Index` as Master Admin until the indexed and failure totals match.
 6. Validate a known question such as trenching and one controlled Word/PDF procedure. Confirm every displayed caution opens only its cited supporting lessons.
 
 ## Guardrails

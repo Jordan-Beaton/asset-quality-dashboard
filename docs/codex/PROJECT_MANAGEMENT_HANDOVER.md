@@ -4,15 +4,25 @@
 
 In Progress. The Wadden Sea workspace is implemented and live, with production workflow QA still required.
 
-## Workspace Structure
+## Architecture
+
+Projects share a common feature set driven by a central registry at `src/lib/projectRegistry.ts`. Adding a new project requires only adding an entry there — all shared pages route dynamically under `app/projects/[projectKey]/`.
+
+- **Registry**: `src/lib/projectRegistry.ts` — defines label, NOI sequence floor, scope options, and which tabs to show per project.
+- **Shared nav**: `src/components/ProjectWorkspaceNav.tsx`
+- **Shared pages**: `ItpTrackerPage`, `NoiTrackerPage`, `NoiCreatorPage`, `ItpSignOffPage` in `src/components/`
+- **Dynamic routes**: `app/projects/[projectKey]/itp/`, `noi/`, `noi/create/`, `itp-sign-off/`
+- **Project-specific**: dashboards (`app/projects/{key}/page.tsx`) and reports (`app/projects/{key}/reports/`) remain bespoke static routes.
+
+## Workspace Structure (Wadden Sea example)
 
 - Entry route: `/projects/wadden-sea`
-- Shared navigation: `src/components/WaddenSeaWorkspaceNav.tsx`
-- Dashboard: `app/projects/wadden-sea/page.tsx`
-- Supplier ITP programme: `app/projects/wadden-sea/itp/page.tsx`
-- Project NOI requirements: `app/projects/wadden-sea/noi/page.tsx`
-- NOI Creator: `app/projects/wadden-sea/noi/create/page.tsx`
-- Project Reports: `app/projects/wadden-sea/reports/page.tsx`
+- Dashboard: `app/projects/wadden-sea/page.tsx` (project-specific)
+- Supplier ITP programme: `/projects/wadden-sea/itp` → dynamic route
+- Project NOI requirements: `/projects/wadden-sea/noi` → dynamic route
+- NOI Creator: `/projects/wadden-sea/noi/create` → dynamic route
+- ITP Sign-Off: `/projects/wadden-sea/itp-sign-off` → dynamic route
+- Project Reports: `app/projects/wadden-sea/reports/page.tsx` (project-specific)
 
 The workspace follows the Quality Management visual structure: hero, top meta/status row, tabs, KPI cards, panels, filters, and compact registers.
 

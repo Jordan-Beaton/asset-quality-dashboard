@@ -14,7 +14,7 @@ export default function HseIncidentsPage() {
         { title: "Open Incidents", value: "-", accent: "#F93822" },
         { title: "Near Misses", value: "-", accent: "#FFAD00" },
         { title: "Investigations Due", value: "-", accent: "#63B1BC" },
-        { title: "Lessons Learned", value: "-", accent: "#005670" },
+        { title: "Lessons Learnt", value: "-", accent: "#005670" },
       ]}
       panels={[
         {
@@ -23,7 +23,7 @@ export default function HseIncidentsPage() {
         },
         {
           title: "Learning Capture",
-          text: "This area will support trend review and lessons learned without changing current Quality workflows.",
+          text: "This area will support trend review and lessons learnt without changing current Quality workflows.",
         },
       ]}
     />

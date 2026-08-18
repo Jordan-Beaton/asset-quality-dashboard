@@ -28,7 +28,7 @@ Admin / Settings controls login users, invites, permissions, reference data, and
 - Users & Access and application route enforcement both read the same registry. New modules/tabs must be added there once; do not create another hard-coded Admin permission list.
 - Generic `ims_tab_permissions` rows now determine Full, Part Access or None when rows exist, so new modules do not require a new `people` access column.
 - Legacy module access columns remain fallback values for existing users who do not yet have rows for a newly registered module.
-- Lessons Learned and Project Management are registered as independent permission modules. Project areas cover Projects, Wadden Sea, Supplier ITP, NOI and Project Reports/Open Points.
+- Lessons Learnt and Project Management are registered as independent permission modules. Project areas cover Projects, Wadden Sea, Supplier ITP, NOI and Project Reports/Open Points.
 - People Management and Management Review have been added to permission controls.
 - Module cards on Home remain visible but show No Access if the user has no access.
 - `None` module permission now denies module access properly.

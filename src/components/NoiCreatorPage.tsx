@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { ImsTopMetaRow } from "../../../../../src/components/ImsPrimitives";
-import { QualityKpiCard } from "../../../../../src/components/QualityKpiCard";
-import { QualityPageHero } from "../../../../../src/components/QualityPageHero";
-import { BalticPowerWorkspaceNav } from "../../../../../src/components/BalticPowerWorkspaceNav";
-import { supabase } from "../../../../../src/lib/supabase";
+import { ImsTopMetaRow } from "./ImsPrimitives";
+import { QualityKpiCard } from "./QualityKpiCard";
+import { QualityPageHero } from "./QualityPageHero";
+import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
+import { supabase } from "../lib/supabase";
+import { getProject } from "../lib/projectRegistry";
 
 type Itp = { id: string; document_number: string; title: string; supplier: string | null; scope: string | null };
 type NoiPoint = { id: string; itp_id: string; section_number: string; activity_description: string; intervention_type: string; planned_date: string | null; noi_number: string | null; status: string };
@@ -49,14 +50,17 @@ async function imageData(url: string) {
   });
 }
 
-export default function NoiCreatorPage() {
+export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
+  const config = getProject(projectKey);
+  const filePrefix = config.label.replace(/\s+/g, "-");
+
   const [itps, setItps] = useState<Itp[]>([]);
   const [points, setPoints] = useState<NoiPoint[]>([]);
   const [supplier, setSupplier] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [message, setMessage] = useState("Loading NOI requirements...");
   const [busy, setBusy] = useState(false);
-  const [projectDetails, setProjectDetails] = useState("Baltic Power Project");
+  const [projectDetails, setProjectDetails] = useState(`${config.label} Project`);
   const [inspectionDate, setInspectionDate] = useState("");
   const [duration, setDuration] = useState("");
   const [location, setLocation] = useState("");
@@ -70,8 +74,8 @@ export default function NoiCreatorPage() {
   useEffect(() => {
     void (async () => {
       const [itpResult, pointResult] = await Promise.all([
-        supabase.from("project_itps").select("id,document_number,title,supplier,scope").eq("project_key", "baltic-power").order("supplier"),
-        supabase.from("project_noi_points").select("id,itp_id,section_number,activity_description,intervention_type,planned_date,noi_number,status").eq("project_key", "baltic-power").order("planned_date"),
+        supabase.from("project_itps").select("id,document_number,title,supplier,scope").eq("project_key", projectKey).order("supplier"),
+        supabase.from("project_noi_points").select("id,itp_id,section_number,activity_description,intervention_type,planned_date,noi_number,status").eq("project_key", projectKey).order("planned_date"),
       ]);
       if (itpResult.error || pointResult.error) {
         setMessage(itpResult.error?.message || pointResult.error?.message || "NOI data could not be loaded.");
@@ -91,16 +95,24 @@ export default function NoiCreatorPage() {
         setSelectedIds(linked.map((point) => point.id));
         if (linkedDates.length === 1) setInspectionDate(linkedDates[0]);
       }
-      const saved = await supabase.storage.from(STORAGE_BUCKET).download(`baltic-power/nois/${requestedNoi}/noi.json`);
+      const saved = await supabase.storage.from(STORAGE_BUCKET).download(`${projectKey}/nois/${requestedNoi}/noi.json`);
       if (!saved.error) {
         const details = JSON.parse(await saved.data.text()) as SavedNoi;
         setSupplier(details.supplier || linkedItpSupplier(linked, (itpResult.data || []) as Itp[]));
         setSelectedIds(details.pointIds?.filter((id) => loadedPoints.some((point) => point.id === id)) || linked.map((point) => point.id));
-        setProjectDetails(details.projectDetails || "Baltic Power Project"); setInspectionDate(linkedDates.length === 1 ? linkedDates[0] : details.inspectionDate || ""); setDuration(details.duration || ""); setLocation(details.location || "");
-        setAttendees(details.attendees?.length ? details.attendees : [blankAttendee(), blankAttendee()]); setHostName(details.hostName || ""); setHostTelephone(details.hostTelephone || ""); setHostPosition(details.hostPosition || ""); setHostEmail(details.hostEmail || "");
+        setProjectDetails(details.projectDetails || `${config.label} Project`);
+        setInspectionDate(linkedDates.length === 1 ? linkedDates[0] : details.inspectionDate || "");
+        setDuration(details.duration || "");
+        setLocation(details.location || "");
+        setAttendees(details.attendees?.length ? details.attendees : [blankAttendee(), blankAttendee()]);
+        setHostName(details.hostName || "");
+        setHostTelephone(details.hostTelephone || "");
+        setHostPosition(details.hostPosition || "");
+        setHostEmail(details.hostEmail || "");
         setMessage(`NOI ${requestedNoi} loaded. Edit the details and regenerate when ready.`);
       } else setMessage(`NOI ${requestedNoi} points loaded. This NOI predates saved editable details, so complete any blank fields before regenerating.`);
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const itpById = useMemo(() => new Map(itps.map((itp) => [itp.id, itp])), [itps]);
@@ -109,8 +121,8 @@ export default function NoiCreatorPage() {
   const selected = useMemo(() => supplierPoints.filter((point) => selectedIds.includes(point.id)), [selectedIds, supplierPoints]);
   const nextSequence = useMemo(() => {
     const used = points.map((point) => Number(String(point.noi_number || "").match(/\d+/)?.[0])).filter(Number.isFinite);
-    return String(Math.max(0, ...used) + 1).padStart(3, "0");
-  }, [points]);
+    return String(Math.max(config.sequenceFloor, ...used) + 1).padStart(3, "0");
+  }, [points, config.sequenceFloor]);
   const noiNumber = editingNumber || nextSequence;
   const selectedItps = useMemo(() => [...new Set(selected.map((point) => itpById.get(point.itp_id)?.document_number).filter(Boolean) as string[])], [itpById, selected]);
   const selectedDates = useMemo(() => [...new Set(selected.map((point) => point.planned_date).filter(Boolean) as string[])], [selected]);
@@ -119,8 +131,8 @@ export default function NoiCreatorPage() {
     if (selectedDates.length === 1) setInspectionDate(selectedDates[0]);
   }, [selectedDates]);
   useEffect(() => {
-    if (supplier && !editingNumber) setProjectDetails(`Baltic Power Project - ${supplier}`);
-  }, [editingNumber, supplier]);
+    if (supplier && !editingNumber) setProjectDetails(`${config.label} Project - ${supplier}`);
+  }, [editingNumber, supplier, config.label]);
 
   function toggle(point: NoiPoint) {
     setSelectedIds((current) => current.includes(point.id) ? current.filter((id) => id !== point.id) : [...current, point.id]);
@@ -131,8 +143,8 @@ export default function NoiCreatorPage() {
   }
 
   async function downloadSaved(format: "docx" | "pdf") {
-    const fileName = `Baltic-Power-NOI-${noiNumber}.${format}`;
-    const result = await supabase.storage.from(STORAGE_BUCKET).download(`baltic-power/nois/${noiNumber}/${fileName}`);
+    const fileName = `${filePrefix}-NOI-${noiNumber}.${format}`;
+    const result = await supabase.storage.from(STORAGE_BUCKET).download(`${projectKey}/nois/${noiNumber}/${fileName}`);
     if (result.error) { setMessage(`The saved ${format.toUpperCase()} is not available yet. Save this NOI once to create it.`); return; }
     download(result.data, fileName);
   }
@@ -148,7 +160,7 @@ export default function NoiCreatorPage() {
         const reset = await supabase.from("project_noi_points").update({ noi_number: null, status: "Planned", updated_at: new Date().toISOString() }).in("id", linkedIds);
         if (reset.error) throw reset.error;
       }
-      const folder = `baltic-power/nois/${editingNumber}`;
+      const folder = `${projectKey}/nois/${editingNumber}`;
       const listed = await supabase.storage.from(STORAGE_BUCKET).list(folder);
       if (listed.error) throw listed.error;
       const paths = (listed.data || []).map((file) => `${folder}/${file.name}`);
@@ -159,7 +171,7 @@ export default function NoiCreatorPage() {
       const deletedNumber = editingNumber;
       setPoints((current) => current.map((point) => point.noi_number === deletedNumber ? { ...point, noi_number: null, status: "Planned" } : point));
       setEditingNumber(""); setSelectedIds([]);
-      window.history.replaceState({}, "", "/projects/baltic-power/noi/create");
+      window.history.replaceState({}, "", `/projects/${projectKey}/noi/create`);
       setMessage(`NOI ${deletedNumber} deleted. Its inspection points are available again and the next number has been recalculated.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The NOI could not be deleted.");
@@ -250,11 +262,11 @@ export default function NoiCreatorPage() {
       const wordBlob = await response.blob();
       const pdfBlob = await generatePdf();
       const savedDetails = { supplier, pointIds: selected.map((point) => point.id), projectDetails, inspectionDate, duration, location, attendees, hostName, hostTelephone, hostPosition, hostEmail };
-      const storagePath = `baltic-power/nois/${noiNumber}`;
+      const storagePath = `${projectKey}/nois/${noiNumber}`;
       const uploads = await Promise.all([
         supabase.storage.from(STORAGE_BUCKET).upload(`${storagePath}/noi.json`, new Blob([JSON.stringify(savedDetails)], { type: "application/json" }), { upsert: true, contentType: "application/json" }),
-        supabase.storage.from(STORAGE_BUCKET).upload(`${storagePath}/Baltic-Power-NOI-${noiNumber}.docx`, wordBlob, { upsert: true, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
-        supabase.storage.from(STORAGE_BUCKET).upload(`${storagePath}/Baltic-Power-NOI-${noiNumber}.pdf`, pdfBlob, { upsert: true, contentType: "application/pdf" }),
+        supabase.storage.from(STORAGE_BUCKET).upload(`${storagePath}/${filePrefix}-NOI-${noiNumber}.docx`, wordBlob, { upsert: true, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
+        supabase.storage.from(STORAGE_BUCKET).upload(`${storagePath}/${filePrefix}-NOI-${noiNumber}.pdf`, pdfBlob, { upsert: true, contentType: "application/pdf" }),
       ]);
       const storageError = uploads.find((item) => item.error)?.error;
       if (storageError) throw storageError;
@@ -265,8 +277,8 @@ export default function NoiCreatorPage() {
         const cleared = await supabase.from("project_noi_points").update({ noi_number: null, status: "Planned", updated_at: new Date().toISOString() }).in("id", removed);
         if (cleared.error) throw cleared.error;
       }
-      download(wordBlob, `Baltic-Power-NOI-${noiNumber}.docx`);
-      download(pdfBlob, `Baltic-Power-NOI-${noiNumber}.pdf`);
+      download(wordBlob, `${filePrefix}-NOI-${noiNumber}.docx`);
+      download(pdfBlob, `${filePrefix}-NOI-${noiNumber}.pdf`);
       setPoints((current) => current.map((point) => selectedIds.includes(point.id) ? { ...point, noi_number: noiNumber, planned_date: inspectionDate, status: "NOI Issued" } : point));
       setEditingNumber(noiNumber);
       setMessage(`NOI ${noiNumber} saved and generated in Word and PDF. Its tracker date is now ${displayDate(inspectionDate)}.`);
@@ -277,9 +289,9 @@ export default function NoiCreatorPage() {
 
   return (
     <main style={page}>
-      <QualityPageHero label="Baltic Power · Inspection control" title="NOI Creator" description="Create controlled Notices of Inspection directly from the Project NOI requirements register." />
-      <ImsTopMetaRow backHref="/projects/baltic-power" backLabel="Back to Baltic Power" status={<><strong>Status:</strong> {message}</>} />
-      <BalticPowerWorkspaceNav active="noi-creator" />
+      <QualityPageHero label={`${config.label} · Inspection control`} title="NOI Creator" description="Create controlled Notices of Inspection directly from the Project NOI requirements register." />
+      <ImsTopMetaRow backHref={`/projects/${projectKey}`} backLabel={`Back to ${config.label}`} status={<><strong>Status:</strong> {message}</>} />
+      <ProjectWorkspaceNav projectKey={projectKey} active="noi-creator" />
       <section style={metrics} className="quality-kpi-grid">
         <QualityKpiCard title={editingNumber ? "Editing NOI" : "Next NOI Number"} value={noiNumber} accent="#005670" />
         <QualityKpiCard title="Supplier Points" value={supplierPoints.length} accent="#63B1BC" />
@@ -345,6 +357,3 @@ const actions: CSSProperties = { display: "flex", justifyContent: "flex-end", ga
 const primaryButton: CSSProperties = { border: 0, borderRadius: 10, padding: "12px 17px", background: "#005670", color: "#fff", fontWeight: 900, cursor: "pointer" };
 const secondaryButton: CSSProperties = { ...primaryButton, padding: "8px 12px", background: "#D0D0CE", color: "#000000" };
 const deleteNoiButton: CSSProperties = { ...secondaryButton, background: "#ECECE7", color: "#F93822", border: "1px solid #ECECE7" };
-
-
-

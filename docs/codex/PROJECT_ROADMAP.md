@@ -60,11 +60,16 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - NOI Creator generates multi-point controlled ENS-HSEQ-FRM-074 Word and matching one-page PDF outputs, assigns sequential NOI numbers, stores editable form data and generated files, synchronises inspection dates with tracker planned dates, and supports reopen/edit/download/delete workflows.
 - Wadden Sea Project Reports consolidate Audit NCR, Audit Programme, and eight-week lookahead outputs, with the NOI register retained as the primary lookahead data source and Excel upload retained as a fallback.
 - Project ITP extraction now uses shared authority/identifier/activity rules, recognises Baltic Power Employer Surveillance and Task # layouts, excludes MWS and supplier-side columns, returns transparent scan diagnostics, and supports saved template-fingerprint mappings for unfamiliar future layouts.
-- Lessons Learned is live as a central searchable knowledge repository with controlled Project/People/Asset references, repeat-theme linkage, interactive analytics, cumulative filters, evidence, large-register support and a rotating “What We’ve Learned” insight.
-- Field Tools now provides a permission-aware `Capture a Lesson` launcher into a compact Lessons Learned field mode with essential-first entry, expandable optional detail, photo/file evidence and repeat-capture behavior; the desktop workspace remains unchanged.
+- Lessons Learnt is live as a central searchable knowledge repository with controlled Project/People/Asset references, repeat-theme linkage, interactive analytics, cumulative filters, evidence, large-register support and a rotating “What We’ve Learnt” insight.
+- Field Tools now provides a permission-aware `Capture a Lesson` launcher into a compact Lessons Learnt field mode with essential-first entry, expandable optional detail, photo/file evidence and repeat-capture behavior; the desktop workspace remains unchanged.
 - Wadden Sea Project Reports now include a dedicated Open Points dashboard/register aligned to `CA_Act_1699`, with simplified entry, People-linked raiser/owner fields, controlled phase creation/history, NCR linkage, evidence, client-copy tracking, deadline/closure controls and aligned Excel/Word/PDF outputs.
-- Admin permission definitions and route enforcement now share `src/lib/imsPermissionRegistry.ts`. Lessons Learned and Project Management are independent generic permission modules, and future registered modules/tabs automatically appear in Users & Access without new per-module database columns.
+- Admin permission definitions and route enforcement now share `src/lib/imsPermissionRegistry.ts`. Lessons Learnt and Project Management are independent generic permission modules, and future registered modules/tabs automatically appear in Users & Access without new per-module database columns.
+- Project Management now uses a shared component architecture driven by a central project registry (`src/lib/projectRegistry.ts`). All common feature tabs — ITP Tracker, NOI Tracker, NOI Creator, ITP Sign-Off — route through `app/projects/[projectKey]/` dynamic routes, eliminating duplicated code between Baltic Power and Wadden Sea. Adding a new project requires only a registry entry and a bespoke dashboard page.
+- NOI Tracker now exports to both PDF and styled Excel. The Excel export includes Enshore brand colours (teal `#005670` header with white text, alternating `#ECECE7` row tints), AutoFilter on every column (Supplier, ITP Number, Status, etc.), a frozen header row, and respects the active filtered view.
+- All user-visible “Lessons Learned” labels, headings, field labels, nav items, and messages renamed to “Lessons Learnt” across the IMS. Technical identifiers (database tables, columns, storage buckets, URL paths, code variables) are unchanged.
 - Login now supports controlled self-service access requests without self-registration. Requests are limited to Enshore email addresses, use Admin reference departments and the permission registry, appear on Master Admin Home and in Users & Access, and remain Pending until Admin prepares/rejects them.
+- IMS email notifications now route through `Document Control <documents@enshoresubsea.com>` via Resend across all three email flows: document notifications, document workflow actions, and ITP sign-off. The `DOCUMENT_NOTIFICATIONS_FROM_EMAIL` env var is updated in both `.env.local` and Vercel. Email will be fully live once IT (Adam Shaw) confirms Bondgate have added the two required DNS records (`resend._domainkey` TXT and `send` MX) to the `enshoresubsea.com` domain. Resend domain status was `not_started` as of 18 Aug 2026.
+- Whole-IMS detail panel visual standardisation completed: all IMS module detail panels now use the tinted gradient background (`linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)`), consistent border, border-radius, padding, and box-shadow matching the Audit Findings reference standard. Bold text in form field values resolved across all modules via a global CSS fix in `globals.css`.
 
 # In Progress
 
@@ -74,14 +79,14 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Document Control workflow verification and revision handling, especially reject/resubmit/approve cleanup and up-rev history behavior.
 - Button-level create/edit/delete permission enforcement across remaining edge routes after the Central Actions, Document Control, Quality, HSE Actions/Reports, HSE AINM, HSE Observations, HSE Inspections, Admin / Settings, Risk Register, and Asset spot-check hardening passes.
 - Admin/Settings detail panel polish and Vercel invite-flow verification.
-- Admin permission-registry production QA: verify legacy fallback, explicit Full/Part/None saves, new-user defaults, and route denial for Lessons Learned and each Project Management area.
+- Admin permission-registry production QA: verify legacy fallback, explicit Full/Part/None saves, new-user defaults, and route denial for Lessons Learnt and each Project Management area.
 - Access-request production QA after applying the latest `admin_settings.sql`: public validation, duplicate prevention, Home notification, view-only permission preparation, approval/rejection status, audit history and invite/setup-link fallback.
 - Opportunistic internal primitive migration only when a page is already being changed; the global UI contract is complete and this is not a standalone roadmap project.
 - Production/device QA of the shared whole-IMS mobile card, panel, bottom-navigation, upload, and form behavior across the device and module matrix in `MOBILE_COMPATIBILITY_HANDOVER.md`.
 - Risk Management shell and workflows.
 - Project Management production QA for saved NOI reopen/edit/delete, controlled document storage, sequential numbering, planned-date synchronisation, and mobile responsiveness.
 - Cross-project ITP extraction QA using real supplier revisions to expand the regression fixture library only where evidence shows a genuinely new table role or continuation pattern.
-- Lessons Learned production QA for the 2,990-row import, uncapped KPI totals, cumulative filters, controlled dropdowns, repeat-record drill-downs and the new Field Tools capture workflow.
+- Lessons Learnt production QA for the 2,990-row import, uncapped KPI totals, cumulative filters, controlled dropdowns, repeat-record drill-downs and the new Field Tools capture workflow.
 - Open Points production QA and confirmation that `scripts/sql/project_open_points.sql` has been applied to the live Supabase project.
 - IMS Home production/browser QA for synchronized video playback, persisted desktop preference, all six desktop layouts, permission-restricted cards, and the fixed phone workspace list.
 
@@ -94,6 +99,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Button-level permissions may not be fully hardened across every edge route; Central Actions, Document Control, Quality, HSE Actions/Reports, HSE AINM, HSE Observations, HSE Inspections, Admin / Settings, Risk Register, and Asset spot checks now have explicit page-level or visible-control guards.
 - Admin invite flow still needs full Vercel verification, including Copy Setup Link, password setup, and permission application.
 - Resend may rate-limit invite/notification email; Copy Setup Link is the workaround.
+- IMS email is configured to send from `documents@enshoresubsea.com` but Resend domain verification is pending Bondgate adding two DNS records. Until verified, no outbound IMS emails will be delivered. Action owner: Adam Shaw (IT). DNS records required: DKIM TXT `resend._domainkey` and SPF MX `send` → `feedback-smtp.eu-west-1.amazonses.com`. Check status: Resend dashboard → Domains.
 - `NEXT_PUBLIC_SITE_URL` should ideally be set to deployed site URL.
 - AINM register/type/filter/detail behavior and the latest inline action/report changes require Vercel verification with real records.
 - HSE Observation phone layout is locally verified at `390px` with no overflow; the public submit, evidence upload, saved register record, and Action linkage still need Vercel verification with real data.
@@ -103,7 +109,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Some legacy pages retain local implementation constants, but the shared global contract governs their rendered appearance. Replace them only during related functional work; do not reopen a whole-IMS styling project for this alone.
 - Risk Management exists as shell/functionality but needs review for maturity and consistency.
 - NOIs created before editable NOI storage was introduced retain their linked tracker points but cannot recover manual form values that were never persisted; saving them once establishes the editable stored record.
-- Historic Lessons Learned narrative quality is inconsistent; automated trend statements must remain proportionate to the evidence.
+- Historic Lessons Learnt narrative quality is inconsistent; automated trend statements must remain proportionate to the evidence.
 - Open Points phase history and People-linked Raised By require the latest `project_open_points.sql` migration in the live database.
 
 # Next Priorities
@@ -119,7 +125,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 9. Verify the corrected HSE Observation Card on a physical phone: add at least two photographs one at a time, remove/re-add one, submit, confirm every evidence file and the saved register record, and verify linkage to Action Management.
 10. Preserve the completed UI baseline when touching pages; migrate local styles only where it is low-risk and directly relevant to the active change.
 11. Review Risk Management pages for route completeness, visual consistency, and demo readiness.
-12. Verify Lessons Learned and the complete Wadden Sea workflow on Vercel, including Open Points database migration, phase history, NCR linking, evidence and register outputs.
+12. Verify Lessons Learnt and the complete Wadden Sea workflow on Vercel, including Open Points database migration, phase history, NCR linking, evidence and register outputs.
 13. Verify IMS Home with representative permission profiles: all six layouts and persisted preference on desktop, plus the fixed simple workspace list with no selector on mobile.
 
 # Future Enhancements
@@ -188,10 +194,10 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 ## Document Control
 
 - Status: In Progress
-- Summary: Document Control is a central IMS hub with company/system and asset-specific numbering, uploaded files, migration history, workflow foundations, email/notification APIs, and certification route. It is high value and high risk.
+- Summary: Document Control is a central IMS hub with company/system and asset-specific numbering, uploaded files, migration history, workflow foundations, email/notification APIs, and certification route. It is high value and high risk. Email notifications are configured for `documents@enshoresubsea.com` — awaiting Bondgate DNS records before delivery is live.
 - Outstanding Actions:
   - Verify rejection-field cleanup on Vercel after the local controlled-upload and workflow-path hardening.
-  - Verify review/approval workflow and notification behavior.
+  - Verify review/approval workflow and notification behavior — email delivery will be live once Bondgate add the Resend DNS records (see Known Issues).
   - Verify create/edit/read-only permission behavior on Vercel after the new page-level guards.
   - Protect numbering, reclassification, storage, and revision history logic.
   - Confirm up-rev archives previous current revision and captures comments at the correct moment.
@@ -224,11 +230,11 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
   - Verify invite/setup flow on Vercel.
   - Continue Users & Access detail panel polish.
   - Verify create/edit/read-only behavior on Vercel after the page-level Admin guard pass.
-  - Verify registry-driven Lessons Learned and Project Management permissions for existing and newly invited users.
+  - Verify registry-driven Lessons Learnt and Project Management permissions for existing and newly invited users.
   - Never expose or print Supabase, Resend, OpenAI, or service-role secrets.
   - Keep `NEXT_PUBLIC_SITE_URL` aligned to deployed site where possible.
 
-## Lessons Learned
+## Lessons Learnt
 
 - Status: In Progress
 - Summary: The central repository, import, analytics, repeat-theme linking, controlled dropdowns, evidence and interactive register behavior are implemented. Prevention Intelligence now adds free-text evidence-grounded caution briefings, semantic recurrence retrieval, procedure review, supporting-lesson drill-down and analysis audit storage. Historic data quality and production-scale reconciliation remain the main risks.

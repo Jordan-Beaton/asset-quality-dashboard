@@ -6,7 +6,7 @@ import type { CSSProperties } from "react";
 import { ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
-import { BalticPowerWorkspaceNav } from "../../../src/components/BalticPowerWorkspaceNav";
+import { ProjectWorkspaceNav } from "../../../src/components/ProjectWorkspaceNav";
 import { supabase } from "../../../src/lib/supabase";
 
 type ItpRow = {
@@ -107,7 +107,7 @@ export default function WaddenSeaPage() {
 
       <ImsTopMetaRow backHref="/projects" backLabel="Back to Project Management" status={<><strong>Status:</strong> {message}</>} />
 
-      <BalticPowerWorkspaceNav active="dashboard" />
+      <ProjectWorkspaceNav projectKey="baltic-power" active="dashboard" />
 
       <div className="project-dashboard-command">
         <ImsTabs tabs={[{ value: "overview", label: "Overview" }, { value: "planning", label: "Inspection Planning" }, { value: "controls", label: "Project Controls" }]} active={dashboardView} onChange={setDashboardView} ariaLabel="Baltic Power dashboard views" />

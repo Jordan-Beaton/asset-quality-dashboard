@@ -50,7 +50,7 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - People Management: `PEOPLE_MANAGEMENT_HANDOVER.md`
 - Action Management: `ACTION_MANAGEMENT_HANDOVER.md`
 - Project Management: `PROJECT_MANAGEMENT_HANDOVER.md`
-- Lessons Learned: `LESSONS_LEARNED_HANDOVER.md`
+- Lessons Learnt: `LESSONS_LEARNED_HANDOVER.md`
 - Whole-IMS mobile compatibility: `MOBILE_COMPATIBILITY_HANDOVER.md`
 
 ## Current IMS Modules
@@ -64,11 +64,13 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - Management Review
 - Risk Management shell/functionality
 - Project Management with Wadden Sea workspace
-- Lessons Learned central knowledge repository
+- Lessons Learnt central knowledge repository
 - Admin / Settings
 
 ## Latest Workflow Note
 
 - Public HSE Observations now accumulate multiple photographic/supporting attachments across repeated file-picker or phone-camera selections, show the queued files with individual removal controls, and upload every queued file as a separate evidence record. See `HSE_HANDOVER.md` and `MOBILE_COMPATIBILITY_HANDOVER.md` before changing this flow.
 - HSE AINM Part 1/Part 2 now supports inline department-controlled central Action creation, Part 1 containment terminology and attachment `Other` detail, and fuller labelled Word/compiled PDF outputs. See `HSE_HANDOVER.md` and `ACTION_MANAGEMENT_HANDOVER.md` before changing this flow.
-- Lessons Learned Prevention Intelligence now supports free-text failure-prevention questions, evidence-linked caution briefings, semantic recurrence retrieval and procedure-to-lessons review. It uses the dedicated server-side `OPENAI_BUSINESS_API_KEY`; see `LESSONS_LEARNED_HANDOVER.md` and apply `scripts/sql/lessons_learned_prevention_ai.sql` before building the semantic index.
+- Lessons Learnt Prevention Intelligence now supports free-text failure-prevention questions, evidence-linked caution briefings, semantic recurrence retrieval and procedure-to-lessons review. It uses the dedicated server-side `OPENAI_BUSINESS_API_KEY`; see `LESSONS_LEARNED_HANDOVER.md` and apply `scripts/sql/lessons_learned_prevention_ai.sql` before building the semantic index.
+- IMS email notifications (document workflows, ITP sign-off) are configured to send from `Document Control <documents@enshoresubsea.com>` via Resend. `DOCUMENT_NOTIFICATIONS_FROM_EMAIL` is set correctly in both `.env.local` and Vercel. Email delivery is pending Bondgate adding two DNS records to `enshoresubsea.com` — action owner is Adam Shaw (IT). See `DOCUMENT_CONTROL_HANDOVER.md` for the exact records required and how to check domain verification status.
+- Whole-IMS detail panel visual standardisation is complete. All module detail panels use a consistent tinted gradient background. Bold field values resolved globally via `app/globals.css`.

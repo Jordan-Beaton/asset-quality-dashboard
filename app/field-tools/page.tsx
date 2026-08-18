@@ -98,7 +98,7 @@ export default function FieldToolsPage() {
       {!showHse && !showAssets && !showLessons ? (
         <section style={emptyStyle}>
           <strong>No field tools are assigned to your account.</strong>
-          <span>Ask an IMS administrator to review your HSE, Asset, or Lessons Learned permissions.</span>
+          <span>Ask an IMS administrator to review your HSE, Asset, or Lessons Learnt permissions.</span>
         </section>
       ) : null}
     </main>

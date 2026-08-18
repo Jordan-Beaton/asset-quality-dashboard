@@ -21,8 +21,8 @@ export const IMS_PERMISSION_REGISTRY: ImsPermissionModule[] = [
     { key: "actions", label: "Actions", routes: [{ path: "/quality/actions", match: "prefix" }] },
     { key: "reports", label: "Reports", routes: [{ path: "/reports", match: "prefix" }] },
   ] },
-  { moduleKey: "lessons", label: "Lessons Learned", areas: [
-    { key: "workspace", label: "Lessons Learned Workspace", routes: [{ path: "/lessons-learned", match: "prefix" }] },
+  { moduleKey: "lessons", label: "Lessons Learnt", areas: [
+    { key: "workspace", label: "Lessons Learnt Workspace", routes: [{ path: "/lessons-learned", match: "prefix" }] },
   ] },
   { moduleKey: "projects", label: "Project Management", areas: [
     { key: "projects", label: "Projects", routes: [{ path: "/projects" }] },

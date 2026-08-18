@@ -55,8 +55,15 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 
 ## Email And Secrets
 
-- Emails currently use Resend.
-- Company-domain delivery may be blocked pending IT approval.
+- Emails use Resend. Three flows share the same `DOCUMENT_NOTIFICATIONS_FROM_EMAIL` env var:
+  1. `app/api/document-notifications/route.ts` — document upload/review/approval notifications; recipients come from `body.recipientEmails` (dynamic, not hardcoded)
+  2. `app/api/document-workflow-action/route.ts` — workflow action emails; recipient is `document.workflow_approver_email`
+  3. `app/api/projects/itp-sign-off/route.ts` — ITP sign-off requests and verification codes; recipient entered by the user at sign-off time
+- `DOCUMENT_NOTIFICATIONS_FROM_EMAIL` is set to `Document Control <documents@enshoresubsea.com>` in both `.env.local` and Vercel.
+- **DNS records for `enshoresubsea.com` must be verified in Resend before emails will send from this address.** Two records need adding at Bondgate (IT contact: Adam Shaw, `AShaw@enshoresubsea.com`):
+  - DKIM TXT: name `resend._domainkey`, value `p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC1Z/UnPmR+1LcH07/KzHLBf0ezjg6osYffTkD3k56D8GlQVLNtOjHKESyb0Mf2a1BGTUjlDkXH3cDnUk5xFjBP0znQ/7YERg3TjZvdj61uqGxqrQh/1TimGsWaMuXEo0u6HSAiBVtRB2LX4nd2C+EfxxoieOl4Eva4xPcPljsq5QIDAQAB`
+  - SPF MX: name `send`, value `feedback-smtp.eu-west-1.amazonses.com`, priority `10`
+- Check domain verification status: Resend dashboard → Domains, or query `GET https://api.resend.com/domains` with `Authorization: Bearer <RESEND_API_KEY>`. Status must be `verified` (currently `not_started` as of 18 Aug 2026).
 - Never expose or print Supabase, Resend, OpenAI, or service-role secrets.
 - Relevant Vercel env vars include:
   - `RESEND_API_KEY`

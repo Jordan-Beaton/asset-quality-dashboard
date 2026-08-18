@@ -166,7 +166,7 @@ export const legacyModulePermissionDefinitions = [
       ["audits", "Audits"],
       ["actions", "Actions"],
       ["reports", "Reports"],
-      ["lessons", "Lessons Learned"],
+      ["lessons", "Lessons Learnt"],
     ],
   },
   {
