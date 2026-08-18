@@ -99,7 +99,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Button-level permissions may not be fully hardened across every edge route; Central Actions, Document Control, Quality, HSE Actions/Reports, HSE AINM, HSE Observations, HSE Inspections, Admin / Settings, Risk Register, and Asset spot checks now have explicit page-level or visible-control guards.
 - Admin invite flow still needs full Vercel verification, including Copy Setup Link, password setup, and permission application.
 - Resend may rate-limit invite/notification email; Copy Setup Link is the workaround.
-- IMS email is configured to send from `documents@enshoresubsea.com` but Resend domain verification is pending Bondgate adding two DNS records. Until verified, no outbound IMS emails will be delivered. Action owner: Adam Shaw (IT). DNS records required: DKIM TXT `resend._domainkey` and SPF MX `send` → `feedback-smtp.eu-west-1.amazonses.com`. Check status: Resend dashboard → Domains.
+- IMS email is fully live. Resend domain `enshoresubsea.com` was verified on 18 Aug 2026 — DKIM, SPF MX, and SPF TXT all confirmed. All outbound IMS emails (document notifications, workflow actions, ITP sign-off) now deliver from `documents@enshoresubsea.com`.
 - `NEXT_PUBLIC_SITE_URL` should ideally be set to deployed site URL.
 - AINM register/type/filter/detail behavior and the latest inline action/report changes require Vercel verification with real records.
 - HSE Observation phone layout is locally verified at `390px` with no overflow; the public submit, evidence upload, saved register record, and Action linkage still need Vercel verification with real data.
@@ -194,10 +194,10 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 ## Document Control
 
 - Status: In Progress
-- Summary: Document Control is a central IMS hub with company/system and asset-specific numbering, uploaded files, migration history, workflow foundations, email/notification APIs, and certification route. It is high value and high risk. Email notifications are configured for `documents@enshoresubsea.com` — awaiting Bondgate DNS records before delivery is live.
+- Summary: Document Control is a central IMS hub with company/system and asset-specific numbering, uploaded files, migration history, workflow foundations, email/notification APIs, and certification route. It is high value and high risk. Email notifications deliver from `documents@enshoresubsea.com` — Resend domain verified 18 Aug 2026.
 - Outstanding Actions:
   - Verify rejection-field cleanup on Vercel after the local controlled-upload and workflow-path hardening.
-  - Verify review/approval workflow and notification behavior — email delivery will be live once Bondgate add the Resend DNS records (see Known Issues).
+  - Verify review/approval workflow and notification behavior end-to-end on Vercel with real documents.
   - Verify create/edit/read-only permission behavior on Vercel after the new page-level guards.
   - Protect numbering, reclassification, storage, and revision history logic.
   - Confirm up-rev archives previous current revision and captures comments at the correct moment.
