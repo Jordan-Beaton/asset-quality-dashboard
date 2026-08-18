@@ -6777,7 +6777,6 @@ const readOnlyInputStyle: CSSProperties = {
   ...inputStyle,
   background: "#ECECE7",
   color: "#53565A",
-  fontWeight: 700,
 };
 
 const textareaStyle: CSSProperties = {

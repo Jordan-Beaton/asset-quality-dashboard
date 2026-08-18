@@ -76,6 +76,13 @@ body {
   font-size: var(--ims-text-base);
 }
 
+/* Prevent label font-weight from cascading into form controls */
+.ims-page-container input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.ims-page-container select,
+.ims-page-container textarea {
+  font-weight: 400 !important;
+}
+
 .ims-page-container input,
 .ims-page-container select,
 .ims-page-container textarea {

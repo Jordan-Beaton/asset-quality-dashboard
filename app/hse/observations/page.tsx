@@ -706,7 +706,7 @@ function Info({ label, value, large = false }: { label: string; value: ReactNode
   return (
     <div style={infoStyle}>
       <span style={infoLabelStyle}>{label}</span>
-      <strong style={{ ...infoValueStyle, whiteSpace: large ? "pre-wrap" : "normal" }}>{value || "-"}</strong>
+      <span style={{ ...infoValueStyle, whiteSpace: large ? "pre-wrap" : "normal" }}>{value || "-"}</span>
     </div>
   );
 }

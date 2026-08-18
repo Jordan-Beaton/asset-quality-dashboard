@@ -5273,7 +5273,6 @@ const readOnlyInputStyle: CSSProperties = {
   background: "#ECECE7",
   color: "#53565A",
   width: "100%",
-  fontWeight: 700,
   boxSizing: "border-box",
 };
 
