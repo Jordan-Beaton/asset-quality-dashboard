@@ -4178,6 +4178,7 @@ function NcrCapaPageContent() {
                   </span>
                 </div>
 
+                <div style={detailSectionStyle}>
                 <div style={detailFormGridStyle}>
                   <div style={formSectionTitleStyle}>A. Core NCR Information</div>
 
@@ -4512,6 +4513,7 @@ function NcrCapaPageContent() {
                       </div>
                     </>
                   )}
+                </div>
                 </div>
 
                 {editRow.type === "NCR" ? (
@@ -5580,11 +5582,22 @@ const detailFormGridStyle: CSSProperties = {
   gap: "12px",
 };
 
+const detailSectionStyle: CSSProperties = {
+  border: "1px solid #D0D0CE",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
+  minWidth: 0,
+};
+
 const formSectionTitleStyle: CSSProperties = {
   gridColumn: "1 / -1",
   fontSize: 13,
   fontWeight: 800,
-  color: "#000000",
+  color: "#005670",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
   paddingTop: 4,
 };
 

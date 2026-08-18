@@ -3745,6 +3745,10 @@ const selectedCalibrationTableRowStyle: CSSProperties = {
 
 const editPanelStyle: CSSProperties = {
   marginTop: "20px",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  border: "1px solid #D0D0CE",
+  borderRadius: "18px",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
 };
 
 const detailSummaryGridStyle: CSSProperties = {

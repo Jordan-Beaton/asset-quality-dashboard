@@ -5251,18 +5251,24 @@ const fieldsetResetStyle: CSSProperties = {
 
 const subSectionStackStyle: CSSProperties = {
   display: "grid",
-  gap: "12px",
+  gap: "18px",
 };
 
 const detailSectionStyle: CSSProperties = {
+  border: "1px solid #D0D0CE",
+  borderRadius: "18px",
+  padding: "18px",
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
 
 const detailSectionTitleStyle: CSSProperties = {
-  fontSize: 13,
+  fontSize: "13px",
   fontWeight: 800,
-  color: "#000000",
-  paddingTop: 4,
+  color: "#005670",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
   marginBottom: "12px",
 };
 
