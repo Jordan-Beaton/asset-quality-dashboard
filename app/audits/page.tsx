@@ -7250,11 +7250,6 @@ const miniStatValueStyle: CSSProperties = {
 };
 
 const detailSectionStyle: CSSProperties = {
-  border: "1px solid #D0D0CE",
-  borderRadius: "18px",
-  padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
 
