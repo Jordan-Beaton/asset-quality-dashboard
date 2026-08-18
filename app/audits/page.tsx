@@ -1916,11 +1916,13 @@ function AuditsPageContent() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            kind: "assigned",
             recipientEmail: ownerRecord.email,
             recipientName: ownerRecord.name,
             itemType: "Audit Finding",
             itemRef: reference,
             itemTitle: findingForm.description.trim().slice(0, 120) || undefined,
+            status: findingForm.status,
             dueDate: findingForm.due_date || undefined,
             itemUrl: insertedFinding?.id
               ? `${window.location.origin}/audits?findingId=${encodeURIComponent(insertedFinding.id)}`
@@ -1994,11 +1996,13 @@ function AuditsPageContent() {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
+                kind: "assigned",
                 recipientEmail: ownerRecord.email,
                 recipientName: ownerRecord.name,
                 itemType: "Audit Finding",
                 itemRef: current.reference,
                 itemTitle: current.description?.slice(0, 120) || undefined,
+                status: current.status,
                 dueDate: current.due_date || undefined,
                 itemUrl: `${window.location.origin}/audits?findingId=${encodeURIComponent(findingId)}`,
               }),
@@ -2045,11 +2049,13 @@ function AuditsPageContent() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            kind: "assigned",
             recipientEmail: ownerRecord.email,
             recipientName: ownerRecord.name,
             itemType: "Audit Finding",
             itemRef: openFindingForm.reference,
             itemTitle: openFindingForm.description?.slice(0, 120) || undefined,
+            status: openFindingForm.status,
             dueDate: openFindingForm.due_date || undefined,
             itemUrl: `${window.location.origin}/audits?findingId=${encodeURIComponent(openFindingForm.id)}`,
           }),

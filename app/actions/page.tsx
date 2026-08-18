@@ -64,6 +64,8 @@ type ActionItem = {
   linked_hse_inspection_number: string | null;
   linked_observation_id: string | null;
   linked_observation_number: string | null;
+  close_out_comments: string | null;
+  raised_by_email: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -274,6 +276,7 @@ type ActionForm = {
   linked_hse_inspection_number: string;
   linked_observation_id: string;
   linked_observation_number: string;
+  close_out_comments: string;
 };
 
 const emptyForm: ActionForm = {
@@ -309,6 +312,7 @@ const emptyForm: ActionForm = {
   linked_hse_inspection_number: "",
   linked_observation_id: "",
   linked_observation_number: "",
+  close_out_comments: "",
 };
 
 const actionSourceOptions = [
@@ -801,6 +805,7 @@ function buildActionFormFromItem(action: ActionItem): ActionForm {
     linked_hse_inspection_number: action.linked_hse_inspection_number || "",
     linked_observation_id: action.linked_observation_id || "",
     linked_observation_number: action.linked_observation_number || "",
+    close_out_comments: action.close_out_comments || "",
   };
 }
 
@@ -2669,6 +2674,7 @@ function ActionsPageContent() {
           linked_hse_inspection_number: form.linked_hse_inspection_number.trim() || null,
           linked_observation_id: form.linked_observation_id || null,
           linked_observation_number: form.linked_observation_number.trim() || null,
+          raised_by_email: currentUserEmail || null,
         },
       ])
       .select("*")
@@ -2704,11 +2710,13 @@ function ActionsPageContent() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            kind: "assigned",
             recipientEmail: ownerRecord.email,
             recipientName: ownerRecord.name,
             itemType: "Action",
             itemRef: `Action ${actionNumberToUse}`,
             itemTitle: form.title.trim(),
+            status: form.status,
             dueDate: form.due_date || undefined,
             itemUrl: `${window.location.origin}/actions?action=${encodeURIComponent(String(actionNumberToUse))}`,
           }),
@@ -2764,6 +2772,7 @@ function ActionsPageContent() {
         linked_hse_inspection_number: editForm.linked_hse_inspection_number.trim() || null,
         linked_observation_id: editForm.linked_observation_id || null,
         linked_observation_number: editForm.linked_observation_number.trim() || null,
+        close_out_comments: editForm.close_out_comments.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
@@ -2777,26 +2786,72 @@ function ActionsPageContent() {
 
     setMessage("Action updated successfully.");
 
+    const actionRecord = actions.find((a) => a.id === id);
+    const actionRef = actionRecord?.action_number ? `Action ${actionRecord.action_number}` : "Action";
+    const actionUrl = actionRecord?.action_number
+      ? `${window.location.origin}/actions?action=${encodeURIComponent(String(actionRecord.action_number))}`
+      : undefined;
+    const prevStatus = actionRecord?.status ?? "";
+    const prevCloseOut = actionRecord?.close_out_comments ?? "";
+
+    // Notify owner they've been assigned
     if (editForm.owner.trim()) {
       const ownerRecord = people.find((p) => p.name.toLowerCase() === editForm.owner.trim().toLowerCase());
       if (ownerRecord?.email) {
-        const actionRecord = actions.find((a) => a.id === id);
         void fetch("/api/notify-assignment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            kind: "assigned",
             recipientEmail: ownerRecord.email,
             recipientName: ownerRecord.name,
             itemType: "Action",
-            itemRef: actionRecord?.action_number ? `Action ${actionRecord.action_number}` : "Action",
+            itemRef: actionRef,
             itemTitle: editForm.title.trim(),
+            status: editForm.status,
             dueDate: editForm.due_date || undefined,
-            itemUrl: actionRecord?.action_number
-              ? `${window.location.origin}/actions?action=${encodeURIComponent(String(actionRecord.action_number))}`
-              : undefined,
+            itemUrl: actionUrl,
           }),
         });
       }
+    }
+
+    // Notify raiser when status changes
+    const raiserEmail = actionRecord?.raised_by_email;
+    if (raiserEmail && editForm.status !== prevStatus) {
+      void fetch("/api/notify-assignment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "status-changed",
+          recipientEmail: raiserEmail,
+          itemType: "Action",
+          itemRef: actionRef,
+          itemTitle: editForm.title.trim(),
+          status: editForm.status,
+          dueDate: editForm.due_date || undefined,
+          itemUrl: actionUrl,
+        }),
+      });
+    }
+
+    // Notify raiser when close-out comments are newly added or changed
+    const newCloseOut = editForm.close_out_comments.trim();
+    if (raiserEmail && newCloseOut && newCloseOut !== (prevCloseOut ?? "").trim()) {
+      void fetch("/api/notify-assignment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "closed-out",
+          recipientEmail: raiserEmail,
+          itemType: "Action",
+          itemRef: actionRef,
+          itemTitle: editForm.title.trim(),
+          status: editForm.status,
+          closeOutComments: newCloseOut,
+          itemUrl: actionUrl,
+        }),
+      });
     }
 
     await loadActions(false);
@@ -4368,6 +4423,15 @@ function ActionsPageContent() {
                     <option value="In Progress">In Progress</option>
                     <option value="Closed">Closed</option>
                   </select>
+                </Field>
+
+                <Field label="Close-out Comments">
+                  <textarea
+                    value={editForm.close_out_comments}
+                    onChange={(e) => setEditForm((current) => ({ ...current, close_out_comments: e.target.value }))}
+                    style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }}
+                    placeholder="Add close-out comments once the action has been completed…"
+                  />
                 </Field>
 
                 <Field label="Due Date">
