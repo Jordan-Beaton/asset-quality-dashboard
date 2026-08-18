@@ -1625,7 +1625,6 @@ function AuditsPageContent() {
   function validateAuditForm(targetForm: AuditForm) {
     if (!targetForm.title.trim()) return "Audit title is required.";
     if (!targetForm.auditee.trim()) return "Auditee is required.";
-    if (!targetForm.audit_date) return "Audit date is required.";
     if (!targetForm.lead_auditor.trim()) return "Lead auditor is required.";
     if (targetForm.standards.length === 0) return "Select at least one standard.";
 
