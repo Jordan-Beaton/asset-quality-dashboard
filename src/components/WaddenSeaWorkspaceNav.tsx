@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { imsActiveTabButtonStyle, imsTabButtonStyle, imsTabListStyle } from "./imsTheme";
 
-type WaddenSeaView = "dashboard" | "itp" | "noi" | "noi-creator" | "reports";
+type WaddenSeaView = "dashboard" | "itp" | "noi" | "noi-creator" | "reports" | "itp-sign-off";
 
 const tabs: Array<{ view: WaddenSeaView; href: string; label: string }> = [
   { view: "dashboard", href: "/projects/wadden-sea", label: "Dashboard" },
@@ -12,6 +12,7 @@ const tabs: Array<{ view: WaddenSeaView; href: string; label: string }> = [
   { view: "noi", href: "/projects/wadden-sea/noi", label: "NOI Tracker" },
   { view: "noi-creator", href: "/projects/wadden-sea/noi/create", label: "NOI Creator" },
   { view: "reports", href: "/projects/wadden-sea/reports", label: "Project Reports" },
+  { view: "itp-sign-off", href: "/projects/wadden-sea/itp-sign-off", label: "ITP Sign-Off" },
 ];
 
 export function WaddenSeaWorkspaceNav({ active }: { active: WaddenSeaView }) {
