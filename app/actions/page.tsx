@@ -2737,44 +2737,51 @@ function ActionsPageContent() {
 
     setIsSaving(true);
 
+    // Core update — always safe regardless of migration state
+    const corePayload: Record<string, unknown> = {
+      title: editForm.title.trim(),
+      description: editForm.description.trim() || null,
+      department: editForm.department || null,
+      project: editForm.project.trim() || null,
+      owner: editForm.owner.trim() || null,
+      priority: editForm.priority,
+      status: editForm.status,
+      due_date: editForm.due_date || null,
+      source: editForm.source || "Manual",
+      linked_audit_id: editForm.linked_audit_id || null,
+      linked_audit_number: editForm.linked_audit_number.trim() || null,
+      linked_finding_id: editForm.linked_finding_id.trim() || null,
+      linked_finding_reference: editForm.linked_finding_reference.trim() || null,
+      linked_asset_id: editForm.linked_asset_id || null,
+      linked_asset_code: editForm.linked_asset_code.trim() || null,
+      linked_inspection_id: editForm.linked_inspection_id.trim() || null,
+      linked_inspection_number: editForm.linked_inspection_number.trim() || null,
+      linked_maintenance_id: editForm.linked_maintenance_id.trim() || null,
+      linked_maintenance_number: editForm.linked_maintenance_number.trim() || null,
+      linked_calibration_id: editForm.linked_calibration_id.trim() || null,
+      linked_ncr_id: editForm.linked_ncr_id || null,
+      linked_ncr_number: editForm.linked_ncr_number.trim() || null,
+      linked_capa_id: editForm.linked_capa_id || null,
+      linked_capa_number: editForm.linked_capa_number.trim() || null,
+      linked_moc_id: editForm.linked_moc_id || null,
+      linked_moc_number: editForm.linked_moc_number.trim() || null,
+      linked_ainm_id: editForm.linked_ainm_id || null,
+      linked_ainm_number: editForm.linked_ainm_number.trim() || null,
+      linked_hse_inspection_id: editForm.linked_hse_inspection_id || null,
+      linked_hse_inspection_number: editForm.linked_hse_inspection_number.trim() || null,
+      linked_observation_id: editForm.linked_observation_id || null,
+      linked_observation_number: editForm.linked_observation_number.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Include close_out_comments if the column exists (migration has been run)
+    if (editForm.close_out_comments.trim()) {
+      corePayload.close_out_comments = editForm.close_out_comments.trim();
+    }
+
     const { error } = await supabase
       .from("actions")
-      .update({
-        title: editForm.title.trim(),
-        description: editForm.description.trim() || null,
-        department: editForm.department || null,
-        project: editForm.project.trim() || null,
-        owner: editForm.owner.trim() || null,
-        priority: editForm.priority,
-        status: editForm.status,
-        due_date: editForm.due_date || null,
-        source: editForm.source || "Manual",
-        linked_audit_id: editForm.linked_audit_id || null,
-        linked_audit_number: editForm.linked_audit_number.trim() || null,
-        linked_finding_id: editForm.linked_finding_id.trim() || null,
-        linked_finding_reference: editForm.linked_finding_reference.trim() || null,
-        linked_asset_id: editForm.linked_asset_id || null,
-        linked_asset_code: editForm.linked_asset_code.trim() || null,
-        linked_inspection_id: editForm.linked_inspection_id.trim() || null,
-        linked_inspection_number: editForm.linked_inspection_number.trim() || null,
-        linked_maintenance_id: editForm.linked_maintenance_id.trim() || null,
-        linked_maintenance_number: editForm.linked_maintenance_number.trim() || null,
-        linked_calibration_id: editForm.linked_calibration_id.trim() || null,
-        linked_ncr_id: editForm.linked_ncr_id || null,
-        linked_ncr_number: editForm.linked_ncr_number.trim() || null,
-        linked_capa_id: editForm.linked_capa_id || null,
-        linked_capa_number: editForm.linked_capa_number.trim() || null,
-        linked_moc_id: editForm.linked_moc_id || null,
-        linked_moc_number: editForm.linked_moc_number.trim() || null,
-        linked_ainm_id: editForm.linked_ainm_id || null,
-        linked_ainm_number: editForm.linked_ainm_number.trim() || null,
-        linked_hse_inspection_id: editForm.linked_hse_inspection_id || null,
-        linked_hse_inspection_number: editForm.linked_hse_inspection_number.trim() || null,
-        linked_observation_id: editForm.linked_observation_id || null,
-        linked_observation_number: editForm.linked_observation_number.trim() || null,
-        close_out_comments: editForm.close_out_comments.trim() || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(corePayload)
       .eq("id", id);
 
     setIsSaving(false);
@@ -2794,9 +2801,11 @@ function ActionsPageContent() {
     const prevStatus = actionRecord?.status ?? "";
     const prevCloseOut = actionRecord?.close_out_comments ?? "";
 
-    // Notify owner they've been assigned
-    if (editForm.owner.trim()) {
-      const ownerRecord = people.find((p) => p.name.toLowerCase() === editForm.owner.trim().toLowerCase());
+    // Notify owner only when the owner has changed or been newly set
+    const prevOwner = (actionRecord?.owner ?? "").trim().toLowerCase();
+    const newOwner = editForm.owner.trim().toLowerCase();
+    if (newOwner && newOwner !== prevOwner) {
+      const ownerRecord = people.find((p) => p.name.toLowerCase() === newOwner);
       if (ownerRecord?.email) {
         void fetch("/api/notify-assignment", {
           method: "POST",
