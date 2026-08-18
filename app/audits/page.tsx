@@ -1884,7 +1884,7 @@ function AuditsPageContent() {
         ? findingForm.closure_date || new Date().toISOString().slice(0, 10)
         : "";
 
-    const { error } = await supabase.from("audit_findings").insert([
+    const { data: insertedFinding, error } = await supabase.from("audit_findings").insert([
       {
         audit_id: selectedAudit.id,
         reference,
@@ -1899,7 +1899,7 @@ function AuditsPageContent() {
         containment_action: findingForm.containment_action.trim() || null,
         corrective_action: findingForm.corrective_action.trim() || null,
       },
-    ]);
+    ]).select("id").single();
 
     if (error) {
       setMessage(`Save finding failed: ${error.message}`);
@@ -1922,6 +1922,9 @@ function AuditsPageContent() {
             itemRef: reference,
             itemTitle: findingForm.description.trim().slice(0, 120) || undefined,
             dueDate: findingForm.due_date || undefined,
+            itemUrl: insertedFinding?.id
+              ? `${window.location.origin}/audits?findingId=${encodeURIComponent(insertedFinding.id)}`
+              : undefined,
           }),
         });
       }
@@ -1997,6 +2000,7 @@ function AuditsPageContent() {
                 itemRef: current.reference,
                 itemTitle: current.description?.slice(0, 120) || undefined,
                 dueDate: current.due_date || undefined,
+                itemUrl: `${window.location.origin}/audits?findingId=${encodeURIComponent(findingId)}`,
               }),
             });
           }
@@ -2047,6 +2051,7 @@ function AuditsPageContent() {
             itemRef: openFindingForm.reference,
             itemTitle: openFindingForm.description?.slice(0, 120) || undefined,
             dueDate: openFindingForm.due_date || undefined,
+            itemUrl: `${window.location.origin}/audits?findingId=${encodeURIComponent(openFindingForm.id)}`,
           }),
         });
       }

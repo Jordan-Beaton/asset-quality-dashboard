@@ -2710,6 +2710,7 @@ function ActionsPageContent() {
             itemRef: `Action ${actionNumberToUse}`,
             itemTitle: form.title.trim(),
             dueDate: form.due_date || undefined,
+            itemUrl: `${window.location.origin}/actions?action=${encodeURIComponent(String(actionNumberToUse))}`,
           }),
         });
       }
@@ -2790,6 +2791,9 @@ function ActionsPageContent() {
             itemRef: actionRecord?.action_number ? `Action ${actionRecord.action_number}` : "Action",
             itemTitle: editForm.title.trim(),
             dueDate: editForm.due_date || undefined,
+            itemUrl: actionRecord?.action_number
+              ? `${window.location.origin}/actions?action=${encodeURIComponent(String(actionRecord.action_number))}`
+              : undefined,
           }),
         });
       }

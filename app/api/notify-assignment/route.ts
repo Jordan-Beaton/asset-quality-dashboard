@@ -11,9 +11,10 @@ export async function POST(req: NextRequest) {
     itemRef: string;
     itemTitle?: string;
     dueDate?: string;
+    itemUrl?: string;
   };
 
-  const { recipientEmail, recipientName, itemType, itemRef, itemTitle, dueDate } = body;
+  const { recipientEmail, recipientName, itemType, itemRef, itemTitle, dueDate, itemUrl } = body;
 
   if (!recipientEmail || !itemType || !itemRef) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -22,6 +23,14 @@ export async function POST(req: NextRequest) {
   const from = process.env.DOCUMENT_NOTIFICATIONS_FROM_EMAIL ?? "documents@enshoresubsea.com";
   const dueDateRow = dueDate
     ? `<tr><td style="padding:4px 0;color:#53565A;font-size:14px;"><strong>Due Date:</strong></td><td style="padding:4px 8px;color:#53565A;font-size:14px;">${dueDate}</td></tr>`
+    : "";
+
+  const ctaButton = itemUrl
+    ? `<tr><td colspan="2" style="padding:16px 0 0;">
+        <a href="${itemUrl}" style="display:inline-block;background:#005670;color:#ffffff;font-size:14px;font-weight:bold;padding:12px 24px;border-radius:4px;text-decoration:none;">
+          View ${itemType} in IMS →
+        </a>
+      </td></tr>`
     : "";
 
   const html = `
@@ -47,10 +56,8 @@ export async function POST(req: NextRequest) {
               <tr><td style="padding:4px 0;color:#53565A;font-size:14px;"><strong>Reference:</strong></td><td style="padding:4px 8px;color:#53565A;font-size:14px;">${itemRef}</td></tr>
               ${itemTitle ? `<tr><td style="padding:4px 0;color:#53565A;font-size:14px;"><strong>Title / Description:</strong></td><td style="padding:4px 8px;color:#53565A;font-size:14px;">${itemTitle}</td></tr>` : ""}
               ${dueDateRow}
+              ${ctaButton}
             </table>
-            <p style="color:#53565A;font-size:14px;margin:0;">
-              Please log in to the Enshore IMS to view the full details and take action.
-            </p>
           </td>
         </tr>
         <tr>

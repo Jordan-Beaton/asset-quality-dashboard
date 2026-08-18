@@ -1746,6 +1746,7 @@ function NcrCapaPageContent() {
             itemRef: nextNumber,
             itemTitle: newNcr.title.trim(),
             dueDate: newNcr.due_date || undefined,
+            itemUrl: `${window.location.origin}/ncr-capa?ncr=${encodeURIComponent(nextNumber)}`,
           }),
         });
       }
@@ -1947,6 +1948,7 @@ function NcrCapaPageContent() {
             itemRef: editRow.number,
             itemTitle: editRow.title,
             dueDate: editRow.due_date || undefined,
+            itemUrl: `${window.location.origin}/ncr-capa?ncr=${encodeURIComponent(editRow.number)}`,
           }),
         });
       }
