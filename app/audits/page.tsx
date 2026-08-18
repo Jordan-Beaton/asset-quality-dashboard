@@ -4661,7 +4661,12 @@ function AuditsPageContent() {
                 </Field>
 
                 <Field label="Scheduled Month">
-                  <input value={formatMonth(form.audit_month)} readOnly style={readOnlyInputStyle} />
+                  <input
+                    type="month"
+                    value={form.audit_month}
+                    onChange={(e) => setForm((prev) => ({ ...prev, audit_month: e.target.value }))}
+                    style={inputStyle}
+                  />
                 </Field>
 
                 <Field label="Status">
@@ -5068,7 +5073,12 @@ function AuditsPageContent() {
                   </Field>
 
                   <Field label="Audit Month">
-                    <input value={formatMonth(detailForm.audit_month)} readOnly style={readOnlyInputStyle} />
+                    <input
+                      type="month"
+                      value={detailForm.audit_month}
+                      onChange={(e) => setDetailForm((prev) => ({ ...prev, audit_month: e.target.value }))}
+                      style={inputStyle}
+                    />
                   </Field>
 
                   <Field label="Status">
