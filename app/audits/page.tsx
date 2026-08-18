@@ -4925,8 +4925,10 @@ function AuditsPageContent() {
                 </div>
 
                 <div style={topUploadButtonsStyle}>
-                  <label style={uploadButtonStyle} className="audit-upload-label">
-                    {isUploadingReport ? "Uploading..." : "Upload document"}
+                  <label style={uploadButtonStyle}>
+                    <span style={{ color: "#ffffff", fontWeight: 700, pointerEvents: "none" }}>
+                      {isUploadingReport ? "Uploading..." : "Upload document"}
+                    </span>
                     <input
                       type="file"
                       accept=".pdf,.doc,.docx,.xlsx,.xls,.png,.jpg,.jpeg"
