@@ -2696,9 +2696,7 @@ function DocumentsPageContent() {
     const note = `Responsible persons updated. ${changes.join(". ")}.`;
     const { error } = await supabase.from("documents").update({
       reviewed_by: reviewed_by || null,
-      reviewer_email: reviewer_email || null,
       approved_by: approved_by || null,
-      approver_email: approver_email || null,
     }).eq("id", selectedDocument.id);
     if (error) { setMessage(`Update failed: ${error.message}`); return; }
     await recordWorkflowActivity(
