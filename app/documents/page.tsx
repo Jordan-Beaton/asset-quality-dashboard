@@ -603,6 +603,9 @@ function DocumentsPageContent() {
   const [selectedDocumentId, setSelectedDocumentId] = useState("");
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<"details" | "file" | "history">("details");
+  const [showPersonsModal, setShowPersonsModal] = useState(false);
+  const [personsModalForm, setPersonsModalForm] = useState<{ reviewed_by: string; reviewer_email: string; approved_by: string; approver_email: string }>({ reviewed_by: "", reviewer_email: "", approved_by: "", approver_email: "" });
+  const [personsModalSearch, setPersonsModalSearch] = useState<{ reviewed_by: string; approved_by: string }>({ reviewed_by: "", approved_by: "" });
   const detailPanelRef = useRef<HTMLElement | null>(null);
   const shouldScrollToDetailRef = useRef(false);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
@@ -1108,27 +1111,24 @@ function DocumentsPageContent() {
     (doc) => !doc.next_review_date && (doc.status || "").trim().toLowerCase() === "live"
   ).length;
   const due30Days = documents.filter((doc) => {
-    const tone = getReviewTone(doc.next_review_date);
-    if (tone.label !== "Due Soon") return false;
+    if (!doc.next_review_date) return false;
     const today = new Date(); today.setHours(0,0,0,0);
-    const rev = new Date(doc.next_review_date!);
-    const diffDays = Math.floor((rev.getTime() - today.getTime()) / 86400000);
+    const rev = new Date(doc.next_review_date); rev.setHours(0,0,0,0);
+    const diffDays = Math.round((rev.getTime() - today.getTime()) / 86400000);
     return diffDays >= 0 && diffDays <= 30;
   }).length;
   const due31to60Days = documents.filter((doc) => {
-    const tone = getReviewTone(doc.next_review_date);
-    if (tone.label !== "Due Soon") return false;
+    if (!doc.next_review_date) return false;
     const today = new Date(); today.setHours(0,0,0,0);
-    const rev = new Date(doc.next_review_date!);
-    const diffDays = Math.floor((rev.getTime() - today.getTime()) / 86400000);
+    const rev = new Date(doc.next_review_date); rev.setHours(0,0,0,0);
+    const diffDays = Math.round((rev.getTime() - today.getTime()) / 86400000);
     return diffDays > 30 && diffDays <= 60;
   }).length;
   const due61to90Days = documents.filter((doc) => {
-    const tone = getReviewTone(doc.next_review_date);
-    if (tone.label !== "Due Soon") return false;
+    if (!doc.next_review_date) return false;
     const today = new Date(); today.setHours(0,0,0,0);
-    const rev = new Date(doc.next_review_date!);
-    const diffDays = Math.floor((rev.getTime() - today.getTime()) / 86400000);
+    const rev = new Date(doc.next_review_date); rev.setHours(0,0,0,0);
+    const diffDays = Math.round((rev.getTime() - today.getTime()) / 86400000);
     return diffDays > 60 && diffDays <= 90;
   }).length;
   const DEPT_ORDER = ["Assets","Commercial","HSEQ","Procurement","Projects","Finance","HR","Engineering"];
@@ -2668,6 +2668,53 @@ function DocumentsPageContent() {
     await loadDocumentRevisions(selectedDocument.id, { quiet: true });
   }
 
+  function openPersonsModal() {
+    if (!requireEditPermission("update responsible persons")) return;
+    if (!selectedDocument) { setMessage("Select a document first."); return; }
+    setPersonsModalForm({
+      reviewed_by: selectedDocument.reviewed_by || "",
+      reviewer_email: selectedDocument.reviewer_email || "",
+      approved_by: selectedDocument.approved_by || "",
+      approver_email: selectedDocument.approver_email || "",
+    });
+    setPersonsModalSearch({
+      reviewed_by: selectedDocument.reviewed_by || "",
+      approved_by: selectedDocument.approved_by || "",
+    });
+    setShowPersonsModal(true);
+  }
+
+  async function saveResponsiblePersons() {
+    if (!selectedDocument) return;
+    const { reviewed_by, reviewer_email, approved_by, approver_email } = personsModalForm;
+    const oldReviewer = selectedDocument.reviewed_by || "—";
+    const oldApprover = selectedDocument.approved_by || "—";
+    const changes: string[] = [];
+    if (reviewed_by !== (selectedDocument.reviewed_by || "")) changes.push(`Reviewer: ${oldReviewer} → ${reviewed_by || "—"}`);
+    if (approved_by !== (selectedDocument.approved_by || "")) changes.push(`Approver: ${oldApprover} → ${approved_by || "—"}`);
+    if (changes.length === 0) { setShowPersonsModal(false); return; }
+    const note = `Responsible persons updated. ${changes.join(". ")}.`;
+    const { error } = await supabase.from("documents").update({
+      reviewed_by: reviewed_by || null,
+      reviewer_email: reviewer_email || null,
+      approved_by: approved_by || null,
+      approver_email: approver_email || null,
+    }).eq("id", selectedDocument.id);
+    if (error) { setMessage(`Update failed: ${error.message}`); return; }
+    await recordWorkflowActivity(
+      selectedDocument,
+      "persons_updated",
+      selectedDocument.workflow_status as WorkflowStatus,
+      selectedDocument.workflow_status as WorkflowStatus,
+      currentUserPerson?.name || "",
+      currentUserEmail || "",
+      note
+    );
+    setShowPersonsModal(false);
+    setMessage("Responsible persons updated.");
+    await loadDocuments({ selectDocumentId: selectedDocument.id });
+  }
+
   async function removeControlledFile() {
     if (!requireEditPermission("remove controlled document files")) return;
 
@@ -4101,6 +4148,15 @@ function DocumentsPageContent() {
                             Mark reviewed — no changes
                           </button>
                         ) : null}
+                        <button
+                          type="button"
+                          style={{ ...secondaryButtonStyle, color: "#005670", borderColor: "#63B1BC" }}
+                          onClick={openPersonsModal}
+                          disabled={!canEditDocument}
+                          title="Update the reviewer or approver without changing the document revision"
+                        >
+                          Update responsible persons
+                        </button>
                         {selectedDocument.file_name ? (
                           <button type="button" style={{ ...secondaryButtonStyle, color: "#B83232", borderColor: "#E4AEAE" }} onClick={removeControlledFile} disabled={!canEditDocument}>
                             Remove file
@@ -4154,6 +4210,70 @@ function DocumentsPageContent() {
           </section>
         );
       })() : null}
+      {/* Update responsible persons modal */}
+      {showPersonsModal && selectedDocument && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowPersonsModal(false); }}
+        >
+          <div style={{ background: "#FFFFFF", borderRadius: "16px", padding: "28px", width: "100%", maxWidth: "500px", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#000000" }}>Update Responsible Persons</h2>
+              <p style={{ margin: "6px 0 0", fontSize: "13px", color: "#53565A", lineHeight: 1.5 }}>
+                {selectedDocument.document_number} — {selectedDocument.title}<br />
+                Changes are recorded in the document activity log without up-revving.
+              </p>
+            </div>
+
+            <div style={{ display: "grid", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#53565A", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px" }}>
+                  Reviewer
+                </label>
+                <PeopleSelector
+                  inputId="persons-modal-reviewer"
+                  value={personsModalSearch.reviewed_by}
+                  selectedName={personsModalForm.reviewed_by}
+                  people={people}
+                  placeholder="Start typing a name"
+                  onChange={(value) => setPersonsModalSearch((prev) => ({ ...prev, reviewed_by: value }))}
+                  onSelect={(person) => {
+                    setPersonsModalForm((prev) => ({ ...prev, reviewed_by: person?.name || "", reviewer_email: person?.email || "" }));
+                    setPersonsModalSearch((prev) => ({ ...prev, reviewed_by: person?.name || "" }));
+                  }}
+                  onBlur={() => {}}
+                  resolvedEmail={personsModalForm.reviewer_email}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#53565A", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px" }}>
+                  Approver
+                </label>
+                <PeopleSelector
+                  inputId="persons-modal-approver"
+                  value={personsModalSearch.approved_by}
+                  selectedName={personsModalForm.approved_by}
+                  people={people}
+                  placeholder="Start typing a name"
+                  onChange={(value) => setPersonsModalSearch((prev) => ({ ...prev, approved_by: value }))}
+                  onSelect={(person) => {
+                    setPersonsModalForm((prev) => ({ ...prev, approved_by: person?.name || "", approver_email: person?.email || "" }));
+                    setPersonsModalSearch((prev) => ({ ...prev, approved_by: person?.name || "" }));
+                  }}
+                  onBlur={() => {}}
+                  resolvedEmail={personsModalForm.approver_email}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button type="button" style={secondaryButtonStyle} onClick={() => setShowPersonsModal(false)}>Cancel</button>
+              <button type="button" style={primaryButtonStyle} onClick={saveResponsiblePersons}>Save changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
