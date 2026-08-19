@@ -2507,6 +2507,100 @@ function DocumentsPageContent() {
     await loadDocumentRevisions(selectedDocument.id, { quiet: true });
   }
 
+  async function markReviewedNoChanges() {
+    if (!requireEditPermission("record a no-change review")) return;
+
+    if (!selectedDocument) {
+      setMessage("Select a document first.");
+      return;
+    }
+
+    if (selectedDocument.workflow_status !== "Approved") {
+      setMessage("Only Approved documents can be recorded as reviewed with no changes.");
+      return;
+    }
+
+    const reviewComment = window.prompt(
+      "Record periodic review — no changes required.\n\nAdd any additional notes (optional):",
+      ""
+    );
+    if (reviewComment === null) return; // cancelled
+
+    const today = todayIsoDate();
+    const reviewCycle = selectedDocument.review_cycle_years || 3;
+    const newNextReviewDate = (() => {
+      const d = new Date(today);
+      d.setFullYear(d.getFullYear() + reviewCycle);
+      return d.toISOString().split("T")[0];
+    })();
+
+    const reviewNote = [
+      `Document reviewed ${new Date().toLocaleDateString("en-GB")} — no changes required.`,
+      reviewComment.trim(),
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    // Get the current revision row to carry its file info forward
+    const currentRevisions = revisionsByDocumentId[selectedDocument.id] || [];
+    const currentRevRow = currentRevisions.find((r) => r.is_current);
+
+    await supabase
+      .from("document_revisions")
+      .update({ is_current: false })
+      .eq("document_id", selectedDocument.id)
+      .eq("is_current", true);
+
+    const { error: insertError } = await supabase.from("document_revisions").insert({
+      document_id: selectedDocument.id,
+      revision: selectedDocument.current_revision || "A",
+      revision_notes: reviewNote,
+      file_name: currentRevRow?.file_name ?? selectedDocument.file_name ?? null,
+      file_path: currentRevRow?.file_path ?? selectedDocument.file_path ?? null,
+      file_size: currentRevRow?.file_size ?? selectedDocument.file_size ?? null,
+      uploaded_at: currentRevRow?.uploaded_at ?? selectedDocument.uploaded_at ?? null,
+      issue_date: selectedDocument.issue_date || today,
+      reviewed_by: currentUserPerson?.name || selectedDocument.reviewed_by || null,
+      reviewed_at: today,
+      approved_by: selectedDocument.approved_by || selectedDocument.workflow_approver_name || null,
+      approved_at: selectedDocument.approved_at || null,
+      is_current: true,
+    });
+
+    if (insertError) {
+      setMessage(`Review record failed: ${insertError.message}`);
+      return;
+    }
+
+    const { error: patchError } = await supabase
+      .from("documents")
+      .update({
+        next_review_date: newNextReviewDate,
+        reviewed_by: currentUserPerson?.name || selectedDocument.reviewed_by || null,
+        reviewed_at: today,
+      })
+      .eq("id", selectedDocument.id);
+
+    if (patchError) {
+      setMessage(`Review date update failed: ${patchError.message}`);
+      return;
+    }
+
+    await recordWorkflowActivity(
+      selectedDocument,
+      "periodic_review_no_changes",
+      "Approved",
+      "Approved",
+      currentUserPerson?.name || "",
+      currentUserEmail || "",
+      reviewNote
+    );
+
+    setMessage(`Periodic review recorded. Next review date updated to ${newNextReviewDate}.`);
+    await loadDocuments({ selectDocumentId: selectedDocument.id });
+    await loadDocumentRevisions(selectedDocument.id, { quiet: true });
+  }
+
   async function removeControlledFile() {
     if (!requireEditPermission("remove controlled document files")) return;
 
@@ -3803,6 +3897,17 @@ function DocumentsPageContent() {
                         <button type="button" style={secondaryButtonStyle} onClick={issueNextRevision} disabled={!canEditDocument}>
                           Up-rev to {getNextRevision(selectedDocument.current_revision || "A")}
                         </button>
+                        {selectedDocument.workflow_status === "Approved" ? (
+                          <button
+                            type="button"
+                            style={{ ...secondaryButtonStyle, color: "#1A6B3C", borderColor: "#A3C9B3" }}
+                            onClick={markReviewedNoChanges}
+                            disabled={!canEditDocument}
+                            title="Record that this document has been reviewed and requires no changes — updates the next review date without up-revving"
+                          >
+                            Mark reviewed — no changes
+                          </button>
+                        ) : null}
                         {selectedDocument.file_name ? (
                           <button type="button" style={{ ...secondaryButtonStyle, color: "#B83232", borderColor: "#E4AEAE" }} onClick={removeControlledFile} disabled={!canEditDocument}>
                             Remove file
@@ -3811,7 +3916,7 @@ function DocumentsPageContent() {
                       </div>
 
                       <div style={{ fontSize: "12px", color: "#8A8E91", lineHeight: 1.5 }}>
-                        Files are view / download only — no editing in the system. Upload new version to replace the current file on this revision. Up-rev creates a new formal revision and resets the workflow.
+                        Files are view / download only — no editing in the system. Upload new version to replace the current file on this revision. Up-rev creates a new formal revision and resets the workflow. Mark reviewed — no changes records the review date and adds a history entry without incrementing the revision.
                       </div>
                     </div>
                   ) : null}
