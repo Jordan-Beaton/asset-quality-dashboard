@@ -5,13 +5,14 @@ import type { CSSProperties } from "react";
 import { imsActiveTabButtonStyle, imsTabButtonStyle, imsTabListStyle } from "./imsTheme";
 import { getProject } from "../lib/projectRegistry";
 
-export type ProjectTab = "dashboard" | "itp" | "noi" | "noi-creator" | "reports" | "itp-sign-off";
+export type ProjectTab = "dashboard" | "itp" | "noi" | "noi-creator" | "inspection-records" | "reports" | "itp-sign-off";
 
 const TAB_LABELS: Record<ProjectTab, string> = {
   dashboard: "Dashboard",
   itp: "ITP Tracker",
   noi: "NOI Tracker",
   "noi-creator": "NOI Creator",
+  "inspection-records": "Inspection Records",
   reports: "Project Reports",
   "itp-sign-off": "ITP Sign-Off",
 };
