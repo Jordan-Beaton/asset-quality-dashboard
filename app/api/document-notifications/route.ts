@@ -245,6 +245,25 @@ async function createWorkflowButtons(
             toStatus: "Rejected",
           },
         ]
+      : body.eventType === "periodic_review_no_changes"
+      ? [
+          {
+            label: "Confirm — No Changes Required",
+            action: "confirm_periodic_review",
+            tone: "primary" as const,
+            intendedName: body.approvedBy || "",
+            fromStatus: "Approved",
+            toStatus: "Approved",
+          },
+          {
+            label: "Raise a Concern",
+            action: "reject_periodic_review",
+            tone: "danger" as const,
+            intendedName: body.approvedBy || "",
+            fromStatus: "Approved",
+            toStatus: "Approved",
+          },
+        ]
       : [];
 
   const buttons: WorkflowButton[] = [];

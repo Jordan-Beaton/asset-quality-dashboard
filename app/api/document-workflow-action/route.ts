@@ -90,6 +90,8 @@ function buildSubject(eventType: string, documentNumber: string) {
     reviewed: `${documentNumber} reviewed and ready for approval`,
     approved: `${documentNumber} approved and now live`,
     rejected: `${documentNumber} rejected`,
+    confirmed_periodic_review: `${documentNumber} periodic review confirmed`,
+    rejected_periodic_review: `${documentNumber} periodic review — approver has raised a concern`,
   };
 
   return subjectMap[eventType] || `${documentNumber} update`;
@@ -528,6 +530,80 @@ export async function POST(request: Request) {
         message: `${tokenRow.intended_name || "Reviewer/approver"} rejected the document. Reason: ${rejectionReason}`,
       });
       statusMessage = "Document rejected and the originator has been notified.";
+    } else if (tokenRow.action === "confirm_periodic_review") {
+      // Advance next_review_date and set approved_at — the approver has confirmed no changes needed
+      const reviewCycle = document.review_cycle_years || 3;
+      const nextReviewDate = new Date(today);
+      nextReviewDate.setFullYear(nextReviewDate.getFullYear() + reviewCycle);
+      const nextReviewDateStr = formatDate(nextReviewDate);
+
+      const { error } = await supabase
+        .from("documents")
+        .update({
+          approved_at: today,
+          next_review_date: nextReviewDateStr,
+        })
+        .eq("id", document.id);
+
+      if (error) throw error;
+
+      await upsertCurrentRevisionSnapshot(supabase, document, {
+        approved_by: tokenRow.intended_name || document.approved_by || null,
+        approved_at: today,
+      });
+      await writeActivity(
+        supabase,
+        document,
+        tokenRow,
+        "Approved",
+        `Periodic review confirmed by ${tokenRow.intended_name || "approver"}. Next review date updated to ${nextReviewDateStr}.`
+      );
+
+      // Notify the reviewer that the approver has confirmed
+      const reviewerEmails = uniqueEmails([
+        document.reviewed_at ? document.reviewed_by : null, // just to avoid TS; email is below
+        document.workflow_reviewer_email,
+        document.reviewer_email,
+      ].filter(Boolean) as string[]);
+
+      notificationWarning = await sendWorkflowEmail({
+        to: reviewerEmails,
+        eventType: "confirmed_periodic_review",
+        document,
+        message: `${tokenRow.intended_name || "The approver"} has confirmed no changes are required. The next review date has been updated to ${nextReviewDateStr}.`,
+      });
+
+      statusMessage = `Review confirmed. Next review date updated to ${nextReviewDateStr}.`;
+    } else if (tokenRow.action === "reject_periodic_review") {
+      if (!rejectionReason) {
+        return NextResponse.json(
+          { error: "Please describe your concern or what needs to be reviewed." },
+          { status: 400 }
+        );
+      }
+
+      await writeActivity(
+        supabase,
+        document,
+        tokenRow,
+        document.workflow_status || "Approved",
+        `Approver raised a concern during periodic review: ${rejectionReason}`
+      );
+
+      // Notify the reviewer — the document status does NOT change
+      const reviewerEmails = uniqueEmails([
+        document.workflow_reviewer_email,
+        document.reviewer_email,
+      ].filter(Boolean) as string[]);
+
+      notificationWarning = await sendWorkflowEmail({
+        to: reviewerEmails,
+        eventType: "rejected_periodic_review",
+        document,
+        message: `${tokenRow.intended_name || "The approver"} has raised a concern following the periodic review:\n\n${rejectionReason}\n\nThe document remains Approved. Please follow up directly with the approver.`,
+      });
+
+      statusMessage = "Your concern has been recorded and the reviewer has been notified.";
     } else {
       return NextResponse.json({ error: "Unsupported workflow action." }, { status: 400 });
     }

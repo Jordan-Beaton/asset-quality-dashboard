@@ -1281,6 +1281,8 @@ function DocumentsPageContent() {
         ? uniqueEmails([source.approver_email])
         : eventType === "approved"
         ? uniqueEmails([source.originator_email, source.reviewer_email, source.approver_email])
+        : eventType === "periodic_review_no_changes"
+        ? uniqueEmails([source.approver_email])
         : uniqueEmails([source.originator_email, source.reviewer_email, source.approver_email]);
 
     try {
@@ -2631,7 +2633,7 @@ function DocumentsPageContent() {
       reviewed_by: currentUserPerson?.name || selectedDocument.reviewed_by || null,
       reviewed_at: today,
       approved_by: selectedDocument.approved_by || selectedDocument.workflow_approver_name || null,
-      approved_at: selectedDocument.approved_at || today,
+      approved_at: selectedDocument.approved_at || null,
       is_current: true,
     });
 
@@ -2643,7 +2645,6 @@ function DocumentsPageContent() {
     const { error: patchError } = await supabase
       .from("documents")
       .update({
-        next_review_date: newNextReviewDate,
         reviewed_by: currentUserPerson?.name || selectedDocument.reviewed_by || null,
         reviewed_at: today,
       })
@@ -2688,7 +2689,7 @@ function DocumentsPageContent() {
       );
     }
 
-    setMessage(`Periodic review recorded. Next review date updated to ${newNextReviewDate}.`);
+    setMessage(`Periodic review recorded. An email has been sent to ${selectedDocument.approved_by || "the approver"} to confirm — the next review date will update once they confirm.`);
     await loadDocuments({ selectDocumentId: selectedDocument.id });
     await loadDocumentRevisions(selectedDocument.id, { quiet: true });
   }
