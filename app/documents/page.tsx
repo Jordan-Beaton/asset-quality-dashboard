@@ -1158,12 +1158,12 @@ function DocumentsPageContent() {
   const rejectedCount = workflowQueueDocuments.filter((doc) =>
     normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status) === "Rejected"
   ).length;
-  const originatorSetCount = documents.filter((doc) => doc.originator && doc.originator.trim()).length;
+  const originatorSetCount = documents.filter((doc) => doc.originator_name && doc.originator_name.trim()).length;
   const reviewerSetCount = documents.filter((doc) => doc.reviewed_by && doc.reviewed_by.trim()).length;
   const approverSetCount = documents.filter((doc) => doc.approved_by && doc.approved_by.trim()).length;
   const fullyPopulatedCount = documents.filter(
     (doc) =>
-      doc.originator && doc.originator.trim() &&
+      doc.originator_name && doc.originator_name.trim() &&
       doc.reviewed_by && doc.reviewed_by.trim() &&
       doc.approved_by && doc.approved_by.trim()
   ).length;
@@ -1396,6 +1396,8 @@ function DocumentsPageContent() {
     statuses?: string[];
     approval?: string;
     review?: string;
+    department?: string;
+    missingReviewDate?: boolean;
   }) {
     setActiveView("register");
     if (filter.statuses?.length || filter.status !== undefined) {
@@ -1403,6 +1405,8 @@ function DocumentsPageContent() {
     }
     if (filter.approval !== undefined) setApprovalFilter(filter.approval);
     if (filter.review !== undefined) setReviewFilter(filter.review);
+    if (filter.department !== undefined) setOwnerFilter(filter.department);
+    if (filter.missingReviewDate) setReviewFilter("Not set");
     setMessage("Snapshot filter applied.");
     window.setTimeout(() => {
       document.getElementById("document-register")?.scrollIntoView({ behavior: "smooth", block: "start" });
