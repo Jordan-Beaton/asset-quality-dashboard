@@ -2630,7 +2630,7 @@ function DocumentsPageContent() {
       reviewed_by: currentUserPerson?.name || selectedDocument.reviewed_by || null,
       reviewed_at: today,
       approved_by: selectedDocument.approved_by || selectedDocument.workflow_approver_name || null,
-      approved_at: selectedDocument.approved_at || null,
+      approved_at: selectedDocument.approved_at || today,
       is_current: true,
     });
 
