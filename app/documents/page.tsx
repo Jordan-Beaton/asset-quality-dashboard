@@ -3081,39 +3081,30 @@ function DocumentsPageContent() {
           </section>
 
           {/* People coverage strip */}
-          <section style={{ background: "#FFFFFF", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "16px 20px", display: "flex", gap: "28px", flexWrap: "wrap", alignItems: "flex-start", marginBottom: "20px" }}>
-            <div style={{ minWidth: "120px" }}>
-              <div style={quickActionLabelStyle}>Originator set</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#005670", fontVariantNumeric: "tabular-nums" }}>{originatorSetCount}</div>
-              <div style={{ fontSize: "11px", color: "#53565A" }}>of {totalDocuments} documents</div>
-              <div style={{ marginTop: "6px", background: "#D0D0CE", borderRadius: "4px", height: "5px", overflow: "hidden" }}>
-                <div style={{ width: `${Math.round((originatorSetCount / Math.max(totalDocuments, 1)) * 100)}%`, height: "100%", background: "#005670", borderRadius: "4px" }} />
+          <section style={{ background: "#FFFFFF", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "16px 20px", display: "flex", gap: "0", alignItems: "flex-start", marginBottom: "20px" }}>
+            {[
+              { label: "Originator set", count: originatorSetCount, color: "#005670" },
+              { label: "Reviewer set", count: reviewerSetCount, color: "#005670" },
+              { label: "Approver set", count: approverSetCount, color: "#005670" },
+              { label: "Fully populated", count: fullyPopulatedCount, color: "#63B1BC", sub: `all 3 fields set · ${Math.round((fullyPopulatedCount / Math.max(totalDocuments, 1)) * 100)}% of documents`, accent: true },
+            ].map(({ label, count, color, sub, accent }, i, arr) => (
+              <div
+                key={label}
+                style={{
+                  flex: 1,
+                  paddingLeft: i === 0 ? 0 : "20px",
+                  paddingRight: i === arr.length - 1 ? 0 : "20px",
+                  borderLeft: accent ? "1px solid #D0D0CE" : "none",
+                }}
+              >
+                <div style={quickActionLabelStyle}>{label}</div>
+                <div style={{ fontSize: "20px", fontWeight: 800, color, fontVariantNumeric: "tabular-nums" }}>{count}</div>
+                <div style={{ fontSize: "11px", color: "#53565A" }}>{sub ?? `of ${totalDocuments} documents`}</div>
+                <div style={{ marginTop: "6px", background: "#D0D0CE", borderRadius: "4px", height: "5px", overflow: "hidden" }}>
+                  <div style={{ width: `${Math.round((count / Math.max(totalDocuments, 1)) * 100)}%`, height: "100%", background: color, borderRadius: "4px" }} />
+                </div>
               </div>
-            </div>
-            <div style={{ minWidth: "120px" }}>
-              <div style={quickActionLabelStyle}>Reviewer set</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#005670", fontVariantNumeric: "tabular-nums" }}>{reviewerSetCount}</div>
-              <div style={{ fontSize: "11px", color: "#53565A" }}>of {totalDocuments} documents</div>
-              <div style={{ marginTop: "6px", background: "#D0D0CE", borderRadius: "4px", height: "5px", overflow: "hidden" }}>
-                <div style={{ width: `${Math.round((reviewerSetCount / Math.max(totalDocuments, 1)) * 100)}%`, height: "100%", background: "#005670", borderRadius: "4px" }} />
-              </div>
-            </div>
-            <div style={{ minWidth: "120px" }}>
-              <div style={quickActionLabelStyle}>Approver set</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#005670", fontVariantNumeric: "tabular-nums" }}>{approverSetCount}</div>
-              <div style={{ fontSize: "11px", color: "#53565A" }}>of {totalDocuments} documents</div>
-              <div style={{ marginTop: "6px", background: "#D0D0CE", borderRadius: "4px", height: "5px", overflow: "hidden" }}>
-                <div style={{ width: `${Math.round((approverSetCount / Math.max(totalDocuments, 1)) * 100)}%`, height: "100%", background: "#005670", borderRadius: "4px" }} />
-              </div>
-            </div>
-            <div style={{ minWidth: "150px", paddingLeft: "20px", borderLeft: "1px solid #D0D0CE" }}>
-              <div style={quickActionLabelStyle}>Fully populated</div>
-              <div style={{ fontSize: "20px", fontWeight: 800, color: "#63B1BC", fontVariantNumeric: "tabular-nums" }}>{fullyPopulatedCount}</div>
-              <div style={{ fontSize: "11px", color: "#53565A" }}>all 3 fields set · {Math.round((fullyPopulatedCount / Math.max(totalDocuments, 1)) * 100)}% of documents</div>
-              <div style={{ marginTop: "6px", background: "#D0D0CE", borderRadius: "4px", height: "5px", overflow: "hidden" }}>
-                <div style={{ width: `${Math.round((fullyPopulatedCount / Math.max(totalDocuments, 1)) * 100)}%`, height: "100%", background: "#63B1BC", borderRadius: "4px" }} />
-              </div>
-            </div>
+            ))}
           </section>
         </>
       ) : null}
