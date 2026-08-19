@@ -1104,6 +1104,69 @@ function DocumentsPageContent() {
     (doc) => getReviewTone(doc.next_review_date).label === "Overdue"
   ).length;
   const dueSoonReviews = dueSoonDocuments.length;
+  const missingReviewDate = documents.filter(
+    (doc) => !doc.next_review_date && (doc.status || "").trim().toLowerCase() === "live"
+  ).length;
+  const due30Days = documents.filter((doc) => {
+    const tone = getReviewTone(doc.next_review_date);
+    if (tone.label !== "Due Soon") return false;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const rev = new Date(doc.next_review_date!);
+    const diffDays = Math.floor((rev.getTime() - today.getTime()) / 86400000);
+    return diffDays >= 0 && diffDays <= 30;
+  }).length;
+  const due31to60Days = documents.filter((doc) => {
+    const tone = getReviewTone(doc.next_review_date);
+    if (tone.label !== "Due Soon") return false;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const rev = new Date(doc.next_review_date!);
+    const diffDays = Math.floor((rev.getTime() - today.getTime()) / 86400000);
+    return diffDays > 30 && diffDays <= 60;
+  }).length;
+  const due61to90Days = documents.filter((doc) => {
+    const tone = getReviewTone(doc.next_review_date);
+    if (tone.label !== "Due Soon") return false;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const rev = new Date(doc.next_review_date!);
+    const diffDays = Math.floor((rev.getTime() - today.getTime()) / 86400000);
+    return diffDays > 60 && diffDays <= 90;
+  }).length;
+  const DEPT_ORDER = ["Assets","Commercial","HSEQ","Procurement","Projects","Finance","HR","Engineering"];
+  const overdueByDept: Record<string, number> = {};
+  documents.forEach((doc) => {
+    if (getReviewTone(doc.next_review_date).label !== "Overdue") return;
+    const dept = (doc.department_owner || "Other").trim();
+    overdueByDept[dept] = (overdueByDept[dept] || 0) + 1;
+  });
+  const overdueByDeptSorted = Object.entries(overdueByDept).sort((a, b) => {
+    const ai = DEPT_ORDER.indexOf(a[0]); const bi = DEPT_ORDER.indexOf(b[0]);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return b[1] - a[1];
+  });
+  const maxOverdueDept = Math.max(...overdueByDeptSorted.map(([, v]) => v), 1);
+  const pendingReviewCount = workflowQueueDocuments.filter((doc) =>
+    normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status) === "Pending Review"
+  ).length;
+  const reviewedCount = workflowQueueDocuments.filter((doc) =>
+    normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status) === "Reviewed"
+  ).length;
+  const pendingApprovalCount = workflowQueueDocuments.filter((doc) =>
+    normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status) === "Pending Approval"
+  ).length;
+  const rejectedCount = workflowQueueDocuments.filter((doc) =>
+    normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status) === "Rejected"
+  ).length;
+  const originatorSetCount = documents.filter((doc) => doc.originator && doc.originator.trim()).length;
+  const reviewerSetCount = documents.filter((doc) => doc.reviewed_by && doc.reviewed_by.trim()).length;
+  const approverSetCount = documents.filter((doc) => doc.approved_by && doc.approved_by.trim()).length;
+  const fullyPopulatedCount = documents.filter(
+    (doc) =>
+      doc.originator && doc.originator.trim() &&
+      doc.reviewed_by && doc.reviewed_by.trim() &&
+      doc.approved_by && doc.approved_by.trim()
+  ).length;
   const approvedDocuments = documents.filter(
     (doc) => normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status) === "Approved"
   ).length;
@@ -2887,33 +2950,168 @@ function DocumentsPageContent() {
       ) : null}
 
       {activeView === "dashboard" ? (
-        <section style={dashboardPanelGridStyle}>
-          <SectionCard title="Review Control" subtitle="Documents needing review attention.">
-            <div style={quickActionGridStyle}>
-              <button type="button" style={quickActionCardStyle} onClick={() => applySnapshotFilter({ review: "Overdue" })}>
-                <span style={quickActionLabelStyle}>Overdue reviews</span>
-                <strong style={quickActionValueStyle}>{overdueReviews}</strong>
-              </button>
-              <button type="button" style={quickActionCardStyle} onClick={() => applySnapshotFilter({ review: "Due soon" })}>
-                <span style={quickActionLabelStyle}>Due soon</span>
-                <strong style={quickActionValueStyle}>{dueSoonReviews}</strong>
+        <>
+          {/* Missing review date alert */}
+          {missingReviewDate > 0 && (
+            <div
+              style={{
+                background: "#FFF8E6",
+                border: "1px solid #FFAD00",
+                borderRadius: "10px",
+                padding: "12px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                marginBottom: "16px",
+                fontSize: "13px",
+              }}
+            >
+              <span style={{ fontSize: "15px", flexShrink: 0 }}>⚠</span>
+              <span style={{ color: "#000000" }}>
+                <strong style={{ color: "#996600" }}>{missingReviewDate} live document{missingReviewDate !== 1 ? "s" : ""}</strong>
+                {" "}have no review date set — they will never appear as overdue without one.
+              </span>
+              <button
+                type="button"
+                style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 700, color: "#996600", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "2px", whiteSpace: "nowrap" }}
+                onClick={() => applySnapshotFilter({ missingReviewDate: true })}
+              >
+                Filter &amp; fix →
               </button>
             </div>
-          </SectionCard>
+          )}
 
-          <SectionCard title="Workflow Queues" subtitle="Review and approval work in progress.">
-            <div style={quickActionGridStyle}>
-              <button type="button" style={quickActionCardStyle} onClick={() => switchWorkspaceView("workflow")}>
-                <span style={quickActionLabelStyle}>Workflow items</span>
-                <strong style={quickActionValueStyle}>{workflowQueueDocuments.length}</strong>
-              </button>
-              <button type="button" style={quickActionCardStyle} onClick={() => switchWorkspaceView("archive")}>
-                <span style={quickActionLabelStyle}>Archive / superseded</span>
-                <strong style={quickActionValueStyle}>{archiveDocuments.length}</strong>
-              </button>
+          <section style={dashboardPanelGridStyle}>
+            {/* Overdue by department */}
+            <SectionCard title="Overdue by Department" subtitle="Live documents past their next review date, grouped by department.">
+              {overdueByDeptSorted.length === 0 ? (
+                <p style={{ fontSize: "13px", color: "#53565A" }}>No overdue reviews — great work!</p>
+              ) : (
+                <div style={{ display: "grid", gap: "10px" }}>
+                  {overdueByDeptSorted.map(([dept, count]) => (
+                    <button
+                      key={dept}
+                      type="button"
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+                      onClick={() => applySnapshotFilter({ department: dept, review: "Overdue" })}
+                      title={`Show ${count} overdue doc${count !== 1 ? "s" : ""} in ${dept}`}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{ width: "96px", fontSize: "12px", fontWeight: 600, color: "#53565A", flexShrink: 0 }}>{dept}</span>
+                        <div style={{ flex: 1, background: "#D0D0CE", borderRadius: "4px", height: "8px", overflow: "hidden" }}>
+                          <div style={{ width: `${Math.round((count / maxOverdueDept) * 100)}%`, height: "100%", background: "#F93822", borderRadius: "4px" }} />
+                        </div>
+                        <span style={{ width: "22px", textAlign: "right", fontSize: "12px", fontWeight: 700, color: "#F93822", fontVariantNumeric: "tabular-nums" }}>{count}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+
+            {/* Right column: pipeline + workflow */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {/* Upcoming reviews pipeline */}
+              <SectionCard title="Review Pipeline" subtitle="How overdue and upcoming reviews are spread.">
+                <div style={{ display: "grid", gap: "0" }}>
+                  {[
+                    { dot: "#F93822", label: "Overdue now", sub: "Past next review date", count: overdueReviews, color: "#F93822", onClick: () => applySnapshotFilter({ review: "Overdue" }) },
+                    { dot: "#FFAD00", label: "Due in 0–30 days", sub: "Requires attention soon", count: due30Days, color: "#FFAD00", onClick: () => applySnapshotFilter({ review: "Due soon" }) },
+                    { dot: "#FFAD00", label: "Due in 31–60 days", sub: "", count: due31to60Days, color: "#FFAD00", onClick: () => applySnapshotFilter({ review: "Due soon" }) },
+                    { dot: "#D0D0CE", label: "Due in 61–90 days", sub: "", count: due61to90Days, color: "#53565A", onClick: () => applySnapshotFilter({ review: "Due soon" }) },
+                  ].map(({ dot, label, sub, count, color, onClick }, i, arr) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={onClick}
+                      style={{
+                        display: "flex", alignItems: "center", gap: "12px",
+                        padding: "10px 0",
+                        borderTop: "none", borderLeft: "none", borderRight: "none",
+                        borderBottom: i < arr.length - 1 ? "1px solid #D0D0CE" : "none",
+                        background: "none",
+                        cursor: "pointer", textAlign: "left",
+                      }}
+                    >
+                      <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: dot, flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "13px", color: "#000000", fontWeight: 500 }}>{label}</div>
+                        {sub && <div style={{ fontSize: "11px", color: "#53565A" }}>{sub}</div>}
+                      </div>
+                      <span style={{ fontSize: "16px", fontWeight: 700, color, fontVariantNumeric: "tabular-nums" }}>{count}</span>
+                    </button>
+                  ))}
+                </div>
+              </SectionCard>
+
+              {/* Workflow queue */}
+              <SectionCard title="Workflow Queue" subtitle="Documents moving through review and approval.">
+                <div style={{ display: "grid", gap: "0" }}>
+                  {[
+                    { label: "Pending Review", count: pendingReviewCount, pillColor: "#FFAD00", pillBg: "#FFF8E6", onClick: () => switchWorkspaceView("workflow") },
+                    { label: "Reviewed — awaiting approval", count: reviewedCount, pillColor: "#FFAD00", pillBg: "#FFF8E6", onClick: () => switchWorkspaceView("workflow") },
+                    { label: "Pending Approval", count: pendingApprovalCount, pillColor: "#F93822", pillBg: "#FEF0EE", onClick: () => switchWorkspaceView("workflow") },
+                    { label: "Rejected — needs rework", count: rejectedCount, pillColor: "#F93822", pillBg: "#FEF0EE", onClick: () => switchWorkspaceView("workflow") },
+                    { label: "Archived / Superseded", count: archiveDocuments.length, pillColor: "#53565A", pillBg: "#ECECE7", onClick: () => switchWorkspaceView("archive") },
+                  ].map(({ label, count, pillColor, pillBg, onClick }, i, arr) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={onClick}
+                      style={{
+                        display: "flex", alignItems: "center", gap: "10px",
+                        padding: "9px 0",
+                        borderTop: "none", borderLeft: "none", borderRight: "none",
+                        borderBottom: i < arr.length - 1 ? "1px solid #D0D0CE" : "none",
+                        background: "none",
+                        cursor: "pointer", textAlign: "left",
+                      }}
+                    >
+                      <span style={{ flex: 1, fontSize: "13px", color: "#000000" }}>{label}</span>
+                      <span style={{ fontSize: "12px", fontWeight: 700, padding: "2px 9px", borderRadius: "20px", background: pillBg, color: pillColor, fontVariantNumeric: "tabular-nums" }}>{count}</span>
+                    </button>
+                  ))}
+                </div>
+              </SectionCard>
             </div>
-          </SectionCard>
-        </section>
+          </section>
+
+          {/* People coverage strip */}
+          <section style={{ background: "#FFFFFF", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "16px 20px", display: "flex", gap: "28px", flexWrap: "wrap", alignItems: "flex-start", marginBottom: "20px" }}>
+            <div style={{ minWidth: "120px" }}>
+              <div style={quickActionLabelStyle}>Originator set</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#005670", fontVariantNumeric: "tabular-nums" }}>{originatorSetCount}</div>
+              <div style={{ fontSize: "11px", color: "#53565A" }}>of {totalDocuments} documents</div>
+              <div style={{ marginTop: "6px", background: "#D0D0CE", borderRadius: "4px", height: "5px", overflow: "hidden" }}>
+                <div style={{ width: `${Math.round((originatorSetCount / Math.max(totalDocuments, 1)) * 100)}%`, height: "100%", background: "#005670", borderRadius: "4px" }} />
+              </div>
+            </div>
+            <div style={{ minWidth: "120px" }}>
+              <div style={quickActionLabelStyle}>Reviewer set</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#005670", fontVariantNumeric: "tabular-nums" }}>{reviewerSetCount}</div>
+              <div style={{ fontSize: "11px", color: "#53565A" }}>of {totalDocuments} documents</div>
+              <div style={{ marginTop: "6px", background: "#D0D0CE", borderRadius: "4px", height: "5px", overflow: "hidden" }}>
+                <div style={{ width: `${Math.round((reviewerSetCount / Math.max(totalDocuments, 1)) * 100)}%`, height: "100%", background: "#005670", borderRadius: "4px" }} />
+              </div>
+            </div>
+            <div style={{ minWidth: "120px" }}>
+              <div style={quickActionLabelStyle}>Approver set</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#005670", fontVariantNumeric: "tabular-nums" }}>{approverSetCount}</div>
+              <div style={{ fontSize: "11px", color: "#53565A" }}>of {totalDocuments} documents</div>
+              <div style={{ marginTop: "6px", background: "#D0D0CE", borderRadius: "4px", height: "5px", overflow: "hidden" }}>
+                <div style={{ width: `${Math.round((approverSetCount / Math.max(totalDocuments, 1)) * 100)}%`, height: "100%", background: "#005670", borderRadius: "4px" }} />
+              </div>
+            </div>
+            <div style={{ minWidth: "150px", paddingLeft: "20px", borderLeft: "1px solid #D0D0CE" }}>
+              <div style={quickActionLabelStyle}>Fully populated</div>
+              <div style={{ fontSize: "20px", fontWeight: 800, color: "#63B1BC", fontVariantNumeric: "tabular-nums" }}>{fullyPopulatedCount}</div>
+              <div style={{ fontSize: "11px", color: "#53565A" }}>all 3 fields set · {Math.round((fullyPopulatedCount / Math.max(totalDocuments, 1)) * 100)}% of documents</div>
+              <div style={{ marginTop: "6px", background: "#D0D0CE", borderRadius: "4px", height: "5px", overflow: "hidden" }}>
+                <div style={{ width: `${Math.round((fullyPopulatedCount / Math.max(totalDocuments, 1)) * 100)}%`, height: "100%", background: "#63B1BC", borderRadius: "4px" }} />
+              </div>
+            </div>
+          </section>
+        </>
       ) : null}
 
       {activeView === "create" ? (
