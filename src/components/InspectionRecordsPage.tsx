@@ -427,7 +427,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
 
   return (
     <main style={page}>
-      <QualityPageHero title="Inspection Records" />
+      <QualityPageHero label="Project Management · Inspection Records" title="Inspection Records" description="Link completed inspection documentation to NOIs and notify recipients." />
       <ImsTopMetaRow status={<><strong>Status:</strong> {message || "Link completed inspection documentation to NOIs and notify recipients."}</>} />
       <ProjectWorkspaceNav projectKey={projectKey} active="inspection-records" />
 
