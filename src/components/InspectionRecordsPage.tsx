@@ -77,8 +77,8 @@ function Pill({ status }: { status: "complete" | "pending" }) {
   const s: CSSProperties = {
     display: "inline-block", fontSize: "10px", fontWeight: 800,
     padding: "2px 9px", borderRadius: "999px",
-    background: status === "complete" ? "#e8f5e9" : "#fff8e1",
-    color: status === "complete" ? "#2E7D32" : "#7a5500",
+    background: status === "complete" ? imsColours.brand : imsColours.warning,
+    color: "#ffffff",
   };
   return <span style={s}>{status === "complete" ? "Complete" : "Pending records"}</span>;
 }
@@ -112,8 +112,8 @@ const filterSel: CSSProperties = {
 const tagStyle = (type: string): CSSProperties => ({
   display: "inline-block", fontSize: 10, fontWeight: 800,
   padding: "2px 6px", borderRadius: 4, marginRight: 3, marginBottom: 2,
-  background: type.includes("H") ? "#fdecea" : "#fff8e1",
-  color: type.includes("H") ? imsColours.danger : "#7a5500",
+  background: imsColours.brandSoft,
+  color: type.includes("H") ? imsColours.danger : imsColours.brand,
 });
 
 const recipChip: CSSProperties = {
@@ -156,7 +156,7 @@ const sectionTitle: CSSProperties = {
 const pointRow = (checked: boolean): CSSProperties => ({
   display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 12px",
   border: `1px solid ${checked ? imsColours.brandAccent : imsColours.border}`,
-  borderRadius: 8, background: checked ? "#d6eef1" : imsColours.page,
+  borderRadius: 8, background: checked ? imsColours.brandSoft : imsColours.page,
   cursor: "pointer",
 });
 const uploadZone: CSSProperties = {
@@ -175,13 +175,13 @@ const fileRow: CSSProperties = {
   border: `1px solid ${imsColours.border}`, borderRadius: 8, background: imsColours.page,
 };
 const fileIcon: CSSProperties = {
-  width: 32, height: 32, background: "#d6eef1", borderRadius: 6,
+  width: 32, height: 32, background: imsColours.brandSoft, borderRadius: 6,
   display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0,
 };
 const notifBanner: CSSProperties = {
   display: "flex", alignItems: "center", gap: 8, padding: "8px 12px",
-  background: "#e8f5e9", border: "1px solid #a5d6a7", borderRadius: 8,
-  fontSize: 12, color: "#2E7D32", fontWeight: 600,
+  background: imsColours.brandSoft, border: `1px solid ${imsColours.brandAccent}`, borderRadius: 8,
+  fontSize: 12, color: imsColours.brand, fontWeight: 600,
 };
 const msgStyle = (type: "ok" | "err"): CSSProperties => ({
   position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
@@ -433,7 +433,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
 
       <section style={metricsGrid}>
         <QualityKpiCard title="Total Records" value={records.length} accent={imsColours.brand} />
-        <QualityKpiCard title="Complete" value={totalComplete} accent="#2E7D32" />
+        <QualityKpiCard title="Complete" value={totalComplete} accent={imsColours.brandAccent} />
         <QualityKpiCard title="Pending Records" value={totalPending} accent={imsColours.warning} />
       </section>
 

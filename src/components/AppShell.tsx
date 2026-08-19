@@ -130,6 +130,7 @@ const documentNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/documents", label: "Document Control", icon: "documents" },
   { href: "/certification", label: "Certification", icon: "certification" },
+  { href: "/guides", label: "Process Guides", icon: "lessons" },
 ];
 
 const assetNavItems: NavItem[] = [
