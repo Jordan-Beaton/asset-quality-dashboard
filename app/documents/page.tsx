@@ -195,7 +195,8 @@ type NotificationEventType =
   | "reviewed"
   | "approved"
   | "rejected"
-  | "superseded";
+  | "superseded"
+  | "periodic_review_no_changes";
 
 type DocumentWorkspaceView =
   | "dashboard"
@@ -2662,6 +2663,30 @@ function DocumentsPageContent() {
       currentUserEmail || "",
       reviewNote
     );
+
+    // Notify the approver — they may spot something that needs updating even if the reviewer didn't
+    const approverEmail =
+      detailForm.approver_email.trim() ||
+      selectedDocument.workflow_approver_email ||
+      selectedDocument.approver_email ||
+      "";
+    if (approverEmail) {
+      const notificationSource: DocumentForm = {
+        ...detailForm,
+        reviewed_by: currentUserPerson?.name || selectedDocument.reviewed_by || "",
+        reviewer_email: currentUserEmail || detailForm.reviewer_email || "",
+        approved_by: selectedDocument.approved_by || selectedDocument.workflow_approver_name || "",
+        approver_email: approverEmail,
+      };
+      await notifyDocumentEvent(
+        "periodic_review_no_changes",
+        notificationSource,
+        selectedDocument.id,
+        selectedDocument.document_number,
+        selectedDocument.title || "",
+        `${currentUserPerson?.name || "The reviewer"} has completed a periodic review and confirmed no document changes are required. Please review and confirm, or raise any concerns directly.\n\nReview notes: ${reviewNote}`
+      );
+    }
 
     setMessage(`Periodic review recorded. Next review date updated to ${newNextReviewDate}.`);
     await loadDocuments({ selectDocumentId: selectedDocument.id });

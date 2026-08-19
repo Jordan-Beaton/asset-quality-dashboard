@@ -52,6 +52,7 @@ function buildSubject(eventType: string, documentNumber: string) {
     approved: `${documentNumber} approved and now live`,
     rejected: `${documentNumber} rejected`,
     superseded: `${documentNumber} superseded`,
+    periodic_review_no_changes: `${documentNumber} periodic review completed — please confirm`,
   };
 
   return subjectMap[eventType] || `${documentNumber} update`;
