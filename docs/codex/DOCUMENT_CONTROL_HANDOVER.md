@@ -9,6 +9,7 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 - Certification: `app/certification/page.tsx`
 - Notification API: `app/api/document-notifications/route.ts`
 - Workflow action API: `app/api/document-workflow-action/route.ts`
+- Process Guides: `app/guides/page.tsx` — inline user guide hub; Document Control guide is the first guide, rendered in full without external links. Staff access at `/guides` via the Document Control sidebar nav item "Process Guides". All content is embedded directly (no Claude artifact dependency).
 
 ## Numbering Rules
 
@@ -63,7 +64,7 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 - **DNS records for `enshoresubsea.com` must be verified in Resend before emails will send from this address.** Two records need adding at Bondgate (IT contact: Adam Shaw, `AShaw@enshoresubsea.com`):
   - DKIM TXT: name `resend._domainkey`, value `p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC1Z/UnPmR+1LcH07/KzHLBf0ezjg6osYffTkD3k56D8GlQVLNtOjHKESyb0Mf2a1BGTUjlDkXH3cDnUk5xFjBP0znQ/7YERg3TjZvdj61uqGxqrQh/1TimGsWaMuXEo0u6HSAiBVtRB2LX4nd2C+EfxxoieOl4Eva4xPcPljsq5QIDAQAB`
   - SPF MX: name `send`, value `feedback-smtp.eu-west-1.amazonses.com`, priority `10`
-- Check domain verification status: Resend dashboard → Domains, or query `GET https://api.resend.com/domains` with `Authorization: Bearer <RESEND_API_KEY>`. Status must be `verified` (currently `not_started` as of 18 Aug 2026).
+- Check domain verification status: Resend dashboard → Domains, or query `GET https://api.resend.com/domains` with `Authorization: Bearer <RESEND_API_KEY>`. Status was confirmed `verified` on 18 Aug 2026 — DKIM, SPF MX, and SPF TXT all confirmed. Email delivery from `documents@enshoresubsea.com` is live.
 - Never expose or print Supabase, Resend, OpenAI, or service-role secrets.
 - Relevant Vercel env vars include:
   - `RESEND_API_KEY`

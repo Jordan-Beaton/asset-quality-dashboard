@@ -70,6 +70,8 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Login now supports controlled self-service access requests without self-registration. Requests are limited to Enshore email addresses, use Admin reference departments and the permission registry, appear on Master Admin Home and in Users & Access, and remain Pending until Admin prepares/rejects them.
 - IMS email notifications now route through `Document Control <documents@enshoresubsea.com>` via Resend across all three email flows: document notifications, document workflow actions, and ITP sign-off. The `DOCUMENT_NOTIFICATIONS_FROM_EMAIL` env var is updated in both `.env.local` and Vercel. Email will be fully live once IT (Adam Shaw) confirms Bondgate have added the two required DNS records (`resend._domainkey` TXT and `send` MX) to the `enshoresubsea.com` domain. Resend domain status was `not_started` as of 18 Aug 2026.
 - Whole-IMS detail panel visual standardisation completed: all IMS module detail panels now use the tinted gradient background (`linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)`), consistent border, border-radius, padding, and box-shadow matching the Audit Findings reference standard. Bold text in form field values resolved across all modules via a global CSS fix in `globals.css`.
+- Inspection Records module added to the Project workspace (`app/projects/[projectKey]/inspection-records/page.tsx`). Uses the standard project workspace layout (`QualityPageHero` + `ImsTopMetaRow` + `ProjectWorkspaceNav`). Tabs wired in `projectRegistry.ts`. DB tables: `inspection_records`, `inspection_record_files`, `inspection_record_notifications`. Notification email includes ITP reference, supplier, and branded styling; ITP/supplier resolved at send time via `project_noi_points` → `project_itps` join.
+- Process Guides tab added to Document Control sidebar nav (`AppShell.tsx`). `/guides` route (`app/guides/page.tsx`) renders a full inline Document Control user guide covering 16 sections (overview, register, add, upload, metadata, owners, submit, review, approval, approve, reject, periodic review, approver confirmation, new revision, supersede, status reference). Content is embedded directly in the IMS — no external artifact or Claude login required. Uses approved `imsColours` tokens throughout.
 
 # In Progress
 
@@ -194,7 +196,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 ## Document Control
 
 - Status: In Progress
-- Summary: Document Control is a central IMS hub with company/system and asset-specific numbering, uploaded files, migration history, workflow foundations, email/notification APIs, and certification route. It is high value and high risk. Email notifications deliver from `documents@enshoresubsea.com` — Resend domain verified 18 Aug 2026.
+- Summary: Document Control is a central IMS hub with company/system and asset-specific numbering, uploaded files, migration history, workflow foundations, email/notification APIs, and certification route. It is high value and high risk. Email notifications deliver from `documents@enshoresubsea.com` — Resend domain verified 18 Aug 2026. A Process Guides tab in the Document Control sidebar nav leads to `/guides`, which renders the full inline Document Control user guide (16 sections, no external dependencies).
 - Outstanding Actions:
   - Verify rejection-field cleanup on Vercel after the local controlled-upload and workflow-path hardening.
   - Verify review/approval workflow and notification behavior end-to-end on Vercel with real documents.
