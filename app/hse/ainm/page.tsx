@@ -37,6 +37,7 @@ import {
   imsTableStyle,
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { exportColours, exportRgb, exportTypography } from "../../../src/lib/exportTheme";
 
 export const dynamic = "force-dynamic";
 
@@ -947,14 +948,14 @@ export default function HseAinmPage() {
 
   function exportDashboardSummaryPdf() {
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    doc.setFillColor(0, 86, 112);
+    doc.setFillColor(...exportRgb.brand);
     doc.rect(12, 12, 273, 20, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(255, 255, 255);
+    doc.setFont(exportTypography.pdfFont, "bold");
+    doc.setFontSize(exportTypography.titlePt);
+    doc.setTextColor(...exportRgb.white);
     doc.text("AINM Dashboard Summary", 18, 25);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFont(exportTypography.pdfFont, "normal");
+    doc.setFontSize(exportTypography.bodyPt);
     doc.text(`Year: ${dashboardYear || "All Years"} | Scope: ${dashboardScope} | Generated: ${new Date().toLocaleString("en-GB")}`, 190, 25);
 
     autoTable(doc, {
@@ -970,8 +971,9 @@ export default function HseAinmPage() {
         ["Compiled Report Packs", String(kpis.compiledReports), "Final compiled PDF packs generated"],
       ],
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 3, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.15 },
-      headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
+      styles: { font: exportTypography.pdfFont, fontSize: exportTypography.tablePt, cellPadding: 3, textColor: [...exportRgb.ink], lineColor: [...exportRgb.border], lineWidth: 0.15 },
+      headStyles: { fillColor: [...exportRgb.brand], textColor: [...exportRgb.white], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [...exportRgb.page] },
       columnStyles: { 1: { halign: "center", cellWidth: 32 } },
       margin: { left: 12, right: 12 },
     });
@@ -986,8 +988,9 @@ export default function HseAinmPage() {
         dashboardInsights.projectRows[index]?.value ? String(dashboardInsights.projectRows[index].value) : "",
       ]),
       theme: "grid",
-      styles: { fontSize: 9, cellPadding: 3, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.15 },
-      headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
+      styles: { font: exportTypography.pdfFont, fontSize: exportTypography.tablePt, cellPadding: 3, textColor: [...exportRgb.ink], lineColor: [...exportRgb.border], lineWidth: 0.15 },
+      headStyles: { fillColor: [...exportRgb.brand], textColor: [...exportRgb.white], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [...exportRgb.page] },
       columnStyles: { 1: { halign: "center", cellWidth: 25 }, 3: { halign: "center", cellWidth: 25 } },
       margin: { left: 12, right: 12 },
     });
@@ -995,8 +998,14 @@ export default function HseAinmPage() {
     const pages = doc.getNumberOfPages();
     for (let page = 1; page <= pages; page += 1) {
       doc.setPage(page);
-      doc.setFontSize(8);
-      doc.setTextColor(83, 86, 90);
+      doc.setDrawColor(...exportRgb.brand);
+      doc.line(12, 200, 285, 200);
+      doc.setFont(exportTypography.pdfFont, "bold");
+      doc.setFontSize(exportTypography.captionPt);
+      doc.setTextColor(...exportRgb.brand);
+      doc.text("AINM Dashboard Summary", 14, 205.2);
+      doc.setFont(exportTypography.pdfFont, "normal");
+      doc.setTextColor(...exportRgb.muted);
       doc.text(`Page ${page} of ${pages}`, 285, 202, { align: "right" });
     }
     doc.save(`AINM-dashboard-summary-${dashboardYear || "all-years"}.pdf`);
@@ -1819,17 +1828,17 @@ export default function HseAinmPage() {
   function wordRun(text: string, options?: { bold?: boolean; color?: string; size?: number; italics?: boolean }) {
     return new TextRun({
       text: clean(text),
-      font: "Azo Sans",
+      font: exportTypography.wordFont,
       bold: options?.bold,
       italics: options?.italics,
-      color: options?.color || "000000",
-      size: options?.size || 18,
+      color: options?.color || exportColours.ink,
+      size: options?.size || exportTypography.bodyPt * 2,
     });
   }
 
-  const wordBorder = { style: BorderStyle.SINGLE, color: "D0D0CE", size: 2 };
+  const wordBorder = { style: BorderStyle.SINGLE, color: exportColours.border, size: 2 };
   const wordBorders = { top: wordBorder, bottom: wordBorder, left: wordBorder, right: wordBorder, insideHorizontal: wordBorder, insideVertical: wordBorder };
-  const wordHeaderBorder = { style: BorderStyle.SINGLE, color: "005670", size: 2 };
+  const wordHeaderBorder = { style: BorderStyle.SINGLE, color: exportColours.brand, size: 2 };
   const wordHeaderBorders = {
     top: wordHeaderBorder,
     bottom: wordHeaderBorder,
@@ -1844,13 +1853,17 @@ export default function HseAinmPage() {
       width: options?.width ? { size: options.width, type: WidthType.DXA } : undefined,
       verticalAlign: VerticalAlign.CENTER,
       shading: options?.header || options?.label
-        ? { type: ShadingType.CLEAR, fill: "ECECE7", color: "auto" }
+        ? { type: ShadingType.CLEAR, fill: exportColours.page, color: "auto" }
         : undefined,
       margins: { top: 110, bottom: 110, left: 120, right: 120 },
       children: [
         new Paragraph({
           alignment: options?.align === "center" ? AlignmentType.CENTER : AlignmentType.LEFT,
-          children: [wordRun(text, { bold: options?.header || options?.label, color: "000000" })],
+          children: [wordRun(text, {
+            bold: options?.header || options?.label,
+            color: exportColours.ink,
+            size: exportTypography.tablePt * 2,
+          })],
         }),
       ],
     });
@@ -1921,10 +1934,10 @@ export default function HseAinmPage() {
             new TableCell({
               width: { size: 9360, type: WidthType.DXA },
               verticalAlign: VerticalAlign.CENTER,
-              shading: { type: ShadingType.CLEAR, fill: "005670", color: "auto" },
+              shading: { type: ShadingType.CLEAR, fill: exportColours.brand, color: "auto" },
               borders: wordHeaderBorders,
               margins: { top: 120, bottom: 120, left: 140, right: 140 },
-              children: [new Paragraph({ children: [wordRun(title, { bold: true, color: "FFFFFF", size: 20 })] })],
+              children: [new Paragraph({ children: [wordRun(title, { bold: true, color: exportColours.white, size: exportTypography.headingPt * 2 })] })],
             }),
           ],
         }),
@@ -1969,7 +1982,7 @@ export default function HseAinmPage() {
                       ? [
                           new ExternalHyperlink({
                             link: url,
-                            children: [wordRun("Open evidence", { bold: true, color: "1D4ED8" })],
+                            children: [wordRun("Open evidence", { bold: true, color: exportColours.brand, size: exportTypography.tablePt * 2 })],
                           }),
                         ]
                       : [wordRun("")],
@@ -2013,7 +2026,7 @@ export default function HseAinmPage() {
               columnSpan: 6,
               width: { size: 9360, type: WidthType.DXA },
               verticalAlign: VerticalAlign.CENTER,
-              shading: { type: ShadingType.CLEAR, fill: "005670", color: "auto" },
+              shading: { type: ShadingType.CLEAR, fill: exportColours.brand, color: "auto" },
               borders: wordHeaderBorders,
               margins: { top: 120, bottom: 120, left: 140, right: 140 },
               children: [
@@ -2021,8 +2034,8 @@ export default function HseAinmPage() {
                   children: [
                     wordRun("Additional information and attachments included within this report (please check box and attach)", {
                       bold: true,
-                      color: "FFFFFF",
-                      size: 20,
+                      color: exportColours.white,
+                      size: exportTypography.headingPt * 2,
                     }),
                   ],
                 }),
@@ -2129,9 +2142,9 @@ export default function HseAinmPage() {
           children: [
             new TableCell({
               columnSpan: 4,
-              shading: { type: ShadingType.CLEAR, fill: "E5E7EB", color: "auto" },
+              shading: { type: ShadingType.CLEAR, fill: exportColours.page, color: "auto" },
               margins: { top: 110, bottom: 110, left: 120, right: 120 },
-              children: [new Paragraph({ children: [wordRun(role, { size: 18 })] })],
+              children: [new Paragraph({ children: [wordRun(role, { size: exportTypography.tablePt * 2 })] })],
             }),
           ],
         }),
@@ -2149,18 +2162,18 @@ export default function HseAinmPage() {
     });
   }
 
-  function wordHeader(title: string, record: AINMRecord, logoData: string) {
+  function wordHeader(record: AINMRecord, logoData: string) {
     const logo =
       logoData && logoData.startsWith("data:image/")
         ? new ImageRun({ type: "png", data: dataUrlToBytes(logoData), transformation: { width: 112, height: 56 } })
-        : wordRun("ENSHORE", { bold: true, size: 24 });
+        : wordRun("ENSHORE", { bold: true, size: exportTypography.headingPt * 2, color: exportColours.brand });
 
     return new Header({
       children: [
         new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
           layout: TableLayoutType.FIXED,
-          columnWidths: [2400, 4560, 2400],
+          columnWidths: [4680, 4680],
           borders: {
             top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
             bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
@@ -2172,32 +2185,56 @@ export default function HseAinmPage() {
           rows: [
             new TableRow({
               children: [
-                new TableCell({ children: [new Paragraph({ children: [logo] })] }),
+                new TableCell({ width: { size: 4680, type: WidthType.DXA }, children: [new Paragraph({ children: [logo] })] }),
                 new TableCell({
-                  children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [wordRun(title, { bold: true, size: 24 })] })],
-                }),
-                new TableCell({
+                  width: { size: 4680, type: WidthType.DXA },
                   children: [
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(record.ainm_number, { color: "53565A" })] }),
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(displayDate(record.event_date), { color: "53565A" })] }),
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(record.ainm_number, { color: exportColours.muted, size: exportTypography.captionPt * 2 })] }),
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(displayDate(record.event_date), { color: exportColours.muted, size: exportTypography.captionPt * 2 })] }),
                   ],
                 }),
               ],
             }),
           ],
         }),
-        new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 5 } } }),
+        new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, color: exportColours.border, size: 5 } } }),
       ],
     });
   }
 
-  function wordFooter() {
+  function wordFooter(documentReference: string) {
     return new Footer({
       children: [
-        new Paragraph({ border: { top: { style: BorderStyle.SINGLE, color: "005670", size: 4 } } }),
-        new Paragraph({
-          alignment: AlignmentType.RIGHT,
-          children: [wordRun("Page ", { color: "53565A", size: 16 }), new SimpleField("PAGE"), wordRun(" of ", { color: "53565A", size: 16 }), new SimpleField("NUMPAGES")],
+        new Paragraph({ border: { top: { style: BorderStyle.SINGLE, color: exportColours.brand, size: 4 } } }),
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          layout: TableLayoutType.FIXED,
+          columnWidths: [7200, 2160],
+          borders: {
+            top: { style: BorderStyle.NONE, size: 0, color: exportColours.white },
+            bottom: { style: BorderStyle.NONE, size: 0, color: exportColours.white },
+            left: { style: BorderStyle.NONE, size: 0, color: exportColours.white },
+            right: { style: BorderStyle.NONE, size: 0, color: exportColours.white },
+            insideHorizontal: { style: BorderStyle.NONE, size: 0, color: exportColours.white },
+            insideVertical: { style: BorderStyle.NONE, size: 0, color: exportColours.white },
+          },
+          rows: [new TableRow({ children: [
+            new TableCell({
+              width: { size: 7200, type: WidthType.DXA },
+              margins: { top: 70, bottom: 70, left: 100, right: 100 },
+              children: [new Paragraph({ children: [wordRun(documentReference, { bold: true, color: exportColours.brand, size: exportTypography.captionPt * 2 })] })],
+            }),
+            new TableCell({
+              width: { size: 2160, type: WidthType.DXA },
+              margins: { top: 70, bottom: 70, left: 100, right: 0 },
+              children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [
+                wordRun("Page ", { color: exportColours.muted, size: exportTypography.captionPt * 2 }),
+                new SimpleField("PAGE"),
+                wordRun(" of ", { color: exportColours.muted, size: exportTypography.captionPt * 2 }),
+                new SimpleField("NUMPAGES"),
+              ] })],
+            }),
+          ] })],
         }),
       ],
     });
@@ -2259,7 +2296,7 @@ export default function HseAinmPage() {
 
       const children: (Paragraph | Table)[] = [];
       children.push(
-        new Paragraph({ spacing: { after: 150 }, children: [wordRun(`${record.ainm_number} - ${record.title}`, { bold: true, size: 30 })] })
+        new Paragraph({ spacing: { after: 150 }, children: [wordRun(`${record.ainm_number} - ${record.title}`, { bold: true, size: exportTypography.titlePt * 2 })] })
       );
 
       if (stage === "notification") {
@@ -2273,7 +2310,7 @@ export default function HseAinmPage() {
           classificationTable(record),
           new Paragraph({
             spacing: { before: 120, after: 80 },
-            children: [wordRun("Please avoid names - use job title or term 'IP' (Injured Person).", { italics: true, color: "53565A", size: 17 })],
+            children: [wordRun("Please avoid names - use job title or term 'IP' (Injured Person).", { italics: true, color: exportColours.muted, size: exportTypography.captionPt * 2 })],
           }),
           wordSectionHeader("Brief details of the event"),
           wordBodyTable([""], [[record.brief_event_details || ""]], [9360], [], { repeatHeader: false, padEmptyRows: false }),
@@ -2293,7 +2330,7 @@ export default function HseAinmPage() {
           evidenceWordTable(notificationEvidenceWithUrls),
           new Paragraph({
             spacing: { before: 70 },
-            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "53565A", size: 16 })],
+            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: exportColours.muted, size: exportTypography.captionPt * 2 })],
           })
         );
       }
@@ -2338,7 +2375,7 @@ export default function HseAinmPage() {
           evidenceWordTable(part1EvidenceWithUrls),
           new Paragraph({
             spacing: { before: 70 },
-            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "53565A", size: 16 })],
+            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: exportColours.muted, size: exportTypography.captionPt * 2 })],
           }),
           wordSpacer(),
           wordSectionHeader("Reviewed and accepted by"),
@@ -2386,17 +2423,17 @@ export default function HseAinmPage() {
           evidenceWordTable(part2EvidenceWithUrls),
           new Paragraph({
             spacing: { before: 70 },
-            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: "53565A", size: 16 })],
+            children: [wordRun("Evidence links are secure signed URLs and may expire after generation.", { italics: true, color: exportColours.muted, size: exportTypography.captionPt * 2 })],
           })
         );
       }
 
       const doc = new WordDocument({
-        styles: { default: { document: { run: { font: "Azo Sans", size: 18, color: "000000" } } } },
+        styles: { default: { document: { run: { font: exportTypography.wordFont, size: exportTypography.bodyPt * 2, color: exportColours.ink } } } },
         sections: [
           {
-            headers: { default: wordHeader(title, record, logoData) },
-            footers: { default: wordFooter() },
+            headers: { default: wordHeader(record, logoData) },
+            footers: { default: wordFooter(title) },
             properties: { page: { margin: { top: 900, right: 720, bottom: 900, left: 720, header: 360, footer: 360 } } },
             children,
           },
@@ -2426,46 +2463,42 @@ export default function HseAinmPage() {
     return ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || fallback);
   }
 
-  function pdfHeader(doc: jsPDF, title: string, record: AINMRecord, logoData: string) {
+  function pdfHeader(doc: jsPDF, record: AINMRecord, logoData: string) {
     if (logoData) {
       try {
         doc.addImage(logoData, "PNG", 12, 10, 40, 20);
       } catch {
-        doc.setFont("helvetica", "bold");
+        doc.setFont(exportTypography.pdfFont, "bold");
         doc.text("ENSHORE", 12, 18);
       }
     }
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(0, 0, 0);
-    doc.text(title, 105, 18, { align: "center" });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(83, 86, 90);
+    doc.setFont(exportTypography.pdfFont, "normal");
+    doc.setFontSize(exportTypography.bodyPt);
+    doc.setTextColor(...exportRgb.muted);
     doc.text(record.ainm_number, 198, 14, { align: "right" });
     doc.text(displayDate(record.event_date), 198, 20, { align: "right" });
-    doc.setDrawColor(0, 86, 112);
+    doc.setDrawColor(...exportRgb.brand);
     doc.setLineWidth(0.6);
     doc.line(12, 30, 198, 30);
   }
 
   function pdfSection(doc: jsPDF, title: string, y: number) {
-    doc.setFillColor(0, 86, 112);
+    doc.setFillColor(...exportRgb.brand);
     doc.roundedRect(12, y, 186, 8, 1.5, 1.5, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
+    doc.setFont(exportTypography.pdfFont, "bold");
+    doc.setFontSize(exportTypography.headingPt);
+    doc.setTextColor(...exportRgb.white);
     doc.text(title, 15, y + 5.4);
     return y + 11;
   }
 
   function pdfSubsection(doc: jsPDF, title: string, y: number) {
-    doc.setFillColor(236, 236, 231);
-    doc.setDrawColor(208, 208, 206);
+    doc.setFillColor(...exportRgb.page);
+    doc.setDrawColor(...exportRgb.border);
     doc.roundedRect(12, y, 186, 7, 1.2, 1.2, "FD");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(0, 86, 112);
+    doc.setFont(exportTypography.pdfFont, "bold");
+    doc.setFontSize(exportTypography.subheadingPt);
+    doc.setTextColor(...exportRgb.brand);
     doc.text(title, 15, y + 4.8);
     return y + 9;
   }
@@ -2476,23 +2509,27 @@ export default function HseAinmPage() {
       head,
       body: body.length ? body : [head[0].map(() => "")],
       theme: "grid",
-      styles: { fontSize: 8, cellPadding: 2, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.15 },
-      headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [236, 236, 231] },
+      styles: { font: exportTypography.pdfFont, fontSize: exportTypography.tablePt, cellPadding: 2, textColor: [...exportRgb.ink], lineColor: [...exportRgb.border], lineWidth: 0.15 },
+      headStyles: { fillColor: [...exportRgb.page], textColor: [...exportRgb.ink], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [...exportRgb.page] },
       margin: { left: 12, right: 12 },
       columnStyles,
     });
     return pdfLastY(doc, y) + 6;
   }
 
-  function pdfFooter(doc: jsPDF) {
+  function pdfFooter(doc: jsPDF, documentReference: string) {
     const pages = doc.getNumberOfPages();
     for (let page = 1; page <= pages; page += 1) {
       doc.setPage(page);
-      doc.setDrawColor(0, 86, 112);
+      doc.setDrawColor(...exportRgb.brand);
       doc.line(12, 286, 198, 286);
-      doc.setFontSize(8);
-      doc.setTextColor(83, 86, 90);
+      doc.setFont(exportTypography.pdfFont, "bold");
+      doc.setFontSize(exportTypography.captionPt);
+      doc.setTextColor(...exportRgb.brand);
+      doc.text(documentReference, 14, 291.2, { maxWidth: 126 });
+      doc.setFont(exportTypography.pdfFont, "normal");
+      doc.setTextColor(...exportRgb.muted);
       doc.text(`Page ${page} of ${pages}`, 198, 291, { align: "right" });
     }
   }
@@ -2504,12 +2541,12 @@ export default function HseAinmPage() {
     try {
       const logoData = await getLogoDataUrl();
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      pdfHeader(doc, "AINM Complete Report Pack", record, logoData);
+      pdfHeader(doc, record, logoData);
       let y = 38;
       const addSubheading = (title: string) => {
         if (y > 260) {
           doc.addPage();
-          pdfHeader(doc, "AINM Complete Report Pack", record, logoData);
+          pdfHeader(doc, record, logoData);
           y = 38;
         }
         y = pdfSubsection(doc, title, y);
@@ -2552,7 +2589,7 @@ export default function HseAinmPage() {
 
       if (y > 235) {
         doc.addPage();
-        pdfHeader(doc, "AINM Complete Report Pack", record, logoData);
+        pdfHeader(doc, record, logoData);
         y = 38;
       }
 
@@ -2588,7 +2625,7 @@ export default function HseAinmPage() {
 
       if (y > 225) {
         doc.addPage();
-        pdfHeader(doc, "AINM Complete Report Pack", record, logoData);
+        pdfHeader(doc, record, logoData);
         y = 38;
       }
 
@@ -2604,26 +2641,27 @@ export default function HseAinmPage() {
           ? evidenceWithUrls.map(({ file }) => [file.stage, file.file_name, formatFileSize(file.file_size), displayDateTime(file.uploaded_at), ""])
           : [["", "", "", "", ""]],
         theme: "grid",
-        styles: { fontSize: 8, cellPadding: 2, textColor: [0, 0, 0], lineColor: [208, 208, 206], lineWidth: 0.15 },
-        headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
+        styles: { font: exportTypography.pdfFont, fontSize: exportTypography.tablePt, cellPadding: 2, textColor: [...exportRgb.ink], lineColor: [...exportRgb.border], lineWidth: 0.15 },
+        headStyles: { fillColor: [...exportRgb.page], textColor: [...exportRgb.ink], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [...exportRgb.page] },
         margin: { left: 12, right: 12 },
         columnStyles: { 0: { cellWidth: 24 }, 2: { cellWidth: 22 }, 3: { cellWidth: 34 }, 4: { cellWidth: 28 } },
         didDrawCell: (data) => {
           if (data.section === "body" && data.column.index === 4) {
             const item = evidenceWithUrls[data.row.index];
             if (item?.url) {
-              doc.setFont("helvetica", "bold");
-              doc.setFontSize(8);
-              doc.setTextColor(0, 86, 112);
+              doc.setFont(exportTypography.pdfFont, "bold");
+              doc.setFontSize(exportTypography.tablePt);
+              doc.setTextColor(...exportRgb.brand);
               doc.textWithLink("Open Evidence", data.cell.x + 2, data.cell.y + 5, { url: item.url });
-              doc.setFont("helvetica", "normal");
-              doc.setTextColor(0, 0, 0);
+              doc.setFont(exportTypography.pdfFont, "normal");
+              doc.setTextColor(...exportRgb.ink);
             }
           }
         },
       });
 
-      pdfFooter(doc);
+      pdfFooter(doc, "AINM Complete Report Pack");
       const fileName = `${record.ainm_number}-complete-ainm-report.pdf`;
       doc.save(fileName);
 
