@@ -30,6 +30,7 @@ import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { exportColours, exportRgb, exportTypography } from "../../src/lib/exportTheme";
 import { supabase } from "../../src/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -363,6 +364,31 @@ function wordText(value: string | null | undefined) {
   return text;
 }
 
+function narrativeParagraphs(value: string | null | undefined) {
+  const paragraphs: string[] = [];
+  let currentParagraph = "";
+
+  const flushParagraph = () => {
+    if (currentParagraph) paragraphs.push(currentParagraph);
+    currentParagraph = "";
+  };
+
+  for (const rawLine of (value || "").replace(/\r\n?/g, "\n").split("\n")) {
+    const line = rawLine.replace(/[\t\u00a0 ]+/g, " ").trim();
+    if (!line) {
+      flushParagraph();
+      continue;
+    }
+
+    const startsListItem = /^(?:\d+[.)]|[-*])\s+/.test(line);
+    if (currentParagraph && startsListItem) flushParagraph();
+    currentParagraph = currentParagraph ? `${currentParagraph} ${line}` : line;
+  }
+
+  flushParagraph();
+  return paragraphs;
+}
+
 function wordParagraph(text: string, options?: { bold?: boolean; size?: number; color?: string; spacingAfter?: number }) {
   return new Paragraph({
     spacing: { after: options?.spacingAfter ?? 120 },
@@ -479,27 +505,45 @@ function wordKeyValueTable(rows: Array<[string, string, string, string]>) {
 }
 
 function wordParagraphBox(label: string, value: string | null | undefined) {
+  const paragraphs = narrativeParagraphs(value);
+
   return [
     wordParagraph(label, { bold: true, size: 18, color: "000000", spacingAfter: 60 }),
     wordTable(
       [
         new TableRow({
-          cantSplit: true,
           children: [
             wordCell(
-              [
-                new Paragraph({
-                  spacing: { line: 235 },
-                  children: [
-                    new TextRun({
-                      text: wordText(value),
-                      font: "Azo Sans",
-                      size: 18,
-                      color: "000000",
+              paragraphs.length
+                ? paragraphs.map(
+                    (paragraph, index) =>
+                      new Paragraph({
+                        spacing: {
+                          line: 235,
+                          after: index < paragraphs.length - 1 ? 90 : 0,
+                        },
+                        children: [
+                          new TextRun({
+                            text: paragraph,
+                            font: exportTypography.wordFont,
+                            size: exportTypography.bodyPt * 2,
+                            color: exportColours.ink,
+                          }),
+                        ],
+                      })
+                  )
+                : [
+                    new Paragraph({
+                      spacing: { line: 235 },
+                      children: [
+                        new TextRun({
+                          text: "",
+                          font: exportTypography.wordFont,
+                          size: exportTypography.bodyPt * 2,
+                        }),
+                      ],
                     }),
                   ],
-                }),
-              ],
               {
                 width: 9360,
                 fill: "FFFFFF",
@@ -2106,6 +2150,8 @@ function NcrCapaPageContent() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 14;
+      const contentTop = 18;
+      const contentBottom = pageHeight - 18;
       const title = externalFacingPdf
         ? "Supplier / Client NCR Response Form"
         : "Non-Conformance Report";
@@ -2177,39 +2223,73 @@ function NcrCapaPageContent() {
       let y = ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 44) + 8;
 
       const drawHeading = (heading: string) => {
-        if (y > pageHeight - 40) {
+        if (y > contentBottom - 12) {
           doc.addPage();
-          y = 18;
+          y = contentTop;
         }
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
+        doc.setFont(exportTypography.pdfFont, "bold");
+        doc.setFontSize(exportTypography.headingPt);
+        doc.setTextColor(...exportRgb.ink);
         doc.text(heading, margin, y);
         y += 5;
       };
 
       const drawParagraphBox = (label: string, value: string, minHeight = 22) => {
-        if (y > pageHeight - 55) {
-          doc.addPage();
-          y = 18;
+        const paragraphs = narrativeParagraphs(getPdfText(value));
+        doc.setFont(exportTypography.pdfFont, "normal");
+        doc.setFontSize(exportTypography.bodyPt);
+        const lines = paragraphs.flatMap((paragraph, index) => [
+          ...(index > 0 ? [""] : []),
+          ...doc.splitTextToSize(paragraph, pageWidth - margin * 2 - 4),
+        ]);
+        const lineHeight = 4.5;
+        let lineIndex = 0;
+        let fragmentIndex = 0;
+
+        do {
+          const continuationLabel = fragmentIndex === 0 ? label : `${label} (continued)`;
+          if (y + 2 + minHeight > contentBottom) {
+            doc.addPage();
+            y = contentTop;
+          }
+
+          doc.setFont(exportTypography.pdfFont, "bold");
+          doc.setFontSize(exportTypography.bodyPt + 0.5);
+          doc.setTextColor(...exportRgb.ink);
+          doc.text(continuationLabel, margin, y);
+
+          const boxY = y + 2;
+          const availableHeight = contentBottom - boxY;
+          const maximumLineCount = Math.max(1, Math.floor((availableHeight - 6) / lineHeight));
+          const fragmentLines = lines.slice(lineIndex, lineIndex + maximumLineCount);
+          const hasMore = lineIndex + fragmentLines.length < lines.length;
+          const bodyHeight = hasMore
+            ? availableHeight
+            : Math.max(minHeight, fragmentLines.length * lineHeight + 6);
+
+          doc.setDrawColor(...exportRgb.border);
+          doc.setFillColor(...exportRgb.white);
+          doc.roundedRect(margin, boxY, pageWidth - margin * 2, bodyHeight, 1.8, 1.8, "FD");
+          if (fragmentLines.length > 0) {
+            doc.setFont(exportTypography.pdfFont, "normal");
+            doc.setFontSize(exportTypography.bodyPt);
+            doc.setTextColor(...exportRgb.ink);
+            doc.text(fragmentLines, margin + 2, y + 7);
+          }
+
+          lineIndex += fragmentLines.length;
+          y += bodyHeight + 8;
+          fragmentIndex += 1;
+
+          if (hasMore) {
+            doc.addPage();
+            y = contentTop;
+          }
+        } while (lineIndex < lines.length);
+
+        if (lines.length === 0) {
+          y = Math.max(y, contentTop);
         }
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9.5);
-        doc.setTextColor(0, 0, 0);
-        doc.text(label, margin, y);
-        const text = getPdfText(value);
-        const lines = text ? doc.splitTextToSize(text, pageWidth - margin * 2 - 4) : [];
-        const bodyHeight = Math.max(minHeight, lines.length * 4.5 + 6);
-        doc.setDrawColor(208, 208, 206);
-        doc.setFillColor(255, 255, 255);
-        doc.roundedRect(margin, y + 2, pageWidth - margin * 2, bodyHeight, 1.8, 1.8, "FD");
-        if (lines.length > 0) {
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(9.2);
-          doc.setTextColor(83, 86, 90);
-          doc.text(lines, margin + 2, y + 7);
-        }
-        y += bodyHeight + 8;
       };
 
       const drawKeyValueTable = (rows: Array<[string, string]>) => {
@@ -2305,7 +2385,7 @@ function NcrCapaPageContent() {
               overflow: "linebreak",
             },
               headStyles: {
-                fillColor: [0, 0, 0],
+                fillColor: [...exportRgb.brand],
                 textColor: [255, 255, 255],
                 fontStyle: "bold",
               },
@@ -2582,12 +2662,12 @@ function NcrCapaPageContent() {
               [
                 new TableRow({
                   children: [
-                    wordCell("Record", { fill: "000000", color: "FFFFFF", bold: true, width: 1200 }),
-                    wordCell("File Name", { fill: "000000", color: "FFFFFF", bold: true, width: 2600 }),
-                    wordCell("Type", { fill: "000000", color: "FFFFFF", bold: true, width: 1200 }),
-                    wordCell("Uploaded", { fill: "000000", color: "FFFFFF", bold: true, width: 1600 }),
-                    wordCell("Reference", { fill: "000000", color: "FFFFFF", bold: true, width: 1800 }),
-                    wordCell("Link", { fill: "000000", color: "FFFFFF", bold: true, width: 960 }),
+                    wordCell("Record", { fill: exportColours.brand, color: exportColours.white, bold: true, width: 1200 }),
+                    wordCell("File Name", { fill: exportColours.brand, color: exportColours.white, bold: true, width: 2600 }),
+                    wordCell("Type", { fill: exportColours.brand, color: exportColours.white, bold: true, width: 1200 }),
+                    wordCell("Uploaded", { fill: exportColours.brand, color: exportColours.white, bold: true, width: 1600 }),
+                    wordCell("Reference", { fill: exportColours.brand, color: exportColours.white, bold: true, width: 1800 }),
+                    wordCell("Link", { fill: exportColours.brand, color: exportColours.white, bold: true, width: 960 }),
                   ],
                 }),
                 ...selectedNcrPdfEvidence.map((file) => {
