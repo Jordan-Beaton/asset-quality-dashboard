@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Bar,
   BarChart,
@@ -85,14 +85,26 @@ type AuditFindingRow = {
   description?: string | null;
   clause?: string | null;
   reference?: string | null;
+  due_date?: string | null;
 };
 
 type DocumentSummary = {
   id: string;
+  document_number: string | null;
+  title: string | null;
   status: string | null;
   review_approval_status: string | null;
   next_review_date: string | null;
   department_owner: string | null;
+};
+
+type QualitySignalItem = {
+  id: string;
+  type: "NCR" | "Audit Finding" | "MOC" | "Action" | "Document";
+  number: string;
+  title: string;
+  detail: string;
+  href: string;
 };
 
 type MocRecord = {
@@ -303,12 +315,15 @@ function getChartPayloadName(data: unknown) {
   return "";
 }
 
-export default function Home() {
+function QualityDashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const linkedView = searchParams.get("view")?.trim() || "";
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [audits, setAudits] = useState<AuditRecord[]>([]);
+  const auditNumberById = useMemo(() => new Map(audits.map((audit) => [audit.id, audit.audit_number])), [audits]);
   const [auditFindings, setAuditFindings] = useState<AuditFindingRow[]>([]);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const hseqDocuments = useMemo(
@@ -320,7 +335,25 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
-  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning">("overview");
+  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning">(
+    linkedView === "planning" || linkedView === "analytics" ? linkedView : "overview"
+  );
+  const criticalPressureRef = useRef<HTMLDivElement | null>(null);
+  const openWorkloadRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (linkedView === "planning" || linkedView === "analytics") {
+      setDashboardView(linkedView);
+    }
+  }, [linkedView]);
+
+  useEffect(() => {
+    if (dashboardView !== "planning") return;
+    const hash = window.location.hash.replace("#", "");
+    const target = hash === "critical-pressure" ? criticalPressureRef.current : hash === "open-workload" ? openWorkloadRef.current : null;
+    if (!target) return;
+    window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  }, [dashboardView]);
 
   async function fetchDashboardData() {
     setIsLoading(true);
@@ -344,7 +377,7 @@ export default function Home() {
       supabase.from("audits").select("*"),
       supabase.from("audit_findings").select("*"),
       supabase.from("asset_quality").select("id,asset_id"),
-      supabase.from("documents").select("id,status,review_approval_status,next_review_date,department_owner"),
+      supabase.from("documents").select("id,document_number,title,status,review_approval_status,next_review_date,department_owner"),
       supabase
         .from("moc_reports")
         .select("id,moc_report_no,moc_report_title,change_type,status,temporary_valid_to,created_at,updated_at"),
@@ -699,8 +732,6 @@ export default function Home() {
     const closedNcrs = yearNcrs.filter((item) => isClosedLikeStatus(item.status)).length;
     const totalFindings = yearAuditFindings.length;
     const closedFindings = yearAuditFindings.filter((item) => isClosedLikeStatus(item.status)).length;
-    const totalDocs = hseqDocuments.length;
-    const docsInDate = hseqDocuments.filter((document) => getDocumentBucket(document) !== "Overdue").length;
     const totalMocs = yearMocs.length;
     const closedMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "closed").length;
     const openActions = qualityActions.filter((item) => !isClosedLikeStatus(item.status)).length;
@@ -708,15 +739,13 @@ export default function Home() {
 
     const ncrClosure = percentage(closedNcrs, totalNcrs);
     const findingClosure = percentage(closedFindings, totalFindings);
-    const documentHealth = percentage(docsInDate, totalDocs);
     const mocClosure = percentage(closedMocs, totalMocs);
-    const score = clampPercent((ncrClosure * 0.24) + (findingClosure * 0.24) + (documentHealth * 0.22) + (mocClosure * 0.15) + (actionPressureScore * 0.15));
+    const score = clampPercent((ncrClosure * 0.3) + (findingClosure * 0.3) + (mocClosure * 0.2) + (actionPressureScore * 0.2));
 
     return {
       score,
       ncrClosure,
       findingClosure,
-      documentHealth,
       mocClosure,
       actionPressureScore,
       openWorkload: openNcrs + openAuditFindings + openMocs + openQualityActions,
@@ -724,7 +753,6 @@ export default function Home() {
       warningItems: dueSoonNcrs + nearingTemporaryMocs,
     };
   }, [
-    hseqDocuments,
     dueSoonNcrs,
     expiredTemporaryMocs,
     qualityActions,
@@ -740,6 +768,119 @@ export default function Home() {
     yearMocs,
     yearNcrs,
   ]);
+
+  const criticalPressureItems = useMemo<QualitySignalItem[]>(() => {
+    const items: QualitySignalItem[] = [];
+
+    yearNcrs.forEach((item) => {
+      if (isClosedLikeStatus(item.status)) return;
+      const days = getDaysFromToday(item.due_date || null);
+      if (days === null || days >= 0) return;
+      items.push({
+        id: `ncr-${item.id}`,
+        type: "NCR",
+        number: item.ncr_number || "-",
+        title: item.title || "Untitled NCR",
+        detail: `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`,
+        href: buildHref("/ncr-capa", { search: item.ncr_number || "" }),
+      });
+    });
+
+    qualityActions.forEach((action) => {
+      if (isClosedLikeStatus(action.status)) return;
+      const days = getDaysFromToday(action.due_date);
+      if (days === null || days >= 0) return;
+      items.push({
+        id: `action-${action.id}`,
+        type: "Action",
+        number: action.action_number || "-",
+        title: action.title || "Untitled action",
+        detail: `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`,
+        href: buildHref("/actions", { search: action.action_number || "" }),
+      });
+    });
+
+    hseqDocuments.forEach((document) => {
+      if (getDocumentBucket(document) !== "Overdue") return;
+      items.push({
+        id: `document-${document.id}`,
+        type: "Document",
+        number: document.document_number || "-",
+        title: document.title || "Untitled document",
+        detail: `Review was due ${formatDate(document.next_review_date)}`,
+        href: buildHref("/documents", { search: document.document_number || "" }),
+      });
+    });
+
+    yearMocs.forEach((item) => {
+      if (!isExpiredTemporaryMoc(item)) return;
+      items.push({
+        id: `moc-${item.id}`,
+        type: "MOC",
+        number: item.moc_report_no || "-",
+        title: item.moc_report_title || "Untitled MOC",
+        detail: `Temporary change expired ${formatDate(item.temporary_valid_to)}`,
+        href: buildHref("/moc", { search: item.moc_report_no || "" }),
+      });
+    });
+
+    return items;
+  }, [yearNcrs, qualityActions, hseqDocuments, yearMocs]);
+
+  const openWorkloadItems = useMemo<QualitySignalItem[]>(() => {
+    const items: QualitySignalItem[] = [];
+
+    yearNcrs.forEach((item) => {
+      if (isClosedLikeStatus(item.status)) return;
+      items.push({
+        id: `ncr-${item.id}`,
+        type: "NCR",
+        number: item.ncr_number || "-",
+        title: item.title || "Untitled NCR",
+        detail: item.due_date ? `Due ${formatDate(item.due_date)}` : "No due date",
+        href: buildHref("/ncr-capa", { search: item.ncr_number || "" }),
+      });
+    });
+
+    yearAuditFindings.forEach((finding) => {
+      if (isClosedLikeStatus(finding.status)) return;
+      const auditNumber = auditNumberById.get(finding.audit_id) || "";
+      items.push({
+        id: `finding-${finding.id}`,
+        type: "Audit Finding",
+        number: auditNumber ? `${auditNumber} · ${finding.reference || "-"}` : finding.reference || "-",
+        title: finding.description || "Untitled finding",
+        detail: finding.due_date ? `Due ${formatDate(finding.due_date)}` : "No due date",
+        href: buildHref("/audits", { view: "open-findings", findingId: finding.id }),
+      });
+    });
+
+    yearMocs.forEach((item) => {
+      if (normaliseStatus(item.status) === "closed") return;
+      items.push({
+        id: `moc-${item.id}`,
+        type: "MOC",
+        number: item.moc_report_no || "-",
+        title: item.moc_report_title || "Untitled MOC",
+        detail: item.status || "Open",
+        href: buildHref("/moc", { search: item.moc_report_no || "" }),
+      });
+    });
+
+    qualityActions.forEach((action) => {
+      if (isClosedLikeStatus(action.status)) return;
+      items.push({
+        id: `action-${action.id}`,
+        type: "Action",
+        number: action.action_number || "-",
+        title: action.title || "Untitled action",
+        detail: action.due_date ? `Due ${formatDate(action.due_date)}` : "No due date",
+        href: buildHref("/actions", { search: action.action_number || "" }),
+      });
+    });
+
+    return items;
+  }, [yearNcrs, yearAuditFindings, auditNumberById, yearMocs, qualityActions]);
 
   const operationalPressureData = useMemo(
     () => [
@@ -972,15 +1113,15 @@ export default function Home() {
       {
         label: "Critical pressure",
         value: qualityPulse.criticalItems,
-        detail: "Overdue NCRs, actions, documents, and expired temporary MOCs",
-        href: qualityPulse.criticalItems ? buildHref("/management-review") : buildHref("/quality"),
+        detail: "Overdue NCRs, actions, HSEQ documents, and expired temporary MOCs",
+        href: `${buildHref("/quality", { view: "planning" })}#critical-pressure`,
         accent: "#F93822",
       },
       {
         label: "Open workload",
         value: qualityPulse.openWorkload,
         detail: "Open NCRs, findings, MOCs, and Quality actions",
-        href: buildHref("/actions", { view: "register", department: "Quality" }),
+        href: `${buildHref("/quality", { view: "planning" })}#open-workload`,
         accent: "#63B1BC",
       },
       {
@@ -1242,7 +1383,7 @@ export default function Home() {
             <span style={commandEyebrowStyle}>Live Quality Pulse</span>
             <h2 style={commandTitleStyle}>Operational control score</h2>
             <p style={commandTextStyle}>
-              Weighted from NCR closure, audit finding closure, document review health, MOC closure, and Quality action pressure.
+              Weighted from NCR closure, audit finding closure, MOC closure, and Quality action pressure.
             </p>
           </div>
           <Link
@@ -1769,6 +1910,67 @@ export default function Home() {
 
       {dashboardView === "planning" ? <div className="quality-view-panel" role="tabpanel">
       <section className="quality-bottom-grid" style={bottomGridStyle}>
+        <div ref={criticalPressureRef}>
+          <SectionCard
+            title="Critical Pressure Items"
+            subtitle="Overdue NCRs, actions, HSEQ documents, and expired temporary MOCs."
+          >
+            {isLoading ? (
+              <p style={emptyTextStyle}>Loading critical pressure items...</p>
+            ) : criticalPressureItems.length === 0 ? (
+              <p style={emptyTextStyle}>Nothing overdue or expired right now.</p>
+            ) : (
+              <div style={stackCompactStyle}>
+                {criticalPressureItems.slice(0, 8).map((item) => (
+                  <Link key={item.id} href={item.href} className="quality-work-item" style={workItemStyle}>
+                    <div style={workItemTopStyle}>
+                      <div style={workItemNumberStyle}>{item.type} · {item.number}</div>
+                      <StatusBadge value="Overdue" />
+                    </div>
+                    <div style={workItemTitleStyle}>{item.title}</div>
+                    <div style={workItemMetaStyle}>
+                      <span>{item.detail}</span>
+                    </div>
+                  </Link>
+                ))}
+                {criticalPressureItems.length > 8 ? (
+                  <p style={emptyTextStyle}>+{criticalPressureItems.length - 8} more not shown.</p>
+                ) : null}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+
+        <div ref={openWorkloadRef}>
+          <SectionCard
+            title="Open Workload Items"
+            subtitle="Open NCRs, findings, MOCs, and Quality actions."
+          >
+            {isLoading ? (
+              <p style={emptyTextStyle}>Loading open workload items...</p>
+            ) : openWorkloadItems.length === 0 ? (
+              <p style={emptyTextStyle}>No open Quality workload right now.</p>
+            ) : (
+              <div style={stackCompactStyle}>
+                {openWorkloadItems.slice(0, 8).map((item) => (
+                  <Link key={item.id} href={item.href} className="quality-work-item" style={workItemStyle}>
+                    <div style={workItemTopStyle}>
+                      <div style={workItemNumberStyle}>{item.type} · {item.number}</div>
+                    </div>
+                    <div style={workItemTitleStyle}>{item.title}</div>
+                    <div style={workItemMetaStyle}>
+                      <span>{item.detail}</span>
+                    </div>
+                  </Link>
+                ))}
+                {openWorkloadItems.length > 8 ? (
+                  <p style={emptyTextStyle}>+{openWorkloadItems.length - 8} more not shown.</p>
+                ) : null}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+
         <SectionCard
           title="Quality Priority Actions"
           subtitle="Top five overdue or high-priority Quality-owned actions."
@@ -1924,6 +2126,14 @@ export default function Home() {
       </section>
       </div> : null}
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<main style={{ padding: "24px" }}>Loading quality dashboard...</main>}>
+      <QualityDashboardContent />
+    </Suspense>
   );
 }
 
