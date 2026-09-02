@@ -1108,6 +1108,7 @@ function DocumentsPageContent() {
     (doc) => getReviewTone(doc.next_review_date).label === "Overdue"
   ).length;
   const dueSoonReviews = dueSoonDocuments.length;
+  const docsInDatePercent = totalDocuments ? Math.round(((totalDocuments - overdueReviews) / totalDocuments) * 100) : 100;
   const missingReviewDate = documents.filter(
     (doc) => !doc.next_review_date && (doc.status || "").trim().toLowerCase() === "live"
   ).length;
@@ -3033,6 +3034,12 @@ function DocumentsPageContent() {
           value={dueSoonReviews}
           accent="#FFAD00"
           onClick={() => applySnapshotFilter({ review: "Due soon" })}
+        />
+        <QualityKpiCard
+          title="Docs In Date"
+          value={`${docsInDatePercent}%`}
+          accent={docsInDatePercent >= 80 ? "#005670" : docsInDatePercent >= 50 ? "#FFAD00" : "#F93822"}
+          onClick={() => applySnapshotFilter({ review: "Overdue" })}
         />
       </section>
       ) : null}

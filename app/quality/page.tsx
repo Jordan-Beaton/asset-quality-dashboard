@@ -92,6 +92,7 @@ type DocumentSummary = {
   status: string | null;
   review_approval_status: string | null;
   next_review_date: string | null;
+  department_owner: string | null;
 };
 
 type MocRecord = {
@@ -310,6 +311,10 @@ export default function Home() {
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [auditFindings, setAuditFindings] = useState<AuditFindingRow[]>([]);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const hseqDocuments = useMemo(
+    () => documents.filter((document) => (document.department_owner || "").trim() === "HSEQ"),
+    [documents]
+  );
   const [mocs, setMocs] = useState<MocRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -339,7 +344,7 @@ export default function Home() {
       supabase.from("audits").select("*"),
       supabase.from("audit_findings").select("*"),
       supabase.from("asset_quality").select("id,asset_id"),
-      supabase.from("documents").select("id,status,review_approval_status,next_review_date"),
+      supabase.from("documents").select("id,status,review_approval_status,next_review_date,department_owner"),
       supabase
         .from("moc_reports")
         .select("id,moc_report_no,moc_report_title,change_type,status,temporary_valid_to,created_at,updated_at"),
@@ -451,7 +456,7 @@ export default function Home() {
     return days !== null && days < 0;
   }).length;
 
-  const overdueDocuments = documents.filter((doc) => getDocumentBucket(doc) === "Overdue").length;
+  const overdueDocuments = hseqDocuments.filter((doc) => getDocumentBucket(doc) === "Overdue").length;
   const expiredTemporaryMocs = yearMocs.filter((item) => isExpiredTemporaryMoc(item)).length;
   const nearingTemporaryMocs = yearMocs.filter((item) => isNearingTemporaryMoc(item)).length;
 
@@ -666,8 +671,8 @@ export default function Home() {
     const closedNcrs = yearNcrs.filter((item) => isClosedLikeStatus(item.status)).length;
     const totalFindings = yearAuditFindings.length;
     const closedFindings = yearAuditFindings.filter((item) => isClosedLikeStatus(item.status)).length;
-    const totalDocs = documents.length;
-    const docsInDate = documents.filter((document) => getDocumentBucket(document) !== "Overdue").length;
+    const totalDocs = hseqDocuments.length;
+    const docsInDate = hseqDocuments.filter((document) => getDocumentBucket(document) !== "Overdue").length;
     const totalMocs = yearMocs.length;
     const closedMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "closed").length;
 
@@ -680,22 +685,22 @@ export default function Home() {
         href: buildHref("/audits", { view: "findings" }),
       },
       {
-        name: "Docs In Date",
+        name: "HSEQ Docs In Date",
         value: percentage(docsInDate, totalDocs),
         fill: "#63B1BC",
         href: buildHref("/documents", { view: "dashboard" }),
       },
       { name: "MOC Closure", value: percentage(closedMocs, totalMocs), fill: "#005670", href: "/moc" },
     ];
-  }, [documents, yearAuditFindings, yearMocs, yearNcrs]);
+  }, [hseqDocuments, yearAuditFindings, yearMocs, yearNcrs]);
 
   const qualityPulse = useMemo(() => {
     const totalNcrs = yearNcrs.length;
     const closedNcrs = yearNcrs.filter((item) => isClosedLikeStatus(item.status)).length;
     const totalFindings = yearAuditFindings.length;
     const closedFindings = yearAuditFindings.filter((item) => isClosedLikeStatus(item.status)).length;
-    const totalDocs = documents.length;
-    const docsInDate = documents.filter((document) => getDocumentBucket(document) !== "Overdue").length;
+    const totalDocs = hseqDocuments.length;
+    const docsInDate = hseqDocuments.filter((document) => getDocumentBucket(document) !== "Overdue").length;
     const totalMocs = yearMocs.length;
     const closedMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "closed").length;
     const openActions = qualityActions.filter((item) => !isClosedLikeStatus(item.status)).length;
@@ -719,7 +724,7 @@ export default function Home() {
       warningItems: dueSoonNcrs + nearingTemporaryMocs,
     };
   }, [
-    documents,
+    hseqDocuments,
     dueSoonNcrs,
     expiredTemporaryMocs,
     qualityActions,
