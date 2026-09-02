@@ -707,20 +707,22 @@ function QualityDashboardContent() {
     const closedMocs = yearMocs.filter((item) => normaliseStatus(item.status) === "closed").length;
 
     return [
-      { name: "NCR Closure", value: percentage(closedNcrs, totalNcrs), fill: "#005670", href: "/ncr-capa" },
+      { name: "NCR Closure", value: percentage(closedNcrs, totalNcrs), hasData: totalNcrs > 0, fill: "#005670", href: "/ncr-capa" },
       {
         name: "Finding Closure",
         value: percentage(closedFindings, totalFindings),
+        hasData: totalFindings > 0,
         fill: "#53565A",
         href: buildHref("/audits", { view: "findings" }),
       },
       {
         name: "HSEQ Docs In Date",
         value: percentage(docsInDate, totalDocs),
+        hasData: totalDocs > 0,
         fill: "#63B1BC",
         href: buildHref("/documents", { view: "dashboard" }),
       },
-      { name: "MOC Closure", value: percentage(closedMocs, totalMocs), fill: "#005670", href: "/moc" },
+      { name: "MOC Closure", value: percentage(closedMocs, totalMocs), hasData: totalMocs > 0, fill: "#005670", href: "/moc" },
     ];
   }, [hseqDocuments, yearAuditFindings, yearMocs, yearNcrs]);
 
@@ -737,7 +739,21 @@ function QualityDashboardContent() {
     const ncrClosure = percentage(closedNcrs, totalNcrs);
     const findingClosure = percentage(closedFindings, totalFindings);
     const mocClosure = percentage(closedMocs, totalMocs);
-    const score = clampPercent((ncrClosure * 0.3) + (findingClosure * 0.3) + (mocClosure * 0.2) + (actionPressureScore * 0.2));
+
+    // A control with zero live records (e.g. no MOCs raised this year) has nothing to
+    // measure and must not be scored as a 0% failure; exclude it and redistribute its
+    // weight across the components that do have data, rather than dragging the score down.
+    const scoreComponents = [
+      { value: ncrClosure, weight: 0.3, hasData: totalNcrs > 0 },
+      { value: findingClosure, weight: 0.3, hasData: totalFindings > 0 },
+      { value: mocClosure, weight: 0.2, hasData: totalMocs > 0 },
+      { value: actionPressureScore, weight: 0.2, hasData: true },
+    ];
+    const activeComponents = scoreComponents.filter((component) => component.hasData);
+    const activeWeight = activeComponents.reduce((sum, component) => sum + component.weight, 0);
+    const score = activeWeight
+      ? clampPercent(activeComponents.reduce((sum, component) => sum + component.value * component.weight, 0) / activeWeight)
+      : 0;
 
     return {
       score,
@@ -1502,7 +1518,13 @@ function QualityDashboardContent() {
               <p style={{ ...sectionSubtitleStyle, color: "rgba(255,255,255,0.78)" }}>Closure strength across the core controls.</p>
             </div>
             <span style={healthAveragePillStyle}>
-              {isLoading ? "-" : `${Math.round(qualityHealthData.reduce((sum, item) => sum + item.value, 0) / Math.max(qualityHealthData.length, 1))}% avg`}
+              {isLoading
+                ? "-"
+                : (() => {
+                    const withData = qualityHealthData.filter((item) => item.hasData);
+                    if (!withData.length) return "No data avg";
+                    return `${Math.round(withData.reduce((sum, item) => sum + item.value, 0) / withData.length)}% avg`;
+                  })()}
             </span>
           </div>
           <div style={analyticsHealthListStyle}>
@@ -1510,10 +1532,10 @@ function QualityDashboardContent() {
               <Link key={item.name} href={item.href} className="quality-health-card" style={analyticsHealthRowStyle}>
                 <div style={analyticsHealthRowTopStyle}>
                   <span>{item.name}</span>
-                  <strong>{isLoading ? "-" : `${item.value}%`}</strong>
+                  <strong>{isLoading ? "-" : item.hasData ? `${item.value}%` : "No data"}</strong>
                 </div>
                 <div style={healthGaugeTrackStyle}>
-                  <div style={{ ...healthGaugeFillStyle, width: `${item.value}%`, background: item.fill }} />
+                  <div style={{ ...healthGaugeFillStyle, width: item.hasData ? `${item.value}%` : "0%", background: item.fill }} />
                 </div>
               </Link>
             ))}
