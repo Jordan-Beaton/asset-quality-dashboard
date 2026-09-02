@@ -7,7 +7,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Bar,
   BarChart,
@@ -81,6 +81,9 @@ type FindingOption = {
   audit_id: string;
   reference: string;
   description: string;
+  owner: string;
+  status: string;
+  due_date: string;
 };
 
 type NcrCapaOption = {
@@ -88,6 +91,24 @@ type NcrCapaOption = {
   id: string;
   number: string;
   title: string;
+  owner: string;
+  status: string;
+  due_date: string;
+  project: string;
+};
+
+type MyWorkItemSource = "Action" | "NCR" | "Audit Finding" | "AINM" | "Observation";
+
+type MyWorkItem = {
+  id: string;
+  source: MyWorkItemSource;
+  number: string;
+  title: string;
+  project: string;
+  status: string | null;
+  due_date: string | null;
+  action: ActionItem | null;
+  href: string | null;
 };
 
 type MocOption = {
@@ -103,6 +124,8 @@ type AinmOption = {
   project: string;
   event_date: string;
   classification: string;
+  owner: string;
+  status: string;
 };
 
 type AssetOption = {
@@ -154,6 +177,8 @@ type ObservationOption = {
   site_location: string;
   observation_date: string;
   observation_type: string;
+  assigned_to: string;
+  status: string;
 };
 
 type ActionPerson = {
@@ -572,7 +597,7 @@ function getDaysFromToday(value: string | null | undefined) {
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
 }
 
-function isOverdue(action: ActionItem) {
+function isOverdue(action: { due_date: string | null; status: string | null }) {
   if (!action.due_date) return false;
   if (isClosedLikeStatus(action.status)) return false;
 
@@ -811,6 +836,7 @@ function buildActionFormFromItem(action: ActionItem): ActionForm {
 
 function ActionsPageContent() {
   const imsPermissions = useImsPermissions();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const linkedStatus = searchParams.get("status")?.trim() || "";
@@ -955,6 +981,9 @@ function ActionsPageContent() {
   const [showClosedOnly, setShowClosedOnly] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
   const [myActionFilter, setMyActionFilter] = useState<MyActionFilter>("all");
+  const [showMyItemFilters, setShowMyItemFilters] = useState(false);
+  const [myItemStatusFilter, setMyItemStatusFilter] = useState("");
+  const [myItemTypeFilter, setMyItemTypeFilter] = useState("");
   const [showEvidenceOnly, setShowEvidenceOnly] = useState(false);
   const [showLinkedIssuesOnly, setShowLinkedIssuesOnly] = useState(false);
   const [dueStartFilter, setDueStartFilter] = useState(0);
@@ -1061,7 +1090,7 @@ function ActionsPageContent() {
   async function loadFindingOptions() {
     const { data, error } = await supabase
       .from("audit_findings")
-      .select("id,audit_id,reference,description")
+      .select("id,audit_id,reference,description,owner,status,due_date")
       .order("reference", { ascending: true });
 
     if (error) return;
@@ -1072,6 +1101,9 @@ function ActionsPageContent() {
         audit_id: String(row.audit_id || ""),
         reference: String(row.reference || ""),
         description: String(row.description || ""),
+        owner: String(row.owner || ""),
+        status: String(row.status || ""),
+        due_date: String(row.due_date || ""),
       }))
       .filter((row) => row.id && row.audit_id && row.reference);
 
@@ -1080,7 +1112,7 @@ function ActionsPageContent() {
 
   async function loadNcrCapaOptions() {
     const [ncrRes, capaRes] = await Promise.all([
-      supabase.from("ncrs").select("id,ncr_number,title").order("ncr_number", { ascending: true }),
+      supabase.from("ncrs").select("id,ncr_number,title,owner,status,due_date,project").order("ncr_number", { ascending: true }),
       supabase.from("capas").select("id,capa_number,title").order("capa_number", { ascending: true }),
     ]);
 
@@ -1094,6 +1126,10 @@ function ActionsPageContent() {
             id: String(row.id || ""),
             number: String(row.ncr_number || ""),
             title: String(row.title || ""),
+            owner: String(row.owner || ""),
+            status: String(row.status || ""),
+            due_date: String(row.due_date || ""),
+            project: String(row.project || ""),
           }))
           .filter((row) => row.id && row.number)
       );
@@ -1107,6 +1143,10 @@ function ActionsPageContent() {
             id: String(row.id || ""),
             number: String(row.capa_number || ""),
             title: String(row.title || ""),
+            owner: "",
+            status: "",
+            due_date: "",
+            project: "",
           }))
           .filter((row) => row.id && row.number)
       );
@@ -1137,7 +1177,7 @@ function ActionsPageContent() {
   async function loadAinmOptions() {
     const { data, error } = await supabase
       .from("hse_ainm_records")
-      .select("id,ainm_number,title,project,event_date,event_classification")
+      .select("id,ainm_number,title,project,event_date,event_classification,owner,overall_status")
       .order("event_date", { ascending: false })
       .order("ainm_number", { ascending: false });
 
@@ -1151,6 +1191,8 @@ function ActionsPageContent() {
         project: String(row.project || ""),
         event_date: String(row.event_date || ""),
         classification: String(row.event_classification || ""),
+        owner: String(row.owner || ""),
+        status: String(row.overall_status || ""),
       }))
       .filter((row) => row.id && row.number);
 
@@ -1184,7 +1226,7 @@ function ActionsPageContent() {
   async function loadObservationOptions() {
     const { data, error } = await supabase
       .from("hse_observations")
-      .select("id,observation_number,title,project,site_location,observation_date,observation_type")
+      .select("id,observation_number,title,project,site_location,observation_date,observation_type,assigned_to,status")
       .order("created_at", { ascending: false });
 
     if (error) return;
@@ -1198,6 +1240,8 @@ function ActionsPageContent() {
         site_location: String(row.site_location || ""),
         observation_date: String(row.observation_date || ""),
         observation_type: String(row.observation_type || ""),
+        assigned_to: String(row.assigned_to || ""),
+        status: String(row.status || ""),
       }))
       .filter((row) => row.id && row.observation_number);
 
@@ -1689,45 +1733,158 @@ function ActionsPageContent() {
       .slice(0, 8);
   }, [actions]);
 
-  const myActionList = useMemo(() => {
+  const auditNumberById = useMemo(() => {
+    return new Map(auditOptions.map((audit) => [audit.id, audit.audit_number]));
+  }, [auditOptions]);
+
+  const myOwnActionItems = useMemo<MyWorkItem[]>(() => {
     if (!currentPersonName) return [];
-    return [...actions]
+    return actions
       .filter((action) => matchesPersonName(action.owner, currentPersonName))
-      .sort((a, b) => {
-        const aClosed = isClosedLikeStatus(a.status);
-        const bClosed = isClosedLikeStatus(b.status);
-        if (aClosed !== bClosed) return aClosed ? 1 : -1;
-        const aDate = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
-        const bDate = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
-        return aDate - bDate;
-      });
+      .map((action) => ({
+        id: action.id,
+        source: "Action" as const,
+        number: action.action_number || "-",
+        title: action.title || "Untitled action",
+        project: action.project || "No project",
+        status: action.status,
+        due_date: action.due_date,
+        action,
+        href: null,
+      }));
   }, [actions, currentPersonName]);
 
-  const myOverdueActions = myActionList.filter((action) => isOverdue(action));
-  const myDueThisWeekActions = myActionList.filter((action) => {
-    if (!action.due_date || isClosedLikeStatus(action.status)) return false;
-    const days = getDaysFromToday(action.due_date);
+  const myNcrItems = useMemo<MyWorkItem[]>(() => {
+    if (!currentPersonName) return [];
+    return ncrCapaOptions
+      .filter((option) => option.type === "NCR" && matchesPersonName(option.owner, currentPersonName))
+      .map((option) => ({
+        id: option.id,
+        source: "NCR" as const,
+        number: option.number || "-",
+        title: option.title || "Untitled NCR",
+        project: option.project || "No project",
+        status: option.status || null,
+        due_date: option.due_date || null,
+        action: null,
+        href: `/ncr-capa?ncrId=${option.id}`,
+      }));
+  }, [ncrCapaOptions, currentPersonName]);
+
+  const myFindingItems = useMemo<MyWorkItem[]>(() => {
+    if (!currentPersonName) return [];
+    return findingOptions
+      .filter((finding) => matchesPersonName(finding.owner, currentPersonName))
+      .map((finding) => {
+        const auditNumber = auditNumberById.get(finding.audit_id) || "";
+        return {
+          id: finding.id,
+          source: "Audit Finding" as const,
+          number: auditNumber ? `${auditNumber} · ${finding.reference || "-"}` : finding.reference || "-",
+          title: finding.description || "Untitled finding",
+          project: auditNumber ? `Audit ${auditNumber}` : "Audit finding",
+          status: finding.status || null,
+          due_date: finding.due_date || null,
+          action: null,
+          href: `/audits?findingId=${finding.id}`,
+        };
+      });
+  }, [findingOptions, auditNumberById, currentPersonName]);
+
+  const myAinmItems = useMemo<MyWorkItem[]>(() => {
+    if (!currentPersonName) return [];
+    return ainmOptions
+      .filter((option) => matchesPersonName(option.owner, currentPersonName))
+      .map((option) => ({
+        id: option.id,
+        source: "AINM" as const,
+        number: option.number || "-",
+        title: option.title || "Untitled AINM",
+        project: option.project || "No project",
+        status: option.status || null,
+        due_date: null,
+        action: null,
+        href: `/hse/ainm?ainmId=${option.id}`,
+      }));
+  }, [ainmOptions, currentPersonName]);
+
+  const myObservationItems = useMemo<MyWorkItem[]>(() => {
+    if (!currentPersonName) return [];
+    return observationOptions
+      .filter((option) => matchesPersonName(option.assigned_to, currentPersonName))
+      .map((option) => ({
+        id: option.id,
+        source: "Observation" as const,
+        number: option.observation_number || "-",
+        title: option.title || "Untitled observation",
+        project: option.project || option.site_location || "No project",
+        status: option.status || null,
+        due_date: null,
+        action: null,
+        href: `/hse/observations?observationId=${option.id}`,
+      }));
+  }, [observationOptions, currentPersonName]);
+
+  const myActionList = useMemo(() => {
+    return [...myOwnActionItems, ...myNcrItems, ...myFindingItems, ...myAinmItems, ...myObservationItems].sort((a, b) => {
+      const aClosed = isClosedLikeStatus(a.status);
+      const bClosed = isClosedLikeStatus(b.status);
+      if (aClosed !== bClosed) return aClosed ? 1 : -1;
+      const aDate = a.due_date ? new Date(a.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+      const bDate = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
+      return aDate - bDate;
+    });
+  }, [myOwnActionItems, myNcrItems, myFindingItems, myAinmItems, myObservationItems]);
+
+  const myOpenWorkItems = myActionList.filter((item) => !isClosedLikeStatus(item.status));
+  const myOverdueActions = myActionList.filter((item) => isOverdue(item));
+  const myDueThisWeekActions = myActionList.filter((item) => {
+    if (!item.due_date || isClosedLikeStatus(item.status)) return false;
+    const days = getDaysFromToday(item.due_date);
     return days !== null && days >= 0 && days <= 7;
   });
-  const myClosedActions = myActionList.filter((action) => isClosedLikeStatus(action.status));
-  const myFilteredActions = useMemo(() => {
-    if (myActionFilter === "open") return myActionList.filter((action) => !isClosedLikeStatus(action.status));
+  const myClosedActions = myActionList.filter((item) => isClosedLikeStatus(item.status));
+  const myQuickFilteredActions = useMemo(() => {
+    if (myActionFilter === "open") return myOpenWorkItems;
     if (myActionFilter === "closed") return myClosedActions;
     if (myActionFilter === "overdue") return myOverdueActions;
     if (myActionFilter === "dueWeek") return myDueThisWeekActions;
     return myActionList;
-  }, [myActionFilter, myActionList, myClosedActions, myDueThisWeekActions, myOverdueActions]);
+  }, [myActionFilter, myActionList, myClosedActions, myDueThisWeekActions, myOpenWorkItems, myOverdueActions]);
+
+  const myFilteredActions = useMemo(() => {
+    return myQuickFilteredActions.filter((item) => {
+      if (myItemStatusFilter === "Open" && isClosedLikeStatus(item.status)) return false;
+      if (myItemStatusFilter === "Closed" && !isClosedLikeStatus(item.status)) return false;
+      if (myItemTypeFilter && item.source !== myItemTypeFilter) return false;
+      return true;
+    });
+  }, [myQuickFilteredActions, myItemStatusFilter, myItemTypeFilter]);
+
+  function clearMyItemFilters() {
+    setMyActionFilter("all");
+    setMyItemStatusFilter("");
+    setMyItemTypeFilter("");
+  }
 
   const myActionFilterLabel =
     myActionFilter === "open"
-      ? "Open Actions"
+      ? "Open Items"
       : myActionFilter === "closed"
-      ? "Closed / Complete Actions"
+      ? "Closed / Complete Items"
       : myActionFilter === "overdue"
-      ? "Overdue Actions"
+      ? "Overdue Items"
       : myActionFilter === "dueWeek"
       ? "Due This Week"
-      : "All Actions";
+      : "All Items";
+
+  function openMyWorkItem(item: MyWorkItem) {
+    if (item.source === "Action" && item.action) {
+      openActionInRegister(item.action);
+      return;
+    }
+    if (item.href) router.push(item.href);
+  }
 
   const linkedAction = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -3786,16 +3943,16 @@ function ActionsPageContent() {
       {activeView === "my" ? (
         <SectionCard
           title="My Actions"
-          subtitle="Personal action view matched from the signed-in user email to the active People Management record."
+          subtitle="Personal work view matched from the signed-in user email to the active People Management record. Includes central Actions, NCRs, Audit Findings, AINMs, and Observations assigned to you."
         >
           <div style={myActionsNoticeStyle}>
             <strong>My Actions:</strong> {currentPersonNotice}
           </div>
 
           <section style={statsGridStyle}>
-            <QualityKpiCard title="My Total Actions" value={myActionList.length} accent="#005670" onClick={() => setMyActionFilter("all")} />
-            <QualityKpiCard title="My Open Actions" value={myOpenActions} accent="#63B1BC" onClick={() => setMyActionFilter("open")} />
-            <QualityKpiCard title="My Closed Actions" value={myClosedActions.length} accent="#005670" onClick={() => setMyActionFilter("closed")} />
+            <QualityKpiCard title="My Total Items" value={myActionList.length} accent="#005670" onClick={() => setMyActionFilter("all")} />
+            <QualityKpiCard title="My Open Items" value={myOpenWorkItems.length} accent="#63B1BC" onClick={() => setMyActionFilter("open")} />
+            <QualityKpiCard title="My Closed Items" value={myClosedActions.length} accent="#005670" onClick={() => setMyActionFilter("closed")} />
             <QualityKpiCard title="My Overdue" value={myOverdueActions.length} accent="#F93822" onClick={() => setMyActionFilter("overdue")} />
             <QualityKpiCard title="My Due This Week" value={myDueThisWeekActions.length} accent="#FFAD00" onClick={() => setMyActionFilter("dueWeek")} />
           </section>
@@ -3804,33 +3961,33 @@ function ActionsPageContent() {
             <>
               <div style={listGridStyle}>
                 <MiniListCard
-                  title="My Overdue Actions"
-                  emptyText="No overdue actions are assigned to you."
+                  title="My Overdue Items"
+                  emptyText="No overdue items are assigned to you."
                   onItemClick={(id) => {
-                    const action = actions.find((item) => item.id === id);
-                    if (action) openActionInRegister(action);
+                    const item = myOverdueActions.find((entry) => entry.id === id);
+                    if (item) openMyWorkItem(item);
                   }}
-                  items={myOverdueActions.slice(0, 8).map((action) => ({
-                    id: action.id,
-                    line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
-                    line2: `${action.project || "No project"} | ${getActionSourceLabel(action)} | ${getDueLabel(
-                      action.due_date
+                  items={myOverdueActions.slice(0, 8).map((item) => ({
+                    id: item.id,
+                    line1: `${item.number} - ${item.title}`,
+                    line2: `${item.project} | ${item.source === "Action" && item.action ? getActionSourceLabel(item.action) : item.source} | ${getDueLabel(
+                      item.due_date
                     )}`,
                     tone: "red" as const,
                   }))}
                 />
                 <MiniListCard
                   title="My Due This Week"
-                  emptyText="No actions assigned to you are due this week."
+                  emptyText="No items assigned to you are due this week."
                   onItemClick={(id) => {
-                    const action = actions.find((item) => item.id === id);
-                    if (action) openActionInRegister(action);
+                    const item = myDueThisWeekActions.find((entry) => entry.id === id);
+                    if (item) openMyWorkItem(item);
                   }}
-                  items={myDueThisWeekActions.slice(0, 8).map((action) => ({
-                    id: action.id,
-                    line1: `${action.action_number || "-"} - ${action.title || "Untitled action"}`,
-                    line2: `${action.project || "No project"} | ${getActionSourceLabel(action)} | ${getDueLabel(
-                      action.due_date
+                  items={myDueThisWeekActions.slice(0, 8).map((item) => ({
+                    id: item.id,
+                    line1: `${item.number} - ${item.title}`,
+                    line2: `${item.project} | ${item.source === "Action" && item.action ? getActionSourceLabel(item.action) : item.source} | ${getDueLabel(
+                      item.due_date
                     )}`,
                     tone: "amber" as const,
                   }))}
@@ -3844,17 +4001,52 @@ function ActionsPageContent() {
                     Showing {myFilteredActions.length} {myActionFilterLabel.toLowerCase()} for {currentPersonName}.
                   </p>
                 </div>
-                <button type="button" style={secondaryButtonStyle} onClick={() => setMyActionFilter("all")}>
+                <button type="button" style={secondaryButtonStyle} onClick={clearMyItemFilters}>
                   Show All Mine
                 </button>
+              </div>
+
+              <div className="ims-filter-panel" style={simpleFilterShellStyle}>
+                <div style={simpleFilterTopRowStyle}>
+                  <button type="button" onClick={clearMyItemFilters} style={secondaryButtonStyle}>
+                    Clear Filters
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowMyItemFilters((current) => !current)}
+                    style={showMyItemFilters ? secondaryButtonStyle : primaryButtonStyle}
+                  >
+                    {showMyItemFilters ? "Hide Filters" : "Show Filters"}
+                  </button>
+                </div>
+
+                {showMyItemFilters ? (
+                  <div className="ims-filter-panel" style={filterBarStyle}>
+                    <select value={myItemStatusFilter} onChange={(e) => setMyItemStatusFilter(e.target.value)} style={inputStyle}>
+                      <option value="">All Status</option>
+                      <option value="Open">Open</option>
+                      <option value="Closed">Closed</option>
+                    </select>
+
+                    <select value={myItemTypeFilter} onChange={(e) => setMyItemTypeFilter(e.target.value)} style={inputStyle}>
+                      <option value="">All Types</option>
+                      <option value="Action">Action</option>
+                      <option value="NCR">NCR</option>
+                      <option value="AINM">AINM</option>
+                      <option value="Observation">Observation</option>
+                      <option value="Audit Finding">Audit Finding</option>
+                    </select>
+                  </div>
+                ) : null}
               </div>
 
               <div style={{ overflowX: "auto" }}>
                 <table style={tableStyle}>
                   <thead>
                     <tr>
-                      <th style={tableHeadStyle}>Action No.</th>
-                      <th style={tableHeadStyle}>Title</th>
+                      <th style={tableHeadStyle}>Type</th>
+                      <th style={tableHeadStyle}>Reference</th>
+                      <th style={{ ...tableHeadStyle, ...myTitleColumnStyle }}>Title</th>
                       <th style={tableHeadStyle}>Source</th>
                       <th style={tableHeadStyle}>Linked Record</th>
                       <th style={tableHeadStyle}>Priority</th>
@@ -3866,41 +4058,42 @@ function ActionsPageContent() {
                   <tbody>
                     {myFilteredActions.length === 0 ? (
                       <tr>
-                        <td colSpan={8} style={emptyTableCellStyle}>
-                          No actions match this My Actions filter.
+                        <td colSpan={9} style={emptyTableCellStyle}>
+                          No items match this My Actions filter.
                         </td>
                       </tr>
                     ) : (
-                      myFilteredActions.map((action) => {
-                        const overdue = isOverdue(action);
+                      myFilteredActions.map((item) => {
+                        const overdue = isOverdue(item);
                         return (
                           <tr
-                            key={action.id}
+                            key={item.id}
                             style={{ ...tableRowStyle, cursor: "pointer", background: overdue ? "#ECECE7" : "white" }}
-                            onClick={() => openActionInRegister(action)}
+                            onClick={() => openMyWorkItem(item)}
                           >
-                            <td style={tableCellStyle}><div style={actionNumberCellStyle}>{action.action_number || "-"}</div></td>
-                            <td style={tableCellStyle}>
-                              <div style={primaryCellTextStyle}>{action.title || "-"}</div>
-                              <div style={secondaryCellTextStyle}>{action.project || "No project"}</div>
+                            <td style={tableCellStyle}><MyWorkItemTypeChip source={item.source} /></td>
+                            <td style={tableCellStyle}><div style={actionNumberCellStyle}>{item.number}</div></td>
+                            <td style={{ ...tableCellStyle, ...myTitleColumnStyle }}>
+                              <div style={truncatedCellTextStyle} title={item.title}>{item.title}</div>
+                              <div style={secondaryCellTextStyle}>{item.project}</div>
                             </td>
-                            <td style={tableCellStyle}><SourceChip action={action} /></td>
-                            <td style={tableCellStyle}><LinkedRecordChips action={action} /></td>
-                            <td style={tableCellStyle}><span style={badgeStyle}>{action.priority || "-"}</span></td>
+                            <td style={tableCellStyle}>{item.source === "Action" && item.action ? <SourceChip action={item.action} /> : <span style={secondaryCellTextStyle}>-</span>}</td>
+                            <td style={tableCellStyle}>{item.source === "Action" && item.action ? <LinkedRecordChips action={item.action} /> : <span style={secondaryCellTextStyle}>-</span>}</td>
+                            <td style={tableCellStyle}><span style={badgeStyle}>{item.source === "Action" && item.action ? item.action.priority || "-" : "-"}</span></td>
                             <td style={tableCellStyle}>
-                              <div style={primaryCellTextStyle}>{formatDate(action.due_date)}</div>
+                              <div style={primaryCellTextStyle}>{formatDate(item.due_date)}</div>
                               <div style={{ ...secondaryCellTextStyle, color: overdue ? "#F93822" : "#53565A", fontWeight: overdue ? 700 : 500 }}>
-                                {getDueLabel(action.due_date)}
+                                {getDueLabel(item.due_date)}
                               </div>
                             </td>
-                            <td style={tableCellStyle}><StatusBadge value={action.status || "Unknown"} /></td>
+                            <td style={tableCellStyle}><StatusBadge value={item.status || "Unknown"} /></td>
                             <td style={tableCellStyle}>
                               <button
                                 type="button"
                                 style={miniButtonStyle}
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  openActionInRegister(action);
+                                  openMyWorkItem(item);
                                 }}
                               >
                                 Open
@@ -5092,6 +5285,16 @@ function QuickFilterButton({
   );
 }
 
+function MyWorkItemTypeChip({ source }: { source: MyWorkItemSource }) {
+  const tone: LinkedRecordChip["tone"] =
+    source === "NCR" ? "red" : source === "Audit Finding" ? "blue" : source === "AINM" ? "red" : source === "Observation" ? "teal" : "slate";
+  return (
+    <span style={{ ...linkedChipStyle, ...linkedChipToneStyles[tone] }}>
+      {source}
+    </span>
+  );
+}
+
 function SourceChip({ action }: { action: ActionItem }) {
   const source = getActionSourceValue(action);
   return (
@@ -5770,6 +5973,18 @@ const secondaryCellTextStyle: CSSProperties = {
   fontSize: "12px",
   color: "#53565A",
   marginTop: "4px",
+};
+
+const myTitleColumnStyle: CSSProperties = {
+  maxWidth: "360px",
+};
+
+const truncatedCellTextStyle: CSSProperties = {
+  ...primaryCellTextStyle,
+  maxWidth: "360px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 const actionNumberCellStyle: CSSProperties = {

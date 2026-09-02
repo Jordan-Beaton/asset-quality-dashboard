@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import React, { ChangeEvent, CSSProperties, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import React, { ChangeEvent, CSSProperties, ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -616,8 +617,10 @@ function dataUrlToBytes(dataUrl: string) {
   return bytes;
 }
 
-export default function HseAinmPage() {
+function HseAinmPageContent() {
   const imsPermissions = useImsPermissions();
+  const searchParams = useSearchParams();
+  const directAinmId = searchParams.get("ainmId")?.trim() || "";
   const [records, setRecords] = useState<AINMRecord[]>([]);
   const [actions, setActions] = useState<AINMAction[]>([]);
   const [centralActions, setCentralActions] = useState<CentralAction[]>([]);
@@ -715,6 +718,14 @@ export default function HseAinmPage() {
       selectedDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
   }
+
+  useEffect(() => {
+    if (!directAinmId || records.length === 0) return;
+    const match = records.find((record) => record.id === directAinmId);
+    if (!match) return;
+    setActiveView("register");
+    selectAinmAndScroll(match);
+  }, [records, directAinmId]);
   const selectedEvidence = useMemo(() => evidence.filter((file) => file.ainm_id === selectedId), [evidence, selectedId]);
   const selectedExternalEvidence = useMemo(
     () => externalEvidence.filter((file) => file.external_ainm_id === selectedExternalId),
@@ -3876,6 +3887,14 @@ export default function HseAinmPage() {
         </SectionCard>
       ) : null}
     </main>
+  );
+}
+
+export default function HseAinmPage() {
+  return (
+    <Suspense fallback={<main style={{ padding: "24px" }}>Loading AINM...</main>}>
+      <HseAinmPageContent />
+    </Suspense>
   );
 }
 
