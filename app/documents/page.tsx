@@ -605,8 +605,8 @@ function DocumentsPageContent() {
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<"details" | "file" | "history">("details");
   const [showPersonsModal, setShowPersonsModal] = useState(false);
-  const [personsModalForm, setPersonsModalForm] = useState<{ reviewed_by: string; reviewer_email: string; approved_by: string; approver_email: string }>({ reviewed_by: "", reviewer_email: "", approved_by: "", approver_email: "" });
-  const [personsModalSearch, setPersonsModalSearch] = useState<{ reviewed_by: string; approved_by: string }>({ reviewed_by: "", approved_by: "" });
+  const [personsModalForm, setPersonsModalForm] = useState<{ originator_name: string; originator_email: string; reviewed_by: string; reviewer_email: string; approved_by: string; approver_email: string }>({ originator_name: "", originator_email: "", reviewed_by: "", reviewer_email: "", approved_by: "", approver_email: "" });
+  const [personsModalSearch, setPersonsModalSearch] = useState<{ originator_name: string; reviewed_by: string; approved_by: string }>({ originator_name: "", reviewed_by: "", approved_by: "" });
   const detailPanelRef = useRef<HTMLElement | null>(null);
   const shouldScrollToDetailRef = useRef(false);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
@@ -1897,7 +1897,7 @@ function DocumentsPageContent() {
       selectedDocument.id,
       selectedDocument.document_number,
       detailForm.title.trim(),
-      detailForm.comments.trim()
+      detailForm.comments.trim() ? `What's changed: ${detailForm.comments.trim()}` : ""
     );
 
     setMessage(buildWorkflowMessage("Document sent to reviewer.", notificationError, activityError));
@@ -2041,7 +2041,12 @@ function DocumentsPageContent() {
       selectedDocument.id,
       selectedDocument.document_number,
       detailForm.title.trim(),
-      `Document reviewed and sent to ${detailForm.approved_by.trim()} for approval.`
+      [
+        `Document reviewed and sent to ${detailForm.approved_by.trim()} for approval.`,
+        detailForm.comments.trim() ? `What's changed: ${detailForm.comments.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n")
     );
 
     setMessage(buildWorkflowMessage("Document sent to approver.", notificationError, activityError));
@@ -2515,6 +2520,7 @@ function DocumentsPageContent() {
         workflow_reviewer_email: null,
         workflow_approver_name: null,
         workflow_approver_email: null,
+        comments: revisionReason,
       })
       .eq("id", selectedDocument.id);
 
@@ -2569,7 +2575,7 @@ function DocumentsPageContent() {
       rejected_by: "",
       rejected_at: "",
       rejection_reason: "",
-      comments: "",
+      comments: revisionReason,
     }));
 
     setMessage(`Document moved to revision ${nextRevision}. Upload the new controlled copy next.`);
@@ -2698,12 +2704,15 @@ function DocumentsPageContent() {
     if (!requireEditPermission("update responsible persons")) return;
     if (!selectedDocument) { setMessage("Select a document first."); return; }
     setPersonsModalForm({
+      originator_name: selectedDocument.originator_name || "",
+      originator_email: selectedDocument.originator_email || "",
       reviewed_by: selectedDocument.reviewed_by || "",
       reviewer_email: selectedDocument.reviewer_email || "",
       approved_by: selectedDocument.approved_by || "",
       approver_email: selectedDocument.approver_email || "",
     });
     setPersonsModalSearch({
+      originator_name: selectedDocument.originator_name || "",
       reviewed_by: selectedDocument.reviewed_by || "",
       approved_by: selectedDocument.approved_by || "",
     });
@@ -2712,15 +2721,19 @@ function DocumentsPageContent() {
 
   async function saveResponsiblePersons() {
     if (!selectedDocument) return;
-    const { reviewed_by, reviewer_email, approved_by, approver_email } = personsModalForm;
+    const { originator_name, originator_email, reviewed_by, reviewer_email, approved_by, approver_email } = personsModalForm;
+    const oldOriginator = selectedDocument.originator_name || "—";
     const oldReviewer = selectedDocument.reviewed_by || "—";
     const oldApprover = selectedDocument.approved_by || "—";
     const changes: string[] = [];
+    if (originator_name !== (selectedDocument.originator_name || "")) changes.push(`Originator: ${oldOriginator} → ${originator_name || "—"}`);
     if (reviewed_by !== (selectedDocument.reviewed_by || "")) changes.push(`Reviewer: ${oldReviewer} → ${reviewed_by || "—"}`);
     if (approved_by !== (selectedDocument.approved_by || "")) changes.push(`Approver: ${oldApprover} → ${approved_by || "—"}`);
     if (changes.length === 0) { setShowPersonsModal(false); return; }
     const note = `Responsible persons updated. ${changes.join(". ")}.`;
     const { error } = await supabase.from("documents").update({
+      originator_name: originator_name || null,
+      originator_email: originator_email || null,
       reviewed_by: reviewed_by || null,
       approved_by: approved_by || null,
     }).eq("id", selectedDocument.id);
@@ -4250,6 +4263,26 @@ function DocumentsPageContent() {
             </div>
 
             <div style={{ display: "grid", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#53565A", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px" }}>
+                  Originator
+                </label>
+                <PeopleSelector
+                  inputId="persons-modal-originator"
+                  value={personsModalSearch.originator_name}
+                  selectedName={personsModalForm.originator_name}
+                  people={people}
+                  placeholder="Start typing a name"
+                  onChange={(value) => setPersonsModalSearch((prev) => ({ ...prev, originator_name: value }))}
+                  onSelect={(person) => {
+                    setPersonsModalForm((prev) => ({ ...prev, originator_name: person?.name || "", originator_email: person?.email || "" }));
+                    setPersonsModalSearch((prev) => ({ ...prev, originator_name: person?.name || "" }));
+                  }}
+                  onBlur={() => {}}
+                  resolvedEmail={personsModalForm.originator_email}
+                />
+              </div>
+
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#53565A", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px" }}>
                   Reviewer
