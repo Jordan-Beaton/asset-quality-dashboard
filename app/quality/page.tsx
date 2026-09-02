@@ -130,14 +130,11 @@ function isClosedLikeStatus(value: string | null | undefined) {
 function isQualityAction(item: ActionItem) {
   const department = normaliseStatus(item.department);
   const source = normaliseStatus(item.source);
-  const qualitySources = new Set(["ncr/capa", "audit finding", "moc", "quality", "manual"]);
-  const hseSources = new Set(["hse", "ainm", "hse inspection", "observation", "ptw"]);
+  const qualityWorkflowSources = new Set(["ncr/capa", "audit finding", "moc"]);
 
   if (department === "quality") return true;
-  if (department === "hse") return false;
-  if (hseSources.has(source)) return false;
-  if (department === "hseq" && qualitySources.has(source)) return true;
-  return qualitySources.has(source);
+  if (department === "hseq") return qualityWorkflowSources.has(source);
+  return false;
 }
 
 function formatDate(value: string | null | undefined) {
