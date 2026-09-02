@@ -119,6 +119,7 @@ const qualityNavItems: NavItem[] = [
   { href: "/audits", label: "Audits", icon: "audits" },
   { href: "/quality/actions", label: "Actions", icon: "actions" },
   { href: "/reports", label: "Reports", icon: "reports" },
+  { href: "/guides?guide=ncr", label: "Process Guides", icon: "lessons" },
 ];
 
 const lessonsNavItems: NavItem[] = [
@@ -165,6 +166,7 @@ const hseNavItems: NavItem[] = [
   { href: "/hse/inspections", label: "Inspections", icon: "inspection" },
   { href: "/hse/actions", label: "Actions", icon: "actions" },
   { href: "/hse/reports", label: "Reports", icon: "reports" },
+  { href: "/guides?guide=ainm", label: "Process Guides", icon: "lessons" },
 ];
 
 const adminNavItems: NavItem[] = [
