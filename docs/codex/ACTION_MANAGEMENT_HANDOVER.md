@@ -15,7 +15,7 @@ Action Management is a top-level module with module-specific action tabs feeding
 - Central `/actions` route is preserved.
 - Quality, HSE, and Assets have module-specific action tabs that feed central Actions.
 - HSE Actions and Quality Actions should show department/module-specific actions.
-- My Actions was improved but may need further testing.
+- My Actions now merges three record types for the signed-in person (matched by email to their People record, then by owner name): central Actions, NCR (`ncrs` table), and Audit Findings (`audit_findings` table, with the parent audit number resolved from `audits`). Each row carries a `source: "Action" | "NCR" | "Audit Finding"` Type badge; NCR/Audit Finding rows link out via the existing deep-link params (`/ncr-capa?ncrId=`, `/audits?findingId=`) rather than opening in the central register. This is a deliberate exception to the normal module-permission boundary — a person's own NCR/Finding ownership is visible in My Actions even without NCR/Audits module read access, because the point is personal accountability visibility. MOC and other linked-record sources are not yet included in this merge; extend using the same pattern (query the source table filtered by owner, normalize into the same item shape) if requested.
 - Linked record chips/buttons should open the linked record.
 - AINM Part 1 and Part 2 can now create central actions inline with explicit title, description, department, owner, priority, and target date fields.
 - AINM-linked departments are selected explicitly and are not inferred from the accountable person.
@@ -25,6 +25,13 @@ Action Management is a top-level module with module-specific action tabs feeding
   - Create permission is required for manual action creation, evidence attached during creation, and bulk action import.
   - Edit permission is required for action edits, deletes, evidence upload, and evidence delete.
   - Main write buttons/file inputs are disabled when the current tab permission does not allow the action.
+
+## Register Table Layout
+
+- My Actions (`app/actions/page.tsx`), Quality Actions (`app/quality/actions/page.tsx`), and HSE Actions (`app/hse/actions/page.tsx`) registers all use `table-layout: fixed` with explicit percentage-width columns (not auto-layout). This was a deliberate fix: auto-layout tables only "fit" the page by accident when a register happened to have little data — HSE's 213-row register made the underlying overflow bug obvious where Quality's near-empty one did not.
+- Quality Actions and HSE Actions share identical column widths (Action No. 9%, Title 30%, Owner 13%, Source 9%, Due Date 12%, Priority 7%, Status 9%, Action 11%) so the two stay pixel-consistent. My Actions has its own wider column set (Type, Reference, Title, Source, Linked Record, Priority, Due Date, Status, Action) to fit its extra Type/Linked Record columns.
+- Title/Owner/Source cells truncate to an ellipsis with a `title` attribute for the full text on hover, and badge/chip columns (Type, Source, Linked Record, Status) carry `overflow: hidden` so an oversized badge clips at its own column boundary instead of visually bleeding into the next cell.
+- When adding a column or changing the column set on any of these three registers, recompute the percentages so they still sum to 100% and keep enough width for the widest realistic badge text (e.g. "Audit Finding") — this was the exact bug fixed here.
 
 ## Linked Record Sources
 

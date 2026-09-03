@@ -72,6 +72,10 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Whole-IMS detail panel visual standardisation completed: all IMS module detail panels now use the tinted gradient background (`linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)`), consistent border, border-radius, padding, and box-shadow matching the Audit Findings reference standard. Bold text in form field values resolved across all modules via a global CSS fix in `globals.css`.
 - Inspection Records module added to the Project workspace (`app/projects/[projectKey]/inspection-records/page.tsx`). Uses the standard project workspace layout (`QualityPageHero` + `ImsTopMetaRow` + `ProjectWorkspaceNav`). Tabs wired in `projectRegistry.ts`. DB tables: `inspection_records`, `inspection_record_files`, `inspection_record_notifications`. Notification email includes ITP reference, supplier, and branded styling; ITP/supplier resolved at send time via `project_noi_points` → `project_itps` join.
 - Process Guides tab added to Document Control sidebar nav (`AppShell.tsx`). `/guides` route (`app/guides/page.tsx`) renders a full inline Document Control user guide covering 16 sections (overview, register, add, upload, metadata, owners, submit, review, approval, approve, reject, periodic review, approver confirmation, new revision, supersede, status reference). Content is embedded directly in the IMS — no external artifact or Claude login required. Uses approved `imsColours` tokens throughout.
+- Process Guides expanded from a single Document Control guide into a four-guide hub with a guide switcher at the top of `/guides` (Document Control, NCR, MOC, AINM). Shared visual toolkit extracted to `src/components/guides/guideKit.tsx`; each guide's content lives in its own file under `src/components/guides/`. "Process Guides" nav entries added to the Quality (`?guide=ncr`) and HSE (`?guide=ainm`) sidebars alongside Document Control's existing one.
+- Document Control's Update Responsible Persons modal now includes Originator alongside Reviewer and Approver. Issuing a new revision now captures the change description directly into General Comments, which is carried through automatically into the reviewer and approver workflow emails as a "What's changed" note.
+- Quality dashboard operational control score re-scoped to be genuinely Quality-only: document review health removed (Document Control has no Quality/HSE data split to scope it by), NCR/Finding/MOC/Action-pressure re-weighted to 30/30/20/20. Fixed `isQualityAction()` incorrectly counting non-Quality-department actions (e.g. Logistics, Manual source) toward the score and the Quality Priority Actions panel. Critical Pressure and Open Workload KPIs now drill into real Critical Pressure Items / Open Workload Items panels listing the actual underlying records, replacing links to a mismatched or unrelated destination.
+- Central Action Management's My Actions tab now merges NCR and Audit Finding records owned by the signed-in person alongside central Actions, each linking to its own record. My Actions, Quality Actions, and HSE Actions registers standardised to a fixed-width table layout (see `ACTION_MANAGEMENT_HANDOVER.md`) so none of them require horizontal scrolling regardless of row count — this surfaced on HSE's 213-row register.
 
 # In Progress
 
@@ -95,7 +99,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 # Known Issues
 
 - Document Control rejection-field cleanup has been tightened locally; verify reject -> resubmit -> review -> approve behavior on Vercel with real document data.
-- Document Control revision history remains sensitive: historic revision names/dates/files must be preserved, and up-rev comments should be captured at the up-rev moment.
+- Document Control revision history remains sensitive: historic revision names/dates/files must be preserved. Up-rev comments are now captured at the up-rev moment and flow into the reviewer/approver emails; verify this end-to-end on Vercel with a real document.
 - Document numbering must remain locked and non-reused; reclassification must supersede/archive old documents and create new numbers.
 - Some old migration-extracted document names, such as `Checker`, may need blanking unless they match People Management.
 - Button-level permissions may not be fully hardened across every edge route; Central Actions, Document Control, Quality, HSE Actions/Reports, HSE AINM, HSE Observations, HSE Inspections, Admin / Settings, Risk Register, and Asset spot checks now have explicit page-level or visible-control guards.
@@ -161,13 +165,14 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 ## Quality Management
 
 - Status: Complete
-- Summary: Quality is the visual and workflow benchmark. Dashboard, NCR, Audits, MOC, Quality Actions, and Reports are implemented with live data, drill-downs, reports, evidence, People dropdowns, central Action links, and page-level create/edit guards across the main write paths.
+- Summary: Quality is the visual and workflow benchmark. Dashboard, NCR, Audits, MOC, Quality Actions, and Reports are implemented with live data, drill-downs, reports, evidence, People dropdowns, central Action links, and page-level create/edit guards across the main write paths. The operational control score is re-weighted to be genuinely Quality-only (NCR/Finding/MOC/Action pressure at 30/30/20/20, document review health removed), `isQualityAction()` no longer misattributes non-Quality-department actions, and Critical Pressure/Open Workload KPIs drill into real item-list panels (see `QUALITY_HANDOVER.md`).
 - Outstanding Actions:
   - Preserve Quality as the reference layout.
   - Avoid reintroducing visible CAPA language into NCR unless explicitly requested.
   - Regression-test linked Action generation from NCR, MOC, and Audits before demos.
   - Verify create/edit/read-only behavior on Vercel after the Quality permission hardening pass.
   - Preserve the completed UI contract; migrate local implementation styles only during related functional work.
+  - Verify the re-weighted operational control score and the Critical Pressure Items / Open Workload Items panels on Vercel against real data.
 
 ## HSE Management
 
@@ -202,18 +207,20 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
   - Verify review/approval workflow and notification behavior end-to-end on Vercel with real documents.
   - Verify create/edit/read-only permission behavior on Vercel after the new page-level guards.
   - Protect numbering, reclassification, storage, and revision history logic.
-  - Confirm up-rev archives previous current revision and captures comments at the correct moment.
+  - Up-rev now archives the previous current revision and captures comments at the up-rev moment, carrying them into reviewer/approver emails; verify on Vercel with a real document.
   - Clean bad migrated person placeholders only when they do not match People Management.
 
 ## Action Management
 
 - Status: In Progress
-- Summary: Central `/actions` is preserved, with Quality/HSE/Assets/Risk module-specific action tabs feeding it. AINM Part 1/Part 2 now create linked central actions inline using an explicitly selected department, while the full Action form retains AINM/project context without forcing title, description, department, or owner. Linked record behavior and My Actions still need production testing. Central Actions retains explicit page-level create/edit guards.
+- Summary: Central `/actions` is preserved, with Quality/HSE/Assets/Risk module-specific action tabs feeding it. AINM Part 1/Part 2 now create linked central actions inline using an explicitly selected department, while the full Action form retains AINM/project context without forcing title, description, department, or owner. My Actions now merges NCR and Audit Finding records owned by the signed-in person alongside central Actions (see `ACTION_MANAGEMENT_HANDOVER.md`), and still needs production testing with real cross-module data. My Actions, Quality Actions, and HSE Actions registers were standardised to a fixed-width table layout so they no longer require horizontal scrolling at any row count. Central Actions retains explicit page-level create/edit guards.
 - Outstanding Actions:
   - Verify linked source dropdowns for NCR, MOC, AINM, HSE Inspection, Observations, Asset Inspection/Maintenance/Calibration, and Risk.
   - Test linked chips/buttons open the correct record.
   - Confirm module-specific action tabs show the correct department/source filters.
   - Verify create/edit/read-only behavior on Vercel after the new Central Actions page-level guards.
+  - Verify My Actions' NCR/Audit Finding merge on Vercel with real data: correct owner matching, correct deep-link navigation to `/ncr-capa`/`/audits`, and that the intentional cross-module read exception (visible regardless of NCR/Audits module permission) behaves as intended.
+  - Extend the same merge pattern to MOC if requested — not yet included.
 
 ## People Management
 

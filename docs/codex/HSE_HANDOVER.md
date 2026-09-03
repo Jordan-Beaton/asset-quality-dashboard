@@ -24,6 +24,8 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, appr
 - HSE Dashboard now follows the Quality command-view model with Overview, Analytics and Planning. The reporting year is integrated into the command bar, and the operational-pressure chart uses the shared high-contrast analytics treatment with visible values.
 - HSE Actions are HSE-specific and link to central Action Management.
 - HSE Actions and HSE Reports now include explicit create/edit permission guards on direct write paths, with primary write controls disabled for restricted users.
+- HSE Actions register uses `table-layout: fixed` with the same column widths as Quality Actions (see `ACTION_MANAGEMENT_HANDOVER.md` — Register Table Layout) so it never requires horizontal scrolling regardless of row count; this was fixed after HSE's 213-row register made an existing auto-layout overflow bug visible.
+- An AINM process guide now exists at `/guides?guide=ainm` (part of the multi-guide Process Guides hub — see `DOCUMENT_CONTROL_HANDOVER.md`), and a "Process Guides" nav entry was added to the HSE sidebar.
 
 ## AINM
 

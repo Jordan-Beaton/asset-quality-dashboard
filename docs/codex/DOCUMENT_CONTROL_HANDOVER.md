@@ -9,7 +9,7 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 - Certification: `app/certification/page.tsx`
 - Notification API: `app/api/document-notifications/route.ts`
 - Workflow action API: `app/api/document-workflow-action/route.ts`
-- Process Guides: `app/guides/page.tsx` — inline user guide hub; Document Control guide is the first guide, rendered in full without external links. Staff access at `/guides` via the Document Control sidebar nav item "Process Guides". All content is embedded directly (no Claude artifact dependency).
+- Process Guides: `app/guides/page.tsx` — inline user guide hub covering Document Control, NCR, MOC, and AINM (a guide switcher at the top selects which). Document Control's guide content lives in `src/components/guides/documentControlGuideContent.tsx`; shared styling/mock-UI helpers are in `src/components/guides/guideKit.tsx`. Staff access at `/guides` via the Document Control sidebar nav item "Process Guides" (Quality and HSE sidebars link to the same page with a `?guide=` param preselecting NCR/MOC or AINM). All content is embedded directly (no Claude artifact dependency).
 
 ## Numbering Rules
 
@@ -31,6 +31,7 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
   - Edit permission is required for save, submit for review, review acceptance, send to approver, approval, rejection, delete, controlled file upload/remove, and up-rev actions.
   - Supersede & Create New requires both edit permission on the existing document and create permission for the replacement document.
   - Main workflow/file/save/delete buttons are disabled when the current tab permission does not allow the action.
+- Update Responsible Persons now includes Originator alongside Reviewer and Approver (previously Originator could only be set at document creation or via Edit Details). All three resolve email from People Management and the change is recorded in the document activity log without up-revving.
 - Big migration from Z drive was performed:
   - Current files uploaded.
   - Revisions/history attempted.
@@ -50,7 +51,7 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 
 - Preserve historic revision names, dates, and files.
 - Up-rev should archive the previous current revision properly.
-- Comments/revision notes should be captured at the up-rev moment.
+- Comments/revision notes are now captured at the up-rev moment: the description entered in the `Up-rev to [next letter]` prompt is saved to General Comments and carried through automatically into the reviewer email (Submit for Review) and approver email (Send to Approver) as a "What's changed" note, so the description does not need to be re-typed.
 - Avoid stale free-floating revision notes.
 - Detail panel should auto-scroll into view when a document is clicked.
 
