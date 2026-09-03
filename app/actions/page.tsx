@@ -5981,14 +5981,14 @@ const myActionsTableStyle: CSSProperties = {
   tableLayout: "fixed",
 };
 
-const myTypeColumnStyle: CSSProperties = { width: "8%" };
-const myReferenceColumnStyle: CSSProperties = { width: "9%" };
-const myTitleColumnStyle: CSSProperties = { width: "23%" };
-const mySourceColumnStyle: CSSProperties = { width: "10%" };
-const myLinkedRecordColumnStyle: CSSProperties = { width: "16%" };
-const myPriorityColumnStyle: CSSProperties = { width: "8%" };
+const myTypeColumnStyle: CSSProperties = { width: "11%", overflow: "hidden" };
+const myReferenceColumnStyle: CSSProperties = { width: "10%" };
+const myTitleColumnStyle: CSSProperties = { width: "21%" };
+const mySourceColumnStyle: CSSProperties = { width: "9%", overflow: "hidden" };
+const myLinkedRecordColumnStyle: CSSProperties = { width: "15%", overflow: "hidden" };
+const myPriorityColumnStyle: CSSProperties = { width: "7%" };
 const myDueDateColumnStyle: CSSProperties = { width: "12%" };
-const myStatusColumnStyle: CSSProperties = { width: "8%" };
+const myStatusColumnStyle: CSSProperties = { width: "9%", overflow: "hidden" };
 const myActionColumnStyle: CSSProperties = { width: "6%" };
 
 const truncatedCellTextStyle: CSSProperties = {
