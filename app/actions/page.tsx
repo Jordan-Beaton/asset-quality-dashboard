@@ -4041,18 +4041,18 @@ function ActionsPageContent() {
               </div>
 
               <div style={{ overflowX: "auto" }}>
-                <table style={tableStyle}>
+                <table style={myActionsTableStyle}>
                   <thead>
                     <tr>
-                      <th style={tableHeadStyle}>Type</th>
-                      <th style={tableHeadStyle}>Reference</th>
+                      <th style={{ ...tableHeadStyle, ...myTypeColumnStyle }}>Type</th>
+                      <th style={{ ...tableHeadStyle, ...myReferenceColumnStyle }}>Reference</th>
                       <th style={{ ...tableHeadStyle, ...myTitleColumnStyle }}>Title</th>
-                      <th style={tableHeadStyle}>Source</th>
-                      <th style={tableHeadStyle}>Linked Record</th>
-                      <th style={tableHeadStyle}>Priority</th>
-                      <th style={tableHeadStyle}>Due Date</th>
-                      <th style={tableHeadStyle}>Status</th>
-                      <th style={tableHeadStyle}>Action</th>
+                      <th style={{ ...tableHeadStyle, ...mySourceColumnStyle }}>Source</th>
+                      <th style={{ ...tableHeadStyle, ...myLinkedRecordColumnStyle }}>Linked Record</th>
+                      <th style={{ ...tableHeadStyle, ...myPriorityColumnStyle }}>Priority</th>
+                      <th style={{ ...tableHeadStyle, ...myDueDateColumnStyle }}>Due Date</th>
+                      <th style={{ ...tableHeadStyle, ...myStatusColumnStyle }}>Status</th>
+                      <th style={{ ...tableHeadStyle, ...myActionColumnStyle }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4071,23 +4071,23 @@ function ActionsPageContent() {
                             style={{ ...tableRowStyle, cursor: "pointer", background: overdue ? "#ECECE7" : "white" }}
                             onClick={() => openMyWorkItem(item)}
                           >
-                            <td style={tableCellStyle}><MyWorkItemTypeChip source={item.source} /></td>
-                            <td style={tableCellStyle}><div style={actionNumberCellStyle}>{item.number}</div></td>
+                            <td style={{ ...tableCellStyle, ...myTypeColumnStyle }}><MyWorkItemTypeChip source={item.source} /></td>
+                            <td style={{ ...tableCellStyle, ...myReferenceColumnStyle }}><div style={actionNumberCellStyle}>{item.number}</div></td>
                             <td style={{ ...tableCellStyle, ...myTitleColumnStyle }}>
                               <div style={truncatedCellTextStyle} title={item.title}>{item.title}</div>
-                              <div style={secondaryCellTextStyle}>{item.project}</div>
+                              <div style={truncatedSecondaryCellTextStyle} title={item.project}>{item.project}</div>
                             </td>
-                            <td style={tableCellStyle}>{item.source === "Action" && item.action ? <SourceChip action={item.action} /> : <span style={secondaryCellTextStyle}>-</span>}</td>
-                            <td style={tableCellStyle}>{item.source === "Action" && item.action ? <LinkedRecordChips action={item.action} /> : <span style={secondaryCellTextStyle}>-</span>}</td>
-                            <td style={tableCellStyle}><span style={badgeStyle}>{item.source === "Action" && item.action ? item.action.priority || "-" : "-"}</span></td>
-                            <td style={tableCellStyle}>
+                            <td style={{ ...tableCellStyle, ...mySourceColumnStyle }}>{item.source === "Action" && item.action ? <SourceChip action={item.action} /> : <span style={secondaryCellTextStyle}>-</span>}</td>
+                            <td style={{ ...tableCellStyle, ...myLinkedRecordColumnStyle }}>{item.source === "Action" && item.action ? <LinkedRecordChips action={item.action} /> : <span style={secondaryCellTextStyle}>-</span>}</td>
+                            <td style={{ ...tableCellStyle, ...myPriorityColumnStyle }}><span style={badgeStyle}>{item.source === "Action" && item.action ? item.action.priority || "-" : "-"}</span></td>
+                            <td style={{ ...tableCellStyle, ...myDueDateColumnStyle }}>
                               <div style={primaryCellTextStyle}>{formatDate(item.due_date)}</div>
                               <div style={{ ...secondaryCellTextStyle, color: overdue ? "#F93822" : "#53565A", fontWeight: overdue ? 700 : 500 }}>
                                 {getDueLabel(item.due_date)}
                               </div>
                             </td>
-                            <td style={tableCellStyle}><StatusBadge value={item.status || "Unknown"} /></td>
-                            <td style={tableCellStyle}>
+                            <td style={{ ...tableCellStyle, ...myStatusColumnStyle }}><StatusBadge value={item.status || "Unknown"} /></td>
+                            <td style={{ ...tableCellStyle, ...myActionColumnStyle }}>
                               <button
                                 type="button"
                                 style={miniButtonStyle}
@@ -5975,13 +5975,31 @@ const secondaryCellTextStyle: CSSProperties = {
   marginTop: "4px",
 };
 
-const myTitleColumnStyle: CSSProperties = {
-  maxWidth: "360px",
+const myActionsTableStyle: CSSProperties = {
+  ...tableStyle,
+  minWidth: 0,
+  tableLayout: "fixed",
 };
+
+const myTypeColumnStyle: CSSProperties = { width: "8%" };
+const myReferenceColumnStyle: CSSProperties = { width: "9%" };
+const myTitleColumnStyle: CSSProperties = { width: "23%" };
+const mySourceColumnStyle: CSSProperties = { width: "10%" };
+const myLinkedRecordColumnStyle: CSSProperties = { width: "16%" };
+const myPriorityColumnStyle: CSSProperties = { width: "8%" };
+const myDueDateColumnStyle: CSSProperties = { width: "12%" };
+const myStatusColumnStyle: CSSProperties = { width: "8%" };
+const myActionColumnStyle: CSSProperties = { width: "6%" };
 
 const truncatedCellTextStyle: CSSProperties = {
   ...primaryCellTextStyle,
-  maxWidth: "360px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const truncatedSecondaryCellTextStyle: CSSProperties = {
+  ...secondaryCellTextStyle,
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",

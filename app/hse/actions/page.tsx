@@ -1182,39 +1182,38 @@ export default function HseActionsPage() {
             <table style={tableStyle}>
               <thead>
                 <tr>
-                  <th style={thStyle}>Action No.</th>
-                  <th style={thStyle}>Title</th>
-                  <th style={thStyle}>Owner</th>
-                  <th style={thStyle}>Source</th>
-                  <th style={thStyle}>Due Date</th>
-                  <th style={thStyle}>Priority</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Action</th>
+                  <th style={{ ...thStyle, ...colActionNoStyle }}>Action No.</th>
+                  <th style={{ ...thStyle, ...colTitleStyle }}>Title</th>
+                  <th style={{ ...thStyle, ...colOwnerStyle }}>Owner</th>
+                  <th style={{ ...thStyle, ...colSourceStyle }}>Source</th>
+                  <th style={{ ...thStyle, ...colDueDateStyle }}>Due Date</th>
+                  <th style={{ ...thStyle, ...colPriorityStyle }}>Priority</th>
+                  <th style={{ ...thStyle, ...colStatusStyle }}>Status</th>
+                  <th style={{ ...thStyle, ...colActionStyle }}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredActions.length ? filteredActions.map((action) => (
+                {filteredActions.length ? filteredActions.map((action) => {
+                  const projectSummary = `${action.project || "No project"}${action.linked_ainm_number ? ` | AINM ${action.linked_ainm_number}` : ""}${action.linked_hse_inspection_number ? ` | HSE Inspection ${action.linked_hse_inspection_number}` : ""}`;
+                  return (
                   <tr key={action.id} aria-selected={selectedId === action.id} data-selected={selectedId === action.id ? "true" : "false"} style={selectedId === action.id ? selectedRowStyle : trStyle} onClick={() => setSelectedId(action.id)}>
-                    <td style={tdStrongStyle}>{action.action_number || "-"}</td>
-                    <td style={tdStyle}>
-                      <strong>{action.title || "-"}</strong>
-                      <div style={mutedTextStyle}>
-                        {action.project || "No project"}
-                        {action.linked_ainm_number ? ` | AINM ${action.linked_ainm_number}` : ""}
-                        {action.linked_hse_inspection_number ? ` | HSE Inspection ${action.linked_hse_inspection_number}` : ""}
-                      </div>
+                    <td style={{ ...tdStrongStyle, ...colActionNoStyle }}>{action.action_number || "-"}</td>
+                    <td style={{ ...tdStyle, ...colTitleStyle }}>
+                      <strong style={{ ...truncatedTextStyle, display: "block" }} title={action.title || "-"}>{action.title || "-"}</strong>
+                      <div style={{ ...mutedTextStyle, ...truncatedTextStyle }} title={projectSummary}>{projectSummary}</div>
                     </td>
-                    <td style={tdStyle}>{action.owner || "-"}</td>
-                    <td style={tdStyle}>{action.source || "-"}</td>
-                    <td style={tdStyle}>
+                    <td style={{ ...tdStyle, ...colOwnerStyle, ...truncatedTextStyle }} title={action.owner || "-"}>{action.owner || "-"}</td>
+                    <td style={{ ...tdStyle, ...colSourceStyle, ...truncatedTextStyle }} title={action.source || "-"}>{action.source || "-"}</td>
+                    <td style={{ ...tdStyle, ...colDueDateStyle }}>
                       <strong>{formatDate(action.due_date)}</strong>
                       <div style={{ ...mutedTextStyle, color: isOverdue(action) ? "#F93822" : "#53565A" }}>{getDueLabel(action.due_date)}</div>
                     </td>
-                    <td style={tdStyle}>{action.priority || "-"}</td>
-                    <td style={tdStyle}><StatusPill status={action.status || "Open"} /></td>
-                    <td style={tdStyle}><Link href={`/actions?actionId=${encodeURIComponent(action.id)}`} style={smallLinkStyle}>Open Central</Link></td>
+                    <td style={{ ...tdStyle, ...colPriorityStyle }}>{action.priority || "-"}</td>
+                    <td style={{ ...tdStyle, ...colStatusStyle }}><StatusPill status={action.status || "Open"} /></td>
+                    <td style={{ ...tdStyle, ...colActionStyle }}><Link href={`/actions?actionId=${encodeURIComponent(action.id)}`} style={smallLinkStyle}>Open Central</Link></td>
                   </tr>
-                )) : (
+                  );
+                }) : (
                   <tr><td colSpan={8} style={emptyCellStyle}>No HSE actions match the current filters.</td></tr>
                 )}
               </tbody>
@@ -1603,8 +1602,24 @@ const tableStyle: CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
   background: "#ffffff",
-  minWidth: 960,
+  minWidth: 0,
+  tableLayout: "fixed",
   fontSize: "13px",
+};
+
+const colActionNoStyle: CSSProperties = { width: "9%" };
+const colTitleStyle: CSSProperties = { width: "30%" };
+const colOwnerStyle: CSSProperties = { width: "13%" };
+const colSourceStyle: CSSProperties = { width: "9%" };
+const colDueDateStyle: CSSProperties = { width: "12%" };
+const colPriorityStyle: CSSProperties = { width: "7%" };
+const colStatusStyle: CSSProperties = { width: "9%" };
+const colActionStyle: CSSProperties = { width: "11%" };
+
+const truncatedTextStyle: CSSProperties = {
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 const thStyle: CSSProperties = {
   textAlign: "left",
