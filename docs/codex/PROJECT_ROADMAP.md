@@ -78,6 +78,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Central Action Management's My Actions tab now merges NCR and Audit Finding records owned by the signed-in person alongside central Actions, each linking to its own record. My Actions, Quality Actions, and HSE Actions registers standardised to a fixed-width table layout (see `ACTION_MANAGEMENT_HANDOVER.md`) so none of them require horizontal scrolling regardless of row count — this surfaced on HSE's 213-row register.
 - Fixed the Process Guides sidebar link (Quality/HSE/Document Control) resolving access against Quality module permission regardless of which sidebar it appeared in; added a dedicated `guides` access area in `src/components/AppShell.tsx` granted to anyone with Quality, Documents, or HSE access. The IMS Home "access requests awaiting review" banner is now shown to anyone with `system_role = "Admin"`, not only the Master Admin account (`isAdmin` added to the shared `ImsPermissionValue`).
 - Management Review rebuilt as a whole-business, permission-aware live snapshot — see the Management Review module status entry below for full detail.
+- Added "Base" to the Action department list. Every action-creation path (central, Quality/HSE/Assets Create Action forms, AINM's inline corrective-action creator, bulk import) now records who raised the action; "Raised by X" is shown in the central Action Register and edit panel. Status-change and close-out notifications now go to the current owner as well as the raiser, not just the raiser. See `ACTION_MANAGEMENT_HANDOVER.md`.
 
 # In Progress
 
@@ -223,6 +224,9 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
   - Verify create/edit/read-only behavior on Vercel after the new Central Actions page-level guards.
   - Verify My Actions' NCR/Audit Finding merge on Vercel with real data: correct owner matching, correct deep-link navigation to `/ncr-capa`/`/audits`, and that the intentional cross-module read exception (visible regardless of NCR/Audits module permission) behaves as intended.
   - Extend the same merge pattern to MOC if requested — not yet included.
+  - Verify owner + raiser notification emails on Vercel for status-change and close-out, and confirm "Raised by" displays correctly for actions created through every path (central, Quality/HSE/Assets, AINM inline, bulk import).
+  - "Raised by" is not yet surfaced in Quality/HSE/Assets' own simplified action views or in My Actions — only the central Action Register and edit panel. Extend if wanted.
+  - Actions created before this change have no raiser recorded and will show as unknown.
 
 ## People Management
 
