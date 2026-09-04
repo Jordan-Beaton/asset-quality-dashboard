@@ -357,6 +357,7 @@ const actionSourceOptions = [
 ] as const;
 const departmentOptions = [
   "Assets",
+  "Base",
   "Commercial",
   "Crewing",
   "Engineering",
@@ -747,6 +748,13 @@ function countBy<T>(items: T[], getKey: (item: T) => string) {
   return [...counts.entries()]
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+}
+
+function raisedByLabel(action: ActionItem, people: ActionPerson[]) {
+  const email = (action.raised_by_email || "").trim();
+  if (!email) return "";
+  const match = people.find((p) => (p.email || "").trim().toLowerCase() === email.toLowerCase());
+  return `Raised by ${match?.name || email}`;
 }
 
 function buildActionSourceLabel(action: ActionItem) {
@@ -2355,6 +2363,7 @@ function ActionsPageContent() {
         status: row.status,
         due_date: row.due_date || null,
         source: row.source || "HSE",
+        raised_by_email: currentUserEmail || null,
         ...buildLinkedImportFields(row),
       }));
 
@@ -2985,41 +2994,58 @@ function ActionsPageContent() {
     // Notify raiser when status changes
     const raiserEmail = actionRecord?.raised_by_email;
     const raiserName = raiserEmail ? (people.find((p) => p.email === raiserEmail)?.name ?? undefined) : undefined;
-    if (raiserEmail && editForm.status !== prevStatus) {
-      void fetch("/api/notify-assignment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind: "status-changed",
-          recipientEmail: raiserEmail,
-          recipientName: raiserName,
-          itemType: "Action",
-          itemRef: actionRef,
-          itemTitle: editForm.title.trim(),
-          status: editForm.status,
-          dueDate: editForm.due_date || undefined,
-          itemUrl: actionUrl,
-        }),
+
+    // Notify the current owner too, so someone editing/closing an action on the owner's
+    // behalf doesn't leave the owner unaware — but not if they're also the raiser (already notified above).
+    const ownerRecord = editForm.owner.trim() ? people.find((p) => p.name.toLowerCase() === editForm.owner.trim().toLowerCase()) : undefined;
+    const ownerEmail = ownerRecord?.email && ownerRecord.email !== raiserEmail ? ownerRecord.email : undefined;
+    const ownerName = ownerRecord?.name;
+
+    if (editForm.status !== prevStatus) {
+      const recipients: Array<{ email: string; name?: string }> = [];
+      if (raiserEmail) recipients.push({ email: raiserEmail, name: raiserName });
+      if (ownerEmail) recipients.push({ email: ownerEmail, name: ownerName });
+      recipients.forEach(({ email, name }) => {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: "status-changed",
+            recipientEmail: email,
+            recipientName: name,
+            itemType: "Action",
+            itemRef: actionRef,
+            itemTitle: editForm.title.trim(),
+            status: editForm.status,
+            dueDate: editForm.due_date || undefined,
+            itemUrl: actionUrl,
+          }),
+        });
       });
     }
 
-    // Notify raiser when close-out comments are newly added or changed
+    // Notify raiser and owner when close-out comments are newly added or changed
     const newCloseOut = editForm.close_out_comments.trim();
-    if (raiserEmail && newCloseOut && newCloseOut !== (prevCloseOut ?? "").trim()) {
-      void fetch("/api/notify-assignment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind: "closed-out",
-          recipientEmail: raiserEmail,
-          recipientName: raiserName,
-          itemType: "Action",
-          itemRef: actionRef,
-          itemTitle: editForm.title.trim(),
-          status: editForm.status,
-          closeOutComments: newCloseOut,
-          itemUrl: actionUrl,
-        }),
+    if (newCloseOut && newCloseOut !== (prevCloseOut ?? "").trim()) {
+      const recipients: Array<{ email: string; name?: string }> = [];
+      if (raiserEmail) recipients.push({ email: raiserEmail, name: raiserName });
+      if (ownerEmail) recipients.push({ email: ownerEmail, name: ownerName });
+      recipients.forEach(({ email, name }) => {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: "closed-out",
+            recipientEmail: email,
+            recipientName: name,
+            itemType: "Action",
+            itemRef: actionRef,
+            itemTitle: editForm.title.trim(),
+            status: editForm.status,
+            closeOutComments: newCloseOut,
+            itemUrl: actionUrl,
+          }),
+        });
       });
     }
 
@@ -4435,7 +4461,7 @@ function ActionsPageContent() {
                       <td style={tableCellStyle}>
                         <div style={primaryCellTextStyle}>{action.title || "-"}</div>
                         <div style={secondaryCellTextStyle}>
-                          {buildActionSourceLabel(action) || " "}
+                          {[buildActionSourceLabel(action), raisedByLabel(action, people)].filter(Boolean).join(" · ") || " "}
                         </div>
                       </td>
                       <td style={tableCellStyle}>
@@ -4596,6 +4622,14 @@ function ActionsPageContent() {
                       </option>
                     ))}
                   </select>
+                </Field>
+
+                <Field label="Raised By">
+                  <input
+                    value={selectedEvidenceAction ? raisedByLabel(selectedEvidenceAction, people).replace(/^Raised by /, "") || "Unknown" : ""}
+                    readOnly
+                    style={readOnlyInputStyle}
+                  />
                 </Field>
 
                 <Field label="Project">

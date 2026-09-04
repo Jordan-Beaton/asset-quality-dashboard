@@ -233,6 +233,7 @@ function countByOwner(actions: ActionItem[]) {
 export default function AssetActionsPage() {
   const imsPermissions = useImsPermissions();
   const [actions, setActions] = useState<ActionItem[]>([]);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
   const [findingOptions, setFindingOptions] = useState<FindingOption[]>([]);
@@ -381,6 +382,9 @@ export default function AssetActionsPage() {
 
   useEffect(() => {
     void loadData();
+    void supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserEmail(data.user?.email?.trim().toLowerCase() || "");
+    });
   }, []);
 
   const selectedAction = useMemo(() => actions.find((action) => action.id === selectedId) || null, [actions, selectedId]);
@@ -494,6 +498,7 @@ export default function AssetActionsPage() {
       action_number: nextNumber,
       title: form.title.trim(),
       description: form.description.trim() || null,
+      raised_by_email: currentUserEmail || null,
       department: "Assets",
       project: form.project.trim() || null,
       owner: form.owner.trim() || null,

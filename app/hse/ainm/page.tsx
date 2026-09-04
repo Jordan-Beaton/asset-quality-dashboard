@@ -632,6 +632,7 @@ function HseAinmPageContent() {
   const [activeView, setActiveView] = useState<AINMView>("dashboard");
   const [detailTab, setDetailTab] = useState<DetailTab>("notification");
   const [selectedId, setSelectedId] = useState("");
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const selectedDetailRef = useRef<HTMLDivElement | null>(null);
   const [selectedExternalId, setSelectedExternalId] = useState("");
   const [draft, setDraft] = useState<AINMRecord>(emptyRecord);
@@ -1024,6 +1025,9 @@ function HseAinmPageContent() {
 
   useEffect(() => {
     void loadData();
+    void supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserEmail(data.user?.email?.trim().toLowerCase() || "");
+    });
   }, []);
 
   useEffect(() => {
@@ -1191,6 +1195,7 @@ function HseAinmPageContent() {
       status: "Open",
       due_date: inlineAction.due_date || null,
       source: "AINM",
+      raised_by_email: currentUserEmail || null,
       linked_ainm_id: selectedId,
       linked_ainm_number: draft.ainm_number,
     }]);

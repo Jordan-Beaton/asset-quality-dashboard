@@ -229,6 +229,7 @@ function QualityActionsPageContent() {
   const linkedSearch = searchParams.get("search")?.trim() || "";
   const directActionId = searchParams.get("actionId")?.trim() || "";
   const [actions, setActions] = useState<ActionItem[]>([]);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
   const [findingOptions, setFindingOptions] = useState<FindingOption[]>([]);
@@ -381,6 +382,9 @@ function QualityActionsPageContent() {
 
   useEffect(() => {
     void loadData();
+    void supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserEmail(data.user?.email?.trim().toLowerCase() || "");
+    });
   }, []);
 
   const selectedAction = useMemo(() => actions.find((action) => action.id === selectedId) || null, [actions, selectedId]);
@@ -507,6 +511,7 @@ function QualityActionsPageContent() {
       owner: form.owner.trim() || null,
       priority: form.priority,
       status: form.status,
+          raised_by_email: currentUserEmail || null,
           due_date: form.due_date || null,
           source: form.source || "Manual",
           linked_audit_id: form.linked_audit_id || null,
