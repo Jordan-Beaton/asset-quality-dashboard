@@ -351,6 +351,8 @@ function getActivePermissionValue({
     return getAllowedModuleKeys(role).has(moduleKey);
   };
 
+  const isAdmin = isMasterAdmin || role === "Admin";
+
   if (!target) {
     return {
       loaded,
@@ -361,6 +363,7 @@ function getActivePermissionValue({
       canEdit: true,
       fullAccess: true,
       isMasterAdmin,
+      isAdmin,
       canAccessModule,
     };
   }
@@ -375,6 +378,7 @@ function getActivePermissionValue({
       canEdit: true,
       fullAccess: true,
       isMasterAdmin: true,
+      isAdmin,
       canAccessModule,
     };
   }
@@ -392,6 +396,7 @@ function getActivePermissionValue({
       canEdit: fullAccess || Boolean(tabPermission?.can_edit),
       fullAccess,
       isMasterAdmin: false,
+      isAdmin,
       canAccessModule,
     };
   }
@@ -404,6 +409,7 @@ function getActivePermissionValue({
     areaKey: target.areaKey,
     ...permission,
     isMasterAdmin: false,
+    isAdmin,
     canAccessModule,
   };
 }

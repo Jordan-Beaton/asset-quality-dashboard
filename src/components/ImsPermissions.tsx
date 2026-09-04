@@ -11,6 +11,7 @@ export type ImsPermissionValue = {
   canEdit: boolean;
   fullAccess: boolean;
   isMasterAdmin: boolean;
+  isAdmin: boolean;
   canAccessModule: (moduleKey: string) => boolean;
 };
 
@@ -23,6 +24,7 @@ const defaultPermissionValue: ImsPermissionValue = {
   canEdit: false,
   fullAccess: false,
   isMasterAdmin: false,
+  isAdmin: false,
   canAccessModule: () => true,
 };
 

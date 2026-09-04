@@ -286,7 +286,7 @@ export default function HomePage() {
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
-  useEffect(() => { if (!permissions.loaded || !permissions.isMasterAdmin) return; void fetch("/api/admin-settings", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((json) => setPendingRequests((json?.accessRequests || []).filter((request: { status: string }) => request.status === "Pending"))).catch(() => undefined); }, [permissions.isMasterAdmin, permissions.loaded]);
+  useEffect(() => { if (!permissions.loaded || !permissions.isAdmin) return; void fetch("/api/admin-settings", { cache: "no-store" }).then((response) => response.ok ? response.json() : null).then((json) => setPendingRequests((json?.accessRequests || []).filter((request: { status: string }) => request.status === "Pending"))).catch(() => undefined); }, [permissions.isAdmin, permissions.loaded]);
   useEffect(() => {
     const savedView = window.localStorage.getItem("enshore-ims-home-view");
     if (savedView && homeViews.some((view) => view.id === savedView)) setHomeView(savedView as HomeView);
@@ -605,7 +605,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {permissions.isMasterAdmin && pendingRequests.length ? <section style={adminRequestPanel}><div><div style={surfaceEyebrowStyle}>ADMIN ATTENTION</div><h2 style={adminRequestTitle}>{pendingRequests.length} access request{pendingRequests.length === 1 ? "" : "s"} awaiting review</h2><p style={surfaceHintStyle}>{pendingRequests.slice(0, 3).map((request) => `${request.first_name} ${request.last_name} · ${request.department}`).join(" | ")}</p></div><Link href="/admin" style={adminRequestLink}>Review Requests</Link></section> : null}
+      {permissions.isAdmin && pendingRequests.length ? <section style={adminRequestPanel}><div><div style={surfaceEyebrowStyle}>ADMIN ATTENTION</div><h2 style={adminRequestTitle}>{pendingRequests.length} access request{pendingRequests.length === 1 ? "" : "s"} awaiting review</h2><p style={surfaceHintStyle}>{pendingRequests.slice(0, 3).map((request) => `${request.first_name} ${request.last_name} · ${request.department}`).join(" | ")}</p></div><Link href="/admin" style={adminRequestLink}>Review Requests</Link></section> : null}
 
       <section style={commandSurfaceStyle} aria-label="Management modules">
         <div style={surfaceHeaderStyle}>
