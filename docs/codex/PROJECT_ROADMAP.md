@@ -76,6 +76,8 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Document Control's Update Responsible Persons modal now includes Originator alongside Reviewer and Approver. Issuing a new revision now captures the change description directly into General Comments, which is carried through automatically into the reviewer and approver workflow emails as a "What's changed" note.
 - Quality dashboard operational control score re-scoped to be genuinely Quality-only: document review health removed (Document Control has no Quality/HSE data split to scope it by), NCR/Finding/MOC/Action-pressure re-weighted to 30/30/20/20. Fixed `isQualityAction()` incorrectly counting non-Quality-department actions (e.g. Logistics, Manual source) toward the score and the Quality Priority Actions panel. Critical Pressure and Open Workload KPIs now drill into real Critical Pressure Items / Open Workload Items panels listing the actual underlying records, replacing links to a mismatched or unrelated destination.
 - Central Action Management's My Actions tab now merges NCR and Audit Finding records owned by the signed-in person alongside central Actions, each linking to its own record. My Actions, Quality Actions, and HSE Actions registers standardised to a fixed-width table layout (see `ACTION_MANAGEMENT_HANDOVER.md`) so none of them require horizontal scrolling regardless of row count — this surfaced on HSE's 213-row register.
+- Fixed the Process Guides sidebar link (Quality/HSE/Document Control) resolving access against Quality module permission regardless of which sidebar it appeared in; added a dedicated `guides` access area in `src/components/AppShell.tsx` granted to anyone with Quality, Documents, or HSE access. The IMS Home "access requests awaiting review" banner is now shown to anyone with `system_role = "Admin"`, not only the Master Admin account (`isAdmin` added to the shared `ImsPermissionValue`).
+- Management Review rebuilt as a whole-business, permission-aware live snapshot — see the Management Review module status entry below for full detail.
 
 # In Progress
 
@@ -258,12 +260,14 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 
 ## Management Review
 
-- Status: Needs Review
-- Summary: A read-only executive snapshot and PDF export exist, with safe drill-down links. The desired direction is CEO-facing and business-story focused.
+- Status: In Progress
+- Summary: Rebuilt as a whole-business, permission-aware live snapshot (previously Quality/HSE/Documents-only, unchanged since 11 Aug and drifted 16 confirmed bugs out of sync with the modules it summarised). Uses the standard Overview/Business Areas command-view tabs and a Year/All-Time period selector. The single blended "Business Control Score" was removed in favour of a per-area On Track/Needs Attention/Critical status built from raw counts that trace back to each area's own live register — no invented percentage that can silently disagree with a module's own dashboard. Covers seven business areas: Quality, HSE, Document Control, Project Delivery, Asset Management, Action Management (all 15 departments, not just Quality/HSE), and Lessons Learnt. Each area renders only for users with access to that module. PDF and PowerPoint export were rebuilt to match. See `ACTION_MANAGEMENT_HANDOVER.md`, `QUALITY_HANDOVER.md` for the shared formulas reused (isQualityAction, calibration compliance, Open Points closure logic, NOI lookahead) so numbers agree with each source dashboard rather than contradicting them.
 - Outstanding Actions:
-  - Review the executive narrative, metric usefulness, and demo readiness without reopening the completed visual baseline.
-  - Confirm drill-down targets remain safe and permission-aware.
-  - Plan PowerPoint/export pack from Quality, HSE, Document Control, and Management Review as a future enhancement.
+  - Verify all seven business areas on Vercel with real data and representative permission profiles (Full/Part/None per module).
+  - Add audit-programme completion (planned vs. completed audits from the `audits` table, not just findings) — identified as a gap, not yet built.
+  - Consider whether a formal minuted review record (periods, attendees, sign-off, actions-from-last-review) is wanted as a separate future piece of work; current build is deliberately live-dashboard-only.
+  - Risk, People, and PTW remain out of scope by design (Risk needs its own maturity pass first; PTW is parked).
+  - `app/ncr-capa/page.tsx` gained a `?year=All+Years` URL override to support this page's Open NCRs drill-down; verify it doesn't regress any other NCR deep link.
 
 ## Risk Management
 
