@@ -74,7 +74,7 @@ type PeopleAccessRecord = {
   admin_access?: string | null;
 };
 
-type AccessArea = "public" | "login" | "home" | "people" | "quality" | "lessons" | "documents" | "hse" | "assets" | "risk" | "actions" | "management-review" | "projects" | "admin";
+type AccessArea = "public" | "login" | "home" | "people" | "quality" | "lessons" | "documents" | "hse" | "assets" | "risk" | "actions" | "management-review" | "projects" | "admin" | "guides";
 
 type NavIconKey =
   | "home"
@@ -221,6 +221,7 @@ function getAccessAreaFromHref(href: string): AccessArea {
   if (href.startsWith("/assets")) return "assets";
   if (href.startsWith("/risk")) return "risk";
   if (href === "/documents" || href.startsWith("/documents") || href === "/certification" || href.startsWith("/certification")) return "documents";
+  if (href.startsWith("/guides")) return "guides";
   return "quality";
 }
 
@@ -524,7 +525,7 @@ function filterNavItemsForRole(items: NavItem[], role: SystemRole, moduleAccess:
   });
 }
 
-function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleAccess) {
+function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleAccess): boolean {
   if (area === "public" || area === "login") return true;
   if (area === "home") return true;
   if (area === "people") return !isExplicitNone(moduleAccess.people) && (hasExplicitAccess(moduleAccess.people) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer");
@@ -538,6 +539,7 @@ function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleA
   if (area === "management-review") return !isExplicitNone(moduleAccess.managementReview) && (hasExplicitAccess(moduleAccess.managementReview) || role === "Admin" || role === "Manager" || role === "Viewer");
   if (area === "projects") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
   if (area === "admin") return !isExplicitNone(moduleAccess.admin) && (hasExplicitAccess(moduleAccess.admin) || role === "Admin");
+  if (area === "guides") return isAreaAllowed("quality", role, moduleAccess) || isAreaAllowed("documents", role, moduleAccess) || isAreaAllowed("hse", role, moduleAccess);
   return false;
 }
 
