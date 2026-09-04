@@ -827,6 +827,7 @@ function NcrCapaPageContent() {
   const directNcrNumber = searchParams.get("ncr")?.trim() || "";
   const directNcrId = searchParams.get("ncrId")?.trim() || "";
   const requestedWorkspaceView = parseNcrWorkspaceView(searchParams.get("view"));
+  const linkedYear = searchParams.get("year")?.trim() || "";
   const hasRegisterQuery =
     Boolean(linkedSearch) ||
     linkedStatus !== "All" ||
@@ -838,7 +839,8 @@ function NcrCapaPageContent() {
     Boolean(linkedCreatedMonth) ||
     Boolean(linkedClosedMonth) ||
     Boolean(directNcrNumber) ||
-    Boolean(directNcrId);
+    Boolean(directNcrId) ||
+    linkedYear === "All Years";
 
   const [ncrs, setNcrs] = useState<Ncr[]>([]);
   const [capas, setCapas] = useState<Capa[]>([]);
@@ -869,7 +871,7 @@ function NcrCapaPageContent() {
   const [showAttentionOnly, setShowAttentionOnly] = useState(false);
   const [activeLogTab, setActiveLogTab] = useState<"NCR" | "CAPA">("NCR");
   const [ncrQuickFilter, setNcrQuickFilter] = useState<NcrQuickFilter>("");
-  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+  const [yearFilter, setYearFilter] = useState(linkedYear === "All Years" ? "All Years" : String(new Date().getFullYear()));
   const [ncrSort, setNcrSort] = useState<{ key: NcrSortKey; direction: SortDirection } | null>(null);
 
   const [ncrOptions, setNcrOptions] = useState<LinkedOption[]>([]);
