@@ -108,6 +108,7 @@ const projectNavItems: NavItem[] = [
   { href: "/projects", label: "Projects", icon: "dashboard" },
   { href: "/projects/wadden-sea", label: "Wadden Sea", icon: "assets" },
   { href: "/projects/baltic-power", label: "Baltic Power", icon: "assets" },
+  { href: "/inspections", label: "Overall Inspections", icon: "inspection" },
 ];
 
 const qualityNavItems: NavItem[] = [
@@ -216,6 +217,7 @@ function getAccessAreaFromHref(href: string): AccessArea {
   if (href === "/management-review") return "management-review";
   if (href.startsWith("/admin")) return "admin";
   if (href.startsWith("/projects")) return "projects";
+  if (href.startsWith("/inspections")) return "projects";
   if (href.startsWith("/lessons-learned")) return "lessons";
   if (href.startsWith("/hse")) return "hse";
   if (href.startsWith("/assets")) return "assets";
@@ -716,7 +718,7 @@ export default function AppShell({ children }: AppShellProps) {
   const isAdminModule = pathname.startsWith("/admin");
   const isPeopleModule = pathname.startsWith("/people");
   const isActionModule = pathname === "/actions";
-  const isProjectModule = pathname.startsWith("/projects");
+  const isProjectModule = pathname.startsWith("/projects") || pathname.startsWith("/inspections");
   const isLessonsModule = pathname.startsWith("/lessons-learned");
   const isAinmFieldMode = pathname === "/hse/ainm/field";
   const isAssetInspectionFieldMode = pathname === "/assets/inspection/field";

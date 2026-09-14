@@ -272,6 +272,11 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
       if (storageError) throw storageError;
       const update = await supabase.from("project_noi_points").update({ noi_number: noiNumber, planned_date: inspectionDate, status: "NOI Issued", updated_at: new Date().toISOString() }).in("id", selected.map((point) => point.id));
       if (update.error) throw update.error;
+      const attendeesToSave = attendees.filter((person) => person.name.trim() || person.company.trim() || person.contact.trim() || person.email.trim());
+      await supabase.from("project_noi_attendees").upsert(
+        selected.map((point) => ({ point_id: point.id, project_key: projectKey, noi_number: noiNumber, attendees: attendeesToSave, location, duration, updated_at: new Date().toISOString() })),
+        { onConflict: "point_id" }
+      );
       const removed = points.filter((point) => point.noi_number === noiNumber && !selectedIds.includes(point.id)).map((point) => point.id);
       if (removed.length) {
         const cleared = await supabase.from("project_noi_points").update({ noi_number: null, status: "Planned", updated_at: new Date().toISOString() }).in("id", removed);

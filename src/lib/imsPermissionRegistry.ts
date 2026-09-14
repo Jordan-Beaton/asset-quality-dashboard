@@ -31,6 +31,7 @@ export const IMS_PERMISSION_REGISTRY: ImsPermissionModule[] = [
     { key: "noi", label: "NOI Register and Creator", routes: [{ path: "/projects/wadden-sea/noi", match: "prefix" }] },
     { key: "reports", label: "Project Reports and Open Points", routes: [{ path: "/projects/wadden-sea/reports", match: "prefix" }, { path: "/reports/project", match: "prefix" }] },
     { key: "baltic-power", label: "Baltic Power", routes: [{ path: "/projects/baltic-power", match: "prefix" }] },
+    { key: "inspections", label: "Overall Inspections", routes: [{ path: "/inspections", match: "prefix" }] },
   ] },
   { moduleKey: "documents", label: "Document Control", legacyAccessField: "document_access", areas: [
     { key: "document-control", label: "Document Control", routes: [{ path: "/documents", match: "prefix" }] },

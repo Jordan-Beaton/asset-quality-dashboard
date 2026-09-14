@@ -38,6 +38,15 @@ export default function ProjectsPage() {
             <p style={copy}>ITP control, NOI planning, and evidence-based phase sign-off with external approval.</p>
             <span style={cta}>Open project workspace →</span>
           </Link>
+          <Link href="/inspections" style={card}>
+            <div style={cardTop}>
+              <span style={badge}>All projects</span>
+              <span style={code}>OVI</span>
+            </div>
+            <h3 style={cardTitle}>Overall Inspections</h3>
+            <p style={copy}>Cross-project 8-week lookahead of who is covering what, including manual entries, fully filterable for client-ready exports.</p>
+            <span style={cta}>Open Overall Inspections →</span>
+          </Link>
         </div>
       </section>
     </main>

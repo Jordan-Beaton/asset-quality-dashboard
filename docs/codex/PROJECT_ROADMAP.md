@@ -79,6 +79,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Fixed the Process Guides sidebar link (Quality/HSE/Document Control) resolving access against Quality module permission regardless of which sidebar it appeared in; added a dedicated `guides` access area in `src/components/AppShell.tsx` granted to anyone with Quality, Documents, or HSE access. The IMS Home "access requests awaiting review" banner is now shown to anyone with `system_role = "Admin"`, not only the Master Admin account (`isAdmin` added to the shared `ImsPermissionValue`).
 - Management Review rebuilt as a whole-business, permission-aware live snapshot — see the Management Review module status entry below for full detail.
 - Added "Base" to the Action department list. Every action-creation path (central, Quality/HSE/Assets Create Action forms, AINM's inline corrective-action creator, bulk import) now records who raised the action; "Raised by X" is shown in the central Action Register and edit panel. Status-change and close-out notifications now go to the current owner as well as the raiser, not just the raiser. See `ACTION_MANAGEMENT_HANDOVER.md`.
+- New "Overall Inspections" module (`app/inspections/page.tsx`) gives a business-wide, permission-aware, project-grouped 8-week inspection lookahead across every current and future project, combining live ITP/NOI data with a manual-entry path for inspections that have no ITP behind them (fully filterable, with Excel/PDF export of exactly the filtered set — no live shareable link, matching the existing house convention). Wadden Sea's existing dashboard and Project Reports are deliberately untouched; Overall Inspections only reads their NOI data. `NoiCreatorPage` now also persists attendees to Postgres (`project_noi_attendees`) alongside its existing Word/PDF/Storage-JSON output. See `PROJECT_MANAGEMENT_HANDOVER.md`.
 
 # In Progress
 
@@ -120,6 +121,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - NOIs created before editable NOI storage was introduced retain their linked tracker points but cannot recover manual form values that were never persisted; saving them once establishes the editable stored record.
 - Historic Lessons Learnt narrative quality is inconsistent; automated trend statements must remain proportionate to the evidence.
 - Open Points phase history and People-linked Raised By require the latest `project_open_points.sql` migration in the live database.
+- Overall Inspections attendees and manual entries require `scripts/sql/project_inspections.sql` to be applied to the live Supabase project; it has not been applied from the repository. Until then the page still loads and shows ITP/NOI-derived rows only, with a status message pointing at the SQL file.
 
 # Next Priorities
 
@@ -287,7 +289,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 ## Project Management
 
 - Status: In Progress
-- Summary: Project Management has a Wadden Sea workspace aligned to the Quality Management layout standard. It includes a dashboard, controlled Supplier ITP programme, Project NOI requirements register, controlled NOI Creator, project report annexes, and eight-week inspection lookahead. NOI generation supports multiple inspection points, controlled Word/PDF output, shared project storage, editable saved records, tracker date synchronisation, sequential numbering, and self-service deletion of trial or cancelled NOIs.
+- Summary: Project Management has a Wadden Sea workspace aligned to the Quality Management layout standard. It includes a dashboard, controlled Supplier ITP programme, Project NOI requirements register, controlled NOI Creator, project report annexes, and eight-week inspection lookahead. NOI generation supports multiple inspection points, controlled Word/PDF output, shared project storage, editable saved records, tracker date synchronisation, sequential numbering, and self-service deletion of trial or cancelled NOIs. A new business-wide "Overall Inspections" module (`/inspections`) sits alongside the per-project workspaces with a project-grouped 8-week lookahead across every project plus manual entries for inspections with no ITP behind them; see `PROJECT_MANAGEMENT_HANDOVER.md`.
 - Outstanding Actions:
   - Verify the complete workflow on Vercel with authenticated users and real supplier records.
   - Confirm saved NOI Word, PDF, and JSON records can be reopened across different user sessions.
@@ -298,3 +300,5 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
   - Keep the NOI register as the primary eight-week-lookahead source while retaining Excel upload as a fallback.
   - Apply and verify the latest Open Points SQL migration, including People-linked raiser and phase-settings history.
   - Verify Open Points filters, fixed register, phase creation, NCR dropdown, evidence, deadline/closure workflow and aligned Excel/Word/PDF outputs.
+  - Apply `scripts/sql/project_inspections.sql` to the live Supabase project (adds `project_noi_attendees` and `project_manual_inspections`) before relying on Overall Inspections attendees or manual entries.
+  - Verify Overall Inspections on Vercel with real data: the project-grouped 8-week grid, Full Register view, all filters, manual entry create/edit/delete, and both Excel/PDF exports.
