@@ -41,6 +41,7 @@ Admin / Settings controls login users, invites, permissions, reference data, and
 ## Invite/Login Flow
 
 - Login now includes a public `Request access` workflow for first name, last name, Enshore email, controlled department, reason and requested modules.
+- Fixed a long-standing bug (present since the feature was added on 4 Aug 2026) where the email field's HTML `pattern` attribute in `app/login/page.tsx` contained doubled backslashes (`[^@\\s]+@enshoresubsea\\.com` in source), which JSX passes through literally rather than collapsing to a single escape. The compiled regex required a literal backslash character before `s` and before `.com`, so it rejected every email address, including plain ones like `name@enshoresubsea.com` — not just addresses with punctuation in the local part. Fixed to a single-backslash pattern (`[^@\s]+@enshoresubsea\.com`); verified against both a plain address and one with dots/hyphens in the local part (e.g. `medic.olympic-triton@enshoresubsea.com`).
 - Public API: `app/api/access-requests/route.ts`. It accepts only `@enshoresubsea.com`, validates active departments/modules and blocks duplicate Pending requests.
 - Database queue: `ims_access_requests`, created by `scripts/sql/admin_settings.sql`. No anonymous table policy is exposed; the server route writes through the service role after validation.
 - A request does not create an account. Master Admin sees a Pending Access Requests notice on IMS Home and the review queue in Users & Access.
