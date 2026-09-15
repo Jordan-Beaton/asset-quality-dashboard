@@ -4061,7 +4061,7 @@ function DocumentsPageContent() {
                         <input value={detailForm.title} onChange={(e) => setDetailForm({ ...detailForm, title: e.target.value })} style={inputStyle} />
                       </Field>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "12px" }}>
                         <Field label="Document Type">
                           <select value={detailForm.document_type} onChange={(e) => setDetailForm({ ...detailForm, document_type: e.target.value as DocumentTypeOption | "" })} style={inputStyle}>
                             <option value="">Select type</option>
@@ -4081,7 +4081,7 @@ function DocumentsPageContent() {
                         </Field>
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "12px" }}>
                         <Field label="Current Revision">
                           <input
                             value={detailForm.current_revision}
@@ -4098,7 +4098,7 @@ function DocumentsPageContent() {
                         </Field>
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "12px" }}>
                         <Field label="Issue Date">
                           <input type="date" value={detailForm.issue_date} onChange={(e) => setDetailForm({ ...detailForm, issue_date: e.target.value })} style={inputStyle} />
                         </Field>
@@ -4810,6 +4810,7 @@ const detailFormGridStyle: CSSProperties = {
 const fieldWrapStyle: CSSProperties = {
   display: "grid",
   gap: "6px",
+  minWidth: 0,
 };
 
 const fieldLabelStyle: CSSProperties = {

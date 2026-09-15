@@ -97,7 +97,7 @@ type NcrCapaOption = {
   project: string;
 };
 
-type MyWorkItemSource = "Action" | "NCR" | "Audit Finding" | "AINM" | "Observation";
+type MyWorkItemSource = "Action" | "NCR" | "Audit Finding" | "AINM" | "Observation" | "MOC";
 
 type MyWorkItem = {
   id: string;
@@ -115,6 +115,16 @@ type MocOption = {
   id: string;
   number: string;
   title: string;
+};
+
+type MocDueItem = {
+  id: string;
+  moc_report_id: string;
+  action_no: string;
+  description: string;
+  responsible_person: string;
+  target_date: string;
+  status: string;
 };
 
 type AinmOption = {
@@ -191,7 +201,7 @@ type ActionPerson = {
 
 type QuickFilter = "" | "my" | "overdue" | "dueWeek" | "highPriority";
 
-type ActionView = "dashboard" | "register" | "create" | "my" | "priority" | "bulk";
+type ActionView = "dashboard" | "register" | "create" | "my" | "today" | "priority" | "bulk";
 type MyActionFilter = "all" | "open" | "closed" | "overdue" | "dueWeek";
 
 type ActionImportRow = {
@@ -381,6 +391,7 @@ const actionViews: Array<{ id: ActionView; label: string }> = [
   { id: "register", label: "Action Register" },
   { id: "create", label: "Create Action" },
   { id: "my", label: "My Actions" },
+  { id: "today", label: "Today" },
   { id: "priority", label: "Overdue / Priority" },
   { id: "bulk", label: "Bulk Upload" },
 ];
@@ -938,6 +949,7 @@ function ActionsPageContent() {
   const [findingOptions, setFindingOptions] = useState<FindingOption[]>([]);
   const [ncrCapaOptions, setNcrCapaOptions] = useState<NcrCapaOption[]>([]);
   const [mocOptions, setMocOptions] = useState<MocOption[]>([]);
+  const [mocDueItems, setMocDueItems] = useState<MocDueItem[]>([]);
   const [ainmOptions, setAinmOptions] = useState<AinmOption[]>([]);
   const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]);
   const [assetInspectionOptions, setAssetInspectionOptions] = useState<AssetInspectionOption[]>([]);
@@ -1182,6 +1194,29 @@ function ActionsPageContent() {
     setMocOptions(options);
   }
 
+  async function loadMocDueItems() {
+    const { data, error } = await supabase
+      .from("moc_action_plan_items")
+      .select("id,moc_report_id,action_no,description,responsible_person,target_date,status")
+      .order("target_date", { ascending: true });
+
+    if (error) return;
+
+    const items = ((data || []) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        id: String(row.id || ""),
+        moc_report_id: String(row.moc_report_id || ""),
+        action_no: String(row.action_no || ""),
+        description: String(row.description || ""),
+        responsible_person: String(row.responsible_person || ""),
+        target_date: String(row.target_date || ""),
+        status: String(row.status || ""),
+      }))
+      .filter((row) => row.id && row.moc_report_id);
+
+    setMocDueItems(items);
+  }
+
   async function loadAinmOptions() {
     const { data, error } = await supabase
       .from("hse_ainm_records")
@@ -1370,6 +1405,7 @@ function ActionsPageContent() {
         loadFindingOptions(),
         loadNcrCapaOptions(),
         loadMocOptions(),
+        loadMocDueItems(),
         loadAinmOptions(),
         loadHseInspectionOptions(),
         loadObservationOptions(),
@@ -1745,6 +1781,10 @@ function ActionsPageContent() {
     return new Map(auditOptions.map((audit) => [audit.id, audit.audit_number]));
   }, [auditOptions]);
 
+  const mocOptionById = useMemo(() => {
+    return new Map(mocOptions.map((option) => [option.id, option]));
+  }, [mocOptions]);
+
   const myOwnActionItems = useMemo<MyWorkItem[]>(() => {
     if (!currentPersonName) return [];
     return actions
@@ -1833,8 +1873,28 @@ function ActionsPageContent() {
       }));
   }, [observationOptions, currentPersonName]);
 
+  const myMocItems = useMemo<MyWorkItem[]>(() => {
+    if (!currentPersonName) return [];
+    return mocDueItems
+      .filter((item) => matchesPersonName(item.responsible_person, currentPersonName))
+      .map((item) => {
+        const report = mocOptionById.get(item.moc_report_id);
+        return {
+          id: item.id,
+          source: "MOC" as const,
+          number: report?.number ? (item.action_no ? `${report.number} · ${item.action_no}` : report.number) : item.action_no || "-",
+          title: item.description || report?.title || "Untitled MOC action",
+          project: report?.number ? `MOC ${report.number}` : "MOC action",
+          status: item.status || null,
+          due_date: item.target_date || null,
+          action: null,
+          href: report?.number ? `/moc?search=${encodeURIComponent(report.number)}` : null,
+        };
+      });
+  }, [mocDueItems, mocOptionById, currentPersonName]);
+
   const myActionList = useMemo(() => {
-    return [...myOwnActionItems, ...myNcrItems, ...myFindingItems, ...myAinmItems, ...myObservationItems].sort((a, b) => {
+    return [...myOwnActionItems, ...myNcrItems, ...myFindingItems, ...myAinmItems, ...myObservationItems, ...myMocItems].sort((a, b) => {
       const aClosed = isClosedLikeStatus(a.status);
       const bClosed = isClosedLikeStatus(b.status);
       if (aClosed !== bClosed) return aClosed ? 1 : -1;
@@ -1842,7 +1902,7 @@ function ActionsPageContent() {
       const bDate = b.due_date ? new Date(b.due_date).getTime() : Number.MAX_SAFE_INTEGER;
       return aDate - bDate;
     });
-  }, [myOwnActionItems, myNcrItems, myFindingItems, myAinmItems, myObservationItems]);
+  }, [myOwnActionItems, myNcrItems, myFindingItems, myAinmItems, myObservationItems, myMocItems]);
 
   const myOpenWorkItems = myActionList.filter((item) => !isClosedLikeStatus(item.status));
   const myOverdueActions = myActionList.filter((item) => isOverdue(item));
@@ -1852,6 +1912,33 @@ function ActionsPageContent() {
     return days !== null && days >= 0 && days <= 7;
   });
   const myClosedActions = myActionList.filter((item) => isClosedLikeStatus(item.status));
+
+  const myTodayOpenItems = useMemo(() => myActionList.filter((item) => !isClosedLikeStatus(item.status)), [myActionList]);
+  const myTodayOverdueItems = useMemo(() => myTodayOpenItems.filter((item) => isOverdue(item)), [myTodayOpenItems]);
+  const myTodayDueTodayItems = useMemo(
+    () =>
+      myTodayOpenItems.filter((item) => {
+        const days = getDaysFromToday(item.due_date);
+        return days === 0;
+      }),
+    [myTodayOpenItems]
+  );
+  const myTodayDueThisWeekItems = useMemo(
+    () =>
+      myTodayOpenItems.filter((item) => {
+        const days = getDaysFromToday(item.due_date);
+        return days !== null && days >= 1 && days <= 7;
+      }),
+    [myTodayOpenItems]
+  );
+  const myTodayLaterItems = useMemo(
+    () =>
+      myTodayOpenItems.filter((item) => {
+        const days = getDaysFromToday(item.due_date);
+        return days === null || days > 7;
+      }),
+    [myTodayOpenItems]
+  );
   const myQuickFilteredActions = useMemo(() => {
     if (myActionFilter === "open") return myOpenWorkItems;
     if (myActionFilter === "closed") return myClosedActions;
@@ -3969,7 +4056,7 @@ function ActionsPageContent() {
       {activeView === "my" ? (
         <SectionCard
           title="My Actions"
-          subtitle="Personal work view matched from the signed-in user email to the active People Management record. Includes central Actions, NCRs, Audit Findings, AINMs, and Observations assigned to you."
+          subtitle="Personal work view matched from the signed-in user email to the active People Management record. Includes central Actions, NCRs, Audit Findings, AINMs, Observations, and MOC actions assigned to you."
         >
           <div style={myActionsNoticeStyle}>
             <strong>My Actions:</strong> {currentPersonNotice}
@@ -4061,6 +4148,7 @@ function ActionsPageContent() {
                       <option value="AINM">AINM</option>
                       <option value="Observation">Observation</option>
                       <option value="Audit Finding">Audit Finding</option>
+                      <option value="MOC">MOC</option>
                     </select>
                   </div>
                 ) : null}
@@ -4132,6 +4220,59 @@ function ActionsPageContent() {
                   </tbody>
                 </table>
               </div>
+            </>
+          ) : (
+            <div style={emptyEvidencePanelStyle}>No personal action list is available until your login email matches an active People record.</div>
+          )}
+        </SectionCard>
+      ) : null}
+
+      {activeView === "today" ? (
+        <SectionCard
+          title="Today"
+          subtitle="A single urgency-sorted view of everything assigned to you - Overdue, Due Today, Due This Week, and Later - across Actions, NCRs, Audit Findings, AINMs, Observations, and MOC actions."
+        >
+          <div style={myActionsNoticeStyle}>
+            <strong>Today:</strong> {currentPersonNotice}
+          </div>
+
+          {currentPersonName ? (
+            <>
+              <section style={statsGridStyle}>
+                <QualityKpiCard title="Overdue" value={myTodayOverdueItems.length} accent="#F93822" />
+                <QualityKpiCard title="Due Today" value={myTodayDueTodayItems.length} accent="#FFAD00" />
+                <QualityKpiCard title="Due This Week" value={myTodayDueThisWeekItems.length} accent="#63B1BC" />
+                <QualityKpiCard title="Later / No Date" value={myTodayLaterItems.length} accent="#005670" />
+              </section>
+
+              <TodayBucketSection
+                title="Overdue"
+                tone="red"
+                items={myTodayOverdueItems}
+                emptyText="Nothing overdue - nice work."
+                onOpen={openMyWorkItem}
+              />
+              <TodayBucketSection
+                title="Due Today"
+                tone="amber"
+                items={myTodayDueTodayItems}
+                emptyText="Nothing due today."
+                onOpen={openMyWorkItem}
+              />
+              <TodayBucketSection
+                title="Due This Week"
+                tone="teal"
+                items={myTodayDueThisWeekItems}
+                emptyText="Nothing else due in the next 7 days."
+                onOpen={openMyWorkItem}
+              />
+              <TodayBucketSection
+                title="Later"
+                tone="slate"
+                items={myTodayLaterItems}
+                emptyText="Nothing further out is open."
+                onOpen={openMyWorkItem}
+              />
             </>
           ) : (
             <div style={emptyEvidencePanelStyle}>No personal action list is available until your login email matches an active People record.</div>
@@ -5321,11 +5462,70 @@ function QuickFilterButton({
 
 function MyWorkItemTypeChip({ source }: { source: MyWorkItemSource }) {
   const tone: LinkedRecordChip["tone"] =
-    source === "NCR" ? "red" : source === "Audit Finding" ? "blue" : source === "AINM" ? "red" : source === "Observation" ? "teal" : "slate";
+    source === "NCR"
+      ? "red"
+      : source === "Audit Finding"
+      ? "blue"
+      : source === "AINM"
+      ? "red"
+      : source === "Observation"
+      ? "teal"
+      : source === "MOC"
+      ? "amber"
+      : "slate";
   return (
     <span style={{ ...linkedChipStyle, ...linkedChipToneStyles[tone] }}>
       {source}
     </span>
+  );
+}
+
+function TodayBucketSection({
+  title,
+  tone,
+  items,
+  emptyText,
+  onOpen,
+}: {
+  title: string;
+  tone: "red" | "amber" | "teal" | "slate";
+  items: MyWorkItem[];
+  emptyText: string;
+  onOpen: (item: MyWorkItem) => void;
+}) {
+  const accent = tone === "red" ? "#F93822" : tone === "amber" ? "#FFAD00" : tone === "teal" ? "#63B1BC" : "#005670";
+
+  return (
+    <div style={todayBucketSectionStyle}>
+      <div style={{ ...todayBucketHeaderStyle, borderLeft: `4px solid ${accent}` }}>
+        <h3 style={todayBucketTitleStyle}>{title}</h3>
+        <span style={{ ...todayBucketCountStyle, color: accent }}>{items.length}</span>
+      </div>
+
+      {items.length === 0 ? (
+        <p style={emptyTextStyle}>{emptyText}</p>
+      ) : (
+        <div style={miniListWrapStyle}>
+          {items.map((item) => (
+            <button type="button" key={item.id} onClick={() => onOpen(item)} style={todayBucketItemStyle}>
+              <MyWorkItemTypeChip source={item.source} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={miniListLine1Style} title={item.title}>
+                  {item.number} - {item.title}
+                </div>
+                <div style={miniListLine2Style} title={item.project}>
+                  {item.project}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={primaryCellTextStyle}>{formatDate(item.due_date)}</div>
+                <div style={{ ...secondaryCellTextStyle, color: accent, fontWeight: 700 }}>{getDueLabel(item.due_date)}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -5887,6 +6087,44 @@ const miniListLine2Style: CSSProperties = {
   fontSize: "13px",
   marginTop: "4px",
   lineHeight: 1.45,
+};
+
+const todayBucketSectionStyle: CSSProperties = {
+  marginBottom: "20px",
+};
+
+const todayBucketHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: "6px 0 6px 14px",
+  marginBottom: "12px",
+};
+
+const todayBucketTitleStyle: CSSProperties = {
+  margin: 0,
+  fontSize: "16px",
+  fontWeight: 800,
+  color: "#000000",
+};
+
+const todayBucketCountStyle: CSSProperties = {
+  fontSize: "20px",
+  fontWeight: 900,
+};
+
+const todayBucketItemStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  borderRadius: "12px",
+  padding: "12px 14px",
+  border: "none",
+  width: "100%",
+  textAlign: "left",
+  fontFamily: "inherit",
+  background: "#ECECE7",
+  cursor: "pointer",
 };
 
 const filterBarStyle: CSSProperties = {

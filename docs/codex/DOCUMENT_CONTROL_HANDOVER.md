@@ -32,6 +32,7 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
   - Supersede & Create New requires both edit permission on the existing document and create permission for the replacement document.
   - Main workflow/file/save/delete buttons are disabled when the current tab permission does not allow the action.
 - Update Responsible Persons now includes Originator alongside Reviewer and Approver (previously Originator could only be set at document creation or via Edit Details). All three resolve email from People Management and the change is recorded in the document activity log without up-revving.
+- Fixed the Details tab's paired fields (Document Type/Department, Current Revision/Review Cycle, Issue Date/Next Review Date) overflowing/clipping their labels and values at narrower widths: their three `gridTemplateColumns: "1fr 1fr"` rows were the only unguarded two-column grids in `app/documents/page.tsx` — every other multi-column grid in the file already uses `minmax(0, 1fr)` so grid tracks can shrink below their content's intrinsic width. Fixed to `minmax(0, 1fr) minmax(0, 1fr)`, and added `minWidth: 0` to the shared `fieldWrapStyle` used by every `Field` label/input pair as a general safeguard against the same class of overflow recurring elsewhere.
 - Big migration from Z drive was performed:
   - Current files uploaded.
   - Revisions/history attempted.

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 
@@ -142,16 +142,51 @@ const moduleCards = [
 
 type ModuleIcon = (typeof moduleCards)[number]["icon"];
 type ModuleCard = (typeof moduleCards)[number];
-type HomeView = "grid" | "spotlight" | "compact" | "list" | "columns" | "hub";
+type HomeView = "grid" | "compact" | "hub" | "mission" | "constellation" | "holodeck" | "list";
 
 const homeViews: Array<{ id: HomeView; label: string }> = [
   { id: "grid", label: "Card grid" },
-  { id: "spotlight", label: "Spotlight" },
   { id: "compact", label: "Compact tiles" },
-  { id: "list", label: "List" },
-  { id: "columns", label: "Two columns" },
   { id: "hub", label: "IMS hub" },
+  { id: "mission", label: "Mission Control" },
+  { id: "constellation", label: "Constellation" },
+  { id: "holodeck", label: "Holo Deck" },
 ];
+
+type StatusTone = "live" | "ready" | "shell";
+
+function getStatusTone(status: ModuleCard["status"]): StatusTone {
+  if (status === "Live") return "live";
+  if (status === "Ready") return "ready";
+  return "shell";
+}
+
+function getModuleInitials(title: string) {
+  return title
+    .split(/[\s/]/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+}
+
+const STATUS_TONE_LABEL: Record<StatusTone, string> = {
+  live: "Connected",
+  ready: "Ready",
+  shell: "In Build",
+};
+
+const GROUP_POSITIONS: Record<string, [number, number]> = {
+  Operations: [18, 22],
+  "Core IMS": [50, 12],
+  Control: [82, 22],
+  Projects: [85, 62],
+  Governance: [50, 88],
+  "Master Data": [15, 62],
+};
+
+const CONSTELLATION_GROUP_ORDER = ["Operations", "Core IMS", "Control", "Projects", "Governance", "Master Data"];
 
 function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
   const common = {
@@ -275,10 +310,14 @@ export default function HomePage() {
   const [heroTilt, setHeroTilt] = useState({ x: 0, y: 0 });
   const [homeView, setHomeView] = useState<HomeView>("grid");
   const [isMobileHome, setIsMobileHome] = useState(false);
-  const [spotlightIndex, setSpotlightIndex] = useState(0);
   const [viewPreferenceLoaded, setViewPreferenceLoaded] = useState(false);
+  const [missionClock, setMissionClock] = useState("--:--:--");
+  const [holoParticles, setHoloParticles] = useState<Array<{ left: number; duration: number; delay: number }>>([]);
+  const [holoTilts, setHoloTilts] = useState<Record<string, { x: number; y: number }>>({});
+  const [constellationSize, setConstellationSize] = useState({ width: 0, height: 0 });
   const headerVideoRef = useRef<HTMLVideoElement>(null);
   const hubVideoRef = useRef<HTMLVideoElement>(null);
+  const constellationRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 720px)");
     const update = () => setIsMobileHome(media.matches);
@@ -313,6 +352,32 @@ export default function HomePage() {
     const timer = window.setInterval(synchronize, 400);
     return () => window.clearInterval(timer);
   }, [effectiveHomeView]);
+  useEffect(() => {
+    if (effectiveHomeView !== "mission") return;
+    const update = () => setMissionClock(new Date().toLocaleTimeString("en-GB", { hour12: false }));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [effectiveHomeView]);
+  useEffect(() => {
+    if (effectiveHomeView !== "holodeck") return;
+    setHoloParticles(
+      Array.from({ length: 22 }).map(() => ({
+        left: Math.random() * 100,
+        duration: 8 + Math.random() * 10,
+        delay: Math.random() * -18,
+      }))
+    );
+  }, [effectiveHomeView]);
+  useEffect(() => {
+    if (effectiveHomeView !== "constellation") return;
+    const el = constellationRef.current;
+    if (!el) return;
+    const update = () => setConstellationSize({ width: el.clientWidth, height: el.clientHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [effectiveHomeView]);
   const isModuleAccessible = (moduleKey: (typeof moduleCards)[number]["moduleKey"]) => {
     if (!permissions.loaded) return true;
     if (moduleKey === "field-tools") {
@@ -320,7 +385,7 @@ export default function HomePage() {
     }
     return permissions.canAccessModule(moduleKey);
   };
-  const renderModuleCard = (card: ModuleCard, cardIndex: number, variant: "standard" | "spotlight" | "compact" | "list" | "hub" = "standard") => {
+  const renderModuleCard = (card: ModuleCard, cardIndex: number, variant: "standard" | "compact" | "list" | "hub" = "standard") => {
     const hasAccess = isModuleAccessible(card.moduleKey);
     const shellStyle = {
       ...cardShellStyle,
@@ -357,6 +422,128 @@ export default function HomePage() {
     if (!hasAccess) return <div key={card.title} style={shellStyle} aria-disabled="true" title="No access assigned for this module.">{cardContent}</div>;
     return <Link key={card.title} href={card.href} style={shellStyle}>{cardContent}</Link>;
   };
+
+  const renderMissionTile = (card: ModuleCard, index: number) => {
+    const hasAccess = isModuleAccessible(card.moduleKey);
+    const tone: StatusTone = hasAccess ? getStatusTone(card.status) : "shell";
+    const label = hasAccess ? STATUS_TONE_LABEL[tone].toUpperCase() : "NO ACCESS";
+    const inner = (
+      <>
+        <div className="mc-tile-top">
+          <span className="mc-icon">{getModuleInitials(card.title)}</span>
+          <span className={`mc-dot mc-dot-${tone}`} aria-hidden="true" />
+        </div>
+        <h3 className="mc-title">{card.title}</h3>
+        <div className="mc-group">{card.group}</div>
+        <div className="mc-stat">
+          <span className="mc-stat-k">Status</span>
+          <span className={`mc-stat-v mc-stat-v-${tone}`}>{label}</span>
+        </div>
+      </>
+    );
+    if (!hasAccess) {
+      return (
+        <div
+          key={card.title}
+          className="mc-tile mc-tile-disabled"
+          style={{ animationDelay: `${(index % 6) * -1}s` }}
+          aria-disabled="true"
+          title="No access assigned for this module."
+        >
+          {inner}
+        </div>
+      );
+    }
+    return (
+      <Link key={card.title} href={card.href} className="mc-tile" style={{ animationDelay: `${(index % 6) * -1}s` }}>
+        {inner}
+      </Link>
+    );
+  };
+
+  const renderConstellationNode = (card: ModuleCard) => {
+    const hasAccess = isModuleAccessible(card.moduleKey);
+    const tone: StatusTone = hasAccess ? getStatusTone(card.status) : "shell";
+    const inner = (
+      <span className="cn-name">
+        <span className={`cn-dot cn-dot-${tone}`} aria-hidden="true" />
+        {card.title}
+      </span>
+    );
+    if (!hasAccess) {
+      return (
+        <div key={card.title} className="cn-node cn-node-disabled" aria-disabled="true" title="No access assigned for this module.">
+          {inner}
+        </div>
+      );
+    }
+    return (
+      <Link key={card.title} href={card.href} className="cn-node">
+        {inner}
+      </Link>
+    );
+  };
+
+  const renderHoloCard = (card: ModuleCard, index: number) => {
+    const hasAccess = isModuleAccessible(card.moduleKey);
+    const tone: StatusTone = hasAccess ? getStatusTone(card.status) : "shell";
+    const label = hasAccess ? STATUS_TONE_LABEL[tone] : "No access";
+    const tilt = holoTilts[card.title];
+    const transform = tilt ? `rotateY(${tilt.x * 14}deg) rotateX(${tilt.y * -14}deg) translateZ(6px)` : undefined;
+    const handleMove = (event: ReactMouseEvent<HTMLElement>) => {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      setHoloTilts((current) => ({
+        ...current,
+        [card.title]: {
+          x: (event.clientX - bounds.left) / bounds.width - 0.5,
+          y: (event.clientY - bounds.top) / bounds.height - 0.5,
+        },
+      }));
+    };
+    const handleLeave = () => {
+      setHoloTilts((current) => {
+        const next = { ...current };
+        delete next[card.title];
+        return next;
+      });
+    };
+    const inner = (
+      <>
+        <span className="holo-sheen" aria-hidden="true" />
+        <span className="holo-icon">{getModuleInitials(card.title)}</span>
+        <h3 className="holo-title">{card.title}</h3>
+        <div className="holo-group">{card.group}</div>
+        <div className="holo-footer">
+          <span className={`holo-pill holo-pill-${tone}`}>{label}</span>
+          {hasAccess ? <span className="holo-cta">Open &rarr;</span> : null}
+        </div>
+      </>
+    );
+    const sharedProps = {
+      className: `holo-card${hasAccess ? "" : " holo-card-disabled"}`,
+      style: { animationDelay: `${-(index % 5)}s`, transform },
+      onMouseMove: handleMove,
+      onMouseLeave: handleLeave,
+    };
+    if (!hasAccess) {
+      return (
+        <div key={card.title} {...sharedProps} aria-disabled="true" title="No access assigned for this module.">
+          {inner}
+        </div>
+      );
+    }
+    return (
+      <Link key={card.title} {...sharedProps} href={card.href}>
+        {inner}
+      </Link>
+    );
+  };
+
+  const constellationClusters = CONSTELLATION_GROUP_ORDER.map((group) => ({
+    group,
+    pos: GROUP_POSITIONS[group] || [50, 50],
+    cards: moduleCards.filter((card) => card.group === group),
+  })).filter((cluster) => cluster.cards.length > 0);
 
   return (
     <main className="ims-home-page" style={pageStyle}>
@@ -454,21 +641,12 @@ export default function HomePage() {
           .workspace-view-tools { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
           .workspace-view-select { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 5px 6px 5px 12px; border: 1px solid #D0D0CE; border-radius: 12px; background: white; color: #005670; box-shadow: 0 6px 16px rgba(15,23,42,.06); font-size: 12px; font-weight: 900; }
           .workspace-view-select select { min-height: 30px; border: 0; border-radius: 8px; outline: 0; background: #ECECE7; color: #005670; padding: 4px 28px 4px 9px; font: inherit; cursor: pointer; }
-          .module-spotlight-view { position: relative; display: grid; grid-template-columns: 48px minmax(0, 640px) 48px; justify-content: center; align-items: center; gap: 18px; min-height: 350px; padding: 8px 20px 24px; }
-          .spotlight-stage, .spotlight-stage > a, .spotlight-stage > div { width: 100%; }
-          .module-card-spotlight { height: 294px !important; padding: 26px !important; }
-          .module-card-spotlight h3 { font-size: 34px !important; }
-          .module-card-spotlight .module-icon { width: 58px !important; height: 58px !important; }
-          .spotlight-arrow { width: 48px; height: 48px; border: 1px solid #D0D0CE; border-radius: 50%; background: white; color: #005670; cursor: pointer; font-size: 32px; line-height: 1; box-shadow: 0 10px 24px rgba(15,23,42,.08); transition: 180ms ease; }
-          .spotlight-arrow:hover { transform: scale(1.1); background: #005670; border-color: #005670; color: white; }
-          .spotlight-counter { position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%); color: #53565A; font-size: 12px; font-weight: 900; }
           .module-compact-view { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
           .module-card-compact { height: 154px !important; min-height: 154px !important; padding: 14px !important; }
           .module-card-compact > div:last-child { display: none !important; }
           .module-card-compact h3 { font-size: 17px !important; }
           .module-list-view { display: grid; gap: 10px; }
-          .module-columns-view { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-          .module-list-view > a, .module-list-view > div, .module-columns-view > a, .module-columns-view > div { width: 100%; }
+          .module-list-view > a, .module-list-view > div { width: 100%; }
           .module-card-list { height: 104px !important; min-height: 104px !important; display: grid !important; grid-template-columns: 82px minmax(0, 1fr) minmax(150px, auto); align-items: center; gap: 16px !important; padding: 14px 18px !important; }
           .module-card-list > div:first-of-type .module-launch-arrow { display: none; }
           .module-card-list > div:last-child { border-top: 0 !important; padding-top: 0 !important; }
@@ -486,6 +664,86 @@ export default function HomePage() {
           .module-card-hub > div:nth-of-type(2) { align-content: start !important; }
           .module-card-hub h3 { font-size: 13px !important; line-height: 1.05 !important; }
           .module-card-hub .module-access-label, .module-card-hub > div:last-child { display: none !important; }
+
+          @keyframes mcDrift { from { background-position: 0 0, 0 0; } to { background-position: 34px 68px, 34px 68px; } }
+          @keyframes mcScan { 0% { top: -120px; } 100% { top: 100%; } }
+          @keyframes mcFloat { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(30px, 20px); } }
+          @keyframes mcShimmer { 0% { background-position: 120% 0; } 100% { background-position: -20% 0; } }
+          @keyframes cnHeartbeat { 0%, 100% { box-shadow: 0 0 0 8px rgba(0,86,112,.08), 0 12px 24px rgba(0,86,112,.25); } 50% { box-shadow: 0 0 0 14px rgba(0,86,112,.14), 0 16px 30px rgba(0,86,112,.3); } }
+          @keyframes cnFlow { to { stroke-dashoffset: -22; } }
+          @keyframes holoAurora { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(3%, -2%) rotate(4deg); } }
+          @keyframes holoRise { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: .6; } 100% { transform: translateY(-620px); opacity: 0; } }
+          @keyframes holoBreathe { 0%, 100% { box-shadow: 0 10px 24px rgba(0,0,0,.25); } 50% { box-shadow: 0 10px 24px rgba(0,0,0,.25), 0 0 0 1px rgba(99,177,188,.35); } }
+
+          .mc-console { position: relative; overflow: hidden; border-radius: 22px; padding: 26px 24px; background: radial-gradient(ellipse at 50% -10%, rgba(0,0,0,.05) 0%, rgba(0,0,0,.5) 55%, rgba(0,0,0,.7) 100%), #005670; box-shadow: 0 30px 60px rgba(0,0,0,.35); }
+          .mc-drift-grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(99,177,188,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(99,177,188,.09) 1px, transparent 1px); background-size: 34px 34px; animation: mcDrift 18s linear infinite; pointer-events: none; }
+          .mc-scanline { position: absolute; left: 0; right: 0; height: 120px; background: linear-gradient(180deg, transparent, rgba(99,177,188,.16) 45%, transparent); animation: mcScan 7s ease-in-out infinite; pointer-events: none; }
+          .mc-glow-orb { position: absolute; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(99,177,188,.16), transparent 70%); filter: blur(4px); animation: mcFloat 14s ease-in-out infinite; pointer-events: none; }
+          .mc-glow-orb-a { top: -80px; left: -60px; }
+          .mc-glow-orb-b { bottom: -100px; right: -40px; animation-delay: -7s; }
+          .mc-head { position: relative; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+          .mc-head-title { color: #FFFFFF; font-weight: 800; font-size: 15px; letter-spacing: .04em; }
+          .mc-head-title span { color: #63B1BC; font-family: ui-monospace, SFMono-Regular, "Courier New", monospace; font-weight: 700; font-size: 11px; letter-spacing: .1em; display: block; margin-top: 2px; }
+          .mc-clock { font-family: ui-monospace, SFMono-Regular, "Courier New", monospace; color: #63B1BC; font-size: 13px; letter-spacing: .05em; display: flex; align-items: center; gap: 8px; }
+          .mc-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #63B1BC; animation: imsSignalPulse 1.8s ease-in-out infinite; }
+          .mc-grid { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+          .mc-tile { position: relative; overflow: hidden; display: block; text-decoration: none; background: rgba(255,255,255,.03); border: 1px solid rgba(99,177,188,.25); border-radius: 14px; padding: 14px; cursor: pointer; transition: border-color 150ms ease, background 150ms ease; }
+          .mc-tile::after { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, transparent 40%, rgba(99,177,188,.08) 50%, transparent 60%); background-size: 220% 220%; animation: mcShimmer 6s linear infinite; pointer-events: none; }
+          .mc-tile:hover { border-color: #63B1BC; background: rgba(99,177,188,.08); }
+          .mc-tile-disabled { cursor: not-allowed; }
+          .mc-tile-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; position: relative; }
+          .mc-icon { width: 34px; height: 34px; border-radius: 9px; background: rgba(99,177,188,.15); display: flex; align-items: center; justify-content: center; color: #63B1BC; font-weight: 800; font-size: 13px; }
+          .mc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+          .mc-dot-live { background: #63B1BC; animation: imsSignalPulse 1.8s ease-in-out infinite; }
+          .mc-dot-ready { background: #FFAD00; }
+          .mc-dot-shell { background: rgba(255,255,255,.35); }
+          .mc-title { position: relative; color: #FFFFFF; font-size: 13.5px; font-weight: 700; margin: 10px 0 2px; }
+          .mc-group { position: relative; color: rgba(255,255,255,.5); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; font-family: ui-monospace, SFMono-Regular, "Courier New", monospace; }
+          .mc-stat { position: relative; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(99,177,188,.18); display: flex; justify-content: space-between; align-items: center; font-family: ui-monospace, SFMono-Regular, "Courier New", monospace; font-size: 10px; }
+          .mc-stat-k { color: rgba(255,255,255,.45); }
+          .mc-stat-v-live { color: #63B1BC; }
+          .mc-stat-v-ready { color: #FFAD00; }
+          .mc-stat-v-shell { color: rgba(255,255,255,.5); }
+
+          .cn-canvas-wrap { background: #FFFFFF; border: 1px solid #D0D0CE; border-radius: 22px; padding: 20px; box-shadow: 0 20px 40px rgba(15,23,42,.06); }
+          .cn-canvas { position: relative; width: 100%; height: 560px; }
+          .cn-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+          .cn-flow-line { stroke: #63B1BC; stroke-width: 1.5; opacity: .55; stroke-dasharray: 4 7; animation: cnFlow 1.6s linear infinite; }
+          .cn-pulse-dot { fill: #63B1BC; filter: drop-shadow(0 0 3px rgba(99,177,188,.9)); }
+          .cn-cluster { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+          .cn-cluster-label { background: #005670; color: #FFFFFF; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
+          .cn-cluster-nodes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: 230px; }
+          .cn-node { display: block; background: #FFFFFF; border: 1.5px solid #63B1BC; border-radius: 12px; padding: 8px 10px; cursor: pointer; text-align: center; min-width: 96px; text-decoration: none; transition: transform 120ms ease, box-shadow 120ms ease; }
+          .cn-node:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,86,112,.18); border-color: #005670; }
+          .cn-node-disabled { cursor: not-allowed; opacity: .6; }
+          .cn-name { font-size: 11.5px; font-weight: 800; color: #000000; line-height: 1.25; }
+          .cn-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+          .cn-dot-live { background: #63B1BC; }
+          .cn-dot-ready { background: #FFAD00; }
+          .cn-dot-shell { background: #53565A; }
+          .cn-core { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 78px; height: 78px; border-radius: 50%; background: radial-gradient(circle, #005670 0%, #000000 140%); display: flex; align-items: center; justify-content: center; color: #FFFFFF; font-weight: 900; font-size: 20px; z-index: 2; animation: cnHeartbeat 2.6s ease-in-out infinite; }
+
+          .holo-deck { position: relative; overflow: hidden; border-radius: 22px; padding: 28px 24px; background: linear-gradient(160deg, #005670 0%, #000000 155%); box-shadow: 0 30px 60px rgba(0,0,0,.3); }
+          .holo-aurora { position: absolute; inset: -20%; pointer-events: none; background: radial-gradient(circle at 20% 20%, rgba(99,177,188,.3), transparent 40%), radial-gradient(circle at 80% 30%, rgba(99,177,188,.22), transparent 45%), radial-gradient(circle at 50% 90%, rgba(99,177,188,.2), transparent 45%); animation: holoAurora 16s ease-in-out infinite; }
+          .holo-particles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+          .holo-particle { position: absolute; bottom: -10px; width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.55); box-shadow: 0 0 6px rgba(99,177,188,.9); animation: holoRise linear infinite; }
+          .holo-head { position: relative; color: #FFFFFF; margin-bottom: 20px; }
+          .holo-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #63B1BC; }
+          .holo-heading { margin: 4px 0 0; font-size: 19px; font-weight: 800; color: #FFFFFF; }
+          .holo-grid { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; perspective: 1200px; }
+          .holo-card { position: relative; display: block; overflow: hidden; text-decoration: none; border-radius: 16px; padding: 16px; cursor: pointer; transform-style: preserve-3d; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease; box-shadow: 0 10px 24px rgba(0,0,0,.25); animation: holoBreathe 5s ease-in-out infinite; }
+          .holo-card:hover { border-color: rgba(99,177,188,.65); box-shadow: 0 18px 34px rgba(0,0,0,.4); }
+          .holo-card-disabled { cursor: not-allowed; }
+          .holo-sheen { position: absolute; inset: 0; border-radius: 16px; background: linear-gradient(115deg, rgba(255,255,255,.18), transparent 40%); pointer-events: none; opacity: .8; }
+          .holo-icon { position: relative; display: flex; width: 36px; height: 36px; border-radius: 10px; background: rgba(99,177,188,.2); align-items: center; justify-content: center; color: #FFFFFF; font-weight: 800; font-size: 13px; margin-bottom: 12px; }
+          .holo-title { position: relative; color: #FFFFFF; font-size: 13.5px; font-weight: 700; margin: 0 0 4px; }
+          .holo-group { position: relative; color: rgba(255,255,255,.55); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; }
+          .holo-footer { position: relative; margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.14); display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; }
+          .holo-pill { padding: 3px 8px; border-radius: 999px; font-weight: 800; font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; }
+          .holo-pill-live { background: rgba(99,177,188,.22); color: #63B1BC; }
+          .holo-pill-ready { background: rgba(255,173,0,.2); color: #FFAD00; }
+          .holo-pill-shell { background: rgba(255,255,255,.12); color: rgba(255,255,255,.6); }
+          .holo-cta { color: #63B1BC; font-weight: 700; }
 
           @media (prefers-reduced-motion: reduce) {
             .ambient-ring,
@@ -511,6 +769,9 @@ export default function HomePage() {
             .hub-connection-ring { top: 112px; width: 220px; height: 220px; }
             .hub-module-position { position: static; width: auto; transform: none; }
             .module-card-hub { height: 110px !important; min-height: 110px !important; }
+            .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .holo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .cn-canvas { height: 720px; }
           }
 
           @media (max-width: 560px) {
@@ -524,12 +785,11 @@ export default function HomePage() {
               margin: -36px -54px;
             }
             .workspace-view-tools { justify-content: flex-start; }
-            .module-columns-view { grid-template-columns: 1fr; }
             .module-hub-view { grid-template-columns: 1fr; }
             .module-card-list { grid-template-columns: 64px minmax(0, 1fr); }
             .module-card-list > div:last-child { display: none !important; }
-            .module-spotlight-view { grid-template-columns: 38px minmax(0, 1fr) 38px; gap: 8px; padding-inline: 0; }
-            .spotlight-arrow { width: 38px; height: 38px; }
+            .mc-grid { grid-template-columns: 1fr; }
+            .holo-grid { grid-template-columns: 1fr; }
           }
 
           .home-module-card {
@@ -625,18 +885,8 @@ export default function HomePage() {
 
         {effectiveHomeView === "grid" ? <div style={moduleGridStyle}>{moduleCards.map((card, index) => renderModuleCard(card, index))}</div> : null}
 
-        {effectiveHomeView === "spotlight" ? (
-          <div className="module-spotlight-view">
-            <button type="button" className="spotlight-arrow" aria-label="Previous workspace" onClick={() => setSpotlightIndex((index) => (index - 1 + moduleCards.length) % moduleCards.length)}>‹</button>
-            <div className="spotlight-stage">{renderModuleCard(moduleCards[spotlightIndex], spotlightIndex, "spotlight")}</div>
-            <button type="button" className="spotlight-arrow" aria-label="Next workspace" onClick={() => setSpotlightIndex((index) => (index + 1) % moduleCards.length)}>›</button>
-            <div className="spotlight-counter">{spotlightIndex + 1} / {moduleCards.length}</div>
-          </div>
-        ) : null}
-
         {effectiveHomeView === "compact" ? <div className="module-compact-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "compact"))}</div> : null}
         {effectiveHomeView === "list" ? <div className="module-list-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
-        {effectiveHomeView === "columns" ? <div className="module-columns-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
         {effectiveHomeView === "hub" ? (
           <div className="module-hub-view">
             <div className="hub-connection-ring" aria-hidden="true" />
@@ -660,6 +910,74 @@ export default function HomePage() {
                 </div>
               );
             })}
+          </div>
+        ) : null}
+
+        {effectiveHomeView === "mission" ? (
+          <div className="mc-console">
+            <div className="mc-glow-orb mc-glow-orb-a" aria-hidden="true" />
+            <div className="mc-glow-orb mc-glow-orb-b" aria-hidden="true" />
+            <div className="mc-scanline" aria-hidden="true" />
+            <div className="mc-drift-grid" aria-hidden="true" />
+            <div className="mc-head">
+              <div className="mc-head-title">
+                Enshore IMS
+                <span>Workspace status &middot; {moduleCards.length} systems</span>
+              </div>
+              <div className="mc-clock"><span className="mc-live-dot" aria-hidden="true" />{missionClock}</div>
+            </div>
+            <div className="mc-grid">{moduleCards.map((card, index) => renderMissionTile(card, index))}</div>
+          </div>
+        ) : null}
+
+        {effectiveHomeView === "constellation" ? (
+          <div className="cn-canvas-wrap">
+            <div className="cn-canvas" ref={constellationRef}>
+              <svg className="cn-lines" aria-hidden="true">
+                {constellationClusters.map((cluster, i) => {
+                  const cx = constellationSize.width / 2;
+                  const cy = constellationSize.height / 2;
+                  const x = (cluster.pos[0] / 100) * constellationSize.width;
+                  const y = (cluster.pos[1] / 100) * constellationSize.height;
+                  const path = `M ${cx} ${cy} L ${x} ${y}`;
+                  return (
+                    <g key={cluster.group}>
+                      <line className="cn-flow-line" x1={cx} y1={cy} x2={x} y2={y} style={{ animationDelay: `${-i * 0.25}s` }} />
+                      <circle className="cn-pulse-dot" r={3}>
+                        <animateMotion dur={`${2.4 + i * 0.2}s`} repeatCount="indefinite" path={path} />
+                      </circle>
+                    </g>
+                  );
+                })}
+              </svg>
+              <div className="cn-core">IMS</div>
+              {constellationClusters.map((cluster) => (
+                <div key={cluster.group} className="cn-cluster" style={{ left: `${cluster.pos[0]}%`, top: `${cluster.pos[1]}%` }}>
+                  <div className="cn-cluster-label">{cluster.group}</div>
+                  <div className="cn-cluster-nodes">{cluster.cards.map((card) => renderConstellationNode(card))}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {effectiveHomeView === "holodeck" ? (
+          <div className="holo-deck">
+            <div className="holo-aurora" aria-hidden="true" />
+            <div className="holo-particles" aria-hidden="true">
+              {holoParticles.map((particle, index) => (
+                <span
+                  key={index}
+                  className="holo-particle"
+                  style={{ left: `${particle.left}%`, animationDuration: `${particle.duration}s`, animationDelay: `${particle.delay}s` }}
+                />
+              ))}
+            </div>
+            <div className="holo-head">
+              <div className="holo-eyebrow">Enshore IMS</div>
+              <h2 className="holo-heading">Holo Deck &middot; {moduleCards.length} workspaces</h2>
+            </div>
+            <div className="holo-grid">{moduleCards.map((card, index) => renderHoloCard(card, index))}</div>
           </div>
         ) : null}
       </section>
