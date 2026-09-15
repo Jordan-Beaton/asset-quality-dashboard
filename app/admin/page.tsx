@@ -873,7 +873,10 @@ export default function AdminDashboardPage() {
               <section key={definition.moduleKey} style={compactModuleCardStyle}>
                 <div style={modulePermissionHeaderStyle}>
                   <div>
-                    <h4 style={modulePermissionTitleStyle}>{definition.label}</h4>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <h4 style={modulePermissionTitleStyle}>{definition.label}</h4>
+                      {moduleAccessValue === "Role Default" ? <StatusPill tone="neutral">Role Default</StatusPill> : null}
+                    </div>
                     <p style={modulePermissionSubtitleStyle}>
                       {moduleAccessValue === "Full"
                         ? "Full module access"
@@ -881,7 +884,7 @@ export default function AdminDashboardPage() {
                           ? "Part access - selected tabs only"
                           : moduleAccessValue === "None"
                             ? "No module access"
-                            : "Using role default unless changed"}
+                            : "Inherits from this person's role unless overridden here"}
                     </p>
                   </div>
                   <div style={segmentedButtonRowStyle}>
@@ -1042,7 +1045,13 @@ export default function AdminDashboardPage() {
             <QualityKpiCard title="Departments" value={departments.length} accent={imsColours.blue} />
             <QualityKpiCard title="Projects / Sites" value={projects.length} accent={imsColours.brandDark} />
           </section>
-          {pendingAccessRequests.length ? <ImsPanel title={`Pending Access Requests (${pendingAccessRequests.length})`} subtitle="Review requested modules before creating an account or issuing a setup link."><div style={requestQueue}>{pendingAccessRequests.map((request) => <article key={request.id} style={requestCard}><div><strong>{request.first_name} {request.last_name}</strong><small style={requestMeta}>{request.email} · {request.department} · {formatDateTime(request.submitted_at)}</small><p style={paragraphStyle}>{request.reason}</p><small style={requestMeta}>Requested: {(request.requested_modules || []).map((key) => IMS_PERMISSION_REGISTRY.find((module) => module.moduleKey === key)?.label || key).join(", ")}</small></div><div style={requestActions}><ImsButton onClick={() => prepareAccessRequest(request)} disabled={!canCreateAdmin}>Review & Prepare</ImsButton><ImsButton variant="danger" onClick={() => void rejectAccessRequest(request)} disabled={!canEditAdmin}>Reject</ImsButton></div></article>)}</div></ImsPanel> : null}
+          <ImsPanel title={`Pending Access Requests (${pendingAccessRequests.length})`} subtitle="Review requested modules before creating an account or issuing a setup link.">
+            {pendingAccessRequests.length ? (
+              <div style={requestQueue}>{pendingAccessRequests.map((request) => <article key={request.id} style={requestCard}><div><strong>{request.first_name} {request.last_name}</strong><small style={requestMeta}>{request.email} · {request.department} · {formatDateTime(request.submitted_at)}</small><p style={paragraphStyle}>{request.reason}</p><small style={requestMeta}>Requested: {(request.requested_modules || []).map((key) => IMS_PERMISSION_REGISTRY.find((module) => module.moduleKey === key)?.label || key).join(", ")}</small></div><div style={requestActions}><ImsButton onClick={() => prepareAccessRequest(request)} disabled={!canCreateAdmin}>Review & Prepare</ImsButton><ImsButton variant="danger" onClick={() => void rejectAccessRequest(request)} disabled={!canEditAdmin}>Reject</ImsButton></div></article>)}</div>
+            ) : (
+              <p style={paragraphStyle}>No pending access requests right now. New public sign-up requests will appear here for review.</p>
+            )}
+          </ImsPanel>
           <ImsPanel title="Invite User" subtitle="Create a login-ready person record, assign permissions, and send the setup invite." style={{ scrollMarginTop: 90 }}>
             <div id="admin-invite-panel" />
             <div style={inviteHeaderRowStyle}>
@@ -1798,11 +1807,13 @@ const rolePermissionGridStyle: CSSProperties = {
 
 const modulePermissionCardStyle: CSSProperties = {
   border: `1px solid ${imsColours.border}`,
+  borderTop: `3px solid ${imsColours.brandAccent}`,
   borderRadius: 14,
   background: "#ffffff",
   padding: 14,
   display: "grid",
   gap: 12,
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const compactModuleCardStyle: CSSProperties = {
@@ -1846,9 +1857,9 @@ const segmentedButtonRowStyle: CSSProperties = {
 const permissionModeButtonStyle: CSSProperties = {
   border: `1px solid ${imsColours.border}`,
   borderRadius: 10,
-  background: "#D0D0CE",
-  color: imsColours.ink,
-  fontWeight: 900,
+  background: "#ffffff",
+  color: imsColours.slate,
+  fontWeight: 800,
   padding: "10px 12px",
   cursor: "pointer",
 };
@@ -1857,6 +1868,7 @@ const permissionModeButtonActiveStyle: CSSProperties = {
   background: imsColours.brand,
   borderColor: imsColours.brand,
   color: "#ffffff",
+  fontWeight: 900,
 };
 
 const tabPermissionTableStyle: CSSProperties = {
