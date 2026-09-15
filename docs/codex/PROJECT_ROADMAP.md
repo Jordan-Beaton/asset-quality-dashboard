@@ -80,6 +80,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 - Management Review rebuilt as a whole-business, permission-aware live snapshot — see the Management Review module status entry below for full detail.
 - Added "Base" to the Action department list. Every action-creation path (central, Quality/HSE/Assets Create Action forms, AINM's inline corrective-action creator, bulk import) now records who raised the action; "Raised by X" is shown in the central Action Register and edit panel. Status-change and close-out notifications now go to the current owner as well as the raiser, not just the raiser. See `ACTION_MANAGEMENT_HANDOVER.md`.
 - New "Overall Inspections" module (`app/inspections/page.tsx`) gives a business-wide, permission-aware, project-grouped 8-week inspection lookahead across every current and future project, combining live ITP/NOI data with a manual-entry path for inspections that have no ITP behind them (fully filterable, with Excel/PDF export of exactly the filtered set — no live shareable link, matching the existing house convention). Wadden Sea's existing dashboard and Project Reports are deliberately untouched; Overall Inspections only reads their NOI data. `NoiCreatorPage` now also persists attendees to Postgres (`project_noi_attendees`) alongside its existing Word/PDF/Storage-JSON output. See `PROJECT_MANAGEMENT_HANDOVER.md`.
+- People Management revamped with a Document-Control-style KPI/dashboard header (Total/Active/Inactive/Departments Represented) and a clickable "People by Department" breakdown, and the person detail/edit view now opens as a modal overlay on row click instead of a bottom-anchored panel requiring scroll. Fixed a bug where a person with a blank department silently defaulted to "Assets" in the edit form, risking an incorrect overwrite on save; the department field is now genuinely optional throughout. See `PEOPLE_MANAGEMENT_HANDOVER.md`.
 
 # In Progress
 
@@ -233,7 +234,7 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
 ## People Management
 
 - Status: Complete
-- Summary: People Management is the source for person records and IMS dropdown values. Excel import exists, generated email logic exists, and the module is separate from Admin login users.
+- Summary: People Management is the source for person records and IMS dropdown values. Excel import exists, generated email logic exists, and the module is separate from Admin login users. The page now has a Document-Control-style KPI/dashboard header with a clickable department breakdown, and the person detail/edit view opens as a modal overlay on row click instead of an inline panel requiring scroll. Fixed a bug where a blank department silently defaulted to "Assets" in the edit form.
 - Outstanding Actions:
   - Preserve distinction between People records and Admin user access.
   - Verify dropdown usage across NCR, Audits, MOC, Documents, and inspection/sign-off fields.

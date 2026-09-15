@@ -13,6 +13,9 @@ People Management is the source of person records and dropdown values across the
 - Missing emails can be generated as first initial plus surname at `enshoresubsea.com`.
 - People table is the source for dropdowns across IMS.
 - People Management has been added to permission controls.
+- The page now opens a dashboard-style KPI strip (Total People, Active, Inactive, Departments Represented) plus a clickable "People by Department" breakdown above the register, matching the visual treatment used on Document Control. Clicking a KPI or a department bar filters the register below.
+- Clicking a register row opens the full detail/edit panel as a centred modal overlay (same pattern as the Overall Inspections detail panel) instead of an inline panel anchored at the bottom of the page — no more scrolling to reach it.
+- Fixed a bug where selecting a person whose `department` was blank/null defaulted the edit form to `"Assets"` (the first entry in the `DEPARTMENTS` array), which risked silently overwriting a person's real department on save. The department field is now genuinely optional end to end: `PersonForm.department` is typed `Department | ""`, both the create and edit dropdowns have a blank "Select department" option, and blank values are saved as `null` rather than an arbitrary default.
 
 ## Separation From Admin
 

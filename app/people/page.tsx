@@ -44,7 +44,7 @@ type PersonForm = {
   name: string;
   email: string;
   role: string;
-  department: Department;
+  department: Department | "";
   active: boolean;
 };
 
@@ -64,7 +64,7 @@ const emptyPersonForm: PersonForm = {
   name: "",
   email: "",
   role: "",
-  department: "Assets",
+  department: "",
   active: true,
 };
 
@@ -131,8 +131,8 @@ function PeoplePageContent() {
   const [departmentFilter, setDepartmentFilter] = useState<"" | Department>("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [search, setSearch] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState("");
+  const [isAddingNew, setIsAddingNew] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
@@ -184,7 +184,9 @@ function PeoplePageContent() {
 
   const activeCount = people.filter((person) => person.active).length;
   const inactiveCount = people.length - activeCount;
-  const latestPerson = people[0] || null;
+  const departmentsRepresented = useMemo(() => {
+    return new Set(people.map((person) => person.department).filter(Boolean)).size;
+  }, [people]);
   const importableRows = importRows.filter((row) => !row.skipped && row.errors.length === 0);
   const skippedImportRows = importRows.filter((row) => row.skipped || row.errors.length > 0);
 
@@ -334,7 +336,7 @@ function PeoplePageContent() {
           name: newPerson.name.trim(),
           email: newPerson.email.trim() || null,
           role: newPerson.role.trim() || null,
-          department: newPerson.department,
+          department: newPerson.department || null,
           active: true,
         },
       ]);
@@ -342,6 +344,7 @@ function PeoplePageContent() {
       if (error) throw new Error(error.message);
 
       setNewPerson(emptyPersonForm);
+      setIsAddingNew(false);
       setMessage("Person added.");
       await loadPeople();
     } catch (error) {
@@ -368,7 +371,7 @@ function PeoplePageContent() {
           name: detailForm.name.trim(),
           email: detailForm.email.trim() || null,
           role: detailForm.role.trim() || null,
-          department: detailForm.department,
+          department: detailForm.department || null,
           active: detailForm.active,
         })
         .eq("id", selectedPerson.id);
@@ -436,12 +439,6 @@ function PeoplePageContent() {
         label="SYSTEM MANAGEMENT"
         title="People"
         description="Manage the shared people directory used across departments, while preserving inactive historic records and preparing future email-linked workflows."
-        contextCards={[
-          { label: "Last Refreshed", value: lastRefreshed || "-" },
-          { label: "Active People", value: activeCount },
-          { label: "Inactive People", value: inactiveCount },
-          { label: "Latest Person", value: latestPerson?.name || "No people yet" },
-        ]}
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
@@ -451,73 +448,15 @@ function PeoplePageContent() {
         </div>
       </div>
 
+      <div style={statsStripStyle}>
+        <div style={statChipStyle}><strong>{people.length}</strong> total</div>
+        <div style={statChipStyle}><strong>{activeCount}</strong> active</div>
+        <div style={statChipStyle}><strong>{inactiveCount}</strong> inactive</div>
+        <div style={statChipStyle}><strong>{departmentsRepresented}</strong> departments</div>
+        {lastRefreshed ? <div style={statChipMutedStyle}>Refreshed {lastRefreshed}</div> : null}
+      </div>
+
       <section style={stackedGridStyle}>
-        <SectionCard
-          title="Add Person"
-          subtitle="Create shared people records for department-wide reuse across actions, audits, assets, calibration, inspection, maintenance, and future reviewer workflows."
-        >
-          <form onSubmit={createPerson}>
-            <div style={formGridStyle}>
-              <Field label="Name">
-                <input
-                  value={newPerson.name}
-                  onChange={(e) => setNewPerson((prev) => ({ ...prev, name: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="Full name"
-                />
-              </Field>
-
-              <Field label="Email">
-                <input
-                  type="email"
-                  value={newPerson.email}
-                  onChange={(e) => setNewPerson((prev) => ({ ...prev, email: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="Email address"
-                />
-              </Field>
-
-              <Field label="Role">
-                <input
-                  value={newPerson.role}
-                  onChange={(e) => setNewPerson((prev) => ({ ...prev, role: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="Role (optional)"
-                />
-              </Field>
-
-              <Field label="Department">
-                <select
-                  value={newPerson.department}
-                  onChange={(e) =>
-                    setNewPerson((prev) => ({
-                      ...prev,
-                      department: e.target.value as Department,
-                    }))
-                  }
-                  style={inputStyle}
-                >
-                  {DEPARTMENTS.map((department) => (
-                    <option key={department} value={department}>
-                      {department}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Status">
-                <input value="Active on save" readOnly style={readOnlyInputStyle} />
-              </Field>
-            </div>
-
-            <div style={buttonRowStyle}>
-              <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
-                {isSaving ? "Saving..." : "Add Person"}
-              </button>
-            </div>
-          </form>
-        </SectionCard>
-
         <SectionCard
           title="Import People from Excel"
           subtitle="Bulk-create shared people records from the first worksheet while skipping duplicates and allowing blank departments."
@@ -618,61 +557,44 @@ function PeoplePageContent() {
           ) : null}
         </SectionCard>
 
-        <SectionCard
-          title="People Register"
-          subtitle="Filter the full people directory by department, status, and text search while keeping inactive records available for historical traceability."
-        >
-          <div className="ims-filter-panel" style={filterGridStyle}>
-            <Field label="Search">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={inputStyle}
-                placeholder="Search name, email, or role"
-              />
-            </Field>
+      </section>
 
-            <button
-              type="button"
-              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
-              onClick={() => setShowRegisterFilters((current) => !current)}
-            >
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
+      <div style={splitContainerStyle}>
+        <div style={listPanelStyle}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={inputStyle}
+            placeholder="Search name, email, or role"
+          />
+
+          <div style={filterChipsRowStyle}>
+            {(["all", "active", "inactive"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                style={statusFilter === value ? filterChipActiveStyle : filterChipStyle}
+                onClick={() => setStatusFilter(value)}
+              >
+                {value === "all" ? "All" : value === "active" ? "Active" : "Inactive"}
+              </button>
+            ))}
           </div>
 
-          {showRegisterFilters ? (
-          <div className="ims-filter-panel" style={filterGridStyle}>
-            <Field label="Department Filter">
-              <select
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value as "" | Department)}
-                style={inputStyle}
-              >
-                <option value="">All departments</option>
-                {DEPARTMENTS.map((department) => (
-                  <option key={department} value={department}>
-                    {department}
-                  </option>
-                ))}
-              </select>
-            </Field>
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value as "" | Department)}
+            style={inputStyle}
+          >
+            <option value="">All departments</option>
+            {DEPARTMENTS.map((department) => (
+              <option key={department} value={department}>
+                {department}
+              </option>
+            ))}
+          </select>
 
-            <Field label="Status Filter">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
-                style={inputStyle}
-              >
-                <option value="all">All</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </Field>
-          </div>
-          ) : null}
-
-          <div style={buttonRowStyle}>
+          {(search || departmentFilter || statusFilter !== "all") ? (
             <button
               type="button"
               style={secondaryButtonStyle}
@@ -682,178 +604,108 @@ function PeoplePageContent() {
                 setStatusFilter("all");
               }}
             >
-              Clear Filters
+              Clear filters
             </button>
-          </div>
+          ) : null}
 
-          <div style={peopleRegisterWrapStyle}>
+          <button
+            type="button"
+            style={addPersonButtonStyle}
+            onClick={() => {
+              setIsAddingNew(true);
+              setSelectedPersonId("");
+            }}
+          >
+            + Add Person
+          </button>
+
+          <div style={listScrollStyle}>
             {filteredPeople.length === 0 ? (
               <div style={emptyStateStyle}>No people match the current filters.</div>
             ) : (
-              <table style={peopleRegisterTableStyle}>
-                <thead>
-                  <tr>
-                    <th style={peopleRegisterHeaderCellStyle}>Name</th>
-                    <th style={peopleRegisterHeaderCellStyle}>Email</th>
-                    <th style={peopleRegisterHeaderCellStyle}>Role</th>
-                    <th style={peopleRegisterHeaderCellStyle}>Department</th>
-                    <th style={peopleRegisterHeaderCellStyle}>Status</th>
-                    <th style={peopleRegisterHeaderCellStyle}>Created</th>
-                    <th style={{ ...peopleRegisterHeaderCellStyle, textAlign: "right" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPeople.map((person) => {
-                    const tone = statusTone(person.active);
-                    const selected = selectedPersonId === person.id;
-
-                    const selectPerson = () => {
+              filteredPeople.map((person) => {
+                const selected = selectedPersonId === person.id;
+                return (
+                  <button
+                    key={person.id}
+                    type="button"
+                    style={selected ? personRowSelectedStyle : personRowStyle}
+                    onClick={() => {
+                      setIsAddingNew(false);
                       setSelectedPersonId(person.id);
                       setDetailForm({
                         name: person.name,
                         email: person.email || "",
                         role: person.role || "",
-                        department: (person.department as Department) || "Assets",
+                        department: (person.department as Department) || "",
                         active: person.active,
                       });
-                    };
-
-                    return (
-                      <tr
-                        key={person.id}
-                        aria-selected={selected}
-                        data-selected={selected ? "true" : "false"}
-                        style={{
-                          ...peopleRegisterRowStyle,
-                          background: selected ? "#eef7f8" : "#ffffff",
-                        }}
-                        onClick={selectPerson}
-                      >
-                        <td style={peopleRegisterPrimaryCellStyle}>{person.name}</td>
-                        <td style={peopleRegisterCellStyle}>{person.email || "-"}</td>
-                        <td style={peopleRegisterCellStyle}>{person.role || "-"}</td>
-                        <td style={peopleRegisterCellStyle}>{person.department || "-"}</td>
-                        <td style={peopleRegisterCellStyle}>
-                          <span
-                            style={{
-                              ...pillStyle,
-                              background: tone.bg,
-                              color: tone.text,
-                              border: `1px solid ${tone.border}`,
-                            }}
-                          >
-                            {person.active ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                        <td style={peopleRegisterCellStyle}>{formatDateTime(person.created_at)}</td>
-                        <td style={{ ...peopleRegisterCellStyle, textAlign: "right" }}>
-                          <button
-                            type="button"
-                            style={secondaryButtonStyle}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              selectPerson();
-                            }}
-                          >
-                            {selected ? "Open" : "Edit / View"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    }}
+                  >
+                    <span style={{ ...statusDotStyle, background: person.active ? "#005670" : "#53565A" }} />
+                    <span style={personRowInfoStyle}>
+                      <span style={personRowNameStyle}>{person.name}</span>
+                      <span style={personRowMetaStyle}>{person.department || "No department"} &middot; {person.role || "No role"}</span>
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
-        </SectionCard>
+        </div>
 
-        <SectionCard
-          title={selectedPerson ? `Person Detail - ${selectedPerson.name}` : "Person Detail"}
-          subtitle={
-            selectedPerson
-              ? "Edit the selected shared person record or change active status without deleting historic references."
-              : "Click a person in the register to open the full detail and edit panel."
-          }
-        >
-          {!selectedPerson ? (
-            <div style={emptyStateStyle}>No person selected.</div>
-          ) : (
-            <div style={detailPanelStyle}>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <button
-                  type="button"
-                  style={secondaryButtonStyle}
-                  onClick={() => {
-                    setSelectedPersonId("");
-                    setDetailForm(emptyPersonForm);
-                  }}
-                >
-                  Hide Panel
+        <div style={isAddingNew || selectedPerson ? detailPanelPersistentStyle : detailPanelEmptyStyle}>
+          {isAddingNew ? (
+            <form onSubmit={createPerson} style={{ display: "grid", gap: "16px" }}>
+              <div style={detailHeaderRowStyle}>
+                <div>
+                  <span style={detailKickerStyle}>New Record</span>
+                  <h2 style={detailTitleStyle}>Add Person</h2>
+                </div>
+                <button type="button" style={secondaryButtonStyle} onClick={() => setIsAddingNew(false)}>
+                  Cancel
                 </button>
               </div>
-
-              <div style={detailSummaryRowStyle}>
-                <SummaryTile label="Name" value={selectedPerson.name} />
-                <SummaryTile label="Department" value={selectedPerson.department || "-"} />
-                <SummaryTile label="Status" value={selectedPerson.active ? "Active" : "Inactive"} />
-                <SummaryTile label="Created" value={formatDateTime(selectedPerson.created_at)} />
+              <p style={helperTextStyle}>
+                Create shared people records for department-wide reuse across actions, audits, assets, calibration, inspection, maintenance, and future reviewer workflows.
+              </p>
+              <PersonFormFields
+                form={newPerson}
+                onChange={(changes) => setNewPerson((prev) => ({ ...prev, ...changes }))}
+              />
+              <div style={detailFooterBarStyle}>
+                <div style={helperTextStyle}>New people are created as Active.</div>
+                <button type="submit" style={primaryButtonStyle} disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Add Person"}
+                </button>
+              </div>
+            </form>
+          ) : selectedPerson ? (
+            <div style={{ display: "grid", gap: "16px" }}>
+              <div style={detailHeaderRowStyle}>
+                <div>
+                  <span style={detailKickerStyle}>Person Detail</span>
+                  <h2 style={detailTitleStyle}>{selectedPerson.name}</h2>
+                </div>
+                <span
+                  style={{
+                    ...pillStyle,
+                    background: statusTone(selectedPerson.active).bg,
+                    color: statusTone(selectedPerson.active).text,
+                  }}
+                >
+                  {selectedPerson.active ? "Active" : "Inactive"}
+                </span>
               </div>
 
-              <div style={formGridStyle}>
-                <Field label="Name">
-                  <input
-                    value={detailForm.name}
-                    onChange={(e) => setDetailForm((prev) => ({ ...prev, name: e.target.value }))}
-                    style={inputStyle}
-                  />
-                </Field>
-
-                <Field label="Email">
-                  <input
-                    type="email"
-                    value={detailForm.email}
-                    onChange={(e) => setDetailForm((prev) => ({ ...prev, email: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="Email address"
-                  />
-                </Field>
-
-                <Field label="Role">
-                  <input
-                    value={detailForm.role}
-                    onChange={(e) => setDetailForm((prev) => ({ ...prev, role: e.target.value }))}
-                    style={inputStyle}
-                    placeholder="Role (optional)"
-                  />
-                </Field>
-
-                <Field label="Department">
-                  <select
-                    value={detailForm.department}
-                    onChange={(e) =>
-                      setDetailForm((prev) => ({
-                        ...prev,
-                        department: e.target.value as Department,
-                      }))
-                    }
-                    style={inputStyle}
-                  >
-                    {DEPARTMENTS.map((department) => (
-                      <option key={department} value={department}>
-                        {department}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Status">
-                  <input value={detailForm.active ? "Active" : "Inactive"} readOnly style={readOnlyInputStyle} />
-                </Field>
-              </div>
+              <PersonFormFields
+                form={detailForm}
+                onChange={(changes) => setDetailForm((prev) => ({ ...prev, ...changes }))}
+              />
 
               <div style={detailFooterBarStyle}>
                 <div style={helperTextStyle}>
-                  Shared people records stay reusable across modules while inactive people remain visible on historical records.
+                  Created {formatDateTime(selectedPerson.created_at)}. Shared people records stay reusable across modules while inactive people remain visible on historical records.
                 </div>
                 <div style={buttonRowStyleTight}>
                   <button
@@ -883,9 +735,11 @@ function PeoplePageContent() {
                 </div>
               </div>
             </div>
+          ) : (
+            <div style={emptyDetailContentStyle}>Select a person from the list, or add a new one.</div>
           )}
-        </SectionCard>
-      </section>
+        </div>
+      </div>
     </main>
   );
 }
@@ -894,13 +748,15 @@ function SectionCard({
   title,
   subtitle,
   children,
+  id,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  id?: string;
 }) {
   return (
-    <section style={panelStyle}>
+    <section id={id} style={panelStyle}>
       <div style={sectionHeaderRowStyle}>
         <div>
           <h2 style={sectionTitleStyle}>{title}</h2>
@@ -921,11 +777,52 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function SummaryTile({ label, value }: { label: string; value: string | number }) {
+function PersonFormFields({
+  form,
+  onChange,
+}: {
+  form: PersonForm;
+  onChange: (changes: Partial<PersonForm>) => void;
+}) {
   return (
-    <div style={summaryTileStyle}>
-      <div style={summaryTileLabelStyle}>{label}</div>
-      <div style={summaryTileValueStyle}>{value}</div>
+    <div style={formGridStyle}>
+      <Field label="Name">
+        <input value={form.name} onChange={(e) => onChange({ name: e.target.value })} style={inputStyle} placeholder="Full name" />
+      </Field>
+
+      <Field label="Email">
+        <input
+          type="email"
+          value={form.email}
+          onChange={(e) => onChange({ email: e.target.value })}
+          style={inputStyle}
+          placeholder="Email address"
+        />
+      </Field>
+
+      <Field label="Role">
+        <input
+          value={form.role}
+          onChange={(e) => onChange({ role: e.target.value })}
+          style={inputStyle}
+          placeholder="Role (optional)"
+        />
+      </Field>
+
+      <Field label="Department">
+        <select
+          value={form.department}
+          onChange={(e) => onChange({ department: e.target.value as Department | "" })}
+          style={inputStyle}
+        >
+          <option value="">Select department</option>
+          {DEPARTMENTS.map((department) => (
+            <option key={department} value={department}>
+              {department}
+            </option>
+          ))}
+        </select>
+      </Field>
     </div>
   );
 }
@@ -966,6 +863,183 @@ const stackedGridStyle: CSSProperties = {
   gap: "20px",
 };
 
+const statsStripStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  flexWrap: "wrap",
+  marginBottom: "20px",
+};
+
+const statChipStyle: CSSProperties = {
+  background: "#ffffff",
+  border: "1px solid #D0D0CE",
+  borderRadius: "999px",
+  padding: "7px 14px",
+  fontSize: "13px",
+  color: "#53565A",
+};
+
+const statChipMutedStyle: CSSProperties = {
+  ...statChipStyle,
+  background: "#ECECE7",
+  border: "1px solid #ECECE7",
+  fontSize: "12px",
+};
+
+const splitContainerStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "360px minmax(0, 1fr)",
+  gap: "18px",
+  alignItems: "start",
+};
+
+const listPanelStyle: CSSProperties = {
+  background: "#ffffff",
+  border: "1px solid #D0D0CE",
+  borderRadius: "18px",
+  padding: "16px",
+  display: "grid",
+  gap: "10px",
+  boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
+};
+
+const filterChipsRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "6px",
+};
+
+const filterChipStyle: CSSProperties = {
+  flex: 1,
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
+  borderRadius: "8px",
+  padding: "7px 8px",
+  fontSize: "12px",
+  fontWeight: 700,
+  color: "#53565A",
+  cursor: "pointer",
+};
+
+const filterChipActiveStyle: CSSProperties = {
+  ...filterChipStyle,
+  background: "#005670",
+  color: "#ffffff",
+  border: "1px solid #005670",
+};
+
+const addPersonButtonStyle: CSSProperties = {
+  background: "#005670",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "10px",
+  padding: "10px 12px",
+  fontWeight: 800,
+  fontSize: "13px",
+  cursor: "pointer",
+  width: "100%",
+};
+
+const listScrollStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  maxHeight: "620px",
+  overflowY: "auto",
+  borderTop: "1px solid #ECECE7",
+};
+
+const personRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  padding: "10px 8px",
+  borderBottom: "1px solid #ECECE7",
+  borderLeft: "3px solid transparent",
+  background: "none",
+  border: "none",
+  borderBottomWidth: "1px",
+  cursor: "pointer",
+  textAlign: "left",
+  width: "100%",
+};
+
+const personRowSelectedStyle: CSSProperties = {
+  ...personRowStyle,
+  background: "#ECECE7",
+  borderLeft: "3px solid #005670",
+};
+
+const statusDotStyle: CSSProperties = {
+  width: "8px",
+  height: "8px",
+  borderRadius: "50%",
+  flexShrink: 0,
+};
+
+const personRowInfoStyle: CSSProperties = {
+  minWidth: 0,
+  display: "grid",
+  gap: "2px",
+};
+
+const personRowNameStyle: CSSProperties = {
+  fontWeight: 700,
+  fontSize: "13.5px",
+  color: "#000000",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const personRowMetaStyle: CSSProperties = {
+  fontSize: "11.5px",
+  color: "#53565A",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+};
+
+const detailPanelPersistentStyle: CSSProperties = {
+  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  border: "1px solid #D0D0CE",
+  borderRadius: "18px",
+  padding: "22px",
+  minHeight: "620px",
+};
+
+const detailPanelEmptyStyle: CSSProperties = {
+  ...detailPanelPersistentStyle,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const detailHeaderRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "12px",
+};
+
+const detailKickerStyle: CSSProperties = {
+  color: "#005670",
+  fontSize: "11px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: ".08em",
+};
+
+const detailTitleStyle: CSSProperties = {
+  margin: "4px 0 0",
+  color: "#000000",
+  fontSize: "20px",
+};
+
+const emptyDetailContentStyle: CSSProperties = {
+  color: "#53565A",
+  fontSize: "13.5px",
+  textAlign: "center",
+};
+
 const panelStyle: CSSProperties = {
   background: "#ffffff",
   borderRadius: "18px",
@@ -1000,19 +1074,6 @@ const formGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
   gap: "12px",
-};
-
-const filterGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
-  alignItems: "end",
-  marginBottom: "14px",
-  padding: "12px",
-  border: "1px solid #D0D0CE",
-  borderRadius: "16px",
-  background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
 };
 
 const fieldWrapStyle: CSSProperties = {
@@ -1114,14 +1175,6 @@ const deleteButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const peopleRegisterWrapStyle: CSSProperties = {
-  marginTop: "18px",
-  overflowX: "auto",
-  border: "1px solid #D0D0CE",
-  borderRadius: "14px",
-  background: "#ffffff",
-};
-
 const importPanelStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr) auto",
@@ -1162,14 +1215,6 @@ const peopleImportTableStyle: CSSProperties = {
   fontSize: "13px",
 };
 
-const peopleRegisterTableStyle: CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-  background: "#ffffff",
-  minWidth: 960,
-  fontSize: "13px",
-};
-
 const peopleRegisterHeaderCellStyle: CSSProperties = {
   padding: "12px 14px",
   fontSize: "12px",
@@ -1181,10 +1226,6 @@ const peopleRegisterHeaderCellStyle: CSSProperties = {
   borderBottom: "1px solid #D0D0CE",
   textAlign: "left",
   whiteSpace: "nowrap",
-};
-
-const peopleRegisterRowStyle: CSSProperties = {
-  cursor: "pointer",
 };
 
 const peopleRegisterPrimaryCellStyle: CSSProperties = {
@@ -1213,52 +1254,6 @@ const pillStyle: CSSProperties = {
   padding: "6px 10px",
   fontSize: "12px",
   fontWeight: 700,
-};
-
-const detailPanelStyle: CSSProperties = {
-  display: "grid",
-  gap: "18px",
-  border: "1px solid #D0D0CE",
-  borderRadius: "18px",
-  padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
-  width: "100%",
-  boxSizing: "border-box",
-  minWidth: 0,
-};
-
-const detailSummaryRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
-};
-
-const summaryTileStyle: CSSProperties = {
-  borderRadius: "14px",
-  border: "1px solid #D0D0CE",
-  background: "#ECECE7",
-  padding: "14px 16px",
-  minHeight: "96px",
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "space-between",
-};
-
-const summaryTileLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 800,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  color: "#53565A",
-  marginBottom: "6px",
-};
-
-const summaryTileValueStyle: CSSProperties = {
-  fontSize: "16px",
-  fontWeight: 800,
-  color: "#000000",
-  wordBreak: "break-word",
 };
 
 const detailFooterBarStyle: CSSProperties = {
