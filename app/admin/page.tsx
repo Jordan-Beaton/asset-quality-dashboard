@@ -1034,6 +1034,14 @@ export default function AdminDashboardPage() {
 
       {activeView === "users" ? (
         <section style={{ display: "grid", gap: "18px" }}>
+          <section className="quality-kpi-grid" style={kpiGridStyle}>
+            <QualityKpiCard title="IMS Users" value={userStats.total} accent={imsColours.brand} />
+            <QualityKpiCard title="Active Access" value={userStats.active} accent={imsColours.success} />
+            <QualityKpiCard title="Pending Invites" value={userStats.invited} accent={imsColours.warning} />
+            <QualityKpiCard title="Admins" value={userStats.admins} accent={imsColours.purple} />
+            <QualityKpiCard title="Departments" value={departments.length} accent={imsColours.blue} />
+            <QualityKpiCard title="Projects / Sites" value={projects.length} accent={imsColours.brandDark} />
+          </section>
           {pendingAccessRequests.length ? <ImsPanel title={`Pending Access Requests (${pendingAccessRequests.length})`} subtitle="Review requested modules before creating an account or issuing a setup link."><div style={requestQueue}>{pendingAccessRequests.map((request) => <article key={request.id} style={requestCard}><div><strong>{request.first_name} {request.last_name}</strong><small style={requestMeta}>{request.email} · {request.department} · {formatDateTime(request.submitted_at)}</small><p style={paragraphStyle}>{request.reason}</p><small style={requestMeta}>Requested: {(request.requested_modules || []).map((key) => IMS_PERMISSION_REGISTRY.find((module) => module.moduleKey === key)?.label || key).join(", ")}</small></div><div style={requestActions}><ImsButton onClick={() => prepareAccessRequest(request)} disabled={!canCreateAdmin}>Review & Prepare</ImsButton><ImsButton variant="danger" onClick={() => void rejectAccessRequest(request)} disabled={!canEditAdmin}>Reject</ImsButton></div></article>)}</div></ImsPanel> : null}
           <ImsPanel title="Invite User" subtitle="Create a login-ready person record, assign permissions, and send the setup invite." style={{ scrollMarginTop: 90 }}>
             <div id="admin-invite-panel" />
@@ -1683,13 +1691,18 @@ const invitePermissionSubtitleStyle: CSSProperties = {
 
 const invitePermissionRowsStyle: CSSProperties = {
   display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10,
+  alignItems: "start",
 };
 
 const invitePermissionRowStyle: CSSProperties = {
   display: "grid",
   gap: 16,
   padding: "12px 16px",
-  borderTop: `1px solid ${imsColours.border}`,
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: 14,
+  background: "#ffffff",
   color: imsColours.ink,
 };
 
@@ -1731,8 +1744,8 @@ const invitePermissionOptionActiveStyle: CSSProperties = {
   borderColor: imsColours.brand,
   color: "#ffffff",
 };
-const requestQueue: CSSProperties = { display: "grid", gap: 10 };
-const requestCard: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "start", gap: 16, padding: 14, border: "1px solid #D0D0CE", borderRadius: 12, background: "#ECECE7" };
+const requestQueue: CSSProperties = { display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 };
+const requestCard: CSSProperties = { display: "grid", gap: 12, alignContent: "start", flex: "0 0 280px", minWidth: 280, padding: 14, border: "1px solid #D0D0CE", borderRadius: 12, background: "#ECECE7" };
 const requestMeta: CSSProperties = { display: "block", marginTop: 4, color: "#53565A", fontSize: 12, lineHeight: 1.4 };
 const requestActions: CSSProperties = { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 };
 
@@ -1799,7 +1812,9 @@ const compactModuleCardStyle: CSSProperties = {
 
 const modulePermissionStackStyle: CSSProperties = {
   display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
   gap: 10,
+  alignItems: "start",
 };
 
 const modulePermissionHeaderStyle: CSSProperties = {

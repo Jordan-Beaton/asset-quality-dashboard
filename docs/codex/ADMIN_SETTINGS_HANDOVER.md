@@ -21,6 +21,7 @@ Admin / Settings controls login users, invites, permissions, reference data, and
   - Audit Log
 - Cluttered Roles, Company, and Notifications tabs were removed from the active Admin UI.
 - Users & Access detail panel should stay professional and uncluttered.
+- "Command Center" layout pass (3 alternate layouts were mocked up as Artifacts and reviewed before implementation; this one was chosen): the Users & Access tab now opens with the 6 `QualityKpiCard`s (IMS Users, Active Access, Pending Invites, Admins, Departments, Projects/Sites) that previously only existed under the unreachable `activeView === "dashboard"` state — that dead-code block is untouched and still unreachable, this only reuses its existing `userStats`/`departments`/`projects` values in a second place. Pending Access Requests render as a horizontal scrollable card row (`requestQueue`/`requestCard` styles) instead of a vertical stack. The per-person permissions editor (`modulePermissionStackStyle`, used by `renderPersonPermissionEditor`) and the Invite New User form's module list (`invitePermissionRowsStyle`/`invitePermissionRowStyle`) both now lay out as a responsive 2-column grid of module cards instead of one long vertical list — this is a CSS-only change to the container/card styles; the underlying Full/Part Access/None segmented control, per-area View/Create/Edit checkboxes, and Permission Override dropdown logic are byte-for-byte unchanged.
 
 ## Permissions
 
