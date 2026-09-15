@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { ImsPermissionNotice, ImsPermissionProvider, type ImsPermissionValue } from "./ImsPermissions";
 import { MobileTableEnhancer } from "./MobileTableEnhancer";
 import { MobileCompatibilityGuard } from "./MobileCompatibilityGuard";
+import NotificationBell from "./NotificationBell";
 import { supabase } from "../lib/supabase";
 import { getPermissionTargetFromPath } from "../lib/imsPermissionRegistry";
 
@@ -700,6 +701,7 @@ export default function AppShell({ children }: AppShellProps) {
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [isRailPinned, setIsRailPinned] = useState(false);
   const [signedInName, setSignedInName] = useState("");
+  const [signedInEmail, setSignedInEmail] = useState("");
   const [signedInRole, setSignedInRole] = useState<SystemRole>("");
   const [signedInModuleAccess, setSignedInModuleAccess] = useState<ModuleAccess>({});
   const [signedInTabPermissions, setSignedInTabPermissions] = useState<TabPermissionRecord[]>([]);
@@ -866,6 +868,7 @@ export default function AppShell({ children }: AppShellProps) {
       if (!isMounted || !user) {
         if (isMounted) {
           setSignedInName("");
+          setSignedInEmail("");
           setSignedInRole("");
           setSignedInModuleAccess({});
           setSignedInTabPermissions([]);
@@ -876,6 +879,7 @@ export default function AppShell({ children }: AppShellProps) {
       }
 
       const email = user.email || "";
+      if (isMounted) setSignedInEmail(email);
       if (email) {
         const normalisedEmail = email.trim().toLowerCase();
         const { data: peopleMatches } = await supabase
@@ -1140,25 +1144,7 @@ export default function AppShell({ children }: AppShellProps) {
                   minWidth: 0,
                 }}
               >
-              <button
-                onClick={handleLogout}
-                style={{
-                  background: "#ffffff",
-                  color: "#005670",
-                  border: "1px solid #D0D0CE",
-                  borderRadius: "8px",
-                  padding: "8px 12px",
-                  fontWeight: 700,
-                  fontSize: "13.5px",
-                  cursor: "pointer",
-                  height: "38px",
-                  boxSizing: "border-box",
-                  whiteSpace: "nowrap",
-                  lineHeight: 1,
-                }}
-              >
-                Sign out
-              </button>
+              <NotificationBell email={signedInEmail} />
               {signedInName ? (
                 <div
                   title={signedInName}
@@ -1204,6 +1190,25 @@ export default function AppShell({ children }: AppShellProps) {
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{signedInName}</span>
                 </div>
               ) : null}
+              <button
+                onClick={handleLogout}
+                style={{
+                  background: "#ffffff",
+                  color: "#005670",
+                  border: "1px solid #D0D0CE",
+                  borderRadius: "8px",
+                  padding: "8px 12px",
+                  fontWeight: 700,
+                  fontSize: "13.5px",
+                  cursor: "pointer",
+                  height: "38px",
+                  boxSizing: "border-box",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1,
+                }}
+              >
+                Sign out
+              </button>
               </div>
             ) : null}
           </div>

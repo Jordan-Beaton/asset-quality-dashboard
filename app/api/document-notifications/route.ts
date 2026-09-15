@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { createClient as createServerSupabaseClient } from "../../../src/lib/supabase/server";
+import { writeNotifications } from "../../../src/lib/notifications";
+
+const NOTIFICATION_TITLES: Record<string, string> = {
+  submitted_for_review: "submitted for your review",
+  reviewed: "reviewed — ready for your approval",
+  approved: "approved and now live",
+  rejected: "rejected",
+  superseded: "superseded",
+  periodic_review_no_changes: "periodic review — please confirm",
+};
 
 type NotificationRequest = {
   eventType?: string;
@@ -396,6 +406,16 @@ export async function POST(request: Request) {
     }
 
     await logEmailAttempt(body, recipientEmails, true, sendResult.data?.id || null, null);
+
+    await writeNotifications(
+      recipientEmails.map((recipientEmail) => ({
+        recipientEmail,
+        sourceModule: "Document Control",
+        title: `${documentNumber} ${NOTIFICATION_TITLES[eventType] || "updated"}`,
+        body: documentTitle !== "-" ? documentTitle : null,
+        link: `/documents?search=${encodeURIComponent(documentNumber)}`,
+      }))
+    );
 
     return NextResponse.json({
       ok: true,

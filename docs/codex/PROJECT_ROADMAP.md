@@ -171,6 +171,24 @@ The whole-IMS visual and structural baseline is complete. Quality remains the wo
   - Verify last-view persistence across browser close/reopen and confirm synchronized header/hub playback does not visibly drift.
   - Test Full, Part, and None module permissions in each view.
 
+## Notification Centre
+
+- Status: Built; requires `scripts/sql/ims_notifications.sql` to be applied in Supabase before it holds any data
+- Summary: Second of the three "next level" features requested together (Today digest → Notifications → Dark mode). A bell icon with an unread-count badge sits in the shared app header's account row (`src/components/AppShell.tsx`, `.ims-header-account`), ordered bell → avatar/name → Sign out, approved via Artifact mockup before implementation. Clicking it opens a panel (`src/components/NotificationBell.tsx`) listing notifications newest-first with an unread dot, relative timestamp, body detail, and a source-module tag; clicking a row marks it read and navigates to its `link`. New generic table `ims_notifications` (`recipient_email`, `source_module`, `title`, `body`, `link`, `created_at`, `read_at`) — the app had no cross-feature notification log before this, only single-purpose ones (`inspection_record_notifications`, `document_workflow_activity`). A shared server-side helper (`src/lib/notifications.ts`, `writeNotification()`/`writeNotifications()`) is called alongside the existing email sends at the highest-value points, keyed by recipient email rather than person name since every touchpoint already carries an email and person-name resolution is inconsistent across the app:
+  - Central Action/NCR/CAPA/Audit Finding assignment, status-change, and close-out — `app/api/notify-assignment/route.ts` (already the single shared route for all three modules).
+  - Document Control workflow (submitted for review, reviewed, approved, rejected, superseded, periodic review) — `app/api/document-notifications/route.ts`, one row per recipient.
+  - ITP sign-off requested (to the signer) and sign-off decision recorded (to the requester) — `app/api/projects/itp-sign-off/route.ts`.
+  - New public access request submitted — notifies every active Admin (`people.system_role = "Admin"`) — `app/api/access-requests/route.ts`.
+  - Admin invite/reset emails are deliberately NOT wired in — those go to someone who doesn't have an IMS account yet, so an in-app notification would be unreadable until they can log in.
+- No realtime/websocket infrastructure exists anywhere in the app (confirmed by research before building this), so the bell polls every 60 seconds while a page is open rather than pushing live — consistent with the rest of the app's plain request/response pattern. A notification can lag by up to that interval; this is expected, not a bug.
+- Permanent Rules:
+  - Never let a notification write fail loudly — `writeNotification()`/`writeNotifications()` swallow all errors so a missing table or a transient failure never blocks the underlying email/action.
+  - Keep using approved-palette colours only; `#ECECE7` for the unread-row tint (not the mockup's literal `#EAF3F6`, which is not on the approved list).
+- Outstanding Actions:
+  - Apply `scripts/sql/ims_notifications.sql` in the Supabase SQL editor — until then the bell silently shows no notifications (no error, just empty) rather than breaking anything.
+  - Verify end-to-end on Vercel: assign an Action/NCR/Finding, run a document through its workflow, request/decide an ITP sign-off, and submit a public access request, confirming each produces a notification for the right recipient(s) alongside its existing email.
+  - Consider extending coverage to other module-specific action tabs (Quality/HSE/Assets Create Action) if the central route's coverage proves insufficient in practice.
+
 ## Quality Management
 
 - Status: Complete

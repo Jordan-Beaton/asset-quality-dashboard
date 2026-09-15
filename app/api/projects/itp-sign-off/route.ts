@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { createClient as createServerClient } from "../../../../src/lib/supabase/server";
 import { createItpSignOffCertificate } from "../../../../src/lib/itpSignOffCertificate";
+import { writeNotification } from "../../../../src/lib/notifications";
 
 const STORAGE_BUCKET = "project-documents";
 
@@ -61,6 +62,13 @@ export async function POST(request: Request) {
     });
     if (result.error) throw new Error(result.error.message);
     await supabase.from("project_itp_sign_off_requests").update({ request_email_id: result.data?.id || null }).eq("id", signoff.id);
+    await writeNotification({
+      recipientEmail: clean(signoff.recipient_email),
+      sourceModule: "Project Management",
+      title: `ITP sign-off requested: Phase ${clean(signoff.phase_number)}`,
+      body: `${projectDisplayName(clean(signoff.project_key))} · ${clean(signoff.document_name)}`,
+      link: `/projects/${clean(signoff.project_key)}/itp-sign-off`,
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to send sign-off request." }, { status: 500 });
@@ -160,6 +168,14 @@ export async function PATCH(request: Request) {
     } catch (error) {
       notificationWarning = error instanceof Error ? error.message : "Confirmation email could not be sent.";
     }
+
+    await writeNotification({
+      recipientEmail: clean(signoff.sender_email),
+      sourceModule: "Project Management",
+      title: `ITP Phase ${clean(signoff.phase_number)} ${decision}`,
+      body: `${projectDisplayName(clean(signoff.project_key))} · ${clean(signoff.document_name)} · decided by ${name}`,
+      link: `/projects/${clean(signoff.project_key)}/itp-sign-off`,
+    });
 
     return NextResponse.json({ ok: true, message: `ITP phase ${decision.toLowerCase()}. The verified decision and PDF certificate are now recorded in the IMS.${notificationWarning ? ` Warning: ${notificationWarning}` : ""}`, certificatePath, confirmationEmailId: confirmationId });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to record sign-off." }, { status: 500 }); }

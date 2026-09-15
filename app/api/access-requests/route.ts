@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { IMS_PERMISSION_REGISTRY } from "../../../src/lib/imsPermissionRegistry";
+import { writeNotifications } from "../../../src/lib/notifications";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,6 +38,21 @@ export async function POST(request: Request) {
     if (existing) return NextResponse.json({ error: "A pending request already exists for this email address." }, { status: 409 });
     const { error } = await service.from("ims_access_requests").insert({ first_name: firstName, last_name: lastName, email, department: validDepartment.name, reason, requested_modules: requestedModules });
     if (error) throw error;
+
+    const { data: admins } = await service.from("people").select("email").eq("system_role", "Admin").eq("active", true);
+    await writeNotifications(
+      (admins || [])
+        .map((admin) => admin.email as string)
+        .filter(Boolean)
+        .map((recipientEmail) => ({
+          recipientEmail,
+          sourceModule: "Admin / Settings",
+          title: `Access request awaiting review: ${firstName} ${lastName}`,
+          body: `${department} · requested ${requestedModules.length} module${requestedModules.length === 1 ? "" : "s"}`,
+          link: "/admin",
+        }))
+    );
+
     return NextResponse.json({ ok: true, message: "Access request submitted. An IMS Admin will review it." });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Access request could not be submitted." }, { status: 500 });

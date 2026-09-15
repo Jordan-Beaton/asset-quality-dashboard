@@ -1,7 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { writeNotification } from "../../../src/lib/notifications";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+function notificationTitle(kind: "assigned" | "status-changed" | "closed-out", itemType: string, itemRef: string, status?: string) {
+  if (kind === "assigned") return `${itemType} ${itemRef} assigned to you`;
+  if (kind === "status-changed") return `${itemType} ${itemRef} status updated${status ? ` to "${status}"` : ""}`;
+  return `${itemType} ${itemRef} closed out`;
+}
+
+function notificationSourceModule(itemType: string) {
+  if (itemType === "Action") return "Action Management";
+  if (itemType === "NCR" || itemType === "CAPA") return "NCR / CAPA";
+  if (itemType === "Audit Finding") return "Audits";
+  return itemType;
+}
+
+function relativeLink(absoluteUrl: string | undefined) {
+  if (!absoluteUrl) return null;
+  try {
+    const parsed = new URL(absoluteUrl);
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return null;
+  }
+}
 
 function statusBadge(status: string): string {
   const s = status.toLowerCase();
@@ -221,6 +245,13 @@ export async function POST(req: NextRequest) {
 
   try {
     await resend.emails.send({ from, to: [recipientEmail], subject, html });
+    await writeNotification({
+      recipientEmail,
+      sourceModule: notificationSourceModule(itemType),
+      title: notificationTitle(kind, itemType, itemRef, status),
+      body: itemTitle,
+      link: relativeLink(itemUrl),
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
