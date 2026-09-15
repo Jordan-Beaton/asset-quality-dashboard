@@ -55,15 +55,17 @@ Admin / Settings controls login users, invites, permissions, reference data, and
 - If email fails or is rate-limited, the user still exists.
 - `Copy Setup Link` exists in Admin / Settings -> Users & Access.
 - Copy Setup Link generates a secure Supabase setup link without sending email.
-- Use Copy Setup Link when Resend rate-limits email.
+- Use Copy Setup Link when Supabase's own auth email sending is rate-limited.
 - If invite email fails, status should clearly say user was created but invite failed.
+- Invite/reset emails (`sendExistingInvite`, `inviteUser` in `app/api/admin-settings/route.ts`) go through Supabase Auth's own `resetPasswordForEmail`/`admin.inviteUserByEmail`, not Resend.
+- **Resolved 15 Sep 2026**: Supabase Auth's SMTP was on the default shared sender, which has a very low built-in rate limit (~2 per hour) — this was being hit after only 1-2 invite/reset sends and was previously mis-documented as a Resend limit. Fixed by configuring custom SMTP in Supabase Dashboard -> Authentication -> Emails -> SMTP Settings, pointed at Resend (`smtp.resend.com`, port 465, username `resend`, password = the Resend API key, sender `noreply@enshoresubsea.com`). Confirmed working via a live test reset email. Invite/reset emails now send through the same Resend infrastructure as the app's own notification emails and are no longer subject to Supabase's shared-sender limit. Copy Setup Link remains available as an email-free fallback regardless.
 
 ## Supabase And Env Notes
 
 - Vercel env vars include Supabase URL, anon key, service role, Resend key, notification from email, and OpenAI key.
 - Never print secrets.
 - User may rotate keys later, but current focus is functionality.
-- Resend may rate-limit; Copy Setup Link is the workaround.
+- Supabase Auth's SMTP is now configured to use Resend (see above) — both the app's own notification emails and Supabase's invite/reset emails now go through Resend, though as separate sending paths (one via the app's `RESEND_API_KEY` calls, one via Supabase's own SMTP integration).
 - `NEXT_PUBLIC_SITE_URL` should ideally be set to the deployed site URL.
 - If `NEXT_PUBLIC_SITE_URL` is missing, the app falls back to Vercel URL/origin.
 
