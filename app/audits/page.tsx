@@ -2035,6 +2035,8 @@ function AuditsPageContent() {
       corrective_action: openFindingForm.corrective_action.trim() || null,
     };
 
+    const before = findings.find((finding) => finding.id === openFindingForm.id);
+
     const { error } = await supabase.from("audit_findings").update(payload).eq("id", openFindingForm.id);
 
     if (error) {
@@ -2042,14 +2044,29 @@ function AuditsPageContent() {
       return;
     }
 
-    if (openFindingForm.owner.trim()) {
-      const ownerRecord = peopleOptions.find((p) => p.name.toLowerCase() === openFindingForm.owner.trim().toLowerCase());
+    // Only notify the owner about what actually changed: a genuine (re)assignment,
+    // or a status change on a finding they already own. Saving unrelated field
+    // edits (e.g. root cause, corrective action) with owner and status unchanged
+    // should not tell them they've "been assigned" — that isn't what happened.
+    const prevOwner = (before?.owner ?? "").trim().toLowerCase();
+    const newOwner = openFindingForm.owner.trim();
+    const prevStatus = before?.status ?? "";
+    const newStatus = openFindingForm.status;
+    const notifyKind: "assigned" | "status-changed" | null =
+      newOwner && newOwner.toLowerCase() !== prevOwner
+        ? "assigned"
+        : newOwner && newStatus !== prevStatus
+        ? "status-changed"
+        : null;
+
+    if (notifyKind) {
+      const ownerRecord = peopleOptions.find((p) => p.name.toLowerCase() === newOwner.toLowerCase());
       if (ownerRecord?.email) {
         void fetch("/api/notify-assignment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            kind: "assigned",
+            kind: notifyKind,
             recipientEmail: ownerRecord.email,
             recipientName: ownerRecord.name,
             itemType: "Audit Finding",

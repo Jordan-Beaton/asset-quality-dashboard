@@ -1983,14 +1983,29 @@ function NcrCapaPageContent() {
     setSaving(false);
     setMessage(`${editRow.number} updated successfully.`);
 
-    if (editRow.owner?.trim()) {
-      const ownerRecord = people.find((p) => (p.name ?? "").toLowerCase() === (editRow.owner ?? "").trim().toLowerCase());
+    // Only notify the owner about what actually changed: a genuine (re)assignment,
+    // or a status change on a record they already own. Editing unrelated fields
+    // (e.g. root cause, description) with the owner and status unchanged should
+    // not tell them they've "been assigned" — that isn't what happened.
+    const prevOwner = (selectedRow?.owner ?? "").trim().toLowerCase();
+    const newOwner = (editRow.owner ?? "").trim();
+    const prevStatus = selectedRow?.status ?? "";
+    const newStatus = editRow.status ?? "";
+    const notifyKind: "assigned" | "status-changed" | null =
+      newOwner && newOwner.toLowerCase() !== prevOwner
+        ? "assigned"
+        : newOwner && newStatus !== prevStatus
+        ? "status-changed"
+        : null;
+
+    if (notifyKind) {
+      const ownerRecord = people.find((p) => (p.name ?? "").toLowerCase() === newOwner.toLowerCase());
       if (ownerRecord?.email) {
         void fetch("/api/notify-assignment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            kind: "assigned",
+            kind: notifyKind,
             recipientEmail: ownerRecord.email,
             recipientName: ownerRecord.name,
             itemType: editRow.type === "NCR" ? "NCR" : "CAPA",
