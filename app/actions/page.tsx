@@ -4120,7 +4120,7 @@ function ActionsPageContent() {
               </div>
 
               <div className="ims-filter-panel" style={simpleFilterShellStyle}>
-                <div style={simpleFilterTopRowStyle}>
+                <div style={simpleFilterButtonRowStyle}>
                   <button type="button" onClick={clearMyItemFilters} style={secondaryButtonStyle}>
                     Clear Filters
                   </button>
@@ -5887,6 +5887,13 @@ const simpleFilterTopRowStyle: CSSProperties = {
   gridTemplateColumns: "minmax(220px, 1fr) auto 132px",
   gap: "10px",
   alignItems: "center",
+};
+
+const simpleFilterButtonRowStyle: CSSProperties = {
+  display: "flex",
+  gap: "10px",
+  alignItems: "center",
+  justifyContent: "flex-end",
 };
 
 const importPanelStyle: CSSProperties = {

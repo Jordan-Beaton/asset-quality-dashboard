@@ -133,7 +133,7 @@ const overlay: CSSProperties = {
   zIndex: 200, padding: 20,
 };
 const modal = (maxW = 680): CSSProperties => ({
-  background: "#fff", borderRadius: 14, width: "100%", maxWidth: maxW,
+  background: imsColours.panel, borderRadius: 14, width: "100%", maxWidth: maxW,
   maxHeight: "90vh", display: "flex", flexDirection: "column",
   boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
 });

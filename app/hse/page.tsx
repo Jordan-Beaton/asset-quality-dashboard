@@ -458,8 +458,8 @@ export default function HseDashboardPage() {
           align-items: center;
           justify-content: space-between;
           gap: 14px;
-          background: #ffffff;
-          border: 1px solid #D0D0CE;
+          background: var(--enshore-surface);
+          border: 1px solid var(--enshore-border);
           border-radius: 16px;
           box-shadow: 0 1px 3px rgba(15,23,42,0.08);
         }
@@ -870,7 +870,7 @@ const signalCardStyle: CSSProperties = {
   borderRadius: "18px",
   border: "1px solid #D0D0CE",
   borderTop: "5px solid",
-  background: "#ffffff",
+  background: imsColours.panel,
   color: imsColours.ink,
   textDecoration: "none",
   boxShadow: imsShadows.panel,
@@ -947,8 +947,8 @@ const yearFilterStyle: CSSProperties = {
   minHeight: "42px",
   padding: "0 10px",
   borderRadius: "10px",
-  background: "#ffffff",
-  border: "1px solid #D0D0CE",
+  background: imsColours.panel,
+  border: `1px solid ${imsColours.border}`,
   color: imsColours.ink,
   fontWeight: 900,
 };
@@ -1017,7 +1017,7 @@ const chartPlaceholderStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   color: imsColours.slate,
-  background: "#ECECE7",
+  background: imsColours.page,
   borderRadius: "14px",
   border: "1px dashed #D0D0CE",
   fontWeight: 800,
@@ -1036,7 +1036,7 @@ const focusItemStyle: CSSProperties = {
   padding: "12px",
   borderRadius: "14px",
   border: "1px solid #D0D0CE",
-  background: "#ffffff",
+  background: imsColours.panel,
   color: imsColours.ink,
   textDecoration: "none",
 };
@@ -1045,6 +1045,6 @@ const emptyStateStyle: CSSProperties = {
   border: "1px dashed #D0D0CE",
   borderRadius: "14px",
   padding: "16px",
-  background: "#ECECE7",
+  background: imsColours.page,
   color: imsColours.slate,
 };

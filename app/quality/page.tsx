@@ -1270,9 +1270,9 @@ function QualityDashboardContent() {
         }
         .quality-view-command {
           margin-bottom: 18px;
-          border: 1px solid #D0D0CE;
+          border: 1px solid var(--enshore-border);
           border-radius: 16px;
-          background: #ffffff;
+          background: var(--enshore-surface);
           box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
           display: flex;
           align-items: center;
@@ -2452,7 +2452,7 @@ const signalCardStyle: CSSProperties = {
   minHeight: "104px",
   textDecoration: "none",
   color: imsColours.ink,
-  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  background: `linear-gradient(180deg, ${imsColours.panel} 0%, ${imsColours.page} 100%)`,
   border: `1px solid ${imsColours.border}`,
   borderTop: "4px solid #005670",
   borderRadius: "18px",
@@ -2926,8 +2926,8 @@ const yearFilterStyle: CSSProperties = {
   minHeight: "42px",
   padding: "0 10px",
   borderRadius: "10px",
-  background: "#ffffff",
-  border: "1px solid #D0D0CE",
+  background: imsColours.panel,
+  border: `1px solid ${imsColours.border}`,
   color: imsColours.ink,
   fontWeight: 900,
 };

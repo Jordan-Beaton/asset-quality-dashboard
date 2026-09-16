@@ -263,7 +263,7 @@ export const mockInput: CSSProperties = {
   padding: "7px 10px",
   border: `1px solid ${imsColours.border}`,
   borderRadius: 7,
-  background: "#fff",
+  background: imsColours.panel,
   color: imsColours.ink,
   fontSize: 12,
   fontFamily: "inherit",

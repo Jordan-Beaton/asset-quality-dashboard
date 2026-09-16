@@ -1168,7 +1168,7 @@ function StatusPill({ event }: { event: CalendarEvent }) {
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div style={{ border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: "#ECECE7" }}>{text}</div>;
+  return <div style={{ border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: imsColours.page }}>{text}</div>;
 }
 
 function EventListButton({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
@@ -1335,7 +1335,7 @@ const listButtonStyle: CSSProperties = {
   border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "12px",
-  background: "#ffffff",
+  background: imsColours.panel,
   color: imsColours.ink,
   textAlign: "left",
   cursor: "pointer",
@@ -1408,7 +1408,7 @@ const noticeStyle: CSSProperties = {
   border: "1px solid #D0D0CE",
   borderRadius: "14px",
   padding: "14px",
-  background: "#ECECE7",
+  background: imsColours.page,
   color: imsColours.slate,
   lineHeight: 1.55,
 };
@@ -1446,7 +1446,7 @@ const legendItemStyle: CSSProperties = {
   border: "1px solid #D0D0CE",
   borderRadius: "999px",
   padding: "6px 10px",
-  background: "#ECECE7",
+  background: imsColours.page,
   color: imsColours.slate,
   fontSize: "12px",
   fontWeight: 900,
@@ -1536,7 +1536,7 @@ const calendarEventStyle: CSSProperties = {
   border: "1px solid #D0D0CE",
   borderRadius: "9px",
   padding: "5px 6px",
-  background: "#ECECE7",
+  background: imsColours.page,
   color: imsColours.ink,
   fontSize: "11px",
   fontWeight: 800,

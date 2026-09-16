@@ -1,25 +1,25 @@
 import type { CSSProperties } from "react";
 
 export const imsColours = {
-  brand: "#005670",
-  brandDark: "#005670",
-  brandAccent: "#63B1BC",
-  brandSoft: "#ECECE7",
-  brandBorder: "#D0D0CE",
-  ink: "#000000",
-  muted: "#53565A",
-  slate: "#53565A",
-  page: "#ECECE7",
-  panel: "#ffffff",
-  panelAlt: "#ECECE7",
-  border: "#D0D0CE",
-  borderSoft: "#D0D0CE",
+  brand: "var(--enshore-brand)",
+  brandDark: "var(--enshore-brand)",
+  brandAccent: "var(--enshore-accent)",
+  brandSoft: "var(--enshore-page)",
+  brandBorder: "var(--enshore-border)",
+  ink: "var(--enshore-ink)",
+  muted: "var(--enshore-muted)",
+  slate: "var(--enshore-muted)",
+  page: "var(--enshore-page)",
+  panel: "var(--enshore-surface)",
+  panelAlt: "var(--enshore-page)",
+  border: "var(--enshore-border)",
+  borderSoft: "var(--enshore-border)",
   danger: "#F93822",
   dangerBright: "#F93822",
   warning: "#FFAD00",
-  success: "#005670",
-  purple: "#53565A",
-  blue: "#63B1BC",
+  success: "var(--enshore-brand)",
+  purple: "var(--enshore-muted)",
+  blue: "var(--enshore-accent)",
 } as const;
 
 export const imsRadii = {
@@ -73,7 +73,7 @@ export const imsTopMetaRowStyle: CSSProperties = {
   marginBottom: "20px",
   padding: "8px 12px",
   borderRadius: "14px",
-  background: "#ffffff",
+  background: imsColours.panel,
   border: `1px solid ${imsColours.border}`,
   boxShadow: imsShadows.panel,
   boxSizing: "border-box",
@@ -105,7 +105,7 @@ export const imsTabListStyle: CSSProperties = {
 
 export const imsTabButtonStyle: CSSProperties = {
   border: "none",
-  background: "#eef7f8",
+  background: "var(--enshore-tint)",
   color: imsColours.ink,
   borderRadius: imsRadii.control,
   padding: "10px 14px",
@@ -159,7 +159,7 @@ export const imsDangerButtonStyle: CSSProperties = {
 
 export const imsGhostButtonStyle: CSSProperties = {
   ...imsButtonBaseStyle,
-  background: "#ffffff",
+  background: imsColours.panel,
   color: imsColours.brandDark,
   border: `1px solid ${imsColours.brandBorder}`,
 };
@@ -171,7 +171,7 @@ export const imsInputStyle: CSSProperties = {
   border: `1px solid ${imsColours.border}`,
   padding: "10px 12px",
   fontSize: "14px",
-  background: "#ffffff",
+  background: imsColours.panel,
   color: imsColours.ink,
   boxSizing: "border-box",
 };
@@ -275,6 +275,12 @@ export const imsTableHeadStyle: CSSProperties = {
 export const imsTableCellStyle: CSSProperties = {
   padding: "10px",
   borderBottom: `1px solid ${imsColours.border}`,
+  // Deliberately no background here: <td> stays transparent so the table's
+  // own background (imsTableStyle, which correctly inverts in dark mode)
+  // shows through as the base surface, AND the shared hover/selected-row
+  // CSS rules (.ims-page-container table tbody tr:hover > td etc., which
+  // have no !important) can still paint over it. Setting an inline
+  // background here would permanently block both.
   color: imsColours.ink,
   verticalAlign: "middle",
   fontSize: "12px",

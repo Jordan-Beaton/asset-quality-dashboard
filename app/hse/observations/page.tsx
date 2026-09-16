@@ -352,20 +352,18 @@ export default function HseObservationsPage() {
       <ImsTopMetaRow
         backHref="/home"
         backLabel="Back to IMS Home"
-        actions={
-          <>
-            <label style={yearSelectStyle}>
-              <span>Year</span>
-              <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
-                {availableYears.map((year) => <option key={year}>{year}</option>)}
-              </select>
-            </label>
-          </>
-        }
         status={<><strong>Status:</strong> {message}</>}
       />
 
-      <ImsTabs tabs={tabs} active={activeView} onChange={setActiveView} ariaLabel="Observation views" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+        <ImsTabs tabs={tabs} active={activeView} onChange={setActiveView} ariaLabel="Observation views" />
+        <label style={{ ...yearSelectStyle, marginBottom: "20px" }}>
+          <span>Year</span>
+          <select value={yearFilter} onChange={(event) => setYearFilter(event.target.value)}>
+            {availableYears.map((year) => <option key={year}>{year}</option>)}
+          </select>
+        </label>
+      </div>
 
       {activeView === "dashboard" ? (
         <>
@@ -729,7 +727,7 @@ const yearSelectStyle: CSSProperties = {
   minHeight: "42px",
   padding: "0 10px",
   borderRadius: "10px",
-  background: "#ffffff",
+  background: imsColours.panel,
   border: "1px solid #D0D0CE",
   color: imsColours.ink,
   fontWeight: 900,
@@ -741,8 +739,8 @@ const fieldStyle: CSSProperties = { display: "grid", gap: "6px" };
 const labelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 900 };
 const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#eef7f8" };
 const rowStyle: CSSProperties = { cursor: "pointer" };
-const emptyCellStyle: CSSProperties = { padding: "28px 14px", textAlign: "center", color: imsColours.slate, background: "#ECECE7" };
-const emptyStateStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: "#ECECE7", lineHeight: 1.45 };
+const emptyCellStyle: CSSProperties = { padding: "28px 14px", textAlign: "center", color: imsColours.slate, background: imsColours.page };
+const emptyStateStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: imsColours.page, lineHeight: 1.45 };
 const latestListStyle: CSSProperties = { display: "grid", gap: "10px" };
 const latestItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #D0D0CE", borderRadius: "14px", padding: "12px", background: "#ffffff", textAlign: "left", cursor: "pointer" };
 const detailGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", marginBottom: "12px" };

@@ -753,8 +753,28 @@ Do:
 Do Not:
 
 - Introduce unrelated module colour systems.
-- Use heavy dark themes for standard operational pages.
+- Design an individual page to look heavy/dark for stylistic effect while the rest of the IMS stays light. This rule predates dark mode as a feature; see "Dark Mode" below for the one approved exception.
 - Rely on colour alone; pair status colours with text.
+
+## Dark Mode
+
+- Dark mode is an explicit, user-toggled, whole-app theme — never a per-page design choice. A page must never hardcode a dark look for its own sake; that stays covered by the "Do Not" rule above.
+- The toggle lives once, in the shared app shell (`src/components/AppShell.tsx`), and applies everywhere via a `data-theme` attribute on `.ims-app-root`, driven by CSS custom properties in `app/globals.css` (`--enshore-*` tokens already exist; dark values are added as overrides under `[data-theme="dark"]`, never as a second hardcoded colour system).
+- Retrofitting a page for dark mode means making its inline styles reference the shared tokens (`var(--enshore-*)` or the `imsColours` helpers) instead of literal hex — not inventing new dark-specific colours. Brand teal, accent, amber, and red keep the same role in both themes; only backgrounds/surfaces/borders/text invert.
+- The rollout is incremental: shared shell and primitives first, then modules one at a time. A module not yet retrofitted must still render correctly (readable, on-brand) in dark mode by falling back to the light tokens — never a broken or unreadable page.
+- Dark-mode token values (defined in `app/globals.css` under `.ims-app-root[data-theme="dark"]`, and the only new hex literals `npm run check:ui` accepts beyond the light palette above):
+  - Page background: `#0A1E24` (was `#ECECE7`).
+  - Surface/card background: `#10262D` (was `#FFFFFF`).
+  - Border: `#234049` (was `#D0D0CE`).
+  - Main text: `#F4F8F8` (was `#000000`).
+  - Secondary/muted text: `#AEC4C9` (was `#53565A`).
+  - Pale accent tint (e.g. inactive tab background): `rgba(99, 177, 188, 0.14)` (was `#EEF7F8`) — an rgba wash rather than a fifth new hex literal.
+- **Building a new page or module — how to not reintroduce the bugs this rollout kept hitting:**
+  - Prefer the shared primitives and style constants (`ImsPanel`, `QualityKpiCard`, `ImsTopMetaRow`, `ImsTabs`, `ImsButton`, `ImsFilterPanel`, and `imsColours`/`imsPanelStyle`/`imsButtonBaseStyle`/`imsInputStyle`/`imsTableStyle`/`imsTableCellStyle` etc. from `src/components/imsTheme.ts`) over hand-rolled inline styles. They are already correctly dark-mode-paired — a new page built from them gets dark mode for free, with zero extra work.
+  - If you must write a page-local style, a `background`/`color` (or `background`/`border`) pair must invert **together or not at all**: either both use a token (`imsColours.panel` + `imsColours.ink`, or `imsColours.page` + `imsColours.muted`, etc.) or both stay a plain hardcoded literal. Never mix — one themed half plus one hardcoded half is exactly the bug that repeatedly shipped invisible text during this rollout (`npm run check:ui` now catches this automatically for same-line pairs in `.ts`/`.tsx` files — see `checkThemeColourPairing` in `scripts/check-ims-ui-contract.mjs` — but use the rule as your mental model, not just the safety net).
+  - Never add `!important` to `background` or `color` on a broad/structural selector (anything matching many pages — `.ims-page-container *`, a bare element like `table`/`input`/`select`, or any new `.ims-*` "control contract" class) unless you are ALSO forcing the paired property the same way in the same rule. An `!important` on only one half silently discards a correctly-tokenized inline style set by page-local code with no visible error at write-time — this exact mistake caused three separate rounds of "invisible text in yet another register" during this rollout (`.ims-top-meta-status`/`.ims-filter-panel`, then `.ims-page-container table`, then `.ims-top-meta-row`) before being found and fixed. This class of bug is a cross-file CSS-vs-JS interaction that the automated `check:ui` check cannot catch — it has to be caught by this rule at write time.
+  - Do not set an inline `background` on a `<td>`/table-cell style unless you also intend to permanently block that table's row-hover and row-selected highlighting (which paint over the cell via CSS with no `!important`, so any inline cell background always wins and hides them). Let the `<table>` element's own background show through instead.
+  - A hardcoded-light element with **no explicit text colour of its own** is safe by design (the app's ambient/inherited default colour is deliberately fixed, not theme-aware — see `--foreground` in `app/globals.css`) — but a hardcoded-light element that explicitly sets `color: imsColours.ink` (or `muted`) is not; that combination is the mismatch this whole section is about.
 
 ## Consistency Rules
 

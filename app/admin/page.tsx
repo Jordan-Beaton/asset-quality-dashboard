@@ -1711,7 +1711,7 @@ const invitePermissionRowStyle: CSSProperties = {
   padding: "12px 16px",
   border: `1px solid ${imsColours.border}`,
   borderRadius: 14,
-  background: "#ffffff",
+  background: imsColours.panel,
   color: imsColours.ink,
 };
 
@@ -1740,7 +1740,7 @@ const invitePermissionOptionGroupStyle: CSSProperties = {
 const invitePermissionOptionStyle: CSSProperties = {
   border: `1px solid ${imsColours.border}`,
   borderRadius: 10,
-  background: "#ECECE7",
+  background: imsColours.page,
   color: imsColours.ink,
   cursor: "pointer",
   fontSize: 14,
@@ -1857,7 +1857,7 @@ const segmentedButtonRowStyle: CSSProperties = {
 const permissionModeButtonStyle: CSSProperties = {
   border: `1px solid ${imsColours.border}`,
   borderRadius: 10,
-  background: "#ffffff",
+  background: imsColours.panel,
   color: imsColours.slate,
   fontWeight: 800,
   padding: "10px 12px",
@@ -1890,7 +1890,7 @@ const tabPermissionRowStyle: CSSProperties = {
 
 const tabPermissionHeadRowStyle: CSSProperties = {
   borderTop: "none",
-  background: "#ECECE7",
+  background: imsColours.page,
   color: imsColours.slate,
   fontSize: 12,
   fontWeight: 900,

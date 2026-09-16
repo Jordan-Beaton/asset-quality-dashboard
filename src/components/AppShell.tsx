@@ -700,6 +700,8 @@ export default function AppShell({ children }: AppShellProps) {
   const [isFieldInspectionMode, setIsFieldInspectionMode] = useState(false);
   const [isRailExpanded, setIsRailExpanded] = useState(false);
   const [isRailPinned, setIsRailPinned] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [themePreferenceLoaded, setThemePreferenceLoaded] = useState(false);
   const [signedInName, setSignedInName] = useState("");
   const [signedInEmail, setSignedInEmail] = useState("");
   const [signedInRole, setSignedInRole] = useState<SystemRole>("");
@@ -855,6 +857,17 @@ export default function AppShell({ children }: AppShellProps) {
       window.removeEventListener("popstate", updateFieldInspectionMode);
     };
   }, [pathname]);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("enshore-ims-theme");
+    if (savedTheme === "dark") setIsDarkMode(true);
+    setThemePreferenceLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!themePreferenceLoaded) return;
+    window.localStorage.setItem("enshore-ims-theme", isDarkMode ? "dark" : "light");
+  }, [isDarkMode, themePreferenceLoaded]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1018,7 +1031,8 @@ export default function AppShell({ children }: AppShellProps) {
     <MobileCompatibilityGuard routeKey={pathname} />
     <div
       className="ims-app-root"
-      style={{ minHeight: "100vh", background: "#ECECE7", scrollbarGutter: "stable" }}
+      data-theme={isDarkMode ? "dark" : "light"}
+      style={{ minHeight: "100vh", background: "var(--enshore-page)", scrollbarGutter: "stable" }}
       onClickCapture={handlePermissionClickCapture}
       onSubmitCapture={handlePermissionSubmitCapture}
       onChangeCapture={handlePermissionChangeCapture}
@@ -1029,8 +1043,8 @@ export default function AppShell({ children }: AppShellProps) {
           position: "sticky",
           top: 0,
           zIndex: 1000,
-          background: "#ffffff",
-          borderBottom: "1px solid #D0D0CE",
+          background: "var(--enshore-surface)",
+          borderBottom: "1px solid var(--enshore-border)",
           boxShadow: "0 6px 20px rgba(15, 23, 42, 0.08)",
         }}
       >
@@ -1108,7 +1122,7 @@ export default function AppShell({ children }: AppShellProps) {
               <div
                 className="ims-header-title"
                 style={{
-                  color: "#000000",
+                  color: "var(--enshore-ink)",
                   fontWeight: 700,
                   fontSize: isFieldInspectionMode ? "15px" : "20px",
                   letterSpacing: "-0.01em",
@@ -1121,7 +1135,7 @@ export default function AppShell({ children }: AppShellProps) {
                 <div
                   className="ims-header-subtitle"
                   style={{
-                    color: "#53565A",
+                    color: "var(--enshore-muted)",
                     fontSize: "12px",
                     fontWeight: 500,
                     whiteSpace: "nowrap",
@@ -1144,6 +1158,36 @@ export default function AppShell({ children }: AppShellProps) {
                   minWidth: 0,
                 }}
               >
+              <button
+                type="button"
+                onClick={() => setIsDarkMode((current) => !current)}
+                aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+                title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+                style={{
+                  width: "38px",
+                  height: "38px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--enshore-border)",
+                  background: "var(--enshore-surface)",
+                  color: "var(--enshore-brand)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                {isDarkMode ? (
+                  <svg viewBox="0 0 24 24" style={{ width: "18px", height: "18px" }} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4" />
+                    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" style={{ width: "18px", height: "18px" }} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M21 12.5A8.5 8.5 0 1 1 11.5 3a7 7 0 0 0 9.5 9.5Z" />
+                  </svg>
+                )}
+              </button>
               <NotificationBell email={signedInEmail} />
               {signedInName ? (
                 <div
@@ -1154,7 +1198,7 @@ export default function AppShell({ children }: AppShellProps) {
                     gap: "8px",
                     minHeight: "38px",
                     maxWidth: "210px",
-                    color: "#000000",
+                    color: "var(--enshore-ink)",
                     fontSize: "13px",
                     fontWeight: 800,
                     whiteSpace: "nowrap",
@@ -1168,9 +1212,9 @@ export default function AppShell({ children }: AppShellProps) {
                       width: "28px",
                       height: "28px",
                       borderRadius: "999px",
-                      background: "#ECECE7",
-                      color: "#005670",
-                      border: "1px solid #D0D0CE",
+                      background: "var(--enshore-page)",
+                      color: "var(--enshore-brand)",
+                      border: "1px solid var(--enshore-border)",
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -1193,9 +1237,9 @@ export default function AppShell({ children }: AppShellProps) {
               <button
                 onClick={handleLogout}
                 style={{
-                  background: "#ffffff",
-                  color: "#005670",
-                  border: "1px solid #D0D0CE",
+                  background: "var(--enshore-surface)",
+                  color: "var(--enshore-brand)",
+                  border: "1px solid var(--enshore-border)",
                   borderRadius: "8px",
                   padding: "8px 12px",
                   fontWeight: 700,
@@ -1233,8 +1277,8 @@ export default function AppShell({ children }: AppShellProps) {
             bottom: 0,
             zIndex: 900,
             width: railOpen ? "236px" : "74px",
-            background: "rgba(255,255,255,0.96)",
-            borderRight: "1px solid #D0D0CE",
+            background: "var(--enshore-surface-translucent)",
+            borderRight: "1px solid var(--enshore-border)",
             boxShadow: "10px 0 28px rgba(15, 23, 42, 0.08)",
             padding: "14px 10px",
             boxSizing: "border-box",
@@ -1246,7 +1290,7 @@ export default function AppShell({ children }: AppShellProps) {
           <div
             className="ims-side-rail-label"
             style={{
-              color: "#53565A",
+              color: "var(--enshore-muted)",
               fontSize: "10px",
               fontWeight: 900,
               letterSpacing: "0.12em",
@@ -1269,9 +1313,9 @@ export default function AppShell({ children }: AppShellProps) {
               minHeight: "34px",
               marginBottom: "10px",
               borderRadius: "11px",
-              border: "1px solid #D0D0CE",
-              background: isRailPinned ? "#ECECE7" : "#ffffff",
-              color: isRailPinned ? "#005670" : "#53565A",
+              border: "1px solid var(--enshore-border)",
+              background: isRailPinned ? "var(--enshore-page)" : "var(--enshore-surface)",
+              color: isRailPinned ? "var(--enshore-brand)" : "var(--enshore-muted)",
               cursor: "pointer",
               display: "grid",
               gridTemplateColumns: "42px minmax(0, 1fr)",
@@ -1292,7 +1336,7 @@ export default function AppShell({ children }: AppShellProps) {
                 alignItems: "center",
                 justifyContent: "center",
                 justifySelf: "center",
-                background: isRailPinned ? "#D0D0CE" : "#ECECE7",
+                background: isRailPinned ? "var(--enshore-border)" : "var(--enshore-page)",
                 fontSize: "12px",
                 lineHeight: 1,
               }}
@@ -1345,7 +1389,7 @@ export default function AppShell({ children }: AppShellProps) {
                     boxSizing: "border-box",
                     textDecoration: "none",
                     background: isActive ? "#005670" : "transparent",
-                    color: isActive ? "#ffffff" : "#000000",
+                    color: isActive ? "#ffffff" : "var(--enshore-ink)",
                     border: isActive ? "1px solid #005670" : "1px solid transparent",
                     transition: "background 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
                   }}
@@ -1374,7 +1418,7 @@ export default function AppShell({ children }: AppShellProps) {
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      background: isActive ? "rgba(255,255,255,0.18)" : "#ECECE7",
+                      background: isActive ? "rgba(255,255,255,0.18)" : "var(--enshore-page)",
                       color: isActive ? "#ffffff" : "#005670",
                       fontSize: "11px",
                       fontWeight: 900,
@@ -1436,8 +1480,8 @@ export default function AppShell({ children }: AppShellProps) {
           ) : (
             <section
               style={{
-                background: "#ffffff",
-                border: "1px solid #D0D0CE",
+                background: "var(--enshore-surface)",
+                border: "1px solid var(--enshore-border)",
                 borderRadius: "18px",
                 padding: "24px",
                 boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
@@ -1459,7 +1503,7 @@ export default function AppShell({ children }: AppShellProps) {
                 </div>
                 <h1 style={{ margin: "8px 0 0", fontSize: "28px", lineHeight: 1.1 }}>You do not currently have access to this area.</h1>
               </div>
-              <p style={{ margin: 0, color: "#53565A", lineHeight: 1.6 }}>
+              <p style={{ margin: 0, color: "var(--enshore-muted)", lineHeight: 1.6 }}>
                 Your current role or individual permissions do not include the {moduleTitle} workspace. If this looks wrong, ask an Admin to review your role or permission override in Admin / Settings.
               </p>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -1483,8 +1527,8 @@ export default function AppShell({ children }: AppShellProps) {
                       alignItems: "center",
                       borderRadius: "10px",
                       padding: "12px 14px",
-                      background: "#ECECE7",
-                      color: "#53565A",
+                      background: "var(--enshore-page)",
+                      color: "var(--enshore-muted)",
                       fontWeight: 800,
                     }}
                   >

@@ -577,7 +577,7 @@ const twoColumn: CSSProperties = { display: "grid", gridTemplateColumns: "repeat
 const repeatGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 };
 const repeatCard: CSSProperties = { display: "grid", gap: 7, textAlign: "left", padding: 14, borderRadius: 14, border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft, color: imsColours.ink, cursor: "pointer" };
 const learningSpotlightWrap: CSSProperties = { display: "grid", gap: 10 };
-const learningSpotlightCard: CSSProperties = { width: "100%", display: "grid", alignContent: "center", gap: 10, minHeight: 220, padding: "24px clamp(20px, 4vw, 48px)", borderRadius: 16, border: `1px solid ${imsColours.brandBorder}`, background: "linear-gradient(135deg, #ffffff 0%, #ECECE7 58%, #ECECE7 100%)", color: imsColours.ink, textAlign: "left", font: "inherit", cursor: "pointer" };
+const learningSpotlightCard: CSSProperties = { width: "100%", display: "grid", alignContent: "center", gap: 10, minHeight: 220, padding: "24px clamp(20px, 4vw, 48px)", borderRadius: 16, border: `1px solid ${imsColours.brandBorder}`, background: `linear-gradient(135deg, ${imsColours.panel} 0%, ${imsColours.page} 58%, ${imsColours.page} 100%)`, color: imsColours.ink, textAlign: "left", font: "inherit", cursor: "pointer" };
 const learningEyebrow: CSSProperties = { color: imsColours.brandDark, fontSize: 11, fontWeight: 900, letterSpacing: ".05em", textTransform: "uppercase" };
 const learningTitleStyle: CSSProperties = { fontSize: 22, lineHeight: 1.2 };
 const learningTextStyle: CSSProperties = { maxWidth: 980, margin: 0, fontSize: 16, lineHeight: 1.65 };
@@ -590,7 +590,7 @@ const formGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(
 const field: CSSProperties = { display: "grid", minWidth: 0, maxWidth: "100%", gap: 6, alignContent: "start" }; const labelStyle: CSSProperties = { color: imsColours.slate, fontSize: 12, fontWeight: 800 };
 const tableWrap: CSSProperties = { width: "100%", overflowX: "auto" }; const table: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: 13 };
 const registerTableStyle: CSSProperties = { ...table, tableLayout: "fixed", minWidth: 1490 };
-const th: CSSProperties = { background: imsColours.panelAlt, color: "#53565A", fontSize: 12, fontWeight: 900, letterSpacing: ".04em", textTransform: "uppercase", textAlign: "left", padding: "12px 14px", whiteSpace: "nowrap" };
+const th: CSSProperties = { background: imsColours.panelAlt, color: imsColours.muted, fontSize: 12, fontWeight: 900, letterSpacing: ".04em", textTransform: "uppercase", textAlign: "left", padding: "12px 14px", whiteSpace: "nowrap" };
 const td: CSSProperties = { padding: "12px 14px", borderBottom: `1px solid ${imsColours.borderSoft}`, verticalAlign: "top", lineHeight: 1.45, maxWidth: 280 };
 const infoRow: CSSProperties = { color: imsColours.slate, fontSize: 13, fontWeight: 700, margin: "12px 0" }; const muted: CSSProperties = { color: imsColours.muted, fontSize: 13, lineHeight: 1.5 };
 const actionRow: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 10, marginTop: 18 }; const evidenceGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginTop: 16 };
@@ -598,8 +598,8 @@ const evidenceCard: CSSProperties = { display: "grid", gap: 5, padding: 12, text
 const importSummary: CSSProperties = { display: "grid", gap: 7, alignContent: "center", padding: 12, background: imsColours.panelAlt, borderRadius: 12, color: imsColours.slate };
 const activeAnalysisStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12, padding: "10px 12px", borderRadius: 12, background: imsColours.brandSoft, border: `1px solid ${imsColours.brandBorder}`, color: imsColours.brandDark, fontSize: 13 };
 const datasetActionsStyle: CSSProperties = { display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 };
-const loadingOverlay: CSSProperties = { position: "fixed", right: 24, bottom: 24, padding: "12px 16px", background: imsColours.ink, color: "white", borderRadius: 12, boxShadow: "0 14px 28px rgba(15,23,42,.2)", zIndex: 20 };
-const fieldIntroStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: 14, borderRadius: 16, border: `1px solid ${imsColours.brandBorder}`, background: "#ffffff", boxShadow: "0 1px 3px rgba(15,23,42,.08)" };
+const loadingOverlay: CSSProperties = { position: "fixed", right: 24, bottom: 24, padding: "12px 16px", background: imsColours.brand, color: "white", borderRadius: 12, boxShadow: "0 14px 28px rgba(15,23,42,.2)", zIndex: 20 };
+const fieldIntroStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, marginBottom: 12, padding: 14, borderRadius: 16, border: `1px solid ${imsColours.brandBorder}`, background: imsColours.panel, boxShadow: "0 1px 3px rgba(15,23,42,.08)" };
 const fieldIntroIconStyle: CSSProperties = { flex: "0 0 auto", width: 44, height: 44, display: "grid", placeItems: "center", borderRadius: 13, background: imsColours.brand, color: "#ffffff" };
 const fieldIntroTitleStyle: CSSProperties = { display: "block", color: imsColours.ink, fontSize: 18, lineHeight: 1.2 };
 const fieldIntroTextStyle: CSSProperties = { display: "block", marginTop: 4, color: imsColours.slate, fontSize: 13, lineHeight: 1.4 };

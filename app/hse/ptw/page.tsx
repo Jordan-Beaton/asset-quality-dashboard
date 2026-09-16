@@ -1666,10 +1666,12 @@ export default function HsePermitToWorkPage() {
       <ImsTopMetaRow
         backHref="/hse"
         status={<><strong>Status:</strong> {statusMessage}</>}
-        actions={<ImsButton onClick={startNewPtw}>New PTW</ImsButton>}
       />
 
-      <ImsTabs tabs={viewTabs} active={activeView} onChange={setActiveView} ariaLabel="Permit to Work views" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+        <ImsTabs tabs={viewTabs} active={activeView} onChange={setActiveView} ariaLabel="Permit to Work views" />
+        <ImsButton onClick={startNewPtw} style={{ marginBottom: "20px" }}>New PTW</ImsButton>
+      </div>
 
       {activeView === "dashboard" ? (
         <div style={{ display: "grid", gap: "20px" }}>
@@ -1716,7 +1718,7 @@ export default function HsePermitToWorkPage() {
             </button>
           </div>
           {showRegisterFilters ? (
-            <div className="ims-filter-panel" style={registerToolbarStyle}>
+            <div className="ims-filter-panel" style={registerExpandedFiltersStyle}>
               <select style={registerFilterStyle} value={registerStatusFilter} onChange={(event) => setRegisterStatusFilter(event.target.value)}>
                 <option value="">All Statuses</option>
                 {["Draft", "Awaiting Issue", "Issued", "Extended", "Closed"].map((status) => <option key={status} value={status}>{status}</option>)}
@@ -2119,32 +2121,33 @@ const statusPillStyle: CSSProperties = { borderRadius: "999px", background: "rgb
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "14px" };
 const signatureGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" };
 const labelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 900, lineHeight: 1.2 };
-const inputStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "10px 12px", fontSize: "14px", lineHeight: 1.35, boxSizing: "border-box", color: imsColours.ink, background: "#ffffff" };
+const inputStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "10px 12px", fontSize: "14px", lineHeight: 1.35, boxSizing: "border-box", color: imsColours.ink, background: imsColours.panel };
 const textareaStyle: CSSProperties = { ...inputStyle, minHeight: "96px", lineHeight: 1.45, resize: "vertical" };
 const inlineSectionTitleStyle: CSSProperties = { background: imsColours.brand, color: "#ffffff", borderRadius: "10px", padding: "11px 14px" };
 const inlineSectionHeadingStyle: CSSProperties = { margin: 0, fontSize: "16px", fontWeight: 800, lineHeight: 1.25 };
 const inlineSectionSubtitleStyle: CSSProperties = { margin: "4px 0 0", color: "rgba(255,255,255,0.84)", fontSize: "12px", lineHeight: 1.4, fontWeight: 700 };
 const checkGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "10px" };
-const checkStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: "#ffffff", color: imsColours.ink, display: "grid", gridTemplateColumns: "24px 1fr", gap: "8px", alignItems: "center", padding: "9px 11px", textAlign: "left", fontWeight: 800, fontSize: "13px", lineHeight: 1.3, cursor: "pointer" };
+const checkStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: imsColours.panel, color: imsColours.ink, display: "grid", gridTemplateColumns: "24px 1fr", gap: "8px", alignItems: "center", padding: "9px 11px", textAlign: "left", fontWeight: 800, fontSize: "13px", lineHeight: 1.3, cursor: "pointer" };
 const selectedCheckStyle: CSSProperties = { ...checkStyle, borderColor: imsColours.brandBorder, background: imsColours.brandSoft, color: imsColours.brandDark };
 const yesNoGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" };
-const choiceStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: "#ffffff", color: imsColours.ink, fontWeight: 900, fontSize: "14px", cursor: "pointer" };
+const choiceStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: imsColours.panel, color: imsColours.ink, fontWeight: 900, fontSize: "14px", cursor: "pointer" };
 const selectedChoiceStyle: CSSProperties = { ...choiceStyle, borderColor: imsColours.brandBorder, background: imsColours.brandSoft, color: imsColours.brandDark };
 const signatureCardStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "12px", background: "#ffffff", padding: "14px", display: "grid", gap: "12px" };
 const extensionCardStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", background: "#ffffff", padding: "14px", display: "grid", gap: "12px" };
 const smallHeadingStyle: CSSProperties = { margin: 0, color: imsColours.ink, fontSize: "15px", fontWeight: 900 };
 const actionRowStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap" };
-const emptyStateStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "18px", background: "#ECECE7", color: imsColours.slate };
+const emptyStateStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "18px", background: imsColours.page, color: imsColours.slate };
 const noticeStyle: CSSProperties = { ...emptyStateStyle, borderStyle: "solid", lineHeight: 1.55 };
 const workflowGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" };
 const workflowStepStyle: CSSProperties = { ...imsPanelStyle, padding: "14px", display: "grid", gap: "8px" };
 const templateGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" };
-const templateTileStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "16px", background: "#ECECE7", color: imsColours.ink, fontWeight: 900 };
+const templateTileStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "16px", background: imsColours.page, color: imsColours.ink, fontWeight: 900 };
 const registerToolbarStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", background: "#ffffff", padding: "10px", display: "grid", gridTemplateColumns: "minmax(220px, 1fr) minmax(180px, 420px)", gap: "12px", alignItems: "center", marginBottom: "12px" };
-const registerSearchStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "10px 12px", fontSize: "14px", lineHeight: 1.35, boxSizing: "border-box", color: imsColours.ink, background: "#ffffff" };
+const registerExpandedFiltersStyle: CSSProperties = { ...registerToolbarStyle, gridTemplateColumns: "minmax(180px, 1fr) minmax(180px, 1fr) auto" };
+const registerSearchStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "10px 12px", fontSize: "14px", lineHeight: 1.35, boxSizing: "border-box", color: imsColours.ink, background: imsColours.panel };
 const registerFilterStyle: CSSProperties = { ...registerSearchStyle };
 const registerPrimaryButtonStyle: CSSProperties = { minHeight: "42px", border: `1px solid ${imsColours.brandBorder}`, borderRadius: "10px", background: imsColours.brand, color: "#ffffff", fontWeight: 900, fontSize: "14px", cursor: "pointer", padding: "9px 14px" };
-const registerSecondaryButtonStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: "#D0D0CE", color: imsColours.ink, fontWeight: 900, fontSize: "14px", cursor: "pointer", padding: "9px 14px" };
+const registerSecondaryButtonStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: imsColours.border, color: imsColours.ink, fontWeight: 900, fontSize: "14px", cursor: "pointer", padding: "9px 14px" };
 const registerCountStyle: CSSProperties = { color: imsColours.ink, fontSize: "12px", fontWeight: 800, lineHeight: 1.4, margin: "0 0 10px" };
 const distributionStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "14px", background: imsColours.brandSoft, color: imsColours.brandDark, fontWeight: 800, lineHeight: 1.45 };
 const attachmentUploadGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" };
@@ -2153,7 +2156,7 @@ const attachmentUploadHeaderStyle: CSSProperties = { display: "flex", justifyCon
 const attachmentUploadButtonStyle: CSSProperties = { border: `1px solid ${imsColours.brandBorder}`, borderRadius: "10px", background: imsColours.brandSoft, color: imsColours.brandDark, minHeight: "36px", padding: "8px 12px", fontSize: "12px", fontWeight: 900, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", whiteSpace: "nowrap" };
 const attachmentHintStyle: CSSProperties = { margin: "4px 0 0", color: imsColours.slate, fontSize: "12px", lineHeight: 1.35, fontWeight: 700 };
 const attachmentEmptyStyle: CSSProperties = { margin: 0, color: imsColours.slate, fontSize: "12px", lineHeight: 1.35 };
-const attachmentFileRowStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "10px", background: "#ECECE7", padding: "8px 10px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", alignItems: "center", gap: "10px", color: imsColours.ink, fontSize: "12px", fontWeight: 800, lineHeight: 1.35 };
+const attachmentFileRowStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "10px", background: imsColours.page, padding: "8px 10px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", alignItems: "center", gap: "10px", color: imsColours.ink, fontSize: "12px", fontWeight: 800, lineHeight: 1.35 };
 const attachmentRemoveButtonStyle: CSSProperties = { border: "1px solid #ECECE7", borderRadius: "8px", background: "#ECECE7", color: "#F93822", minHeight: "28px", padding: "5px 8px", fontSize: "11px", fontWeight: 900, cursor: "pointer" };
-const mobileSummaryStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "14px", background: "#ffffff", color: imsColours.ink };
+const mobileSummaryStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "14px", background: imsColours.panel, color: imsColours.ink };
 const tableWrapStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", overflowX: "auto", background: "#ffffff" };

@@ -704,17 +704,19 @@ export default function AssetActionsPage() {
       <ImsTopMetaRow
         backHref="/home"
         backLabel="Back to IMS Home"
-        actions={<Link href="/actions?department=Assets" style={primaryLinkStyle}>Open Central Actions</Link>}
         status={<><strong>Status:</strong> {message}</>}
       />
 
-      <nav className="ims-tabs" style={viewNavStyle} role="tablist" aria-label="Asset Action views">
-        {viewTabs.map((tab) => (
-          <button key={tab.id} type="button" role="tab" aria-selected={activeView === tab.id} data-active={activeView === tab.id ? "true" : "false"} style={activeView === tab.id ? activeViewButtonStyle : viewButtonStyle} onClick={() => setActiveView(tab.id)} disabled={tab.id === "create" && !hasCreateAccess()}>
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: 20 }}>
+        <nav className="ims-tabs" style={{ display: "flex", gap: 10, flexWrap: "wrap" }} role="tablist" aria-label="Asset Action views">
+          {viewTabs.map((tab) => (
+            <button key={tab.id} type="button" role="tab" aria-selected={activeView === tab.id} data-active={activeView === tab.id ? "true" : "false"} style={activeView === tab.id ? activeViewButtonStyle : viewButtonStyle} onClick={() => setActiveView(tab.id)} disabled={tab.id === "create" && !hasCreateAccess()}>
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+        <Link href="/actions?department=Assets" style={primaryLinkStyle}>Open Central Actions</Link>
+      </div>
 
       {activeView === "dashboard" ? (
         <>
@@ -1020,7 +1022,6 @@ function MiniFocus({ label, value, tone, onClick }: { label: string; value: numb
 
 const primaryLinkStyle: CSSProperties = { background: "#005670", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
 const smallLinkStyle: CSSProperties = { ...primaryLinkStyle, padding: "8px 10px", fontSize: 12 };
-const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 };
 const viewButtonStyle: CSSProperties = { background: "#ECECE7", color: "#000000", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
 const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#005670", color: "white" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };

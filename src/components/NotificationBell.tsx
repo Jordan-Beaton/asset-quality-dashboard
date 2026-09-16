@@ -117,7 +117,7 @@ export default function NotificationBell({ email }: { email: string }) {
                     key={notification.id}
                     type="button"
                     onClick={() => openNotification(notification)}
-                    style={{ ...itemStyle, background: notification.read_at ? "transparent" : "#ECECE7" }}
+                    style={{ ...itemStyle, background: notification.read_at ? "transparent" : "var(--enshore-page)" }}
                   >
                     <span style={notification.read_at ? dotSpacerStyle : dotStyle} aria-hidden="true" />
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -144,8 +144,8 @@ const bellButtonStyle: CSSProperties = {
   width: "38px",
   height: "38px",
   borderRadius: "8px",
-  border: "1px solid #D0D0CE",
-  background: "#ffffff",
+  border: "1px solid var(--enshore-border)",
+  background: "var(--enshore-surface)",
   color: "#005670",
   display: "flex",
   alignItems: "center",
@@ -179,7 +179,7 @@ const badgeStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  border: "2px solid #ffffff",
+  border: "2px solid var(--enshore-surface)",
   boxSizing: "border-box",
 };
 
@@ -195,8 +195,8 @@ const panelStyle: CSSProperties = {
   right: 0,
   width: "392px",
   maxWidth: "calc(100vw - 40px)",
-  background: "#ffffff",
-  border: "1px solid #D0D0CE",
+  background: "var(--enshore-surface)",
+  border: "1px solid var(--enshore-border)",
   borderRadius: "14px",
   boxShadow: "0 20px 44px rgba(15, 23, 42, 0.16)",
   overflow: "hidden",
@@ -208,13 +208,13 @@ const panelHeadStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   padding: "14px 16px",
-  borderBottom: "1px solid #D0D0CE",
+  borderBottom: "1px solid var(--enshore-border)",
 };
 
 const panelTitleStyle: CSSProperties = {
   fontWeight: 800,
   fontSize: "14px",
-  color: "#000000",
+  color: "var(--enshore-ink)",
 };
 
 const markAllStyle: CSSProperties = {
@@ -237,7 +237,7 @@ const panelListStyle: CSSProperties = {
 const emptyStyle: CSSProperties = {
   padding: "34px 16px",
   textAlign: "center",
-  color: "#53565A",
+  color: "var(--enshore-muted)",
   fontSize: "13px",
 };
 
@@ -279,21 +279,21 @@ const itemTopStyle: CSSProperties = {
 const itemTitleStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
-  color: "#000000",
+  color: "var(--enshore-ink)",
   lineHeight: 1.35,
 };
 
 const itemTimeStyle: CSSProperties = {
   flexShrink: 0,
   fontSize: "11px",
-  color: "#53565A",
+  color: "var(--enshore-muted)",
   whiteSpace: "nowrap",
   fontVariantNumeric: "tabular-nums",
 };
 
 const itemBodyStyle: CSSProperties = {
   fontSize: "12.5px",
-  color: "#53565A",
+  color: "var(--enshore-muted)",
   marginTop: "2px",
   lineHeight: 1.4,
 };
@@ -305,5 +305,5 @@ const itemTagStyle: CSSProperties = {
   fontWeight: 800,
   textTransform: "uppercase",
   letterSpacing: "0.05em",
-  color: "#53565A",
+  color: "var(--enshore-muted)",
 };

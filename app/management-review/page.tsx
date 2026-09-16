@@ -1025,7 +1025,7 @@ const periodSelectStyle: CSSProperties = {
   border: `1px solid ${imsColours.border}`,
   padding: "0 12px",
   fontSize: "14px",
-  background: "#ffffff",
+  background: imsColours.panel,
   color: imsColours.ink,
 };
 
@@ -1078,7 +1078,7 @@ const areaCardStyle: CSSProperties = {
   borderRadius: "18px",
   border: `1px solid ${imsColours.border}`,
   borderTop: "5px solid",
-  background: "#ffffff",
+  background: imsColours.panel,
   color: imsColours.ink,
   textDecoration: "none",
   boxShadow: imsShadows.panel,
@@ -1189,7 +1189,7 @@ const metricCardStyle: CSSProperties = {
   minHeight: "78px",
   border: `1px solid ${imsColours.borderSoft}`,
   borderRadius: "14px",
-  background: "#ECECE7",
+  background: imsColours.page,
   padding: "13px",
   overflow: "hidden",
 };
@@ -1241,7 +1241,7 @@ const emptyChartStyle: CSSProperties = {
   marginBottom: "14px",
   border: "1px dashed #D0D0CE",
   borderRadius: "14px",
-  background: "#ECECE7",
+  background: imsColours.page,
   color: imsColours.slate,
   display: "grid",
   placeItems: "center",
