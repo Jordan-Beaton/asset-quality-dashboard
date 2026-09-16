@@ -332,11 +332,12 @@ function QualityDashboardContent() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
-  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning">(
+  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning" | "architecture">(
     linkedView === "planning" || linkedView === "analytics" ? linkedView : "overview"
   );
   const criticalPressureRef = useRef<HTMLDivElement | null>(null);
   const openWorkloadRef = useRef<HTMLDivElement | null>(null);
+  const architectureFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
     if (linkedView === "planning" || linkedView === "analytics") {
@@ -1367,6 +1368,7 @@ function QualityDashboardContent() {
             { value: "overview", label: "Overview" },
             { value: "analytics", label: "Analytics" },
             { value: "planning", label: "Actions & Audits" },
+            { value: "architecture", label: "Architecture" },
           ]}
           active={dashboardView}
           onChange={setDashboardView}
@@ -2144,6 +2146,30 @@ function QualityDashboardContent() {
         </SectionCard>
       </section>
       </div> : null}
+
+      {dashboardView === "architecture" ? <div className="quality-view-panel" role="tabpanel">
+      <section style={architecturePanelStyle}>
+        <div style={architectureHeaderStyle}>
+          <div>
+            <h2 style={architectureTitleStyle}>Enshore IMS Architecture</h2>
+            <p style={architectureSubtitleStyle}>
+              A map of how the IMS is built: the infrastructure it runs on, how the eleven business modules depend on
+              each other, and every top-level route. Useful as a reference document, and formatted to export cleanly
+              for a tender submission.
+            </p>
+          </div>
+          <ImsButton onClick={() => architectureFrameRef.current?.contentWindow?.print()}>
+            Download PDF
+          </ImsButton>
+        </div>
+        <iframe
+          ref={architectureFrameRef}
+          src="/architecture/ims-architecture.html"
+          title="Enshore IMS Architecture"
+          style={architectureFrameStyle}
+        />
+      </section>
+      </div> : null}
     </main>
   );
 }
@@ -2352,6 +2378,46 @@ const errorBannerStyle: CSSProperties = {
   borderRadius: "14px",
   padding: "14px 16px",
   marginBottom: "18px",
+};
+
+const architecturePanelStyle: CSSProperties = {
+  background: imsColours.panel,
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: "18px",
+  boxShadow: imsShadows.panel,
+  padding: "18px",
+  marginBottom: "18px",
+};
+
+const architectureHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: "16px",
+  flexWrap: "wrap",
+  marginBottom: "14px",
+};
+
+const architectureTitleStyle: CSSProperties = {
+  margin: "0 0 6px",
+  color: imsColours.ink,
+};
+
+const architectureSubtitleStyle: CSSProperties = {
+  margin: 0,
+  maxWidth: "70ch",
+  color: imsColours.muted,
+  fontSize: "13.5px",
+  lineHeight: 1.5,
+};
+
+const architectureFrameStyle: CSSProperties = {
+  width: "100%",
+  height: "80vh",
+  minHeight: "640px",
+  border: `1px solid ${imsColours.border}`,
+  borderRadius: "14px",
+  background: imsColours.page,
 };
 
 const commandDeckStyle: CSSProperties = {
