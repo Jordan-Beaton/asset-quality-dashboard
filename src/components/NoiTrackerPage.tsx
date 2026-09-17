@@ -52,6 +52,14 @@ function typeTone(type: InterventionType) {
   return { background: "#ECECE7", color: "#005670" };
 }
 
+function statusTone(status: string) {
+  if (status === "NOI Required") return { background: "#FFAD00", color: "#FFFFFF" };
+  if (status === "NOI Issued") return { background: "#005670", color: "#FFFFFF" };
+  if (status === "Completed") return { background: "#63B1BC", color: "#FFFFFF" };
+  if (status === "Cancelled") return { background: "#F93822", color: "#FFFFFF" };
+  return { background: "#ECECE7", color: "#53565A" };
+}
+
 function validIntervention(value: string) {
   const normalised = value.toUpperCase().replace(/\s+/g, "");
   return /^[A-Z](?:\/[A-Z])*$/.test(normalised) && normalised.split("/").some((part) => part === "W" || part === "H");
@@ -77,6 +85,11 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
   const [diagnostics, setDiagnostics] = useState<ExtractionDiagnostics | null>(null);
   const [mapping, setMapping] = useState<ExtractionMapping>(emptyMapping);
   const [showMapping, setShowMapping] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  // The scanner panel collapses by default so the register (what people use
+  // day-to-day) isn't pushed below the fold, but it stays open automatically
+  // while there's scan/manual-entry work in progress so nothing gets hidden.
+  const scannerExpanded = scannerOpen || showManualEntry || candidates.length > 0 || Boolean(diagnostics);
 
   const load = useCallback(async () => {
     const [itpResult, pointResult] = await Promise.all([
@@ -133,6 +146,40 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
     const available = new Set(pointsMatchingPointFilters(["status"]).map((point) => point.status));
     return statuses.filter((status) => available.has(status));
   }, [pointsMatchingPointFilters]);
+
+  // Points grouped under their ITP so supplier/revision context is shown once
+  // per group instead of repeated on every row, and groups are ordered by
+  // document number so the register reads the same way every time.
+  const groupedRows = useMemo(() => {
+    const groups = new Map<string, { itp?: Itp; rows: typeof pointRows }>();
+    pointRows.forEach((row) => {
+      const key = row.itp?.id || "unassigned";
+      if (!groups.has(key)) groups.set(key, { itp: row.itp, rows: [] });
+      groups.get(key)!.rows.push(row);
+    });
+    return [...groups.values()].sort((a, b) => (a.itp?.document_number || "￿").localeCompare(b.itp?.document_number || "￿"));
+  }, [pointRows]);
+
+  const activeFilterChips = useMemo(() => {
+    const chips: { key: string; label: string; clear: () => void }[] = [];
+    if (query.trim()) chips.push({ key: "query", label: `Search: ${query.trim()}`, clear: () => setQuery("") });
+    if (supplierFilter !== "All") chips.push({ key: "supplier", label: `Supplier: ${supplierFilter}`, clear: () => setSupplierFilter("All") });
+    if (itpNumberFilter !== "All") chips.push({ key: "itpNumber", label: `ITP: ${itpNumberFilter}`, clear: () => setItpNumberFilter("All") });
+    if (itpTitleFilter !== "All") chips.push({ key: "itpTitle", label: `Title: ${itpTitleFilter}`, clear: () => setItpTitleFilter("All") });
+    if (typeFilter !== "All") chips.push({ key: "type", label: `Point: ${typeFilter}`, clear: () => setTypeFilter("All") });
+    if (statusFilter !== "All") chips.push({ key: "status", label: `Status: ${statusFilter}`, clear: () => setStatusFilter("All") });
+    return chips;
+  }, [query, supplierFilter, itpNumberFilter, itpTitleFilter, typeFilter, statusFilter]);
+
+  function clearAllFilters() {
+    setQuery("");
+    setSupplierFilter("All");
+    setItpNumberFilter("All");
+    setItpTitleFilter("All");
+    setTypeFilter("All");
+    setStatusFilter("All");
+  }
+
   const metrics = useMemo(() => ({
     total: points.length,
     witness: points.filter((point) => point.intervention_type.split("/").includes("W")).length,
@@ -449,6 +496,9 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
 
   return (
     <main style={page}>
+      <style>{`
+        .noi-register-table tbody tr:hover { background: rgba(0, 86, 112, 0.06); }
+      `}</style>
       <QualityPageHero label={`${config.label} · Inspection intelligence`} title="NOI Tracker" description="Controlled witness and hold-point register extracted from current Supplier ITP revisions." />
       <ImsTopMetaRow backHref={`/projects/${projectKey}`} backLabel={`Back to ${config.label}`} status={<><strong>Status:</strong> {message || "Client, Enshore and Contractor W/H requirements loaded."}</>} />
       <ProjectWorkspaceNav projectKey={projectKey} active="noi" />
@@ -462,7 +512,12 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
       </section>
 
       <section style={surface}>
-        <div style={sectionHeader}><div><div style={kicker}>ITP scanner</div><h2 style={title}>Extract W/H involvement points</h2></div></div>
+        <div style={panelHeadClickable} onClick={() => setScannerOpen((current) => !current)}>
+          <div><div style={kicker}>ITP scanner</div><h2 style={title}>Extract or add W/H points</h2></div>
+          <span style={{ ...chevron, transform: scannerExpanded ? "rotate(0deg)" : "rotate(-90deg)" }}>▾</span>
+        </div>
+        {message && <div style={notice}>{message}</div>}
+        {scannerExpanded && <>
         <div style={scanner}>
           <label style={field}><span>Current ITP</span><select style={input} value={selectedItpId} onChange={(event) => { setSelectedItpId(event.target.value); setCandidates([]); setDiagnostics(null); setMapping(emptyMapping()); setShowMapping(false); }}>{itps.map((itp) => {
             const revision = currentRevision(itp);
@@ -471,7 +526,6 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
           <button style={primaryButton} disabled={busy || !selectedItp} onClick={() => void scanSelectedItp()}>{busy ? "Scanning..." : "Scan current revision"}</button>
           <button style={secondaryButton} disabled={busy || !selectedItp} onClick={() => setShowManualEntry((current) => !current)}>{showManualEntry ? "Close manual entry" : "Add manual point"}</button>
         </div>
-        {message && <div style={notice}>{message}</div>}
         {diagnostics && <div style={mappingSummary}>
           <div style={mappingSummaryHeader}><div><strong>Scanner interpretation</strong><span>{diagnostics.explanation.join(" ")}</span></div><button type="button" style={secondaryButton} onClick={() => setShowMapping((current) => !current)}>{showMapping ? "Hide mapping" : "Review mapping"}</button></div>
           {showMapping && <div style={mappingPanel}>
@@ -508,6 +562,7 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
           </div>)}
           <div style={candidateActions}><button style={secondaryButton} onClick={() => setCandidates([])}>Discard</button><button style={primaryButton} disabled={busy} onClick={() => void saveCandidates()}>Add selected points to register</button></div>
         </div>}
+        </>}
       </section>
 
       <section style={surface}>
@@ -521,29 +576,67 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
           <select aria-label="Filter by point type" style={input} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="All">All point types</option>{typeOptions.map((type) => <option key={type}>{type}</option>)}</select>
           <select aria-label="Filter by status" style={input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="All">All statuses</option>{statusOptions.map((status) => <option key={status}>{status}</option>)}</select>
         </div>
-        <div style={tableWrap}><table style={table}>
+        {activeFilterChips.length > 0 && <div style={activeFiltersRow}>
+          {activeFilterChips.map((chip) => (
+            <span key={chip.key} style={filterTag}>
+              {chip.label}
+              <button type="button" style={filterTagRemove} onClick={chip.clear} title="Remove filter">✕</button>
+            </span>
+          ))}
+          <button type="button" style={clearAllLink} onClick={clearAllFilters}>Clear all</button>
+        </div>}
+        <div style={tableWrap}><table style={table} className="noi-register-table">
           <colgroup>
-            <col style={{ width: "14%" }} /><col style={{ width: "7%" }} /><col style={{ width: "26%" }} /><col style={{ width: "6%" }} />
-            <col style={{ width: "10%" }} /><col style={{ width: "9%" }} /><col style={{ width: "9%" }} /><col style={{ width: "14%" }} /><col style={{ width: "5%" }} />
+            <col style={{ width: "8%" }} /><col style={{ width: "34%" }} /><col style={{ width: "7%" }} />
+            <col style={{ width: "11%" }} /><col style={{ width: "11%" }} /><col style={{ width: "12%" }} /><col style={{ width: "12%" }} /><col style={{ width: "5%" }} />
           </colgroup>
-          <thead><tr>{["ITP / supplier", "Section", "Activity", "Point", "Planned date", "NOI number", "Status", "Notes", ""].map((heading) => <th key={heading} style={th}>{heading}</th>)}</tr></thead><tbody>
-          {pointRows.map(({ point, itp }) => <tr key={point.id}>
-            <td style={td}><strong style={teal}>{itp?.document_number || "Unknown ITP"}</strong><small style={small}>{itp?.supplier || "—"} · {itp?.scope || "No scope"}</small></td>
-            <td style={td}><strong>{point.section_number}</strong><small style={small}>{point.source_location || point.party_heading}</small></td>
-            <td style={td}><textarea rows={2} style={activityTextareaStyle} value={point.activity_description} onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, activity_description: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { activity_description: event.target.value })} /></td>
-            <td style={td}><input list="noi-intervention-codes" style={{ ...compactInput, ...typeTone(point.intervention_type) }} value={point.intervention_type} onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, intervention_type: event.target.value.toUpperCase() } : item))} onBlur={(event) => {
-              const value = event.target.value.toUpperCase().replace(/\s+/g, "");
-              if (validIntervention(value)) void updatePoint(point, { intervention_type: value });
-              else { setMessage("Intervention codes must contain W or H, for example W, H, R/W, M/W, or W/H."); void load(); }
-            }} /></td>
-            <td style={td}><input style={compactInput} type="date" value={point.planned_date || ""} onChange={(event) => void updatePoint(point, { planned_date: event.target.value || null })} /></td>
-            <td style={td}><input style={compactInput} value={point.noi_number || ""} placeholder="TBC" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, noi_number: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { noi_number: event.target.value || null })} /></td>
-            <td style={td}><select style={compactInput} value={point.status} onChange={(event) => void updatePoint(point, { status: event.target.value })}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></td>
-            <td style={td}><input style={wideInput} value={point.notes || ""} placeholder="Notes" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, notes: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { notes: event.target.value || null })} /></td>
-            <td style={td}><div style={rowActions}>{point.noi_number ? <Link style={noiButton} href={`/projects/${projectKey}/noi/create?noi=${encodeURIComponent(point.noi_number)}`}>NOI</Link> : null}<button style={deleteButton} disabled={savingId === point.id} onClick={() => void deletePoint(point)}>{savingId === point.id ? "..." : "Delete"}</button></div></td>
-          </tr>)}
-          {pointRows.length === 0 && <tr><td colSpan={9} style={empty}>No NOI points match the current filters.</td></tr>}
-        </tbody></table></div>
+          <thead><tr>{["Section", "Activity", "Point", "Planned date", "NOI number", "Status", "Notes", ""].map((heading) => <th key={heading} style={th}>{heading}</th>)}</tr></thead>
+          {groupedRows.map(({ itp, rows }) => {
+            const revision = itp ? currentRevision(itp) : undefined;
+            const issuedCount = rows.filter((row) => Boolean(row.point.noi_number)).length;
+            const progressPct = rows.length ? Math.round((issuedCount / rows.length) * 100) : 0;
+            return (
+              <tbody key={itp?.id || "unassigned"}>
+                <tr>
+                  <td colSpan={8} style={groupHeadCell}>
+                    <div style={groupHeadRow}>
+                      <span style={groupItpDoc}>{itp?.document_number || "Unknown ITP"}</span>
+                      <span style={groupItpTitle}>{itp?.title || "No title on record"}</span>
+                      <span style={{ ...pill, ...pillSupplier }}>{itp?.supplier || "No supplier"}</span>
+                      {revision && <span style={{ ...pill, ...pillRev }}>Rev {revision.revision}</span>}
+                      <span style={progressWrap}>
+                        <span style={progressTrack}><span style={{ ...progressFill, width: `${progressPct}%` }} /></span>
+                        {issuedCount} of {rows.length} issued
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+                {rows.map(({ point }) => (
+                  <tr key={point.id}>
+                    <td style={td}><strong>{point.section_number}</strong><small style={small}>{point.source_location || point.party_heading}</small></td>
+                    <td style={td}><textarea rows={2} style={activityTextareaStyle} value={point.activity_description} onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, activity_description: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { activity_description: event.target.value })} /></td>
+                    <td style={td}><input list="noi-intervention-codes" style={{ ...compactInput, ...typeTone(point.intervention_type) }} value={point.intervention_type} onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, intervention_type: event.target.value.toUpperCase() } : item))} onBlur={(event) => {
+                      const value = event.target.value.toUpperCase().replace(/\s+/g, "");
+                      if (validIntervention(value)) void updatePoint(point, { intervention_type: value });
+                      else { setMessage("Intervention codes must contain W or H, for example W, H, R/W, M/W, or W/H."); void load(); }
+                    }} /></td>
+                    <td style={td}><input style={compactInput} type="date" value={point.planned_date || ""} onChange={(event) => void updatePoint(point, { planned_date: event.target.value || null })} /></td>
+                    <td style={td}><input style={compactInput} value={point.noi_number || ""} placeholder="TBC" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, noi_number: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { noi_number: event.target.value || null })} /></td>
+                    <td style={td}><select style={{ ...statusPill, ...statusTone(point.status) }} value={point.status} onChange={(event) => void updatePoint(point, { status: event.target.value })}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></td>
+                    <td style={td}><input style={wideInput} value={point.notes || ""} placeholder="Notes" onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, notes: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { notes: event.target.value || null })} /></td>
+                    <td style={td}>
+                      <div style={rowActions}>
+                        {point.noi_number ? <Link style={iconButton} href={`/projects/${projectKey}/noi/create?noi=${encodeURIComponent(point.noi_number)}`} title="Open in NOI Creator">↗</Link> : null}
+                        <button style={iconButtonDanger} disabled={savingId === point.id} onClick={() => void deletePoint(point)} title="Delete">{savingId === point.id ? "…" : "✕"}</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            );
+          })}
+          {pointRows.length === 0 && <tbody><tr><td colSpan={8} style={empty}>No NOI points match the current filters.</td></tr></tbody>}
+        </table></div>
       </section>
     </main>
   );
@@ -581,9 +674,30 @@ const tableWrap: CSSProperties = { width: "100%", overflowX: "auto", borderTop: 
 const table: CSSProperties = { width: "100%", minWidth: 1200, borderCollapse: "collapse", tableLayout: "fixed", fontSize: 10 };
 const th: CSSProperties = { textAlign: "left", background: "#005670", color: "#fff", padding: "9px 7px", fontSize: 9, textTransform: "uppercase" };
 const td: CSSProperties = { borderBottom: "1px solid #D0D0CE", padding: "7px", verticalAlign: "top", color: "#53565A" };
-const teal: CSSProperties = { color: "#005670", display: "block" };
 const small: CSSProperties = { display: "block", color: "#53565A", marginTop: 3, lineHeight: 1.25 };
-const deleteButton: CSSProperties = { border: "1px solid #ECECE7", borderRadius: 6, background: "#ECECE7", color: "#F93822", padding: "5px 7px", fontWeight: 900, fontSize: 9, cursor: "pointer" };
 const rowActions: CSSProperties = { display: "flex", gap: 5, alignItems: "center" };
-const noiButton: CSSProperties = { borderRadius: 6, background: "#ECECE7", color: "#005670", padding: "6px 8px", fontWeight: 900, fontSize: 10, textDecoration: "none" };
 const empty: CSSProperties = { padding: 30, textAlign: "center", color: "#53565A" };
+
+const panelHeadClickable: CSSProperties = { ...sectionHeader, cursor: "pointer", userSelect: "none" };
+const chevron: CSSProperties = { color: "#53565A", fontSize: 14, transition: "transform .15s ease" };
+
+const activeFiltersRow: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "0 18px 14px" };
+const filterTag: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(0, 86, 112, 0.08)", color: "#005670", border: "1px solid rgba(0, 86, 112, 0.25)", borderRadius: 999, padding: "6px 6px 6px 12px", fontSize: 12, fontWeight: 700 };
+const filterTagRemove: CSSProperties = { border: "none", background: "rgba(0, 86, 112, 0.16)", color: "#005670", width: 16, height: 16, borderRadius: "50%", cursor: "pointer", fontSize: 9, lineHeight: 1, fontWeight: 900, display: "grid", placeItems: "center", padding: 0 };
+const clearAllLink: CSSProperties = { border: "none", background: "transparent", color: "#53565A", fontSize: 12, fontWeight: 700, textDecoration: "underline", cursor: "pointer", padding: "6px 2px" };
+
+const groupHeadCell: CSSProperties = { background: "#ECECE7", borderTop: "1px solid #D0D0CE", borderBottom: "1px solid #D0D0CE", padding: "10px 12px" };
+const groupHeadRow: CSSProperties = { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" };
+const groupItpDoc: CSSProperties = { fontWeight: 900, color: "#005670", fontSize: 13 };
+const groupItpTitle: CSSProperties = { color: "#53565A", fontSize: 12 };
+const pill: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 10px", fontSize: 10, fontWeight: 800 };
+const pillSupplier: CSSProperties = { background: "#FFFFFF", color: "#53565A", border: "1px solid #D0D0CE" };
+const pillRev: CSSProperties = { background: "#FFFFFF", color: "#005670", border: "1px solid #D0D0CE" };
+const progressWrap: CSSProperties = { display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#53565A", fontWeight: 700, marginLeft: "auto" };
+const progressTrack: CSSProperties = { width: 74, height: 6, borderRadius: 999, background: "#ECECE7", overflow: "hidden" };
+const progressFill: CSSProperties = { display: "block", height: "100%", background: "#005670", borderRadius: 999 };
+
+const statusPill: CSSProperties = { ...compactInput, border: "none", borderRadius: 999, fontWeight: 800, textAlign: "center" };
+
+const iconButton: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, border: "1px solid #D0D0CE", background: "#fff", color: "#53565A", textDecoration: "none", fontSize: 12, cursor: "pointer" };
+const iconButtonDanger: CSSProperties = { ...iconButton, color: "#F93822" };
