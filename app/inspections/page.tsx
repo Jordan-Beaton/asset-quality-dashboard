@@ -120,8 +120,16 @@ function attendeeSummary(attendees: Attendee[]) {
   return attendees.filter((person) => person.name.trim()).map((person) => person.name.trim());
 }
 
-function sortByDate(events: InspectionEvent[]) {
+function chipMetaLabel(event: InspectionEvent) {
+  const typeLabel = event.interventionType || (event.source === "Manual" ? "" : event.source);
+  const dateLabel = event.date ? parseDate(event.date)?.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
+  return [typeLabel, dateLabel].filter(Boolean).join(" · ");
+}
+
+function sortByProjectThenDate(events: InspectionEvent[]) {
   return [...events].sort((a, b) => {
+    const projectCompare = a.projectLabel.localeCompare(b.projectLabel);
+    if (projectCompare !== 0) return projectCompare;
     const dateA = parseDate(a.date);
     const dateB = parseDate(b.date);
     if (!dateA && !dateB) return 0;
@@ -229,12 +237,13 @@ export default function OverallInspectionsPage() {
       sectionNumber: "",
       interventionType: (row.intervention_type as string | null) || "",
       status: row.status as string,
-      noiNumber: null,
+      noiNumber: (row.noi_number as string | null) || null,
       location: (row.location as string | null) || "",
       duration: (row.duration as string | null) || "",
       attendees: (row.attendees as Attendee[] | null) || [],
       clientVisible: row.client_visible as boolean,
       notes: (row.notes as string | null) || "",
+      editHref: `/projects/${row.project_key}/noi/create?manual=${row.id}`,
       manualId: row.id as string,
     }));
 
@@ -268,7 +277,7 @@ export default function OverallInspectionsPage() {
 
   const filteredEvents = useMemo(() => {
     const search = attendeeSearch.trim().toLowerCase();
-    return events.filter((event) => {
+    const matches = events.filter((event) => {
       if (projectFilter !== "All" && event.projectKey !== projectFilter) return false;
       if (sourceFilter !== "All" && event.source !== sourceFilter) return false;
       if (statusFilter !== "All" && event.status !== statusFilter) return false;
@@ -281,6 +290,7 @@ export default function OverallInspectionsPage() {
       }
       return true;
     });
+    return sortByProjectThenDate(matches);
   }, [events, projectFilter, sourceFilter, statusFilter, typeFilter, clientVisibleOnly, attendeeSearch, view, lookaheadStart, lookaheadEnd]);
 
   const gridProjects = useMemo(() => {
@@ -544,7 +554,7 @@ export default function OverallInspectionsPage() {
   }
 
   function exportExcel() {
-    const rows = sortByDate(filteredEvents).map((event) => ({
+    const rows = filteredEvents.map((event) => ({
       Project: event.projectLabel,
       Date: displayDate(event.date),
       Reference: event.noiNumber || event.sectionNumber || "-",
@@ -601,7 +611,7 @@ export default function OverallInspectionsPage() {
     doc.setLineWidth(0.7);
     doc.line(margin, 34, pageWidth - margin, 34);
 
-    const sortedEvents = sortByDate(filteredEvents);
+    const sortedEvents = filteredEvents;
     const eventRow = (event: InspectionEvent) => [
       event.projectLabel,
       displayDate(event.date),
@@ -760,11 +770,11 @@ export default function OverallInspectionsPage() {
                         <button
                           key={event.id}
                           type="button"
-                          style={{ ...chipStyle, background: event.source === "Manual" ? imsColours.warning : imsColours.brandSoft, color: event.source === "Manual" ? "#ffffff" : imsColours.brand }}
+                          style={{ ...chipStyle, background: imsColours.brandSoft, color: imsColours.brand }}
                           onClick={() => openDetail(event)}
                           title={event.title}
                         >
-                          <span style={chipMetaStyle}>{event.interventionType || event.source}{event.date ? ` · ${parseDate(event.date)?.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</span>
+                          <span style={chipMetaStyle}>{chipMetaLabel(event)}</span>
                           <span style={chipTitleStyle}>{event.title}</span>
                         </button>
                       ))}
@@ -871,6 +881,12 @@ export default function OverallInspectionsPage() {
                 const selectedPersonId = people.find((candidate) => candidate.name === person.name && candidate.email === person.email)?.id || "";
                 return (
                   <div key={index} style={attendeeSelectRowStyle}>
+                    {person.name.trim() && !selectedPersonId ? (
+                      <div style={freeTextAttendeeStyle}>
+                        {person.name}{person.company ? ` · ${person.company}` : ""}
+                        <span style={freeTextAttendeeHintStyle}>Not in People Management - entered via the NOI creator</span>
+                      </div>
+                    ) : null}
                     <select
                       style={imsInputStyle}
                       value={selectedPersonId}
@@ -880,7 +896,7 @@ export default function OverallInspectionsPage() {
                         updateDetailAttendee(index, { name: selectedPerson?.name || "", email: selectedPerson?.email || "" });
                       }}
                     >
-                      <option value="">Select...</option>
+                      <option value="">{person.name.trim() && !selectedPersonId ? "Reassign to a People Management contact..." : "Select..."}</option>
                       {people.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
                     </select>
                   </div>
@@ -997,6 +1013,12 @@ export default function OverallInspectionsPage() {
                 const selectedPersonId = people.find((candidate) => candidate.name === person.name && candidate.email === person.email)?.id || "";
                 return (
                   <div key={index} style={attendeeSelectRowStyle}>
+                    {person.name.trim() && !selectedPersonId ? (
+                      <div style={freeTextAttendeeStyle}>
+                        {person.name}{person.company ? ` · ${person.company}` : ""}
+                        <span style={freeTextAttendeeHintStyle}>Not in People Management - entered via the NOI creator</span>
+                      </div>
+                    ) : null}
                     <select
                       style={imsInputStyle}
                       value={selectedPersonId}
@@ -1005,7 +1027,7 @@ export default function OverallInspectionsPage() {
                         updateFormAttendee(index, { name: selected?.name || "", email: selected?.email || "" });
                       }}
                     >
-                      <option value="">Select...</option>
+                      <option value="">{person.name.trim() && !selectedPersonId ? "Reassign to a People Management contact..." : "Select..."}</option>
                       {people.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
                     </select>
                   </div>
@@ -1104,6 +1126,8 @@ const detailLabelStyle: CSSProperties = { color: imsColours.muted, fontSize: 11,
 const detailValueStyle: CSSProperties = { color: imsColours.ink, fontSize: 14, fontWeight: 700 };
 const detailEmptyStyle: CSSProperties = { color: imsColours.muted, fontSize: 13, margin: "4px 0 0" };
 const attendeeListStyle: CSSProperties = { margin: "6px 0 0", paddingLeft: 18, color: imsColours.ink, fontSize: 13, lineHeight: 1.7 };
+const freeTextAttendeeStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 2, color: imsColours.ink, fontSize: 13, fontWeight: 700, marginBottom: 4 };
+const freeTextAttendeeHintStyle: CSSProperties = { color: imsColours.muted, fontSize: 11, fontWeight: 600 };
 const detailActionsStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 12 };
 const attendeeHeaderStyle: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 };

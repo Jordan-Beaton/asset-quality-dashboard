@@ -15,6 +15,19 @@ type Itp = { id: string; document_number: string; title: string; supplier: strin
 type NoiPoint = { id: string; itp_id: string; section_number: string; activity_description: string; intervention_type: string; planned_date: string | null; noi_number: string | null; status: string };
 type Attendee = { name: string; company: string; contact: string; email: string };
 type SavedNoi = { supplier?: string; pointIds?: string[]; projectDetails?: string; inspectionDate?: string; duration?: string; location?: string; attendees?: Attendee[]; hostName?: string; hostTelephone?: string; hostPosition?: string; hostEmail?: string };
+type ManualInspection = {
+  id: string;
+  project_key: string;
+  title: string;
+  itp_reference: string | null;
+  intervention_type: string | null;
+  inspection_date: string | null;
+  duration: string | null;
+  location: string | null;
+  attendees: Attendee[] | null;
+  status: string;
+  noi_number: string | null;
+};
 
 const STORAGE_BUCKET = "project-documents";
 
@@ -70,12 +83,15 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
   const [hostEmail, setHostEmail] = useState("");
   const [attendees, setAttendees] = useState<Attendee[]>([blankAttendee(), blankAttendee()]);
   const [editingNumber, setEditingNumber] = useState("");
+  const [manualInspection, setManualInspection] = useState<ManualInspection | null>(null);
+  const [manualNoiNumbers, setManualNoiNumbers] = useState<string[]>([]);
 
   useEffect(() => {
     void (async () => {
-      const [itpResult, pointResult] = await Promise.all([
+      const [itpResult, pointResult, manualNoiResult] = await Promise.all([
         supabase.from("project_itps").select("id,document_number,title,supplier,scope").eq("project_key", projectKey).order("supplier"),
         supabase.from("project_noi_points").select("id,itp_id,section_number,activity_description,intervention_type,planned_date,noi_number,status").eq("project_key", projectKey).order("planned_date"),
+        supabase.from("project_manual_inspections").select("noi_number").eq("project_key", projectKey).not("noi_number", "is", null),
       ]);
       if (itpResult.error || pointResult.error) {
         setMessage(itpResult.error?.message || pointResult.error?.message || "NOI data could not be loaded.");
@@ -84,7 +100,54 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
       setItps((itpResult.data || []) as Itp[]);
       const loadedPoints = (pointResult.data || []) as NoiPoint[];
       setPoints(loadedPoints);
-      const requestedNoi = new URLSearchParams(window.location.search).get("noi")?.trim() || "";
+      setManualNoiNumbers(
+        ((manualNoiResult.data || []) as { noi_number: string | null }[])
+          .map((row) => row.noi_number)
+          .filter((value): value is string => Boolean(value))
+      );
+
+      const params = new URLSearchParams(window.location.search);
+      const requestedManualId = params.get("manual")?.trim() || "";
+
+      if (requestedManualId) {
+        const manualResult = await supabase.from("project_manual_inspections").select("*").eq("id", requestedManualId).single();
+        if (manualResult.error || !manualResult.data) {
+          setMessage("This manual inspection could not be found.");
+          return;
+        }
+        const manual = manualResult.data as ManualInspection;
+        setManualInspection(manual);
+        setInspectionDate(manual.inspection_date || "");
+        setDuration(manual.duration || "");
+        setLocation(manual.location || "");
+        setAttendees(manual.attendees?.length ? manual.attendees : [blankAttendee(), blankAttendee()]);
+        setProjectDetails(`${config.label} Project - ${manual.title}`);
+
+        if (manual.noi_number) {
+          setEditingNumber(manual.noi_number);
+          const saved = await supabase.storage.from(STORAGE_BUCKET).download(`${projectKey}/nois/${manual.noi_number}/noi.json`);
+          if (!saved.error) {
+            const details = JSON.parse(await saved.data.text()) as SavedNoi;
+            setProjectDetails(details.projectDetails || `${config.label} Project - ${manual.title}`);
+            setInspectionDate(details.inspectionDate || manual.inspection_date || "");
+            setDuration(details.duration || manual.duration || "");
+            setLocation(details.location || manual.location || "");
+            setAttendees(details.attendees?.length ? details.attendees : manual.attendees?.length ? manual.attendees : [blankAttendee(), blankAttendee()]);
+            setHostName(details.hostName || "");
+            setHostTelephone(details.hostTelephone || "");
+            setHostPosition(details.hostPosition || "");
+            setHostEmail(details.hostEmail || "");
+            setMessage(`NOI ${manual.noi_number} loaded. Edit the details and regenerate when ready.`);
+          } else {
+            setMessage(`NOI ${manual.noi_number} loaded from the inspection record. This NOI predates saved editable details, so complete any blank fields before regenerating.`);
+          }
+        } else {
+          setMessage("Complete the NOI details below to generate a Notice of Inspection for this manual entry.");
+        }
+        return;
+      }
+
+      const requestedNoi = params.get("noi")?.trim() || "";
       if (!requestedNoi) { setMessage("Select a supplier and one or more inspection points."); return; }
       setEditingNumber(requestedNoi);
       const linked = loadedPoints.filter((point) => point.noi_number === requestedNoi);
@@ -120,12 +183,19 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
   const supplierPoints = useMemo(() => points.filter((point) => itpById.get(point.itp_id)?.supplier === supplier), [itpById, points, supplier]);
   const selected = useMemo(() => supplierPoints.filter((point) => selectedIds.includes(point.id)), [selectedIds, supplierPoints]);
   const nextSequence = useMemo(() => {
-    const used = points.map((point) => Number(String(point.noi_number || "").match(/\d+/)?.[0])).filter(Number.isFinite);
+    const fromPoints = points.map((point) => Number(String(point.noi_number || "").match(/\d+/)?.[0]));
+    const fromManual = manualNoiNumbers.map((value) => Number(String(value).match(/\d+/)?.[0]));
+    const used = [...fromPoints, ...fromManual].filter(Number.isFinite);
     return String(Math.max(config.sequenceFloor, ...used) + 1).padStart(3, "0");
-  }, [points, config.sequenceFloor]);
+  }, [points, manualNoiNumbers, config.sequenceFloor]);
   const noiNumber = editingNumber || nextSequence;
   const selectedItps = useMemo(() => [...new Set(selected.map((point) => itpById.get(point.itp_id)?.document_number).filter(Boolean) as string[])], [itpById, selected]);
   const selectedDates = useMemo(() => [...new Set(selected.map((point) => point.planned_date).filter(Boolean) as string[])], [selected]);
+  const isManualMode = Boolean(manualInspection);
+  const activityDescriptions = isManualMode ? [manualInspection!.title] : selected.map((point) => point.activity_description);
+  const interventionTypesList = isManualMode ? [manualInspection?.intervention_type || ""].filter(Boolean) : selected.map((point) => point.intervention_type);
+  const taskNumbersList = isManualMode ? [] : selected.map((point) => point.section_number);
+  const effectiveItpReference = isManualMode ? manualInspection?.itp_reference || "" : selectedItps.join("\n");
 
   useEffect(() => {
     if (selectedDates.length === 1) setInspectionDate(selectedDates[0]);
@@ -151,13 +221,17 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
 
   async function deleteNoi() {
     if (!editingNumber) return;
-    if (!window.confirm(`Delete NOI ${editingNumber}?\n\nIts saved Word, PDF and editable details will be removed. Linked inspection points will return to Planned.`)) return;
+    if (!window.confirm(`Delete NOI ${editingNumber}?\n\nIts saved Word, PDF and editable details will be removed. ${manualInspection ? "This manual inspection" : "Linked inspection points"} will return to Planned.`)) return;
     setBusy(true);
     setMessage(`Deleting NOI ${editingNumber}...`);
     try {
-      const linkedIds = points.filter((point) => point.noi_number === editingNumber).map((point) => point.id);
+      const linkedIds = manualInspection ? [] : points.filter((point) => point.noi_number === editingNumber).map((point) => point.id);
       if (linkedIds.length) {
         const reset = await supabase.from("project_noi_points").update({ noi_number: null, status: "Planned", updated_at: new Date().toISOString() }).in("id", linkedIds);
+        if (reset.error) throw reset.error;
+      }
+      if (manualInspection) {
+        const reset = await supabase.from("project_manual_inspections").update({ noi_number: null, status: "Planned", updated_at: new Date().toISOString() }).eq("id", manualInspection.id);
         if (reset.error) throw reset.error;
       }
       const folder = `${projectKey}/nois/${editingNumber}`;
@@ -168,14 +242,33 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
         const removed = await supabase.storage.from(STORAGE_BUCKET).remove(paths);
         if (removed.error) throw removed.error;
       }
+      const attachedInspectionIds = manualInspection ? [`manual-${manualInspection.id}`] : linkedIds.map((id) => `noi-${id}`);
+      if (attachedInspectionIds.length) {
+        await supabase.from("project_inspection_attachments").delete().in("inspection_id", attachedInspectionIds).like("file_path", `${folder}/%`);
+      }
       const deletedNumber = editingNumber;
       setPoints((current) => current.map((point) => point.noi_number === deletedNumber ? { ...point, noi_number: null, status: "Planned" } : point));
+      if (manualInspection) setManualInspection((current) => (current ? { ...current, noi_number: null, status: "Planned" } : current));
       setEditingNumber(""); setSelectedIds([]);
-      window.history.replaceState({}, "", `/projects/${projectKey}/noi/create`);
-      setMessage(`NOI ${deletedNumber} deleted. Its inspection points are available again and the next number has been recalculated.`);
+      window.history.replaceState({}, "", manualInspection ? `/projects/${projectKey}/noi/create?manual=${manualInspection.id}` : `/projects/${projectKey}/noi/create`);
+      setMessage(`NOI ${deletedNumber} deleted. ${manualInspection ? "This manual inspection is" : "Its inspection points are"} available again and the next number has been recalculated.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The NOI could not be deleted.");
     } finally { setBusy(false); }
+  }
+
+  async function saveNoiAttachments(inspectionIds: string[], noiNumberValue: string, docxSize: number, pdfSize: number) {
+    if (!inspectionIds.length) return;
+    const storagePath = `${projectKey}/nois/${noiNumberValue}`;
+    const docxPath = `${storagePath}/${filePrefix}-NOI-${noiNumberValue}.docx`;
+    const pdfPath = `${storagePath}/${filePrefix}-NOI-${noiNumberValue}.pdf`;
+    await supabase.from("project_inspection_attachments").delete().in("inspection_id", inspectionIds).in("file_path", [docxPath, pdfPath]);
+    await supabase.from("project_inspection_attachments").insert(
+      inspectionIds.flatMap((inspectionId) => [
+        { inspection_id: inspectionId, project_key: projectKey, file_name: `${filePrefix}-NOI-${noiNumberValue}.docx`, file_path: docxPath, file_size: docxSize, content_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+        { inspection_id: inspectionId, project_key: projectKey, file_name: `${filePrefix}-NOI-${noiNumberValue}.pdf`, file_path: pdfPath, file_size: pdfSize, content_type: "application/pdf" },
+      ])
+    );
   }
 
   async function generatePdf() {
@@ -187,11 +280,11 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
     autoTable(doc, { ...common, startY: 40, body: [["Project Details:", projectDetails], ["NOI Number:", noiNumber]], columnStyles: { 0: { cellWidth: 40, fontStyle: "bold", fillColor: [210, 210, 210] }, 1: { cellWidth: 130 } } });
     const firstEnd = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 58;
     autoTable(doc, { ...common, startY: firstEnd + 4, head: [[{ content: "Inspection Details (to be completed in full)", colSpan: 4 }]], body: [
-      ["Inspection Activity:", { content: selected.map((point) => point.activity_description).join("\n"), colSpan: 3 }],
-      ["Witness/Hold Point:", { content: selected.map((point) => point.intervention_type).join("\n"), colSpan: 3 }],
+      ["Inspection Activity:", { content: activityDescriptions.join("\n"), colSpan: 3 }],
+      ["Witness/Hold Point:", { content: interventionTypesList.join("\n"), colSpan: 3 }],
       ["Inspection Date:", displayDate(inspectionDate), "Duration (start time/hours):", duration],
       ["Inspection Location:", { content: location, colSpan: 3 }],
-      ["ITP Reference No:", selectedItps.join("\n"), "ITP Task Number:", selected.map((point) => point.section_number).join("\n")],
+      ["ITP Reference No:", effectiveItpReference, "ITP Task Number:", taskNumbersList.join("\n")],
       [{ content: "Attendees' Details", colSpan: 4, styles: { fillColor: [190, 190, 190], fontStyle: "bold" } }],
       ...attendees.map((person) => ["Contact Name:\nCompany:", `${person.name}\n${person.company}`, "Contact Number:\nE-mail:", `${person.contact}\n${person.email}`]),
     ], columnStyles: { 0: { cellWidth: 40, fontStyle: "bold" }, 1: { cellWidth: 45 }, 2: { cellWidth: 40, fontStyle: "bold" }, 3: { cellWidth: 45 } } });
@@ -239,20 +332,21 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!selected.length) { setMessage("Select at least one inspection point."); return; }
+    if (!isManualMode && !selected.length) { setMessage("Select at least one inspection point."); return; }
+    if (isManualMode && !manualInspection) { setMessage("This manual inspection could not be loaded."); return; }
     if (!projectDetails || !inspectionDate || !duration || !location) { setMessage("Complete the project details, inspection date, time/duration and location."); return; }
     setBusy(true);
     setMessage(`${editingNumber ? "Updating" : "Generating"} NOI ${noiNumber}...`);
     const payload = {
       noiNumber,
       projectDetails,
-      activities: selected.map((point) => point.activity_description),
-      interventionTypes: selected.map((point) => point.intervention_type),
+      activities: activityDescriptions,
+      interventionTypes: interventionTypesList,
       inspectionDate,
       duration,
       location,
-      itpReference: selectedItps.join("\n"),
-      taskNumbers: selected.map((point) => point.section_number),
+      itpReference: effectiveItpReference,
+      taskNumbers: taskNumbersList,
       attendees,
       hostName, hostTelephone, hostPosition, hostEmail,
     };
@@ -270,23 +364,41 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
       ]);
       const storageError = uploads.find((item) => item.error)?.error;
       if (storageError) throw storageError;
-      const update = await supabase.from("project_noi_points").update({ noi_number: noiNumber, planned_date: inspectionDate, status: "NOI Issued", updated_at: new Date().toISOString() }).in("id", selected.map((point) => point.id));
-      if (update.error) throw update.error;
       const attendeesToSave = attendees.filter((person) => person.name.trim() || person.company.trim() || person.contact.trim() || person.email.trim());
-      await supabase.from("project_noi_attendees").upsert(
-        selected.map((point) => ({ point_id: point.id, project_key: projectKey, noi_number: noiNumber, attendees: attendeesToSave, location, duration, updated_at: new Date().toISOString() })),
-        { onConflict: "point_id" }
-      );
-      const removed = points.filter((point) => point.noi_number === noiNumber && !selectedIds.includes(point.id)).map((point) => point.id);
-      if (removed.length) {
-        const cleared = await supabase.from("project_noi_points").update({ noi_number: null, status: "Planned", updated_at: new Date().toISOString() }).in("id", removed);
-        if (cleared.error) throw cleared.error;
+      let attachedInspectionIds: string[] = [];
+
+      if (isManualMode && manualInspection) {
+        const manualUpdate = await supabase
+          .from("project_manual_inspections")
+          .update({ noi_number: noiNumber, inspection_date: inspectionDate, duration, location, attendees: attendeesToSave, status: "NOI Issued", updated_at: new Date().toISOString() })
+          .eq("id", manualInspection.id);
+        if (manualUpdate.error) throw manualUpdate.error;
+        attachedInspectionIds = [`manual-${manualInspection.id}`];
+        setManualInspection((current) =>
+          current ? { ...current, noi_number: noiNumber, inspection_date: inspectionDate, duration, location, attendees: attendeesToSave, status: "NOI Issued" } : current
+        );
+      } else {
+        const update = await supabase.from("project_noi_points").update({ noi_number: noiNumber, planned_date: inspectionDate, status: "NOI Issued", updated_at: new Date().toISOString() }).in("id", selected.map((point) => point.id));
+        if (update.error) throw update.error;
+        await supabase.from("project_noi_attendees").upsert(
+          selected.map((point) => ({ point_id: point.id, project_key: projectKey, noi_number: noiNumber, attendees: attendeesToSave, location, duration, updated_at: new Date().toISOString() })),
+          { onConflict: "point_id" }
+        );
+        const removed = points.filter((point) => point.noi_number === noiNumber && !selectedIds.includes(point.id)).map((point) => point.id);
+        if (removed.length) {
+          const cleared = await supabase.from("project_noi_points").update({ noi_number: null, status: "Planned", updated_at: new Date().toISOString() }).in("id", removed);
+          if (cleared.error) throw cleared.error;
+        }
+        attachedInspectionIds = selected.map((point) => `noi-${point.id}`);
+        setPoints((current) => current.map((point) => selectedIds.includes(point.id) ? { ...point, noi_number: noiNumber, planned_date: inspectionDate, status: "NOI Issued" } : point));
       }
+
+      await saveNoiAttachments(attachedInspectionIds, noiNumber, wordBlob.size, pdfBlob.size);
+
       download(wordBlob, `${filePrefix}-NOI-${noiNumber}.docx`);
       download(pdfBlob, `${filePrefix}-NOI-${noiNumber}.pdf`);
-      setPoints((current) => current.map((point) => selectedIds.includes(point.id) ? { ...point, noi_number: noiNumber, planned_date: inspectionDate, status: "NOI Issued" } : point));
       setEditingNumber(noiNumber);
-      setMessage(`NOI ${noiNumber} saved and generated in Word and PDF. Its tracker date is now ${displayDate(inspectionDate)}.`);
+      setMessage(`NOI ${noiNumber} saved and generated in Word and PDF. Its tracker date is now ${displayDate(inspectionDate)}. A copy has been attached to the inspection record.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The NOI could not be generated.");
     } finally { setBusy(false); }
@@ -299,19 +411,48 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
       <ProjectWorkspaceNav projectKey={projectKey} active="noi-creator" />
       <section style={metrics} className="quality-kpi-grid">
         <QualityKpiCard title={editingNumber ? "Editing NOI" : "Next NOI Number"} value={noiNumber} accent="#005670" />
-        <QualityKpiCard title="Supplier Points" value={supplierPoints.length} accent="#63B1BC" />
-        <QualityKpiCard title="Selected Points" value={selected.length} accent="#53565A" />
-        <QualityKpiCard title="Selected ITPs" value={selectedItps.length} accent="#FFAD00" />
+        {manualInspection ? (
+          <>
+            <QualityKpiCard title="Manual Inspection" value={manualInspection.title} accent="#63B1BC" />
+            <QualityKpiCard title="Witness / Hold" value={manualInspection.intervention_type || "-"} accent="#53565A" />
+            <QualityKpiCard title="ITP Reference" value={manualInspection.itp_reference || "None"} accent="#FFAD00" />
+          </>
+        ) : (
+          <>
+            <QualityKpiCard title="Supplier Points" value={supplierPoints.length} accent="#63B1BC" />
+            <QualityKpiCard title="Selected Points" value={selected.length} accent="#53565A" />
+            <QualityKpiCard title="Selected ITPs" value={selectedItps.length} accent="#FFAD00" />
+          </>
+        )}
       </section>
 
       <section style={panel}>
-        <div style={panelHeader}><div><span style={kicker}>Step 1</span><h2 style={heading}>Select inspection points</h2></div></div>
-        <div style={supplierBar}><label style={field}><span>Supplier</span><select style={input} value={supplier} onChange={(event) => { setSupplier(event.target.value); setSelectedIds([]); }}><option value="">Select supplier</option>{suppliers.map((value) => <option key={value}>{value}</option>)}</select></label></div>
-        <div style={pointList}>{supplierPoints.map((point) => {
-          const itp = itpById.get(point.itp_id);
-          const checked = selectedIds.includes(point.id);
-          return <label key={point.id} style={{ ...pointRow, borderColor: checked ? "#005670" : "#D0D0CE", background: checked ? "#ECECE7" : "#fff" }}><input type="checkbox" checked={checked} onChange={() => toggle(point)} /><span style={pointIdentity}><strong>{point.section_number} · {point.activity_description}</strong><small>{itp?.document_number} · {point.planned_date ? displayDate(point.planned_date) : "Date TBC"}</small></span><span style={codeBadge}>{point.intervention_type}</span><span style={statusBadge}>{point.noi_number ? `NOI ${point.noi_number}` : point.status}</span></label>;
-        })}{supplier && !supplierPoints.length ? <div style={empty}>No NOI requirements are registered for this supplier.</div> : null}</div>
+        {manualInspection ? (
+          <>
+            <div style={panelHeader}><div><span style={kicker}>Step 1</span><h2 style={heading}>Manual inspection being covered</h2></div></div>
+            <div style={pointList}>
+              <div style={{ ...pointRow, gridTemplateColumns: "1fr", cursor: "default" }}>
+                <span style={pointIdentity}>
+                  <strong>{manualInspection.title}</strong>
+                  <small>
+                    {manualInspection.itp_reference || "No ITP reference"} · {manualInspection.inspection_date ? displayDate(manualInspection.inspection_date) : "Date TBC"}
+                    {manualInspection.intervention_type ? ` · ${manualInspection.intervention_type}` : ""}
+                  </small>
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={panelHeader}><div><span style={kicker}>Step 1</span><h2 style={heading}>Select inspection points</h2></div></div>
+            <div style={supplierBar}><label style={field}><span>Supplier</span><select style={input} value={supplier} onChange={(event) => { setSupplier(event.target.value); setSelectedIds([]); }}><option value="">Select supplier</option>{suppliers.map((value) => <option key={value}>{value}</option>)}</select></label></div>
+            <div style={pointList}>{supplierPoints.map((point) => {
+              const itp = itpById.get(point.itp_id);
+              const checked = selectedIds.includes(point.id);
+              return <label key={point.id} style={{ ...pointRow, borderColor: checked ? "#005670" : "#D0D0CE", background: checked ? "#ECECE7" : "#fff" }}><input type="checkbox" checked={checked} onChange={() => toggle(point)} /><span style={pointIdentity}><strong>{point.section_number} · {point.activity_description}</strong><small>{itp?.document_number} · {point.planned_date ? displayDate(point.planned_date) : "Date TBC"}</small></span><span style={codeBadge}>{point.intervention_type}</span><span style={statusBadge}>{point.noi_number ? `NOI ${point.noi_number}` : point.status}</span></label>;
+            })}{supplier && !supplierPoints.length ? <div style={empty}>No NOI requirements are registered for this supplier.</div> : null}</div>
+          </>
+        )}
       </section>
 
       <form onSubmit={submit} style={panel}>
@@ -328,7 +469,7 @@ export function NoiCreatorPage({ projectKey }: { projectKey: string }) {
         </div>
         <div style={attendeeHeader}><div style={attendeeTitle}><span style={kicker}>Attendees</span><span style={attendeeHint}>Add up to five Enshore or client representatives</span></div>{attendees.length < 5 ? <button type="button" style={secondaryButton} onClick={() => setAttendees((current) => [...current, blankAttendee()])}>Add attendee</button> : null}</div>
         <div style={attendeeList}>{attendees.map((person, index) => <div key={index} style={attendeeRow}><input style={input} value={person.name} onChange={(event) => updateAttendee(index, { name: event.target.value })} placeholder="Contact name" /><input style={input} value={person.company} onChange={(event) => updateAttendee(index, { company: event.target.value })} placeholder="Company" /><input style={input} value={person.contact} onChange={(event) => updateAttendee(index, { contact: event.target.value })} placeholder="Contact number" /><input style={input} type="email" value={person.email} onChange={(event) => updateAttendee(index, { email: event.target.value })} placeholder="Email" /></div>)}</div>
-        <div style={actions}>{editingNumber ? <><button type="button" style={deleteNoiButton} disabled={busy} onClick={() => void deleteNoi()}>Delete NOI</button><button type="button" style={secondaryButton} disabled={busy} onClick={() => void downloadSaved("docx")}>Open saved Word</button><button type="button" style={secondaryButton} disabled={busy} onClick={() => void downloadSaved("pdf")}>Open saved PDF</button></> : null}<button type="submit" style={primaryButton} disabled={busy || !selected.length}>{busy ? "Working..." : `${editingNumber ? "Save changes to" : "Generate"} NOI ${noiNumber} · Word & PDF`}</button></div>
+        <div style={actions}>{editingNumber ? <><button type="button" style={deleteNoiButton} disabled={busy} onClick={() => void deleteNoi()}>Delete NOI</button><button type="button" style={secondaryButton} disabled={busy} onClick={() => void downloadSaved("docx")}>Open saved Word</button><button type="button" style={secondaryButton} disabled={busy} onClick={() => void downloadSaved("pdf")}>Open saved PDF</button></> : null}<button type="submit" style={primaryButton} disabled={busy || (!isManualMode && !selected.length)}>{busy ? "Working..." : `${editingNumber ? "Save changes to" : "Generate"} NOI ${noiNumber} · Word & PDF`}</button></div>
       </form>
     </main>
   );

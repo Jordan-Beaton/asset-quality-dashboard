@@ -66,15 +66,26 @@ create table if not exists public.project_manual_inspections (
   inspection_date date not null,
   duration text,
   location text,
-  status text not null default 'Planned' check (status in ('Planned', 'Confirmed', 'Completed', 'Cancelled')),
+  status text not null default 'Planned' check (status in ('Planned', 'Confirmed', 'Completed', 'Cancelled', 'NOI Issued')),
   attendees jsonb not null default '[]'::jsonb,
   client_visible boolean not null default true,
   notes text,
+  noi_number text,
   created_by uuid references auth.users(id) on delete set null,
   created_by_email text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.project_manual_inspections
+  add column if not exists noi_number text;
+
+-- Widen the status check constraint to allow "NOI Issued" for tables created
+-- before the NOI Creator could generate a Notice of Inspection directly from a
+-- manual inspection (see NoiCreatorPage's manual mode).
+alter table public.project_manual_inspections drop constraint if exists project_manual_inspections_status_check;
+alter table public.project_manual_inspections add constraint project_manual_inspections_status_check
+  check (status in ('Planned', 'Confirmed', 'Completed', 'Cancelled', 'NOI Issued'));
 
 create index if not exists project_manual_inspections_date_idx
   on public.project_manual_inspections (inspection_date);
