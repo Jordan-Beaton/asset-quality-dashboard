@@ -2086,7 +2086,10 @@ function NcrCapaPageContent() {
     await loadData();
   }
 
-  async function createEvidenceSignedUrl(filePath: string, expiresIn = 900) {
+  // Default expiry covers links baked into exported PDF/Word evidence lists,
+  // which are routinely emailed and opened well after generation. openEvidence()
+  // below passes its own short expiry since that link is consumed immediately.
+  async function createEvidenceSignedUrl(filePath: string, expiresIn = 60 * 60 * 24 * 7) {
     const { data, error } = await supabase.storage
       .from("quality-evidence")
       .createSignedUrl(filePath, expiresIn);

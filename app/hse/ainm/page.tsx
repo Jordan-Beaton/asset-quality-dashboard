@@ -604,7 +604,11 @@ async function getLogoDataUrl() {
 
 async function createSignedEvidenceUrl(path: string) {
   if (!path) return "";
-  const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(path, 3600);
+  // These links get baked into exported AINM Word documents (notification,
+  // Part 1, Part 2) and generated report PDFs, which are routinely emailed
+  // and opened well after generation, so they need a long-lived signed URL
+  // rather than a short in-app-only expiry.
+  const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(path, 60 * 60 * 24 * 7);
   if (error || !data?.signedUrl) return "";
   return data.signedUrl;
 }

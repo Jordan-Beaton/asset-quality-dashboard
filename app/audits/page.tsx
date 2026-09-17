@@ -571,7 +571,12 @@ async function tryLoadActionOptions(): Promise<AuditLinkOption[]> {
 async function createSignedFileUrl(path: string) {
   if (!path) return "";
 
-  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+  // These links get baked into exported PDFs (audit and finding reports) that
+  // are routinely emailed and opened well after generation, so they need a
+  // long-lived signed URL rather than the short expiry used for an in-app
+  // "open now" action. 7 days matches the convention already used for
+  // document-notification and inspection-record links elsewhere in the app.
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7);
   if (error || !data?.signedUrl) return "";
   return data.signedUrl;
 }
@@ -2928,7 +2933,7 @@ function AuditsPageContent() {
         doc.setFont("helvetica", "italic");
         doc.setFontSize(8);
         doc.setTextColor(83, 86, 90);
-        doc.text("Evidence links are secure signed URLs and may expire after generation.", margin, y);
+        doc.text("Evidence links are secure signed URLs valid for 7 days from generation. Regenerate this report for working links after that.", margin, y);
       }
 
       const pageCount = doc.getNumberOfPages();

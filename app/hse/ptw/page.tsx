@@ -730,9 +730,12 @@ export default function HsePermitToWorkPage() {
   }
 
   async function createSignedAttachmentLinks() {
+    // These links get baked into the exported PTW PDF, which is routinely
+    // emailed and opened well after generation, so they need a long-lived
+    // signed URL rather than a short in-app-only expiry.
     const rows = await Promise.all(
       selectedAttachments.map(async (attachment) => {
-        const { data } = await supabase.storage.from(evidenceBucket).createSignedUrl(attachment.file_path, 3600);
+        const { data } = await supabase.storage.from(evidenceBucket).createSignedUrl(attachment.file_path, 60 * 60 * 24 * 7);
         return {
           attachmentType: attachment.attachment_type,
           fileName: attachment.file_name,
