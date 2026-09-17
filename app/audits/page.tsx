@@ -572,11 +572,10 @@ async function createSignedFileUrl(path: string) {
   if (!path) return "";
 
   // These links get baked into exported PDFs (audit and finding reports) that
-  // are routinely emailed and opened well after generation, so they need a
-  // long-lived signed URL rather than the short expiry used for an in-app
-  // "open now" action. 7 days matches the convention already used for
-  // document-notification and inspection-record links elsewhere in the app.
-  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7);
+  // are routinely emailed to external recipients with no IMS access, so the
+  // link itself has to carry the access, not a login — 6 months (180 days)
+  // rather than the short expiry used for an in-app "open now" action.
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 180);
   if (error || !data?.signedUrl) return "";
   return data.signedUrl;
 }
@@ -2933,7 +2932,7 @@ function AuditsPageContent() {
         doc.setFont("helvetica", "italic");
         doc.setFontSize(8);
         doc.setTextColor(83, 86, 90);
-        doc.text("Evidence links are secure signed URLs valid for 7 days from generation. Regenerate this report for working links after that.", margin, y);
+        doc.text("Evidence links are secure signed URLs valid for 6 months from generation. Regenerate this report for working links after that.", margin, y);
       }
 
       const pageCount = doc.getNumberOfPages();

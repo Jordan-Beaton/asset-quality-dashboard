@@ -606,9 +606,9 @@ async function createSignedEvidenceUrl(path: string) {
   if (!path) return "";
   // These links get baked into exported AINM Word documents (notification,
   // Part 1, Part 2) and generated report PDFs, which are routinely emailed
-  // and opened well after generation, so they need a long-lived signed URL
-  // rather than a short in-app-only expiry.
-  const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(path, 60 * 60 * 24 * 7);
+  // to external recipients with no IMS access — 6 months (180 days) so the
+  // link itself carries the access, rather than a short in-app-only expiry.
+  const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(path, 60 * 60 * 24 * 180);
   if (error || !data?.signedUrl) return "";
   return data.signedUrl;
 }

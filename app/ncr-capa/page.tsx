@@ -2087,9 +2087,10 @@ function NcrCapaPageContent() {
   }
 
   // Default expiry covers links baked into exported PDF/Word evidence lists,
-  // which are routinely emailed and opened well after generation. openEvidence()
+  // which are routinely emailed to external recipients with no IMS access —
+  // 6 months (180 days) so the link itself carries the access. openEvidence()
   // below passes its own short expiry since that link is consumed immediately.
-  async function createEvidenceSignedUrl(filePath: string, expiresIn = 60 * 60 * 24 * 7) {
+  async function createEvidenceSignedUrl(filePath: string, expiresIn = 60 * 60 * 24 * 180) {
     const { data, error } = await supabase.storage
       .from("quality-evidence")
       .createSignedUrl(filePath, expiresIn);
