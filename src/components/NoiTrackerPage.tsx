@@ -105,6 +105,34 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
       && (itpTitleFilter === "All" || itp?.title === itpTitleFilter)
       && (supplierFilter === "All" || (itp?.supplier || "No supplier") === supplierFilter);
   }), [points, itps, query, typeFilter, statusFilter, itpNumberFilter, itpTitleFilter, supplierFilter]);
+
+  // Each filter's own option list is scoped to the OTHER active filters (never
+  // to itself), so choosing e.g. Supplier: Dynpap immediately narrows what the
+  // ITP number/title, point type and status dropdowns offer to Dynpap-only
+  // values, instead of always listing every value across every supplier.
+  const itpsMatchingItpFilters = useCallback((exclude: Array<"itpNumber" | "itpTitle" | "supplier">) => itps.filter((itp) => {
+    if (!exclude.includes("itpNumber") && itpNumberFilter !== "All" && itp.document_number !== itpNumberFilter) return false;
+    if (!exclude.includes("itpTitle") && itpTitleFilter !== "All" && itp.title !== itpTitleFilter) return false;
+    if (!exclude.includes("supplier") && supplierFilter !== "All" && (itp.supplier || "No supplier") !== supplierFilter) return false;
+    return true;
+  }), [itps, itpNumberFilter, itpTitleFilter, supplierFilter]);
+  const pointsMatchingPointFilters = useCallback((exclude: Array<"type" | "status">) => points.filter((point) => {
+    const itp = itps.find((candidate) => candidate.id === point.itp_id);
+    if (itpNumberFilter !== "All" && itp?.document_number !== itpNumberFilter) return false;
+    if (itpTitleFilter !== "All" && itp?.title !== itpTitleFilter) return false;
+    if (supplierFilter !== "All" && (itp?.supplier || "No supplier") !== supplierFilter) return false;
+    if (!exclude.includes("type") && typeFilter !== "All" && point.intervention_type !== typeFilter) return false;
+    if (!exclude.includes("status") && statusFilter !== "All" && point.status !== statusFilter) return false;
+    return true;
+  }), [points, itps, itpNumberFilter, itpTitleFilter, supplierFilter, typeFilter, statusFilter]);
+  const itpNumberOptions = useMemo(() => [...new Set(itpsMatchingItpFilters(["itpNumber"]).map((itp) => itp.document_number))].sort(), [itpsMatchingItpFilters]);
+  const itpTitleOptions = useMemo(() => [...new Set(itpsMatchingItpFilters(["itpTitle"]).map((itp) => itp.title))].sort(), [itpsMatchingItpFilters]);
+  const supplierOptions = useMemo(() => [...new Set(itpsMatchingItpFilters(["supplier"]).map((itp) => itp.supplier || "No supplier"))].sort(), [itpsMatchingItpFilters]);
+  const typeOptions = useMemo(() => [...new Set(pointsMatchingPointFilters(["type"]).map((point) => point.intervention_type))].sort(), [pointsMatchingPointFilters]);
+  const statusOptions = useMemo(() => {
+    const available = new Set(pointsMatchingPointFilters(["status"]).map((point) => point.status));
+    return statuses.filter((status) => available.has(status));
+  }, [pointsMatchingPointFilters]);
   const metrics = useMemo(() => ({
     total: points.length,
     witness: points.filter((point) => point.intervention_type.split("/").includes("W")).length,
@@ -474,7 +502,7 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
           {candidates.map((candidate, index) => <div key={`${candidate.sectionNumber}-${index}`} style={candidateRow}>
             <input type="checkbox" checked={candidate.selected} onChange={(event) => setCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, selected: event.target.checked } : item))} />
             <input style={compactInput} value={candidate.sectionNumber} onChange={(event) => setCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, sectionNumber: event.target.value } : item))} />
-            <input style={wideInput} value={candidate.activityDescription} onChange={(event) => setCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, activityDescription: event.target.value } : item))} />
+            <input style={{ ...wideInput, fontSize: 12, color: "#000000" }} value={candidate.activityDescription} onChange={(event) => setCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, activityDescription: event.target.value } : item))} />
             <input list="noi-intervention-codes" style={{ ...compactInput, ...typeTone(candidate.interventionType) }} value={candidate.interventionType} onChange={(event) => setCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, interventionType: event.target.value.toUpperCase() } : item))} />
             <span style={source}><strong>{candidate.partyHeading}</strong><small>{candidate.sourceLocation} · {candidate.confidence}</small></span>
           </div>)}
@@ -487,17 +515,22 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
         <datalist id="noi-intervention-codes"><option value="W" /><option value="H" /><option value="W/H" /><option value="R/W" /><option value="M/W" /><option value="H/R" /></datalist>
         <div style={filterGrid}>
           <input style={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search section, activity, NOI or notes..." />
-          <select aria-label="Filter by ITP number" style={input} value={itpNumberFilter} onChange={(event) => setItpNumberFilter(event.target.value)}><option value="All">All ITP numbers</option>{[...new Set(itps.map((itp) => itp.document_number))].sort().map((value) => <option key={value}>{value}</option>)}</select>
-          <select aria-label="Filter by ITP title" style={input} value={itpTitleFilter} onChange={(event) => setItpTitleFilter(event.target.value)}><option value="All">All ITP titles</option>{[...new Set(itps.map((itp) => itp.title))].sort().map((value) => <option key={value}>{value}</option>)}</select>
-          <select aria-label="Filter by supplier" style={input} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option value="All">All suppliers</option>{[...new Set(itps.map((itp) => itp.supplier || "No supplier"))].sort().map((value) => <option key={value}>{value}</option>)}</select>
-          <select aria-label="Filter by point type" style={input} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="All">All point types</option>{[...new Set(points.map((point) => point.intervention_type))].sort().map((type) => <option key={type}>{type}</option>)}</select>
-          <select aria-label="Filter by status" style={input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="All">All statuses</option>{statuses.map((status) => <option key={status}>{status}</option>)}</select>
+          <select aria-label="Filter by ITP number" style={input} value={itpNumberFilter} onChange={(event) => setItpNumberFilter(event.target.value)}><option value="All">All ITP numbers</option>{itpNumberOptions.map((value) => <option key={value}>{value}</option>)}</select>
+          <select aria-label="Filter by ITP title" style={input} value={itpTitleFilter} onChange={(event) => setItpTitleFilter(event.target.value)}><option value="All">All ITP titles</option>{itpTitleOptions.map((value) => <option key={value}>{value}</option>)}</select>
+          <select aria-label="Filter by supplier" style={input} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option value="All">All suppliers</option>{supplierOptions.map((value) => <option key={value}>{value}</option>)}</select>
+          <select aria-label="Filter by point type" style={input} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="All">All point types</option>{typeOptions.map((type) => <option key={type}>{type}</option>)}</select>
+          <select aria-label="Filter by status" style={input} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="All">All statuses</option>{statusOptions.map((status) => <option key={status}>{status}</option>)}</select>
         </div>
-        <div style={tableWrap}><table style={table}><thead><tr>{["ITP / supplier", "Section", "Activity", "Point", "Planned date", "NOI number", "Status", "Notes", ""].map((heading) => <th key={heading} style={th}>{heading}</th>)}</tr></thead><tbody>
+        <div style={tableWrap}><table style={table}>
+          <colgroup>
+            <col style={{ width: "14%" }} /><col style={{ width: "7%" }} /><col style={{ width: "26%" }} /><col style={{ width: "6%" }} />
+            <col style={{ width: "10%" }} /><col style={{ width: "9%" }} /><col style={{ width: "9%" }} /><col style={{ width: "14%" }} /><col style={{ width: "5%" }} />
+          </colgroup>
+          <thead><tr>{["ITP / supplier", "Section", "Activity", "Point", "Planned date", "NOI number", "Status", "Notes", ""].map((heading) => <th key={heading} style={th}>{heading}</th>)}</tr></thead><tbody>
           {pointRows.map(({ point, itp }) => <tr key={point.id}>
             <td style={td}><strong style={teal}>{itp?.document_number || "Unknown ITP"}</strong><small style={small}>{itp?.supplier || "—"} · {itp?.scope || "No scope"}</small></td>
             <td style={td}><strong>{point.section_number}</strong><small style={small}>{point.source_location || point.party_heading}</small></td>
-            <td style={td}><input style={wideInput} value={point.activity_description} onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, activity_description: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { activity_description: event.target.value })} /></td>
+            <td style={td}><textarea rows={2} style={activityTextareaStyle} value={point.activity_description} onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, activity_description: event.target.value } : item))} onBlur={(event) => void updatePoint(point, { activity_description: event.target.value })} /></td>
             <td style={td}><input list="noi-intervention-codes" style={{ ...compactInput, ...typeTone(point.intervention_type) }} value={point.intervention_type} onChange={(event) => setPoints((current) => current.map((item) => item.id === point.id ? { ...item, intervention_type: event.target.value.toUpperCase() } : item))} onBlur={(event) => {
               const value = event.target.value.toUpperCase().replace(/\s+/g, "");
               if (validIntervention(value)) void updatePoint(point, { intervention_type: value });
@@ -540,6 +573,7 @@ const candidateHeader: CSSProperties = { display: "flex", justifyContent: "space
 const candidateRow: CSSProperties = { display: "grid", gridTemplateColumns: "22px 75px 1fr 60px 190px", gap: 7, alignItems: "center", background: "#fff", border: "1px solid #D0D0CE", borderRadius: 8, padding: 7 };
 const compactInput: CSSProperties = { ...input, padding: "6px 7px", borderRadius: 6, fontSize: 10 };
 const wideInput: CSSProperties = { ...compactInput, width: "100%" };
+const activityTextareaStyle: CSSProperties = { ...wideInput, fontSize: 12, color: "#000000", lineHeight: 1.4, padding: "7px 9px", resize: "vertical", minHeight: 44, fontFamily: "inherit" };
 const source: CSSProperties = { display: "grid", gap: 2, color: "#53565A", fontSize: 10 };
 const candidateActions: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 5 };
 const filterGrid: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px,1.4fr) repeat(5,minmax(120px,1fr))", gap: 8, padding: "3px 18px 14px" };
