@@ -28,6 +28,7 @@ type InspectionEvent = {
   title: string;
   itpReference: string;
   supplier: string;
+  manualSupplier: string;
   sectionNumber: string;
   interventionType: string;
   status: string;
@@ -47,6 +48,7 @@ type ManualFormState = {
   title: string;
   description: string;
   itpReference: string;
+  supplier: string;
   interventionType: string;
   inspectionDate: string;
   duration: string;
@@ -68,6 +70,7 @@ const blankForm = (): ManualFormState => ({
   title: "",
   description: "",
   itpReference: "",
+  supplier: "",
   interventionType: "",
   inspectionDate: "",
   duration: "",
@@ -121,6 +124,16 @@ function attendeeSummary(attendees: Attendee[]) {
   return attendees.filter((person) => person.name.trim()).map((person) => person.name.trim());
 }
 
+// Some ITP-scanned activity text comes out with runs of extra whitespace
+// (e.g. spaced between individual letters) depending on how the source PDF
+// encodes its text layer. That renders fine as a plain string, but jsPDF's
+// autoTable can mis-measure it and stretch it into oddly letter-spaced,
+// truncated text. Collapsing whitespace before it reaches the PDF avoids
+// that regardless of how the text got that way.
+function cleanPdfText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
 function chipMetaLabel(event: InspectionEvent) {
   const typeLabel = event.interventionType || (event.source === "Manual" ? "" : event.source);
   const dateLabel = event.date ? parseDate(event.date)?.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
@@ -167,7 +180,7 @@ export default function OverallInspectionsPage() {
   const [form, setForm] = useState<ManualFormState>(blankForm());
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [people, setPeople] = useState<{ id: string; name: string; email: string }[]>([]);
-  const [allItps, setAllItps] = useState<{ project_key: string; document_number: string }[]>([]);
+  const [allItps, setAllItps] = useState<{ project_key: string; document_number: string; supplier: string }[]>([]);
 
   useEffect(() => {
     void loadAll();
@@ -194,8 +207,16 @@ export default function OverallInspectionsPage() {
       return;
     }
     const setupNeeded = Boolean(attendeesResult.error || manualResult.error);
-    setAllItps((itpsResult.data || []).map((itp) => ({ project_key: itp.project_key as string, document_number: itp.document_number as string })));
+    setAllItps((itpsResult.data || []).map((itp) => ({ project_key: itp.project_key as string, document_number: itp.document_number as string, supplier: (itp.supplier as string | null) || "" })));
     const itpById = new Map((itpsResult.data || []).map((itp) => [itp.id as string, itp as { document_number: string; supplier: string | null }]));
+    // Manual entries store their ITP reference as the ITP's document number
+    // (the "ITP reference" dropdown on the manual form is built from these
+    // same document numbers), so a manual entry can resolve its supplier by
+    // matching on this, the same way an ITP/NOI-derived row resolves it via
+    // itp_id.
+    const supplierByDocNumber = new Map(
+      (itpsResult.data || []).map((itp) => [(itp.document_number as string).trim().toLowerCase(), (itp.supplier as string | null) || ""])
+    );
     const attendeeMeta = new Map(
       (attendeesResult.data || []).map((row) => [
         row.point_id as string,
@@ -215,6 +236,7 @@ export default function OverallInspectionsPage() {
         title: point.activity_description as string,
         itpReference: itp?.document_number || "",
         supplier: itp?.supplier || "",
+        manualSupplier: "",
         sectionNumber: point.section_number as string,
         interventionType: point.intervention_type as string,
         status: point.status as string,
@@ -228,15 +250,24 @@ export default function OverallInspectionsPage() {
       };
     });
 
-    const manualEvents: InspectionEvent[] = (manualResult.data || []).map((row) => ({
+    const manualEvents: InspectionEvent[] = (manualResult.data || []).map((row) => {
+      const itpReference = (row.itp_reference as string | null) || "";
+      const manualSupplier = (row.supplier as string | null) || "";
+      const resolvedItpSupplier = itpReference ? supplierByDocNumber.get(itpReference.trim().toLowerCase()) : undefined;
+      return {
       id: `manual-${row.id}`,
       source: "Manual",
       projectKey: row.project_key as string,
       projectLabel: row.project_label as string,
       date: row.inspection_date as string | null,
       title: row.title as string,
-      itpReference: (row.itp_reference as string | null) || "",
-      supplier: "",
+      itpReference,
+      // An ITP reference that matches a known ITP always wins — it's the
+      // live, authoritative supplier for that ITP. The manually-entered
+      // value is only used as a fallback when there's no ITP to resolve
+      // from (or the reference doesn't match one).
+      supplier: resolvedItpSupplier || manualSupplier,
+      manualSupplier,
       sectionNumber: "",
       interventionType: (row.intervention_type as string | null) || "",
       status: row.status as string,
@@ -248,7 +279,8 @@ export default function OverallInspectionsPage() {
       notes: (row.notes as string | null) || "",
       editHref: `/projects/${row.project_key}/noi/create?manual=${row.id}`,
       manualId: row.id as string,
-    }));
+      };
+    });
 
     setEvents([...noiEvents, ...manualEvents]);
     setMessage(
@@ -270,6 +302,12 @@ export default function OverallInspectionsPage() {
     const source = form.projectKey && matchingProject.length ? matchingProject : allItps;
     return [...new Set(source.map((itp) => itp.document_number))].sort();
   }, [allItps, form.projectKey]);
+
+  const supplierByItpReference = useMemo(
+    () => new Map(allItps.map((itp) => [itp.document_number.trim().toLowerCase(), itp.supplier])),
+    [allItps]
+  );
+  const formResolvedSupplier = form.itpReference ? supplierByItpReference.get(form.itpReference.trim().toLowerCase()) || "" : "";
 
   const weekStarts = useMemo(() => {
     const start = startOfIsoWeek(new Date());
@@ -470,6 +508,7 @@ export default function OverallInspectionsPage() {
       title: event.title,
       description: "",
       itpReference: event.itpReference,
+      supplier: event.manualSupplier,
       interventionType: event.interventionType,
       inspectionDate: event.date || "",
       duration: event.duration,
@@ -501,6 +540,11 @@ export default function OverallInspectionsPage() {
       title: form.title.trim(),
       description: form.description.trim() || null,
       itp_reference: form.itpReference.trim() || null,
+      // Only store the manual fallback when there's no ITP to resolve a
+      // supplier from — with an ITP reference, the app always reads that
+      // ITP's own (live) supplier instead, so persisting a value here would
+      // just be a stale duplicate.
+      supplier: form.itpReference.trim() ? null : form.supplier.trim() || null,
       intervention_type: form.interventionType.trim() || null,
       inspection_date: form.inspectionDate,
       duration: form.duration.trim() || null,
@@ -617,12 +661,12 @@ export default function OverallInspectionsPage() {
 
     const sortedEvents = filteredEvents;
     const eventRow = (event: InspectionEvent) => [
-      event.projectLabel,
+      cleanPdfText(event.projectLabel),
       displayDate(event.date),
-      event.noiNumber || event.sectionNumber || "-",
-      event.title,
-      event.itpReference || "-",
-      event.supplier || "-",
+      cleanPdfText(event.noiNumber || event.sectionNumber || "-"),
+      cleanPdfText(event.title),
+      cleanPdfText(event.itpReference || "-"),
+      cleanPdfText(event.supplier || "-"),
       event.interventionType || "-",
       attendeeSummary(event.attendees).join(", ") || "-",
       event.status,
@@ -666,7 +710,7 @@ export default function OverallInspectionsPage() {
       startY: 40,
       margin: { left: margin, right: margin },
       theme: "grid",
-      styles: { font: exportTypography.pdfFont, fontSize: exportTypography.tablePt, cellPadding: 2.2, lineColor: [...exportRgb.border], textColor: [...exportRgb.ink], fillColor: [255, 255, 255] },
+      styles: { font: exportTypography.pdfFont, fontSize: exportTypography.tablePt, cellPadding: 2.2, overflow: "linebreak", lineColor: [...exportRgb.border], textColor: [...exportRgb.ink], fillColor: [255, 255, 255] },
       headStyles: { fillColor: [...exportPdfTableTheme.headStyles.fillColor], textColor: [...exportPdfTableTheme.headStyles.textColor], fontStyle: exportPdfTableTheme.headStyles.fontStyle },
       head: [["Project", "Date", "Reference", "Activity", "ITP Ref", "Supplier", "Type", "Attendees", "Status", "Source"]],
       body,
@@ -991,6 +1035,14 @@ export default function OverallInspectionsPage() {
                   <option value="">No ITP reference</option>
                   {itpOptionsForForm.map((documentNumber) => <option key={documentNumber} value={documentNumber}>{documentNumber}</option>)}
                 </select>
+              </label>
+              <label style={imsFieldStyle}>
+                <span style={imsLabelStyle}>Supplier{form.itpReference ? " (from ITP)" : ""}</span>
+                {form.itpReference ? (
+                  <input style={{ ...imsInputStyle, opacity: 0.7 }} value={formResolvedSupplier || "No supplier on that ITP"} disabled readOnly />
+                ) : (
+                  <input style={imsInputStyle} value={form.supplier} onChange={(event) => setForm((current) => ({ ...current, supplier: event.target.value }))} placeholder="e.g. Parkburn" />
+                )}
               </label>
               <label style={imsFieldStyle}>
                 <span style={imsLabelStyle}>Witness / Hold (optional)</span>

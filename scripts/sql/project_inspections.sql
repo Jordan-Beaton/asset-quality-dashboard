@@ -71,6 +71,7 @@ create table if not exists public.project_manual_inspections (
   client_visible boolean not null default true,
   notes text,
   noi_number text,
+  supplier text,
   created_by uuid references auth.users(id) on delete set null,
   created_by_email text,
   created_at timestamptz not null default now(),
@@ -79,6 +80,12 @@ create table if not exists public.project_manual_inspections (
 
 alter table public.project_manual_inspections
   add column if not exists noi_number text;
+
+-- Fallback supplier for a manual inspection that has no ITP reference to
+-- resolve one from. When itp_reference matches a known ITP, the app reads
+-- that ITP's own supplier instead and ignores this column.
+alter table public.project_manual_inspections
+  add column if not exists supplier text;
 
 -- Widen the status check constraint to allow "NOI Issued" for tables created
 -- before the NOI Creator could generate a Notice of Inspection directly from a
