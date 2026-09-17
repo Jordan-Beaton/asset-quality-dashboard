@@ -27,6 +27,7 @@ type InspectionEvent = {
   date: string | null;
   title: string;
   itpReference: string;
+  supplier: string;
   sectionNumber: string;
   interventionType: string;
   status: string;
@@ -213,6 +214,7 @@ export default function OverallInspectionsPage() {
         date: point.planned_date as string | null,
         title: point.activity_description as string,
         itpReference: itp?.document_number || "",
+        supplier: itp?.supplier || "",
         sectionNumber: point.section_number as string,
         interventionType: point.intervention_type as string,
         status: point.status as string,
@@ -234,6 +236,7 @@ export default function OverallInspectionsPage() {
       date: row.inspection_date as string | null,
       title: row.title as string,
       itpReference: (row.itp_reference as string | null) || "",
+      supplier: "",
       sectionNumber: "",
       interventionType: (row.intervention_type as string | null) || "",
       status: row.status as string,
@@ -560,6 +563,7 @@ export default function OverallInspectionsPage() {
       Reference: event.noiNumber || event.sectionNumber || "-",
       Activity: event.title,
       "ITP Reference": event.itpReference || "-",
+      Supplier: event.supplier || "-",
       Type: event.interventionType || "-",
       Attendees: attendeeSummary(event.attendees).join(", ") || "-",
       Status: event.status,
@@ -618,6 +622,7 @@ export default function OverallInspectionsPage() {
       event.noiNumber || event.sectionNumber || "-",
       event.title,
       event.itpReference || "-",
+      event.supplier || "-",
       event.interventionType || "-",
       attendeeSummary(event.attendees).join(", ") || "-",
       event.status,
@@ -626,7 +631,7 @@ export default function OverallInspectionsPage() {
     const weekBandRow = (label: string) => [
       {
         content: label,
-        colSpan: 9,
+        colSpan: 10,
         styles: {
           fillColor: [exportRgb.page[0], exportRgb.page[1], exportRgb.page[2]] as [number, number, number],
           textColor: [exportRgb.brand[0], exportRgb.brand[1], exportRgb.brand[2]] as [number, number, number],
@@ -663,7 +668,7 @@ export default function OverallInspectionsPage() {
       theme: "grid",
       styles: { font: exportTypography.pdfFont, fontSize: exportTypography.tablePt, cellPadding: 2.2, lineColor: [...exportRgb.border], textColor: [...exportRgb.ink], fillColor: [255, 255, 255] },
       headStyles: { fillColor: [...exportPdfTableTheme.headStyles.fillColor], textColor: [...exportPdfTableTheme.headStyles.textColor], fontStyle: exportPdfTableTheme.headStyles.fontStyle },
-      head: [["Project", "Date", "Reference", "Activity", "ITP Ref", "Type", "Attendees", "Status", "Source"]],
+      head: [["Project", "Date", "Reference", "Activity", "ITP Ref", "Supplier", "Type", "Attendees", "Status", "Source"]],
       body,
     });
 
@@ -812,6 +817,7 @@ export default function OverallInspectionsPage() {
                 <th style={{ ...imsTableHeadStyle, ...referenceColumnStyle }}>Reference</th>
                 <th style={{ ...imsTableHeadStyle, ...activityColumnStyle }}>Activity</th>
                 <th style={{ ...imsTableHeadStyle, ...itpRefColumnStyle }}>ITP Ref</th>
+                <th style={{ ...imsTableHeadStyle, ...supplierColumnStyle }}>Supplier</th>
                 <th style={{ ...imsTableHeadStyle, ...typeColumnStyle }}>Type</th>
                 <th style={{ ...imsTableHeadStyle, ...attendeesColumnStyle }}>Attendees</th>
                 <th style={{ ...imsTableHeadStyle, ...statusColumnStyle }}>Status</th>
@@ -827,6 +833,7 @@ export default function OverallInspectionsPage() {
                   <td style={{ ...imsTableCellStyle, ...referenceColumnStyle }} title={event.noiNumber || event.sectionNumber || ""}><span style={truncatedCellTextStyle}>{event.noiNumber || event.sectionNumber || "-"}</span></td>
                   <td style={{ ...imsTableCellStyle, ...activityColumnStyle }} title={event.title}><span style={truncatedCellTextStyle}>{event.title}</span></td>
                   <td style={{ ...imsTableCellStyle, ...itpRefColumnStyle }} title={event.itpReference}><span style={truncatedCellTextStyle}>{event.itpReference || "-"}</span></td>
+                  <td style={{ ...imsTableCellStyle, ...supplierColumnStyle }} title={event.supplier}><span style={truncatedCellTextStyle}>{event.supplier || "-"}</span></td>
                   <td style={{ ...imsTableCellStyle, ...typeColumnStyle }}>{event.interventionType || "-"}</td>
                   <td style={{ ...imsTableCellStyle, ...attendeesColumnStyle }} title={attendeeSummary(event.attendees).join(", ")}>{attendeeSummary(event.attendees).length || "-"}</td>
                   <td style={{ ...imsTableCellStyle, ...statusColumnStyle }}>{event.status}</td>
@@ -834,7 +841,7 @@ export default function OverallInspectionsPage() {
                   <td style={{ ...imsTableCellStyle, ...actionColumnStyle }}><button type="button" style={linkButtonStyle} onClick={() => openDetail(event)}>View</button></td>
                 </tr>
               ))}
-              {!filteredEvents.length ? <tr><td style={imsTableCellStyle} colSpan={10}>No inspections match the current filters.</td></tr> : null}
+              {!filteredEvents.length ? <tr><td style={imsTableCellStyle} colSpan={11}>No inspections match the current filters.</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -1097,16 +1104,17 @@ const moreChipStyle: CSSProperties = { border: "none", background: "transparent"
 const emptyCellStyle: CSSProperties = { color: imsColours.muted, fontSize: 11, textAlign: "center", padding: "8px 0" };
 
 const registerTableStyle: CSSProperties = { ...imsTableStyle, minWidth: 0, tableLayout: "fixed" };
-const projectColumnStyle: CSSProperties = { width: "13%" };
-const dateColumnStyle: CSSProperties = { width: "9%" };
-const referenceColumnStyle: CSSProperties = { width: "9%" };
-const activityColumnStyle: CSSProperties = { width: "21%" };
-const itpRefColumnStyle: CSSProperties = { width: "9%" };
-const typeColumnStyle: CSSProperties = { width: "6%", overflow: "hidden" };
-const attendeesColumnStyle: CSSProperties = { width: "9%" };
+const projectColumnStyle: CSSProperties = { width: "10%" };
+const dateColumnStyle: CSSProperties = { width: "8%" };
+const referenceColumnStyle: CSSProperties = { width: "8%" };
+const activityColumnStyle: CSSProperties = { width: "22%" };
+const itpRefColumnStyle: CSSProperties = { width: "8%" };
+const supplierColumnStyle: CSSProperties = { width: "9%" };
+const typeColumnStyle: CSSProperties = { width: "5%", overflow: "hidden" };
+const attendeesColumnStyle: CSSProperties = { width: "8%" };
 const statusColumnStyle: CSSProperties = { width: "8%", overflow: "hidden" };
-const sourceColumnStyle: CSSProperties = { width: "7%", overflow: "hidden" };
-const actionColumnStyle: CSSProperties = { width: "9%", overflow: "hidden" };
+const sourceColumnStyle: CSSProperties = { width: "6%", overflow: "hidden" };
+const actionColumnStyle: CSSProperties = { width: "8%", overflow: "hidden" };
 const truncatedCellTextStyle: CSSProperties = { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
 const linkButtonStyle: CSSProperties = { border: "none", background: "transparent", color: imsColours.brand, fontWeight: 800, cursor: "pointer", padding: 0, fontSize: 12 };
