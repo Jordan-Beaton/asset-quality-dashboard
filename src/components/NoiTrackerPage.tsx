@@ -587,8 +587,8 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
         </div>}
         <div style={tableWrap}><table style={table} className="noi-register-table">
           <colgroup>
-            <col style={{ width: "9%" }} /><col style={{ width: "27%" }} /><col style={{ width: "7%" }} />
-            <col style={{ width: "13%" }} /><col style={{ width: "11%" }} /><col style={{ width: "13%" }} /><col style={{ width: "15%" }} /><col style={{ width: "5%" }} />
+            <col style={{ width: "8%" }} /><col style={{ width: "25%" }} /><col style={{ width: "9%" }} />
+            <col style={{ width: "12%" }} /><col style={{ width: "11%" }} /><col style={{ width: "13%" }} /><col style={{ width: "14%" }} /><col style={{ width: "8%" }} />
           </colgroup>
           <thead><tr>{["Section", "Activity", "Point", "Planned date", "NOI number", "Status", "Notes", ""].map((heading) => <th key={heading} style={th}>{heading}</th>)}</tr></thead>
           {groupedRows.map(({ itp, rows }) => {
@@ -664,22 +664,22 @@ const manualPanel: CSSProperties = { ...candidatePanel, background: "#ECECE7" };
 const manualGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(130px,1fr))", gap: 9 };
 const candidateHeader: CSSProperties = { display: "flex", justifyContent: "space-between", color: "#53565A", fontSize: 11, marginBottom: 3 };
 const candidateRow: CSSProperties = { display: "grid", gridTemplateColumns: "22px 75px 1fr 60px 190px", gap: 7, alignItems: "center", background: "#fff", border: "1px solid #D0D0CE", borderRadius: 8, padding: 7 };
-const compactInput: CSSProperties = { ...input, padding: "6px 7px", borderRadius: 6, fontSize: 10 };
+const compactInput: CSSProperties = { ...input, padding: "6px 7px", borderRadius: 6, fontSize: 11 };
 const wideInput: CSSProperties = { ...compactInput, width: "100%" };
 // A little less horizontal padding and a slightly smaller font than the
 // other compact inputs, so the browser's native calendar-picker icon has
 // room to sit inside the border instead of overlapping/clipping against it.
-const dateInput: CSSProperties = { ...compactInput, padding: "6px 4px", fontSize: 9.5 };
+const dateInput: CSSProperties = { ...compactInput, padding: "6px 4px" };
 const activityTextareaStyle: CSSProperties = { ...wideInput, fontSize: 12, color: "#000000", lineHeight: 1.4, padding: "7px 9px", resize: "vertical", minHeight: 44, fontFamily: "inherit" };
 const source: CSSProperties = { display: "grid", gap: 2, color: "#53565A", fontSize: 10 };
 const candidateActions: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 5 };
 const filterGrid: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px,1.4fr) repeat(5,minmax(120px,1fr))", gap: 8, padding: "3px 18px 14px" };
 const tableWrap: CSSProperties = { width: "100%", overflowX: "auto", borderTop: "1px solid #D0D0CE" };
-const table: CSSProperties = { width: "100%", minWidth: 1200, borderCollapse: "collapse", tableLayout: "fixed", fontSize: 10 };
+const table: CSSProperties = { width: "100%", minWidth: 1200, borderCollapse: "collapse", tableLayout: "fixed", fontSize: 11 };
 const th: CSSProperties = { textAlign: "left", background: "#005670", color: "#fff", padding: "9px 7px", fontSize: 9, textTransform: "uppercase" };
 const td: CSSProperties = { borderBottom: "1px solid #D0D0CE", padding: "7px", verticalAlign: "top", color: "#53565A" };
 const small: CSSProperties = { display: "block", color: "#53565A", marginTop: 3, lineHeight: 1.25 };
-const rowActions: CSSProperties = { display: "flex", gap: 5, alignItems: "center" };
+const rowActions: CSSProperties = { display: "flex", gap: 6, alignItems: "center", justifyContent: "center" };
 const empty: CSSProperties = { padding: 30, textAlign: "center", color: "#53565A" };
 
 const panelHeadClickable: CSSProperties = { ...sectionHeader, cursor: "pointer", userSelect: "none" };
@@ -697,11 +697,33 @@ const groupItpTitle: CSSProperties = { color: "#53565A", fontSize: 12 };
 const pill: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "3px 10px", fontSize: 10, fontWeight: 800 };
 const pillSupplier: CSSProperties = { background: "#FFFFFF", color: "#53565A", border: "1px solid #D0D0CE" };
 const pillRev: CSSProperties = { background: "#FFFFFF", color: "#005670", border: "1px solid #D0D0CE" };
-const progressWrap: CSSProperties = { display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#53565A", fontWeight: 700, marginLeft: "auto" };
+// No marginLeft: "auto" here — this row spans the full (often wider-than-
+// viewport, horizontally scrollable) table, so pushing it to the far right
+// edge put it out of view on anything narrower than ~1200px. It sits inline
+// with the pills instead.
+const progressWrap: CSSProperties = { display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#53565A", fontWeight: 700, whiteSpace: "nowrap" };
 const progressTrack: CSSProperties = { width: 74, height: 6, borderRadius: 999, background: "#ECECE7", border: "1px solid #D0D0CE", overflow: "hidden" };
 const progressFill: CSSProperties = { display: "block", height: "100%", background: "#005670", borderRadius: 999 };
 
 const statusPill: CSSProperties = { ...compactInput, border: "none", borderRadius: 999, fontWeight: 800, textAlign: "center" };
 
-const iconButton: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, border: "1px solid #D0D0CE", background: "#fff", color: "#53565A", textDecoration: "none", fontSize: 12, cursor: "pointer" };
-const iconButtonDanger: CSSProperties = { ...iconButton, color: "#F93822" };
+const iconButton: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxSizing: "border-box",
+  width: 28,
+  height: 28,
+  padding: 0,
+  margin: 0,
+  flexShrink: 0,
+  borderRadius: "50%",
+  border: "1px solid #D0D0CE",
+  background: "#fff",
+  color: "#53565A",
+  textDecoration: "none",
+  fontSize: 13,
+  lineHeight: 1,
+  cursor: "pointer",
+};
+const iconButtonDanger: CSSProperties = { ...iconButton, color: "#F93822", borderColor: "#F93822" };
