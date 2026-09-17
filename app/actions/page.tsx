@@ -3200,7 +3200,7 @@ function ActionsPageContent() {
   async function openEvidence(file: EvidenceFile) {
     const { data, error } = await supabase.storage
       .from("quality-evidence")
-      .createSignedUrl(file.file_path, 300);
+      .createSignedUrl(file.file_path, 60 * 60 * 24 * 180);
 
     if (error || !data?.signedUrl) {
       setMessage(`Could not open file: ${error?.message || "Unknown error"}`);

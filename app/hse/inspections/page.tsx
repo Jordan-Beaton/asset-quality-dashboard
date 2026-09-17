@@ -934,7 +934,7 @@ async function getLogoDataUrl() {
 }
 
 async function createSignedEvidenceUrl(path: string) {
-  const { data } = await supabase.storage.from(evidenceBucket).createSignedUrl(path, 60 * 60 * 24 * 7);
+  const { data } = await supabase.storage.from(evidenceBucket).createSignedUrl(path, 60 * 60 * 24 * 180);
   return data?.signedUrl || "";
 }
 

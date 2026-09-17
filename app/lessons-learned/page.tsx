@@ -378,7 +378,7 @@ export default function LessonsLearnedPage() {
     setSaving(false); setFiles([]); setEvidenceNotes(""); setForm(isFieldMode ? { ...emptyForm, report_date: todayValue() } : emptyForm); setSelected(null); await loadData(); setView(isFieldMode ? "create" : "register");
   }
   async function deleteLesson() { if (!selected || !requireEdit("delete lessons") || !window.confirm(`Delete ${selected.lesson_number}?`)) return; const { error } = await supabase.from("lessons_learned").delete().eq("id", selected.id); setMessage(error ? `Delete failed: ${error.message}` : `${selected.lesson_number} deleted.`); if (!error) { setSelected(null); setForm(emptyForm); await loadData(); } }
-  async function openEvidence(item: Evidence) { const { data, error } = await supabase.storage.from("lessons-learned-evidence").createSignedUrl(item.file_path, 300); if (error) setMessage(`Evidence open failed: ${error.message}`); else window.open(data.signedUrl, "_blank", "noopener,noreferrer"); }
+  async function openEvidence(item: Evidence) { const { data, error } = await supabase.storage.from("lessons-learned-evidence").createSignedUrl(item.file_path, 60 * 60 * 24 * 180); if (error) setMessage(`Evidence open failed: ${error.message}`); else window.open(data.signedUrl, "_blank", "noopener,noreferrer"); }
 
   function previewImport(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; if (!file || !requireCreate("import lessons")) return; setImportName(file.name); setMessage(`Reading ${file.name}...`);

@@ -277,7 +277,7 @@ export default function CertificationPage() {
     }
 
     setOpeningId(row.id);
-    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(row.file_path, 60 * 10);
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(row.file_path, 60 * 60 * 24 * 180);
     setOpeningId("");
 
     if (error || !data?.signedUrl) {

@@ -1919,7 +1919,7 @@ function MOCPageContent() {
     try {
       const { data, error } = await supabase.storage
         .from(MOC_ATTACHMENT_BUCKET)
-        .createSignedUrl(file.file_path, 300);
+        .createSignedUrl(file.file_path, 60 * 60 * 24 * 180);
 
       if (error || !data?.signedUrl) {
         throw new Error(error?.message || "Could not create file link.");

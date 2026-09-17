@@ -325,7 +325,7 @@ export default function HseObservationsPage() {
   }
 
   async function openEvidence(path: string) {
-    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(path, 3600);
+    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) {
       setMessage(`Evidence link failed: ${error?.message || "No link returned"}`);
       return;

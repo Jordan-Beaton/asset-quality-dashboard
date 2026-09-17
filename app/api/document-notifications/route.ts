@@ -321,7 +321,7 @@ async function createControlledFileLink(documentId: string): Promise<ControlledF
 
   const { data: signed, error: signedError } = await supabase.storage
     .from(STORAGE_BUCKET)
-    .createSignedUrl(data.file_path, 60 * 60 * 24 * 7);
+    .createSignedUrl(data.file_path, 60 * 60 * 24 * 180);
 
   if (signedError || !signed?.signedUrl) return null;
 

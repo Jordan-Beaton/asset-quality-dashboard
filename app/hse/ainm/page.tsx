@@ -1731,7 +1731,7 @@ function HseAinmPageContent() {
   }
 
   async function openEvidence(file: AINMEvidence) {
-    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(file.file_path, 3600);
+    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(file.file_path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) {
       setMessage(`Could not open ${file.file_name}.`);
       return;
@@ -1740,7 +1740,7 @@ function HseAinmPageContent() {
   }
 
   async function openExternalEvidence(file: ExternalAINMEvidence) {
-    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(file.file_path, 3600);
+    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(file.file_path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) {
       setMessage(`Could not open ${file.file_name}.`);
       return;
@@ -1753,7 +1753,7 @@ function HseAinmPageContent() {
       setMessage("This generated report does not have a stored file path.");
       return;
     }
-    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(report.file_path, 3600);
+    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(report.file_path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) {
       setMessage(`Could not open ${report.file_name || "compiled PDF report"}.`);
       return;

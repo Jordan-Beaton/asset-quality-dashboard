@@ -484,7 +484,7 @@ export function ItpTrackerPage({ projectKey }: { projectKey: string }) {
   }
 
   async function openFile(revision: Revision) {
-    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(revision.file_path, 3600);
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(revision.file_path, 60 * 60 * 24 * 180);
     if (error) setMessage(error.message);
     else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }

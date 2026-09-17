@@ -152,7 +152,7 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
     setCandidates([]);
     setMessage(`Reading ${revision.file_name}... Structured tables will be checked first; scanned pages will use OCR automatically.`);
     try {
-      const signed = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(revision.file_path, 300);
+      const signed = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(revision.file_path, 60 * 60 * 24 * 180);
       if (signed.error) throw signed.error;
       const fileResponse = await fetch(signed.data.signedUrl);
       if (!fileResponse.ok) throw new Error("The stored ITP could not be downloaded for scanning.");

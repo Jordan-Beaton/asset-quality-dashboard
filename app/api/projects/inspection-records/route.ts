@@ -201,7 +201,7 @@ export async function POST(request: Request) {
     const files: Array<{ file_name: string; file_path: string }> = record.inspection_record_files || [];
     const fileLinks: Array<{ name: string; url: string }> = [];
     for (const file of files) {
-      const { data: signed } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(file.file_path, 60 * 60 * 24 * 7);
+      const { data: signed } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(file.file_path, 60 * 60 * 24 * 180);
       if (signed?.signedUrl) fileLinks.push({ name: file.file_name, url: signed.signedUrl });
     }
 

@@ -318,7 +318,7 @@ export default function HseAinmFieldPage() {
   }
 
   async function openEvidence(file: AINMEvidence) {
-    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(file.file_path, 3600);
+    const { data, error } = await supabase.storage.from(evidenceBucket).createSignedUrl(file.file_path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) {
       setMessage(`Open evidence failed: ${error?.message || "Unable to create link"}`);
       return;

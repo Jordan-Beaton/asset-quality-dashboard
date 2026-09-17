@@ -2146,7 +2146,7 @@ function NcrCapaPageContent() {
   async function openSavedPdf(file: NcrCapaPdf) {
     const { data, error } = await supabase.storage
       .from("quality-evidence")
-      .createSignedUrl(file.file_path, 300);
+      .createSignedUrl(file.file_path, 60 * 60 * 24 * 180);
 
     if (error || !data?.signedUrl) {
       setMessage(`Could not open saved PDF: ${error?.message || "Unknown error"}`);

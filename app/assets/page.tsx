@@ -426,7 +426,7 @@ async function tryLoadActionOptions(): Promise<LinkedOption[]> {
 async function createSignedFileUrl(path: string) {
   if (!path) return "";
 
-  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 180);
 
   if (error || !data?.signedUrl) return "";
   return data.signedUrl;

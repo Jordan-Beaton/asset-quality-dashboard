@@ -395,7 +395,7 @@ export default function OverallInspectionsPage() {
   }
 
   async function openAttachment(attachment: InspectionAttachment) {
-    const { data, error } = await supabase.storage.from("project-documents").createSignedUrl(attachment.file_path, 300);
+    const { data, error } = await supabase.storage.from("project-documents").createSignedUrl(attachment.file_path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) {
       setMessage(error?.message || "The attachment could not be opened.");
       return;

@@ -141,14 +141,14 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
   }
 
   async function openSource(path: string) {
-    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) { setMessage(error?.message || "Unable to open the source ITP."); return; }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
   async function openCertificate(path: string | null) {
     if (!path) { setMessage("No sign-off certificate is available for this record."); return; }
-    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) { setMessage(error?.message || "Unable to open the sign-off certificate."); return; }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }

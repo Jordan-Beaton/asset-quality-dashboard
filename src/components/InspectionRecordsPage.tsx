@@ -289,7 +289,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
     if (notifs) setEvidenceNotifs(notifs as Notification[]);
     const urls: Record<string, string> = {};
     for (const f of record.inspection_record_files) {
-      const { data: signed } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(f.file_path, 60 * 60 * 24 * 7);
+      const { data: signed } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(f.file_path, 60 * 60 * 24 * 180);
       if (signed?.signedUrl) urls[f.id] = signed.signedUrl;
     }
     setSignedUrls(urls);
@@ -401,7 +401,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
         const urls = { ...signedUrls };
         for (const f of (refreshed as InspectionRecord).inspection_record_files) {
           if (!urls[f.id]) {
-            const { data: signed } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(f.file_path, 60 * 60 * 24 * 7);
+            const { data: signed } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(f.file_path, 60 * 60 * 24 * 180);
             if (signed?.signedUrl) urls[f.id] = signed.signedUrl;
           }
         }
