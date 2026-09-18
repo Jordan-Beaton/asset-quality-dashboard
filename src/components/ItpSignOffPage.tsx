@@ -10,6 +10,8 @@ import { supabase } from "../lib/supabase";
 type PhaseItem = { taskNumber?: string; activityDescription?: string };
 type Phase = { phaseNumber: string; phaseTitle: string; items: PhaseItem[] };
 type SignOff = { id: string; document_name: string; document_path: string; phase_number: string; phase_title: string; phase_items: PhaseItem[]; recipient_email: string; status: string; decision_name: string | null; decision_email: string | null; decision_note: string | null; decided_at: string | null; sent_at: string; certificate_path: string | null; certificate_sha256: string | null };
+type ItpRevision = { id: string; revision: string; file_name: string; file_path: string; is_current: boolean; uploaded_at: string };
+type TrackedItp = { id: string; document_number: string; title: string; supplier: string | null; project_itp_revisions?: ItpRevision[] };
 
 export interface ItpSignOffConfig {
   projectKey: string;
@@ -18,6 +20,11 @@ export interface ItpSignOffConfig {
 }
 
 const STORAGE_BUCKET = "project-documents";
+
+function currentItpRevision(itp: TrackedItp) {
+  return (itp.project_itp_revisions || []).find((revision) => revision.is_current)
+    || [...(itp.project_itp_revisions || [])].sort((a, b) => b.uploaded_at.localeCompare(a.uploaded_at))[0];
+}
 
 function decisionDate(value: string | null) {
   return value ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value)) : "-";
@@ -44,6 +51,9 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
   const [recipientEmail, setRecipientEmail] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sourceMode, setSourceMode] = useState<"tracked" | "upload">("tracked");
+  const [trackedItps, setTrackedItps] = useState<TrackedItp[]>([]);
+  const [selectedItpId, setSelectedItpId] = useState("");
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from("project_itp_sign_off_requests").select("*").eq("project_key", projectKey).order("created_at", { ascending: false });
@@ -53,6 +63,28 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
   }, [projectKey]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    void (async () => {
+      const { data, error } = await supabase
+        .from("project_itps")
+        .select("id,document_number,title,supplier,project_itp_revisions(id,revision,file_name,file_path,is_current,uploaded_at)")
+        .eq("project_key", projectKey)
+        .order("document_number");
+      if (!error) setTrackedItps((data || []) as TrackedItp[]);
+    })();
+  }, [projectKey]);
+
+  function resetSelection() {
+    setFile(null); setPhases([]); setSelectedIndexes([]); setSelectedTasks({});
+  }
+
+  function switchSourceMode(mode: "tracked" | "upload") {
+    if (mode === sourceMode) return;
+    setSourceMode(mode);
+    setSelectedItpId("");
+    resetSelection();
+  }
 
   const selectedPhases = selectedIndexes.map((phaseIndex) => {
     const phase = phases[phaseIndex];
@@ -65,13 +97,11 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
   const approved = records.filter((row) => row.status === "Approved").length;
   const rejected = records.filter((row) => row.status === "Rejected").length;
 
-  async function extract(event: ChangeEvent<HTMLInputElement>) {
-    const selected = event.target.files?.[0] || null;
-    setFile(selected); setPhases([]); setSelectedIndexes([]); setSelectedTasks({});
-    if (!selected) return;
+  async function runExtraction(selectedFile: File) {
+    setFile(selectedFile); setPhases([]); setSelectedIndexes([]); setSelectedTasks({});
     setExtracting(true); setMessage("Detecting numbered phase headings and extracting their activity rows...");
     try {
-      const form = new FormData(); form.append("file", selected);
+      const form = new FormData(); form.append("file", selectedFile);
       const response = await fetch("/api/projects/itp-phase-extract", { method: "POST", body: form });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || "Unable to extract the ITP.");
@@ -80,6 +110,35 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
       setMessage(found.length ? `Detected ${found.length} phase heading${found.length === 1 ? "" : "s"}. Select the phases appropriate for this sign-off.` : "No numbered phase headings were identified. Check the file and try again.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to extract the ITP."); }
     finally { setExtracting(false); }
+  }
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files?.[0] || null;
+    if (!selected) { resetSelection(); return; }
+    await runExtraction(selected);
+  }
+
+  async function loadTrackedRevision(itpId: string) {
+    setSelectedItpId(itpId);
+    resetSelection();
+    if (!itpId) return;
+    const itp = trackedItps.find((candidate) => candidate.id === itpId);
+    const revision = itp ? currentItpRevision(itp) : undefined;
+    if (!itp || !revision) { setMessage("This ITP has no current revision on file."); return; }
+    setExtracting(true);
+    setMessage(`Fetching ${revision.file_name} from the ITP Tracker...`);
+    try {
+      const signed = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(revision.file_path, 60 * 60 * 24 * 180);
+      if (signed.error || !signed.data?.signedUrl) throw new Error(signed.error?.message || "Could not access the tracked ITP file.");
+      const fileResponse = await fetch(signed.data.signedUrl);
+      if (!fileResponse.ok) throw new Error("The tracked ITP could not be downloaded.");
+      const blob = await fileResponse.blob();
+      const trackedFile = new File([blob], revision.file_name, { type: blob.type || "application/octet-stream" });
+      await runExtraction(trackedFile);
+    } catch (error) {
+      setExtracting(false);
+      setMessage(error instanceof Error ? error.message : "Unable to load the tracked ITP.");
+    }
   }
 
   function togglePhase(index: number) {
@@ -160,12 +219,31 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
     <section style={metrics}>
       <QualityKpiCard title="Requests" value={records.length} accent="#005670" /><QualityKpiCard title="Pending" value={pending} accent="#FFAD00" /><QualityKpiCard title="Approved" value={approved} accent="#63B1BC" /><QualityKpiCard title="Rejected" value={rejected} accent="#F93822" />
     </section>
-    <ImsPanel style={containedPanel} title="Create sign-off request" subtitle="Upload the complete ITP, then select the numbered phase headings appropriate for this sign-off.">
+    <ImsPanel style={containedPanel} title="Create sign-off request" subtitle="Pick an ITP already tracked for this project, or upload a document directly, then select the numbered phase headings appropriate for this sign-off.">
+      <div style={sourceToggleRow}>
+        <button type="button" style={sourceMode === "tracked" ? sourceToggleActive : sourceToggleButton} onClick={() => switchSourceMode("tracked")} disabled={extracting || sending}>Use a tracked ITP</button>
+        <button type="button" style={sourceMode === "upload" ? sourceToggleActive : sourceToggleButton} onClick={() => switchSourceMode("upload")} disabled={extracting || sending}>Upload a document</button>
+      </div>
       <div style={formGrid}>
-        <label style={field}><span>Internal ITP</span><input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={extract} disabled={extracting || sending} /></label>
+        {sourceMode === "tracked" ? (
+          <label style={field}>
+            <span>Tracked ITP</span>
+            <select value={selectedItpId} onChange={(event) => void loadTrackedRevision(event.target.value)} disabled={extracting || sending}>
+              <option value="">Select an ITP...</option>
+              {trackedItps.map((itp) => {
+                const revision = currentItpRevision(itp);
+                return <option key={itp.id} value={itp.id}>{itp.document_number} · Rev {revision?.revision || "—"} · {itp.supplier || "No supplier"}</option>;
+              })}
+            </select>
+            {!trackedItps.length ? <span style={muted}>No ITPs are tracked for this project yet — use &quot;Upload a document&quot; instead.</span> : null}
+          </label>
+        ) : (
+          <label style={field}><span>Internal ITP</span><input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={(event) => void handleFileChange(event)} disabled={extracting || sending} /></label>
+        )}
         <label style={field}><span>Recipient email</span><input type="email" value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="recipient@example.com" /></label>
       </div>
-      {extracting ? <p style={notice}>Reading the complete ITP and locating its numbered heading structure...</p> : null}
+      {file && !extracting ? <p style={muted}>Using <strong>{file.name}</strong>{sourceMode === "tracked" ? " — current tracked revision" : ""}.</p> : null}
+      {extracting ? <p style={notice}>{sourceMode === "tracked" ? "Fetching the tracked ITP and locating its numbered heading structure..." : "Reading the complete ITP and locating its numbered heading structure..."}</p> : null}
       {phases.length ? <div style={phaseChoices}>
         <div style={choiceHeader}><strong>Detected phase headings</strong><span style={muted}>Select only what is appropriate. Each selected phase receives its own auditable decision.</span></div>
         {phases.map((phase, index) => {
@@ -197,6 +275,9 @@ const page: CSSProperties = { display: "grid", gap: 18, width: "100%", maxWidth:
 const metrics: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 16, minWidth: 0 };
 const containedPanel: CSSProperties = { width: "100%", maxWidth: "100%", minWidth: 0, overflow: "hidden", boxSizing: "border-box" };
 const formGrid: CSSProperties = { display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 12 };
+const sourceToggleRow: CSSProperties = { display: "flex", gap: 8, marginBottom: 14 };
+const sourceToggleButton: CSSProperties = { minHeight: 40, border: "1px solid #D0D0CE", borderRadius: 10, padding: "8px 14px", background: "#fff", color: "#53565A", fontWeight: 800, cursor: "pointer" };
+const sourceToggleActive: CSSProperties = { ...sourceToggleButton, background: "#005670", color: "#fff", borderColor: "#005670" };
 const field: CSSProperties = { display: "grid", gap: 6, color: "#53565A", fontSize: 13, fontWeight: 800 };
 const notice: CSSProperties = { padding: 12, borderRadius: 10, background: "#ECECE7", color: "#005670" };
 const phaseChoices: CSSProperties = { display: "grid", gap: 10, marginTop: 16, minWidth: 0 };
