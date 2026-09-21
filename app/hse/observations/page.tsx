@@ -294,13 +294,18 @@ export default function HseObservationsPage() {
     }
     setMessage(`${selectedRecord.observation_number} updated.`);
 
+    const itemUrl = `${window.location.origin}/hse/observations?observation=${encodeURIComponent(selectedRecord.observation_number)}`;
+    const nextStatus = ("status" in payload ? payload.status : selectedRecord.status) || undefined;
+
     // Only notify when "Assigned To" actually changed to a new person — not
     // on every save (e.g. just adding close-out notes or changing status).
     const prevAssigned = (selectedRecord.assigned_to || "").trim().toLowerCase();
     const nextAssigned = "assigned_to" in payload ? (payload.assigned_to || "").trim() : selectedRecord.assigned_to || "";
+    let assignedEmail: string | undefined;
     if (nextAssigned && nextAssigned.toLowerCase() !== prevAssigned) {
       const person = people.find((candidate) => candidate.name.toLowerCase() === nextAssigned.toLowerCase());
       if (person?.email) {
+        assignedEmail = person.email;
         void fetch("/api/notify-assignment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -311,8 +316,54 @@ export default function HseObservationsPage() {
             itemType: "HSE Observation",
             itemRef: selectedRecord.observation_number,
             itemTitle: selectedRecord.title || undefined,
-            status: payload.status || selectedRecord.status || undefined,
-            itemUrl: `${window.location.origin}/hse/observations?observation=${encodeURIComponent(selectedRecord.observation_number)}`,
+            status: nextStatus,
+            itemUrl,
+          }),
+        });
+      }
+    }
+
+    // Keep whoever submitted the observation ("Submitted By") up to speed on
+    // its progress — notify them when status or close-out notes change. Only
+    // works when that name matches an active person in People Management;
+    // anonymous/external QR submissions have no account to email.
+    const reporterName = (selectedRecord.reporter_name || "").trim();
+    const reporter = reporterName ? people.find((candidate) => candidate.name.toLowerCase() === reporterName.toLowerCase()) : undefined;
+    if (reporter?.email && reporter.email !== assignedEmail) {
+      const prevStatus = selectedRecord.status ?? "";
+      if ("status" in payload && payload.status !== prevStatus) {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: "status-changed",
+            recipientEmail: reporter.email,
+            recipientName: reporter.name,
+            itemType: "HSE Observation",
+            itemRef: selectedRecord.observation_number,
+            itemTitle: selectedRecord.title || undefined,
+            status: nextStatus,
+            itemUrl,
+          }),
+        });
+      }
+
+      const prevCloseout = (selectedRecord.closeout_notes || "").trim();
+      const nextCloseout = "closeout_notes" in payload ? (payload.closeout_notes || "").trim() : prevCloseout;
+      if (nextCloseout && nextCloseout !== prevCloseout) {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: "closed-out",
+            recipientEmail: reporter.email,
+            recipientName: reporter.name,
+            itemType: "HSE Observation",
+            itemRef: selectedRecord.observation_number,
+            itemTitle: selectedRecord.title || undefined,
+            status: nextStatus,
+            closeOutComments: nextCloseout,
+            itemUrl,
           }),
         });
       }
