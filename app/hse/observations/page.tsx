@@ -74,6 +74,7 @@ type EvidenceRecord = {
 type PersonOption = {
   id: string;
   name: string;
+  email: string | null;
   role: string | null;
   department: string | null;
   active: boolean | null;
@@ -204,7 +205,7 @@ export default function HseObservationsPage() {
       supabase.from("hse_observations").select("*").order("created_at", { ascending: false }),
       supabase.from("hse_observation_evidence").select("*").order("uploaded_at", { ascending: false }),
       supabase.from("actions").select("*").order("action_number", { ascending: true }),
-      supabase.from("people").select("id,name,role,department,active").eq("active", true).order("name", { ascending: true }),
+      supabase.from("people").select("id,name,email,role,department,active").eq("active", true).order("name", { ascending: true }),
     ]);
 
     const warnings = [observationRes.error?.message, evidenceRes.error?.message, actionRes.error?.message, peopleRes.error?.message].filter(Boolean);
@@ -292,6 +293,31 @@ export default function HseObservationsPage() {
       return;
     }
     setMessage(`${selectedRecord.observation_number} updated.`);
+
+    // Only notify when "Assigned To" actually changed to a new person — not
+    // on every save (e.g. just adding close-out notes or changing status).
+    const prevAssigned = (selectedRecord.assigned_to || "").trim().toLowerCase();
+    const nextAssigned = "assigned_to" in payload ? (payload.assigned_to || "").trim() : selectedRecord.assigned_to || "";
+    if (nextAssigned && nextAssigned.toLowerCase() !== prevAssigned) {
+      const person = people.find((candidate) => candidate.name.toLowerCase() === nextAssigned.toLowerCase());
+      if (person?.email) {
+        void fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: "assigned",
+            recipientEmail: person.email,
+            recipientName: person.name,
+            itemType: "HSE Observation",
+            itemRef: selectedRecord.observation_number,
+            itemTitle: selectedRecord.title || undefined,
+            status: payload.status || selectedRecord.status || undefined,
+            itemUrl: `${window.location.origin}/hse/observations?observation=${encodeURIComponent(selectedRecord.observation_number)}`,
+          }),
+        });
+      }
+    }
+
     await loadData();
   }
 
