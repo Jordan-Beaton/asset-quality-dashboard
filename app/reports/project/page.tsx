@@ -358,7 +358,7 @@ function makeWordCell(text: string, width: number, options?: { header?: boolean;
         children: [
           new TextRun({
             text: text || "-",
-            font: "Azo Sans",
+            font: "Calibri",
             size: options?.header ? 15 : 14,
             bold: options?.header,
             color: options?.header ? "FFFFFF" : "000000",
@@ -704,14 +704,14 @@ export default function ProjectReportsPage() {
       });
       const title = kind === "ncr" ? "Audit NCR Report" : "Audit Programme";
       const document = new WordDocument({
-        styles: { default: { document: { run: { font: "Azo Sans", size: 17, color: "000000" } } } },
+        styles: { default: { document: { run: { font: "Calibri", size: 17, color: "000000" } } } },
         sections: [{
           properties: { page: { size: { orientation: PageOrientation.LANDSCAPE }, margin: { top: 540, right: 540, bottom: 720, left: 540, footer: 300 } } },
-          footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Wadden Sea | ${title} | Page `, font: "Azo Sans", size: 15, color: "53565A" }), new SimpleField("PAGE"), new TextRun({ text: " of ", font: "Azo Sans", size: 15, color: "53565A" }), new SimpleField("NUMPAGES")] })] }) },
+          footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Wadden Sea | ${title} | Page `, font: "Calibri", size: 15, color: "53565A" }), new SimpleField("PAGE"), new TextRun({ text: " of ", font: "Calibri", size: 15, color: "53565A" }), new SimpleField("NUMPAGES")] })] }) },
           children: [
-            new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Azo Sans", bold: true, size: 32, color: "005670" })] }),
-            new Paragraph({ spacing: { after: 70 }, children: [new TextRun({ text: title, font: "Azo Sans", bold: true, size: 26 })] }),
-            new Paragraph({ spacing: { after: 170 }, children: [new TextRun({ text: `${auditsToExport.length} selected audits${kind === "ncr" ? ` | ${selectedNcrFindings.length} findings` : ""} | Generated ${new Date().toLocaleString("en-GB")}`, font: "Azo Sans", size: 16, color: "53565A" })] }),
+            new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Calibri", bold: true, size: 32, color: "005670" })] }),
+            new Paragraph({ spacing: { after: 70 }, children: [new TextRun({ text: title, font: "Calibri", bold: true, size: 26 })] }),
+            new Paragraph({ spacing: { after: 170 }, children: [new TextRun({ text: `${auditsToExport.length} selected audits${kind === "ncr" ? ` | ${selectedNcrFindings.length} findings` : ""} | Generated ${new Date().toLocaleString("en-GB")}`, font: "Calibri", size: 16, color: "53565A" })] }),
             table,
           ],
         }],
@@ -938,7 +938,7 @@ export default function ProjectReportsPage() {
 
       const document = new WordDocument({
         styles: {
-          default: { document: { run: { font: "Azo Sans", size: 18, color: "000000" } } },
+          default: { document: { run: { font: "Calibri", size: 18, color: "000000" } } },
         },
         sections: [
           {
@@ -954,9 +954,9 @@ export default function ProjectReportsPage() {
                   new Paragraph({
                     alignment: AlignmentType.CENTER,
                     children: [
-                      new TextRun({ text: "Wadden Sea | Eight-Week Inspection Lookahead | Page ", font: "Azo Sans", size: 15, color: "53565A" }),
+                      new TextRun({ text: "Wadden Sea | Eight-Week Inspection Lookahead | Page ", font: "Calibri", size: 15, color: "53565A" }),
                       new SimpleField("PAGE"),
-                      new TextRun({ text: " of ", font: "Azo Sans", size: 15, color: "53565A" }),
+                      new TextRun({ text: " of ", font: "Calibri", size: 15, color: "53565A" }),
                       new SimpleField("NUMPAGES"),
                     ],
                   }),
@@ -984,10 +984,10 @@ export default function ProjectReportsPage() {
                         margins: { top: 170, bottom: 170, left: 180, right: 180 },
                         children: [
                           new Paragraph({
-                            children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Azo Sans", bold: true, size: 34, color: "FFFFFF" })],
+                            children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Calibri", bold: true, size: 34, color: "FFFFFF" })],
                           }),
                           new Paragraph({
-                            children: [new TextRun({ text: "Eight-Week Inspection Lookahead", font: "Azo Sans", bold: true, size: 20, color: "FFFFFF" })],
+                            children: [new TextRun({ text: "Eight-Week Inspection Lookahead", font: "Calibri", bold: true, size: 20, color: "FFFFFF" })],
                           }),
                         ],
                       }),
@@ -997,14 +997,14 @@ export default function ProjectReportsPage() {
               }),
               new Paragraph({
                 spacing: { before: 170, after: 50 },
-                children: [new TextRun({ text: "Annex - Eight-Week Inspection Lookahead", font: "Azo Sans", bold: true, size: 30 })],
+                children: [new TextRun({ text: "Annex - Eight-Week Inspection Lookahead", font: "Calibri", bold: true, size: 30 })],
               }),
               new Paragraph({
                 spacing: { after: 160 },
                 children: [
                   new TextRun({
                     text: `${formatDate(horizonStart)} to ${formatDate(horizonEnd)} | ${selected.length} selected activities | Source: Live IMS NOI register${workbookSummary ? ` + ${workbookSummary.fileName}` : ""}`,
-                    font: "Azo Sans",
+                    font: "Calibri",
                     size: 17,
                     color: "53565A",
                   }),
@@ -1013,7 +1013,7 @@ export default function ProjectReportsPage() {
               detailTable,
               new Paragraph({
                 spacing: { before: 220, after: 80 },
-                children: [new TextRun({ text: "Eight-Week Timeline", font: "Azo Sans", bold: true, size: 24 })],
+                children: [new TextRun({ text: "Eight-Week Timeline", font: "Calibri", bold: true, size: 24 })],
               }),
               timelineTable,
               new Paragraph({
@@ -1021,7 +1021,7 @@ export default function ProjectReportsPage() {
                 children: [
                   new TextRun({
                     text: "Dates are derived from the uploaded NOI tracker. Week-only entries are shown across the stated week.",
-                    font: "Azo Sans",
+                    font: "Calibri",
                     italics: true,
                     size: 15,
                     color: "53565A",

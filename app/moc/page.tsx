@@ -2575,7 +2575,7 @@ function MOCPageContent() {
       children: [
             new TextRun({
               text,
-              font: "Azo Sans",
+              font: "Calibri",
               bold,
               italics: options?.italic,
               color: options?.color || "000000",
@@ -2599,7 +2599,7 @@ function MOCPageContent() {
               margins: { top: 110, bottom: 110, left: 150, right: 150 },
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: text.toUpperCase(), font: "Azo Sans", bold: true, color: "FFFFFF", size: 20 })],
+                  children: [new TextRun({ text: text.toUpperCase(), font: "Calibri", bold: true, color: "FFFFFF", size: 20 })],
                 }),
               ],
             }),
@@ -2610,7 +2610,7 @@ function MOCPageContent() {
   }
 
   function wordSpacer(size = 100) {
-    return new Paragraph({ children: [new TextRun({ text: "", font: "Azo Sans", size: 1 })], spacing: { after: size } });
+    return new Paragraph({ children: [new TextRun({ text: "", font: "Calibri", size: 1 })], spacing: { after: size } });
   }
 
   function wordCell(
@@ -2641,7 +2641,7 @@ function MOCPageContent() {
           children: [
             new TextRun({
               text: wordValue(text),
-              font: "Azo Sans",
+              font: "Calibri",
               bold: header || label,
               color: header ? "FFFFFF" : "000000",
               size: options?.fontSize ?? (header ? 18 : 17),
@@ -2732,7 +2732,7 @@ function MOCPageContent() {
         (item) =>
           new Paragraph({
             spacing: { after: 45 },
-            children: [new TextRun({ text: item, font: "Azo Sans", color: "000000", size: 17 })],
+            children: [new TextRun({ text: item, font: "Calibri", color: "000000", size: 17 })],
           })
       ),
     });
@@ -2776,7 +2776,7 @@ function MOCPageContent() {
               margins: { top: 90, bottom: 90, left: 120, right: 120 },
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: "Impact areas", font: "Azo Sans", bold: true, color: "53565A", size: 15 })],
+                  children: [new TextRun({ text: "Impact areas", font: "Calibri", bold: true, color: "53565A", size: 15 })],
                 }),
               ],
             }),
@@ -2805,7 +2805,7 @@ function MOCPageContent() {
               margins: { top: 90, bottom: 90, left: 120, right: 120 },
               children: [
                 new Paragraph({
-                  children: [new TextRun({ text: "Variation Order", font: "Azo Sans", bold: true, color: "53565A", size: 15 })],
+                  children: [new TextRun({ text: "Variation Order", font: "Calibri", bold: true, color: "53565A", size: 15 })],
                 }),
               ],
             }),
@@ -2823,7 +2823,7 @@ function MOCPageContent() {
                   children: [
                     new TextRun({
                       text: `${wordCheckbox(!report.variation_order_na)} Ref: ${wordValue(report.variation_order_reference_no)}`,
-                      font: "Azo Sans",
+                      font: "Calibri",
                       color: "000000",
                       size: 17,
                     }),
@@ -2833,7 +2833,7 @@ function MOCPageContent() {
                   children: [
                     new TextRun({
                       text: `${wordCheckbox(report.variation_order_na)} N/A`,
-                      font: "Azo Sans",
+                      font: "Calibri",
                       color: "000000",
                       size: 17,
                     }),
@@ -2863,7 +2863,7 @@ function MOCPageContent() {
           ]
         : [
             new Paragraph({
-              children: [new TextRun({ text: "ENSHORE", font: "Azo Sans", bold: true, size: 22, color: "000000" })],
+              children: [new TextRun({ text: "ENSHORE", font: "Calibri", bold: true, size: 22, color: "000000" })],
             }),
           ];
 
@@ -2885,7 +2885,7 @@ function MOCPageContent() {
                     new Paragraph({
                       alignment: AlignmentType.CENTER,
                       heading: HeadingLevel.HEADING_1,
-                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form", font: "Azo Sans", bold: true, size: 24, color: "000000" })],
+                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form", font: "Calibri", bold: true, size: 24, color: "000000" })],
                     }),
                   ],
                 }),
@@ -2893,8 +2893,8 @@ function MOCPageContent() {
                   borders: wordNoBorders,
                   margins: { top: 20, bottom: 45, left: 80, right: 0 },
                   children: [
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Rev D", font: "Azo Sans", size: 17, color: "53565A" })] }),
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: wordValue(report.moc_report_no), font: "Azo Sans", size: 17, color: "53565A" })] }),
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Rev D", font: "Calibri", size: 17, color: "53565A" })] }),
+                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: wordValue(report.moc_report_no), font: "Calibri", size: 17, color: "53565A" })] }),
                   ],
                 }),
               ],
@@ -2915,7 +2915,7 @@ function MOCPageContent() {
         new Paragraph({
           border: { top: { style: BorderStyle.SINGLE, color: "D0D0CE", size: 4 } },
           spacing: { before: 80 },
-                  children: [new TextRun({ text: "", font: "Azo Sans", size: 1 })],
+                  children: [new TextRun({ text: "", font: "Calibri", size: 1 })],
         }),
         new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
@@ -2929,7 +2929,7 @@ function MOCPageContent() {
                   borders: wordNoBorders,
                   children: [
                     new Paragraph({
-                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form Rev D", font: "Azo Sans", size: 16, color: "53565A" })],
+                      children: [new TextRun({ text: "ENS-HSEQ-FRM-008 Management of Change Form Rev D", font: "Calibri", size: 16, color: "53565A" })],
                     }),
                   ],
                 }),
@@ -2939,9 +2939,9 @@ function MOCPageContent() {
                     new Paragraph({
                       alignment: AlignmentType.RIGHT,
                       children: [
-                        new TextRun({ text: "Page ", font: "Azo Sans", size: 16, color: "53565A" }),
+                        new TextRun({ text: "Page ", font: "Calibri", size: 16, color: "53565A" }),
                         new SimpleField("PAGE"),
-                        new TextRun({ text: " of ", font: "Azo Sans", size: 16, color: "53565A" }),
+                        new TextRun({ text: " of ", font: "Calibri", size: 16, color: "53565A" }),
                         new SimpleField("NUMPAGES"),
                       ],
                     }),
@@ -3157,14 +3157,14 @@ function MOCPageContent() {
           default: {
             document: {
               run: {
-                font: "Azo Sans",
+                font: "Calibri",
                 size: 18,
                 color: "000000",
               },
             },
             title: {
               run: {
-                font: "Azo Sans",
+                font: "Calibri",
                 size: 28,
                 bold: true,
                 color: "000000",
@@ -3172,7 +3172,7 @@ function MOCPageContent() {
             },
             heading1: {
               run: {
-                font: "Azo Sans",
+                font: "Calibri",
                 size: 24,
                 bold: true,
                 color: "000000",
@@ -3180,7 +3180,7 @@ function MOCPageContent() {
             },
             heading2: {
               run: {
-                font: "Azo Sans",
+                font: "Calibri",
                 size: 20,
                 bold: true,
                 color: "000000",

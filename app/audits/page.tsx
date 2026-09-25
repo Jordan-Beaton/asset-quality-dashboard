@@ -2441,7 +2441,7 @@ function AuditsPageContent() {
   function wordRun(text: string, options?: { bold?: boolean; color?: string; size?: number; italics?: boolean }) {
     return new TextRun({
       text: exportText(text),
-      font: "Azo Sans",
+      font: "Calibri",
       bold: options?.bold,
       italics: options?.italics,
       color: options?.color || "000000",
@@ -2679,7 +2679,7 @@ function AuditsPageContent() {
       const document = new WordDocument({
         styles: {
           default: {
-            document: { run: { font: "Azo Sans", size: 19, color: "000000" } },
+            document: { run: { font: "Calibri", size: 19, color: "000000" } },
           },
         },
         sections: [
@@ -3692,7 +3692,7 @@ function AuditsPageContent() {
       const document = new WordDocument({
         styles: {
           default: {
-            document: { run: { font: "Azo Sans", size: 19, color: "000000" } },
+            document: { run: { font: "Calibri", size: 19, color: "000000" } },
           },
         },
         sections: [
@@ -3809,7 +3809,7 @@ function AuditsPageContent() {
       const document = new WordDocument({
         styles: {
           default: {
-            document: { run: { font: "Azo Sans", size: 17, color: "000000" } },
+            document: { run: { font: "Calibri", size: 17, color: "000000" } },
           },
         },
         sections: [

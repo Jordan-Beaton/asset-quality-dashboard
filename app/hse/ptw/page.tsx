@@ -1135,7 +1135,7 @@ export default function HsePermitToWorkPage() {
       bold: options.bold,
       color: options.color || "000000",
       size: options.size || 20,
-      font: "Azo Sans",
+      font: "Calibri",
     });
   }
 

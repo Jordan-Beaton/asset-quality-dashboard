@@ -676,7 +676,7 @@ Global font:
 
 - Azo Sans is the primary Enshore brand typeface and the first choice for the IMS.
 - Use the CSS stack `"Azo Sans", "Segoe UI", Arial, Helvetica, sans-serif` so the interface remains usable until a licensed Azo Sans webfont is supplied.
-- Calibri is reserved for internal Microsoft Office documents where Azo Sans is unavailable; it is not the IMS web-interface font.
+- Calibri is reserved for generated Word/PowerPoint documents (see "Generated PDF And Word Outputs" below); it is not the IMS web-interface font.
 - Body text colour: Enshore black `#000000`.
 - Secondary and explanatory text: Pantone cool gray 11 `#53565A`.
 
@@ -707,8 +707,8 @@ All generated reports, registers, forms, certificates, packs, and other download
 
 Typography:
 
-- Word outputs request Azo Sans. Calibri is the permitted Microsoft Office fallback only where Azo Sans is not installed.
-- PDF outputs use embedded Azo Sans when licensed font files are available. Until then, use jsPDF Helvetica as the portable fallback; do not substitute an unrelated decorative or condensed font.
+- Word and PowerPoint outputs request Calibri directly (not Azo Sans) — it ships with essentially every Windows/Office install, so it renders consistently without relying on host font substitution.
+- PDF outputs use jsPDF's built-in Helvetica as the portable fallback, since jsPDF has no built-in Calibri and embedding real Calibri glyphs would need a licensed font file bundled into the app; do not substitute an unrelated decorative or condensed font.
 - Standard print roles are: title `18pt`, heading `13pt`, subheading `11pt`, body `9pt`, table text `8pt`, and caption/footer `8pt`.
 - Use bold weight for titles, headings, table headers, and primary record identifiers. Use normal weight for narrative body copy.
 

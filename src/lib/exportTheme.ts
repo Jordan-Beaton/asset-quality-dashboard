@@ -1,9 +1,11 @@
 /**
  * Enshore Brand Guidelines 2026 tokens for generated PDF and Word outputs.
  *
- * PDF generators use jsPDF's built-in Helvetica as the safe portable fallback
- * until a licensed Azo Sans font file is supplied for embedding. Word outputs
- * request Azo Sans and allow the host Office installation to substitute it.
+ * PDF generators use jsPDF's built-in Helvetica, since jsPDF has no built-in
+ * Calibri and embedding real Calibri glyphs would need a licensed font file
+ * bundled into the app, which hasn't been supplied. Word outputs request
+ * Calibri directly — it ships with essentially every Windows/Office install,
+ * so it renders consistently without relying on host font substitution.
  */
 export const exportColours = {
   brand: "005670",
@@ -31,7 +33,7 @@ export const exportRgb = {
 
 export const exportTypography = {
   pdfFont: "helvetica",
-  wordFont: "Azo Sans",
+  wordFont: "Calibri",
   titlePt: 18,
   headingPt: 13,
   subheadingPt: 11,

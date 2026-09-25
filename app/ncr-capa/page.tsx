@@ -395,7 +395,7 @@ function wordParagraph(text: string, options?: { bold?: boolean; size?: number; 
     children: [
       new TextRun({
         text: wordText(text),
-        font: "Azo Sans",
+        font: "Calibri",
         bold: options?.bold,
         size: options?.size ?? 20,
         color: options?.color ?? "000000",
@@ -410,7 +410,7 @@ function wordHeading(text: string) {
     children: [
       new TextRun({
         text,
-        font: "Azo Sans",
+        font: "Calibri",
         bold: true,
         size: 22,
         color: "000000",
@@ -438,7 +438,7 @@ function wordCell(
             children: [
               new TextRun({
                 text: wordText(children),
-                font: "Azo Sans",
+                font: "Calibri",
                 bold: options?.bold,
                 color: options?.color ?? "000000",
                 size: options?.size ?? 18,
@@ -591,9 +591,9 @@ function wordReportFooter(reference: string) {
                   new Paragraph({
                     alignment: AlignmentType.RIGHT,
                     children: [
-                      new TextRun({ text: "Page ", font: "Azo Sans", size: 16, color: "53565A" }),
+                      new TextRun({ text: "Page ", font: "Calibri", size: 16, color: "53565A" }),
                       new SimpleField("PAGE"),
-                      new TextRun({ text: " of ", font: "Azo Sans", size: 16, color: "53565A" }),
+                      new TextRun({ text: " of ", font: "Calibri", size: 16, color: "53565A" }),
                       new SimpleField("NUMPAGES"),
                     ],
                   }),
@@ -2604,7 +2604,7 @@ function NcrCapaPageContent() {
                               transformation: { width: 170, height: 85 },
                             }),
                           ]
-                        : [new TextRun({ text: "ENSHORE", font: "Azo Sans", bold: true, size: 30 })],
+                        : [new TextRun({ text: "ENSHORE", font: "Calibri", bold: true, size: 30 })],
                     }),
                   ],
                 }),
@@ -2615,16 +2615,16 @@ function NcrCapaPageContent() {
                     new Paragraph({
                       alignment: AlignmentType.RIGHT,
                       spacing: { after: 55 },
-                      children: [new TextRun({ text: title, font: "Azo Sans", bold: true, size: 30, color: "000000" })],
+                      children: [new TextRun({ text: title, font: "Calibri", bold: true, size: 30, color: "000000" })],
                     }),
                     new Paragraph({
                       alignment: AlignmentType.RIGHT,
                       spacing: { after: 35 },
-                      children: [new TextRun({ text: `Reference: ${selectedRow.number}`, font: "Azo Sans", size: 20, color: "53565A" })],
+                      children: [new TextRun({ text: `Reference: ${selectedRow.number}`, font: "Calibri", size: 20, color: "53565A" })],
                     }),
                     new Paragraph({
                       alignment: AlignmentType.RIGHT,
-                      children: [new TextRun({ text: `Generated: ${generatedAt}`, font: "Azo Sans", size: 20, color: "53565A" })],
+                      children: [new TextRun({ text: `Generated: ${generatedAt}`, font: "Calibri", size: 20, color: "53565A" })],
                     }),
                   ],
                 }),
@@ -2790,7 +2790,7 @@ function NcrCapaPageContent() {
           default: {
             document: {
               run: {
-                font: "Azo Sans",
+                font: "Calibri",
                 size: 19,
                 color: "000000",
               },

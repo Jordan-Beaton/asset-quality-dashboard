@@ -776,23 +776,23 @@ export default function ManagementReviewPage() {
         slide.background = { color: "ECECE7" };
         slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.333, h: 0.16, fill: { color: "005670" }, line: { color: "005670" } });
         slide.addImage({ path: "/enshore-primary-logo-colour.png", x: 11.0, y: 0.35, w: 1.7, h: 0.85 });
-        slide.addText(title, { x: 0.55, y: 0.45, w: 8.7, h: 0.38, fontFace: "Azo Sans", fontSize: 23, bold: true, color: "000000", margin: 0 });
+        slide.addText(title, { x: 0.55, y: 0.45, w: 8.7, h: 0.38, fontFace: "Calibri", fontSize: 23, bold: true, color: "000000", margin: 0 });
         if (subtitle) {
-          slide.addText(subtitle, { x: 0.55, y: 0.86, w: 9.8, h: 0.26, fontFace: "Azo Sans", fontSize: 10.5, color: "53565A", margin: 0 });
+          slide.addText(subtitle, { x: 0.55, y: 0.86, w: 9.8, h: 0.26, fontFace: "Calibri", fontSize: 10.5, color: "53565A", margin: 0 });
         }
-        slide.addText(`${lastRefreshed || new Date().toLocaleString("en-GB")} | Period: ${periodLabel}`, { x: 0.55, y: 6.9, w: 5, h: 0.24, fontFace: "Azo Sans", fontSize: 8.5, color: "53565A", margin: 0 });
+        slide.addText(`${lastRefreshed || new Date().toLocaleString("en-GB")} | Period: ${periodLabel}`, { x: 0.55, y: 6.9, w: 5, h: 0.24, fontFace: "Calibri", fontSize: 8.5, color: "53565A", margin: 0 });
       };
 
       const titleSlide = pptx.addSlide();
       titleSlide.background = { color: "ECECE7" };
       titleSlide.addShape(pptx.ShapeType.roundRect, { x: 0.5, y: 0.55, w: 12.35, h: 5.75, rectRadius: 0.16, fill: { color: "005670" }, line: { color: "005670" } });
-      titleSlide.addText("MANAGEMENT REVIEW", { x: 0.95, y: 1.05, w: 4.6, h: 0.28, fontFace: "Azo Sans", fontSize: 11, bold: true, color: "D0D0CE", margin: 0 });
-      titleSlide.addText("Business Health Pack", { x: 0.95, y: 1.48, w: 6.7, h: 0.55, fontFace: "Azo Sans", fontSize: 30, bold: true, color: "FFFFFF", margin: 0 });
-      titleSlide.addText(`Live snapshot across Quality, HSE, Documents, Projects, Assets, Actions, and Lessons Learnt. Period: ${periodLabel}.`, { x: 0.95, y: 2.15, w: 9.5, h: 0.5, fontFace: "Azo Sans", fontSize: 13, color: "ECECE7", margin: 0 });
+      titleSlide.addText("MANAGEMENT REVIEW", { x: 0.95, y: 1.05, w: 4.6, h: 0.28, fontFace: "Calibri", fontSize: 11, bold: true, color: "D0D0CE", margin: 0 });
+      titleSlide.addText("Business Health Pack", { x: 0.95, y: 1.48, w: 6.7, h: 0.55, fontFace: "Calibri", fontSize: 30, bold: true, color: "FFFFFF", margin: 0 });
+      titleSlide.addText(`Live snapshot across Quality, HSE, Documents, Projects, Assets, Actions, and Lessons Learnt. Period: ${periodLabel}.`, { x: 0.95, y: 2.15, w: 9.5, h: 0.5, fontFace: "Calibri", fontSize: 13, color: "ECECE7", margin: 0 });
       titleSlide.addShape(pptx.ShapeType.ellipse, { x: 9.0, y: 1.1, w: 2.4, h: 2.4, fill: { color: "FFFFFF", transparency: 100 }, line: { color: "63B1BC", width: 4 } });
-      titleSlide.addText(String(totalAttention), { x: 9.05, y: 1.72, w: 2.3, h: 0.55, fontFace: "Azo Sans", fontSize: 30, bold: true, color: "FFFFFF", align: "center", margin: 0 });
-      titleSlide.addText("ITEMS NEEDING ATTENTION", { x: 9.0, y: 2.32, w: 2.4, h: 0.24, fontFace: "Azo Sans", fontSize: 8, bold: true, color: "D0D0CE", align: "center", margin: 0 });
-      titleSlide.addText(`Generated ${new Date().toLocaleString("en-GB")}`, { x: 0.95, y: 5.65, w: 4.5, h: 0.24, fontFace: "Azo Sans", fontSize: 9, color: "D0D0CE", margin: 0 });
+      titleSlide.addText(String(totalAttention), { x: 9.05, y: 1.72, w: 2.3, h: 0.55, fontFace: "Calibri", fontSize: 30, bold: true, color: "FFFFFF", align: "center", margin: 0 });
+      titleSlide.addText("ITEMS NEEDING ATTENTION", { x: 9.0, y: 2.32, w: 2.4, h: 0.24, fontFace: "Calibri", fontSize: 8, bold: true, color: "D0D0CE", align: "center", margin: 0 });
+      titleSlide.addText(`Generated ${new Date().toLocaleString("en-GB")}`, { x: 0.95, y: 5.65, w: 4.5, h: 0.24, fontFace: "Calibri", fontSize: 9, color: "D0D0CE", margin: 0 });
 
       const overviewSlide = pptx.addSlide();
       addTitle(overviewSlide, "Business Area Status", "Status and open attention items per business area — no blended score, each area speaks for itself.");
@@ -804,9 +804,9 @@ export default function ManagementReviewPage() {
         const colour = toneColour[area.tone].replace("#", "");
         overviewSlide.addShape(pptx.ShapeType.roundRect, { x, y, w: 2.85, h: 1.35, rectRadius: 0.08, fill: { color: "FFFFFF" }, line: { color: "DBE7F3" } });
         overviewSlide.addShape(pptx.ShapeType.rect, { x, y, w: 2.85, h: 0.08, fill: { color: colour }, line: { color: colour } });
-        overviewSlide.addText(area.title, { x: x + 0.15, y: y + 0.16, w: 2.55, h: 0.24, fontFace: "Azo Sans", fontSize: 11, bold: true, color: "000000", margin: 0 });
-        overviewSlide.addText(toneLabel[area.tone], { x: x + 0.15, y: y + 0.44, w: 2.55, h: 0.2, fontFace: "Azo Sans", fontSize: 9, bold: true, color: colour, margin: 0 });
-        overviewSlide.addText(`${area.attentionCount} needing attention`, { x: x + 0.15, y: y + 0.78, w: 2.55, h: 0.4, fontFace: "Azo Sans", fontSize: 20, bold: true, color: "000000", margin: 0 });
+        overviewSlide.addText(area.title, { x: x + 0.15, y: y + 0.16, w: 2.55, h: 0.24, fontFace: "Calibri", fontSize: 11, bold: true, color: "000000", margin: 0 });
+        overviewSlide.addText(toneLabel[area.tone], { x: x + 0.15, y: y + 0.44, w: 2.55, h: 0.2, fontFace: "Calibri", fontSize: 9, bold: true, color: colour, margin: 0 });
+        overviewSlide.addText(`${area.attentionCount} needing attention`, { x: x + 0.15, y: y + 0.78, w: 2.55, h: 0.4, fontFace: "Calibri", fontSize: 20, bold: true, color: "000000", margin: 0 });
       });
 
       visibleAreas.forEach((area) => {
@@ -815,15 +815,15 @@ export default function ManagementReviewPage() {
         area.headline.forEach((item, index) => {
           const x = 0.6 + index * 3.15;
           slide.addShape(pptx.ShapeType.roundRect, { x, y: 1.25, w: 2.9, h: 1.05, rectRadius: 0.08, fill: { color: "FFFFFF" }, line: { color: "DBE7F3" } });
-          slide.addText(item.label, { x: x + 0.15, y: 1.42, w: 2.6, h: 0.22, fontFace: "Azo Sans", fontSize: 8.5, bold: true, color: "53565A", margin: 0 });
-          slide.addText(item.value === null ? "N/A" : String(item.value), { x: x + 0.15, y: 1.73, w: 2.6, h: 0.4, fontFace: "Azo Sans", fontSize: 21, bold: true, color: "000000", margin: 0 });
+          slide.addText(item.label, { x: x + 0.15, y: 1.42, w: 2.6, h: 0.22, fontFace: "Calibri", fontSize: 8.5, bold: true, color: "53565A", margin: 0 });
+          slide.addText(item.value === null ? "N/A" : String(item.value), { x: x + 0.15, y: 1.73, w: 2.6, h: 0.4, fontFace: "Calibri", fontSize: 21, bold: true, color: "000000", margin: 0 });
         });
-        slide.addText("Detail", { x: 0.6, y: 2.7, w: 3.5, h: 0.3, fontFace: "Azo Sans", fontSize: 16, bold: true, color: "000000", margin: 0 });
+        slide.addText("Detail", { x: 0.6, y: 2.7, w: 3.5, h: 0.3, fontFace: "Calibri", fontSize: 16, bold: true, color: "000000", margin: 0 });
         area.detail.forEach((item, index) => {
           const y = 3.13 + index * 0.46;
           slide.addShape(pptx.ShapeType.roundRect, { x: 0.6, y, w: 11.9, h: 0.34, rectRadius: 0.05, fill: { color: index % 2 ? "FFFFFF" : "ECECE7" }, line: { color: "D0D0CE" } });
-          slide.addText(item.label, { x: 0.82, y: y + 0.08, w: 9.5, h: 0.16, fontFace: "Azo Sans", fontSize: 9.5, bold: true, color: "000000", margin: 0 });
-          slide.addText(item.value === null ? "N/A" : String(item.value), { x: 10.8, y: y + 0.08, w: 1.2, h: 0.16, fontFace: "Azo Sans", fontSize: 9.5, bold: true, color: "000000", align: "right", margin: 0 });
+          slide.addText(item.label, { x: 0.82, y: y + 0.08, w: 9.5, h: 0.16, fontFace: "Calibri", fontSize: 9.5, bold: true, color: "000000", margin: 0 });
+          slide.addText(item.value === null ? "N/A" : String(item.value), { x: 10.8, y: y + 0.08, w: 1.2, h: 0.16, fontFace: "Calibri", fontSize: 9.5, bold: true, color: "000000", align: "right", margin: 0 });
         });
       });
 
