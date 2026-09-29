@@ -4329,11 +4329,6 @@ function MOCPageContent() {
                     </span>
                   </div>
                 </div>
-                <RepeatTableToolbar
-                  onAdd={addActionRow}
-                  label="Add Action Row"
-                  disabled={!canEditImplementationStructure}
-                />
                 <div style={repeatCardStackStyle}>
                   {detailActionItems.map((row, index) => (
                     <div key={`${row.id || "new"}-${index}`} style={repeatCardStyle}>
@@ -4485,6 +4480,11 @@ function MOCPageContent() {
                     </div>
                   ))}
                 </div>
+                <RepeatTableToolbar
+                  onAdd={addActionRow}
+                  label="Add Action Row"
+                  disabled={!canEditImplementationStructure}
+                />
                 </fieldset>
               </DetailSubsection>
 
@@ -4580,7 +4580,6 @@ function MOCPageContent() {
 
               <DetailSubsection title="E. AFFECTED DOCUMENTATION">
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
-                <RepeatTableToolbar onAdd={addAffectedDocumentRow} label="Add Document Row" disabled={!canEditStructural} />
                 <SimpleDocumentTable
                   rows={detailAffectedDocuments}
                   onChange={updateAffectedDocumentRow}
@@ -4588,12 +4587,12 @@ function MOCPageContent() {
                   onMove={moveAffectedDocumentRow}
                   disabled={!canEditStructural}
                 />
+                <RepeatTableToolbar onAdd={addAffectedDocumentRow} label="Add Document Row" disabled={!canEditStructural} />
                 </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="F. RISK MANAGEMENT">
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
-                <RepeatTableToolbar onAdd={addRiskDocumentRow} label="Add Risk Document Row" disabled={!canEditStructural} />
                 <SimpleDocumentTable
                   rows={detailRiskDocuments}
                   onChange={updateRiskDocumentRow}
@@ -4601,6 +4600,7 @@ function MOCPageContent() {
                   onMove={moveRiskDocumentRow}
                   disabled={!canEditStructural}
                 />
+                <RepeatTableToolbar onAdd={addRiskDocumentRow} label="Add Risk Document Row" disabled={!canEditStructural} />
 
                 <div style={{ marginTop: 16 }} />
                 <div style={detailFormGridStyle}>
@@ -4824,7 +4824,6 @@ function MOCPageContent() {
 
               <DetailSubsection title="K. REVIEW AND ENDORSEMENT">
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditReviewSections}>
-                <RepeatTableToolbar onAdd={addReviewRow} label="Add Review Row" disabled={!canEditStructural} />
                 <div style={repeatCardStackStyle}>
                   {detailReviewRows.map((row, index) => (
                     <div key={`${row.id || "new"}-${index}`} style={repeatCardStyle}>
@@ -4942,12 +4941,12 @@ function MOCPageContent() {
                     </div>
                   ))}
                 </div>
+                <RepeatTableToolbar onAdd={addReviewRow} label="Add Review Row" disabled={!canEditStructural} />
                 </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="L. MOC CHANGE ACCEPTANCE">
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditReviewSections}>
-                <RepeatTableToolbar onAdd={addAcceptanceRow} label="Add Acceptance Row" disabled={!canEditStructural} />
                 <SimpleSignoffTable
                   rows={detailAcceptanceRows}
                   onChange={updateAcceptanceRow}
@@ -4960,16 +4959,12 @@ function MOCPageContent() {
                   sendingSignoffKey={sendingSignoffKey}
                   onSendSignoff={sendSignoffRequest}
                 />
+                <RepeatTableToolbar onAdd={addAcceptanceRow} label="Add Acceptance Row" disabled={!canEditStructural} />
                 </fieldset>
               </DetailSubsection>
 
               <DetailSubsection title="M. MOC CLOSE-OUT VERIFICATION">
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCloseout}>
-                <RepeatTableToolbar
-                  onAdd={addCloseoutRow}
-                  label="Add Close-Out Row"
-                  disabled={!canEditCloseoutStructure}
-                />
                 <SimpleSignoffTable
                   rows={detailCloseoutRows}
                   onChange={updateCloseoutRow}
@@ -4981,6 +4976,11 @@ function MOCPageContent() {
                   signoffRequestFor={signoffRequestFor}
                   sendingSignoffKey={sendingSignoffKey}
                   onSendSignoff={sendSignoffRequest}
+                />
+                <RepeatTableToolbar
+                  onAdd={addCloseoutRow}
+                  label="Add Close-Out Row"
+                  disabled={!canEditCloseoutStructure}
                 />
                 </fieldset>
               </DetailSubsection>
@@ -5847,7 +5847,7 @@ const detailTemporaryHintStyle: CSSProperties = {
 const repeatToolbarStyle: CSSProperties = {
   display: "flex",
   justifyContent: "flex-end",
-  marginBottom: "12px",
+  marginTop: "14px",
 };
 
 const tableEditorWrapStyle: CSSProperties = {
