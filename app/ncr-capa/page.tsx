@@ -939,8 +939,39 @@ function NcrCapaPageContent() {
   const [selectedEvidenceFiles, setSelectedEvidenceFiles] = useState<File[]>([]);
   const [selectedEvidenceNotes, setSelectedEvidenceNotes] = useState("");
   const [includeLinkedCapaInPdf, setIncludeLinkedCapaInPdf] = useState(true);
-  const [includeEvidenceListInPdf, setIncludeEvidenceListInPdf] = useState(true);
-  const [externalFacingPdf, setExternalFacingPdf] = useState(false);
+  const [includeEvidenceListInPdf, setIncludeEvidenceListInPdf] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const stored = window.localStorage.getItem("ncr-report-include-evidence-list");
+      return stored === null ? true : stored === "true";
+    } catch {
+      return true;
+    }
+  });
+  const [externalFacingPdf, setExternalFacingPdf] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("ncr-report-external-facing") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ncr-report-include-evidence-list", String(includeEvidenceListInPdf));
+    } catch {
+      // localStorage can be unavailable (private browsing, blocked site data) - not worth surfacing.
+    }
+  }, [includeEvidenceListInPdf]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("ncr-report-external-facing", String(externalFacingPdf));
+    } catch {
+      // localStorage can be unavailable (private browsing, blocked site data) - not worth surfacing.
+    }
+  }, [externalFacingPdf]);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatingWord, setGeneratingWord] = useState(false);
   const [generatingFilteredNcrReport, setGeneratingFilteredNcrReport] = useState(false);
