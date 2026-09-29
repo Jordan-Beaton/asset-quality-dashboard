@@ -50,7 +50,11 @@ Quality Management is the master visual reference for the IMS. Equivalent pages 
 - Section C/D/J/K layouts were improved.
 - Uses People dropdowns where names are required.
 - Supports linked Action generation.
-- MOC creation requires Create permission; save, workflow progression, delete, attachment management, and signature image changes require Edit permission.
+- MOC creation requires Create permission; save, workflow progression, delete, attachment management, and sign-off requests require Edit permission.
+- Sections K (Review & Endorsement), L (Change Acceptance), and M (Close-Out Verification) no longer accept typed or uploaded signatures. Each row is sent for email sign-off instead: pick the person from the People dropdown (their email must be on file) and click "Send for Sign-Off". This mirrors Document Control's email workflow — no OTP, since MOC reviewers are internal people.
+  - Sending a row emails a purpose-built MOC summary PDF (`src/lib/mocSignoffPdf.ts`) plus a link to `/moc/signoff-action?token=...`, a public no-login page where the recipient chooses Approve, Reject, or Comments (`app/api/moc-signoff/route.ts`, `app/api/moc-signoff-action/route.ts`).
+  - The decision writes an audit-trail string into the row's existing `signature` column (e.g. "Approved via email by Jane Doe (jane@...) on 12/01/2026") plus `approved_value`/`review_date` (Review & Endorsement) or `signoff_date` (Acceptance/Close-Out) and `comments`. Comments do not approve or reject the row — they set status "Needs Attention" and notify the MOC Coordinator to follow up.
+  - Requests are tracked in `moc_signoff_requests`/`moc_signoff_tokens` (see `scripts/sql/moc_signoff.sql`, run once in Supabase), addressed by `(moc_report_id, target_table, sort_order)` rather than row `id` — `persistChildTables()` deletes and re-inserts every review/acceptance/closeout row on every MOC save, so `sort_order` is the only stable identity for a row across saves. `withLatestSignoffDecisions()` in `app/moc/page.tsx` re-reads the current DB decision fields before every save so a stale in-memory save can't silently overwrite a decision recorded via email in the meantime.
 
 ## Warnings
 

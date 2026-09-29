@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ChangeEvent, ReactNode } from "react";
@@ -138,6 +137,24 @@ type MocSignoffRow = {
   name: string;
   signature: string;
   signoff_date: string;
+  comments: string;
+};
+
+type MocSignoffTargetTable = "moc_review_endorsement_rows" | "moc_acceptance_rows" | "moc_closeout_rows";
+type MocSignoffStatus = "Pending" | "Approved" | "Rejected" | "Needs Attention";
+
+type MocSignoffRequest = {
+  id: string;
+  moc_report_id: string;
+  target_table: MocSignoffTargetTable;
+  sort_order: number;
+  row_label: string;
+  recipient_name: string;
+  recipient_email: string;
+  status: MocSignoffStatus;
+  decision_name: string;
+  decision_note: string;
+  decided_at: string;
 };
 
 type MocAttachment = {
@@ -442,6 +459,7 @@ function createSignoffRows(roles: string[]): MocSignoffRow[] {
     name: "",
     signature: "",
     signoff_date: "",
+    comments: "",
   }));
 }
 
@@ -879,6 +897,8 @@ function MOCPageContent() {
   const [detailCloseoutRows, setDetailCloseoutRows] = useState<MocSignoffRow[]>(
     createSignoffRows(defaultCloseoutRoles)
   );
+  const [signoffRequests, setSignoffRequests] = useState<MocSignoffRequest[]>([]);
+  const [sendingSignoffKey, setSendingSignoffKey] = useState("");
 
   const canCreateMoc = useMemo(() => {
     return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
@@ -959,6 +979,23 @@ function MOCPageContent() {
     [peopleOptions]
   );
 
+  const resolvePersonEmail = useCallback(
+    (name: string) => {
+      const target = name.trim().toLowerCase();
+      if (!target) return "";
+      const match = peopleOptions.find((person) => person.name.trim().toLowerCase() === target);
+      return (match?.email || "").trim();
+    },
+    [peopleOptions]
+  );
+
+  const signoffRequestFor = useCallback(
+    (targetTable: MocSignoffTargetTable, sortOrder: number) =>
+      signoffRequests.find((request) => request.target_table === targetTable && request.sort_order === sortOrder) ||
+      null,
+    [signoffRequests]
+  );
+
   const openCount = useMemo(
     () => reports.filter((report) => report.status !== "Closed").length,
     [reports]
@@ -1018,21 +1055,6 @@ function MOCPageContent() {
       setActiveView("register");
     }
   }, [linkedAttention, linkedChangeType, linkedRecent, linkedSearch, linkedStatus]);
-
-  async function handleSignatureFile(
-    file: File | null,
-    apply: (value: string) => void
-  ) {
-    if (!requireEditPermission("Attaching MOC signatures")) return;
-    if (!file) return;
-    try {
-      const dataUrl = await toDataUrl(file);
-      apply(dataUrl);
-      showMessage("Signature image attached for PDF output.", "success");
-    } catch {
-      showMessage("Signature image could not be read.", "error");
-    }
-  }
 
   const showMessage = useCallback((text: string, tone: NoticeTone = "neutral") => {
     setMessage(text);
@@ -1149,6 +1171,7 @@ function MOCPageContent() {
       name: String(row.name || ""),
       signature: String(row.signature || ""),
       signoff_date: String(row.signoff_date || ""),
+      comments: String(row.comments || ""),
     }));
     const nextCloseoutRows = ((closeoutRes.data || []) as Record<string, unknown>[]).map((row) => ({
       id: String(row.id || ""),
@@ -1159,6 +1182,7 @@ function MOCPageContent() {
       name: String(row.name || ""),
       signature: String(row.signature || ""),
       signoff_date: String(row.signoff_date || ""),
+      comments: String(row.comments || ""),
     }));
     const nextAttachments = ((attachmentsRes.data || []) as Record<string, unknown>[]).map((row) => ({
       id: String(row.id || ""),
@@ -1290,6 +1314,80 @@ function MOCPageContent() {
     setDetailCloseoutRows(
       bundle.closeoutRows.length ? bundle.closeoutRows : createSignoffRows(defaultCloseoutRoles)
     );
+    void loadSignoffRequests(reportId);
+  }
+
+  async function loadSignoffRequests(reportId: string) {
+    if (!reportId) {
+      setSignoffRequests([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("moc_signoff_requests")
+      .select("*")
+      .eq("moc_report_id", reportId)
+      .order("created_at", { ascending: false });
+    if (error) return;
+    const rows = ((data || []) as Record<string, unknown>[]).map((row) => ({
+      id: String(row.id || ""),
+      moc_report_id: String(row.moc_report_id || ""),
+      target_table: String(row.target_table || "") as MocSignoffTargetTable,
+      sort_order: Number(row.sort_order || 0),
+      row_label: String(row.row_label || ""),
+      recipient_name: String(row.recipient_name || ""),
+      recipient_email: String(row.recipient_email || ""),
+      status: String(row.status || "Pending") as MocSignoffStatus,
+      decision_name: String(row.decision_name || ""),
+      decision_note: String(row.decision_note || ""),
+      decided_at: String(row.decided_at || ""),
+    }));
+    setSignoffRequests(rows);
+  }
+
+  async function sendSignoffRequest(
+    targetTable: MocSignoffTargetTable,
+    sortOrder: number,
+    rowLabel: string,
+    recipientName: string
+  ) {
+    if (!requireEditPermission("Sending MOC sign-off")) return;
+    if (!selectedReportId) return;
+    const trimmedName = recipientName.trim();
+    if (!trimmedName) {
+      showMessage("Select a name before sending for sign-off.", "warning");
+      return;
+    }
+    const recipientEmail = resolvePersonEmail(trimmedName);
+    if (!recipientEmail) {
+      showMessage(`No email on file for ${trimmedName}. Add one on the People record first.`, "warning");
+      return;
+    }
+
+    const key = `${targetTable}:${sortOrder}`;
+    setSendingSignoffKey(key);
+    try {
+      await saveSelectedMoc();
+      const response = await fetch("/api/moc-signoff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mocReportId: selectedReportId,
+          targetTable,
+          sortOrder,
+          rowLabel,
+          recipientName: trimmedName,
+          recipientEmail,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || "Unable to send the sign-off request.");
+      await loadSignoffRequests(selectedReportId);
+      showMessage(`Sign-off requested from ${trimmedName}.`, "success");
+    } catch (error) {
+      showMessage(getErrorMessage(error), "error");
+    } finally {
+      setSendingSignoffKey("");
+    }
   }
 
   function hideDetailPanel() {
@@ -1301,6 +1399,7 @@ function MOCPageContent() {
     setDetailReviewRows(createReviewRows());
     setDetailAcceptanceRows(createSignoffRows(defaultAcceptanceRoles));
     setDetailCloseoutRows(createSignoffRows(defaultCloseoutRoles));
+    setSignoffRequests([]);
   }
 
   function switchMocWorkspaceView(view: MocWorkspaceView) {
@@ -1403,6 +1502,7 @@ function MOCPageContent() {
             name: row.name,
             signature: row.signature,
             signoff_date: row.signoff_date || null,
+            comments: row.comments,
           })),
       },
       {
@@ -1414,6 +1514,7 @@ function MOCPageContent() {
             name: row.name,
             signature: row.signature,
             signoff_date: row.signoff_date || null,
+            comments: row.comments,
           })),
       },
     ];
@@ -1512,6 +1613,66 @@ function MOCPageContent() {
     }
   }
 
+  async function withLatestSignoffDecisions(reportId: string, bundle: PersistableMocBundle) {
+    // Review/acceptance/closeout rows are deleted and re-inserted on every save
+    // (see replaceChildRows), but an emailed sign-off decision can land in the
+    // DB between page loads. Overlay the decision-owned fields with the
+    // current DB values so a stale in-memory save can't silently revert a
+    // decision that was just recorded via the emailed sign-off link.
+    const [reviewRes, acceptanceRes, closeoutRes] = await Promise.all([
+      supabase
+        .from("moc_review_endorsement_rows")
+        .select("sort_order,approved_value,signature,review_date,comments")
+        .eq("moc_report_id", reportId),
+      supabase.from("moc_acceptance_rows").select("sort_order,signature,signoff_date,comments").eq("moc_report_id", reportId),
+      supabase.from("moc_closeout_rows").select("sort_order,signature,signoff_date,comments").eq("moc_report_id", reportId),
+    ]);
+
+    const toMap = (rows: Record<string, unknown>[] | null) => {
+      const map = new Map<number, Record<string, unknown>>();
+      (rows || []).forEach((row) => map.set(Number(row.sort_order || 0), row));
+      return map;
+    };
+    const reviewMap = toMap(reviewRes.data as Record<string, unknown>[] | null);
+    const acceptanceMap = toMap(acceptanceRes.data as Record<string, unknown>[] | null);
+    const closeoutMap = toMap(closeoutRes.data as Record<string, unknown>[] | null);
+
+    return {
+      ...bundle,
+      reviewRows: bundle.reviewRows.map((row, index) => {
+        const latest = reviewMap.get(index);
+        if (!latest) return row;
+        return {
+          ...row,
+          approved_value: normaliseApprovedChoice(String(latest.approved_value || "")),
+          signature: String(latest.signature || ""),
+          review_date: String(latest.review_date || ""),
+          comments: String(latest.comments || ""),
+        };
+      }),
+      acceptanceRows: bundle.acceptanceRows.map((row, index) => {
+        const latest = acceptanceMap.get(index);
+        if (!latest) return row;
+        return {
+          ...row,
+          signature: String(latest.signature || ""),
+          signoff_date: String(latest.signoff_date || ""),
+          comments: String(latest.comments || ""),
+        };
+      }),
+      closeoutRows: bundle.closeoutRows.map((row, index) => {
+        const latest = closeoutMap.get(index);
+        if (!latest) return row;
+        return {
+          ...row,
+          signature: String(latest.signature || ""),
+          signoff_date: String(latest.signoff_date || ""),
+          comments: String(latest.comments || ""),
+        };
+      }),
+    };
+  }
+
   async function saveSelectedMoc() {
     if (!selectedReportId) return;
     if (!requireEditPermission("Saving MOCs")) return;
@@ -1531,7 +1692,8 @@ function MOCPageContent() {
         throw new Error(updateRes.error.message);
       }
 
-      await persistChildTables(selectedReportId, buildCurrentDetailBundle());
+      const mergedBundle = await withLatestSignoffDecisions(selectedReportId, buildCurrentDetailBundle());
+      await persistChildTables(selectedReportId, mergedBundle);
 
       const loaded = await loadData();
       openBundle(selectedReportId, loaded);
@@ -1592,7 +1754,8 @@ function MOCPageContent() {
         throw new Error(updateRes.error.message);
       }
 
-      await persistChildTables(selectedReportId, nextBundle);
+      const mergedBundle = await withLatestSignoffDecisions(selectedReportId, nextBundle);
+      await persistChildTables(selectedReportId, mergedBundle);
 
       const loaded = await loadData();
       openBundle(selectedReportId, loaded);
@@ -1763,10 +1926,6 @@ function MOCPageContent() {
     );
   }
 
-  function uploadReviewSignature(index: number, file: File | null) {
-    void handleSignatureFile(file, (value) => updateReviewRow(index, "signature", value));
-  }
-
   function removeReviewRow(index: number) {
     setDetailReviewRows((prev) => syncSimpleOrders(prev.filter((_, rowIndex) => rowIndex !== index)));
   }
@@ -1778,7 +1937,7 @@ function MOCPageContent() {
   function addAcceptanceRow() {
     setDetailAcceptanceRows((prev) => [
       ...syncSimpleOrders(prev),
-      { id: "", moc_report_id: "", sort_order: prev.length, role_label: "", position: "", name: "", signature: "", signoff_date: "" },
+      { id: "", moc_report_id: "", sort_order: prev.length, role_label: "", position: "", name: "", signature: "", signoff_date: "", comments: "" },
     ]);
   }
 
@@ -1786,10 +1945,6 @@ function MOCPageContent() {
     setDetailAcceptanceRows((prev) =>
       syncSimpleOrders(prev.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)))
     );
-  }
-
-  function uploadAcceptanceSignature(index: number, file: File | null) {
-    void handleSignatureFile(file, (value) => updateAcceptanceRow(index, "signature", value));
   }
 
   function removeAcceptanceRow(index: number) {
@@ -1803,7 +1958,7 @@ function MOCPageContent() {
   function addCloseoutRow() {
     setDetailCloseoutRows((prev) => [
       ...syncSimpleOrders(prev),
-      { id: "", moc_report_id: "", sort_order: prev.length, role_label: "", position: "", name: "", signature: "", signoff_date: "" },
+      { id: "", moc_report_id: "", sort_order: prev.length, role_label: "", position: "", name: "", signature: "", signoff_date: "", comments: "" },
     ]);
   }
 
@@ -1811,10 +1966,6 @@ function MOCPageContent() {
     setDetailCloseoutRows((prev) =>
       syncSimpleOrders(prev.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)))
     );
-  }
-
-  function uploadCloseoutSignature(index: number, file: File | null) {
-    void handleSignatureFile(file, (value) => updateCloseoutRow(index, "signature", value));
   }
 
   function removeCloseoutRow(index: number) {
@@ -4346,11 +4497,11 @@ function MOCPageContent() {
                           />
                         </Field>
                         <Field label="Name">
-                          <PeopleNameInput
+                          <PeopleEmailSelect
                             value={row.name}
-                            onChange={(e) => updateReviewRow(index, "name", e.target.value)}
-                            listId="moc-people-options"
-                            placeholder="Select or type a name"
+                            onChange={(value) => updateReviewRow(index, "name", value)}
+                            people={peopleOptions}
+                            disabled={!canEditReviewSections}
                           />
                         </Field>
                         <Field label="Position">
@@ -4360,43 +4511,36 @@ function MOCPageContent() {
                             style={inputStyle}
                           />
                         </Field>
-                        <Field label="Approved">
-                          <select
-                            value={row.approved_value}
-                            onChange={(e) => updateReviewRow(index, "approved_value", e.target.value as ApprovedChoice)}
-                            style={inputStyle}
-                          >
-                            <option value="">Select</option>
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                          </select>
-                        </Field>
-                        <Field label="Date">
-                          <input
-                            type="date"
-                            value={row.review_date}
-                            onChange={(e) => updateReviewRow(index, "review_date", e.target.value)}
-                            style={inputStyle}
-                          />
+                        <Field label="Decision">
+                          <div style={readOnlyValueStyle}>
+                            {row.approved_value === "Yes"
+                              ? "Approved"
+                              : row.approved_value === "No"
+                              ? "Rejected"
+                              : "Awaiting decision"}
+                            {row.review_date ? ` - ${getPdfDate(row.review_date)}` : ""}
+                          </div>
                         </Field>
                         <div style={{ gridColumn: "1 / -1" }}>
-                          <Field label="Signature">
-                            <SignatureFieldInput
-                              value={row.signature}
-                              onTextChange={(value) => updateReviewRow(index, "signature", value)}
-                              onFileSelect={(file) => uploadReviewSignature(index, file)}
-                              inputId={`moc-review-signature-${index}`}
-                              disabled={!canEditReviewSections}
-                            />
+                          <Field label="Comments">
+                            <div style={readOnlyValueStyle}>{row.comments || "No comments returned."}</div>
                           </Field>
                         </div>
                         <div style={{ gridColumn: "1 / -1" }}>
-                          <Field label="Comments">
-                            <textarea
-                              value={row.comments}
-                              onChange={(e) => updateReviewRow(index, "comments", e.target.value)}
-                              style={reviewCommentsStyle}
-                              placeholder="Add review comments"
+                          <Field label="Sign-Off">
+                            <SignoffStatusControl
+                              request={signoffRequestFor("moc_review_endorsement_rows", index)}
+                              recipientName={row.name}
+                              disabled={!canEditReviewSections}
+                              sending={sendingSignoffKey === `moc_review_endorsement_rows:${index}`}
+                              onSend={() =>
+                                void sendSignoffRequest(
+                                  "moc_review_endorsement_rows",
+                                  index,
+                                  row.involved_party || `Review row ${index + 1}`,
+                                  row.name
+                                )
+                              }
                             />
                           </Field>
                         </div>
@@ -4415,10 +4559,12 @@ function MOCPageContent() {
                   onChange={updateAcceptanceRow}
                   onRemove={removeAcceptanceRow}
                   onMove={moveAcceptanceRow}
-                  onSignatureUpload={uploadAcceptanceSignature}
                   disabled={!canEditReviewSections}
-                  inputIdPrefix="moc-acceptance-signature"
-                  peopleListId="moc-people-options"
+                  peopleOptions={peopleOptions}
+                  targetTable="moc_acceptance_rows"
+                  signoffRequestFor={signoffRequestFor}
+                  sendingSignoffKey={sendingSignoffKey}
+                  onSendSignoff={sendSignoffRequest}
                 />
                 </fieldset>
               </DetailSubsection>
@@ -4435,10 +4581,12 @@ function MOCPageContent() {
                   onChange={updateCloseoutRow}
                   onRemove={removeCloseoutRow}
                   onMove={moveCloseoutRow}
-                  onSignatureUpload={uploadCloseoutSignature}
                   disabled={!canEditCloseoutStructure}
-                  inputIdPrefix="moc-closeout-signature"
-                  peopleListId="moc-people-options"
+                  peopleOptions={peopleOptions}
+                  targetTable="moc_closeout_rows"
+                  signoffRequestFor={signoffRequestFor}
+                  sendingSignoffKey={sendingSignoffKey}
+                  onSendSignoff={sendSignoffRequest}
                 />
                 </fieldset>
               </DetailSubsection>
@@ -4635,72 +4783,71 @@ function PeopleNameInput({
   );
 }
 
-function SignatureFieldInput({
+function PeopleEmailSelect({
   value,
-  onTextChange,
-  onFileSelect,
-  inputId,
+  onChange,
+  people,
   disabled,
 }: {
   value: string;
-  onTextChange: (value: string) => void;
-  onFileSelect: (file: File | null) => void;
-  inputId: string;
+  onChange: (value: string) => void;
+  people: PeopleOption[];
   disabled?: boolean;
 }) {
-  const usingImage = isDataImageUrl(value);
-
+  const hasCurrentValue = !value || people.some((person) => person.name === value);
   return (
-    <div style={signatureFieldStackStyle}>
-      <input
-        value={usingImage ? "" : value}
-        onChange={(e) => onTextChange(e.target.value)}
-        style={inputStyle}
-        placeholder={usingImage ? "Signature image stored" : "Typed signature / approval note"}
-      />
-      {usingImage ? (
-        <div style={signaturePreviewStyle}>
-          <Image
-            src={value}
-            alt="Stored signature preview"
-            width={64}
-            height={28}
-            unoptimized
-            style={signatureImageThumbStyle}
-          />
-          <span style={signaturePreviewTextStyle}>Image attached</span>
+    <select value={value} onChange={(e) => onChange(e.target.value)} style={inputStyle} disabled={disabled}>
+      <option value="">Select a person</option>
+      {!hasCurrentValue ? <option value={value}>{value} (no email on file)</option> : null}
+      {people.map((person) => (
+        <option key={person.id} value={person.name}>
+          {person.name}
+          {person.email ? "" : " (no email)"}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function signoffStatusTone(status: MocSignoffStatus) {
+  if (status === "Approved") return { bg: "#ECECE7", color: "#005670" };
+  if (status === "Rejected") return { bg: "#ECECE7", color: "#F93822" };
+  if (status === "Needs Attention") return { bg: "#ECECE7", color: "#FFAD00" };
+  return { bg: "#D0D0CE", color: "#53565A" };
+}
+
+function SignoffStatusControl({
+  request,
+  recipientName,
+  disabled,
+  sending,
+  onSend,
+}: {
+  request: MocSignoffRequest | null;
+  recipientName: string;
+  disabled?: boolean;
+  sending?: boolean;
+  onSend: () => void;
+}) {
+  const tone = request ? signoffStatusTone(request.status) : null;
+  return (
+    <div style={signoffStatusStackStyle}>
+      {request ? (
+        <div style={{ ...signoffStatusBadgeStyle, background: tone!.bg, color: tone!.color }}>
+          {request.status} - sent to {request.recipient_name}
+          {request.decided_at ? ` - ${formatDateTime(request.decided_at)}` : ""}
         </div>
       ) : (
-        <div style={signatureHintStyle}>Typed text is saved, or upload an image for the PDF.</div>
+        <div style={signoffStatusHintStyle}>Not yet sent for sign-off.</div>
       )}
-      <div style={signatureFieldActionsStyle}>
-        <input
-          id={inputId}
-          type="file"
-          accept="image/*"
-          onChange={(e) => {
-            onFileSelect(e.target.files?.[0] || null);
-            e.currentTarget.value = "";
-          }}
-          style={hiddenFileInputStyle}
-          disabled={disabled}
-        />
-        <label
-          htmlFor={inputId}
-          style={{
-            ...signatureButtonStyle,
-            opacity: disabled ? 0.55 : 1,
-            cursor: disabled ? "not-allowed" : "pointer",
-          }}
-        >
-          {usingImage ? "Replace Signature" : "Upload Signature"}
-        </label>
-        {usingImage ? (
-          <button type="button" style={rowMoveButtonStyle} onClick={() => onTextChange("")} disabled={disabled}>
-            Clear Signature
-          </button>
-        ) : null}
-      </div>
+      <button
+        type="button"
+        style={sendSignoffButtonStyle}
+        onClick={onSend}
+        disabled={disabled || sending || !recipientName.trim()}
+      >
+        {sending ? "Sending..." : request ? "Resend Sign-Off Email" : "Send for Sign-Off"}
+      </button>
     </div>
   );
 }
@@ -4761,19 +4908,28 @@ function SimpleSignoffTable({
   onChange,
   onRemove,
   onMove,
-  onSignatureUpload,
   disabled,
-  inputIdPrefix,
-  peopleListId,
+  peopleOptions,
+  targetTable,
+  signoffRequestFor,
+  sendingSignoffKey,
+  onSendSignoff,
 }: {
   rows: MocSignoffRow[];
   onChange: (index: number, key: keyof MocSignoffRow, value: string | number) => void;
   onRemove: (index: number) => void;
   onMove: (index: number, direction: -1 | 1) => void;
-  onSignatureUpload: (index: number, file: File | null) => void;
   disabled?: boolean;
-  inputIdPrefix: string;
-  peopleListId: string;
+  peopleOptions: PeopleOption[];
+  targetTable: MocSignoffTargetTable;
+  signoffRequestFor: (targetTable: MocSignoffTargetTable, sortOrder: number) => MocSignoffRequest | null;
+  sendingSignoffKey: string;
+  onSendSignoff: (
+    targetTable: MocSignoffTargetTable,
+    sortOrder: number,
+    rowLabel: string,
+    recipientName: string
+  ) => void;
 }) {
   return (
     <div style={repeatCardStackStyle}>
@@ -4801,33 +4957,32 @@ function SimpleSignoffTable({
               <input value={row.role_label} onChange={(e) => onChange(index, "role_label", e.target.value)} style={inputStyle} />
             </Field>
             <Field label="Name">
-              <PeopleNameInput
+              <PeopleEmailSelect
                 value={row.name}
-                onChange={(e) => onChange(index, "name", e.target.value)}
-                listId={peopleListId}
-                placeholder="Select or type a name"
+                onChange={(value) => onChange(index, "name", value)}
+                people={peopleOptions}
                 disabled={disabled}
               />
             </Field>
             <Field label="Position">
               <input value={row.position} onChange={(e) => onChange(index, "position", e.target.value)} style={inputStyle} />
             </Field>
-            <Field label="Date">
-              <input
-                type="date"
-                value={row.signoff_date}
-                onChange={(e) => onChange(index, "signoff_date", e.target.value)}
-                style={inputStyle}
-              />
+            <Field label="Decided">
+              <div style={readOnlyValueStyle}>{row.signoff_date ? getPdfDate(row.signoff_date) : "Awaiting decision"}</div>
             </Field>
             <div style={{ gridColumn: "1 / -1" }}>
-              <Field label="Signature">
-                <SignatureFieldInput
-                  value={row.signature}
-                  onTextChange={(value) => onChange(index, "signature", value)}
-                  onFileSelect={(file) => onSignatureUpload(index, file)}
-                  inputId={`${inputIdPrefix}-${index}`}
+              <Field label="Comments">
+                <div style={readOnlyValueStyle}>{row.comments || "No comments returned."}</div>
+              </Field>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Field label="Sign-Off">
+                <SignoffStatusControl
+                  request={signoffRequestFor(targetTable, index)}
+                  recipientName={row.name}
                   disabled={disabled}
+                  sending={sendingSignoffKey === `${targetTable}:${index}`}
+                  onSend={() => onSendSignoff(targetTable, index, row.role_label || `Signoff ${index + 1}`, row.name)}
                 />
               </Field>
             </div>
@@ -5567,11 +5722,17 @@ const simpleSignoffRowStyle: CSSProperties = {
   minWidth: "1040px",
 };
 
-const reviewCommentsStyle: CSSProperties = {
-  ...inputStyle,
-  minHeight: "74px",
-  resize: "vertical",
+const readOnlyValueStyle: CSSProperties = {
+  minHeight: "38px",
+  borderRadius: "10px",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
+  color: "#000000",
+  padding: "9px 11px",
+  fontSize: "13.5px",
   lineHeight: 1.45,
+  display: "flex",
+  alignItems: "center",
 };
 
 const rowActionsWrapStyle: CSSProperties = {
@@ -5585,10 +5746,38 @@ const rowActionsStyle: CSSProperties = {
   gap: "6px",
 };
 
-const signatureFieldStackStyle: CSSProperties = {
-  display: "grid",
-  gap: "8px",
-  minWidth: 0,
+const signoffStatusStackStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  flexWrap: "wrap",
+};
+
+const signoffStatusBadgeStyle: CSSProperties = {
+  padding: "7px 11px",
+  borderRadius: "999px",
+  fontSize: "12px",
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.02em",
+};
+
+const signoffStatusHintStyle: CSSProperties = {
+  fontSize: "12.5px",
+  color: "#53565A",
+};
+
+const sendSignoffButtonStyle: CSSProperties = {
+  padding: "9px 13px",
+  borderRadius: 8,
+  border: "1px solid #005670",
+  background: "#005670",
+  color: "#ffffff",
+  fontWeight: 700,
+  cursor: "pointer",
+  fontSize: "12px",
+  lineHeight: 1.2,
+  whiteSpace: "nowrap",
 };
 
 const hiddenFileInputStyle: CSSProperties = {
@@ -5603,57 +5792,6 @@ const hiddenFileInputStyle: CSSProperties = {
   border: 0,
 };
 
-const signatureFieldActionsStyle: CSSProperties = {
-  display: "flex",
-  gap: "8px",
-  alignItems: "center",
-  flexWrap: "wrap",
-};
-
-const signatureButtonStyle: CSSProperties = {
-  padding: "9px 11px",
-  borderRadius: 8,
-  border: "1px solid #D0D0CE",
-  background: "#ECECE7",
-  color: "#005670",
-  fontWeight: 700,
-  cursor: "pointer",
-  fontSize: "12px",
-  lineHeight: 1.2,
-  whiteSpace: "nowrap",
-};
-
-const signaturePreviewStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  minHeight: "38px",
-  padding: "8px 10px",
-  borderRadius: "10px",
-  border: "1px solid #D0D0CE",
-  background: "#ECECE7",
-};
-
-const signatureImageThumbStyle: CSSProperties = {
-  width: "64px",
-  height: "28px",
-  objectFit: "contain",
-  borderRadius: "6px",
-  background: "#ffffff",
-  border: "1px solid #D0D0CE",
-  padding: "2px",
-};
-
-const signaturePreviewTextStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 700,
-  color: "#53565A",
-};
-
-const signatureHintStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "#53565A",
-};
 
 const rowMoveButtonStyle: CSSProperties = {
   padding: "8px 10px",
