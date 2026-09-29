@@ -102,6 +102,7 @@ type MocActionPlanItem = {
   responsible_person: string;
   target_date: string;
   status: string;
+  link_key: string;
 };
 
 type MocDocumentRow = {
@@ -160,6 +161,16 @@ type MocSignoffRequest = {
 type MocAttachment = {
   id: string;
   moc_report_id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number | null;
+  content_type: string | null;
+  uploaded_at: string;
+};
+
+type MocActionAttachment = {
+  id: string;
+  action_item_link_key: string;
   file_name: string;
   file_path: string;
   file_size: number | null;
@@ -305,6 +316,38 @@ function normaliseActionPlanStatus(value: string | null | undefined) {
   return "Open";
 }
 
+function mapMocActionStatusToCentralStatus(status: string) {
+  const normalised = normaliseActionPlanStatus(status);
+  if (normalised === "Complete") return "Closed";
+  if (normalised === "Ongoing") return "In Progress";
+  return "Open";
+}
+
+function extractCentralActionNumber(value: string | null | undefined) {
+  if (!value) return null;
+  const match = String(value).match(/(\d+)/);
+  if (!match) return null;
+  const num = Number(match[1]);
+  return Number.isNaN(num) ? null : num;
+}
+
+function formatCentralActionNumber(num: number) {
+  return `ACT-${String(num).padStart(3, "0")}`;
+}
+
+function nextAvailableCentralActionNumbers(usedNumbers: Set<number>, count: number) {
+  const numbers: string[] = [];
+  let next = 1;
+  while (numbers.length < count) {
+    if (!usedNumbers.has(next)) {
+      numbers.push(formatCentralActionNumber(next));
+      usedNumbers.add(next);
+    }
+    next += 1;
+  }
+  return numbers;
+}
+
 function buildMocLinkedActionHref(report: MocReport) {
   const params = new URLSearchParams({
     prefill_source: "MOC",
@@ -318,19 +361,6 @@ function buildMocLinkedActionHref(report: MocReport) {
   return `/actions?${params.toString()}`;
 }
 
-function buildMocActionPlanLinkedActionHref(report: MocReport, row: MocActionPlanItem) {
-  const params = new URLSearchParams({
-    prefill_source: "MOC",
-    prefill_department: "HSEQ",
-    prefill_project: report.project_worksite_address || "",
-    prefill_owner: row.responsible_person || report.responsible_manager_name || report.moc_coordinator_name || "",
-    prefill_due_date: row.target_date || "",
-    linked_moc_id: report.id,
-    linked_moc_number: report.moc_report_no,
-  });
-
-  return `/actions?${params.toString()}`;
-}
 
 function buildNextMocNumber(values: string[]) {
   const used = values
@@ -418,6 +448,7 @@ function createActionItem(sortOrder: number): MocActionPlanItem {
     responsible_person: "",
     target_date: "",
     status: "Open",
+    link_key: crypto.randomUUID(),
   };
 }
 
@@ -899,6 +930,9 @@ function MOCPageContent() {
   );
   const [signoffRequests, setSignoffRequests] = useState<MocSignoffRequest[]>([]);
   const [sendingSignoffKey, setSendingSignoffKey] = useState("");
+  const [actionAttachments, setActionAttachments] = useState<MocActionAttachment[]>([]);
+  const [uploadingActionAttachmentKey, setUploadingActionAttachmentKey] = useState("");
+  const [actionAttachmentActionId, setActionAttachmentActionId] = useState("");
 
   const canCreateMoc = useMemo(() => {
     return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
@@ -1131,6 +1165,7 @@ function MOCPageContent() {
       responsible_person: String(row.responsible_person || ""),
       target_date: String(row.target_date || ""),
       status: normaliseActionPlanStatus(String(row.status || "")),
+      link_key: String(row.link_key || ""),
     }));
     const nextAffectedDocuments = ((affectedDocsRes.data || []) as Record<string, unknown>[]).map((row) => ({
       id: String(row.id || ""),
@@ -1315,6 +1350,118 @@ function MOCPageContent() {
       bundle.closeoutRows.length ? bundle.closeoutRows : createSignoffRows(defaultCloseoutRoles)
     );
     void loadSignoffRequests(reportId);
+    void loadActionAttachments(bundle.actionItems.map((item) => item.link_key).filter(Boolean));
+  }
+
+  async function loadActionAttachments(linkKeys: string[]) {
+    if (!linkKeys.length) {
+      setActionAttachments([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("moc_action_attachments")
+      .select("*")
+      .in("action_item_link_key", linkKeys)
+      .order("uploaded_at", { ascending: false });
+    if (error) return;
+    const rows = ((data || []) as Record<string, unknown>[]).map((row) => ({
+      id: String(row.id || ""),
+      action_item_link_key: String(row.action_item_link_key || ""),
+      file_name: String(row.file_name || ""),
+      file_path: String(row.file_path || ""),
+      file_size: row.file_size == null ? null : Number(row.file_size),
+      content_type: row.content_type == null ? null : String(row.content_type),
+      uploaded_at: String(row.uploaded_at || ""),
+    }));
+    setActionAttachments(rows);
+  }
+
+  async function uploadActionAttachment(linkKey: string, files: FileList | null) {
+    if (!requireEditPermission("Uploading action attachments")) return;
+    if (!linkKey || !files?.length) return;
+
+    setUploadingActionAttachmentKey(linkKey);
+    try {
+      const uploadedPaths: string[] = [];
+      const metadataRows: Array<{
+        action_item_link_key: string;
+        file_name: string;
+        file_path: string;
+        file_size: number;
+        content_type: string;
+      }> = [];
+
+      for (const file of Array.from(files)) {
+        const safeName = sanitizeFileName(file.name);
+        const filePath = `MOC_ACTION/${linkKey}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(MOC_ATTACHMENT_BUCKET)
+          .upload(filePath, file, { cacheControl: "3600", upsert: false });
+        if (uploadError) throw new Error(uploadError.message);
+
+        uploadedPaths.push(filePath);
+        metadataRows.push({
+          action_item_link_key: linkKey,
+          file_name: file.name,
+          file_path: filePath,
+          file_size: file.size,
+          content_type: file.type || "application/octet-stream",
+        });
+      }
+
+      const { error: metadataError } = await supabase.from("moc_action_attachments").insert(metadataRows);
+      if (metadataError) {
+        await supabase.storage.from(MOC_ATTACHMENT_BUCKET).remove(uploadedPaths);
+        throw new Error(metadataError.message);
+      }
+
+      await loadActionAttachments(detailActionItems.map((item) => item.link_key).filter(Boolean));
+      showMessage(
+        metadataRows.length === 1 ? `Uploaded "${metadataRows[0].file_name}".` : `Uploaded ${metadataRows.length} attachments.`,
+        "success"
+      );
+    } catch (error) {
+      showMessage(`Attachment upload failed: ${getErrorMessage(error)}`, "error");
+    } finally {
+      setUploadingActionAttachmentKey("");
+    }
+  }
+
+  async function openActionAttachment(file: MocActionAttachment) {
+    setActionAttachmentActionId(file.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from(MOC_ATTACHMENT_BUCKET)
+        .createSignedUrl(file.file_path, 60 * 60 * 24 * 180);
+      if (error || !data?.signedUrl) throw new Error(error?.message || "Could not create file link.");
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      showMessage(`Could not open attachment: ${getErrorMessage(error)}`, "error");
+    } finally {
+      setActionAttachmentActionId("");
+    }
+  }
+
+  async function removeActionAttachment(file: MocActionAttachment) {
+    if (!requireEditPermission("Removing action attachments")) return;
+    if (!window.confirm(`Remove attachment "${file.file_name}"?`)) return;
+
+    setActionAttachmentActionId(file.id);
+    try {
+      const { error: storageError } = await supabase.storage.from(MOC_ATTACHMENT_BUCKET).remove([file.file_path]);
+      if (storageError) throw new Error(storageError.message);
+
+      const { error: metadataError } = await supabase.from("moc_action_attachments").delete().eq("id", file.id);
+      if (metadataError) throw new Error(metadataError.message);
+
+      await loadActionAttachments(detailActionItems.map((item) => item.link_key).filter(Boolean));
+      showMessage(`Removed "${file.file_name}".`, "success");
+    } catch (error) {
+      showMessage(`Could not remove attachment: ${getErrorMessage(error)}`, "error");
+    } finally {
+      setActionAttachmentActionId("");
+    }
   }
 
   async function loadSignoffRequests(reportId: string) {
@@ -1400,6 +1547,7 @@ function MOCPageContent() {
     setDetailAcceptanceRows(createSignoffRows(defaultAcceptanceRoles));
     setDetailCloseoutRows(createSignoffRows(defaultCloseoutRoles));
     setSignoffRequests([]);
+    setActionAttachments([]);
   }
 
   function switchMocWorkspaceView(view: MocWorkspaceView) {
@@ -1458,6 +1606,7 @@ function MOCPageContent() {
             responsible_person: row.responsible_person,
             target_date: row.target_date || null,
             status: row.status,
+            link_key: row.link_key || crypto.randomUUID(),
           })),
       },
       {
@@ -1673,6 +1822,82 @@ function MOCPageContent() {
     };
   }
 
+  async function syncMocActionsToCentralActions(report: MocReport, actionItems: MocActionPlanItem[]) {
+    const relevant = actionItems.filter((item) => item.description.trim() && item.link_key);
+    const relevantKeys = new Set(relevant.map((item) => item.link_key));
+
+    const [linkedRes, numbersRes] = await Promise.all([
+      supabase.from("actions").select("id,linked_moc_action_key").eq("linked_moc_id", report.id),
+      supabase.from("actions").select("action_number"),
+    ]);
+    if (linkedRes.error) throw new Error(linkedRes.error.message);
+    if (numbersRes.error) throw new Error(numbersRes.error.message);
+
+    const existingByKey = new Map(
+      ((linkedRes.data || []) as { id: string; linked_moc_action_key: string | null }[])
+        .filter((row) => row.linked_moc_action_key)
+        .map((row) => [String(row.linked_moc_action_key), row.id])
+    );
+
+    const usedNumbers = new Set(
+      ((numbersRes.data || []) as { action_number: string | null }[])
+        .map((row) => extractCentralActionNumber(row.action_number))
+        .filter((num): num is number => num !== null && num > 0)
+    );
+
+    const toCreate = relevant.filter((item) => !existingByKey.has(item.link_key));
+    const toUpdate = relevant.filter((item) => existingByKey.has(item.link_key));
+    const newNumbers = nextAvailableCentralActionNumbers(usedNumbers, toCreate.length);
+
+    if (toCreate.length) {
+      const inserts = toCreate.map((item, index) => ({
+        action_number: newNumbers[index],
+        title: item.description.trim() || `MOC Action ${item.action_no}`,
+        description: item.description.trim() || null,
+        department: "HSEQ",
+        project: report.project_worksite_address || null,
+        owner: item.responsible_person.trim() || null,
+        priority: "Medium",
+        status: mapMocActionStatusToCentralStatus(item.status),
+        due_date: item.target_date || null,
+        source: "MOC",
+        linked_moc_id: report.id,
+        linked_moc_number: report.moc_report_no,
+        linked_moc_action_key: item.link_key,
+      }));
+      const { error } = await supabase.from("actions").insert(inserts);
+      if (error) throw new Error(error.message);
+    }
+
+    if (toUpdate.length) {
+      const updateResults = await Promise.all(
+        toUpdate.map((item) =>
+          supabase
+            .from("actions")
+            .update({
+              title: item.description.trim() || `MOC Action ${item.action_no}`,
+              description: item.description.trim() || null,
+              owner: item.responsible_person.trim() || null,
+              status: mapMocActionStatusToCentralStatus(item.status),
+              due_date: item.target_date || null,
+              linked_moc_number: report.moc_report_no,
+            })
+            .eq("id", existingByKey.get(item.link_key))
+        )
+      );
+      const updateError = updateResults.find((result) => result.error)?.error;
+      if (updateError) throw new Error(updateError.message);
+    }
+
+    const staleIds = ((linkedRes.data || []) as { id: string; linked_moc_action_key: string | null }[])
+      .filter((row) => row.linked_moc_action_key && !relevantKeys.has(row.linked_moc_action_key))
+      .map((row) => row.id);
+    if (staleIds.length) {
+      const { error } = await supabase.from("actions").delete().in("id", staleIds);
+      if (error) throw new Error(error.message);
+    }
+  }
+
   async function saveSelectedMoc() {
     if (!selectedReportId) return;
     if (!requireEditPermission("Saving MOCs")) return;
@@ -1697,6 +1922,22 @@ function MOCPageContent() {
 
       const loaded = await loadData();
       openBundle(selectedReportId, loaded);
+
+      try {
+        await syncMocActionsToCentralActions(
+          detailReport,
+          loaded.actionItems.filter((item) => item.moc_report_id === selectedReportId)
+        );
+      } catch (syncError) {
+        showMessage(
+          `Saved ${detailReport.moc_report_no}, but linking actions to Action Management failed: ${getErrorMessage(
+            syncError
+          )}`,
+          "warning"
+        );
+        return;
+      }
+
       showMessage(`Saved ${detailReport.moc_report_no}.`, "success");
     } catch (error) {
       if (previousBundle) {
@@ -1759,6 +2000,22 @@ function MOCPageContent() {
 
       const loaded = await loadData();
       openBundle(selectedReportId, loaded);
+
+      try {
+        await syncMocActionsToCentralActions(
+          nextReport,
+          loaded.actionItems.filter((item) => item.moc_report_id === selectedReportId)
+        );
+      } catch (syncError) {
+        showMessage(
+          `${detailReport.moc_report_no} moved to ${nextStatus}, but linking actions to Action Management failed: ${getErrorMessage(
+            syncError
+          )}`,
+          "warning"
+        );
+        return;
+      }
+
       showMessage(`${detailReport.moc_report_no} moved to ${nextStatus}.`, "success");
     } catch (error) {
       if (previousBundle) {
@@ -2373,6 +2630,39 @@ function MOCPageContent() {
       },
     });
     return y + 9;
+  }
+
+  function drawActionPlanAttachments(
+    doc: jsPDF,
+    y: number,
+    attachmentRows: Array<{ actionNo: string; fileName: string; url: string | null }>
+  ) {
+    if (!attachmentRows.length) return y;
+    y = ensurePageSpace(doc, y, 34);
+    drawSectionHeading(doc, y, "C. ACTION PLAN - ATTACHMENTS");
+    y += 10;
+    autoTable(doc, {
+      startY: y,
+      margin: { left: 12, right: 14 },
+      theme: "grid",
+      styles: { font: "helvetica", fontSize: 7.8, cellPadding: 2.4, textColor: [0, 0, 0], lineColor: [208, 208, 206] },
+      headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
+      head: [["Action No", "File", "Link"]],
+      body: attachmentRows.map((row) => [row.actionNo, row.fileName, row.url ? "Open attachment" : "Unavailable"]),
+      columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 100 }, 2: { cellWidth: 40 } },
+      didDrawCell: (data) => {
+        if (data.section !== "body" || data.column.index !== 2) return;
+        const row = attachmentRows[data.row.index];
+        if (!row?.url) return;
+        doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url: row.url });
+      },
+    });
+    const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(83, 86, 90);
+    doc.text("Attachment links are secure signed URLs valid for 6 months from generation. Regenerate this report for working links after that.", 12, finalY + 5);
+    return finalY + 11;
   }
 
   function drawImpacts(doc: jsPDF, y: number, bundle: MocBundle) {
@@ -3401,12 +3691,33 @@ function MOCPageContent() {
       );
       const logoImage = logoData ? await loadImageMeta(logoData).catch(() => null) : null;
 
+      const actionLinkKeys = bundle.actionItems.map((item) => item.link_key).filter(Boolean);
+      const actionNoByLinkKey = new Map(bundle.actionItems.map((item, index) => [item.link_key, item.action_no || String(index + 1)]));
+      const actionAttachmentRows: Array<{ actionNo: string; fileName: string; url: string | null }> = [];
+      if (actionLinkKeys.length) {
+        const { data: attachmentRows } = await supabase
+          .from("moc_action_attachments")
+          .select("action_item_link_key,file_name,file_path")
+          .in("action_item_link_key", actionLinkKeys);
+        for (const row of (attachmentRows || []) as { action_item_link_key: string; file_name: string; file_path: string }[]) {
+          const { data: signedData } = await supabase.storage
+            .from(MOC_ATTACHMENT_BUCKET)
+            .createSignedUrl(row.file_path, 60 * 60 * 24 * 180);
+          actionAttachmentRows.push({
+            actionNo: actionNoByLinkKey.get(row.action_item_link_key) || "-",
+            fileName: row.file_name,
+            url: signedData?.signedUrl || null,
+          });
+        }
+      }
+
       pdfPageDecorator = (pdfDoc) => drawPdfPageChrome(pdfDoc, logoImage, bundle.report.moc_report_no);
       pdfPageDecorator(doc);
       let y = 28;
       y = drawReportDetails(doc, y, bundle);
       y = drawChangeIdentification(doc, y, bundle);
       y = drawActionPlan(doc, y, bundle);
+      y = drawActionPlanAttachments(doc, y, actionAttachmentRows);
       y = drawImpacts(doc, y, bundle);
       y = drawAffectedDocumentation(doc, y, bundle);
       y = drawRiskSection(doc, y, bundle);
@@ -4000,7 +4311,7 @@ function MOCPageContent() {
                   <div>
                     <strong style={actionPlanIntroTitleStyle}>MOC implementation actions</strong>
                     <span style={actionPlanIntroTextStyle}>
-                      Keep immediate MOC steps here. Send any item that needs wider tracking to central Action Management for ownership, reminders, and reporting.
+                      Every action with a description is automatically linked to central Action Management on save, and kept in sync with any edits here, so it gets ownership, reminders, and reporting there too.
                     </span>
                   </div>
                 </div>
@@ -4024,10 +4335,10 @@ function MOCPageContent() {
                         </div>
                         <div style={rowActionsWrapStyle}>
                           <Link
-                            href={buildMocActionPlanLinkedActionHref(detailReport, row)}
+                            href={`/actions?search=${encodeURIComponent(detailReport.moc_report_no)}`}
                             style={centralActionLinkStyle}
                           >
-                            Create Central Action
+                            View in Action Management ↗
                           </Link>
                           <RowOrderControls
                             index={index}
@@ -4043,6 +4354,24 @@ function MOCPageContent() {
                           >
                             Remove
                           </button>
+                          <details style={optionsMenuStyle}>
+                            <summary style={optionsSummaryStyle}>More options ···</summary>
+                            <div style={optionsMenuPanelStyle}>
+                              <label style={optionsMenuItemStyle}>
+                                {uploadingActionAttachmentKey === row.link_key ? "Uploading..." : "Upload Attachment"}
+                                <input
+                                  type="file"
+                                  multiple
+                                  style={hiddenFileInputStyle}
+                                  disabled={Boolean(uploadingActionAttachmentKey) || !canEditImplementationFields}
+                                  onChange={(e) => {
+                                    void uploadActionAttachment(row.link_key, e.target.files);
+                                    e.currentTarget.value = "";
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          </details>
                         </div>
                       </div>
                       <div style={actionPlanSummaryStyle}>
@@ -4056,7 +4385,7 @@ function MOCPageContent() {
                         </div>
                         <div>
                           <span style={miniMetaLabelStyle}>Central tracking</span>
-                          <strong style={miniMetaValueStyle}>Review before save in Action Management</strong>
+                          <strong style={miniMetaValueStyle}>Linked automatically · kept in sync on save</strong>
                         </div>
                       </div>
                       <div style={actionPlanCardGridStyle}>
@@ -4099,6 +4428,39 @@ function MOCPageContent() {
                               onChange={(e) => updateActionRow(index, "description", e.target.value)}
                               style={textareaStyle}
                             />
+                          </Field>
+                        </div>
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <Field label="Attachments">
+                            {actionAttachments.filter((file) => file.action_item_link_key === row.link_key).length ? (
+                              <div style={actionAttachmentListStyle}>
+                                {actionAttachments
+                                  .filter((file) => file.action_item_link_key === row.link_key)
+                                  .map((file) => (
+                                    <div key={file.id} style={actionAttachmentChipStyle}>
+                                      <span>📎 {file.file_name}</span>
+                                      <button
+                                        type="button"
+                                        style={actionAttachmentLinkButtonStyle}
+                                        onClick={() => void openActionAttachment(file)}
+                                        disabled={actionAttachmentActionId === file.id}
+                                      >
+                                        Open
+                                      </button>
+                                      <button
+                                        type="button"
+                                        style={actionAttachmentRemoveButtonStyle}
+                                        onClick={() => void removeActionAttachment(file)}
+                                        disabled={!canEditImplementationFields || actionAttachmentActionId === file.id}
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  ))}
+                              </div>
+                            ) : (
+                              <div style={signoffStatusHintStyle}>No attachments yet — use More options to add one.</div>
+                            )}
                           </Field>
                         </div>
                       </div>
@@ -5567,6 +5929,85 @@ const centralActionLinkStyle: CSSProperties = {
   fontWeight: 800,
   textDecoration: "none",
   whiteSpace: "nowrap",
+};
+
+const optionsMenuStyle: CSSProperties = { position: "relative" };
+const optionsSummaryStyle: CSSProperties = {
+  listStyle: "none",
+  cursor: "pointer",
+  padding: "10px 12px",
+  borderRadius: "8px",
+  border: "1px solid #D0D0CE",
+  background: "#ffffff",
+  color: "#000000",
+  fontSize: "13px",
+  fontWeight: 800,
+  userSelect: "none",
+};
+const optionsMenuPanelStyle: CSSProperties = {
+  position: "absolute",
+  zIndex: 40,
+  right: 0,
+  top: "calc(100% + 6px)",
+  width: "220px",
+  display: "grid",
+  padding: "6px",
+  borderRadius: "12px",
+  border: "1px solid #D0D0CE",
+  background: "#ffffff",
+  boxShadow: "0 16px 35px rgba(15, 23, 42, 0.18)",
+};
+const optionsMenuItemStyle: CSSProperties = {
+  display: "block",
+  width: "100%",
+  boxSizing: "border-box",
+  border: 0,
+  borderRadius: "8px",
+  background: "transparent",
+  padding: "10px 11px",
+  color: "#000000",
+  textAlign: "left",
+  font: "inherit",
+  fontSize: "13px",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const actionAttachmentListStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+};
+const actionAttachmentChipStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  border: "1px solid #D0D0CE",
+  borderRadius: "10px",
+  background: "#ECECE7",
+  padding: "8px 10px",
+  fontSize: "13px",
+  color: "#000000",
+};
+const actionAttachmentLinkButtonStyle: CSSProperties = {
+  border: "none",
+  background: "transparent",
+  color: "#005670",
+  fontWeight: 800,
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: "13px",
+  padding: 0,
+};
+const actionAttachmentRemoveButtonStyle: CSSProperties = {
+  border: "none",
+  background: "transparent",
+  color: "#F93822",
+  fontWeight: 800,
+  cursor: "pointer",
+  font: "inherit",
+  fontSize: "13px",
+  padding: 0,
 };
 
 const documentCardGridStyle: CSSProperties = {
