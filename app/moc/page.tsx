@@ -142,7 +142,7 @@ type MocSignoffRow = {
 };
 
 type MocSignoffTargetTable = "moc_review_endorsement_rows" | "moc_acceptance_rows" | "moc_closeout_rows";
-type MocSignoffStatus = "Pending" | "Approved" | "Rejected" | "Needs Attention";
+type MocSignoffStatus = "Pending" | "Approved" | "Rejected" | "Needs Attention" | "Informed";
 
 type MocSignoffRequest = {
   id: string;
@@ -1499,7 +1499,8 @@ function MOCPageContent() {
     targetTable: MocSignoffTargetTable,
     sortOrder: number,
     rowLabel: string,
-    recipientName: string
+    recipientName: string,
+    mode: "decision" | "inform" = "decision"
   ) {
     if (!requireEditPermission("Sending MOC sign-off")) return;
     if (!selectedReportId) return;
@@ -1528,12 +1529,16 @@ function MOCPageContent() {
           rowLabel,
           recipientName: trimmedName,
           recipientEmail,
+          mode,
         }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || "Unable to send the sign-off request.");
       await loadSignoffRequests(selectedReportId);
-      showMessage(`Sign-off requested from ${trimmedName}.`, "success");
+      showMessage(
+        mode === "inform" ? `Informed ${trimmedName} by email.` : `Sign-off requested from ${trimmedName}.`,
+        "success"
+      );
     } catch (error) {
       showMessage(getErrorMessage(error), "error");
     } finally {
@@ -4926,12 +4931,19 @@ function MOCPageContent() {
                               recipientName={row.name}
                               disabled={!canEditReviewSections}
                               sending={sendingSignoffKey === `moc_review_endorsement_rows:${index}`}
+                              blockedHint={
+                                !row.approve_flag && !row.inform_flag
+                                  ? "Tick Approve or Inform above to send this row."
+                                  : undefined
+                              }
+                              sendLabel={row.approve_flag ? "Send for Sign-Off" : "Send for Information"}
                               onSend={() =>
                                 void sendSignoffRequest(
                                   "moc_review_endorsement_rows",
                                   index,
                                   row.involved_party || `Review row ${index + 1}`,
-                                  row.name
+                                  row.name,
+                                  row.approve_flag ? "decision" : "inform"
                                 )
                               }
                             />
@@ -5207,6 +5219,7 @@ function signoffStatusTone(status: MocSignoffStatus) {
   if (status === "Approved") return { bg: "#ECECE7", color: "#005670" };
   if (status === "Rejected") return { bg: "#ECECE7", color: "#F93822" };
   if (status === "Needs Attention") return { bg: "#ECECE7", color: "#FFAD00" };
+  if (status === "Informed") return { bg: "#ECECE7", color: "#53565A" };
   return { bg: "#D0D0CE", color: "#53565A" };
 }
 
@@ -5216,12 +5229,16 @@ function SignoffStatusControl({
   disabled,
   sending,
   onSend,
+  blockedHint,
+  sendLabel,
 }: {
   request: MocSignoffRequest | null;
   recipientName: string;
   disabled?: boolean;
   sending?: boolean;
   onSend: () => void;
+  blockedHint?: string;
+  sendLabel?: string;
 }) {
   const tone = request ? signoffStatusTone(request.status) : null;
   return (
@@ -5237,11 +5254,13 @@ function SignoffStatusControl({
             type="button"
             style={quietLinkButtonStyle}
             onClick={onSend}
-            disabled={disabled || sending || !recipientName.trim()}
+            disabled={disabled || sending || !recipientName.trim() || Boolean(blockedHint)}
           >
             {sending ? "Sending..." : "Resend email"}
           </button>
         </>
+      ) : blockedHint ? (
+        <span style={quietHintTextStyle}>{blockedHint}</span>
       ) : (
         <>
           <span style={quietHintTextStyle}>Not yet sent for sign-off.</span>
@@ -5251,7 +5270,7 @@ function SignoffStatusControl({
             onClick={onSend}
             disabled={disabled || sending || !recipientName.trim()}
           >
-            {sending ? "Sending..." : "Send for Sign-Off"}
+            {sending ? "Sending..." : sendLabel || "Send for Sign-Off"}
           </button>
         </>
       )}

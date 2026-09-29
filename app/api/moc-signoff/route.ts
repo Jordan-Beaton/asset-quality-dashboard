@@ -7,6 +7,7 @@ import { writeNotification } from "../../../src/lib/notifications";
 
 const TARGET_TABLES = ["moc_review_endorsement_rows", "moc_acceptance_rows", "moc_closeout_rows"] as const;
 type TargetTable = (typeof TARGET_TABLES)[number];
+type SendMode = "decision" | "inform";
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
       rowLabel?: string;
       recipientName?: string;
       recipientEmail?: string;
+      mode?: string;
     };
     const mocReportId = clean(body.mocReportId);
     const targetTable = clean(body.targetTable) as TargetTable;
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
     const rowLabel = clean(body.rowLabel) || "MOC sign-off";
     const recipientName = clean(body.recipientName);
     const recipientEmail = clean(body.recipientEmail).toLowerCase();
+    const mode: SendMode = body.mode === "inform" ? "inform" : "decision";
 
     if (!mocReportId || !TARGET_TABLES.includes(targetTable) || !Number.isFinite(sortOrder)) {
       return NextResponse.json({ error: "Missing or invalid sign-off target." }, { status: 400 });
@@ -101,6 +104,7 @@ export async function POST(request: Request) {
 
     const senderName = authData.user.user_metadata?.full_name || authData.user.user_metadata?.name || null;
     const senderEmail = authData.user.email || null;
+    const nowIso = new Date().toISOString();
 
     const { data: created, error: createError } = await supabase
       .from("moc_signoff_requests")
@@ -113,16 +117,29 @@ export async function POST(request: Request) {
         recipient_email: recipientEmail,
         sender_name: senderName,
         sender_email: senderEmail,
-        status: "Pending",
+        status: mode === "inform" ? "Informed" : "Pending",
+        decided_at: mode === "inform" ? nowIso : null,
       })
       .select("id")
       .single();
     if (createError || !created) throw createError || new Error("Could not create the sign-off request.");
 
-    const token = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const { error: tokenError } = await supabase.from("moc_signoff_tokens").insert({ request_id: created.id, token, expires_at: expiresAt });
-    if (tokenError) throw tokenError;
+    let actionUrl = "";
+    if (mode === "decision") {
+      const token = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, "");
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { error: tokenError } = await supabase.from("moc_signoff_tokens").insert({ request_id: created.id, token, expires_at: expiresAt });
+      if (tokenError) throw tokenError;
+      actionUrl = `${new URL(request.url).origin}/moc/signoff-action?token=${encodeURIComponent(token)}`;
+    } else {
+      // Inform-only rows have nothing to decide, so there's no decision link
+      // or pending token - record the audit trail on the row immediately.
+      await supabase
+        .from("moc_review_endorsement_rows")
+        .update({ signature: `Informed via email on ${new Date(nowIso).toLocaleDateString("en-GB")}`, review_date: nowIso.slice(0, 10) })
+        .eq("moc_report_id", mocReportId)
+        .eq("sort_order", sortOrder);
+    }
 
     const impactAreas = Object.entries(IMPACT_LABELS)
       .filter(([key]) => Boolean(report[key]))
@@ -153,12 +170,9 @@ export async function POST(request: Request) {
     });
 
     const { resend, from } = emailClient();
-    const actionUrl = `${new URL(request.url).origin}/moc/signoff-action?token=${encodeURIComponent(token)}`;
-    const result = await resend.emails.send({
-      from,
-      to: [recipientEmail],
-      subject: `MOC sign-off requested: ${report.moc_report_no} - ${report.moc_report_title}`,
-      html: `<div style="font-family:'Segoe UI',Arial,sans-serif;color:#000;line-height:1.5">
+    const html =
+      mode === "decision"
+        ? `<div style="font-family:'Segoe UI',Arial,sans-serif;color:#000;line-height:1.5">
         <h2>Management of Change sign-off request</h2>
         <p>Hi ${escapeHtml(recipientName)},</p>
         <p><strong>${escapeHtml(report.moc_report_no)}</strong> - ${escapeHtml(report.moc_report_title)}</p>
@@ -166,7 +180,23 @@ export async function POST(request: Request) {
         <p>A summary of the MOC is attached for your review. Please Approve, Reject, or leave Comments.</p>
         <p><a href="${escapeHtml(actionUrl)}" style="display:inline-block;background:#005670;color:#fff;text-decoration:none;border-radius:10px;padding:12px 18px;font-weight:700">Review and decide</a></p>
         <p style="font-size:12px;color:#53565A">Rejecting or leaving Comments requires a short note. Comments do not approve or reject the change, but the MOC Coordinator will be notified to follow up.</p>
-      </div>`,
+      </div>`
+        : `<div style="font-family:'Segoe UI',Arial,sans-serif;color:#000;line-height:1.5">
+        <h2>Management of Change - for your information</h2>
+        <p>Hi ${escapeHtml(recipientName)},</p>
+        <p><strong>${escapeHtml(report.moc_report_no)}</strong> - ${escapeHtml(report.moc_report_title)}</p>
+        <p>You're being kept informed of this change as: <strong>${escapeHtml(rowLabel)}</strong>. No action or decision is required from you - this is for your awareness only.</p>
+        <p>A summary of the MOC is attached for your records.</p>
+      </div>`;
+
+    const result = await resend.emails.send({
+      from,
+      to: [recipientEmail],
+      subject:
+        mode === "decision"
+          ? `MOC sign-off requested: ${report.moc_report_no} - ${report.moc_report_title}`
+          : `MOC for your information: ${report.moc_report_no} - ${report.moc_report_title}`,
+      html,
       attachments: [{ filename: `${report.moc_report_no}-MOC-Summary.pdf`, content: Buffer.from(pdfBytes) }],
     });
     if (result.error) throw new Error(result.error.message);
@@ -174,7 +204,10 @@ export async function POST(request: Request) {
     await writeNotification({
       recipientEmail,
       sourceModule: "Management of Change",
-      title: `MOC sign-off requested: ${report.moc_report_no}`,
+      title:
+        mode === "decision"
+          ? `MOC sign-off requested: ${report.moc_report_no}`
+          : `MOC for your information: ${report.moc_report_no}`,
       body: `${report.moc_report_title} - ${rowLabel}`,
       link: `/moc?search=${encodeURIComponent(report.moc_report_no)}`,
     });
