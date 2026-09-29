@@ -5410,7 +5410,7 @@ const subSectionStackStyle: CSSProperties = {
   border: "1px solid #D0D0CE",
   borderRadius: "18px",
   padding: "20px",
-  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+  background: "#ECECE7",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
