@@ -4699,10 +4699,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function DetailSubsection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div style={detailSectionStyle}>
+    <>
       <div style={detailSectionTitleStyle}>{title}</div>
       {children}
-    </div>
+    </>
   );
 }
 
@@ -5406,13 +5406,10 @@ const fieldsetResetStyle: CSSProperties = {
 
 const subSectionStackStyle: CSSProperties = {
   display: "grid",
-  gap: "18px",
-};
-
-const detailSectionStyle: CSSProperties = {
+  gap: "22px",
   border: "1px solid #D0D0CE",
   borderRadius: "18px",
-  padding: "18px",
+  padding: "20px",
   background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
@@ -5424,7 +5421,7 @@ const detailSectionTitleStyle: CSSProperties = {
   color: "#005670",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  marginBottom: "12px",
+  marginBottom: "-6px",
 };
 
 const detailTemporaryHintStyle: CSSProperties = {
