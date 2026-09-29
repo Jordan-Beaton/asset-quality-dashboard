@@ -496,23 +496,23 @@ function createSignoffRows(roles: string[]): MocSignoffRow[] {
 
 function getStatusTone(status: string) {
   const value = (status || "").toLowerCase();
-  if (value.includes("closed")) return { bg: "#ECECE7", color: "#005670" };
-  if (value.includes("approved")) return { bg: "#ECECE7", color: "#000000" };
-  if (value.includes("review")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("closed")) return { bg: "#ECECE7", color: "#53565A" };
+  if (value.includes("approved")) return { bg: "#ECECE7", color: "#005670" };
+  if (value.includes("review")) return { bg: "#ECECE7", color: "#FFAD00" };
   return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function getActionPlanStatusTone(status: string) {
   const value = normaliseActionPlanStatus(status);
   if (value === "Complete") return { background: "#ECECE7", color: "#005670" };
-  if (value === "Ongoing") return { background: "#ECECE7", color: "#005670" };
-  if (value === "Hold") return { background: "#ECECE7", color: "#000000" };
+  if (value === "Ongoing") return { background: "#ECECE7", color: "#FFAD00" };
+  if (value === "Hold") return { background: "#ECECE7", color: "#53565A" };
   return { background: "#ECECE7", color: "#F93822" };
 }
 
 function getChangeTypeTone(value: ChangeType) {
   return value === "Temporary"
-    ? { bg: "#ECECE7", color: "#000000" }
+    ? { bg: "#ECECE7", color: "#53565A" }
     : { bg: "#ECECE7", color: "#005670" };
 }
 
@@ -4475,7 +4475,9 @@ function MOCPageContent() {
                                   ))}
                               </div>
                             ) : (
-                              <div style={signoffStatusHintStyle}>No attachments yet — use More options to add one.</div>
+                              <div style={compactAttachmentEmptyStateStyle}>
+                                No attachments yet — use More options to add one.
+                              </div>
                             )}
                           </Field>
                         </div>
@@ -4849,7 +4851,14 @@ function MOCPageContent() {
                         </div>
                       </div>
                       <div style={reviewIntentGridStyle}>
-                        <label style={reviewChoiceStyle}>
+                        <label
+                          style={{
+                            ...reviewChoiceStyle,
+                            background: row.approve_flag ? "#ECECE7" : "#ffffff",
+                            borderColor: row.approve_flag ? "#005670" : "#D0D0CE",
+                            color: row.approve_flag ? "#005670" : "#000000",
+                          }}
+                        >
                           <input
                             type="checkbox"
                             checked={row.approve_flag}
@@ -4857,7 +4866,14 @@ function MOCPageContent() {
                           />
                           <span>Approve</span>
                         </label>
-                        <label style={reviewChoiceStyle}>
+                        <label
+                          style={{
+                            ...reviewChoiceStyle,
+                            background: row.inform_flag ? "#ECECE7" : "#ffffff",
+                            borderColor: row.inform_flag ? "#005670" : "#D0D0CE",
+                            color: row.inform_flag ? "#005670" : "#000000",
+                          }}
+                        >
                           <input
                             type="checkbox"
                             checked={row.inform_flag}
@@ -5211,21 +5227,34 @@ function SignoffStatusControl({
   return (
     <div style={signoffStatusStackStyle}>
       {request ? (
-        <div style={{ ...signoffStatusBadgeStyle, background: tone!.bg, color: tone!.color }}>
-          {request.status} - sent to {request.recipient_name}
-          {request.decided_at ? ` - ${formatDateTime(request.decided_at)}` : ""}
-        </div>
+        <>
+          <span style={{ ...statusDotStyle, background: tone!.color }} />
+          <span style={signoffStatusTextStyle}>
+            <strong>{request.status}</strong> - sent to {request.recipient_name}
+            {request.decided_at ? ` · ${formatDateTime(request.decided_at)}` : ""}
+          </span>
+          <button
+            type="button"
+            style={quietLinkButtonStyle}
+            onClick={onSend}
+            disabled={disabled || sending || !recipientName.trim()}
+          >
+            {sending ? "Sending..." : "Resend email"}
+          </button>
+        </>
       ) : (
-        <div style={signoffStatusHintStyle}>Not yet sent for sign-off.</div>
+        <>
+          <span style={quietHintTextStyle}>Not yet sent for sign-off.</span>
+          <button
+            type="button"
+            style={sendSignoffButtonStyle}
+            onClick={onSend}
+            disabled={disabled || sending || !recipientName.trim()}
+          >
+            {sending ? "Sending..." : "Send for Sign-Off"}
+          </button>
+        </>
       )}
-      <button
-        type="button"
-        style={sendSignoffButtonStyle}
-        onClick={onSend}
-        disabled={disabled || sending || !recipientName.trim()}
-      >
-        {sending ? "Sending..." : request ? "Resend Sign-Off Email" : "Send for Sign-Off"}
-      </button>
     </div>
   );
 }
@@ -5246,7 +5275,7 @@ function SimpleDocumentTable({
   return (
     <div style={repeatCardStackStyle}>
       {rows.map((row, index) => (
-        <div key={`${row.id || "new"}-${index}`} style={compactRepeatCardStyle}>
+        <div key={`${row.id || "new"}-${index}`} style={repeatCardStyle}>
           <div style={repeatCardHeaderStyle}>
             <div>
               <div style={repeatCardKickerStyle}>Document row</div>
@@ -5841,11 +5870,6 @@ const repeatCardStyle: CSSProperties = {
   boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
 };
 
-const compactRepeatCardStyle: CSSProperties = {
-  ...repeatCardStyle,
-  padding: "12px",
-};
-
 const repeatCardHeaderStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
@@ -6006,24 +6030,25 @@ const actionAttachmentChipStyle: CSSProperties = {
   color: "#000000",
 };
 const actionAttachmentLinkButtonStyle: CSSProperties = {
-  border: "none",
-  background: "transparent",
+  border: "1px solid #D0D0CE",
+  borderRadius: "999px",
+  background: "#ffffff",
   color: "#005670",
-  fontWeight: 800,
+  fontWeight: 700,
   cursor: "pointer",
-  font: "inherit",
-  fontSize: "13px",
-  padding: 0,
+  fontSize: "12px",
+  padding: "4px 10px",
 };
 const actionAttachmentRemoveButtonStyle: CSSProperties = {
-  border: "none",
-  background: "transparent",
+  border: "1px solid #D0D0CE",
+  borderRadius: "999px",
+  background: "#ffffff",
   color: "#F93822",
-  fontWeight: 800,
+  fontWeight: 700,
   cursor: "pointer",
-  font: "inherit",
-  fontSize: "13px",
-  padding: 0,
+  fontSize: "12px",
+  padding: "4px 9px",
+  lineHeight: 1,
 };
 
 const documentCardGridStyle: CSSProperties = {
@@ -6181,9 +6206,9 @@ const readOnlyValueStyle: CSSProperties = {
   borderRadius: "10px",
   border: "1px solid #D0D0CE",
   background: "#ECECE7",
-  color: "#000000",
+  color: "#53565A",
   padding: "9px 11px",
-  fontSize: "13.5px",
+  fontSize: "14px",
   lineHeight: 1.45,
   display: "flex",
   alignItems: "center",
@@ -6207,30 +6232,46 @@ const signoffStatusStackStyle: CSSProperties = {
   flexWrap: "wrap",
 };
 
-const signoffStatusBadgeStyle: CSSProperties = {
-  padding: "7px 11px",
-  borderRadius: "999px",
-  fontSize: "12px",
-  fontWeight: 800,
-  textTransform: "uppercase",
-  letterSpacing: "0.02em",
+const quietHintTextStyle: CSSProperties = {
+  fontSize: "13.5px",
+  color: "#53565A",
+  fontStyle: "italic",
 };
 
-const signoffStatusHintStyle: CSSProperties = {
-  fontSize: "12.5px",
-  color: "#53565A",
+const signoffStatusTextStyle: CSSProperties = {
+  fontSize: "13.5px",
+  color: "#000000",
+};
+
+const statusDotStyle: CSSProperties = {
+  display: "inline-block",
+  width: "8px",
+  height: "8px",
+  borderRadius: "50%",
+  flex: "none",
+};
+
+const quietLinkButtonStyle: CSSProperties = {
+  marginLeft: "auto",
+  border: "none",
+  background: "transparent",
+  color: "#005670",
+  fontWeight: 700,
+  fontSize: "13px",
+  cursor: "pointer",
+  padding: "6px 4px",
 };
 
 const sendSignoffButtonStyle: CSSProperties = {
-  padding: "9px 13px",
-  borderRadius: 8,
-  border: "1px solid #005670",
+  marginLeft: "auto",
+  padding: "10px 16px",
+  borderRadius: 10,
+  border: "none",
   background: "#005670",
   color: "#ffffff",
   fontWeight: 700,
   cursor: "pointer",
-  fontSize: "12px",
-  lineHeight: 1.2,
+  fontSize: "13px",
   whiteSpace: "nowrap",
 };
 
@@ -6310,10 +6351,12 @@ const checkToggleStyle: CSSProperties = {
 };
 
 const badgeStyle: CSSProperties = {
-  padding: "5px 10px",
+  padding: "7px 11px",
   borderRadius: "999px",
   fontSize: "12px",
-  fontWeight: 700,
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "0.02em",
   display: "inline-block",
   whiteSpace: "nowrap",
 };
@@ -6399,6 +6442,15 @@ const attachmentEmptyStateStyle: CSSProperties = {
   border: "1px dashed #D0D0CE",
   background: "#ffffff",
   color: "#53565A",
+};
+
+const compactAttachmentEmptyStateStyle: CSSProperties = {
+  padding: "10px 12px",
+  borderRadius: "10px",
+  border: "1px dashed #D0D0CE",
+  background: "#ffffff",
+  color: "#53565A",
+  fontSize: "13px",
 };
 
 const attachmentListStyle: CSSProperties = {
