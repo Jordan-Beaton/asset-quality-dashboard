@@ -1826,16 +1826,24 @@ function MOCPageContent() {
     };
   }
 
+  function departmentForResponsiblePerson(name: string): string {
+    const target = name.trim().toLowerCase();
+    const match = target ? peopleOptions.find((person) => person.name.trim().toLowerCase() === target) : undefined;
+    return match?.department?.trim() || "HSEQ";
+  }
+
   async function syncMocActionsToCentralActions(report: MocReport, actionItems: MocActionPlanItem[]) {
     const relevant = actionItems.filter((item) => item.description.trim() && item.link_key);
     const relevantKeys = new Set(relevant.map((item) => item.link_key));
 
-    const [linkedRes, numbersRes] = await Promise.all([
+    const [linkedRes, numbersRes, userRes] = await Promise.all([
       supabase.from("actions").select("id,linked_moc_action_key").eq("linked_moc_id", report.id),
       supabase.from("actions").select("action_number"),
+      supabase.auth.getUser(),
     ]);
     if (linkedRes.error) throw new Error(linkedRes.error.message);
     if (numbersRes.error) throw new Error(numbersRes.error.message);
+    const currentUserEmail = userRes.data.user?.email?.trim().toLowerCase() || null;
 
     const existingByKey = new Map(
       ((linkedRes.data || []) as { id: string; linked_moc_action_key: string | null }[])
@@ -1858,13 +1866,14 @@ function MOCPageContent() {
         action_number: newNumbers[index],
         title: item.description.trim() || `MOC Action ${item.action_no}`,
         description: item.description.trim() || null,
-        department: "HSEQ",
+        department: departmentForResponsiblePerson(item.responsible_person),
         project: report.project_worksite_address || null,
         owner: item.responsible_person.trim() || null,
         priority: "Medium",
         status: mapMocActionStatusToCentralStatus(item.status),
         due_date: item.target_date || null,
         source: "MOC",
+        raised_by_email: currentUserEmail,
         linked_moc_id: report.id,
         linked_moc_number: report.moc_report_no,
         linked_moc_action_key: item.link_key,
@@ -1881,6 +1890,7 @@ function MOCPageContent() {
             .update({
               title: item.description.trim() || `MOC Action ${item.action_no}`,
               description: item.description.trim() || null,
+              department: departmentForResponsiblePerson(item.responsible_person),
               owner: item.responsible_person.trim() || null,
               status: mapMocActionStatusToCentralStatus(item.status),
               due_date: item.target_date || null,
