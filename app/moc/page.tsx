@@ -4170,7 +4170,7 @@ function MOCPageContent() {
 
             <div style={subSectionStackStyle}>
               <DetailSubsection title="A. MOC REPORT DETAILS">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <div style={detailFormGridStyle}>
                   <Field label="MOC Report No.">
                     <input value={detailReport.moc_report_no} readOnly style={readOnlyInputStyle} />
@@ -4231,7 +4231,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="B. CHANGE IDENTIFICATION">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <Field label="Description of the change (proposed change)">
@@ -4320,7 +4320,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="C. ACTION PLAN">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <div style={actionPlanIntroStyle}>
                   <div>
                     <strong style={actionPlanIntroTitleStyle}>MOC implementation actions</strong>
@@ -4489,7 +4489,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="D. CHANGE IMPACT">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <div style={impactGridStyle}>
                   <ImpactToggle
                     label="Health & Safety"
@@ -4579,7 +4579,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="E. AFFECTED DOCUMENTATION">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <RepeatTableToolbar onAdd={addAffectedDocumentRow} label="Add Document Row" disabled={!canEditStructural} />
                 <SimpleDocumentTable
                   rows={detailAffectedDocuments}
@@ -4592,7 +4592,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="F. RISK MANAGEMENT">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditCoreFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <RepeatTableToolbar onAdd={addRiskDocumentRow} label="Add Risk Document Row" disabled={!canEditStructural} />
                 <SimpleDocumentTable
                   rows={detailRiskDocuments}
@@ -4672,7 +4672,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="G. HAZARDS & MITIGATING ACTIONS">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <div style={detailFormGridStyle}>
                   <div>
                     <Field label="Describe potential Hazards & Risks">
@@ -4697,7 +4697,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="H. COST REVIEW">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <Field label="Description of cost impact (incl. future savings)">
                   <textarea
                     value={detailReport.cost_review_description}
@@ -4709,7 +4709,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="I. SCHEDULE REVIEW">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <Field label="Description of the schedule impact (incl. future savings)">
                   <textarea
                     value={detailReport.schedule_review_description}
@@ -4721,7 +4721,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="J. SUPPORTING DOCUMENTATION AND INFORMATION">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditImplementationFields}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
                     <Field label="Supporting documentation and information">
@@ -4823,7 +4823,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="K. REVIEW AND ENDORSEMENT">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditReviewSections}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditReviewSections}>
                 <RepeatTableToolbar onAdd={addReviewRow} label="Add Review Row" disabled={!canEditStructural} />
                 <div style={repeatCardStackStyle}>
                   {detailReviewRows.map((row, index) => (
@@ -4946,7 +4946,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="L. MOC CHANGE ACCEPTANCE">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditReviewSections}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditReviewSections}>
                 <RepeatTableToolbar onAdd={addAcceptanceRow} label="Add Acceptance Row" disabled={!canEditStructural} />
                 <SimpleSignoffTable
                   rows={detailAcceptanceRows}
@@ -4964,7 +4964,7 @@ function MOCPageContent() {
               </DetailSubsection>
 
               <DetailSubsection title="M. MOC CLOSE-OUT VERIFICATION">
-                <fieldset style={fieldsetResetStyle} disabled={!canEditCloseout}>
+                <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCloseout}>
                 <RepeatTableToolbar
                   onAdd={addCloseoutRow}
                   label="Add Close-Out Row"
