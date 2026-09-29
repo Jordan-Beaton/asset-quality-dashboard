@@ -82,13 +82,18 @@ export async function POST(request: Request) {
         root_cause_description: sectionValue(raw, "Root Cause Description", [
           "Response / Proposed Action",
           "SUPPLIER / CLIENT RESPONSE",
-          "Uploaded Evidence",
+          "EVIDENCE LIST",
+          "EVIDENCE IMAGES",
         ]),
         supplier_response: sectionValue(raw, "Response / Proposed Action", [
           "Acknowledgement / Responsible Contact",
-          "Uploaded Evidence",
+          "EVIDENCE LIST",
+          "EVIDENCE IMAGES",
         ]),
-        supplier_acknowledgement: sectionValue(raw, "Acknowledgement / Responsible Contact", ["Uploaded Evidence"]),
+        supplier_acknowledgement: sectionValue(raw, "Acknowledgement / Responsible Contact", [
+          "EVIDENCE LIST",
+          "EVIDENCE IMAGES",
+        ]),
       },
     });
   } catch (error) {
