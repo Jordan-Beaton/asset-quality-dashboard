@@ -1378,7 +1378,11 @@ function MOCPageContent() {
 
   async function uploadActionAttachment(linkKey: string, files: FileList | null) {
     if (!requireEditPermission("Uploading action attachments")) return;
-    if (!linkKey || !files?.length) return;
+    if (!files?.length) return;
+    if (!linkKey) {
+      showMessage("Save the MOC first, then upload attachments to this action.", "warning");
+      return;
+    }
 
     setUploadingActionAttachmentKey(linkKey);
     try {
@@ -4358,7 +4362,9 @@ function MOCPageContent() {
                             <summary style={optionsSummaryStyle}>More options ···</summary>
                             <div style={optionsMenuPanelStyle}>
                               <label style={optionsMenuItemStyle}>
-                                {uploadingActionAttachmentKey === row.link_key ? "Uploading..." : "Upload Attachment"}
+                                {row.link_key && uploadingActionAttachmentKey === row.link_key
+                                  ? "Uploading..."
+                                  : "Upload Attachment"}
                                 <input
                                   type="file"
                                   multiple
