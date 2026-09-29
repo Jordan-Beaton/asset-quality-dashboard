@@ -2516,8 +2516,8 @@ function NcrCapaPageContent() {
 
         if (externalFacingPdf) {
           drawHeading("SUPPLIER / CLIENT RESPONSE");
-          drawParagraphBox("Response / Proposed Action", "", 28);
-          drawParagraphBox("Acknowledgement / Responsible Contact", "", 18);
+          drawParagraphBox("Response / Proposed Action", selectedRow.supplier_response, 28);
+          drawParagraphBox("Acknowledgement / Responsible Contact", selectedRow.supplier_acknowledgement, 18);
       }
 
         if (includeEvidenceListInPdf) {
@@ -2820,8 +2820,8 @@ function NcrCapaPageContent() {
       if (externalFacingPdf) {
         children.push(
           wordHeading("SUPPLIER / CLIENT RESPONSE"),
-          ...wordParagraphBox("Response / Proposed Action", ""),
-          ...wordParagraphBox("Acknowledgement / Responsible Contact", "")
+          ...wordParagraphBox("Response / Proposed Action", selectedRow.supplier_response),
+          ...wordParagraphBox("Acknowledgement / Responsible Contact", selectedRow.supplier_acknowledgement)
         );
       }
 
