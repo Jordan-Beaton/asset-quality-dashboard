@@ -53,6 +53,8 @@ type Ncr = {
   source_type: string | null;
   root_cause_category: string | null;
   root_cause_description: string | null;
+  supplier_response: string | null;
+  supplier_acknowledgement: string | null;
 };
 
 type Capa = {
@@ -143,6 +145,8 @@ type CombinedRow = {
   linked_to: string;
   root_cause_category: string;
   root_cause_description: string;
+  supplier_response: string;
+  supplier_acknowledgement: string;
   correction_description: string;
   corrective_action_description: string;
   effectiveness_status: string;
@@ -151,6 +155,12 @@ type CombinedRow = {
   effectiveness_comments: string;
   effectiveness_due_date: string;
 };
+
+type NcrImportFields = Pick<
+  CombinedRow,
+  "containment_action" | "corrective_action" | "root_cause_category" | "root_cause_description" | "supplier_response" | "supplier_acknowledgement"
+>;
+type NcrImportPreview = { ncrId: string; file: File; fields: NcrImportFields };
 
 type NcrSortKey = "number" | "severity" | "status" | "due_date";
 type SortDirection = "asc" | "desc";
@@ -858,6 +868,9 @@ function NcrCapaPageContent() {
   const selectedDetailRef = useRef<HTMLDivElement | null>(null);
   const [refreshStamp, setRefreshStamp] = useState<string>("");
   const [message, setMessage] = useState("");
+  const [ncrImportPreview, setNcrImportPreview] = useState<NcrImportPreview | null>(null);
+  const [importingNcrWordId, setImportingNcrWordId] = useState("");
+  const [applyingNcrImport, setApplyingNcrImport] = useState(false);
 
   const [search, setSearch] = useState(linkedSearch);
   const [statusFilter, setStatusFilter] = useState(linkedStatus);
@@ -1067,6 +1080,8 @@ function NcrCapaPageContent() {
       linked_to: "",
       root_cause_category: n.root_cause_category || "",
       root_cause_description: n.root_cause_description || "",
+      supplier_response: n.supplier_response || "",
+      supplier_acknowledgement: n.supplier_acknowledgement || "",
       correction_description: "",
       corrective_action_description: "",
       effectiveness_status: "Pending",
@@ -1096,6 +1111,8 @@ function NcrCapaPageContent() {
       linked_to: c.linked_to || "",
       root_cause_category: "",
       root_cause_description: "",
+      supplier_response: "",
+      supplier_acknowledgement: "",
       correction_description: c.correction_description || "",
       corrective_action_description: c.corrective_action_description || "",
       effectiveness_status: normaliseEffectivenessStatus(c.effectiveness_status),
@@ -1628,6 +1645,151 @@ function NcrCapaPageContent() {
     return { ok: true as const };
   }
 
+  async function handleCompletedNcrUpload(row: CombinedRow, event: React.ChangeEvent<HTMLInputElement>) {
+    if (!requireEditPermission("Importing completed NCR responses")) {
+      event.target.value = "";
+      return;
+    }
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setImportingNcrWordId(row.id);
+    setNcrImportPreview(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      body.append("expectedNumber", row.number);
+      const response = await fetch("/api/ncr-completed-import", { method: "POST", body });
+      const result = (await response.json()) as { error?: string; fields?: NcrImportFields };
+      if (!response.ok || !result.fields) throw new Error(result.error || "The completed NCR could not be read.");
+      setNcrImportPreview({ ncrId: row.id, file, fields: result.fields });
+      setMessage(`${row.number} extracted. Review the proposed changes before applying them.`);
+    } catch (error) {
+      setMessage(`Completed NCR import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setImportingNcrWordId("");
+    }
+  }
+
+  async function applyCompletedNcrImport(row: CombinedRow, accept: boolean) {
+    const preview = ncrImportPreview;
+    if (!preview || preview.ncrId !== row.id) return;
+    if (!requireEditPermission("Applying completed NCR responses")) return;
+
+    setApplyingNcrImport(true);
+    try {
+      if (accept) {
+        const payload: Record<string, string> = {};
+        (Object.keys(preview.fields) as Array<keyof NcrImportFields>).forEach((field) => {
+          const value = String(preview.fields[field] || "").trim();
+          if (value && value !== String(row[field] || "").trim()) payload[field] = value;
+        });
+        if (Object.keys(payload).length) {
+          const { error } = await supabase.from("ncrs").update(payload).eq("id", row.id);
+          if (error) throw new Error(error.message);
+          // loadData() below refreshes the register, but the open edit form
+          // holds its own copy of the row - patch it locally too so the
+          // fields the user just approved show up immediately.
+          setEditRow((prev) => (prev && prev.id === row.id ? { ...prev, ...payload } : prev));
+          setSelectedRow((prev) => (prev && prev.id === row.id ? { ...prev, ...payload } : prev));
+        }
+      }
+
+      // The returned file is kept as evidence either way - even a rejected
+      // round is part of the record, so nothing about the supplier/client
+      // exchange gets lost if this needs another back-and-forth.
+      const uploadResult = await uploadEvidenceForRecord(
+        "NCR",
+        row.id,
+        [preview.file],
+        accept ? "Supplier / client response - accepted" : "Supplier / client response - not yet accepted, needs revision"
+      );
+      if (!uploadResult.ok) throw new Error(uploadResult.message);
+
+      setNcrImportPreview(null);
+      await loadData();
+      setMessage(
+        accept
+          ? `${row.number} updated from the returned Word document and the source file was retained as evidence.`
+          : `${row.number} response kept as evidence. No fields were changed - awaiting a revised response.`
+      );
+    } catch (error) {
+      setMessage(`NCR update failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setApplyingNcrImport(false);
+    }
+  }
+
+  function renderNcrImportPreview(row: CombinedRow) {
+    const preview = ncrImportPreview?.ncrId === row.id ? ncrImportPreview : null;
+    if (!preview) return null;
+
+    const labels: Record<keyof NcrImportFields, string> = {
+      containment_action: "Containment Action",
+      corrective_action: "Corrective Action",
+      root_cause_category: "Root Cause Category",
+      root_cause_description: "Root Cause Description",
+      supplier_response: "Response / Proposed Action",
+      supplier_acknowledgement: "Acknowledgement / Responsible Contact",
+    };
+    const changes = (Object.keys(labels) as Array<keyof NcrImportFields>).filter((field) => {
+      const value = String(preview.fields[field] || "").trim();
+      return value && value !== String(row[field] || "").trim();
+    });
+
+    return (
+      <div style={importPreviewStyle}>
+        <div style={importPreviewHeadStyle}>
+          <div>
+            <strong>Returned NCR response review</strong>
+            <div style={{ fontSize: "12px", color: "#53565A" }}>{preview.file.name}</div>
+          </div>
+          <button type="button" style={quietLinkButtonStyle} onClick={() => setNcrImportPreview(null)}>
+            Discard
+          </button>
+        </div>
+        {changes.length ? (
+          <div style={importComparisonStyle}>
+            {changes.map((field) => (
+              <div key={field} style={importComparisonRowStyle}>
+                <strong>{labels[field]}</strong>
+                <div>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "#53565A", textTransform: "uppercase" }}>Current IMS</span>
+                  <p style={{ margin: "4px 0 0" }}>{String(row[field] || "Not recorded")}</p>
+                </div>
+                <div>
+                  <span style={{ fontSize: "11px", fontWeight: 800, color: "#53565A", textTransform: "uppercase" }}>Returned Word</span>
+                  <p style={{ margin: "4px 0 0" }}>{String(preview.fields[field])}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={emptyTextStyle}>No populated fields differ from the current IMS record.</p>
+        )}
+        <div style={buttonRowStyle}>
+          <button
+            type="button"
+            style={primaryButton}
+            disabled={!changes.length || applyingNcrImport}
+            onClick={() => void applyCompletedNcrImport(row, true)}
+          >
+            {applyingNcrImport ? "Applying..." : "Approve Updates"}
+          </button>
+          <button
+            type="button"
+            style={secondaryButton}
+            disabled={applyingNcrImport}
+            onClick={() => void applyCompletedNcrImport(row, false)}
+          >
+            {applyingNcrImport ? "Saving..." : "Reject - Keep as Evidence"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function addLinkedNcrToNewCapa() {
     if (!newLinkedNcrToAdd) return;
 
@@ -1929,6 +2091,8 @@ function NcrCapaPageContent() {
           root_cause_category:
             resolveRootCauseCategory(editRow.root_cause_category, editRootCauseOther) || null,
           root_cause_description: editRow.root_cause_description || null,
+          supplier_response: editRow.supplier_response || null,
+          supplier_acknowledgement: editRow.supplier_acknowledgement || null,
         })
         .eq("id", editRow.id);
 
@@ -4500,6 +4664,32 @@ function NcrCapaPageContent() {
                           }
                         />
                       </div>
+
+                      <div style={formSectionTitleStyle}>E. Supplier / Client Response</div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Response / Proposed Action</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.supplier_response}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, supplier_response: e.target.value })
+                          }
+                          placeholder="The supplier / client's proposed or completed action, from their returned response"
+                        />
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Acknowledgement / Responsible Contact</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.supplier_acknowledgement}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, supplier_acknowledgement: e.target.value })
+                          }
+                          placeholder="Who at the supplier / client acknowledged this, and their role"
+                        />
+                      </div>
                     </>
                   )}
 
@@ -4749,7 +4939,26 @@ function NcrCapaPageContent() {
                           Open Saved PDF
                         </button>
                       ) : null}
+
+                      <label
+                        style={{
+                          ...secondaryButton,
+                          opacity: importingNcrWordId === editRow.id || !canEditNcr ? 0.6 : 1,
+                          cursor: importingNcrWordId === editRow.id || !canEditNcr ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {importingNcrWordId === editRow.id ? "Reading completed Word..." : "Upload Completed Word"}
+                        <input
+                          type="file"
+                          accept=".docx"
+                          style={hiddenFileInputStyle}
+                          disabled={Boolean(importingNcrWordId) || !canEditNcr}
+                          onChange={(event) => void handleCompletedNcrUpload(editRow, event)}
+                        />
+                      </label>
                     </div>
+
+                    {renderNcrImportPreview(editRow)}
                   </div>
                 ) : null}
 
@@ -5666,6 +5875,68 @@ const buttonRowStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   marginTop: "16px",
+};
+
+const hiddenFileInputStyle: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
+const quietLinkButtonStyle: CSSProperties = {
+  border: "none",
+  background: "transparent",
+  color: "#005670",
+  fontWeight: 700,
+  fontSize: "13px",
+  cursor: "pointer",
+  padding: "6px 4px",
+};
+
+const emptyTextStyle: CSSProperties = {
+  fontSize: "13px",
+  color: "#53565A",
+  margin: 0,
+};
+
+const importPreviewStyle: CSSProperties = {
+  marginTop: "14px",
+  padding: "16px",
+  borderRadius: "14px",
+  border: "1px solid #D0D0CE",
+  background: "#ECECE7",
+  display: "grid",
+  gap: "14px",
+};
+
+const importPreviewHeadStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
+};
+
+const importComparisonStyle: CSSProperties = {
+  display: "grid",
+  gap: "10px",
+};
+
+const importComparisonRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "160px minmax(0, 1fr) minmax(0, 1fr)",
+  gap: "10px",
+  alignItems: "start",
+  padding: "10px",
+  borderRadius: "10px",
+  background: "#ffffff",
+  border: "1px solid #ECECE7",
 };
 
 const attentionNumberStyle: CSSProperties = {
