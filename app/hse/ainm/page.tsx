@@ -602,6 +602,21 @@ async function getLogoDataUrl() {
   }
 }
 
+async function getThreeRsLogoDataUrl() {
+  try {
+    const response = await fetch("/enshore-3rs-primary-rgb.jpg");
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
+}
+
 async function createSignedEvidenceUrl(path: string) {
   if (!path) return "";
   // These links get baked into exported AINM Word documents (notification,
@@ -2182,18 +2197,22 @@ function HseAinmPageContent() {
     });
   }
 
-  function wordHeader(record: AINMRecord, logoData: string) {
+  function wordHeader(logoData: string, threeRsLogoData: string, headerTitle: string) {
     const logo =
       logoData && logoData.startsWith("data:image/")
         ? new ImageRun({ type: "png", data: dataUrlToBytes(logoData), transformation: { width: 112, height: 56 } })
         : wordRun("ENSHORE", { bold: true, size: exportTypography.headingPt * 2, color: exportColours.brand });
+    const threeRsLogo =
+      threeRsLogoData && threeRsLogoData.startsWith("data:image/")
+        ? new ImageRun({ type: "jpg", data: dataUrlToBytes(threeRsLogoData), transformation: { width: 72, height: 56 } })
+        : wordRun("");
 
     return new Header({
       children: [
         new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
           layout: TableLayoutType.FIXED,
-          columnWidths: [4680, 4680],
+          columnWidths: [3120, 3120, 3120],
           borders: {
             top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
             bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
@@ -2205,13 +2224,25 @@ function HseAinmPageContent() {
           rows: [
             new TableRow({
               children: [
-                new TableCell({ width: { size: 4680, type: WidthType.DXA }, children: [new Paragraph({ children: [logo] })] }),
                 new TableCell({
-                  width: { size: 4680, type: WidthType.DXA },
+                  width: { size: 3120, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [new Paragraph({ children: [logo] })],
+                }),
+                new TableCell({
+                  width: { size: 3120, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
                   children: [
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(record.ainm_number, { color: exportColours.muted, size: exportTypography.captionPt * 2 })] }),
-                    new Paragraph({ alignment: AlignmentType.RIGHT, children: [wordRun(displayDate(record.event_date), { color: exportColours.muted, size: exportTypography.captionPt * 2 })] }),
+                    new Paragraph({
+                      alignment: AlignmentType.CENTER,
+                      children: [wordRun(headerTitle, { bold: true, size: exportTypography.headingPt * 2, color: exportColours.brand })],
+                    }),
                   ],
+                }),
+                new TableCell({
+                  width: { size: 3120, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [threeRsLogo] })],
                 }),
               ],
             }),
@@ -2222,7 +2253,7 @@ function HseAinmPageContent() {
     });
   }
 
-  function wordFooter(documentReference: string) {
+  function wordFooter(documentReference: string, ainmNumber: string, eventDate: string) {
     return new Footer({
       children: [
         new Paragraph({ border: { top: { style: BorderStyle.SINGLE, color: exportColours.brand, size: 4 } } }),
@@ -2242,7 +2273,14 @@ function HseAinmPageContent() {
             new TableCell({
               width: { size: 7200, type: WidthType.DXA },
               margins: { top: 70, bottom: 70, left: 100, right: 100 },
-              children: [new Paragraph({ children: [wordRun(documentReference, { bold: true, color: exportColours.brand, size: exportTypography.captionPt * 2 })] })],
+              children: [
+                new Paragraph({ children: [wordRun(documentReference, { bold: true, color: exportColours.brand, size: exportTypography.captionPt * 2 })] }),
+                new Paragraph({ children: [
+                  wordRun(ainmNumber, { color: exportColours.muted, size: exportTypography.captionPt * 2 }),
+                  wordRun("  |  ", { color: exportColours.muted, size: exportTypography.captionPt * 2 }),
+                  wordRun(eventDate, { color: exportColours.muted, size: exportTypography.captionPt * 2 }),
+                ] }),
+              ],
             }),
             new TableCell({
               width: { size: 2160, type: WidthType.DXA },
@@ -2286,6 +2324,7 @@ function HseAinmPageContent() {
     setGeneratingStage(stage);
     try {
       const logoData = await getLogoDataUrl();
+      const threeRsLogoData = await getThreeRsLogoDataUrl();
       const notificationEvidenceFiles = selectedEvidence.filter((file) => file.stage === "Notification");
       const notificationEvidenceWithUrls = await Promise.all(
         notificationEvidenceFiles.map(async (file) => ({
@@ -2313,6 +2352,8 @@ function HseAinmPageContent() {
           : stage === "part1"
           ? "ENS-HSEQ-FRM-028 AINM Part 1 Report"
           : "ENS-HSEQ-FRM-029 AINM Part 2 Report";
+      const headerTitle =
+        stage === "notification" ? "Initial AINM Notification" : stage === "part1" ? "AINM Part 1 Report" : "AINM Part 2 Report";
 
       const children: (Paragraph | Table)[] = [];
       children.push(
@@ -2452,8 +2493,8 @@ function HseAinmPageContent() {
         styles: { default: { document: { run: { font: exportTypography.wordFont, size: exportTypography.bodyPt * 2, color: exportColours.ink } } } },
         sections: [
           {
-            headers: { default: wordHeader(record, logoData) },
-            footers: { default: wordFooter(title) },
+            headers: { default: wordHeader(logoData, threeRsLogoData, headerTitle) },
+            footers: { default: wordFooter(title, record.ainm_number, displayDate(record.event_date)) },
             properties: { page: { margin: { top: 900, right: 720, bottom: 900, left: 720, header: 360, footer: 360 } } },
             children,
           },
@@ -2483,7 +2524,7 @@ function HseAinmPageContent() {
     return ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || fallback);
   }
 
-  function pdfHeader(doc: jsPDF, record: AINMRecord, logoData: string) {
+  function pdfHeader(doc: jsPDF, record: AINMRecord, logoData: string, threeRsLogoData: string) {
     if (logoData) {
       try {
         doc.addImage(logoData, "PNG", 12, 10, 40, 20);
@@ -2492,11 +2533,13 @@ function HseAinmPageContent() {
         doc.text("ENSHORE", 12, 18);
       }
     }
-    doc.setFont(exportTypography.pdfFont, "normal");
-    doc.setFontSize(exportTypography.bodyPt);
-    doc.setTextColor(...exportRgb.muted);
-    doc.text(record.ainm_number, 198, 14, { align: "right" });
-    doc.text(displayDate(record.event_date), 198, 20, { align: "right" });
+    if (threeRsLogoData) {
+      try {
+        doc.addImage(threeRsLogoData, "JPEG", 166, 14, 32, 12);
+      } catch {
+        // Keep header generation resilient if the 3Rs logo cannot be loaded.
+      }
+    }
     doc.setDrawColor(...exportRgb.brand);
     doc.setLineWidth(0.6);
     doc.line(12, 30, 198, 30);
@@ -2538,8 +2581,9 @@ function HseAinmPageContent() {
     return pdfLastY(doc, y) + 6;
   }
 
-  function pdfFooter(doc: jsPDF, documentReference: string) {
+  function pdfFooter(doc: jsPDF, record: AINMRecord, documentReference: string) {
     const pages = doc.getNumberOfPages();
+    const referenceLine = `${record.ainm_number}  |  ${displayDate(record.event_date)}`;
     for (let page = 1; page <= pages; page += 1) {
       doc.setPage(page);
       doc.setDrawColor(...exportRgb.brand);
@@ -2547,10 +2591,11 @@ function HseAinmPageContent() {
       doc.setFont(exportTypography.pdfFont, "bold");
       doc.setFontSize(exportTypography.captionPt);
       doc.setTextColor(...exportRgb.brand);
-      doc.text(documentReference, 14, 291.2, { maxWidth: 126 });
+      doc.text(documentReference, 14, 290, { maxWidth: 126 });
       doc.setFont(exportTypography.pdfFont, "normal");
       doc.setTextColor(...exportRgb.muted);
-      doc.text(`Page ${page} of ${pages}`, 198, 291, { align: "right" });
+      doc.text(referenceLine, 14, 294.5, { maxWidth: 126 });
+      doc.text(`Page ${page} of ${pages}`, 198, 292, { align: "right" });
     }
   }
 
@@ -2560,13 +2605,14 @@ function HseAinmPageContent() {
     setGeneratingStage("compiled-pdf");
     try {
       const logoData = await getLogoDataUrl();
+      const threeRsLogoData = await getThreeRsLogoDataUrl();
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      pdfHeader(doc, record, logoData);
+      pdfHeader(doc, record, logoData, threeRsLogoData);
       let y = 38;
       const addSubheading = (title: string) => {
         if (y > 260) {
           doc.addPage();
-          pdfHeader(doc, record, logoData);
+          pdfHeader(doc, record, logoData, threeRsLogoData);
           y = 38;
         }
         y = pdfSubsection(doc, title, y);
@@ -2609,7 +2655,7 @@ function HseAinmPageContent() {
 
       if (y > 235) {
         doc.addPage();
-        pdfHeader(doc, record, logoData);
+        pdfHeader(doc, record, logoData, threeRsLogoData);
         y = 38;
       }
 
@@ -2645,7 +2691,7 @@ function HseAinmPageContent() {
 
       if (y > 225) {
         doc.addPage();
-        pdfHeader(doc, record, logoData);
+        pdfHeader(doc, record, logoData, threeRsLogoData);
         y = 38;
       }
 
@@ -2681,7 +2727,7 @@ function HseAinmPageContent() {
         },
       });
 
-      pdfFooter(doc, "AINM Complete Report Pack");
+      pdfFooter(doc, record, "AINM Complete Report Pack");
       const fileName = `${record.ainm_number}-complete-ainm-report.pdf`;
       doc.save(fileName);
 
