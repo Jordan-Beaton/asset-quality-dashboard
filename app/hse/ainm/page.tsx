@@ -2540,6 +2540,10 @@ function HseAinmPageContent() {
         // Keep header generation resilient if the 3Rs logo cannot be loaded.
       }
     }
+    doc.setFont(exportTypography.pdfFont, "bold");
+    doc.setFontSize(exportTypography.headingPt);
+    doc.setTextColor(...exportRgb.brand);
+    doc.text("AINM Investigation Report", 105, 21, { align: "center" });
     doc.setDrawColor(...exportRgb.brand);
     doc.setLineWidth(0.6);
     doc.line(12, 30, 198, 30);
