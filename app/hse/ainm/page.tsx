@@ -2204,7 +2204,7 @@ function HseAinmPageContent() {
         : wordRun("ENSHORE", { bold: true, size: exportTypography.headingPt * 2, color: exportColours.brand });
     const threeRsLogo =
       threeRsLogoData && threeRsLogoData.startsWith("data:image/")
-        ? new ImageRun({ type: "jpg", data: dataUrlToBytes(threeRsLogoData), transformation: { width: 72, height: 56 } })
+        ? new ImageRun({ type: "jpg", data: dataUrlToBytes(threeRsLogoData), transformation: { width: 137, height: 52 } })
         : wordRun("");
 
     return new Header({
@@ -2535,7 +2535,7 @@ function HseAinmPageContent() {
     }
     if (threeRsLogoData) {
       try {
-        doc.addImage(threeRsLogoData, "JPEG", 166, 14, 32, 12);
+        doc.addImage(threeRsLogoData, "JPEG", 161.7, 13.2, 36.3, 13.7);
       } catch {
         // Keep header generation resilient if the 3Rs logo cannot be loaded.
       }
