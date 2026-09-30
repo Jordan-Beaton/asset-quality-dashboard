@@ -22,21 +22,36 @@ function clean(value: unknown) {
   return String(value ?? "").replace(/ /g, " ").replace(/[ \t]+/g, " ").trim();
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function valueAfterLabel(text: string, label: string) {
   const lines = text.split("\n").map(clean);
   const index = lines.findIndex((line) => line.toLowerCase() === label.toLowerCase());
   return index >= 0 ? clean(lines.slice(index + 1).find(Boolean)) : "";
 }
 
+// Finds the line that exactly matches `label` (same rule valueAfterLabel
+// relies on), then takes every line after it up to - but not including -
+// the next line that exactly matches one of `nextLabels`, or the end of the
+// document if none is found. This only requires the label lines themselves
+// to be standalone lines; it does not require blank-line-flanked spacing
+// around them, which real returned documents don't reliably preserve once
+// mammoth flattens their tables/paragraphs to plain text (an earlier regex
+// version assumed that spacing and silently swallowed whole sections when
+// it wasn't there).
 function sectionValue(text: string, label: string, nextLabels: string[]) {
-  const next = nextLabels.map(escapeRegExp).join("|");
-  const pattern = new RegExp(`(?:^|\\n)\\s*${escapeRegExp(label)}\\s*\\n([\\s\\S]*?)(?=\\n\\s*(?:${next})\\s*\\n|$)`, "i");
-  const match = text.match(pattern);
-  return clean(match?.[1]?.split("\n").map(clean).filter(Boolean).join("\n"));
+  const lines = text.split("\n").map(clean);
+  const startIndex = lines.findIndex((line) => line.toLowerCase() === label.toLowerCase());
+  if (startIndex < 0) return "";
+
+  const nextLabelsLower = nextLabels.map((next) => next.toLowerCase());
+  let endIndex = lines.length;
+  for (let i = startIndex + 1; i < lines.length; i += 1) {
+    if (nextLabelsLower.includes(lines[i].toLowerCase())) {
+      endIndex = i;
+      break;
+    }
+  }
+
+  return clean(lines.slice(startIndex + 1, endIndex).filter(Boolean).join("\n"));
 }
 
 export async function POST(request: Request) {
