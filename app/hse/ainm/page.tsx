@@ -73,6 +73,7 @@ type AINMRecord = {
   environmental_release_quantity: string | null;
   immediate_corrective_actions: string | null;
   investigation_team_members: InvestigationTeamMember[];
+  timeline_entries: TimelineEntry[];
   root_cause_people: string | null;
   root_cause_equipment: string | null;
   root_cause_environment: string | null;
@@ -149,6 +150,7 @@ type InlineActionDraft = {
   owner: string;
   priority: string;
   due_date: string;
+  status: string;
 };
 
 type AINMEvidence = {
@@ -213,6 +215,11 @@ type InvestigationTeamMember = {
   role: string;
 };
 
+type TimelineEntry = {
+  datetime: string;
+  description: string;
+};
+
 type PeopleOption = {
   id: string;
   name: string;
@@ -220,6 +227,22 @@ type PeopleOption = {
   role: string | null;
   department: string | null;
   active: boolean | null;
+};
+
+type AinmSignoffRole = "location" | "hseq" | "project_manager" | "smt";
+type AinmSignoffStatus = "Pending" | "Approved" | "Rejected" | "Needs Attention";
+
+type AinmSignoffRequest = {
+  id: string;
+  ainm_id: string;
+  role: AinmSignoffRole;
+  row_label: string;
+  recipient_name: string;
+  recipient_email: string;
+  status: AinmSignoffStatus;
+  decision_name: string;
+  decision_note: string;
+  decided_at: string;
 };
 
 type ImportedAction = {
@@ -312,6 +335,7 @@ const emptyRecord: AINMRecord = {
   environmental_release_quantity: "",
   immediate_corrective_actions: "",
   investigation_team_members: [],
+  timeline_entries: [],
   root_cause_people: "",
   root_cause_equipment: "",
   root_cause_environment: "",
@@ -379,6 +403,7 @@ const emptyInlineAction: InlineActionDraft = {
   owner: "",
   priority: "Medium",
   due_date: "",
+  status: "Open",
 };
 
 const actionDepartmentOptions = [
@@ -461,6 +486,17 @@ function normaliseTeamMembers(value: unknown): InvestigationTeamMember[] {
       company: clean(row.company),
       position: clean(row.position),
       role: clean(row.role),
+    };
+  });
+}
+
+function normaliseTimelineEntries(value: unknown): TimelineEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => {
+    const row = item as Partial<TimelineEntry>;
+    return {
+      datetime: clean(row.datetime),
+      description: clean(row.description),
     };
   });
 }
@@ -648,6 +684,8 @@ function HseAinmPageContent() {
   const [externalRecords, setExternalRecords] = useState<ExternalAINMRecord[]>([]);
   const [externalEvidence, setExternalEvidence] = useState<ExternalAINMEvidence[]>([]);
   const [peopleOptions, setPeopleOptions] = useState<PeopleOption[]>([]);
+  const [signoffRequests, setSignoffRequests] = useState<AinmSignoffRequest[]>([]);
+  const [sendingSignoffRole, setSendingSignoffRole] = useState("");
   const [activeView, setActiveView] = useState<AINMView>("dashboard");
   const [detailTab, setDetailTab] = useState<DetailTab>("notification");
   const [selectedId, setSelectedId] = useState("");
@@ -662,6 +700,7 @@ function HseAinmPageContent() {
   const [investigationTeamRows, setInvestigationTeamRows] = useState<InvestigationTeamMember[]>([
     { name: "", company: "", position: "", role: "" },
   ]);
+  const [timelineEntryRows, setTimelineEntryRows] = useState<TimelineEntry[]>([{ datetime: "", description: "" }]);
   const [newRecord, setNewRecord] = useState<AINMRecord>(emptyRecord);
   const [newAinmType, setNewAinmType] = useState<NewAINMType>("");
   const [message, setMessage] = useState("Loading AINM records...");
@@ -746,6 +785,9 @@ function HseAinmPageContent() {
     setActiveView("register");
     selectAinmAndScroll(match);
   }, [records, directAinmId]);
+  useEffect(() => {
+    void loadSignoffRequests(selectedId);
+  }, [selectedId]);
   const selectedEvidence = useMemo(() => evidence.filter((file) => file.ainm_id === selectedId), [evidence, selectedId]);
   const selectedExternalEvidence = useMemo(
     () => externalEvidence.filter((file) => file.external_ainm_id === selectedExternalId),
@@ -1080,11 +1122,13 @@ function HseAinmPageContent() {
       ...selected,
       attachments_checklist: Array.isArray(selected.attachments_checklist) ? selected.attachments_checklist : [],
       investigation_team_members: normaliseTeamMembers(selected.investigation_team_members),
+      timeline_entries: normaliseTimelineEntries(selected.timeline_entries),
     };
     setDraft(nextDraft);
     setCorrectiveActionRows(correctiveActionRowsFromText(nextDraft.immediate_corrective_actions));
     setReferenceDocumentRows(correctiveActionRowsFromText(nextDraft.reference_documents));
     setInvestigationTeamRows(nextDraft.investigation_team_members.length ? nextDraft.investigation_team_members : [{ name: "", company: "", position: "", role: "" }]);
+    setTimelineEntryRows(nextDraft.timeline_entries.length ? nextDraft.timeline_entries : [{ datetime: "", description: "" }]);
   }, [selected]);
 
   useEffect(() => {
@@ -1211,7 +1255,7 @@ function HseAinmPageContent() {
       project: draft.project || null,
       owner: inlineAction.owner.trim() || null,
       priority: inlineAction.priority,
-      status: "Open",
+      status: inlineAction.status,
       due_date: inlineAction.due_date || null,
       source: "AINM",
       raised_by_email: currentUserEmail || null,
@@ -1286,10 +1330,89 @@ function HseAinmPageContent() {
     syncInvestigationTeam(nextRows.length ? nextRows : [{ name: "", company: "", position: "", role: "" }]);
   }
 
+  function syncTimelineEntries(rows: TimelineEntry[]) {
+    setTimelineEntryRows(rows);
+    updateDraft("timeline_entries", rows.filter((row) => row.datetime || row.description) as AINMRecord["timeline_entries"]);
+  }
+
+  function updateTimelineEntryRow(index: number, key: keyof TimelineEntry, value: string) {
+    const rows = [...timelineEntryRows];
+    rows[index] = { ...rows[index], [key]: value };
+    syncTimelineEntries(rows);
+  }
+
+  function addTimelineEntryRow() {
+    syncTimelineEntries([...timelineEntryRows, { datetime: "", description: "" }]);
+  }
+
+  function removeTimelineEntryRow(index: number) {
+    const nextRows = timelineEntryRows.filter((_, rowIndex) => rowIndex !== index);
+    syncTimelineEntries(nextRows.length ? nextRows : [{ datetime: "", description: "" }]);
+  }
+
   function selectPersonForDraftName(nameKey: keyof AINMRecord, positionKey: keyof AINMRecord, personIdOrName: string) {
     const person = peopleOptions.find((item) => item.id === personIdOrName || item.name === personIdOrName);
     updateDraft(nameKey, (person?.name || personIdOrName) as AINMRecord[typeof nameKey]);
     updateDraft(positionKey, (person?.role || "") as AINMRecord[typeof positionKey]);
+  }
+
+  async function loadSignoffRequests(ainmId: string) {
+    if (!ainmId) {
+      setSignoffRequests([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("ainm_signoff_requests")
+      .select("*")
+      .eq("ainm_id", ainmId)
+      .order("created_at", { ascending: false });
+    if (error) return;
+    const rows = ((data || []) as Record<string, unknown>[]).map((row) => ({
+      id: String(row.id || ""),
+      ainm_id: String(row.ainm_id || ""),
+      role: String(row.role || "") as AinmSignoffRole,
+      row_label: String(row.row_label || ""),
+      recipient_name: String(row.recipient_name || ""),
+      recipient_email: String(row.recipient_email || ""),
+      status: String(row.status || "Pending") as AinmSignoffStatus,
+      decision_name: String(row.decision_name || ""),
+      decision_note: String(row.decision_note || ""),
+      decided_at: String(row.decided_at || ""),
+    }));
+    setSignoffRequests(rows);
+  }
+
+  async function sendAinmSignoffRequest(role: AinmSignoffRole, rowLabel: string, recipientName: string) {
+    if (!requireEditPermission("Sending AINM sign-off")) return;
+    if (!selectedId) return;
+    const trimmedName = recipientName.trim();
+    if (!trimmedName) {
+      setMessage("Select a name before sending for sign-off.");
+      return;
+    }
+    const recipientEmail = peopleOptions.find((person) => person.name === trimmedName)?.email || "";
+    if (!recipientEmail) {
+      setMessage(`No email on file for ${trimmedName}. Add one on the People record first.`);
+      return;
+    }
+
+    setSendingSignoffRole(role);
+    try {
+      await saveDraft();
+      const response = await fetch("/api/ainm-signoff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ainmId: selectedId, role, rowLabel, recipientName: trimmedName, recipientEmail }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || "Unable to send the sign-off request.");
+      await loadSignoffRequests(selectedId);
+      setMessage(`Sign-off requested from ${trimmedName}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to send the sign-off request.");
+    } finally {
+      setSendingSignoffRole("");
+    }
   }
 
   function buildPayload(record: AINMRecord) {
@@ -1314,6 +1437,7 @@ function HseAinmPageContent() {
       environmental_release_quantity: clean(record.environmental_release_quantity) || null,
       immediate_corrective_actions: clean(record.immediate_corrective_actions) || null,
       investigation_team_members: normaliseTeamMembers(record.investigation_team_members),
+      timeline_entries: normaliseTimelineEntries(record.timeline_entries),
       root_cause_people: clean(record.root_cause_people) || null,
       root_cause_equipment: clean(record.root_cause_equipment) || null,
       root_cause_environment: clean(record.root_cause_environment) || null,
@@ -1382,6 +1506,7 @@ function HseAinmPageContent() {
       investigation_team_members: normaliseTeamMembers(investigationTeamRows).filter(
         (row) => row.name || row.company || row.position || row.role
       ),
+      timeline_entries: normaliseTimelineEntries(timelineEntryRows).filter((row) => row.datetime || row.description),
     };
   }
 
@@ -1459,10 +1584,14 @@ function HseAinmPageContent() {
     const { error } = await supabase.from("hse_ainm_records").update(buildPayload(draftForSave)).eq("id", selectedId);
     setSaving(false);
     if (error) {
-      const needsSql = error.message.toLowerCase().includes("investigation_team_members");
+      const missingColumn = error.message.toLowerCase().includes("investigation_team_members")
+        ? "investigation_team_members"
+        : error.message.toLowerCase().includes("timeline_entries")
+        ? "timeline_entries"
+        : "";
       setMessage(
-        needsSql
-          ? "Save failed: Supabase is missing the investigation_team_members column. Run the AINM SQL update, then save again. Your current on-screen data has not been reloaded."
+        missingColumn
+          ? `Save failed: Supabase is missing the ${missingColumn} column. Run the AINM SQL update, then save again. Your current on-screen data has not been reloaded.`
           : `Save failed: ${error.message}. Your current on-screen data has not been reloaded.`
       );
       return;
@@ -1673,14 +1802,9 @@ function HseAinmPageContent() {
     await loadData();
   }
 
-  async function uploadEvidence(event: ChangeEvent<HTMLInputElement>, stageOverride?: string) {
-    if (!requireEditPermission("Uploading AINM evidence")) {
-      event.target.value = "";
-      return;
-    }
-
+  async function processEvidenceFiles(files: File[], stageOverride?: string) {
+    if (!requireEditPermission("Uploading AINM evidence")) return;
     if (!selectedId) return;
-    const files = Array.from(event.target.files || []);
     if (!files.length) return;
     setUploading(true);
     const stage = stageOverride || evidenceStage;
@@ -1706,18 +1830,12 @@ function HseAinmPageContent() {
 
     setUploading(false);
     setMessage(`Uploaded ${files.length} evidence file${files.length === 1 ? "" : "s"}.`);
-    event.target.value = "";
     await loadData();
   }
 
-  async function uploadExternalEvidence(event: ChangeEvent<HTMLInputElement>) {
-    if (!requireEditPermission("Uploading external AINM evidence")) {
-      event.target.value = "";
-      return;
-    }
-
+  async function processExternalEvidenceFiles(files: File[]) {
+    if (!requireEditPermission("Uploading external AINM evidence")) return;
     if (!selectedExternalId) return;
-    const files = Array.from(event.target.files || []);
     if (!files.length) return;
     setUploading(true);
 
@@ -1740,7 +1858,6 @@ function HseAinmPageContent() {
     }
 
     setUploading(false);
-    event.target.value = "";
     setMessage(`Uploaded ${files.length} external AINM document${files.length === 1 ? "" : "s"}.`);
     await loadData();
   }
@@ -1984,6 +2101,55 @@ function HseAinmPageContent() {
     return new Paragraph({ spacing: { before: size, after: size }, children: [wordRun("", { size: 2 })] });
   }
 
+  // A single full-width bordered box with a coloured top accent, the field's
+  // label bold at the top, and its answer underneath - used instead of a
+  // label-cell/value-cell table row for long narrative answers, so each
+  // question reads as its own card rather than being squeezed into a split
+  // column that leaves most of the page as empty label-column whitespace.
+  function wordStackedField(label: string, value: string | null | undefined) {
+    const lines = String(value || "").split("\n").map((line) => line.trim()).filter(Boolean);
+    const bodyParagraphs = lines.length
+      ? lines.map((line) => new Paragraph({ spacing: { line: 260, after: 40 }, children: [wordRun(line, { size: exportTypography.bodyPt * 2 })] }))
+      : [new Paragraph({ children: [wordRun("", { size: exportTypography.bodyPt * 2 })] })];
+
+    return new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: TableLayoutType.FIXED,
+      columnWidths: [9360],
+      borders: {
+        top: { style: BorderStyle.SINGLE, color: exportColours.accent, size: 16 },
+        bottom: { style: BorderStyle.SINGLE, color: exportColours.border, size: 2 },
+        left: { style: BorderStyle.SINGLE, color: exportColours.border, size: 2 },
+        right: { style: BorderStyle.SINGLE, color: exportColours.border, size: 2 },
+        insideHorizontal: { style: BorderStyle.NONE, size: 0, color: exportColours.white },
+        insideVertical: { style: BorderStyle.NONE, size: 0, color: exportColours.white },
+      },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: 9360, type: WidthType.DXA },
+              margins: { top: 140, bottom: 140, left: 160, right: 160 },
+              children: [
+                new Paragraph({ spacing: { after: 70 }, children: [wordRun(label, { bold: true, size: exportTypography.bodyPt * 2, color: exportColours.ink })] }),
+                ...bodyParagraphs,
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
+  }
+
+  function wordStackedFieldGroup(rows: Array<[string, string]>) {
+    const elements: (Paragraph | Table)[] = [];
+    rows.forEach(([label, value]) => {
+      elements.push(wordStackedField(label, value));
+      elements.push(wordSpacer(60));
+    });
+    return elements;
+  }
+
   function evidenceWordTable(evidenceWithUrls: { file: AINMEvidence; url: string }[]) {
     const widths = [4200, 1100, 2300, 1760];
     const rows = evidenceWithUrls.length ? evidenceWithUrls : [{ file: null as unknown as AINMEvidence, url: "" }];
@@ -2104,6 +2270,17 @@ function HseAinmPageContent() {
       immediateActionRows(record),
       [900, 8460],
       [0],
+      { padEmptyRows: false }
+    );
+  }
+
+  function timelineEntriesTable(record: AINMRecord) {
+    const rows = normaliseTimelineEntries(record.timeline_entries).filter((row) => row.datetime || row.description);
+    return wordBodyTable(
+      ["Date/Time", "Description"],
+      rows.map((row) => [displayDateTime(row.datetime), row.description]),
+      [2600, 6760],
+      [],
       { padEmptyRows: false }
     );
   }
@@ -2376,6 +2553,9 @@ function HseAinmPageContent() {
           wordSectionHeader("Brief details of the event"),
           wordBodyTable([""], [[record.brief_event_details || ""]], [9360], [], { repeatHeader: false, padEmptyRows: false }),
           wordSpacer(),
+          wordSectionHeader("Timeline of Events"),
+          timelineEntriesTable(record),
+          wordSpacer(),
           wordSectionHeader("Brief details of the injury/release/damage received"),
           wordBodyTable([""], [[record.injury_release_damage_details || ""]], [9360], [], { repeatHeader: false, padEmptyRows: false }),
           wordSpacer(),
@@ -2410,6 +2590,9 @@ function HseAinmPageContent() {
           wordSectionHeader("Event Details"),
           wordBodyTable([""], [[record.brief_event_details || ""]], [9360], [], { repeatHeader: false, padEmptyRows: false }),
           wordSpacer(),
+          wordSectionHeader("Timeline of Events"),
+          timelineEntriesTable(record),
+          wordSpacer(),
           wordSectionHeader("If environmental release, please specify type and quantity:"),
           wordBodyTable(["Field", "Details"], [
             ["Type", record.environmental_release_type || ""],
@@ -2420,12 +2603,12 @@ function HseAinmPageContent() {
           immediateActionTable(record),
           wordSpacer(),
           wordSectionHeader("Event investigation and root cause analysis"),
-          wordBodyTable(["", ""], [
+          ...wordStackedFieldGroup([
             ["People - what did the people do that was incorrect? Why did they do this?", record.root_cause_people || ""],
             ["Equipment - what was defective about the equipment and/or materials?", record.root_cause_equipment || ""],
             ["Environment/Conditions - what was defective about the environment and/or conditions?", record.root_cause_environment || ""],
             ["Process - what was defective about the procedure and systems? Why were they deficient?", record.root_cause_process || ""],
-          ], [3600, 5760], [0], { repeatHeader: false, padEmptyRows: false }),
+          ]),
           wordSpacer(),
           part1AttachmentTable(record),
           wordSpacer(),
@@ -2462,12 +2645,12 @@ function HseAinmPageContent() {
           part2TeamTable(record),
           wordSpacer(),
           wordSectionHeader("Investigation Findings"),
-          wordBodyTable(["", ""], [
+          ...wordStackedFieldGroup([
             ["People - what did the people do that was incorrect? (Identify incorrect actions)", record.investigation_findings_people || record.root_cause_people || ""],
             ["Equipment - what was defective about the equipment and/or materials? (Identify defective items)", record.investigation_findings_equipment || record.root_cause_equipment || ""],
             ["Environment/Conditions - what was defective about the environment and/or conditions?", record.investigation_findings_environment || record.root_cause_environment || ""],
             ["Process - what was defective about the procedure and systems? (Identify defective processes)", record.investigation_findings_process || record.root_cause_process || ""],
-          ], [3900, 5460], [0], { repeatHeader: false, padEmptyRows: false }),
+          ]),
           wordSpacer(),
           wordSectionHeader("Reference documentation used as part of the investigation (list document title and number)"),
           part2ReferenceTable(record),
@@ -2647,6 +2830,16 @@ function HseAinmPageContent() {
         ["Environmental release type", record.environmental_release_type || ""],
         ["Environmental release quantity", record.environmental_release_quantity || ""],
       ], { 0: { cellWidth: 52 } });
+      addSubheading("Timeline of Events");
+      y = pdfTable(
+        doc,
+        y,
+        [["Date/Time", "Description"]],
+        normaliseTimelineEntries(record.timeline_entries)
+          .filter((row) => row.datetime || row.description)
+          .map((row) => [displayDateTime(row.datetime), row.description]),
+        { 0: { cellWidth: 36 } }
+      );
       addSubheading("Immediate Containment Actions Implemented");
       y = pdfTable(doc, y, [["Action No.", "Immediate Containment Action"]], immediateActionRows(record), { 0: { cellWidth: 24, halign: "center" } });
       addSubheading("Event Investigation and Root Cause Analysis");
@@ -2687,8 +2880,8 @@ function HseAinmPageContent() {
       y = pdfTable(doc, y, [["Role", "Name", "Position", "Date"]], [
         ["Location/Senior Representative", record.signoff_location_name || "", record.signoff_location_position || "", displayDate(record.signoff_location_date)],
         ["HSEQ Representative", record.signoff_hseq_name || "", record.signoff_hseq_position || "", displayDate(record.signoff_hseq_date)],
-        ["Work/Project Manager", record.signoff_project_manager_name || "", record.signoff_project_manager_position || "", displayDate(record.signoff_project_manager_date)],
-        ["Senior Management Team Representative", record.signoff_smt_name || "", record.signoff_smt_position || "", displayDate(record.signoff_smt_date)],
+        ["Work/Project Manager (as applicable)", record.signoff_project_manager_name || "", record.signoff_project_manager_position || "", displayDate(record.signoff_project_manager_date)],
+        ["Senior Management Team Representative (as applicable)", record.signoff_smt_name || "", record.signoff_smt_position || "", displayDate(record.signoff_smt_date)],
       ], { 0: { cellWidth: 54 }, 3: { cellWidth: 28 } });
       addSubheading("Further Comments");
       y = pdfTable(doc, y, [["Further Comments"]], [[record.part2_further_comments || ""]]);
@@ -2822,6 +3015,15 @@ function HseAinmPageContent() {
                 value={inlineAction.due_date}
                 onChange={(event) => setInlineAction((current) => ({ ...current, due_date: event.target.value }))}
               />
+            </Field>
+            <Field label="Status">
+              <select
+                style={inputStyle}
+                value={inlineAction.status}
+                onChange={(event) => setInlineAction((current) => ({ ...current, status: event.target.value }))}
+              >
+                {["Open", "In Progress", "Closed"].map((status) => <option key={status}>{status}</option>)}
+              </select>
             </Field>
           </div>
         </div>
@@ -3219,10 +3421,12 @@ function HseAinmPageContent() {
                     <strong>External Documentation / Evidence</strong>
                     <p style={bodyTextStyle}>Upload supplier reports, contractor paperwork, photographs, or supporting documents received from the external party.</p>
                   </div>
-                  <label style={uploadButtonStyle}>
-                    {uploading ? "Uploading..." : "Upload External Documentation"}
-                    <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadExternalEvidence(event)} disabled={uploading || !canEditAinm} />
-                  </label>
+                  <EvidenceUploadControl
+                    label="Upload External Documentation"
+                    uploading={uploading}
+                    disabled={uploading || !canEditAinm}
+                    onFiles={(files) => void processExternalEvidenceFiles(files)}
+                  />
                   <div style={evidenceListStyle}>
                     {selectedExternalEvidence.map((file) => (
                       <div key={file.id} style={evidenceItemStyle}>
@@ -3412,10 +3616,12 @@ function HseAinmPageContent() {
                       <strong>Notification Evidence</strong>
                       <p style={bodyTextStyle}>Upload photographs, document references, statements, or other evidence relevant to the initial notification.</p>
                     </div>
-                    <label style={uploadButtonStyle}>
-                      {uploading ? "Uploading..." : "Upload Notification Evidence"}
-                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event, "Notification")} disabled={uploading || !canEditAinm} />
-                    </label>
+                    <EvidenceUploadControl
+                      label="Upload Notification Evidence"
+                      uploading={uploading}
+                      disabled={uploading || !canEditAinm}
+                      onFiles={(files) => void processEvidenceFiles(files, "Notification")}
+                    />
                     <div style={evidenceListStyle}>
                       {selectedEvidence.filter((file) => file.stage === "Notification").map((file) => (
                         <div key={file.id} style={evidenceItemStyle}>
@@ -3455,6 +3661,36 @@ function HseAinmPageContent() {
                   <div style={formGridStyle}>
                     <Field label="Company in Control"><input style={inputStyle} value={draft.company_in_control || ""} onChange={(e) => updateDraft("company_in_control", e.target.value)} /></Field>
                     <TextAreaField label="Event Details" value={draft.brief_event_details || ""} onChange={(value) => updateDraft("brief_event_details", value)} />
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <h3 style={inlineSectionTitleStyle}>Timeline of Events</h3>
+                      <div style={timelineTableStyle}>
+                        <div style={correctiveHeaderCellStyle}>Date/Time</div>
+                        <div style={correctiveHeaderCellStyle}>Description</div>
+                        <div style={correctiveHeaderCellStyle}>Remove</div>
+                        {timelineEntryRows.map((entry, index) => (
+                          <React.Fragment key={`timeline-${index}`}>
+                            <input
+                              type="datetime-local"
+                              style={teamCellInputStyle}
+                              value={entry.datetime}
+                              onChange={(event) => updateTimelineEntryRow(index, "datetime", event.target.value)}
+                              disabled={!canEditAinm}
+                            />
+                            <input
+                              style={teamCellInputStyle}
+                              value={entry.description}
+                              onChange={(event) => updateTimelineEntryRow(index, "description", event.target.value)}
+                              placeholder="What happened at this point in the timeline"
+                              disabled={!canEditAinm}
+                            />
+                            <button type="button" style={smallDangerButtonStyle} onClick={() => removeTimelineEntryRow(index)} disabled={timelineEntryRows.length === 1 || !canEditAinm}>Remove</button>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                      <div style={buttonRowStyle}>
+                        <button type="button" style={secondaryButtonStyle} onClick={addTimelineEntryRow} disabled={!canEditAinm}>Add Timeline Entry</button>
+                      </div>
+                    </div>
                     <div style={{ gridColumn: "1 / -1" }}>
                       <h3 style={inlineSectionTitleStyle}>If environmental release, please specify type and quantity</h3>
                     </div>
@@ -3556,10 +3792,12 @@ function HseAinmPageContent() {
                       <strong>Part 1 Evidence</strong>
                       <p style={bodyTextStyle}>Upload photographs, statements, task plans, toolbox talks, certificates, or other evidence used for the Part 1 report.</p>
                     </div>
-                    <label style={uploadButtonStyle}>
-                      {uploading ? "Uploading..." : "Upload Part 1 Evidence"}
-                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event, "Part 1")} disabled={uploading || !canEditAinm} />
-                    </label>
+                    <EvidenceUploadControl
+                      label="Upload Part 1 Evidence"
+                      uploading={uploading}
+                      disabled={uploading || !canEditAinm}
+                      onFiles={(files) => void processEvidenceFiles(files, "Part 1")}
+                    />
                     <div style={evidenceListStyle}>
                       {selectedEvidence.filter((file) => file.stage === "Part 1").map((file) => (
                         <div key={file.id} style={evidenceItemStyle}>
@@ -3667,6 +3905,9 @@ function HseAinmPageContent() {
                       onSelect={(value) => selectPersonForDraftName("signoff_location_name", "signoff_location_position", value)}
                       onPosition={(value) => updateDraft("signoff_location_position", value)}
                       onDate={(value) => updateDraft("signoff_location_date", value)}
+                      request={signoffRequests.find((request) => request.role === "location") || null}
+                      sending={sendingSignoffRole === "location"}
+                      onSendSignoff={() => void sendAinmSignoffRequest("location", "Location/Senior Representative", draft.signoff_location_name || "")}
                     />
                     <SignoffBlock
                       title="HSEQ Representative"
@@ -3677,9 +3918,12 @@ function HseAinmPageContent() {
                       onSelect={(value) => selectPersonForDraftName("signoff_hseq_name", "signoff_hseq_position", value)}
                       onPosition={(value) => updateDraft("signoff_hseq_position", value)}
                       onDate={(value) => updateDraft("signoff_hseq_date", value)}
+                      request={signoffRequests.find((request) => request.role === "hseq") || null}
+                      sending={sendingSignoffRole === "hseq"}
+                      onSendSignoff={() => void sendAinmSignoffRequest("hseq", "HSEQ Representative", draft.signoff_hseq_name || "")}
                     />
                     <SignoffBlock
-                      title="Work/Project Manager"
+                      title="Work/Project Manager (as applicable)"
                       name={draft.signoff_project_manager_name || ""}
                       position={draft.signoff_project_manager_position || ""}
                       date={draft.signoff_project_manager_date || ""}
@@ -3687,9 +3931,12 @@ function HseAinmPageContent() {
                       onSelect={(value) => selectPersonForDraftName("signoff_project_manager_name", "signoff_project_manager_position", value)}
                       onPosition={(value) => updateDraft("signoff_project_manager_position", value)}
                       onDate={(value) => updateDraft("signoff_project_manager_date", value)}
+                      request={signoffRequests.find((request) => request.role === "project_manager") || null}
+                      sending={sendingSignoffRole === "project_manager"}
+                      onSendSignoff={() => void sendAinmSignoffRequest("project_manager", "Work/Project Manager", draft.signoff_project_manager_name || "")}
                     />
                     <SignoffBlock
-                      title="Senior Management Team Representative"
+                      title="Senior Management Team Representative (as applicable)"
                       name={draft.signoff_smt_name || ""}
                       position={draft.signoff_smt_position || ""}
                       date={draft.signoff_smt_date || ""}
@@ -3697,6 +3944,9 @@ function HseAinmPageContent() {
                       onSelect={(value) => selectPersonForDraftName("signoff_smt_name", "signoff_smt_position", value)}
                       onPosition={(value) => updateDraft("signoff_smt_position", value)}
                       onDate={(value) => updateDraft("signoff_smt_date", value)}
+                      request={signoffRequests.find((request) => request.role === "smt") || null}
+                      sending={sendingSignoffRole === "smt"}
+                      onSendSignoff={() => void sendAinmSignoffRequest("smt", "Senior Management Team Representative", draft.signoff_smt_name || "")}
                     />
                   </div>
                   <div style={notificationEvidencePanelStyle}>
@@ -3704,10 +3954,12 @@ function HseAinmPageContent() {
                       <strong>Part 2 Evidence</strong>
                       <p style={bodyTextStyle}>Upload investigation evidence, witness statements, reference documents, photographs, or close-out material used for the Part 2 report.</p>
                     </div>
-                    <label style={uploadButtonStyle}>
-                      {uploading ? "Uploading..." : "Upload Part 2 Evidence"}
-                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event, "Part 2")} disabled={uploading || !canEditAinm} />
-                    </label>
+                    <EvidenceUploadControl
+                      label="Upload Part 2 Evidence"
+                      uploading={uploading}
+                      disabled={uploading || !canEditAinm}
+                      onFiles={(files) => void processEvidenceFiles(files, "Part 2")}
+                    />
                     <div style={evidenceListStyle}>
                       {selectedEvidence.filter((file) => file.stage === "Part 2").map((file) => (
                         <div key={file.id} style={evidenceItemStyle}>
@@ -3784,10 +4036,13 @@ function HseAinmPageContent() {
                     <select style={evidenceStageSelectStyle} value={evidenceStage} onChange={(e) => setEvidenceStage(e.target.value)}>
                       {["General", "Notification", "Part 1", "Part 2", "Action Evidence"].map((stage) => <option key={stage} value={stage}>{stage}</option>)}
                     </select>
-                    <label style={compactUploadButtonStyle}>
-                      {uploading ? "Uploading..." : "Upload Evidence"}
-                      <input type="file" multiple style={{ display: "none" }} onChange={(event) => void uploadEvidence(event)} disabled={uploading || !canEditAinm} />
-                    </label>
+                    <EvidenceUploadControl
+                      label="Upload Evidence"
+                      uploading={uploading}
+                      disabled={uploading || !canEditAinm}
+                      compact
+                      onFiles={(files) => void processEvidenceFiles(files)}
+                    />
                   </div>
                   <div style={compactEvidenceListStyle}>
                     {selectedEvidence.map((file) => (
@@ -3977,8 +4232,67 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label style={fieldStyle}><span style={labelStyle}>{label}</span>{children}</label>;
 }
 
+function EvidenceUploadControl({
+  label,
+  uploading,
+  disabled,
+  compact,
+  onFiles,
+}: {
+  label: string;
+  uploading: boolean;
+  disabled?: boolean;
+  compact?: boolean;
+  onFiles: (files: File[]) => void;
+}) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  return (
+    <label
+      style={{
+        ...(compact ? compactUploadDropZoneStyle : uploadDropZoneStyle),
+        ...(isDragOver && !disabled ? uploadDropZoneActiveStyle : {}),
+        opacity: disabled ? 0.6 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        if (!disabled) setIsDragOver(true);
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        setIsDragOver(false);
+        if (disabled) return;
+        const files = Array.from(event.dataTransfer.files || []);
+        if (files.length) onFiles(files);
+      }}
+    >
+      {uploading ? "Uploading..." : isDragOver ? "Drop files to upload" : `${label} (or drag files here)`}
+      <input
+        type="file"
+        multiple
+        style={{ display: "none" }}
+        disabled={disabled}
+        onChange={(event) => {
+          const files = Array.from(event.target.files || []);
+          event.currentTarget.value = "";
+          if (files.length) onFiles(files);
+        }}
+      />
+    </label>
+  );
+}
+
 function TextAreaField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return <div style={{ gridColumn: "1 / -1" }}><Field label={label}><textarea style={textareaStyle} value={value} onChange={(e) => onChange(e.target.value)} /></Field></div>;
+}
+
+function signoffRequestTone(status: AinmSignoffStatus) {
+  if (status === "Approved") return "#005670";
+  if (status === "Rejected") return "#F93822";
+  if (status === "Needs Attention") return "#FFAD00";
+  return "#53565A";
 }
 
 function SignoffBlock({
@@ -3990,6 +4304,9 @@ function SignoffBlock({
   onSelect,
   onPosition,
   onDate,
+  request,
+  sending,
+  onSendSignoff,
 }: {
   title: string;
   name: string;
@@ -3999,6 +4316,9 @@ function SignoffBlock({
   onSelect: (value: string) => void;
   onPosition: (value: string) => void;
   onDate: (value: string) => void;
+  request?: AinmSignoffRequest | null;
+  sending?: boolean;
+  onSendSignoff?: () => void;
 }) {
   return (
     <div style={signoffBlockStyle}>
@@ -4012,6 +4332,30 @@ function SignoffBlock({
       </Field>
       <Field label="Position"><input style={inputStyle} value={position} onChange={(event) => onPosition(event.target.value)} /></Field>
       <Field label="Date"><input type="date" style={inputStyle} value={date} onChange={(event) => onDate(event.target.value)} /></Field>
+      {onSendSignoff ? (
+        <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {request ? (
+            <>
+              <span style={{ width: 9, height: 9, borderRadius: "50%", background: signoffRequestTone(request.status), flexShrink: 0 }} />
+              <span style={{ fontSize: 12.5, color: "#53565A" }}>
+                <strong style={{ color: "#000" }}>{request.status}</strong> - sent to {request.recipient_name}
+                {request.decided_at ? ` · ${new Date(request.decided_at).toLocaleString("en-GB")}` : ""}
+                {request.decision_note ? ` · "${request.decision_note}"` : ""}
+              </span>
+              <button type="button" style={quietSignoffButtonStyle} onClick={onSendSignoff} disabled={sending || !name.trim()}>
+                {sending ? "Sending..." : "Resend email"}
+              </button>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 12.5, color: "#53565A" }}>Not yet sent for sign-off.</span>
+              <button type="button" style={sendSignoffButtonStyle} onClick={onSendSignoff} disabled={sending || !name.trim()}>
+                {sending ? "Sending..." : "Send for Sign-Off"}
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -4249,9 +4593,27 @@ const textareaStyle: CSSProperties = { ...inputStyle, minHeight: 96, resize: "ve
 const buttonRowStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 14 };
 const primaryButtonStyle: CSSProperties = { border: "none", background: "#005670", color: "white", borderRadius: 10, padding: "11px 14px", fontWeight: 900, cursor: "pointer" };
 const secondaryButtonStyle: CSSProperties = { border: "1px solid #D0D0CE", background: "#D0D0CE", color: "#000000", borderRadius: 10, padding: "10px 13px", fontWeight: 800, cursor: "pointer" };
+const sendSignoffButtonStyle: CSSProperties = { border: "1px solid #005670", background: "#005670", color: "#ffffff", borderRadius: 8, padding: "7px 12px", fontWeight: 800, fontSize: 12.5, cursor: "pointer" };
+const quietSignoffButtonStyle: CSSProperties = { border: "1px solid #D0D0CE", background: "#ffffff", color: "#005670", borderRadius: 8, padding: "7px 12px", fontWeight: 800, fontSize: 12.5, cursor: "pointer" };
 const dangerButtonStyle: CSSProperties = { border: "none", background: "#F93822", color: "white", borderRadius: 10, padding: "10px 13px", fontWeight: 900, cursor: "pointer" };
 const smallDangerButtonStyle: CSSProperties = { ...dangerButtonStyle, padding: "7px 9px", fontSize: 12, alignSelf: "center" };
 const uploadButtonStyle: CSSProperties = { ...primaryButtonStyle, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+const uploadDropZoneStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  border: "2px dashed #63B1BC",
+  borderRadius: 10,
+  background: "#ECECE7",
+  color: "#005670",
+  fontWeight: 800,
+  padding: "16px 14px",
+  minHeight: 56,
+  transition: "background 120ms ease, border-color 120ms ease",
+};
+const compactUploadDropZoneStyle: CSSProperties = { ...uploadDropZoneStyle, minHeight: 38, padding: "9px 13px", fontWeight: 700 };
+const uploadDropZoneActiveStyle: CSSProperties = { background: "#EEF7F8", borderColor: "#005670" };
 const importToolbarStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(220px, auto) minmax(220px, 320px)", gap: 14, alignItems: "end", marginBottom: 14 };
 const linkButtonStyle: CSSProperties = { ...primaryButtonStyle, textDecoration: "none" };
 const toolbarStyle: CSSProperties = {
@@ -4324,6 +4686,7 @@ const correctiveHeaderCellStyle: CSSProperties = { background: "#005670", color:
 const correctiveNumberCellStyle: CSSProperties = { padding: "9px 12px", borderTop: "1px solid #D0D0CE", color: "#000000", fontWeight: 900, background: "#ECECE7" };
 const correctiveTextareaStyle: CSSProperties = { width: "100%", minHeight: 38, border: "none", borderTop: "1px solid #D0D0CE", borderLeft: "1px solid #D0D0CE", borderRight: "1px solid #D0D0CE", padding: "9px 12px", fontSize: 14, lineHeight: 1.4, resize: "vertical", boxSizing: "border-box", color: "#000000", background: "white" };
 const teamTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr)) 100px", border: "1px solid #D0D0CE", borderRadius: 12, overflow: "hidden", background: "white", marginTop: 12 };
+const timelineTableStyle: CSSProperties = { display: "grid", gridTemplateColumns: "220px minmax(0, 1fr) 100px", border: "1px solid #D0D0CE", borderRadius: 12, overflow: "hidden", background: "white", marginTop: 12 };
 const teamCellInputStyle: CSSProperties = { minHeight: 40, border: "none", borderTop: "1px solid #D0D0CE", borderRight: "1px solid #D0D0CE", padding: "9px 10px", fontSize: 14, boxSizing: "border-box", color: "#000000", background: "white" };
 const signoffBlockStyle: CSSProperties = { gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, border: "1px solid #D0D0CE", borderRadius: 14, padding: 14, background: "white" };
 const signoffBlockTitleStyle: CSSProperties = { gridColumn: "1 / -1", margin: 0, background: "#D0D0CE", borderRadius: 8, padding: "10px 12px", color: "#000000", fontSize: 15 };
@@ -4345,7 +4708,6 @@ const addPersonPanelStyle: CSSProperties = { display: "grid", gridTemplateColumn
 const evidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", border: "1px solid #D0D0CE", borderRadius: 12, padding: 14, background: "white", color: "#000000" };
 const evidenceToolbarStyle: CSSProperties = { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 };
 const evidenceStageSelectStyle: CSSProperties = { ...inputStyle, minHeight: 38, height: 38, flex: "1 1 280px", padding: "7px 10px" };
-const compactUploadButtonStyle: CSSProperties = { ...primaryButtonStyle, display: "inline-flex", alignItems: "center", justifyContent: "center", minHeight: 38, padding: "8px 13px" };
 const compactEvidenceListStyle: CSSProperties = { display: "grid", gap: 8 };
 const compactEvidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap", border: "1px solid #D0D0CE", borderRadius: 10, padding: "9px 11px", background: "white", color: "#000000" };
 const evidenceFileInfoStyle: CSSProperties = { display: "grid", gap: 3, flex: "1 1 320px", minWidth: 0 };

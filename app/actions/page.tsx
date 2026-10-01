@@ -2980,6 +2980,59 @@ function ActionsPageContent() {
     await loadActions(false);
   }
 
+  // AINM corrective actions are frequently entered into the SMS days after the field work is
+  // already closed out, so the automatic assignment/status/close-out emails below (saveEdit)
+  // are skipped for source === "AINM" and sent only on demand via this explicit button instead.
+  async function sendAinmActionNotification() {
+    if (!selectedEvidenceAction) return;
+
+    const actionRef = selectedEvidenceAction.action_number ? String(selectedEvidenceAction.action_number) : "";
+    const actionUrl = selectedEvidenceAction.action_number
+      ? `${window.location.origin}/actions?action=${encodeURIComponent(String(selectedEvidenceAction.action_number))}`
+      : undefined;
+
+    const raiserEmail = selectedEvidenceAction.raised_by_email || undefined;
+    const raiserName = raiserEmail ? people.find((p) => p.email === raiserEmail)?.name : undefined;
+    const ownerRecord = editForm.owner.trim() ? people.find((p) => p.name.toLowerCase() === editForm.owner.trim().toLowerCase()) : undefined;
+    const ownerEmail = ownerRecord?.email;
+    const ownerName = ownerRecord?.name;
+
+    const recipients: Array<{ email: string; name?: string }> = [];
+    if (ownerEmail) recipients.push({ email: ownerEmail, name: ownerName });
+    if (raiserEmail && raiserEmail !== ownerEmail) recipients.push({ email: raiserEmail, name: raiserName });
+
+    if (!recipients.length) {
+      setMessage("No owner or raiser email found to notify.");
+      return;
+    }
+
+    const kind = editForm.status === "Closed" ? "closed-out" : "status-changed";
+    const closeOutComments = kind === "closed-out" ? editForm.close_out_comments.trim() || undefined : undefined;
+
+    await Promise.all(
+      recipients.map(({ email, name }) =>
+        fetch("/api/notify-assignment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind,
+            recipientEmail: email,
+            recipientName: name,
+            itemType: "Action",
+            itemRef: actionRef,
+            itemTitle: editForm.title.trim(),
+            status: editForm.status,
+            dueDate: editForm.due_date || undefined,
+            closeOutComments,
+            itemUrl: actionUrl,
+          }),
+        })
+      )
+    );
+
+    setMessage(`Notification sent to ${recipients.map((r) => r.name || r.email).join(" and ")}.`);
+  }
+
   async function saveEdit(id: string) {
     if (!requireEditPermission("edit actions")) return;
 
@@ -3054,6 +3107,10 @@ function ActionsPageContent() {
     const prevStatus = actionRecord?.status ?? "";
     const prevCloseOut = actionRecord?.close_out_comments ?? "";
 
+    // AINM corrective actions are often entered into the SMS after the work is already closed
+    // out in the field, so they skip these automatic emails — notification is sent on demand
+    // instead, via the "Send Notification" button (sendAinmActionNotification).
+    if (editForm.source !== "AINM") {
     // Notify owner only when the owner has changed or been newly set
     const prevOwner = (actionRecord?.owner ?? "").trim().toLowerCase();
     const newOwner = editForm.owner.trim().toLowerCase();
@@ -3134,6 +3191,7 @@ function ActionsPageContent() {
           }),
         });
       });
+    }
     }
 
     await loadActions(false);
@@ -4678,17 +4736,40 @@ function ActionsPageContent() {
         }
         action={
           selectedEvidenceAction ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedEvidenceAction(null);
-                setSelectedEvidenceFiles([]);
-                setSelectedEvidenceNotes("");
-              }}
-              style={secondaryButtonStyle}
-            >
-              Hide Panel
-            </button>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              {editForm.source === "AINM" && (editForm.linked_ainm_id || editForm.linked_ainm_number) ? (
+                <Link
+                  href={
+                    editForm.linked_ainm_id
+                      ? `/hse/ainm?ainmId=${encodeURIComponent(editForm.linked_ainm_id)}`
+                      : `/hse/ainm?ainm=${encodeURIComponent(editForm.linked_ainm_number)}`
+                  }
+                  style={secondaryButtonStyle}
+                >
+                  ← Back to AINM
+                </Link>
+              ) : null}
+              {editForm.source === "AINM" ? (
+                <button
+                  type="button"
+                  onClick={() => void sendAinmActionNotification()}
+                  style={secondaryButtonStyle}
+                >
+                  Send Notification
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedEvidenceAction(null);
+                  setSelectedEvidenceFiles([]);
+                  setSelectedEvidenceNotes("");
+                }}
+                style={secondaryButtonStyle}
+              >
+                Hide Panel
+              </button>
+            </div>
           ) : null
         }
       >
