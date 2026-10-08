@@ -46,7 +46,8 @@ export const IMS_PERMISSION_REGISTRY: ImsPermissionModule[] = [
   { moduleKey: "assets", label: "Asset Management", legacyAccessField: "asset_access", areas: [
     { key: "dashboard", label: "Dashboard", routes: [{ path: "/assets/dashboard", match: "prefix" }] }, { key: "register", label: "Asset Register", routes: [{ path: "/assets" }] },
     { key: "calibration", label: "Calibration", routes: [{ path: "/assets/calibration", match: "prefix" }] }, { key: "inspection", label: "Inspection", routes: [{ path: "/assets/inspection", match: "prefix" }] },
-    { key: "maintenance", label: "Maintenance", routes: [{ path: "/assets/maintenance", match: "prefix" }] }, { key: "actions", label: "Actions", routes: [{ path: "/assets/actions", match: "prefix" }] },
+    { key: "maintenance", label: "Maintenance", routes: [{ path: "/assets/maintenance", match: "prefix" }] }, { key: "print-requests", label: "3D Print Requests", routes: [{ path: "/assets/print-requests", match: "prefix" }] },
+    { key: "actions", label: "Actions", routes: [{ path: "/assets/actions", match: "prefix" }] },
     { key: "reports", label: "Reports", routes: [{ path: "/assets/reports", match: "prefix" }] },
   ] },
   { moduleKey: "risk", label: "Risk Management", legacyAccessField: "risk_access", areas: [

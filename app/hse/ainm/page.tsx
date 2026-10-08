@@ -1385,12 +1385,19 @@ function HseAinmPageContent() {
   async function sendAinmSignoffRequest(role: AinmSignoffRole, rowLabel: string, recipientName: string) {
     if (!requireEditPermission("Sending AINM sign-off")) return;
     if (!selectedId) return;
-    const trimmedName = recipientName.trim();
-    if (!trimmedName) {
+    const draftName = recipientName.trim();
+    if (!draftName) {
       setMessage("Select a name before sending for sign-off.");
       return;
     }
-    const recipientEmail = peopleOptions.find((person) => person.name === trimmedName)?.email || "";
+    // After a decision the Name field holds the signed-off audit line, not a person,
+    // so a resend goes back to the person the original request was sent to.
+    const existingRequest = signoffRequests.find((request) => request.role === role) || null;
+    const useExistingRecipient = Boolean(existingRequest && !peopleOptions.some((person) => person.name === draftName));
+    const trimmedName = useExistingRecipient && existingRequest ? existingRequest.recipient_name : draftName;
+    const recipientEmail = useExistingRecipient && existingRequest
+      ? existingRequest.recipient_email
+      : peopleOptions.find((person) => person.name === trimmedName)?.email || "";
     if (!recipientEmail) {
       setMessage(`No email on file for ${trimmedName}. Add one on the People record first.`);
       return;

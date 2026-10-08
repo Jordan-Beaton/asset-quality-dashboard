@@ -45,6 +45,8 @@ Asset Management is covered by the completed whole-IMS visual baseline. Future w
   - Asset People add, activate/deactivate, and save buttons now disable for restricted users.
   - Asset Calibration create/import/new-history/action-generation, certificate attach, item-status save, and remove buttons now disable for restricted users.
 
+- 3D Print Requests (Concept B, dense register) lives under Asset Management with its own `print-requests` permission area. One request holds several objects; each object has its own job number (`JOB-001-A`) and moves Queued > Printing > Completed. Queue order is automatic: overdue first, then highest priority nearest its deadline. Requesters see only their own requests; users with edit access act as operators (status, operator, hours, material cost); full access is admin (savings KPI, estimated buy cost, delete). Operators can export the current view to Excel and PDF. Requires `scripts/sql/asset_print_requests.sql`; reference examples upload to the `asset-files` bucket under `PRINT/`.
+
 ## Layout Direction
 
 - Assets, Calibration, Inspection, and Maintenance now have internal tabs where suitable, such as Dashboard, Register, Create, and Reports.

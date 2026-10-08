@@ -120,7 +120,7 @@ function AinmSignoffActionContent() {
           <div>
             <div style={eyebrowStyle}>HSE / AINM</div>
             <h1 style={titleStyle}>Investigation Sign-Off</h1>
-            <p style={subtitleStyle}>Secure sign-off page - no IMS login required.</p>
+            <p style={subtitleStyle}>Secure sign-off page for Enshore staff. Sign in with your IMS account if prompted.</p>
           </div>
         </div>
 

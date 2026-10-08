@@ -93,6 +93,7 @@ type NavIconKey =
   | "calibration"
   | "inspection"
   | "maintenance"
+  | "print"
   | "risk"
   | "reviews"
   | "controls"
@@ -143,6 +144,7 @@ const assetNavItems: NavItem[] = [
   { href: "/assets/calibration", label: "Calibration", icon: "calibration" },
   { href: "/assets/inspection", label: "Inspection", icon: "inspection" },
   { href: "/assets/maintenance", label: "Maintenance", icon: "maintenance" },
+  { href: "/assets/print-requests", label: "3D Print", icon: "print" },
   { href: "/assets/actions", label: "Actions", icon: "actions" },
   { href: "/assets/reports", label: "Reports", icon: "reports" },
 ];
@@ -288,6 +290,7 @@ function getPermissionTargetFromHref(href: string): PermissionTarget | null {
   if (href === "/assets/calibration") return { moduleKey: "assets", areaKey: "calibration" };
   if (href.startsWith("/assets/inspection")) return { moduleKey: "assets", areaKey: "inspection" };
   if (href.startsWith("/assets/maintenance")) return { moduleKey: "assets", areaKey: "maintenance" };
+  if (href.startsWith("/assets/print-requests")) return { moduleKey: "assets", areaKey: "print-requests" };
   if (href === "/assets/actions") return { moduleKey: "assets", areaKey: "actions" };
   if (href === "/assets/reports") return { moduleKey: "assets", areaKey: "reports" };
 
@@ -623,6 +626,16 @@ function RailIcon({ icon }: { icon: NavIconKey }) {
     );
   }
 
+  if (icon === "print") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 19, height: 19 }}>
+        <path {...common} d="M4 4h16M6 4v3M18 4v3M5 7h14" />
+        <path {...common} d="M9 7v3h6V7M12 10v3" />
+        <path {...common} d="M5 20h14M7 20v-3h10v3" />
+      </svg>
+    );
+  }
+
   if (icon === "risk" || icon === "ncr" || icon === "ainm") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 19, height: 19 }}>
@@ -712,7 +725,8 @@ export default function AppShell({ children }: AppShellProps) {
   const isLoginPage = pathname === "/login";
   const isPublicObservationPage = pathname === "/observe";
   const isPublicItpSignOffPage = pathname === "/projects/itp-sign-off-action";
-  const isPublicStandalonePage = isPublicObservationPage || isPublicItpSignOffPage;
+  const isPublicAinmSignOffPage = pathname === "/hse/ainm/signoff-action";
+  const isPublicStandalonePage = isPublicObservationPage || isPublicItpSignOffPage || isPublicAinmSignOffPage;
   const isHomePage = pathname === "/home";
   const isFieldToolsPage = pathname === "/field-tools";
   const isAssetModule = pathname.startsWith("/assets");

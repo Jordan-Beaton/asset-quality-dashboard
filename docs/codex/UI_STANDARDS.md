@@ -540,7 +540,7 @@ Module navigation sets:
 
 - Quality: Home, Dashboard, MOC, NCR, Audits, Actions, Reports.
 - Documents: Home, Document Control, Certification.
-- Assets: Home, Dashboard, Assets, Calibration, Inspection, Maintenance, Actions, Reports.
+- Assets: Home, Dashboard, Assets, Calibration, Inspection, Maintenance, 3D Print, Actions, Reports.
 - Risk: Home, Dashboard, Register, Reviews, Controls, Opportunities, Actions, Reports.
 - HSE: Home, Dashboard, Calendar, AINM, Observations, PTW, Inspections, Actions, Reports.
 - Admin: Home, Admin Console.
