@@ -4,7 +4,7 @@ import { writeNotification } from "../../../src/lib/notifications";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-function notificationTitle(kind: "assigned" | "status-changed" | "closed-out", itemType: string, itemRef: string, status?: string) {
+function notificationTitleFor(kind: "assigned" | "status-changed" | "closed-out", itemType: string, itemRef: string, status?: string) {
   if (kind === "assigned") return `${itemType} ${itemRef} assigned to you`;
   if (kind === "status-changed") return `${itemType} ${itemRef} status updated${status ? ` to "${status}"` : ""}`;
   return `${itemType} ${itemRef} closed out`;
@@ -15,6 +15,10 @@ function notificationSourceModule(itemType: string) {
   if (itemType === "NCR" || itemType === "CAPA") return "NCR / CAPA";
   if (itemType === "Audit Finding") return "Audits";
   return itemType;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function relativeLink(absoluteUrl: string | undefined) {
@@ -60,6 +64,9 @@ export async function POST(req: NextRequest) {
     dueDate?: string;
     closeOutComments?: string;
     itemUrl?: string;
+    headline?: string;
+    intro?: string;
+    notificationTitle?: string;
   };
 
   const {
@@ -73,6 +80,9 @@ export async function POST(req: NextRequest) {
     dueDate,
     closeOutComments,
     itemUrl,
+    headline: headlineOverride,
+    intro: introOverride,
+    notificationTitle,
   } = body;
 
   if (!recipientEmail || !itemType || !itemRef) {
@@ -106,11 +116,14 @@ export async function POST(req: NextRequest) {
     intro = `Close-out comments have been recorded against the following ${itemType} in the Enshore IMS.`;
   }
 
+  if (headlineOverride) headline = escapeHtml(headlineOverride);
+  if (introOverride) intro = escapeHtml(introOverride);
+
   // Build detail rows
   const rows: string[] = [];
-  rows.push(detailRow("Reference", `<strong style="font-size:13px;color:#000000;font-family:Arial,Helvetica,sans-serif;">${itemRef}</strong>`));
+  rows.push(detailRow("Reference", `<strong style="font-size:13px;color:#000000;font-family:Arial,Helvetica,sans-serif;">${escapeHtml(itemRef)}</strong>`));
   if (itemTitle) {
-    rows.push(detailRow("Title", `<span style="font-size:13px;color:#000000;font-family:Arial,Helvetica,sans-serif;">${itemTitle}</span>`));
+    rows.push(detailRow("Title", `<span style="font-size:13px;color:#000000;font-family:Arial,Helvetica,sans-serif;">${escapeHtml(itemTitle)}</span>`));
   }
   if (status) {
     rows.push(detailRow("Status", statusBadge(status)));
@@ -164,7 +177,7 @@ export async function POST(req: NextRequest) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#ECECE7;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
 
@@ -197,7 +210,7 @@ export async function POST(req: NextRequest) {
             <h1 style="margin:0 0 10px;font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:700;color:#005670;line-height:1.25;">${headline}</h1>
 
             <!-- Greeting -->
-            <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#000000;line-height:1.5;">Hi ${recipientName ?? "there"},</p>
+            <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#000000;line-height:1.5;">Hi ${escapeHtml(recipientName ?? "there")},</p>
 
             <!-- Intro -->
             <p style="margin:0 0 24px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#53565A;line-height:1.6;">${intro}</p>
@@ -248,7 +261,7 @@ export async function POST(req: NextRequest) {
     await writeNotification({
       recipientEmail,
       sourceModule: notificationSourceModule(itemType),
-      title: notificationTitle(kind, itemType, itemRef, status),
+      title: notificationTitle || notificationTitleFor(kind, itemType, itemRef, status),
       body: itemTitle,
       link: relativeLink(itemUrl),
     });

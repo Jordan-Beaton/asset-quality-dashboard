@@ -349,6 +349,7 @@ function getActivePermissionValue({
 }): ImsPermissionValue {
   const canAccessModule = (moduleKey: string) => {
     if (moduleKey === "home") return true;
+    if (moduleKey === "print-requests") return role !== "Contractor";
     if (isMasterAdmin) return true;
     const moduleAccessValue = getEffectiveModuleAccess(moduleKey, moduleAccess, tabPermissions);
     if (isExplicitNone(moduleAccessValue)) return false;
@@ -384,6 +385,24 @@ function getActivePermissionValue({
       canEdit: true,
       fullAccess: true,
       isMasterAdmin: true,
+      isAdmin,
+      canAccessModule,
+    };
+  }
+
+  // 3D Print Requests is open to every signed-in member of staff as a requester.
+  // Operator and admin rights are decided by the roster on the page itself, not
+  // by IMS permission levels, so the shell must not block create/edit controls.
+  if (target.moduleKey === "assets" && target.areaKey === "print-requests" && role !== "Contractor") {
+    return {
+      loaded,
+      moduleKey: target.moduleKey,
+      areaKey: target.areaKey,
+      canView: true,
+      canCreate: true,
+      canEdit: true,
+      fullAccess: false,
+      isMasterAdmin: false,
       isAdmin,
       canAccessModule,
     };
@@ -529,6 +548,7 @@ function getEffectiveModuleAccess(moduleKey: string, moduleAccess: ModuleAccess,
 function filterNavItemsForRole(items: NavItem[], role: SystemRole, moduleAccess: ModuleAccess, tabPermissions: TabPermissionRecord[]) {
   return items.filter((item) => {
     if (item.href === "/home" || item.href === "/") return true;
+    if (item.href === "/assets/print-requests") return role !== "Contractor";
     const target = getPermissionTargetFromHref(item.href);
     if (target && isPartAccess(getEffectiveModuleAccess(target.moduleKey, moduleAccess, tabPermissions))) {
       return hasTabPermission(tabPermissions, target.moduleKey, target.areaKey);

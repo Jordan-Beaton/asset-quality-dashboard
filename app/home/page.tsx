@@ -73,6 +73,17 @@ const moduleCards = [
     cta: "Enter",
   },
   {
+    title: "3D Print Requests",
+    short: "3D Print",
+    icon: "print",
+    description: "Request 3D prints, follow the print queue, and log operator hours and material cost.",
+    href: "/assets/print-requests",
+    moduleKey: "print-requests",
+    status: "Live",
+    group: "Operations",
+    cta: "Open",
+  },
+  {
     title: "Document Control",
     short: "Docs",
     icon: "documents",
@@ -247,6 +258,16 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
       <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
         <path {...common} d="M12 3 4.5 7.2v8.6L12 20l7.5-4.2V7.2z" />
         <path {...common} d="M4.8 7.4 12 11.5l7.2-4.1M12 11.5V20" />
+      </svg>
+    );
+  }
+
+  if (icon === "print") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
+        <path {...common} d="M4 4h16M6 4v3M18 4v3M5 7h14" />
+        <path {...common} d="M9 7v3h6V7M12 10v3" />
+        <path {...common} d="M5 20h14M7 20v-3h10v3" />
       </svg>
     );
   }
