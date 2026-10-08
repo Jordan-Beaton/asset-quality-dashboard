@@ -91,7 +91,6 @@ const tabs: Array<{ value: View; label: string }> = [
 
 const statusOptions: PrintStatus[] = ["Queued", "Printing", "Completed"];
 const priorityOptions: PrintPriority[] = ["High", "Medium", "Low"];
-const defaultProjects = ["Baltic Power", "Wadden Sea", "General / Workshop"];
 const priorityRank: Record<PrintPriority, number> = { High: 0, Medium: 1, Low: 2 };
 const storageBucket = "asset-files";
 const missingTablesMessage = "3D print tables are missing. Run scripts/sql/asset_print_requests.sql in Supabase, then reload this page.";
@@ -217,7 +216,7 @@ export default function PrintRequestsPage() {
   const [projectFilter, setProjectFilter] = useState("");
   const [requesterFilter, setRequesterFilter] = useState("");
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("");
-  const [formProject, setFormProject] = useState(defaultProjects[0]);
+  const [formProject, setFormProject] = useState("");
   const [formJustification, setFormJustification] = useState("");
   const keyCounter = useRef(0);
   const selectedDetailRef = useRef<HTMLDivElement | null>(null);
@@ -312,7 +311,7 @@ export default function PrintRequestsPage() {
 
   const projectOptions = useMemo(() => {
     const saved = requests.map((request) => request.project).filter(Boolean) as string[];
-    return [...new Set([...defaultProjects, ...saved])];
+    return [...new Set(saved.map((project) => project.trim()).filter(Boolean))].sort();
   }, [requests]);
 
   const requesterOptions = useMemo(
@@ -392,7 +391,7 @@ export default function PrintRequestsPage() {
   }
 
   function resetForm() {
-    setFormProject(defaultProjects[0]);
+    setFormProject("");
     setFormJustification("");
     setObjectDrafts([newObjectDraft()]);
   }
@@ -402,7 +401,7 @@ export default function PrintRequestsPage() {
     const request = requestById.get(requestId);
     const sourceObjects = objects.filter((object) => object.request_id === requestId);
     if (!request || !sourceObjects.length) return;
-    setFormProject(request.project || defaultProjects[0]);
+    setFormProject(request.project || "");
     setFormJustification(request.justification || "");
     setObjectDrafts(
       sourceObjects.map((object) => {
@@ -458,7 +457,7 @@ export default function PrintRequestsPage() {
         request_number: requestNumber,
         requester_name: currentUserName,
         requester_email: currentUserEmail || null,
-        project: formProject || null,
+        project: formProject.trim() || null,
         justification: formJustification.trim() || null,
       }])
       .select("id")
@@ -850,9 +849,10 @@ export default function PrintRequestsPage() {
                 <input style={readOnlyInputStyle} value={currentUserName} readOnly />
               </Field>
               <Field label="Project">
-                <select style={imsInputStyle} value={formProject} onChange={(event) => setFormProject(event.target.value)}>
-                  {projectOptions.map((project) => <option key={project}>{project}</option>)}
-                </select>
+                <input style={imsInputStyle} list="print-request-projects" value={formProject} onChange={(event) => setFormProject(event.target.value)} placeholder="Enter a project (optional)" />
+                <datalist id="print-request-projects">
+                  {projectOptions.map((project) => <option key={project} value={project} />)}
+                </datalist>
               </Field>
               <Field label="Why print instead of buy (optional)">
                 <input style={imsInputStyle} value={formJustification} onChange={(event) => setFormJustification(event.target.value)} placeholder="e.g. faster than a 3-week supplier lead time" />
