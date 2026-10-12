@@ -18,6 +18,7 @@ const STORAGE_BUCKET = "project-documents";
 type Revision = { id: string; revision: string; file_name: string; file_path: string; is_current: boolean; uploaded_at: string };
 type Itp = { id: string; document_number: string; title: string; supplier: string | null; scope: string | null; project_itp_revisions?: Revision[] };
 type InterventionType = string;
+type ScanResult = { candidates?: Array<Omit<Candidate, "selected">>; summary: { points: number }; warning?: string | null; extractionMode?: string; diagnostics?: ExtractionDiagnostics };
 type Candidate = { sectionNumber: string; activityDescription: string; interventionType: InterventionType; partyHeading: string; confidence: string; sourceLocation: string; selected: boolean };
 type ExtractionMapping = { authorityHeadings: string[]; identifierHeadings: string[]; activityHeadings: string[] };
 type ExtractionDiagnostics = { templateFingerprint: string; detectedHeadings: string[]; targetAuthorityHeadings: string[]; excludedAuthorityHeadings: string[]; unresolvedAuthorityHeadings: string[]; identifierHeadings: string[]; activityHeadings: string[]; explanation: string[] };
@@ -40,6 +41,34 @@ const emptyManualPoint = {
   status: "Planned",
   notes: "",
 };
+
+// The scan endpoint always answers with JSON, but a host timeout, size limit or
+// expired session answers with an HTML page. Turn that into a readable message.
+async function readScanJson(response: Response) {
+  const raw = await response.text();
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    let redirectedTo = "";
+    try {
+      redirectedTo = response.redirected ? new URL(response.url).pathname : "";
+    } catch {
+      redirectedTo = "";
+    }
+    const detail = `Technical detail: HTTP ${response.status}${redirectedTo ? `, redirected to ${redirectedTo}` : ""}, ${response.headers.get("content-type") || "unknown content type"}.`;
+    if (redirectedTo.includes("/login")) throw new Error(`Your session has expired. Refresh the page, sign in again, and retry the scan. ${detail}`);
+    if (response.status === 504 || response.status === 408) throw new Error(`The server stopped this part of the scan because it took too long. Please retry. ${detail}`);
+    if (response.status === 413) throw new Error(`This ITP is too large to send for scanning in one go. Split it into smaller files and retry. ${detail}`);
+    throw new Error(`The server returned an unexpected response instead of scan results. Please retry; if it keeps happening, send this message to an IMS admin. ${detail}`);
+  }
+}
+
+async function postScan(form: FormData) {
+  const response = await fetch("/api/projects/noi-extract", { method: "POST", body: form });
+  const result = await readScanJson(response);
+  if (!response.ok) throw new Error(String(result.error || "The ITP could not be scanned."));
+  return result;
+}
 
 function currentRevision(itp: Itp) {
   return (itp.project_itp_revisions || []).find((revision) => revision.is_current)
@@ -198,9 +227,11 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
     setBusy(true);
     setCandidates([]);
     setMessage(`Reading ${revision.file_name}... Structured tables will be checked first; scanned pages will use OCR automatically.`);
+    let stage = "preparing the stored ITP";
     try {
       const signed = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(revision.file_path, 60 * 60 * 24 * 180);
       if (signed.error) throw signed.error;
+      stage = "downloading the stored ITP";
       const fileResponse = await fetch(signed.data.signedUrl);
       if (!fileResponse.ok) throw new Error("The stored ITP could not be downloaded for scanning.");
       const blob = await fileResponse.blob();
@@ -209,25 +240,87 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
       const allowVisualAudit = !isPdf || window.confirm(
         "For a complete page-by-page visual/OCR audit, this ITP PDF will be securely sent to the configured OpenAI vision service for document analysis. Continue with visual audit?\n\nChoose Cancel to run local structured extraction only.",
       );
-      const requestScan = async (activeMapping: ExtractionMapping) => {
+      const baseForm = (activeMapping: ExtractionMapping, phase: string) => {
         const form = new FormData();
         form.append("file", file);
         form.append("supplierName", selectedItp.supplier || "");
         form.append("allowVisualAudit", String(allowVisualAudit));
         form.append("extractionMapping", JSON.stringify(activeMapping));
-        const response = await fetch("/api/projects/noi-extract", { method: "POST", body: form });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "The ITP could not be scanned.");
-        return result;
+        form.append("phase", phase);
+        return form;
+      };
+      // Visual audit runs as short batches of pages, a few at a time, so no single
+      // request can outlive the host time limit and progress is visible.
+      const requestVisualAudit = async (activeMapping: ExtractionMapping, structured: Record<string, unknown>): Promise<ScanResult> => {
+        const pageCount = Number(structured.pageCount || 0);
+        const batches: Array<[number, number]> = [];
+        for (let first = 1; first <= pageCount; first += 3) batches.push([first, Math.min(first + 2, pageCount)]);
+        const visualCandidates: unknown[] = [];
+        const visualWarnings: string[] = [];
+        let completed = 0;
+        let nextBatch = 0;
+        const runBatch = async (first: number, last: number) => {
+          const form = baseForm(activeMapping, "visual-chunk");
+          form.append("firstPage", String(first));
+          form.append("lastPage", String(last));
+          try {
+            return await postScan(form);
+          } catch {
+            return postScan(form);
+          }
+        };
+        const worker = async () => {
+          while (nextBatch < batches.length) {
+            const [first, last] = batches[nextBatch];
+            nextBatch += 1;
+            try {
+              const chunk = await runBatch(first, last);
+              visualCandidates.push(...((chunk.candidates as unknown[]) || []));
+            } catch (error) {
+              visualWarnings.push(`Pages ${first}-${last}: ${error instanceof Error ? error.message : "visual audit failed"}`);
+            }
+            completed += 1;
+            setMessage(`Visual audit: ${completed} of ${batches.length} page batch${batches.length === 1 ? "" : "es"} checked...`);
+          }
+        };
+        setMessage(`Visual audit: checking ${pageCount} page${pageCount === 1 ? "" : "s"} in ${batches.length} batch${batches.length === 1 ? "" : "es"}...`);
+        await Promise.all(Array.from({ length: Math.min(3, batches.length) }, () => worker()));
+
+        const mergeForm = new FormData();
+        mergeForm.append("phase", "merge");
+        mergeForm.append("structuredCandidates", JSON.stringify(structured.candidates || []));
+        mergeForm.append("coordinateCandidates", JSON.stringify(structured.coordinateCandidates || []));
+        mergeForm.append("visualCandidates", JSON.stringify(visualCandidates));
+        mergeForm.append("visualWarnings", JSON.stringify(visualWarnings));
+        mergeForm.append("explanation", JSON.stringify((structured.diagnostics as ExtractionDiagnostics | undefined)?.explanation || []));
+        stage = "combining the visual audit results";
+        const merged = await postScan(mergeForm);
+        return { ...structured, ...merged, diagnostics: structured.diagnostics } as unknown as ScanResult;
+      };
+      const requestScan = async (activeMapping: ExtractionMapping): Promise<ScanResult> => {
+        stage = "reading the ITP tables and text";
+        const structured = await postScan(baseForm(activeMapping, "structured"));
+        stage = "running the visual audit";
+        if (!isPdf || !allowVisualAudit || !Number(structured.pageCount || 0)) return structured as unknown as ScanResult;
+        return requestVisualAudit(activeMapping, structured);
       };
       let activeMapping = mappingOverride || mapping;
       let result = await requestScan(activeMapping);
       const firstDiagnostics = result.diagnostics as ExtractionDiagnostics | undefined;
       if (!mappingOverride && !activeMapping.authorityHeadings.length && firstDiagnostics?.templateFingerprint) {
+        stage = "loading the saved column mapping";
         const stored = await supabase.storage.from(STORAGE_BUCKET).download(`${projectKey}/extraction-mappings/${firstDiagnostics.templateFingerprint}.json`);
         if (!stored.error) {
-          activeMapping = JSON.parse(await stored.data.text()) as ExtractionMapping;
-          result = await requestScan(activeMapping);
+          let savedMapping: ExtractionMapping | null = null;
+          try {
+            savedMapping = JSON.parse(await stored.data.text()) as ExtractionMapping;
+          } catch {
+            savedMapping = null;
+          }
+          if (savedMapping && Array.isArray(savedMapping.authorityHeadings)) {
+            activeMapping = savedMapping;
+            result = await requestScan(activeMapping);
+          }
         }
       }
       const nextDiagnostics = result.diagnostics as ExtractionDiagnostics;
@@ -246,7 +339,8 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
       setShowMapping(!result.summary.points || Boolean(nextDiagnostics.unresolvedAuthorityHeadings.length));
       setMessage(result.warning || `${result.summary.points} configured client-side W/H point${result.summary.points === 1 ? "" : "s"} found using ${String(result.extractionMode || "structured").toLowerCase()} extraction. Review before adding them.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "The ITP could not be scanned.");
+      const reason = error instanceof Error ? error.message : "The ITP could not be scanned.";
+      setMessage(`The scan stopped while ${stage}. ${reason}`);
     } finally {
       setBusy(false);
     }

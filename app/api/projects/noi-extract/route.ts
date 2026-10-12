@@ -358,7 +358,9 @@ The following mechanically extracted text is a SECONDARY completeness cross-chec
 --- EXTRACTED TEXT START ---
 ${extractedText.slice(0, 30000)}
 --- EXTRACTED TEXT END ---`;
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -372,7 +374,14 @@ ${extractedText.slice(0, 30000)}
       }],
       max_output_tokens: 5000,
     }),
-  });
+    signal: AbortSignal.timeout(150_000),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new Error("The visual check took too long and was stopped.");
+    }
+    throw error;
+  }
   const payload = await response.json();
   if (!response.ok) throw new Error(payload?.error?.message || "OCR processing failed.");
   const outputText = payload.output_text
@@ -399,54 +408,142 @@ ${extractedText.slice(0, 30000)}
   });
 }
 
-async function extractPdfVisualAudit(
+async function extractPdfVisualPages(
   buffer: Buffer,
   fileName: string,
-  supplierName = "",
-  pageTexts: Array<{ num: number; text: string }> = [],
-  mapping: ExtractionMapping = emptyExtractionMapping(),
+  supplierName: string,
+  firstPage: number,
+  lastPage: number,
+  pageTexts: Array<{ num: number; text: string }>,
+  mapping: ExtractionMapping,
 ) {
   if (buffer.length > 25 * 1024 * 1024) throw new Error("The scanned PDF exceeds the 25 MB OCR limit. Split it into smaller ITP files and retry.");
   const source = await PDFDocument.load(buffer, { ignoreEncryption: true });
   const pageCount = source.getPageCount();
-  const batchSize = 3;
-  const candidates: Candidate[] = [];
-  const warnings: string[] = [];
+  const start = Math.max(0, firstPage - 1);
+  const end = Math.min(pageCount, lastPage);
+  if (start >= end) return [];
 
-  for (let start = 0; start < pageCount; start += batchSize) {
-    const end = Math.min(start + batchSize, pageCount);
-    const excerpt = await PDFDocument.create();
-    const pages = await excerpt.copyPages(source, Array.from({ length: end - start }, (_, index) => start + index));
-    pages.forEach((page) => excerpt.addPage(page));
-    const bytes = await excerpt.save({ useObjectStreams: false });
-    const extractedText = pageTexts
-      .filter((page) => page.num >= start + 1 && page.num <= end)
-      .map((page) => `[Original page ${page.num}]\n${page.text}`)
-      .join("\n\n");
-    try {
-      candidates.push(...await extractPdfVisualChunk(
-        Buffer.from(bytes),
-        `${fileName.replace(/\.pdf$/i, "")}-pages-${start + 1}-${end}.pdf`,
-        supplierName,
-        start + 1,
-        end,
-        extractedText,
-        mapping,
-      ));
-    } catch (error) {
-      warnings.push(`Pages ${start + 1}-${end}: ${error instanceof Error ? error.message : "visual audit failed"}`);
-    }
-  }
+  const excerpt = await PDFDocument.create();
+  const pages = await excerpt.copyPages(source, Array.from({ length: end - start }, (_, index) => start + index));
+  pages.forEach((page) => excerpt.addPage(page));
+  const bytes = await excerpt.save({ useObjectStreams: false });
+  const extractedText = pageTexts
+    .filter((page) => page.num >= start + 1 && page.num <= end)
+    .map((page) => `[Original page ${page.num}]\n${page.text}`)
+    .join("\n\n");
 
-  return { candidates: deduplicate(candidates), warnings, pageCount };
+  return extractPdfVisualChunk(
+    Buffer.from(bytes),
+    `${fileName.replace(/\.pdf$/i, "")}-pages-${start + 1}-${end}.pdf`,
+    supplierName,
+    start + 1,
+    end,
+    extractedText,
+    mapping,
+  );
 }
 
+function parseCandidateList(value: FormDataEntryValue | null): Candidate[] {
+  try {
+    const parsed = JSON.parse(typeof value === "string" ? value : "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item): Candidate[] => {
+      const row = item as Record<string, unknown>;
+      const type = intervention(row.interventionType);
+      const sectionNumber = validSectionNumber(row.sectionNumber);
+      const description = clean(row.activityDescription).slice(0, 300);
+      if (!type || !sectionNumber || description.length < 4) return [];
+      const confidence = clean(row.confidence);
+      return [{
+        sectionNumber,
+        activityDescription: description,
+        interventionType: type,
+        partyHeading: clean(row.partyHeading),
+        confidence: confidence === "High" || confidence === "Medium" ? confidence : "Low",
+        sourceLocation: clean(row.sourceLocation),
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function parseStringList(value: FormDataEntryValue | null) {
+  try {
+    const parsed = JSON.parse(typeof value === "string" ? value : "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.map(clean).filter(Boolean).slice(0, 50) : [];
+  } catch {
+    return [];
+  }
+}
+
+function composeScanResult(args: {
+  structured: Candidate[];
+  coordinate: Candidate[];
+  visual: Candidate[] | null;
+  visualWarnings: string[];
+  isPdf: boolean;
+  explanation: string[];
+}) {
+  let candidates = args.structured;
+  let extractionMode: "Structured" | "Visual" | "Hybrid" = "Structured";
+  let ocrWarning: string | null = null;
+  if (args.isPdf && args.visual) {
+    candidates = reconcilePdfCandidates(candidates, args.visual);
+    extractionMode = args.visual.length && candidates.length > args.visual.length ? "Hybrid" : "Visual";
+    if (args.visualWarnings.length) ocrWarning = `Visual audit incomplete: ${args.visualWarnings.join(" | ")}`;
+  } else if (args.isPdf) {
+    ocrWarning = "Visual/OCR completeness audit was not authorised for this scan.";
+  }
+  if (args.isPdf && args.coordinate.length) {
+    candidates = applyCoordinateAuthority(candidates, args.coordinate);
+  }
+  const unique = deduplicate(candidates);
+  return {
+    candidates: unique,
+    extractionMode,
+    summary: {
+      points: unique.length,
+      witness: unique.filter((point) => point.interventionType.split("/").includes("W")).length,
+      hold: unique.filter((point) => point.interventionType.split("/").includes("H")).length,
+      combined: unique.filter((point) => {
+        const parts = point.interventionType.split("/");
+        return parts.includes("W") && parts.includes("H");
+      }).length,
+    },
+    warning: unique.length
+      ? extractionMode === "Visual" || extractionMode === "Hybrid"
+        ? ocrWarning || "Every PDF page was visually audited and reconciled with structured extraction. Confirm every extracted point before saving."
+        : ocrWarning ? `Structured results were found, but the visual completeness audit could not run: ${ocrWarning}` : null
+      : ocrWarning || `No qualifying W/H points were identified. ${args.explanation.join(" ")}`,
+  };
+}
+
+// The scan runs as short, separate requests so no single request can outlive the
+// host's time limit (which returns an HTML error page instead of JSON):
+//   phase "structured"   - local table/text extraction, returns the page count
+//   phase "visual-chunk" - visual check of a few pages (one AI call)
+//   phase "merge"        - reconciles structured and visual results (no file, no AI)
 export async function POST(request: Request) {
   let parser: PDFParse | null = null;
   try {
     const form = await request.formData();
+    const phase = clean(form.get("phase")) || "structured";
+
+    if (phase === "merge") {
+      const result = composeScanResult({
+        structured: parseCandidateList(form.get("structuredCandidates")),
+        coordinate: parseCandidateList(form.get("coordinateCandidates")),
+        visual: parseCandidateList(form.get("visualCandidates")),
+        visualWarnings: parseStringList(form.get("visualWarnings")),
+        isPdf: true,
+        explanation: parseStringList(form.get("explanation")),
+      });
+      return NextResponse.json(result);
+    }
+
     const file = form.get("file");
-    const allowVisualAudit = form.get("allowVisualAudit") === "true";
     const supplierName = clean(form.get("supplierName"));
     let mapping = emptyExtractionMapping();
     try {
@@ -463,10 +560,26 @@ export async function POST(request: Request) {
     if (file.size > 40 * 1024 * 1024) return NextResponse.json({ error: "The ITP exceeds the 40 MB scanning limit." }, { status: 413 });
     const buffer = Buffer.from(await file.arrayBuffer());
     const extension = file.name.split(".").pop()?.toLowerCase();
+
+    if (phase === "visual-chunk") {
+      if (extension !== "pdf") return NextResponse.json({ error: "Visual audit applies to PDF files only." }, { status: 415 });
+      const firstPage = Math.floor(Number(form.get("firstPage")));
+      const lastPage = Math.floor(Number(form.get("lastPage")));
+      if (!Number.isFinite(firstPage) || !Number.isFinite(lastPage) || firstPage < 1 || lastPage < firstPage || lastPage - firstPage > 5) {
+        return NextResponse.json({ error: "A valid page range is required." }, { status: 400 });
+      }
+      const pages = Array.from({ length: lastPage - firstPage + 1 }, (_, index) => firstPage + index);
+      parser = new PDFParse({ data: new Uint8Array(buffer) });
+      const text = await parser.getText({ partial: pages });
+      const pageTexts = text.pages.map((page) => ({ num: page.num, text: page.text }));
+      const candidates = await extractPdfVisualPages(buffer, file.name, supplierName, firstPage, lastPage, pageTexts, mapping);
+      return NextResponse.json({ candidates });
+    }
+
     let candidates: Candidate[] = [];
     const diagnosticTables: unknown[][][] = [];
-    let pdfPageTexts: Array<{ num: number; text: string }> = [];
     let pdfCoordinateCandidates: Candidate[] = [];
+    let pageCount = 0;
     if (["xlsx", "xls", "xlsm"].includes(extension || "")) {
       const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
       candidates = workbook.SheetNames.flatMap((name) => {
@@ -481,8 +594,6 @@ export async function POST(request: Request) {
     } else if (extension === "pdf") {
       parser = new PDFParse({ data: new Uint8Array(buffer) });
       const tables = await parser.getTable({ first: 30 });
-      const text = await parser.getText({ first: 30 });
-      pdfPageTexts = text.pages.map((page) => ({ num: page.num, text: page.text }));
       for (const page of tables.pages) {
         for (let index = 0; index < page.tables.length; index += 1) {
           const rows = page.tables[index] as unknown[][];
@@ -492,49 +603,21 @@ export async function POST(request: Request) {
       }
       pdfCoordinateCandidates = await extractPdfCoordinateCandidates(buffer, supplierName, mapping);
       candidates = applyCoordinateAuthority(candidates, pdfCoordinateCandidates);
+      pageCount = (await PDFDocument.load(buffer, { ignoreEncryption: true })).getPageCount();
     } else {
       return NextResponse.json({ error: "Use an Excel, Word, or searchable PDF ITP." }, { status: 415 });
     }
-    let extractionMode: "Structured" | "Visual" | "Hybrid" = "Structured";
-    let ocrWarning: string | null = null;
-    if (extension === "pdf" && allowVisualAudit) {
-      try {
-        const visualAudit = await extractPdfVisualAudit(buffer, file.name, supplierName, pdfPageTexts, mapping);
-        candidates = reconcilePdfCandidates(candidates, visualAudit.candidates);
-        extractionMode = visualAudit.candidates.length && candidates.length > visualAudit.candidates.length ? "Hybrid" : "Visual";
-        if (visualAudit.warnings.length) {
-          ocrWarning = `Visual audit incomplete: ${visualAudit.warnings.join(" | ")}`;
-        }
-      } catch (error) {
-        ocrWarning = error instanceof Error ? error.message : "OCR processing failed.";
-      }
-    } else if (extension === "pdf" && !allowVisualAudit) {
-      ocrWarning = "Visual/OCR completeness audit was not authorised for this scan.";
-    }
-    if (extension === "pdf" && pdfCoordinateCandidates.length) {
-      candidates = applyCoordinateAuthority(candidates, pdfCoordinateCandidates);
-    }
-    const unique = deduplicate(candidates);
+
     const diagnostics = buildExtractionDiagnostics(diagnosticTables, supplierName, mapping);
-    return NextResponse.json({
-      candidates: unique,
-      extractionMode,
-      diagnostics,
-      summary: {
-        points: unique.length,
-        witness: unique.filter((point) => point.interventionType.split("/").includes("W")).length,
-        hold: unique.filter((point) => point.interventionType.split("/").includes("H")).length,
-        combined: unique.filter((point) => {
-          const parts = point.interventionType.split("/");
-          return parts.includes("W") && parts.includes("H");
-        }).length,
-      },
-      warning: unique.length
-        ? extractionMode === "Visual" || extractionMode === "Hybrid"
-          ? ocrWarning || "Every PDF page was visually audited and reconciled with structured extraction. Confirm every extracted point before saving."
-          : ocrWarning ? `Structured results were found, but the visual completeness audit could not run: ${ocrWarning}` : null
-        : ocrWarning || `No qualifying W/H points were identified. ${diagnostics.explanation.join(" ")}`,
+    const result = composeScanResult({
+      structured: candidates,
+      coordinate: pdfCoordinateCandidates,
+      visual: null,
+      visualWarnings: [],
+      isPdf: extension === "pdf",
+      explanation: diagnostics.explanation,
     });
+    return NextResponse.json({ ...result, diagnostics, pageCount, coordinateCandidates: pdfCoordinateCandidates });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "The ITP could not be scanned." }, { status: 422 });
   } finally {
