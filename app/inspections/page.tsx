@@ -163,6 +163,7 @@ export default function OverallInspectionsPage() {
   const [projectFilter, setProjectFilter] = useState("All");
   const [sourceFilter, setSourceFilter] = useState<"All" | "NOI" | "Manual">("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [supplierFilter, setSupplierFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState<"All" | "W" | "H">("All");
   const [clientVisibleOnly, setClientVisibleOnly] = useState(false);
   const [attendeeSearch, setAttendeeSearch] = useState("");
@@ -316,12 +317,22 @@ export default function OverallInspectionsPage() {
   const lookaheadEnd = useMemo(() => addDays(weekStarts[weekStarts.length - 1], 7), [weekStarts]);
   const lookaheadStart = weekStarts[0];
 
+  const supplierOptions = useMemo(() => {
+    const byKey = new Map<string, string>();
+    events.forEach((event) => {
+      const label = event.supplier.trim();
+      if (label && !byKey.has(label.toLowerCase())) byKey.set(label.toLowerCase(), label);
+    });
+    return [...byKey.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [events]);
+
   const filteredEvents = useMemo(() => {
     const search = attendeeSearch.trim().toLowerCase();
     const matches = events.filter((event) => {
       if (projectFilter !== "All" && event.projectKey !== projectFilter) return false;
       if (sourceFilter !== "All" && event.source !== sourceFilter) return false;
       if (statusFilter !== "All" && event.status !== statusFilter) return false;
+      if (supplierFilter !== "All" && event.supplier.trim().toLowerCase() !== supplierFilter) return false;
       if (typeFilter !== "All" && !event.interventionType.split("/").includes(typeFilter)) return false;
       if (clientVisibleOnly && !event.clientVisible) return false;
       if (search && !event.attendees.some((person) => person.name.toLowerCase().includes(search) || person.company.toLowerCase().includes(search))) return false;
@@ -332,7 +343,7 @@ export default function OverallInspectionsPage() {
       return true;
     });
     return sortByProjectThenDate(matches);
-  }, [events, projectFilter, sourceFilter, statusFilter, typeFilter, clientVisibleOnly, attendeeSearch, view, lookaheadStart, lookaheadEnd]);
+  }, [events, projectFilter, sourceFilter, statusFilter, supplierFilter, typeFilter, clientVisibleOnly, attendeeSearch, view, lookaheadStart, lookaheadEnd]);
 
   const gridProjects = useMemo(() => {
     const keys = new Set<string>(knownProjects.map(([key]) => key));
@@ -343,12 +354,13 @@ export default function OverallInspectionsPage() {
     return events.filter((event) => {
       if (sourceFilter !== "All" && event.source !== sourceFilter) return false;
       if (statusFilter !== "All" && event.status !== statusFilter) return false;
+      if (supplierFilter !== "All" && event.supplier.trim().toLowerCase() !== supplierFilter) return false;
       if (typeFilter !== "All" && !event.interventionType.split("/").includes(typeFilter)) return false;
       if (clientVisibleOnly && !event.clientVisible) return false;
       const date = parseDate(event.date);
       return date && date >= lookaheadStart && date < lookaheadEnd;
     });
-  }, [events, sourceFilter, statusFilter, typeFilter, clientVisibleOnly, lookaheadStart, lookaheadEnd]);
+  }, [events, sourceFilter, statusFilter, supplierFilter, typeFilter, clientVisibleOnly, lookaheadStart, lookaheadEnd]);
 
   function eventsFor(projectKey: string, weekStart: Date) {
     const weekEnd = addDays(weekStart, 7);
@@ -770,6 +782,13 @@ export default function OverallInspectionsPage() {
               <option value="All">All sources</option>
               <option value="NOI">ITP / NOI</option>
               <option value="Manual">Manual entry</option>
+            </select>
+          </label>
+          <label style={imsFieldStyle}>
+            <span style={imsLabelStyle}>Supplier</span>
+            <select style={imsInputStyle} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}>
+              <option value="All">All suppliers</option>
+              {supplierOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select>
           </label>
           <label style={imsFieldStyle}>
