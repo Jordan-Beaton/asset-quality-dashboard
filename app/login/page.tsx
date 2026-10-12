@@ -42,6 +42,18 @@ function LoginPageContent() {
       const isInvite = searchMode === "invite" || searchType === "invite" || hashType === "invite";
       const isRecovery = searchMode === "recovery" || searchType === "recovery" || hashType === "recovery";
       const isAuthLink = isInvite || isRecovery || Boolean(code) || Boolean(accessToken);
+      const linkErrorCode = hashParams.get("error_code") || searchParams.get("error_code");
+
+      if (linkErrorCode) {
+        setMode("login");
+        setMessage(
+          linkErrorCode === "otp_expired"
+            ? "This sign-in link has expired. If you were invited, open your invite email again and use the button to get a fresh link. Otherwise use Forgot password, or ask an IMS Admin to resend."
+            : "This sign-in link could not be used. Open your invite email again and use the button, or ask an IMS Admin to resend."
+        );
+        window.history.replaceState(null, "", "/login");
+        return;
+      }
 
       if (!isAuthLink) return;
 

@@ -39,6 +39,8 @@ export async function updateSession(request: NextRequest) {
   const isPublicAuthApi = request.nextUrl.pathname === "/api/auth/login";
   const isPublicObservationPage = request.nextUrl.pathname === "/observe";
   const isPublicObservationApi = request.nextUrl.pathname === "/api/hse-observations";
+  const isPublicInvitePage = request.nextUrl.pathname === "/invite";
+  const isPublicInviteApi = request.nextUrl.pathname === "/api/invite-link";
   const requestedPath =
     request.nextUrl.pathname + (request.nextUrl.search || "");
   const isPublicAsset =
@@ -51,7 +53,9 @@ export async function updateSession(request: NextRequest) {
     isPublicAuthApi ||
     isPublicAccessRequestApi ||
     isPublicObservationPage ||
-    isPublicObservationApi
+    isPublicObservationApi ||
+    isPublicInvitePage ||
+    isPublicInviteApi
   ) {
     return response;
   }

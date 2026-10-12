@@ -305,7 +305,7 @@ function getAuthUserForPerson(person: PersonRow, authUsers: AuthUserRow[]) {
 function getLoginStatus(person: PersonRow, authUser: AuthUserRow | null) {
   if (person.active === false || person.access_status === "Deactivated") return { label: "Deactivated", tone: "danger" as const };
   if (!person.email) return { label: "No email", tone: "warn" as const };
-  if (!authUser) return { label: "No login yet", tone: "warn" as const };
+  if (!authUser) return person.access_status === "Invited" ? { label: "Invite pending", tone: "warn" as const } : { label: "No login yet", tone: "warn" as const };
   if (authUser.last_sign_in_at) return { label: "Active login", tone: "good" as const };
   if (person.access_status === "Invited" || authUser.confirmed_at) return { label: "Invite pending", tone: "warn" as const };
   return { label: "Setup pending", tone: "warn" as const };

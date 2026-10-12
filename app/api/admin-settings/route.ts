@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { createClient as createServerSupabaseClient } from "../../../src/lib/supabase/server";
+import { createInviteUrl, getSiteOrigin, issueInviteEmail } from "../../../src/lib/inviteLinks";
 
 const MASTER_ADMIN_EMAIL = "jbeaton@enshoresubsea.com";
 const MASTER_ADMIN_NAME = "Jordan Beaton";
@@ -43,24 +44,7 @@ function cleanBoolean(value: unknown) {
 }
 
 function getInviteOrigin(request: Request) {
-  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
-  if (configuredSiteUrl) return configuredSiteUrl;
-  if (vercelUrl) return vercelUrl.startsWith("http") ? vercelUrl : `https://${vercelUrl}`;
-  return request.headers.get("origin") || "";
-}
-
-function getGeneratedLink(data: unknown) {
-  const result = data as {
-    action_link?: string;
-    properties?: {
-      action_link?: string;
-      email_otp?: string;
-      hashed_token?: string;
-      redirect_to?: string;
-    };
-  };
-  return cleanText(result?.properties?.action_link) || cleanText(result?.action_link);
+  return getSiteOrigin(request);
 }
 
 async function getCurrentUser() {
@@ -331,13 +315,7 @@ export async function POST(request: Request) {
       const origin = getInviteOrigin(request);
       const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const authUser = authUsers.data.users.find((user: User) => (user.email || "").toLowerCase() === email);
-      const redirectTo = origin ? `${origin}/login?mode=invite` : undefined;
-      const inviteResult = authUser
-        ? await service.auth.resetPasswordForEmail(email, { redirectTo })
-        : await service.auth.admin.inviteUserByEmail(email, {
-            data: { name, system_role: role, department },
-            redirectTo,
-          });
+      const inviteResult = await issueInviteEmail({ service, origin, email, name, role, department, personId, actorEmail, kind: authUser ? "password" : "invite" });
 
       if (inviteResult.error) {
         await writeAuditLog(
@@ -391,16 +369,10 @@ export async function POST(request: Request) {
       const department = cleanText(person.department);
       const role = cleanText(person.system_role) || "Viewer";
       const origin = getInviteOrigin(request);
-      const redirectTo = origin ? `${origin}/login?mode=invite` : undefined;
       const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const authUser = authUsers.data.users.find((user: User) => (user.email || "").toLowerCase() === email);
 
-      const inviteResult = authUser
-        ? await service.auth.resetPasswordForEmail(email, { redirectTo })
-        : await service.auth.admin.inviteUserByEmail(email, {
-            data: { name, system_role: role, department },
-            redirectTo,
-          });
+      const inviteResult = await issueInviteEmail({ service, origin, email, name, role, department, personId: id, actorEmail, kind: authUser ? "password" : "invite" });
 
       if (inviteResult.error) {
         return NextResponse.json({ error: inviteResult.error.message }, { status: 400 });
@@ -445,33 +417,14 @@ export async function POST(request: Request) {
       const department = cleanText(person.department);
       const role = cleanText(person.system_role) || "Viewer";
       const origin = getInviteOrigin(request);
-      const redirectTo = origin ? `${origin}/login?mode=invite` : undefined;
       const authUsers = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const authUser = authUsers.data.users.find((user: User) => (user.email || "").toLowerCase() === email);
 
-      const linkResult = authUser
-        ? await service.auth.admin.generateLink({
-            type: "recovery",
-            email,
-            options: { redirectTo },
-          })
-        : await service.auth.admin.generateLink({
-            type: "invite",
-            email,
-            options: {
-              data: { name, system_role: role, department },
-              redirectTo,
-            },
-          });
-
-      if (linkResult.error) {
-        return NextResponse.json({ error: linkResult.error.message }, { status: 400 });
+      const created = await createInviteUrl({ service, origin, email, name, role, department, personId: id, actorEmail });
+      if (created.error) {
+        return NextResponse.json({ error: created.error.message }, { status: 400 });
       }
-
-      const setupLink = getGeneratedLink(linkResult.data);
-      if (!setupLink) {
-        return NextResponse.json({ error: "Supabase did not return a setup link." }, { status: 400 });
-      }
+      const setupLink = created.url;
 
       const { error: updateError } = await service
         .from("people")

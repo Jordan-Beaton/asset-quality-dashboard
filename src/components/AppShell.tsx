@@ -746,7 +746,8 @@ export default function AppShell({ children }: AppShellProps) {
   const isPublicObservationPage = pathname === "/observe";
   const isPublicItpSignOffPage = pathname === "/projects/itp-sign-off-action";
   const isPublicAinmSignOffPage = pathname === "/hse/ainm/signoff-action";
-  const isPublicStandalonePage = isPublicObservationPage || isPublicItpSignOffPage || isPublicAinmSignOffPage;
+  const isPublicInvitePage = pathname === "/invite";
+  const isPublicStandalonePage = isPublicObservationPage || isPublicItpSignOffPage || isPublicAinmSignOffPage || isPublicInvitePage;
   const isHomePage = pathname === "/home";
   const isFieldToolsPage = pathname === "/field-tools";
   const isAssetModule = pathname.startsWith("/assets");
