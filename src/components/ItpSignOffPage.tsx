@@ -97,17 +97,21 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
   const approved = records.filter((row) => row.status === "Approved").length;
   const rejected = records.filter((row) => row.status === "Rejected").length;
 
-  async function runExtraction(selectedFile: File) {
+  async function runExtraction(selectedFile: File, storedPath?: string) {
     setFile(selectedFile); setPhases([]); setSelectedIndexes([]); setSelectedTasks({});
     setExtracting(true); setMessage("Detecting numbered phase headings and extracting their activity rows...");
     try {
-      const form = new FormData(); form.append("file", selectedFile);
+      // A tracked ITP is read from storage by the server, so large files are not limited by the upload size.
+      const form = new FormData();
+      if (storedPath) form.append("filePath", storedPath); else form.append("file", selectedFile);
       const response = await fetch("/api/projects/itp-phase-extract", { method: "POST", body: form });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "Unable to extract the ITP.");
+      const raw = await response.text();
+      let payload: { error?: string; phases?: Phase[] } = {};
+      try { payload = JSON.parse(raw); } catch { /* non-JSON error page */ }
+      if (!response.ok) throw new Error(payload.error || `The ITP could not be extracted (HTTP ${response.status}). Files over about 4 MB cannot be uploaded here; choose it from the ITP Tracker instead.`);
       const found = (payload.phases || []) as Phase[];
       setPhases(found);
-      setMessage(found.length ? `Detected ${found.length} phase heading${found.length === 1 ? "" : "s"}. Select the phases appropriate for this sign-off.` : "No numbered phase headings were identified. Check the file and try again.");
+      setMessage(found.length ? `Detected ${found.length} phase heading${found.length === 1 ? "" : "s"}. Select the phases appropriate for this sign-off.` : "No phase headings were identified. Check the file and try again.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to extract the ITP."); }
     finally { setExtracting(false); }
   }
@@ -134,7 +138,7 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
       if (!fileResponse.ok) throw new Error("The tracked ITP could not be downloaded.");
       const blob = await fileResponse.blob();
       const trackedFile = new File([blob], revision.file_name, { type: blob.type || "application/octet-stream" });
-      await runExtraction(trackedFile);
+      await runExtraction(trackedFile, revision.file_path);
     } catch (error) {
       setExtracting(false);
       setMessage(error instanceof Error ? error.message : "Unable to load the tracked ITP.");

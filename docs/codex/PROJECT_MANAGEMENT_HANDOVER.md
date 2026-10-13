@@ -40,7 +40,7 @@ At phone widths the workspace inherits the whole-IMS bottom navigation, one-colu
 ## Project NOI Requirements
 
 - Data source: `project_noi_points`.
-- Extracts relevant Client, Enshore, Contractor, Customer and equivalent W/H involvement points from PDF, scanned and Word ITPs.
+- Extracts the W/H involvement points of the column the user confirms as Enshore's from PDF, scanned, Word and Excel ITPs (see ITP Column Picker).
 - Supports composite codes containing W or H, including W/H, R/W, and M/W.
 - Supports manual point creation when supplier layouts cannot be extracted reliably.
 - Filters cover ITP number, ITP title, supplier, point type and status.
@@ -48,19 +48,17 @@ At phone widths the workspace inherits the whole-IMS bottom navigation, one-colu
 - Issued rows expose an NOI link that opens the saved record in the Creator.
 - People-assignment controls should continue to use People Management as their source.
 
-## ITP Extraction Mapping Framework
+## ITP Column Picker (NOI Tracker scanner)
 
-- Core rules: `src/lib/noiExtractionRules.ts`.
-- Regression check: `scripts/check-noi-extraction-rules.ts`.
-- The scanner classifies authority, identifier, and activity-description columns rather than relying on one supplier's exact wording.
-- Built-in client-side authority terminology includes Client, Enshore, Contractor, Employer, Employer Surveillance, Customer, Purchaser, Buyer, and Owner.
-- Built-in identifier terminology includes Task, Task #, Step, Item, Point, Section, and Inspection Point variants.
-- Supplier, Vendor, Subcontractor, TPI, Class, HSG, and MWS authority columns are explicitly excluded unless future controlled requirements say otherwise.
-- Every scan returns diagnostics explaining the recognised NOI authority, row identifier, activity column, and excluded authority columns.
-- The Baltic Power NOI page exposes a mapping review when a layout is unresolved. A user can confirm the client/NOI authority, task/item identifier, and activity columns, then save and rescan.
-- Confirmed mappings are stored in `project-documents/{project-key}/extraction-mappings/{template-fingerprint}.json` and automatically reused when later revisions have the same header structure.
-- Visual/OCR instructions and final validation use the same configured authority mapping as structured and coordinate extraction; a heading cannot be accepted by OCR and then silently rejected by a different rule layer.
-- The Baltic Power pattern `Task # / Activity Description / ENS Surveillance / Employer Surveillance / MWS` is covered by regression checks: Employer Surveillance is the NOI authority, Task # is the identifier, and MWS is excluded.
+- Core logic: `src/lib/noiColumnGrid.ts` (pure, shared by the server and the browser). Route: `app/api/projects/noi-extract/route.ts`. UI: `src/components/NoiTrackerPage.tsx`.
+- The scanner no longer guesses which column belongs to Enshore. It reads EVERY inspection column of the ITP (heading plus the code in each row), shows them as cards with their W / H / W/H counts, and the person confirms Enshore's column. W/H points are then taken from that column only.
+- Works for PDF (text position), Word (.docx tables, including Word repeating page headers and legends such as `Contr = Contractor [Enshore]`) and Excel (merged heading cells are filled across their span).
+- A column that looks like Enshore's (Enshore, ENS, Contractor [Enshore]) is pre-selected as "Suggested" when exactly one such column holds marks and no separate Client/Employer column holds marks too. Supplier, 3rd party, TPI, Class, BV, HSG and MWS columns are flagged "Supplier".
+- Scanned PDF pages, and pages whose table layout cannot be read from the text (for example rows without numbers), are read visually through the OpenAI vision service in short page batches, only after the user confirms in a dialog.
+- A cell holding both Witness and Hold is always recorded as `W/H` (never W or H alone).
+- The chosen column heading is remembered per column layout in `project-documents/{project-key}/extraction-mappings/column-choice-{fingerprint}.json` and pre-selected as "Your choice" next time.
+- The scan runs as short phased requests (`grid`, `visual-grid-chunk`, `grid-merge`); the server reads the stored ITP from its file path so no upload size limit applies.
+- Pages / tables / sheets without a numbered row use the closest reference printed on the row, or `n/a`.
 
 ## NOI Creator
 

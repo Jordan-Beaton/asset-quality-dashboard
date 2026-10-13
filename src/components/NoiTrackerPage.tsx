@@ -12,16 +12,14 @@ import { QualityPageHero } from "./QualityPageHero";
 import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
 import { supabase } from "../lib/supabase";
 import { getProject } from "../lib/projectRegistry";
+import { addColumnChoicePrefix, candidatesForColumn, sameColumnLabel, type GridResult } from "../lib/noiColumnGrid";
 
 const STORAGE_BUCKET = "project-documents";
 
 type Revision = { id: string; revision: string; file_name: string; file_path: string; is_current: boolean; uploaded_at: string };
 type Itp = { id: string; document_number: string; title: string; supplier: string | null; scope: string | null; project_itp_revisions?: Revision[] };
 type InterventionType = string;
-type ScanResult = { candidates?: Array<Omit<Candidate, "selected">>; summary: { points: number }; warning?: string | null; extractionMode?: string; diagnostics?: ExtractionDiagnostics };
 type Candidate = { sectionNumber: string; activityDescription: string; interventionType: InterventionType; partyHeading: string; confidence: string; sourceLocation: string; selected: boolean };
-type ExtractionMapping = { authorityHeadings: string[]; identifierHeadings: string[]; activityHeadings: string[] };
-type ExtractionDiagnostics = { templateFingerprint: string; detectedHeadings: string[]; targetAuthorityHeadings: string[]; excludedAuthorityHeadings: string[]; unresolvedAuthorityHeadings: string[]; identifierHeadings: string[]; activityHeadings: string[]; explanation: string[] };
 type NoiPoint = {
   id: string; itp_id: string; revision_id: string; section_number: string; activity_description: string;
   intervention_type: InterventionType; party_heading: string; extraction_confidence: string; source_location: string | null;
@@ -29,7 +27,6 @@ type NoiPoint = {
 };
 
 const statuses = ["Planned", "NOI Required", "NOI Issued", "Completed", "Cancelled"];
-const emptyMapping = (): ExtractionMapping => ({ authorityHeadings: [], identifierHeadings: [], activityHeadings: [] });
 const emptyManualPoint = {
   sectionNumber: "",
   activityDescription: "",
@@ -114,14 +111,16 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualPoint, setManualPoint] = useState(emptyManualPoint);
-  const [diagnostics, setDiagnostics] = useState<ExtractionDiagnostics | null>(null);
-  const [mapping, setMapping] = useState<ExtractionMapping>(emptyMapping);
-  const [showMapping, setShowMapping] = useState(false);
+  const [grid, setGrid] = useState<GridResult | null>(null);
+  const [chosenColumn, setChosenColumn] = useState("");
+  const [rememberColumn, setRememberColumn] = useState(true);
+  const [rememberedColumn, setRememberedColumn] = useState("");
+  const [gridNotice, setGridNotice] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
   // The scanner panel collapses by default so the register (what people use
   // day-to-day) isn't pushed below the fold, but it stays open automatically
   // while there's scan/manual-entry work in progress so nothing gets hidden.
-  const scannerExpanded = scannerOpen || showManualEntry || candidates.length > 0 || Boolean(diagnostics);
+  const scannerExpanded = scannerOpen || showManualEntry || candidates.length > 0 || Boolean(grid);
 
   const load = useCallback(async () => {
     const [itpResult, pointResult] = await Promise.all([
@@ -220,128 +219,143 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
     outstanding: points.filter((point) => !["Completed", "Cancelled"].includes(point.status)).length,
   }), [points]);
 
-  async function scanSelectedItp(mappingOverride?: ExtractionMapping, saveConfirmedMapping = false) {
-    if (!selectedItp) return;
-    const revision = currentRevision(selectedItp);
-    if (!revision) {
-      setMessage("This ITP has no current source document.");
-      return;
+  function compactPages(pages: number[]) {
+    const sorted = [...new Set(pages)].sort((a, b) => a - b);
+    const parts: string[] = [];
+    for (let index = 0; index < sorted.length; index += 1) {
+      let end = index;
+      while (end + 1 < sorted.length && sorted[end + 1] === sorted[end] + 1) end += 1;
+      parts.push(end > index ? `${sorted[index]}-${sorted[end]}` : String(sorted[index]));
+      index = end;
     }
+    return parts.join(", ");
+  }
+
+  function pickColumn(result: GridResult, columnId: string) {
+    setChosenColumn(columnId);
+    setCandidates(columnId ? candidatesForColumn(result, columnId).map((candidate) => ({ ...candidate, selected: true })) : []);
+  }
+
+  // Reads every inspection column of the ITP (PDF, Word or Excel), lets the person choose
+  // Enshore's, then takes the W/H points from that column only.
+  async function scanColumns(revision: Revision) {
+    if (!selectedItp) return;
     setBusy(true);
     setCandidates([]);
-    setMessage(`Reading ${revision.file_name}... Structured tables will be checked first; scanned pages will use OCR automatically.`);
-    let stage = "preparing the stored ITP";
+    setGrid(null);
+    setChosenColumn("");
+    setGridNotice("");
+    setMessage(`Reading the columns in ${revision.file_name}...`);
+    let stage = "reading the ITP columns";
     try {
-      const isPdf = revision.file_name.toLowerCase().endsWith(".pdf");
-      const allowVisualAudit = !isPdf || window.confirm(
-        "For a complete page-by-page visual/OCR audit, this ITP PDF will be securely sent to the configured OpenAI vision service for document analysis. Continue with visual audit?\n\nChoose Cancel to run local structured extraction only.",
-      );
-      const baseForm = (activeMapping: ExtractionMapping, phase: string) => {
-        const form = new FormData();
-        form.append("filePath", revision.file_path);
-        form.append("supplierName", selectedItp.supplier || "");
-        form.append("allowVisualAudit", String(allowVisualAudit));
-        form.append("extractionMapping", JSON.stringify(activeMapping));
-        form.append("phase", phase);
-        return form;
+      const form = (phase: string) => {
+        const data = new FormData();
+        data.append("filePath", revision.file_path);
+        data.append("supplierName", selectedItp.supplier || "");
+        data.append("phase", phase);
+        return data;
       };
-      // Visual audit runs as short batches of pages, a few at a time, so no single
-      // request can outlive the host time limit and progress is visible.
-      const requestVisualAudit = async (activeMapping: ExtractionMapping, structured: Record<string, unknown>): Promise<ScanResult> => {
-        const pageCount = Number(structured.pageCount || 0);
-        const batches: Array<[number, number]> = [];
-        for (let first = 1; first <= pageCount; first += 3) batches.push([first, Math.min(first + 2, pageCount)]);
-        const visualCandidates: unknown[] = [];
-        const visualWarnings: string[] = [];
-        let completed = 0;
-        let nextBatch = 0;
-        const runBatch = async (first: number, last: number) => {
-          const form = baseForm(activeMapping, "visual-chunk");
-          form.append("firstPage", String(first));
-          form.append("lastPage", String(last));
-          try {
-            return await postScan(form);
-          } catch {
-            return postScan(form);
-          }
-        };
-        const worker = async () => {
-          while (nextBatch < batches.length) {
-            const [first, last] = batches[nextBatch];
-            nextBatch += 1;
-            try {
-              const chunk = await runBatch(first, last);
-              visualCandidates.push(...((chunk.candidates as unknown[]) || []));
-            } catch (error) {
-              visualWarnings.push(`Pages ${first}-${last}: ${error instanceof Error ? error.message : "visual audit failed"}`);
-            }
-            completed += 1;
-            setMessage(`Visual audit: ${completed} of ${batches.length} page batch${batches.length === 1 ? "" : "es"} checked...`);
-          }
-        };
-        setMessage(`Visual audit: checking ${pageCount} page${pageCount === 1 ? "" : "s"} in ${batches.length} batch${batches.length === 1 ? "" : "es"}...`);
-        await Promise.all(Array.from({ length: Math.min(3, batches.length) }, () => worker()));
+      const digital = await postScan(form("grid"));
+      let result = (digital.grid as GridResult | null) || null;
+      const pageCount = Number(digital.pageCount || 0);
+      const scannedPages = ((digital.scannedPages as number[]) || []).map(Number);
+      const unreadPages = ((digital.unreadPages as number[]) || []).map(Number);
+      const visualPages = [...new Set([...scannedPages, ...unreadPages])].sort((a, b) => a - b);
+      let notice = "";
 
-        const mergeForm = new FormData();
-        mergeForm.append("phase", "merge");
-        mergeForm.append("structuredCandidates", JSON.stringify(structured.candidates || []));
-        mergeForm.append("coordinateCandidates", JSON.stringify(structured.coordinateCandidates || []));
-        mergeForm.append("coordinatePages", JSON.stringify(structured.coordinatePages || []));
-        mergeForm.append("scannedPages", JSON.stringify(structured.scannedPages || []));
-        mergeForm.append("visualCandidates", JSON.stringify(visualCandidates));
-        mergeForm.append("visualWarnings", JSON.stringify(visualWarnings));
-        mergeForm.append("explanation", JSON.stringify((structured.diagnostics as ExtractionDiagnostics | undefined)?.explanation || []));
-        stage = "combining the visual audit results";
-        const merged = await postScan(mergeForm);
-        return { ...structured, ...merged, diagnostics: structured.diagnostics } as unknown as ScanResult;
-      };
-      const requestScan = async (activeMapping: ExtractionMapping): Promise<ScanResult> => {
-        stage = "reading the ITP tables and text";
-        const structured = await postScan(baseForm(activeMapping, "structured"));
-        stage = "running the visual audit";
-        if (!isPdf || !allowVisualAudit || !Number(structured.pageCount || 0)) return structured as unknown as ScanResult;
-        return requestVisualAudit(activeMapping, structured);
-      };
-      let activeMapping = mappingOverride || mapping;
-      let result = await requestScan(activeMapping);
-      const firstDiagnostics = result.diagnostics as ExtractionDiagnostics | undefined;
-      if (!mappingOverride && !activeMapping.authorityHeadings.length && firstDiagnostics?.templateFingerprint) {
-        stage = "loading the saved column mapping";
-        const stored = await supabase.storage.from(STORAGE_BUCKET).download(`${projectKey}/extraction-mappings/${firstDiagnostics.templateFingerprint}.json`);
-        if (!stored.error) {
-          let savedMapping: ExtractionMapping | null = null;
-          try {
-            savedMapping = JSON.parse(await stored.data.text()) as ExtractionMapping;
-          } catch {
-            savedMapping = null;
-          }
-          if (savedMapping && Array.isArray(savedMapping.authorityHeadings)) {
-            activeMapping = savedMapping;
-            result = await requestScan(activeMapping);
-          }
+      if (visualPages.length) {
+        const approved = window.confirm(
+          `Page${visualPages.length === 1 ? "" : "s"} ${compactPages(visualPages)} of this ITP ${visualPages.length === 1 ? "is" : "are"} scanned or use a layout that cannot be read from the text. To read ${visualPages.length === 1 ? "it" : "them"}, ${visualPages.length === 1 ? "that page" : "those pages"} will be securely sent to the configured OpenAI vision service.\n\nContinue? Choose Cancel to carry on without ${visualPages.length === 1 ? "it" : "them"}.`,
+        );
+        if (approved) {
+          stage = "reading the scanned pages visually";
+          const batches: number[][] = [];
+          for (let index = 0; index < visualPages.length; index += 3) batches.push(visualPages.slice(index, index + 3));
+          const chunks: unknown[] = [];
+          const failures: string[] = [];
+          let completed = 0;
+          let next = 0;
+          const worker = async () => {
+            while (next < batches.length) {
+              const pages = batches[next];
+              next += 1;
+              const data = form("visual-grid-chunk");
+              data.append("pages", JSON.stringify(pages));
+              try {
+                let chunk: Record<string, unknown>;
+                try {
+                  chunk = await postScan(data);
+                } catch {
+                  chunk = await postScan(data);
+                }
+                chunks.push(chunk.chunk);
+              } catch (error) {
+                failures.push(`Pages ${compactPages(pages)}: ${error instanceof Error ? error.message : "could not be read"}`);
+              }
+              completed += 1;
+              setMessage(`Reading scanned pages: ${completed} of ${batches.length} batch${batches.length === 1 ? "" : "es"} done...`);
+            }
+          };
+          setMessage(`Reading ${visualPages.length} scanned page${visualPages.length === 1 ? "" : "s"} in ${batches.length} batch${batches.length === 1 ? "" : "es"}...`);
+          await Promise.all(Array.from({ length: Math.min(3, batches.length) }, () => worker()));
+          const merge = form("grid-merge");
+          merge.delete("filePath");
+          merge.append("grid", JSON.stringify(result));
+          merge.append("chunks", JSON.stringify(chunks));
+          merge.append("pageCount", String(pageCount));
+          merge.append("scannedPages", JSON.stringify(scannedPages));
+          stage = "combining the pages";
+          result = ((await postScan(merge)).grid as GridResult) || result;
+          if (failures.length) notice = `Some pages could not be read: ${failures.join(" | ")}`;
+        } else {
+          notice = `Pages ${compactPages(visualPages)} were not read. Add any points from them manually.`;
         }
       }
-      const nextDiagnostics = result.diagnostics as ExtractionDiagnostics;
-      const recommended = {
-        authorityHeadings: activeMapping.authorityHeadings.length ? activeMapping.authorityHeadings : nextDiagnostics.targetAuthorityHeadings.slice(0, 1),
-        identifierHeadings: activeMapping.identifierHeadings.length ? activeMapping.identifierHeadings : nextDiagnostics.identifierHeadings.slice(0, 1),
-        activityHeadings: activeMapping.activityHeadings.length ? activeMapping.activityHeadings : nextDiagnostics.activityHeadings.slice(0, 1),
-      };
-      setDiagnostics(nextDiagnostics);
-      setMapping(recommended);
-      if (saveConfirmedMapping && nextDiagnostics.templateFingerprint) {
-        const saved = await supabase.storage.from(STORAGE_BUCKET).upload(`${projectKey}/extraction-mappings/${nextDiagnostics.templateFingerprint}.json`, new Blob([JSON.stringify(recommended)], { type: "application/json" }), { upsert: true, contentType: "application/json" });
-        if (saved.error) throw saved.error;
+
+      if (!result || !result.columns.length || !result.rows.length) {
+        setGridNotice(notice);
+        setMessage("No inspection columns with W/H marks could be read from this ITP. Use Add manual point to enter the points.");
+        return;
       }
-      setCandidates((result.candidates || []).map((candidate: Omit<Candidate, "selected">) => ({ ...candidate, selected: true })));
-      setShowMapping(!result.summary.points || Boolean(nextDiagnostics.unresolvedAuthorityHeadings.length));
-      setMessage(result.warning || `${result.summary.points} configured client-side W/H point${result.summary.points === 1 ? "" : "s"} found using ${String(result.extractionMode || "structured").toLowerCase()} extraction. Review before adding them.`);
+
+      // The person's earlier choice for ITPs with the same columns, if any.
+      stage = "checking for a remembered choice";
+      let remembered = "";
+      const stored = await supabase.storage.from(STORAGE_BUCKET).download(`${projectKey}/extraction-mappings/${addColumnChoicePrefix(result.fingerprint)}.json`);
+      if (!stored.error) {
+        try {
+          remembered = String((JSON.parse(await stored.data.text()) as { label?: string }).label || "");
+        } catch {
+          remembered = "";
+        }
+      }
+      const rememberedMatch = remembered ? result.columns.find((column) => sameColumnLabel(column.label, remembered)) : undefined;
+      const preselect = rememberedMatch || result.columns.find((column) => column.suggested);
+      setRememberedColumn(rememberedMatch ? rememberedMatch.id : "");
+      setGrid(result);
+      setGridNotice(notice);
+      pickColumn(result, preselect?.id || "");
+      setMessage(
+        preselect
+          ? `Found ${result.columns.length} inspection column${result.columns.length === 1 ? "" : "s"}. ${rememberedMatch ? "Using the column you chose before" : "Suggested"}: ${preselect.label}. Confirm it is Enshore's column.`
+          : `Found ${result.columns.length} inspection column${result.columns.length === 1 ? "" : "s"}. Choose the column that is Enshore's.`,
+      );
     } catch (error) {
       const reason = error instanceof Error ? error.message : "The ITP could not be scanned.";
       setMessage(`The scan stopped while ${stage}. ${reason}`);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function scanSelectedItp() {
+    if (!selectedItp) return;
+    const revision = currentRevision(selectedItp);
+    if (!revision) {
+      setMessage("This ITP has no current source document.");
+      return;
+    }
+    await scanColumns(revision);
   }
 
   async function saveCandidates() {
@@ -377,8 +391,18 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
     const result = await supabase.from("project_noi_points").upsert(payload, { onConflict: "revision_id,section_number,intervention_type,activity_description", ignoreDuplicates: true });
     if (result.error) setMessage(result.error.message);
     else {
+      const chosen = grid?.columns.find((column) => column.id === chosenColumn);
+      if (grid && chosen && rememberColumn) {
+        await supabase.storage.from(STORAGE_BUCKET).upload(
+          `${projectKey}/extraction-mappings/${addColumnChoicePrefix(grid.fingerprint)}.json`,
+          new Blob([JSON.stringify({ label: chosen.label })], { type: "application/json" }),
+          { upsert: true, contentType: "application/json" },
+        );
+      }
       setMessage(`${selected.length} confirmed point${selected.length === 1 ? "" : "s"} added. Existing matches were not duplicated.`);
       setCandidates([]);
+      setGrid(null);
+      setChosenColumn("");
       await load();
     }
     setBusy(false);
@@ -611,23 +635,13 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
         {message && <div style={notice}>{message}</div>}
         {scannerExpanded && <>
         <div style={scanner}>
-          <label style={field}><span>Current ITP</span><select style={input} value={selectedItpId} onChange={(event) => { setSelectedItpId(event.target.value); setCandidates([]); setDiagnostics(null); setMapping(emptyMapping()); setShowMapping(false); }}>{itps.map((itp) => {
+          <label style={field}><span>Current ITP</span><select style={input} value={selectedItpId} onChange={(event) => { setSelectedItpId(event.target.value); setCandidates([]); setGrid(null); setChosenColumn(""); setGridNotice(""); }}>{itps.map((itp) => {
             const revision = currentRevision(itp);
             return <option key={itp.id} value={itp.id}>{itp.document_number} · Rev {revision?.revision || "—"} · {itp.supplier || "No supplier"}</option>;
           })}</select></label>
           <button style={primaryButton} disabled={busy || !selectedItp} onClick={() => void scanSelectedItp()}>{busy ? "Scanning..." : "Scan current revision"}</button>
           <button style={secondaryButton} disabled={busy || !selectedItp} onClick={() => setShowManualEntry((current) => !current)}>{showManualEntry ? "Close manual entry" : "Add manual point"}</button>
         </div>
-        {diagnostics && <div style={mappingSummary}>
-          <div style={mappingSummaryHeader}><div><strong>Scanner interpretation</strong><span>{diagnostics.explanation.join(" ")}</span></div><button type="button" style={secondaryButton} onClick={() => setShowMapping((current) => !current)}>{showMapping ? "Hide mapping" : "Review mapping"}</button></div>
-          {showMapping && <div style={mappingPanel}>
-            <label style={field}><span>Client / NOI authority column</span><select style={input} value={mapping.authorityHeadings[0] || ""} onChange={(event) => setMapping((current) => ({ ...current, authorityHeadings: event.target.value ? [event.target.value] : [] }))}><option value="">Select authority column</option>{diagnostics.detectedHeadings.map((heading) => <option key={heading}>{heading}</option>)}</select></label>
-            <label style={field}><span>Task / item number column</span><select style={input} value={mapping.identifierHeadings[0] || ""} onChange={(event) => setMapping((current) => ({ ...current, identifierHeadings: event.target.value ? [event.target.value] : [] }))}><option value="">Select identifier column</option>{diagnostics.detectedHeadings.map((heading) => <option key={heading}>{heading}</option>)}</select></label>
-            <label style={field}><span>Activity description column</span><select style={input} value={mapping.activityHeadings[0] || ""} onChange={(event) => setMapping((current) => ({ ...current, activityHeadings: event.target.value ? [event.target.value] : [] }))}><option value="">Select activity column</option>{diagnostics.detectedHeadings.map((heading) => <option key={heading}>{heading}</option>)}</select></label>
-            <button type="button" style={primaryButton} disabled={busy || !mapping.authorityHeadings.length || !mapping.identifierHeadings.length || !mapping.activityHeadings.length} onClick={() => void scanSelectedItp(mapping, true)}>Save mapping and rescan</button>
-            <small style={mappingHelp}>This mapping is stored against the detected table template and reused automatically for later revisions with the same headers. Supplier and third-party columns remain excluded.</small>
-          </div>}
-        </div>}
         {showManualEntry && <form style={manualPanel} onSubmit={(event) => void saveManualPoint(event)}>
           <div style={candidateHeader}><strong>Add manual NOI point</strong><span>Saved against the selected current ITP revision and labelled as a manual entry.</span></div>
           <div style={manualGrid}>
@@ -643,6 +657,27 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
           </div>
           <div style={candidateActions}><button type="button" style={secondaryButton} onClick={() => { setManualPoint(emptyManualPoint); setShowManualEntry(false); }}>Cancel</button><button type="submit" style={primaryButton} disabled={busy}>{busy ? "Saving..." : "Add point to register"}</button></div>
         </form>}
+        {grid && <div style={columnPickerPanel}>
+          <div style={candidateHeader}><strong>Choose Enshore&apos;s column</strong><span>These are the inspection columns found in the ITP. Only the column you choose is used; marks in the others are ignored.</span></div>
+          <div style={columnCardGrid} role="radiogroup" aria-label="Inspection columns">
+            {grid.columns.map((column) => {
+              const selectedCard = column.id === chosenColumn;
+              const sample = candidatesForColumn(grid, column.id).slice(0, 3).map((candidate) => `${candidate.sectionNumber} ${candidate.interventionType}`).join(", ");
+              return <button type="button" key={column.id} role="radio" aria-checked={selectedCard} style={selectedCard ? { ...columnCard, ...columnCardSelected } : columnCard} onClick={() => pickColumn(grid, column.id)}>
+                <span style={columnCardTop}>
+                  <strong style={columnCardName}>{column.label}</strong>
+                  {column.id === rememberedColumn ? <span style={pillBrand}>Your choice</span> : column.suggested ? <span style={pillBrand}>Suggested</span> : column.supplierLike ? <span style={pillRed}>Supplier</span> : null}
+                </span>
+                <span style={columnCardCount}><b>{column.marks}</b> W/H mark{column.marks === 1 ? "" : "s"}</span>
+                <small style={columnCardDetail}>{column.marks ? `H ${column.counts.H} · W ${column.counts.W} · W/H ${column.counts.WH}${column.counts.other ? ` · other ${column.counts.other}` : ""}` : "Empty or no W/H codes"}</small>
+                <small style={columnCardDetail}>{column.pages.length ? `${grid.unit || "Page"}${column.pages.length === 1 ? "" : "s"} ${compactPages(column.pages)}` : ""}{sample ? ` · ${sample}` : ""}</small>
+              </button>;
+            })}
+          </div>
+          <label style={rememberRow}><input type="checkbox" checked={rememberColumn} onChange={(event) => setRememberColumn(event.target.checked)} /> Remember this choice for ITPs with these columns</label>
+          {gridNotice && <div style={notice}>{gridNotice}</div>}
+          {!chosenColumn && <div style={notice}>Select a column above to see its W/H points.</div>}
+        </div>}
         {candidates.length > 0 && <div style={candidatePanel}>
           <div style={candidateHeader}><strong>Review extracted points</strong><span>Untick anything that is not applicable and edit the description if needed.</span></div>
           {candidates.map((candidate, index) => <div key={`${candidate.sectionNumber}-${index}`} style={candidateRow}>
@@ -747,10 +782,17 @@ const input: CSSProperties = { width: "100%", boxSizing: "border-box", border: "
 const primaryButton: CSSProperties = { border: 0, borderRadius: 9, background: "#005670", color: "#fff", padding: "10px 14px", fontWeight: 900, cursor: "pointer" };
 const secondaryButton: CSSProperties = { ...primaryButton, background: "#D0D0CE", color: "#53565A" };
 const notice: CSSProperties = { margin: "0 18px 14px", padding: "10px 12px", borderRadius: 9, background: "#ECECE7", color: "#000000", fontSize: 12 };
-const mappingSummary: CSSProperties = { margin: "0 18px 14px", border: "1px solid #D0D0CE", borderRadius: 10, background: "#fff", overflow: "hidden" };
-const mappingSummaryHeader: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: 12, color: "#53565A", fontSize: 11 };
-const mappingPanel: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3,minmax(150px,1fr)) auto", alignItems: "end", gap: 9, padding: 12, borderTop: "1px solid #D0D0CE", background: "#ECECE7" };
-const mappingHelp: CSSProperties = { gridColumn: "1 / -1", color: "#53565A", lineHeight: 1.4 };
+const columnPickerPanel: CSSProperties = { margin: "0 18px 14px", border: "1px solid #D0D0CE", borderRadius: 10, background: "#fff", padding: 12, display: "grid", gap: 10 };
+const columnCardGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 };
+const columnCard: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: 12, background: "#fff", padding: 11, display: "grid", gap: 4, textAlign: "left", cursor: "pointer", font: "inherit", color: "#000000", minWidth: 0 };
+const columnCardSelected: CSSProperties = { borderColor: "#005670", background: "#EEF7F8", boxShadow: "0 0 0 2px rgba(0, 86, 112, 0.16)" };
+const columnCardTop: CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 8 };
+const columnCardName: CSSProperties = { fontSize: 13, overflowWrap: "anywhere" };
+const columnCardCount: CSSProperties = { fontSize: 13 };
+const columnCardDetail: CSSProperties = { color: "#53565A", fontSize: 11, overflowWrap: "anywhere" };
+const pillBrand: CSSProperties = { background: "#005670", color: "#FFFFFF", borderRadius: 999, padding: "2px 8px", fontSize: 10, fontWeight: 900, whiteSpace: "nowrap" };
+const pillRed: CSSProperties = { background: "#ECECE7", color: "#F93822", borderRadius: 999, padding: "2px 8px", fontSize: 10, fontWeight: 900, whiteSpace: "nowrap" };
+const rememberRow: CSSProperties = { display: "flex", alignItems: "center", gap: 8, color: "#53565A", fontSize: 12, fontWeight: 800 };
 const candidatePanel: CSSProperties = { borderTop: "1px solid #D0D0CE", background: "#ECECE7", padding: 16, display: "grid", gap: 7 };
 const manualPanel: CSSProperties = { ...candidatePanel, background: "#ECECE7" };
 const manualGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(130px,1fr))", gap: 9 };
