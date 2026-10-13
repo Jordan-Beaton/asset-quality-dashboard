@@ -225,50 +225,82 @@ export function buildPageGrid(page: PageInput): PageGrid | null {
   columns.sort((a, b) => a.centre - b.centre);
 
   const leftBound = Math.min(...columns.map((column) => column.centre)) - 18;
-  const activityHeader = band
-    .filter((item) => /activity|description|component|assembly|operation|process/i.test(item.text) && item.x < leftBound)
-    .sort((a, b) => a.x - b.x)[0];
-  const headerStarts = band.filter((item) => item.x < leftBound).map((item) => item.x).sort((a, b) => a - b);
-  let descriptionFrom = modalX + 8;
-  let descriptionTo = modalX + (leftBound - modalX) * 0.28;
-  if (activityHeader) {
-    const centre = activityHeader.x + activityHeader.width / 2;
-    const next = headerStarts.find((start) => start > activityHeader.x + activityHeader.width + 4);
-    descriptionFrom = Math.max(modalX + 8, activityHeader.x - 40);
-    descriptionTo = next ? Math.max(centre + 20, next - 6) : centre + 90;
-  }
+  // Where the activity description sits: from the activity heading to the next heading.
+  const descriptionRange = (headerItems: typeof band) => {
+    const heading = headerItems
+      .filter((item) => /activity|description|component|assembly|operation|process/i.test(item.text) && item.x < leftBound)
+      .sort((a, b) => a.x - b.x)[0];
+    if (!heading) return null;
+    const starts = headerItems.filter((item) => item.x < leftBound).map((item) => item.x).sort((a, b) => a - b);
+    const centre = heading.x + heading.width / 2;
+    const next = starts.find((start) => start > heading.x + heading.width + 4);
+    return { from: Math.max(modalX + 8, heading.x - 40), to: next ? Math.max(centre + 20, next - 6) : centre + 90 };
+  };
+  const fraction = { from: modalX + 8, to: modalX + (leftBound - modalX) * 0.28 };
+  const defaultRange = fraction;
+  // The activity heading often sits close to the row-number column, outside the band used for
+  // the code-column headings, so a wider band is tried when that one has no activity heading.
+  const wideBand = items.filter((item) => item.top >= bandTop && item.top < firstTop - 2 && item.x > modalX + 12);
 
-  const rows: PageGrid["rows"] = [];
-  anchors.forEach((anchor, index) => {
-    const upper = index > 0 ? (anchors[index - 1].top + anchor.top) / 2 : anchor.top - 22;
-    const lower = index < anchors.length - 1 ? (anchor.top + anchors[index + 1].top) / 2 : anchor.top + 40;
-    const cells: Record<string, string> = {};
-    columns.forEach((column) => {
-      const hit = codeItems
+  // Lowest line of the column headings: only the lines level with the "No." / "Item" label
+  // count, so a first row whose text starts above its number is not mistaken for a heading.
+  const headerBottom = headerLabel
+    ? Math.max(-Infinity, ...wideBand.filter((item) => item.top <= headerLabel.top + 25).map((item) => item.top))
+    : -Infinity;
+
+  const buildRows = (range: { from: number; to: number }) => {
+    const built: PageGrid["rows"] = [];
+    anchors.forEach((anchor, index) => {
+      // the first row starts below the column headings, so heading text is never read as description
+      const upper = index > 0 ? (anchors[index - 1].top + anchor.top) / 2 : Math.max(anchor.top - 22, headerBottom + 3);
+      const lower = index < anchors.length - 1 ? (anchor.top + anchors[index + 1].top) / 2 : anchor.top + 40;
+      const cells: Record<string, string> = {};
+      columns.forEach((column) => {
+        const hit = codeItems
+          .filter((item) =>
+            Math.abs(item.x + item.width / 2 - column.centre) <= 16
+            && item.top >= upper - 2
+            && item.top <= lower + 2
+            && Math.abs(item.top - anchor.top) <= 24
+          )
+          .sort((a, b) => Math.abs(a.top - anchor.top) - Math.abs(b.top - anchor.top))[0];
+        if (hit) cells[column.key] = normaliseCode(hit.text);
+      });
+      if (!Object.keys(cells).length) return;
+      const description = items
         .filter((item) =>
-          Math.abs(item.x + item.width / 2 - column.centre) <= 16
+          item !== anchor
           && item.top >= upper - 2
-          && item.top <= lower + 2
-          && Math.abs(item.top - anchor.top) <= 24
+          && item.top < lower
+          && item.x >= range.from
+          && item.x + item.width / 2 <= range.to
+          // a lone letter inside the description column is part of a word ("P" of "Pressure"),
+          // but a code printed in a code column is not description
+          && !columns.some((column) => isCodeText(item.text) && Math.abs(item.x + item.width / 2 - column.centre) <= 16)
         )
-        .sort((a, b) => Math.abs(a.top - anchor.top) - Math.abs(b.top - anchor.top))[0];
-      if (hit) cells[column.key] = normaliseCode(hit.text);
+        .sort((a, b) => a.top - b.top || a.x - b.x)
+        .reduce((text, item, position, list) => {
+          if (!position) return item.text;
+          const previous = list[position - 1];
+          // pieces of one word on the same line (a drop capital, a split run) are joined without a space
+          const gap = item.x - (previous.x + previous.width);
+          const sameWord = Math.abs(item.top - previous.top) < 2.5 && gap > -1.5 && gap < 1 && (previous.text.length <= 3 || item.text.length <= 3);
+          return text + (sameWord ? "" : " ") + item.text;
+        }, "");
+      built.push({ section: sectionOf(anchor.text), description: cleanText(description).slice(0, 220), cells });
     });
-    if (!Object.keys(cells).length) return;
-    const description = items
-      .filter((item) =>
-        item !== anchor
-        && item.top >= upper - 2
-        && item.top < lower
-        && item.x >= descriptionFrom
-        && item.x + item.width / 2 <= descriptionTo
-        && !isCodeText(item.text)
-      )
-      .sort((a, b) => a.top - b.top || a.x - b.x)
-      .map((item) => item.text)
-      .join(" ");
-    rows.push({ section: sectionOf(anchor.text), description: cleanText(description).slice(0, 220), cells });
-  });
+    return built;
+  };
+
+  let rows = buildRows(descriptionRange(band) || defaultRange);
+  if (!descriptionRange(band)) {
+    const wide = descriptionRange(wideBand);
+    if (wide) {
+      const blankShare = rows.filter((row) => !row.description).length / Math.max(1, rows.length);
+      // use the heading-based range when it is tighter than the guess, or the guess found nothing
+      if (wide.to <= fraction.to || blankShare > 0.5) rows = buildRows(wide);
+    }
+  }
   if (!rows.length) return null;
 
   return {
