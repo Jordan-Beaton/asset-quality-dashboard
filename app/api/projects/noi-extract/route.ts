@@ -18,6 +18,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 type Candidate = {
+  rowY?: number;
   sectionNumber: string;
   activityDescription: string;
   interventionType: string;
@@ -31,7 +32,8 @@ function clean(value: unknown) {
 }
 
 function validSectionNumber(value: unknown) {
-  const section = clean(value);
+  // Some ITPs (and OCR of scanned ones) write 5,10. for section 5.10
+  const section = clean(value).replace(/^(\d+),(\d+)/, "$1.$2").replace(/\.$/, "");
   return /^(?:[A-Z]{0,4}[-.]?)?\d+(?:\.\d+)*(?:[A-Z])?$/i.test(section) ? section : "";
 }
 
@@ -168,6 +170,21 @@ function deduplicate(candidates: Candidate[]) {
   });
 }
 
+// Several headers can sit over the same column (for example "Client" and "Enshore"),
+// so the same mark can be found twice. A row is identified by its position on the page,
+// not its section number, because distinct rows can legitimately share a number.
+function deduplicateByRow(candidates: Candidate[]) {
+  const score = (candidate: Candidate) => candidate.activityDescription.length + (/enshore/i.test(candidate.partyHeading) ? 0.5 : 0);
+  const best = new Map<string, Candidate>();
+  for (const candidate of candidates) {
+    const page = candidate.sourceLocation.match(/\bPage\s+(\d+)/i)?.[1] || "";
+    const key = [page, candidate.sectionNumber, candidate.interventionType, Math.round((candidate.rowY ?? 0) / 6)].join("|");
+    const existing = best.get(key);
+    if (!existing || score(candidate) > score(existing)) best.set(key, candidate);
+  }
+  return [...best.values()].map(({ rowY, ...rest }) => { void rowY; return rest; });
+}
+
 function meaningfulWords(value: string) {
   return new Set(value.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 3));
 }
@@ -181,7 +198,20 @@ function sameActivity(left: Candidate, right: Candidate) {
   const leftWords = meaningfulWords(left.activityDescription);
   const rightWords = meaningfulWords(right.activityDescription);
   const common = [...leftWords].filter((word) => rightWords.has(word)).length;
-  return common >= 2 && common / Math.max(1, Math.min(leftWords.size, rightWords.size)) >= 0.4;
+  const smaller = Math.max(1, Math.min(leftWords.size, rightWords.size));
+  // A one-or-two word description (for example "Non-Conformance") is matched on a single
+  // shared meaningful word; longer ones need at least two.
+  return (common >= 2 && common / smaller >= 0.4) || (common >= 1 && smaller <= 2 && common / smaller >= 0.5);
+}
+
+// The same row can be reported by more than one method (table, position, visual audit)
+// with differently worded descriptions. Keep the first report of each row.
+function collapseSameActivity(candidates: Candidate[]) {
+  const kept: Candidate[] = [];
+  for (const candidate of candidates) {
+    if (!kept.some((existing) => sameActivity(existing, candidate))) kept.push(candidate);
+  }
+  return kept;
 }
 
 function reconcilePdfCandidates(structured: Candidate[], visual: Candidate[]) {
@@ -192,18 +222,89 @@ function reconcilePdfCandidates(structured: Candidate[], visual: Candidate[]) {
   return deduplicate(result);
 }
 
-function applyCoordinateAuthority(candidates: Candidate[], coordinateCandidates: Candidate[]) {
-  if (!coordinateCandidates.length) return candidates;
-  const authoritativePages = new Set(
-    coordinateCandidates
+function applyCoordinateAuthority(candidates: Candidate[], coordinateCandidates: Candidate[], columnPages: number[] = [], scannedPages: number[] = []) {
+  if (!coordinateCandidates.length && !columnPages.length) return candidates;
+  // A page is authoritative when its client/Enshore column could be read by position,
+  // even if that column holds no W/H marks: anything another method (such as the visual
+  // audit) reports on that page, for example a mark misread from the supplier's own
+  // column, is then dropped.
+  const authoritativePages = new Set([
+    ...coordinateCandidates
       .map((candidate) => candidate.sourceLocation.match(/\bPage\s+(\d+)/i)?.[1])
       .filter((page): page is string => Boolean(page)),
-  );
+    ...columnPages.map(String),
+  ]);
+  // On a scanned page the text is OCR: it can misplace or miss marks, so it must never
+  // override the visual audit. Those pages keep every source.
+  scannedPages.forEach((page) => authoritativePages.delete(String(page)));
   const candidatesFromOtherPages = candidates.filter((candidate) => {
     const page = candidate.sourceLocation.match(/\bPage\s+(\d+)/i)?.[1];
     return !page || !authoritativePages.has(page);
   });
-  return deduplicate([...candidatesFromOtherPages, ...coordinateCandidates]);
+  const merged = [...candidatesFromOtherPages];
+  for (const candidate of coordinateCandidates) {
+    if (!merged.some((existing) => sameActivity(existing, candidate))) merged.push(candidate);
+  }
+  return deduplicate(merged);
+}
+
+type PositionedText = { text: string; x: number; y: number; width: number };
+
+// Reads the lines of text drawn by annotations (for example FreeText boxes) with their
+// real page positions, in the same coordinate convention as the page text items.
+async function readAnnotationTextItems(
+  pdfjs: typeof import("pdfjs-dist/legacy/build/pdf.mjs"),
+  page: import("pdfjs-dist/legacy/build/pdf.mjs").PDFPageProxy,
+  viewport: import("pdfjs-dist/legacy/build/pdf.mjs").PageViewport,
+): Promise<{ items: PositionedText[]; largeImage: boolean }> {
+  try {
+    const operators = await page.getOperatorList({ annotationMode: pdfjs.AnnotationMode.ENABLE });
+    const names = new Map<number, string>(Object.entries(pdfjs.OPS).map(([name, code]) => [code as number, name]));
+    const result: PositionedText[] = [];
+    let largeImage = false;
+    let annotation: { rect: number[]; matrix: number[] } | null = null;
+    let lineX = 0;
+    let lineY = 0;
+    for (let index = 0; index < operators.fnArray.length; index += 1) {
+      const name = names.get(operators.fnArray[index]);
+      const args = operators.argsArray[index] as unknown[];
+      if (name === "paintImageXObject" || name === "paintInlineImageXObject") {
+        // A page-sized image means the page is a scan with an OCR text layer.
+        const width = Number((args as number[])[1]) || 0;
+        const height = Number((args as number[])[2]) || 0;
+        if (width * height >= 1_000_000) largeImage = true;
+      } else if (name === "beginAnnotation") {
+        annotation = { rect: args[1] as number[], matrix: args[2] as number[] };
+        lineX = 0;
+        lineY = 0;
+      } else if (name === "endAnnotation") {
+        annotation = null;
+      } else if (annotation && name === "setTextMatrix") {
+        lineX = Number((args as number[])[4]) || 0;
+        lineY = Number((args as number[])[5]) || 0;
+      } else if (annotation && name === "moveText") {
+        lineX += Number((args as number[])[0]) || 0;
+        lineY += Number((args as number[])[1]) || 0;
+      } else if (annotation && name === "showText") {
+        const glyphs = (args[0] as Array<{ unicode?: string }>) || [];
+        const text = clean(glyphs.map((glyph) => glyph?.unicode || "").join(""));
+        if (!text) continue;
+        const [a, b, c, d, e, f] = annotation.matrix;
+        const pageX = a * lineX + c * lineY + e;
+        const pageY = b * lineX + d * lineY + f;
+        const [viewX, viewY] = viewport.convertToViewportPoint(pageX, pageY);
+        const left = Math.min(annotation.rect[0], annotation.rect[2]);
+        const right = Math.max(annotation.rect[0], annotation.rect[2]);
+        const [rectLeft] = viewport.convertToViewportPoint(left, pageY);
+        const [rectRight] = viewport.convertToViewportPoint(right, pageY);
+        const x = Math.min(rectLeft, rectRight);
+        result.push({ text, x: Number.isFinite(x) ? x : viewX, y: -viewY, width: Math.abs(rectRight - rectLeft) });
+      }
+    }
+    return { items: result, largeImage };
+  } catch {
+    return { items: [], largeImage: false };
+  }
 }
 
 async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "", mapping: ExtractionMapping = emptyExtractionMapping()) {
@@ -211,6 +312,8 @@ async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "",
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const document = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
   const candidates: Candidate[] = [];
+  const columnPages = new Set<number>();
+  const scannedPages = new Set<number>();
   let carriedTargetHeaders: Array<{ text: string; x: number; y: number; width: number }> = [];
   let carriedPageSignature = "";
   try {
@@ -218,7 +321,7 @@ async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "",
       const page = await document.getPage(pageNumber);
       const viewport = page.getViewport({ scale: 1 });
       const content = await page.getTextContent();
-      const items = content.items.flatMap((raw) => {
+      const textItems = content.items.flatMap((raw) => {
         if (!("str" in raw) || !clean(raw.str)) return [];
         // Normalise every page into its displayed orientation. Some supplier ITPs
         // store landscape tables as rotated portrait pages; raw PDF coordinates
@@ -231,9 +334,33 @@ async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "",
           width: raw.width,
         }];
       });
-      const detectedTargetHeaders = items.filter((item) =>
-        isCoordinateTargetAuthorityHeading(item.text, mapping.authorityHeadings) && !isExcludedAuthorityHeading(item.text, supplierName)
+      // Marks typed into the table as PDF text-box annotations (often a different colour)
+      // are not part of the page text, so read them from the annotation drawing itself.
+      const annotationRead = await readAnnotationTextItems(pdfjs, page, viewport);
+      const items = [...textItems, ...annotationRead.items];
+      if (annotationRead.largeImage) scannedPages.add(pageNumber);
+      // Only words in the table's own header row count as column headings. Cells in the
+      // title block above it (for example "Client: Enshore Subsea Limited") must not.
+      const tableHeaderTop = items
+        .filter((item) => /^(?:item|no\.?|#|task|step|point)$/i.test(item.text))
+        .sort((left, right) => right.y - left.y)[0];
+      const headerCandidates = items.filter((item) =>
+        isCoordinateTargetAuthorityHeading(item.text, mapping.authorityHeadings)
+        && !isExcludedAuthorityHeading(item.text, supplierName)
+        && (!tableHeaderTop || item.y <= tableHeaderTop.y + 14)
       );
+      const columnHasCodes = (header: { x: number; y: number; width: number }) => items.some((item) =>
+        item.y < header.y - 2
+        && Math.abs(item.x + item.width / 2 - (header.x + header.width / 2)) <= 24
+        && /^[A-Z](?:\s*[,/]\s*[A-Z])*$/i.test(item.text)
+        && item.text.length <= 6
+      );
+      // A column named for Enshore itself (ENS, Enshore, Enshore Subsea) is unambiguous,
+      // so when one is readable it wins over generic words such as a second "Client".
+      const explicitHeaders = headerCandidates.filter((item) =>
+        /^(?:ens|enshore(?:\s+subsea(?:\s+limited)?)?|contractor\s*\[\s*enshore\s*\])\s*:?\s*$/i.test(item.text) && columnHasCodes(item)
+      );
+      const detectedTargetHeaders = explicitHeaders.length ? explicitHeaders : headerCandidates;
       const pageSignature = `${page.rotate}:${Math.round(viewport.width)}:${Math.round(viewport.height)}`;
       const targetHeaders = detectedTargetHeaders.length
         ? detectedTargetHeaders
@@ -257,6 +384,22 @@ async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "",
 
       for (const header of targetHeaders) {
         const headerCentre = header.x + header.width / 2;
+        // A page whose client column has no W/H marks (only R, A, M ...) can still be treated
+        // as authoritative, but only when EVERY mark under the header was matched to a row;
+        // an incomplete reading must never override the visual audit.
+        const codeMarks = items.filter((item) =>
+          item.y < header.y - 2
+          && Math.abs(item.x + item.width / 2 - headerCentre) <= 24
+          && /^[A-Z](?:\s*[,/]\s*[A-Z])*$/i.test(item.text)
+          && item.text.length <= 6
+        );
+        const everyMarkMatched = codeMarks.length > 0 && codeMarks.every((mark) => {
+          const nearest = sections
+            .filter((item) => item.x < header.x - 80)
+            .sort((left, right) => Math.abs(left.y - mark.y) - Math.abs(right.y - mark.y) || left.x - right.x)[0];
+          return Boolean(nearest) && Math.abs(nearest.y - mark.y) <= 24;
+        });
+        if (everyMarkMatched && !annotationRead.largeImage) columnPages.add(pageNumber);
         const marks = items.filter((item) => {
           const itemCentre = item.x + item.width / 2;
           return item.y < header.y - 2
@@ -304,6 +447,7 @@ async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "",
             partyHeading: header.text,
             confidence: "High",
             sourceLocation: `PDF column geometry · Page ${pageNumber}`,
+            rowY: mark.y,
           });
         }
       }
@@ -311,7 +455,11 @@ async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "",
   } finally {
     await document.cleanup();
   }
-  return deduplicate(candidates);
+  return {
+    candidates: deduplicateByRow(candidates),
+    columnPages: [...columnPages].sort((a, b) => a - b),
+    scannedPages: [...scannedPages].sort((a, b) => a - b),
+  };
 }
 
 async function extractPdfVisualChunk(
@@ -329,14 +477,14 @@ async function extractPdfVisualChunk(
   // per file), not the whole ITP, so ordinary large ITPs are unaffected.
   if (buffer.length > 30 * 1024 * 1024) throw new Error(`Pages ${firstOriginalPage}-${lastOriginalPage} are too image-heavy to send to the visual check in one batch (over 30 MB).`);
   const supplierInstruction = supplierName
-    ? `The ITP supplier is "${supplierName}". Any column headed with that supplier's name is supplier-side and MUST be ignored.`
-    : "Any column headed with the supplier's name is supplier-side and MUST be ignored.";
+    ? `The ITP supplier is "${supplierName}". Any column headed with that supplier's name, or with a short abbreviation of it (for example KR for Kraaijeveld), is supplier-side and MUST be ignored.`
+    : "Any column headed with the supplier's name or an abbreviation of it is supplier-side and MUST be ignored.";
   const configuredAuthorities = mapping.authorityHeadings.length ? ` Additional confirmed client-side authority headings are: ${mapping.authorityHeadings.join(", ")}.` : "";
   const configuredIdentifiers = mapping.identifierHeadings.length ? ` Confirmed task/item identifier headings include: ${mapping.identifierHeadings.join(", ")}.` : "";
   const prompt = `Perform a page-by-page completeness audit of this excerpt from an Inspection and Test Plan (ITP). This excerpt contains original document pages ${firstOriginalPage}-${lastOriginalPage}. Visually inspect every supplied page image and every table even when the PDF also contains searchable text. Return pageNumber using the ORIGINAL document page number in that ${firstOriginalPage}-${lastOriginalPage} range.
 
 Find ONLY rows where the customer's involvement code contains W (Witness) or H (Hold), either alone or as part of a slash-separated code. Examples to capture include W, H, W/H, R/W, M/W, W/R, and H/R. Relevant layouts include:
-- a column headed Client, Enshore, Contractor, Employer, Employer Surveillance, Customer, Purchaser, Buyer, or Owner;
+- a column headed Client, Enshore, ENS, Contractor, Employer, Employer Surveillance, Customer, Purchaser, Buyer, or Owner;
 - an "Inspection Authority" group with a standalone "Contr" sub-column, where Contr means Contractor;
 - a grouped parent heading such as "Customer Evaluation" with W/H values beneath its "Intervention" sub-column.
 
@@ -474,6 +622,15 @@ function parseCandidateList(value: FormDataEntryValue | null): Candidate[] {
   }
 }
 
+function parsePageList(value: FormDataEntryValue | null) {
+  try {
+    const parsed = JSON.parse(typeof value === "string" ? value : "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.map(Number).filter((page) => Number.isInteger(page) && page > 0).slice(0, 2000) : [];
+  } catch {
+    return [];
+  }
+}
+
 function parseStringList(value: FormDataEntryValue | null) {
   try {
     const parsed = JSON.parse(typeof value === "string" ? value : "[]") as unknown;
@@ -486,6 +643,8 @@ function parseStringList(value: FormDataEntryValue | null) {
 function composeScanResult(args: {
   structured: Candidate[];
   coordinate: Candidate[];
+  coordinatePages: number[];
+  scannedPages: number[];
   visual: Candidate[] | null;
   visualWarnings: string[];
   isPdf: boolean;
@@ -501,10 +660,10 @@ function composeScanResult(args: {
   } else if (args.isPdf) {
     ocrWarning = "Visual/OCR completeness audit was not authorised for this scan.";
   }
-  if (args.isPdf && args.coordinate.length) {
-    candidates = applyCoordinateAuthority(candidates, args.coordinate);
+  if (args.isPdf && (args.coordinate.length || args.coordinatePages.length)) {
+    candidates = applyCoordinateAuthority(candidates, args.coordinate, args.coordinatePages, args.scannedPages);
   }
-  const unique = deduplicate(candidates);
+  const unique = collapseSameActivity(deduplicate(candidates));
   return {
     candidates: unique,
     extractionMode,
@@ -540,6 +699,8 @@ export async function POST(request: Request) {
       const result = composeScanResult({
         structured: parseCandidateList(form.get("structuredCandidates")),
         coordinate: parseCandidateList(form.get("coordinateCandidates")),
+        coordinatePages: parsePageList(form.get("coordinatePages")),
+        scannedPages: parsePageList(form.get("scannedPages")),
         visual: parseCandidateList(form.get("visualCandidates")),
         visualWarnings: parseStringList(form.get("visualWarnings")),
         isPdf: true,
@@ -605,6 +766,8 @@ export async function POST(request: Request) {
     let candidates: Candidate[] = [];
     const diagnosticTables: unknown[][][] = [];
     let pdfCoordinateCandidates: Candidate[] = [];
+    let pdfColumnPages: number[] = [];
+    let pdfScannedPages: number[] = [];
     let pageCount = 0;
     if (["xlsx", "xls", "xlsm"].includes(extension || "")) {
       const XLSX = await import("xlsx");
@@ -630,8 +793,11 @@ export async function POST(request: Request) {
           candidates.push(...extractFromRows(rows, `Page ${page.num}, table ${index + 1}`, supplierName, mapping));
         }
       }
-      pdfCoordinateCandidates = await extractPdfCoordinateCandidates(buffer, supplierName, mapping);
-      candidates = applyCoordinateAuthority(candidates, pdfCoordinateCandidates);
+      const coordinateResult = await extractPdfCoordinateCandidates(buffer, supplierName, mapping);
+      pdfCoordinateCandidates = coordinateResult.candidates;
+      pdfColumnPages = coordinateResult.columnPages;
+      pdfScannedPages = coordinateResult.scannedPages;
+      candidates = applyCoordinateAuthority(candidates, pdfCoordinateCandidates, pdfColumnPages, pdfScannedPages);
       const { PDFDocument } = await import("pdf-lib");
       pageCount = (await PDFDocument.load(buffer, { ignoreEncryption: true })).getPageCount();
     } else {
@@ -642,12 +808,14 @@ export async function POST(request: Request) {
     const result = composeScanResult({
       structured: candidates,
       coordinate: pdfCoordinateCandidates,
+      coordinatePages: pdfColumnPages,
+      scannedPages: pdfScannedPages,
       visual: null,
       visualWarnings: [],
       isPdf: extension === "pdf",
       explanation: diagnostics.explanation,
     });
-    return NextResponse.json({ ...result, diagnostics, pageCount, coordinateCandidates: pdfCoordinateCandidates });
+    return NextResponse.json({ ...result, diagnostics, pageCount, coordinateCandidates: pdfCoordinateCandidates, coordinatePages: pdfColumnPages, scannedPages: pdfScannedPages });
   } catch (error) {
     // Library loading and parsing failures are reported as readable JSON (with the
     // first lines of the stack) so a production-only problem names its own cause.

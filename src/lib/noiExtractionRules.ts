@@ -34,7 +34,7 @@ export function isTargetAuthorityHeading(value: unknown, aliases: string[] = [])
   const heading = normaliseHeading(value);
   return exactAlias(heading, aliases)
     || /^(?:contr|contr\.?)$/i.test(heading)
-    || /^(?:client|enshore(?:\s+subsea(?:\s+limited)?)?|contractor|employer|purchaser|buyer|owner)(?:\s+(?:surveillance|inspection|involvement|evaluation|authority))?$/i.test(heading)
+    || /^(?:client|ens|enshore(?:\s+subsea(?:\s+limited)?)?|contractor|employer|purchaser|buyer|owner)(?:\s+(?:surveillance|inspection|involvement|evaluation|authority))?$/i.test(heading)
     || /^customer(?:\s+(?:evaluation|inspection|involvement|surveillance|authority))?$/i.test(heading)
     || /^contractor\s*\[\s*enshore\s*\]$/i.test(heading);
 }
@@ -42,7 +42,7 @@ export function isTargetAuthorityHeading(value: unknown, aliases: string[] = [])
 export function isCoordinateTargetAuthorityHeading(value: unknown, aliases: string[] = []) {
   const heading = normaliseHeading(value);
   return exactAlias(heading, aliases)
-    || /^(?:client|enshore(?:\s+subsea(?:\s+limited)?)?|contractor|employer(?:\s+surveillance)?|customer(?:\s+(?:evaluation|inspection|involvement))?|purchaser|buyer|owner|contr\.?)\s*:?\s*$/i.test(heading);
+    || /^(?:client|ens|enshore(?:\s+subsea(?:\s+limited)?)?|contractor|employer(?:\s+surveillance)?|customer(?:\s+(?:evaluation|inspection|involvement))?|purchaser|buyer|owner|contr\.?)\s*:?\s*$/i.test(heading);
 }
 
 export function isExcludedAuthorityHeading(value: unknown, supplierName = "") {

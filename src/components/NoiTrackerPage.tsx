@@ -286,6 +286,8 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
         mergeForm.append("phase", "merge");
         mergeForm.append("structuredCandidates", JSON.stringify(structured.candidates || []));
         mergeForm.append("coordinateCandidates", JSON.stringify(structured.coordinateCandidates || []));
+        mergeForm.append("coordinatePages", JSON.stringify(structured.coordinatePages || []));
+        mergeForm.append("scannedPages", JSON.stringify(structured.scannedPages || []));
         mergeForm.append("visualCandidates", JSON.stringify(visualCandidates));
         mergeForm.append("visualWarnings", JSON.stringify(visualWarnings));
         mergeForm.append("explanation", JSON.stringify((structured.diagnostics as ExtractionDiagnostics | undefined)?.explanation || []));
