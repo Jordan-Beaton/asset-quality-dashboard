@@ -66,7 +66,10 @@ async function readScanJson(response: Response) {
 async function postScan(form: FormData) {
   const response = await fetch("/api/projects/noi-extract", { method: "POST", body: form });
   const result = await readScanJson(response);
-  if (!response.ok) throw new Error(String(result.error || "The ITP could not be scanned."));
+  if (!response.ok) {
+    const detail = result.detail ? ` Server detail: ${String(result.detail)}` : "";
+    throw new Error(`${String(result.error || "The ITP could not be scanned.")}${detail}`);
+  }
   return result;
 }
 

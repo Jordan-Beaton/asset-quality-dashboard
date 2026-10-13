@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import * as XLSX from "xlsx";
-import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
-import { PDFDocument } from "pdf-lib";
-import JSZip from "jszip";
+import type { PDFParse } from "pdf-parse";
 import {
   buildExtractionDiagnostics,
   emptyExtractionMapping,
@@ -125,10 +121,13 @@ function htmlTables(html: string) {
 }
 
 async function extractDocxCandidates(buffer: Buffer, supplierName = "", mapping: ExtractionMapping = emptyExtractionMapping()) {
+  const mammothModule = await import("mammoth");
+  const mammoth = (mammothModule as unknown as { default?: typeof mammothModule }).default || mammothModule;
   const html = (await mammoth.convertToHtml({ buffer })).value;
   const tables = htmlTables(html);
   const candidates = tables.flatMap((rows, index) => extractFromRows(rows, `Table ${index + 1}`, supplierName, mapping));
 
+  const JSZip = (await import("jszip")).default;
   const archive = await JSZip.loadAsync(buffer);
   const headerFiles = Object.keys(archive.files).filter((name) => /^word\/header\d+\.xml$/i.test(name));
   const headerXml = (await Promise.all(headerFiles.map((name) => archive.file(name)?.async("string") || ""))).join("\n");
@@ -418,6 +417,7 @@ async function extractPdfVisualPages(
   mapping: ExtractionMapping,
 ) {
   if (buffer.length > 25 * 1024 * 1024) throw new Error("The scanned PDF exceeds the 25 MB OCR limit. Split it into smaller ITP files and retry.");
+  const { PDFDocument } = await import("pdf-lib");
   const source = await PDFDocument.load(buffer, { ignoreEncryption: true });
   const pageCount = source.getPageCount();
   const start = Math.max(0, firstPage - 1);
@@ -569,7 +569,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "A valid page range is required." }, { status: 400 });
       }
       const pages = Array.from({ length: lastPage - firstPage + 1 }, (_, index) => firstPage + index);
-      parser = new PDFParse({ data: new Uint8Array(buffer) });
+      const { PDFParse: PdfParser } = await import("pdf-parse");
+      parser = new PdfParser({ data: new Uint8Array(buffer) });
       const text = await parser.getText({ partial: pages });
       const pageTexts = text.pages.map((page) => ({ num: page.num, text: page.text }));
       const candidates = await extractPdfVisualPages(buffer, file.name, supplierName, firstPage, lastPage, pageTexts, mapping);
@@ -581,6 +582,7 @@ export async function POST(request: Request) {
     let pdfCoordinateCandidates: Candidate[] = [];
     let pageCount = 0;
     if (["xlsx", "xls", "xlsm"].includes(extension || "")) {
+      const XLSX = await import("xlsx");
       const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
       candidates = workbook.SheetNames.flatMap((name) => {
         const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[name], { header: 1, raw: false, defval: "" });
@@ -592,7 +594,8 @@ export async function POST(request: Request) {
       candidates = word.candidates;
       diagnosticTables.push(...word.tables);
     } else if (extension === "pdf") {
-      parser = new PDFParse({ data: new Uint8Array(buffer) });
+      const { PDFParse: PdfParser } = await import("pdf-parse");
+      parser = new PdfParser({ data: new Uint8Array(buffer) });
       const tables = await parser.getTable({ first: 30 });
       for (const page of tables.pages) {
         for (let index = 0; index < page.tables.length; index += 1) {
@@ -603,6 +606,7 @@ export async function POST(request: Request) {
       }
       pdfCoordinateCandidates = await extractPdfCoordinateCandidates(buffer, supplierName, mapping);
       candidates = applyCoordinateAuthority(candidates, pdfCoordinateCandidates);
+      const { PDFDocument } = await import("pdf-lib");
       pageCount = (await PDFDocument.load(buffer, { ignoreEncryption: true })).getPageCount();
     } else {
       return NextResponse.json({ error: "Use an Excel, Word, or searchable PDF ITP." }, { status: 415 });
@@ -619,7 +623,10 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ...result, diagnostics, pageCount, coordinateCandidates: pdfCoordinateCandidates });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "The ITP could not be scanned." }, { status: 422 });
+    // Library loading and parsing failures are reported as readable JSON (with the
+    // first lines of the stack) so a production-only problem names its own cause.
+    const detail = error instanceof Error ? (error.stack || "").split("\n").slice(0, 4).join(" | ").slice(0, 600) : "";
+    return NextResponse.json({ error: error instanceof Error ? error.message : "The ITP could not be scanned.", detail }, { status: 422 });
   } finally {
     if (parser) await parser.destroy().catch(() => undefined);
   }
