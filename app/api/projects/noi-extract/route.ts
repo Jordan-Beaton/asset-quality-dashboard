@@ -14,6 +14,7 @@ import {
   type GridResult,
   type PageGrid,
   type PageInput,
+  type RuleLine,
   type TableInput,
 } from "../../../../src/lib/noiColumnGrid";
 
@@ -164,6 +165,63 @@ function legendFromPages(pages: PageInput[]) {
   return parseLegend(pages.flatMap((page) => page.items.map((item) => item.text)));
 }
 
+// Horizontal table lines of a page (cell borders drawn as thin rectangles or as lines), in the
+// same top-down page coordinates as the text items.
+async function readRuleLines(
+  pdfjs: typeof import("pdfjs-dist/legacy/build/pdf.mjs"),
+  page: Awaited<ReturnType<Awaited<ReturnType<typeof import("pdfjs-dist/legacy/build/pdf.mjs").getDocument>["promise"]>["getPage"]>>,
+  viewport: { transform: number[]; width: number; height: number },
+): Promise<RuleLine[]> {
+  try {
+    const list = await page.getOperatorList();
+    const OPS = pdfjs.OPS;
+    const painting = new Set<number>([OPS.stroke, OPS.closeStroke, OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke]);
+    let matrix = [1, 0, 0, 1, 0, 0];
+    const stack: number[][] = [];
+    const rules: RuleLine[] = [];
+    const addSubpath = (points: Array<[number, number]>) => {
+      if (points.length < 2) return;
+      const xs = points.map((point) => point[0]);
+      const ys = points.map((point) => point[1]);
+      const x0 = Math.min(...xs);
+      const x1 = Math.max(...xs);
+      const y0 = Math.min(...ys);
+      const y1 = Math.max(...ys);
+      if (x1 - x0 < 20) return;
+      if (y1 - y0 <= 2.5) rules.push({ y: (y0 + y1) / 2, x0, x1 });
+      else if (points.length >= 4 && y1 - y0 < viewport.height * 0.8) rules.push({ y: y0, x0, x1 }, { y: y1, x0, x1 });
+    };
+    for (let index = 0; index < list.fnArray.length; index += 1) {
+      const fn = list.fnArray[index];
+      const args = list.argsArray[index] as unknown[];
+      if (fn === OPS.save) stack.push(matrix);
+      else if (fn === OPS.restore) matrix = stack.pop() || matrix;
+      else if (fn === OPS.transform) matrix = pdfjs.Util.transform(matrix, args as number[]);
+      else if (fn === OPS.constructPath && painting.has(Number(args[0]))) {
+        const data = Array.from((args[1] as ArrayLike<number>[])?.[0] || []) as number[];
+        const full = pdfjs.Util.transform(viewport.transform, matrix);
+        let subpath: Array<[number, number]> = [];
+        for (let at = 0; at < data.length;) {
+          const code = data[at];
+          if (code === 0) {
+            addSubpath(subpath);
+            subpath = [];
+          }
+          if (code === 0 || code === 1) {
+            subpath.push([full[0] * data[at + 1] + full[2] * data[at + 2] + full[4], full[1] * data[at + 1] + full[3] * data[at + 2] + full[5]]);
+            at += 3;
+          } else if (code === 2) at += 7;
+          else at += 1;
+        }
+        addSubpath(subpath);
+      }
+    }
+    return rules.slice(0, 4000);
+  } catch {
+    return [];
+  }
+}
+
 // Reads every page of a PDF with real positions (page text plus annotation text) and
 // whether the page is a scan (a page-sized image under an OCR text layer).
 async function readPdfPages(buffer: Buffer): Promise<PageInput[]> {
@@ -188,6 +246,7 @@ async function readPdfPages(buffer: Buffer): Promise<PageInput[]> {
         height: viewport.height,
         items: [...items, ...annotationRead.items],
         scanned: annotationRead.largeImage,
+        rules: annotationRead.largeImage ? [] : await readRuleLines(pdfjs, page, viewport),
       });
     }
   } finally {

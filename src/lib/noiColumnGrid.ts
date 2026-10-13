@@ -9,12 +9,17 @@
 
 export type PositionedItem = { text: string; x: number; y: number; width: number };
 
+// A horizontal table line (a cell border) with its vertical position and horizontal extent.
+export type RuleLine = { y: number; x0: number; x1: number };
+
 export type PageInput = {
   pageNumber: number;
   width: number;
   height: number;
   items: PositionedItem[];
   scanned: boolean;
+  // Horizontal table lines drawn on the page, when they could be read.
+  rules?: RuleLine[];
 };
 
 export type GridColumn = {
@@ -248,8 +253,102 @@ export function buildPageGrid(page: PageInput): PageGrid | null {
     ? Math.max(-Infinity, ...wideBand.filter((item) => item.top <= headerLabel.top + 25).map((item) => item.top))
     : -Infinity;
 
+  const joinItems = (list: Array<{ text: string; x: number; width: number; top: number }>) =>
+    cleanText(
+      [...list]
+        .sort((a, b) => a.top - b.top || a.x - b.x)
+        .reduce((text, item, position, all) => {
+          if (!position) return item.text;
+          const previous = all[position - 1];
+          // pieces of one word on the same line (a drop capital, a split run) are joined without a space
+          const gap = item.x - (previous.x + previous.width);
+          const sameWord = Math.abs(item.top - previous.top) < 2.5 && gap > -1.5 && gap < 1 && (previous.text.length <= 3 || item.text.length <= 3);
+          return text + (sameWord ? "" : " ") + item.text;
+        }, ""),
+    ).slice(0, 220);
+
+  // The description of each row. Cell text is not always level with its row number (numbers
+  // can sit at the top or the middle of a tall row), so lines of description are grouped into
+  // blocks wherever the vertical gap is larger than the normal line spacing, and each block
+  // belongs to the row number that falls within it. Where a block holds several row numbers (rows
+  // set tightly together) each line goes to the nearest row number instead.
+  // Rows are bounded by the table's own horizontal lines when they were drawn: every row number
+  // must then sit in a band of its own, otherwise the lines are not a usable row grid.
+  const descriptionsByRules = (range: { from: number; to: number }) => {
+    const width = Math.max(1, range.to - range.from);
+    const ys = (page.rules || [])
+      .filter((rule) => rule.x0 <= range.from + width * 0.5 && rule.x1 >= range.to - width * 0.5)
+      .map((rule) => rule.y)
+      .sort((a, b) => a - b)
+      .filter((y, index, list) => !index || y - list[index - 1] > 1.5);
+    if (ys.length < 2) return null;
+    const bandOf = (top: number) => {
+      let band = -1;
+      ys.forEach((y, index) => { if (y <= top) band = index; });
+      return band >= 0 && band < ys.length - 1 ? band : -1;
+    };
+    // only row numbers that carry marks become rows (a legend or notes below the table also
+    // has numbered lines, with no lines drawn between them)
+    const live = anchors.map((anchor) => codeItems.some((code) => Math.abs(code.top - anchor.top) <= 24));
+    const anchorBands = anchors.map((anchor, index) => (live[index] ? bandOf(anchor.top) : -2));
+    const liveBands = anchorBands.filter((band, index) => live[index]);
+    if (!liveBands.length || liveBands.some((band) => band < 0) || new Set(liveBands).size !== liveBands.length) return null;
+    const owned: Array<typeof items> = anchors.map(() => []);
+    items.forEach((item) => {
+      if (anchors.includes(item) || item.x < range.from || item.x + item.width / 2 > range.to) return;
+      if (columns.some((column) => isCodeText(item.text) && Math.abs(item.x + item.width / 2 - column.centre) <= 16)) return;
+      const band = bandOf(item.top);
+      const index = band >= 0 ? anchorBands.indexOf(band) : -1;
+      if (index >= 0) owned[index].push(item);
+    });
+    return owned;
+  };
+
+  const descriptionsFor = (range: { from: number; to: number }) => {
+    const byRules = descriptionsByRules(range);
+    if (byRules) return byRules.map((list) => joinItems(list));
+    const first = Math.max(anchors[0].top - 22, headerBottom + 3);
+    const last = anchors[anchors.length - 1].top + 40;
+    const pieces = items
+      .filter((item) =>
+        !anchors.includes(item)
+        && item.top >= first
+        && item.top <= last
+        && item.x >= range.from
+        && item.x + item.width / 2 <= range.to
+        // a lone letter inside the description column is part of a word ("P" of "Pressure"),
+        // but a code printed in a code column is not description
+        && !columns.some((column) => isCodeText(item.text) && Math.abs(item.x + item.width / 2 - column.centre) <= 16)
+      )
+      .sort((a, b) => a.top - b.top || a.x - b.x);
+    const lines: Array<{ top: number; items: typeof pieces }> = [];
+    pieces.forEach((item) => {
+      const line = lines[lines.length - 1];
+      if (line && Math.abs(item.top - line.top) < 2.5) line.items.push(item);
+      else lines.push({ top: item.top, items: [item] });
+    });
+    const steps = lines.slice(1).map((line, index) => line.top - lines[index].top).filter((step) => step > 3 && step < 14);
+    const pitch = median(steps) || 9;
+    const blocks: Array<typeof lines> = [];
+    lines.forEach((line, index) => {
+      if (index && line.top - lines[index - 1].top <= pitch * 1.6) blocks[blocks.length - 1].push(line);
+      else blocks.push([line]);
+    });
+    const nearest = (top: number) => anchors.reduce((best, anchor, index) => (Math.abs(anchor.top - top) < Math.abs(anchors[best].top - top) ? index : best), 0);
+    const owned: Array<typeof pieces> = anchors.map(() => []);
+    blocks.forEach((block) => {
+      const top = block[0].top;
+      const bottom = block[block.length - 1].top;
+      const inside = anchors.map((anchor, index) => (anchor.top >= top - 6 && anchor.top <= bottom + 6 ? index : -1)).filter((index) => index >= 0);
+      if (inside.length === 1) block.forEach((line) => owned[inside[0]].push(...line.items));
+      else block.forEach((line) => owned[nearest(line.top)].push(...line.items));
+    });
+    return owned.map((list) => joinItems(list));
+  };
+
   const buildRows = (range: { from: number; to: number }) => {
     const built: PageGrid["rows"] = [];
+    const descriptions = descriptionsFor(range);
     anchors.forEach((anchor, index) => {
       // the first row starts below the column headings, so heading text is never read as description
       const upper = index > 0 ? (anchors[index - 1].top + anchor.top) / 2 : Math.max(anchor.top - 22, headerBottom + 3);
@@ -267,27 +366,8 @@ export function buildPageGrid(page: PageInput): PageGrid | null {
         if (hit) cells[column.key] = normaliseCode(hit.text);
       });
       if (!Object.keys(cells).length) return;
-      const description = items
-        .filter((item) =>
-          item !== anchor
-          && item.top >= upper - 2
-          && item.top < lower
-          && item.x >= range.from
-          && item.x + item.width / 2 <= range.to
-          // a lone letter inside the description column is part of a word ("P" of "Pressure"),
-          // but a code printed in a code column is not description
-          && !columns.some((column) => isCodeText(item.text) && Math.abs(item.x + item.width / 2 - column.centre) <= 16)
-        )
-        .sort((a, b) => a.top - b.top || a.x - b.x)
-        .reduce((text, item, position, list) => {
-          if (!position) return item.text;
-          const previous = list[position - 1];
-          // pieces of one word on the same line (a drop capital, a split run) are joined without a space
-          const gap = item.x - (previous.x + previous.width);
-          const sameWord = Math.abs(item.top - previous.top) < 2.5 && gap > -1.5 && gap < 1 && (previous.text.length <= 3 || item.text.length <= 3);
-          return text + (sameWord ? "" : " ") + item.text;
-        }, "");
-      built.push({ section: sectionOf(anchor.text), description: cleanText(description).slice(0, 220), cells });
+      const description = descriptions[index];
+      built.push({ section: sectionOf(anchor.text), description, cells });
     });
     return built;
   };
