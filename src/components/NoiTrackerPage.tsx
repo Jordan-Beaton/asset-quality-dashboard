@@ -232,20 +232,13 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
     setMessage(`Reading ${revision.file_name}... Structured tables will be checked first; scanned pages will use OCR automatically.`);
     let stage = "preparing the stored ITP";
     try {
-      const signed = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(revision.file_path, 60 * 60 * 24 * 180);
-      if (signed.error) throw signed.error;
-      stage = "downloading the stored ITP";
-      const fileResponse = await fetch(signed.data.signedUrl);
-      if (!fileResponse.ok) throw new Error("The stored ITP could not be downloaded for scanning.");
-      const blob = await fileResponse.blob();
-      const file = new File([blob], revision.file_name, { type: blob.type });
       const isPdf = revision.file_name.toLowerCase().endsWith(".pdf");
       const allowVisualAudit = !isPdf || window.confirm(
         "For a complete page-by-page visual/OCR audit, this ITP PDF will be securely sent to the configured OpenAI vision service for document analysis. Continue with visual audit?\n\nChoose Cancel to run local structured extraction only.",
       );
       const baseForm = (activeMapping: ExtractionMapping, phase: string) => {
         const form = new FormData();
-        form.append("file", file);
+        form.append("filePath", revision.file_path);
         form.append("supplierName", selectedItp.supplier || "");
         form.append("allowVisualAudit", String(allowVisualAudit));
         form.append("extractionMapping", JSON.stringify(activeMapping));

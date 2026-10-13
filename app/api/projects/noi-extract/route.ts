@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import type { PDFParse } from "pdf-parse";
+import { createClient as createServerSupabaseClient } from "../../../../src/lib/supabase/server";
+import { downloadStoredItp } from "../../../../src/lib/itpStorage";
 import {
   buildExtractionDiagnostics,
   emptyExtractionMapping,
@@ -321,7 +323,9 @@ async function extractPdfVisualChunk(
 ) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OCR is not configured on this environment.");
-  if (buffer.length > 25 * 1024 * 1024) throw new Error("The scanned PDF exceeds the 25 MB OCR limit. Split it into smaller ITP files and retry.");
+  // This is the few-page excerpt sent to the AI service (which accepts roughly 32 MB
+  // per file), not the whole ITP, so ordinary large ITPs are unaffected.
+  if (buffer.length > 30 * 1024 * 1024) throw new Error(`Pages ${firstOriginalPage}-${lastOriginalPage} are too image-heavy to send to the visual check in one batch (over 30 MB).`);
   const supplierInstruction = supplierName
     ? `The ITP supplier is "${supplierName}". Any column headed with that supplier's name is supplier-side and MUST be ignored.`
     : "Any column headed with the supplier's name is supplier-side and MUST be ignored.";
@@ -416,7 +420,6 @@ async function extractPdfVisualPages(
   pageTexts: Array<{ num: number; text: string }>,
   mapping: ExtractionMapping,
 ) {
-  if (buffer.length > 25 * 1024 * 1024) throw new Error("The scanned PDF exceeds the 25 MB OCR limit. Split it into smaller ITP files and retry.");
   const { PDFDocument } = await import("pdf-lib");
   const source = await PDFDocument.load(buffer, { ignoreEncryption: true });
   const pageCount = source.getPageCount();
@@ -543,7 +546,6 @@ export async function POST(request: Request) {
       return NextResponse.json(result);
     }
 
-    const file = form.get("file");
     const supplierName = clean(form.get("supplierName"));
     let mapping = emptyExtractionMapping();
     try {
@@ -556,10 +558,30 @@ export async function POST(request: Request) {
     } catch {
       return NextResponse.json({ error: "The saved extraction mapping is invalid." }, { status: 400 });
     }
-    if (!(file instanceof File)) return NextResponse.json({ error: "No ITP supplied." }, { status: 400 });
-    if (file.size > 40 * 1024 * 1024) return NextResponse.json({ error: "The ITP exceeds the 40 MB scanning limit." }, { status: 413 });
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const extension = file.name.split(".").pop()?.toLowerCase();
+    // A stored ITP is read by the server from its file reference, so the browser never
+    // uploads it again and no request-size limit applies. A direct upload is still
+    // accepted for files that are not stored yet.
+    let buffer: Buffer;
+    let fileName: string;
+    const filePath = clean(form.get("filePath"));
+    if (filePath) {
+      const userClient = await createServerSupabaseClient();
+      const { data: authData } = await userClient.auth.getUser();
+      if (!authData.user) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+      const stored = await downloadStoredItp(userClient, filePath);
+      if (!stored.ok) return NextResponse.json({ error: stored.error }, { status: stored.status });
+      buffer = stored.buffer;
+      fileName = stored.fileName;
+    } else {
+      const file = form.get("file");
+      if (!(file instanceof File)) return NextResponse.json({ error: "No ITP supplied." }, { status: 400 });
+      buffer = Buffer.from(await file.arrayBuffer());
+      fileName = file.name;
+    }
+    // Memory safeguard only: far above any real ITP, but a runaway file would otherwise
+    // crash the function with an unreadable error.
+    if (buffer.length > 400 * 1024 * 1024) return NextResponse.json({ error: "This file is too large for the scanner to hold in memory (over 400 MB). Split it and retry." }, { status: 413 });
+    const extension = fileName.split(".").pop()?.toLowerCase();
 
     if (phase === "visual-chunk") {
       if (extension !== "pdf") return NextResponse.json({ error: "Visual audit applies to PDF files only." }, { status: 415 });
@@ -573,7 +595,7 @@ export async function POST(request: Request) {
       parser = new PdfParser({ data: new Uint8Array(buffer) });
       const text = await parser.getText({ partial: pages });
       const pageTexts = text.pages.map((page) => ({ num: page.num, text: page.text }));
-      const candidates = await extractPdfVisualPages(buffer, file.name, supplierName, firstPage, lastPage, pageTexts, mapping);
+      const candidates = await extractPdfVisualPages(buffer, fileName, supplierName, firstPage, lastPage, pageTexts, mapping);
       return NextResponse.json({ candidates });
     }
 
