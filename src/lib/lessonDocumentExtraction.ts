@@ -1,4 +1,5 @@
 import { extractOpenAiText } from "./lessonsPrevention";
+import { ensurePdfNodeSupport } from "./pdfNodeSupport";
 
 export async function extractLessonDocument(buffer: Buffer, fileName: string) {
   const name = fileName.toLowerCase();
@@ -7,6 +8,7 @@ export async function extractLessonDocument(buffer: Buffer, fileName: string) {
     return (await mammoth.extractRawText({ buffer })).value;
   }
   if (name.endsWith(".pdf")) {
+    ensurePdfNodeSupport();
     const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: new Uint8Array(buffer) });
     try { return (await parser.getText()).text; } finally { await parser.destroy(); }

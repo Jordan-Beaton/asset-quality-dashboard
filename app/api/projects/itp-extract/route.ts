@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
+import type { PDFParse } from "pdf-parse";
+import { ensurePdfNodeSupport } from "../../../../src/lib/pdfNodeSupport";
 
 export const runtime = "nodejs";
 
@@ -58,7 +59,9 @@ export async function POST(request: Request) {
     if (extension === "docx") {
       text = (await mammoth.extractRawText({ buffer })).value;
     } else if (extension === "pdf") {
-      parser = new PDFParse({ data: new Uint8Array(buffer) });
+      ensurePdfNodeSupport();
+      const { PDFParse: PdfParser } = await import("pdf-parse");
+      parser = new PdfParser({ data: new Uint8Array(buffer) });
       text = (await parser.getText({ first: 8 })).text;
     } else if (["xlsx", "xls", "xlsm"].includes(extension || "")) {
       const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });

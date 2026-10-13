@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { PDFParse } from "pdf-parse";
 import { createClient as createServerSupabaseClient } from "../../../../src/lib/supabase/server";
 import { downloadStoredItp } from "../../../../src/lib/itpStorage";
+import { ensurePdfNodeSupport } from "../../../../src/lib/pdfNodeSupport";
 import {
   buildExtractionDiagnostics,
   emptyExtractionMapping,
@@ -206,6 +207,7 @@ function applyCoordinateAuthority(candidates: Candidate[], coordinateCandidates:
 }
 
 async function extractPdfCoordinateCandidates(buffer: Buffer, supplierName = "", mapping: ExtractionMapping = emptyExtractionMapping()) {
+  ensurePdfNodeSupport();
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const document = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
   const candidates: Candidate[] = [];
@@ -591,6 +593,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "A valid page range is required." }, { status: 400 });
       }
       const pages = Array.from({ length: lastPage - firstPage + 1 }, (_, index) => firstPage + index);
+      ensurePdfNodeSupport();
       const { PDFParse: PdfParser } = await import("pdf-parse");
       parser = new PdfParser({ data: new Uint8Array(buffer) });
       const text = await parser.getText({ partial: pages });
@@ -616,6 +619,7 @@ export async function POST(request: Request) {
       candidates = word.candidates;
       diagnosticTables.push(...word.tables);
     } else if (extension === "pdf") {
+      ensurePdfNodeSupport();
       const { PDFParse: PdfParser } = await import("pdf-parse");
       parser = new PdfParser({ data: new Uint8Array(buffer) });
       const tables = await parser.getTable({ first: 30 });
