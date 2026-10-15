@@ -29,6 +29,12 @@ import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
+import {
+  createObservationReportPdf,
+  observationReportFileName,
+  type ObservationReportGroup,
+  type ObservationReportSort,
+} from "../../../src/lib/observationReportPdf";
 
 export const dynamic = "force-dynamic";
 
@@ -163,6 +169,12 @@ export default function HseObservationsPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [riskFilter, setRiskFilter] = useState("");
   const [reporterTypeFilter, setReporterTypeFilter] = useState("");
+  const [projectFilter, setProjectFilter] = useState("");
+  const [showExport, setShowExport] = useState(false);
+  const [exportGroup, setExportGroup] = useState<ObservationReportGroup>("project");
+  const [exportSort, setExportSort] = useState<ObservationReportSort>("newest");
+  const [exportExtras, setExportExtras] = useState({ immediate: false, suggested: false, assigned: false, closeout: false });
+  const [exporting, setExporting] = useState(false);
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [showFilters, setShowFilters] = useState(false);
   const [message, setMessage] = useState("Loading observations...");
@@ -253,9 +265,54 @@ export default function HseObservationsPage() {
       const matchesType = !typeFilter || record.observation_type === typeFilter;
       const matchesRisk = !riskFilter || record.risk_level === riskFilter;
       const matchesReporterType = !reporterTypeFilter || record.reporter_type === reporterTypeFilter;
-      return matchesSearch && matchesStatus && matchesType && matchesRisk && matchesReporterType;
+      const matchesProject = !projectFilter || (record.project || "") === projectFilter;
+      return matchesSearch && matchesStatus && matchesType && matchesRisk && matchesReporterType && matchesProject;
     });
-  }, [reporterTypeFilter, riskFilter, search, statusFilter, typeFilter, yearRecords]);
+  }, [projectFilter, reporterTypeFilter, riskFilter, search, statusFilter, typeFilter, yearRecords]);
+
+  const projectOptions = useMemo(
+    () => [...new Set(yearRecords.map((record) => record.project).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b)),
+    [yearRecords],
+  );
+
+  // The PDF contains exactly the rows the register is showing, with the filters that produced them.
+  async function exportReport() {
+    if (!filteredRecords.length) {
+      setMessage("There are no observations to export for the current filters.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const metadata = authData.user?.user_metadata as { full_name?: string; name?: string } | undefined;
+      const generatedBy = metadata?.full_name || metadata?.name || authData.user?.email || "";
+      const filters = [
+        `Year: ${yearFilter || "All"}`,
+        `Project: ${projectFilter || "All"}`,
+        `Status: ${statusFilter || "All"}`,
+        `Type: ${typeFilter || "All"}`,
+        `Risk: ${riskFilter || "All"}`,
+        `Submitted as: ${reporterTypeFilter || "All"}`,
+        ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+      ];
+      const pdf = createObservationReportPdf(filteredRecords, {
+        group: exportGroup,
+        sort: exportSort,
+        includeImmediateAction: exportExtras.immediate,
+        includeSuggestedAction: exportExtras.suggested,
+        includeAssignedTo: exportExtras.assigned,
+        includeCloseout: exportExtras.closeout,
+        filters,
+        generatedBy,
+      });
+      pdf.save(observationReportFileName(projectFilter));
+      setMessage(`Observation report created with ${filteredRecords.length} observation${filteredRecords.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? `The report could not be created: ${error.message}` : "The report could not be created.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const selectedRecord = useMemo(() => records.find((record) => record.id === selectedId) || null, [records, selectedId]);
   const selectedEvidence = useMemo(() => evidence.filter((item) => item.observation_id === selectedRecord?.id), [evidence, selectedRecord?.id]);
@@ -515,8 +572,17 @@ export default function HseObservationsPage() {
               searchPlaceholder="Search observation no., details, project, reporter..."
               showFilters={showFilters}
               onToggleFilters={() => setShowFilters((value) => !value)}
-              actions={<ImsButton variant="secondary" onClick={() => { setSearch(""); setStatusFilter(""); setTypeFilter(""); setRiskFilter(""); setReporterTypeFilter(""); }}>Clear Filters</ImsButton>}
+              actions={<>
+                <ImsButton variant="secondary" onClick={() => { setSearch(""); setStatusFilter(""); setTypeFilter(""); setRiskFilter(""); setReporterTypeFilter(""); setProjectFilter(""); }}>Clear Filters</ImsButton>
+                <ImsButton variant={showExport ? "secondary" : "primary"} onClick={() => setShowExport((value) => !value)} disabled={!filteredRecords.length} title="Create a PDF of the observations currently shown">{showExport ? "Hide PDF options" : "Export PDF"}</ImsButton>
+              </>}
             >
+              <Field label="Project">
+                <select style={imsInputStyle} value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
+                  <option value="">All projects</option>
+                  {projectOptions.map((project) => <option key={project}>{project}</option>)}
+                </select>
+              </Field>
               <Field label="Status">
                 <select style={imsInputStyle} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                   <option value="">All statuses</option>
@@ -542,6 +608,32 @@ export default function HseObservationsPage() {
                 </select>
               </Field>
             </ImsFilterPanel>
+            {showExport ? (
+              <div style={exportPanelStyle}>
+                <div style={exportGroupStyle}>
+                  <strong style={exportHeadingStyle}>Group by</strong>
+                  {([["project", "Project (recommended)"], ["type", "Observation type"], ["risk", "Risk level"], ["none", "No grouping"]] as Array<[ObservationReportGroup, string]>).map(([value, label]) => (
+                    <label key={value} style={exportOptionStyle}><input type="radio" name="export-group" checked={exportGroup === value} onChange={() => setExportGroup(value)} /> {label}</label>
+                  ))}
+                </div>
+                <div style={exportGroupStyle}>
+                  <strong style={exportHeadingStyle}>Order within each group</strong>
+                  {([["newest", "Newest first"], ["oldest", "Oldest first"], ["risk", "Highest risk first"]] as Array<[ObservationReportSort, string]>).map(([value, label]) => (
+                    <label key={value} style={exportOptionStyle}><input type="radio" name="export-sort" checked={exportSort === value} onChange={() => setExportSort(value)} /> {label}</label>
+                  ))}
+                </div>
+                <div style={exportGroupStyle}>
+                  <strong style={exportHeadingStyle}>Add under each description</strong>
+                  {([["immediate", "Immediate action"], ["suggested", "Suggested action"], ["assigned", "Assigned to"], ["closeout", "Close-out notes"]] as Array<[keyof typeof exportExtras, string]>).map(([key, label]) => (
+                    <label key={key} style={exportOptionStyle}><input type="checkbox" checked={exportExtras[key]} onChange={(event) => setExportExtras((current) => ({ ...current, [key]: event.target.checked }))} /> {label}</label>
+                  ))}
+                </div>
+                <div style={exportFootStyle}>
+                  <span style={{ color: imsColours.slate, fontSize: 12 }}>Landscape A4. Includes all {filteredRecords.length} observation{filteredRecords.length === 1 ? "" : "s"} matching the filters, with status and the full description. Photos and reporter details are not included.</span>
+                  <ImsButton onClick={() => void exportReport()} disabled={exporting || !filteredRecords.length}>{exporting ? "Creating PDF..." : "Download PDF"}</ImsButton>
+                </div>
+              </div>
+            ) : null}
             <div style={imsTableInfoRowStyle}>Showing <strong>{filteredRecords.length}</strong> of <strong>{yearRecords.length}</strong> observations</div>
             <div className="observation-table-wrap" style={{ overflowX: "auto", border: "1px solid #D0D0CE", borderRadius: "14px" }}>
               <table className="observation-table" style={{ ...imsTableStyle, minWidth: 980 }}>
@@ -811,6 +903,11 @@ const yearSelectStyle: CSSProperties = {
 };
 const kpiGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "16px", marginBottom: "20px" };
 const chartGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
+const exportPanelStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "16px", margin: "0 0 14px", padding: "14px 16px", border: "1px solid #005670", borderRadius: "14px", background: "#ECECE7" };
+const exportGroupStyle: CSSProperties = { display: "grid", gap: "6px", alignContent: "start" };
+const exportHeadingStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.06em", textTransform: "uppercase", color: "#53565A" };
+const exportOptionStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#000000", cursor: "pointer" };
+const exportFootStyle: CSSProperties = { gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "12px", paddingTop: "12px", borderTop: "1px solid #D0D0CE" };
 const registerGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "20px", alignItems: "start" };
 const fieldStyle: CSSProperties = { display: "grid", gap: "6px" };
 const labelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 900 };

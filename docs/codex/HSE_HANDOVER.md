@@ -87,6 +87,7 @@ HSE should follow the same IMS rhythm as Quality: dashboard, internal tabs, appr
 - Public `/observe` has a dedicated phone layout at `520px` and below: public AppShell padding is removed, page/card spacing is compact, reporter choices use two columns with `Quick Fill` full-width, all entry controls remain within the card, and the tested `390px` viewport has no horizontal overflow.
 - Preserve the public Observation Card desktop layout. Do not restore the former desktop negative margins at phone widths and do not allow whole-IMS grid rules to collapse the reporter choices back to one oversized button per row.
 - Secured HSE Observations review save/delete and central action generation controls now use page-level create/edit permission guards.
+- The Observation Register has a Project filter and an `Export PDF` button (`src/lib/observationReportPdf.ts`). The PDF is a landscape A4 report of exactly the rows the register is showing (all matching rows, not only the visible ones), with the filters used, a count strip, rows grouped by project (or type, risk, or none) and ordered newest, oldest or highest risk first, and per row the number, date, type, location, risk, status, title and full description. Optional lines under each description: immediate action, suggested action, assigned to, close-out notes. Photos and reporter details are deliberately excluded. It is generated in the browser with jsPDF and downloaded; nothing is stored or emailed.
 
 ### Observation QA still required
 
