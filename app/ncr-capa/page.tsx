@@ -277,6 +277,11 @@ function dueState(date: string | null | undefined) {
   return "ok";
 }
 
+// A closed record is finished, so it is never overdue or due soon.
+function rowDueState(row: { status: string; due_date: string | null | undefined }) {
+  return (row.status || "") === "Closed" ? "none" : dueState(row.due_date);
+}
+
 function getStatusTone(status: string) {
   const value = (status || "").toLowerCase();
   if (value.includes("open")) return { bg: "#ECECE7", color: "#F93822" };
@@ -882,6 +887,8 @@ function NcrCapaPageContent() {
   );
   const [showReportFilters, setShowReportFilters] = useState(false);
   const [showAttentionOnly, setShowAttentionOnly] = useState(false);
+  // Closed NCRs are hidden from the register unless this is ticked.
+  const [showClosedNcrs, setShowClosedNcrs] = useState(false);
   const [activeLogTab, setActiveLogTab] = useState<"NCR" | "CAPA">("NCR");
   const [ncrQuickFilter, setNcrQuickFilter] = useState<NcrQuickFilter>("");
   const [yearFilter, setYearFilter] = useState(linkedYear === "All Years" ? "All Years" : String(new Date().getFullYear()));
@@ -1306,7 +1313,20 @@ function NcrCapaPageContent() {
       const matchesSource =
         activeLogTab === "CAPA" || sourceFilter === "All" || row.source_type === sourceFilter;
       const matchesProject = projectFilter === "All" || row.project === projectFilter;
-      const matchesOverdueOnly = !linkedOverdueOnly || dueState(row.due_date) === "overdue";
+      const matchesOverdueOnly = !linkedOverdueOnly || rowDueState(row) === "overdue";
+      // Closed NCRs only show when asked for: the tick box, or a request that is explicitly about closed
+      // records (Closed status/KPI, a closed month, a direct link to an NCR, or a search).
+      const includeClosedNcrs =
+        activeLogTab !== "NCR" ||
+        showClosedNcrs ||
+        statusFilter === "Closed" ||
+        ncrQuickFilter === "Closed" ||
+        ncrQuickFilter === "All" ||
+        Boolean(linkedClosedMonth) ||
+        Boolean(directNcrNumber) ||
+        Boolean(directNcrId) ||
+        q.length > 0;
+      const matchesClosedVisibility = includeClosedNcrs || row.status !== "Closed";
       const matchesDueWindow =
         linkedDueWindow <= 0 ||
         (() => {
@@ -1326,10 +1346,10 @@ function NcrCapaPageContent() {
         (ncrQuickFilter === "Open" && row.status === "Open") ||
         (ncrQuickFilter === "In Progress" && row.status === "In Progress") ||
         (ncrQuickFilter === "Closed" && row.status === "Closed") ||
-        (ncrQuickFilter === "Overdue" && dueState(row.due_date) === "overdue") ||
-        (ncrQuickFilter === "DueSoon" && dueState(row.due_date) === "soon");
+        (ncrQuickFilter === "Overdue" && rowDueState(row) === "overdue") ||
+        (ncrQuickFilter === "DueSoon" && rowDueState(row) === "soon");
 
-      const attention = dueState(row.due_date) === "overdue" || row.status === "Open";
+      const attention = rowDueState(row) === "overdue" || row.status === "Open";
       const matchesAttention = !showAttentionOnly || attention;
 
       return (
@@ -1345,6 +1365,7 @@ function NcrCapaPageContent() {
         matchesYear &&
         matchesOverdueOnly &&
         matchesQuickFilter &&
+        matchesClosedVisibility &&
         matchesAttention
       );
     });
@@ -1380,8 +1401,8 @@ function NcrCapaPageContent() {
         return bCreated - aCreated;
       }
 
-      const aDueState = dueState(a.due_date);
-      const bDueState = dueState(b.due_date);
+      const aDueState = rowDueState(a);
+      const bDueState = rowDueState(b);
       const aDueRank = aDueState === "overdue" ? 0 : aDueState === "soon" ? 1 : 2;
       const bDueRank = bDueState === "overdue" ? 0 : bDueState === "soon" ? 1 : 2;
       if (aDueRank !== bDueRank) return aDueRank - bDueRank;
@@ -1405,6 +1426,9 @@ function NcrCapaPageContent() {
     linkedDueWindow,
     linkedCreatedMonth,
     linkedClosedMonth,
+    directNcrNumber,
+    directNcrId,
+    showClosedNcrs,
     showAttentionOnly,
     activeLogTab,
     ncrSort,
@@ -1418,6 +1442,7 @@ function NcrCapaPageContent() {
     setProjectFilter("All");
     setShowAttentionOnly(false);
     setNcrQuickFilter("");
+    setShowClosedNcrs(false);
     setYearFilter(String(new Date().getFullYear()));
   }
 
@@ -1449,8 +1474,8 @@ function NcrCapaPageContent() {
     const inProgressCount = yearScopedNcrs.filter((n) => n.status === "In Progress").length;
     const closedCount = yearScopedNcrs.filter((n) => n.status === "Closed").length;
     const totalNcrs = openNcrsCount + inProgressCount + closedCount;
-    const overdue = yearScopedNcrs.filter((row) => dueState(row.due_date) === "overdue").length;
-    const dueSoon = yearScopedNcrs.filter((row) => dueState(row.due_date) === "soon").length;
+    const overdue = yearScopedNcrs.filter((row) => rowDueState(row) === "overdue").length;
+    const dueSoon = yearScopedNcrs.filter((row) => rowDueState(row) === "soon").length;
 
     return {
       totalNcrs,
@@ -1504,17 +1529,17 @@ function NcrCapaPageContent() {
     () => [
       {
         label: "Overdue",
-        value: yearScopedNcrRows.filter((row) => dueState(row.due_date) === "overdue").length,
+        value: yearScopedNcrRows.filter((row) => rowDueState(row) === "overdue").length,
         color: "#F93822",
       },
       {
         label: "Due 7 Days",
-        value: yearScopedNcrRows.filter((row) => dueState(row.due_date) === "soon").length,
+        value: yearScopedNcrRows.filter((row) => rowDueState(row) === "soon").length,
         color: "#FFAD00",
       },
       {
         label: "In Date",
-        value: yearScopedNcrRows.filter((row) => dueState(row.due_date) === "ok").length,
+        value: yearScopedNcrRows.filter((row) => rowDueState(row) === "ok").length,
         color: "#005670",
       },
       {
@@ -4349,6 +4374,12 @@ function NcrCapaPageContent() {
           <div style={tableInfoRowStyle}>
             Showing <strong>{filteredRows.length}</strong> of{" "}
             <strong>{kpis.totalNcrs}</strong> NCR records for {yearFilter}
+            {activeLogTab === "NCR" ? (
+              <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginLeft: "14px", cursor: "pointer", color: "#000000" }}>
+                <input type="checkbox" checked={showClosedNcrs} onChange={(event) => setShowClosedNcrs(event.target.checked)} />
+                Show closed NCRs{!showClosedNcrs && kpis.closed ? ` (${kpis.closed} hidden)` : ""}
+              </label>
+            ) : null}
           </div>
 
           {loading ? (
@@ -4391,7 +4422,8 @@ function NcrCapaPageContent() {
                 {filteredRows.map((row) => {
                   const statusTone = getStatusTone(row.status);
                   const severityTone = getSeverityTone(getSeverityDisplay(row.severity));
-                  const dueTone = dueState(row.due_date);
+                  const dueTone = rowDueState(row);
+                  const dueColour = row.status === "Closed" ? "#53565A" : dueTone === "overdue" ? "#F93822" : "#000000";
                   const active = selectedRow?.id === row.id && selectedRow?.type === row.type;
 
                   return (
@@ -4434,12 +4466,7 @@ function NcrCapaPageContent() {
                         <div
                           style={{
                             ...registerSimpleTextStyle,
-                            color:
-                              dueTone === "overdue"
-                                ? "#F93822"
-                                : dueTone === "soon"
-                                ? "#000000"
-                                : "#000000",
+                            color: dueColour,
                           }}
                         >
                           {formatDate(row.due_date)}
@@ -4450,12 +4477,7 @@ function NcrCapaPageContent() {
                         <div
                           style={{
                             ...registerSimpleTextStyle,
-                            color:
-                              dueTone === "overdue"
-                                ? "#F93822"
-                                : dueTone === "soon"
-                                ? "#000000"
-                                : "#000000",
+                            color: dueColour,
                           }}
                         >
                           {formatDate(row.due_date)}
