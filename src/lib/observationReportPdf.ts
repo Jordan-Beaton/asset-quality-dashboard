@@ -32,7 +32,13 @@ export type ObservationReportOptions = {
   // Plain-language filter descriptions printed under the title, for example "Status: New".
   filters: string[];
   generatedBy?: string;
+  // Logos as data URLs. Either can be left out and the header still renders.
+  logos?: { enshore?: string; threeRs?: string };
 };
+
+// Logo artwork proportions (width / height) so neither is stretched.
+const ENSHORE_LOGO_RATIO = 2040 / 1020;
+const THREE_RS_LOGO_RATIO = 1889 / 712;
 
 const MARGIN = 10;
 const RISK_RANK: Record<string, number> = { "immediate attention": 4, high: 3, medium: 2, low: 1 };
@@ -106,30 +112,52 @@ export function createObservationReportPdf(records: ObservationReportRecord[], o
   const generatedAt = new Date().toLocaleString("en-GB", { timeZone: "Europe/London", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
   const filterText = options.filters.length ? options.filters.map(printable).join("   |   ") : "No filters applied";
 
-  // Title band
-  pdf.setFillColor(...exportRgb.brand);
-  pdf.rect(0, 0, pageWidth, 22, "F");
-  pdf.setTextColor(...exportRgb.white);
+  // Header: Enshore logo left, Recognise / Report / Resolve logo right, title between them,
+  // with a brand-coloured rule underneath.
+  const logoRow = 7;
+  const logoHeight = 15;
+  const addLogo = (dataUrl: string | undefined, x: number, ratio: number, align: "left" | "right") => {
+    if (!dataUrl) return;
+    const width = logoHeight * ratio;
+    const format = dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+    try {
+      pdf.addImage(dataUrl, format, align === "left" ? x : x - width, logoRow, width, logoHeight);
+    } catch {
+      // a logo that cannot be drawn must not stop the report
+    }
+  };
+  addLogo(options.logos?.enshore, MARGIN, ENSHORE_LOGO_RATIO, "left");
+  addLogo(options.logos?.threeRs, pageWidth - MARGIN, THREE_RS_LOGO_RATIO, "right");
+  if (!options.logos?.enshore) {
+    pdf.setTextColor(...exportRgb.brand);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    pdf.text("ENSHORE", MARGIN, logoRow + 9);
+  }
+  pdf.setTextColor(...exportRgb.ink);
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(16);
-  pdf.text("HSE OBSERVATIONS REPORT", MARGIN, 12);
-  pdf.setFontSize(8);
-  pdf.text("ENSHORE SUBSEA - INTEGRATED MANAGEMENT SYSTEM", pageWidth - MARGIN, 11, { align: "right" });
+  pdf.setFontSize(17);
+  pdf.text("HSE Observations Report", pageWidth / 2, logoRow + 7, { align: "center" });
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8.5);
-  pdf.text(`Generated ${generatedAt}${options.generatedBy ? ` by ${printable(options.generatedBy)}` : ""}`, MARGIN, 18);
+  pdf.setTextColor(...exportRgb.muted);
+  pdf.text(`Generated: ${generatedAt}${options.generatedBy ? ` by ${printable(options.generatedBy)}` : ""}`, pageWidth / 2, logoRow + 13, { align: "center" });
+  pdf.setDrawColor(...exportRgb.brand);
+  pdf.setLineWidth(0.8);
+  pdf.line(MARGIN, logoRow + logoHeight + 4, pageWidth - MARGIN, logoRow + logoHeight + 4);
 
   // Filters
+  const filtersTop = logoRow + logoHeight + 11;
   pdf.setTextColor(...exportRgb.muted);
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(7.5);
-  pdf.text("FILTERS", MARGIN, 29);
+  pdf.text("FILTERS", MARGIN, filtersTop);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8.5);
   pdf.setTextColor(...exportRgb.ink);
   const filterLines = pdf.splitTextToSize(filterText, contentWidth - 18) as string[];
-  pdf.text(filterLines, MARGIN + 17, 29);
-  let y = 29 + filterLines.length * 4 + 2;
+  pdf.text(filterLines, MARGIN + 17, filtersTop);
+  let y = filtersTop + filterLines.length * 4 + 2;
 
   // Summary strip
   const open = records.filter((record) => !isClosed(record)).length;

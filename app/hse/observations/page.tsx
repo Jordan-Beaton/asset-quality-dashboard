@@ -275,6 +275,22 @@ export default function HseObservationsPage() {
     [yearRecords],
   );
 
+  async function loadImageDataUrl(path: string) {
+    try {
+      const response = await fetch(path);
+      if (!response.ok) return undefined;
+      const blob = await response.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return undefined;
+    }
+  }
+
   // The PDF contains exactly the rows the register is showing, with the filters that produced them.
   async function exportReport() {
     if (!filteredRecords.length) {
@@ -295,6 +311,10 @@ export default function HseObservationsPage() {
         `Submitted as: ${reporterTypeFilter || "All"}`,
         ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
       ];
+      const [enshoreLogo, threeRsLogo] = await Promise.all([
+        loadImageDataUrl("/enshore-primary-logo-colour.png"),
+        loadImageDataUrl("/enshore-3rs-primary-rgb.jpg"),
+      ]);
       const pdf = createObservationReportPdf(filteredRecords, {
         group: exportGroup,
         sort: exportSort,
@@ -304,6 +324,7 @@ export default function HseObservationsPage() {
         includeCloseout: exportExtras.closeout,
         filters,
         generatedBy,
+        logos: { enshore: enshoreLogo, threeRs: threeRsLogo },
       });
       pdf.save(observationReportFileName(projectFilter));
       setMessage(`Observation report created with ${filteredRecords.length} observation${filteredRecords.length === 1 ? "" : "s"}.`);
