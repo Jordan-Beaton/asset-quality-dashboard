@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { createClient as createServerClient } from "../../../../src/lib/supabase/server";
 import { buildPackUrl } from "../../../../src/lib/inspectionPack";
+import { describePack, ensureStoredPack } from "../../../../src/lib/inspectionPackStorage";
 import { buildInspectionEmailHtml } from "../../../../src/lib/inspectionRecordEmail";
 
 const STORAGE_BUCKET = "project-documents";
@@ -10,7 +11,7 @@ const STORAGE_BUCKET = "project-documents";
 type Recipient = { name: string; email: string };
 type PointSnapshot = { id: string; section_number: string; activity_description: string; intervention_type: string };
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -91,13 +92,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // One signed link (valid six months) to every file in a single ZIP, instead of a link per file.
-    const files: Array<{ file_name: string; file_size: number | null; uploaded_at?: string | null }> = record.inspection_record_files || [];
+    // The files go out as a ZIP (split only when a ZIP would exceed the storage upload limit), linked
+    // with six-month links on the storage domain rather than one link per file.
+    const files: Array<{ file_name: string; file_path: string; file_size: number | null; uploaded_at?: string | null }> = record.inspection_record_files || [];
+    const packs = files.length ? await ensureStoredPack(supabase, recordId, String(record.noi_number), files) : [];
+    const partOf = new Map<string, number>();
+    packs.forEach((pack, index) => pack.files.forEach((name) => { if (!partOf.has(name)) partOf.set(name, index + 1); }));
     const fileList = files
       .slice()
       .sort((a, b) => String(a.uploaded_at || "").localeCompare(String(b.uploaded_at || "")))
-      .map((file) => ({ name: file.file_name, size: file.file_size }));
-    const packUrl = files.length ? buildPackUrl(new URL(request.url).origin, recordId) : "";
+      .map((file) => ({ name: file.file_name, size: file.file_size, part: partOf.get(file.file_name) }));
 
     const resend = new Resend(resendApiKey);
     const toEmails = recipients.map(r => r.email).filter(e => e.includes("@"));
@@ -115,7 +119,8 @@ export async function POST(request: Request) {
         points,
         notes: record.notes || null,
         files: fileList,
-        packUrl,
+        packs,
+        summary: describePack(packs),
       }),
     });
 

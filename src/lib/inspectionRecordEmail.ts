@@ -16,7 +16,8 @@ export function buildInspectionEmailHtml({
   points,
   notes,
   files,
-  packUrl,
+  packs,
+  summary,
 }: {
   noiNumber: string;
   itpNumber: string;
@@ -24,8 +25,9 @@ export function buildInspectionEmailHtml({
   supplier: string;
   points: PointSnapshot[];
   notes: string | null;
-  files: Array<{ name: string; size: number | null }>;
-  packUrl: string;
+  files: Array<{ name: string; size: number | null; part?: number }>;
+  packs: Array<{ label: string; url: string; size: number }>;
+  summary: string;
 }) {
   const pointRows = points
     .map(p => `
@@ -38,24 +40,29 @@ export function buildInspectionEmailHtml({
       </tr>`)
     .join("");
 
-  const totalBytes = files.reduce((total, file) => total + (file.size || 0), 0);
+  const showPartColumn = packs.length > 1;
   const fileList = files
     .map(f => `
       <tr>
         <td style="padding:6px 12px;border-bottom:1px solid #D0D0CE;font-size:13px;">${e(f.name)}</td>
+        ${showPartColumn ? `<td style="padding:6px 12px;border-bottom:1px solid #D0D0CE;font-size:12px;color:#53565A;white-space:nowrap;">Part ${f.part || 1}</td>` : ""}
         <td style="padding:6px 12px;border-bottom:1px solid #D0D0CE;font-size:12px;color:#53565A;white-space:nowrap;text-align:right;">${e(formatBytes(f.size))}</td>
       </tr>`)
     .join("");
-  const fileRows = `
-      <p style="margin:0 0 6px;font-size:13px;color:#000000;">All ${files.length} document${files.length === 1 ? "" : "s"}${totalBytes ? ` (${e(formatBytes(totalBytes))})` : ""} are in one ZIP file.</p>
-      <p style="margin:12px 0;">
-        <a href="${e(packUrl)}" style="display:inline-block;background:#005670;color:#ffffff;text-decoration:none;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:700;">
-          Download document pack (ZIP)
+  const buttons = packs
+    .map(pack => `
+      <p style="margin:10px 0;">
+        <a href="${e(pack.url)}" style="display:inline-block;background:#005670;color:#ffffff;text-decoration:none;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:700;">
+          ${e(pack.label)}${packs.length > 1 && pack.size ? ` (${e(formatBytes(pack.size))})` : ""}
         </a>
-        <span style="font-size:11px;color:#53565A;margin-left:8px;">Link expires in 6 months</span>
-      </p>
+      </p>`)
+    .join("");
+  const fileRows = `
+      <p style="margin:0 0 6px;font-size:13px;color:#000000;">${e(summary)}</p>
+      ${buttons}
+      <p style="margin:0 0 12px;font-size:11px;color:#53565A;">Links expire in 6 months.</p>
       <table style="width:100%;border-collapse:collapse;border:1px solid #D0D0CE;margin-top:12px;">
-        <thead><tr><th colspan="2" style="padding:8px 12px;background:#ECECE7;color:#53565A;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;text-align:left;">Included in the pack</th></tr></thead>
+        <thead><tr><th colspan="${showPartColumn ? 3 : 2}" style="padding:8px 12px;background:#ECECE7;color:#53565A;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;text-align:left;">Included in the pack</th></tr></thead>
         <tbody>${fileList}</tbody>
       </table>`;
 
