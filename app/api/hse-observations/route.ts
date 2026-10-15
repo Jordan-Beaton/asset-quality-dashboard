@@ -87,7 +87,8 @@ export async function POST(request: Request) {
       reporter_name: clean(formData.get("reporter_name")) || null,
       reporter_company: clean(formData.get("reporter_company")) || null,
       reporter_contact: clean(formData.get("reporter_contact")) || null,
-      project: clean(formData.get("project")) || null,
+      project: clean(formData.get("project")).replace(/\s+/g, " ") || null,
+      vessel_worksite: clean(formData.get("vessel_worksite")).replace(/\s+/g, " ").slice(0, 80) || null,
       site_location: clean(formData.get("site_location")) || null,
       observation_date: clean(formData.get("observation_date")) || new Date().toISOString().slice(0, 10),
       observation_time: clean(formData.get("observation_time")) || null,
@@ -102,7 +103,18 @@ export async function POST(request: Request) {
       source_qr: clean(formData.get("source_qr")) || "public-qr",
     };
 
-    const { error: insertError } = await supabase.from("hse_observations").insert(payload);
+    let { error: insertError } = await supabase.from("hse_observations").insert(payload);
+
+    // Until the vessel_worksite column exists in the database, keep the entry by folding it into the
+    // location instead of failing the submission.
+    if (insertError && /vessel_worksite/i.test(insertError.message)) {
+      const { vessel_worksite: vessel, ...withoutVessel } = payload;
+      const fallback = {
+        ...withoutVessel,
+        site_location: [vessel ? `Vessel / worksite: ${vessel}` : "", payload.site_location || ""].filter(Boolean).join(" - ") || null,
+      };
+      ({ error: insertError } = await supabase.from("hse_observations").insert(fallback));
+    }
 
     if (insertError) {
       if (isSupabaseKeyError(insertError.message)) {

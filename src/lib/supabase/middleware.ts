@@ -38,7 +38,9 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname === "/api/access-requests";
   const isPublicAuthApi = request.nextUrl.pathname === "/api/auth/login";
   const isPublicObservationPage = request.nextUrl.pathname === "/observe";
-  const isPublicObservationApi = request.nextUrl.pathname === "/api/hse-observations";
+  const isPublicObservationApi =
+    request.nextUrl.pathname === "/api/hse-observations" ||
+    request.nextUrl.pathname === "/api/hse-observations/options";
   const isPublicInvitePage = request.nextUrl.pathname === "/invite";
   const isPublicInviteApi = request.nextUrl.pathname === "/api/invite-link";
   const requestedPath =

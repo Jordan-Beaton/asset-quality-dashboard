@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent } from "react";
 import { imsColours, imsInputStyle } from "../../src/components/imsTheme";
+import { defaultObservationProjects } from "../../src/lib/observationProjects";
 
 const reporterTypes = ["Employee", "Contractor", "Client", "Visitor", "Quick Fill"];
 const observationTypes = ["Positive Observation", "Unsafe Act", "Unsafe Condition", "Environmental", "Quality / Process", "Other"];
@@ -26,6 +27,70 @@ export default function PublicObservationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showContact, setShowContact] = useState(false);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [projects, setProjects] = useState<string[]>(defaultObservationProjects);
+  const [vessels, setVessels] = useState<Array<{ name: string; projects: string[] }>>([]);
+  const [canAddProject, setCanAddProject] = useState(false);
+  const [selectedProject, setSelectedProject] = useState("");
+  const [addProjectOpen, setAddProjectOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectNumber, setNewProjectNumber] = useState("");
+  const [projectBusy, setProjectBusy] = useState(false);
+  const [projectError, setProjectError] = useState("");
+
+  // The project list, earlier Vessel / Worksite entries, and whether this person may add a project.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch("/api/hse-observations/options");
+        if (!response.ok) return;
+        const result = await response.json() as { projects?: string[]; vessels?: Array<{ name: string; projects: string[] }>; canAddProject?: boolean };
+        if (Array.isArray(result.projects) && result.projects.length) setProjects(result.projects);
+        if (Array.isArray(result.vessels)) setVessels(result.vessels);
+        setCanAddProject(Boolean(result.canAddProject));
+      } catch {
+        // the built-in project list still works without the extra options
+      }
+    })();
+  }, []);
+
+  // Earlier entries for the chosen project come first in the suggestions.
+  const vesselOptions = useMemo(() => {
+    const forProject = vessels.filter((vessel) => selectedProject && vessel.projects.includes(selectedProject));
+    const others = vessels.filter((vessel) => !forProject.includes(vessel));
+    return [...forProject, ...others].map((vessel) => vessel.name);
+  }, [selectedProject, vessels]);
+
+  async function addProject() {
+    if (projectBusy) return;
+    setProjectBusy(true);
+    setProjectError("");
+    try {
+      const response = await fetch("/api/hse-observations/options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newProjectName, number: newProjectNumber }),
+      });
+      const result = await response.json().catch(() => ({})) as { error?: string; project?: string; projects?: string[] };
+      if (response.status === 409 && result.project) {
+        setSelectedProject(result.project);
+        setProjectError(result.error || "");
+        return;
+      }
+      if (!response.ok || !result.project) {
+        setProjectError(result.error || "The project could not be added.");
+        return;
+      }
+      if (Array.isArray(result.projects)) setProjects(result.projects);
+      setSelectedProject(result.project);
+      setNewProjectName("");
+      setNewProjectNumber("");
+      setAddProjectOpen(false);
+    } catch {
+      setProjectError("The project could not be added. Check your connection and try again.");
+    } finally {
+      setProjectBusy(false);
+    }
+  }
 
   const isQuickFill = reporterType === "Quick Fill";
   const hasSelectedReporterType = reporterType.length > 0;
@@ -85,6 +150,7 @@ export default function PublicObservationPage() {
       setSubmittedNumber(result.observationNumber || "");
       setMessage(`Thank you. Your observation has been logged${result.observationNumber ? ` as ${result.observationNumber}` : ""}.`);
       form.reset();
+      setSelectedProject("");
       setShowContact(false);
       setEvidenceFiles([]);
     } catch (error) {
@@ -232,8 +298,42 @@ export default function PublicObservationPage() {
           <section className="observe-card" style={cardStyle}>
             <h2 style={sectionTitleStyle}>Observation details</h2>
             <div style={responsiveGridStyle}>
-              <Field label="Project / vessel / worksite">
-                <input className="observe-control" name="project" style={inputStyle} placeholder="e.g. ENS24, Blyth Base, vessel name" />
+              <div style={fieldStyle}>
+                <label htmlFor="observe-project" style={labelStyle}>Project</label>
+                <div style={projectRowStyle}>
+                  <select id="observe-project" className="observe-control" name="project" style={{ ...inputStyle, flex: 1, minWidth: 0 }} value={selectedProject} onChange={(event) => setSelectedProject(event.target.value)}>
+                    <option value="">Select project</option>
+                    {projects.map((project) => <option key={project} value={project}>{project}</option>)}
+                  </select>
+                  {canAddProject ? (
+                    <button type="button" aria-label="Add a project" title="Add a project to the list" aria-expanded={addProjectOpen} onClick={() => { setAddProjectOpen((value) => !value); setProjectError(""); }} style={addProjectButtonStyle}>+</button>
+                  ) : null}
+                </div>
+              </div>
+              {addProjectOpen && canAddProject ? (
+                  <div style={{ ...addProjectPanelStyle, gridColumn: "1 / -1" }}>
+                    <div style={responsiveGridStyle}>
+                      <label style={fieldStyle}>
+                        <span style={labelStyle}>Project name</span>
+                        <input className="observe-control" style={inputStyle} value={newProjectName} maxLength={60} onChange={(event) => setNewProjectName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void addProject(); } }} placeholder="e.g. Hornsea" />
+                      </label>
+                      <label style={fieldStyle}>
+                        <span style={labelStyle}>Project number (optional)</span>
+                        <input className="observe-control" style={inputStyle} value={newProjectNumber} maxLength={24} onChange={(event) => setNewProjectNumber(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void addProject(); } }} placeholder="e.g. ENS26-018" />
+                      </label>
+                    </div>
+                    {projectError ? <span style={{ color: "#F93822", fontSize: "13px", fontWeight: 800 }}>{projectError}</span> : null}
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <button type="button" onClick={() => void addProject()} disabled={projectBusy || newProjectName.trim().length < 2} style={{ ...smallGhostButtonStyle, opacity: projectBusy || newProjectName.trim().length < 2 ? 0.6 : 1 }}>{projectBusy ? "Adding..." : "Add project"}</button>
+                      <button type="button" onClick={() => { setAddProjectOpen(false); setProjectError(""); }} style={smallGhostButtonStyle}>Cancel</button>
+                    </div>
+                  </div>
+              ) : null}
+              <Field label="Vessel / worksite">
+                <input className="observe-control" name="vessel_worksite" list="observe-vessels" autoComplete="off" maxLength={80} style={inputStyle} placeholder="Vessel name or worksite" />
+                <datalist id="observe-vessels">
+                  {vesselOptions.map((name) => <option key={name} value={name} />)}
+                </datalist>
               </Field>
               <Field label="Exact location">
                 <input className="observe-control" name="site_location" style={inputStyle} placeholder="Area, deck, room, workshop, yard..." />
@@ -385,6 +485,9 @@ const removeEvidenceButtonStyle: CSSProperties = { flex: "0 0 auto", minHeight: 
 const helperTextStyle: CSSProperties = { margin: 0, color: imsColours.slate, fontSize: "13px", lineHeight: 1.45 };
 const ghostButtonStyle: CSSProperties = { border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft, color: imsColours.brandDark, minHeight: "44px", borderRadius: "12px", fontWeight: 900, cursor: "pointer" };
 const formHeaderRowStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" };
+const projectRowStyle: CSSProperties = { display: "flex", gap: "8px", alignItems: "stretch" };
+const addProjectButtonStyle: CSSProperties = { border: `1px solid ${imsColours.brandBorder}`, background: imsColours.brandSoft, color: imsColours.brandDark, minWidth: "48px", minHeight: "48px", borderRadius: "12px", fontSize: "24px", lineHeight: 1, fontWeight: 900, cursor: "pointer" };
+const addProjectPanelStyle: CSSProperties = { display: "grid", gap: "10px", padding: "12px", border: `1px solid ${imsColours.brandBorder}`, borderRadius: "12px", background: imsColours.brandSoft };
 const smallGhostButtonStyle: CSSProperties = { ...ghostButtonStyle, minHeight: "36px", padding: "8px 12px" };
 const submitButtonStyle: CSSProperties = { border: "none", borderRadius: "14px", minHeight: "56px", background: imsColours.brand, color: "#ffffff", fontSize: "17px", fontWeight: 900, cursor: "pointer", boxShadow: "0 16px 30px rgba(0,86,112,0.24)" };
 const statusStyle: CSSProperties = { borderRadius: "14px", background: imsColours.panel, border: "1px solid #D0D0CE", padding: "13px 14px", color: imsColours.ink, boxShadow: "0 1px 3px rgba(15,23,42,0.08)" };

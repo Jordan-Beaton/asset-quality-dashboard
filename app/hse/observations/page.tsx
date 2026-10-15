@@ -48,6 +48,7 @@ type ObservationRecord = {
   reporter_company: string | null;
   reporter_contact: string | null;
   project: string | null;
+  vessel_worksite?: string | null;
   site_location: string | null;
   observation_date: string | null;
   observation_time: string | null;
@@ -257,6 +258,7 @@ export default function HseObservationsPage() {
         record.title,
         record.description,
         record.project,
+        record.vessel_worksite,
         record.site_location,
         record.reporter_name,
         record.reporter_company,
@@ -660,7 +662,7 @@ export default function HseObservationsPage() {
               <table className="observation-table" style={{ ...imsTableStyle, minWidth: 980 }}>
                 <thead>
                   <tr>
-                    {["Observation No.", "Type", "Project", "Location", "Risk", "Status", "Submitted As", "Submitted By", "Date"].map((heading) => (
+                    {["Observation No.", "Type", "Project", "Vessel / Worksite", "Location", "Risk", "Status", "Submitted As", "Submitted By", "Date"].map((heading) => (
                       <th key={heading} style={imsTableHeadStyle}>{heading}</th>
                     ))}
                   </tr>
@@ -671,6 +673,7 @@ export default function HseObservationsPage() {
                       <td data-label="Observation" style={{ ...imsTableCellStyle, fontWeight: 900, color: imsColours.brandDark }}>{record.observation_number}</td>
                       <td data-label="Type" style={imsTableCellStyle}>{record.observation_type || "-"}</td>
                       <td data-label="Project" style={imsTableCellStyle}>{record.project || "-"}</td>
+                      <td data-label="Vessel / Worksite" style={imsTableCellStyle}>{record.vessel_worksite || "-"}</td>
                       <td data-label="Location" style={imsTableCellStyle}>{record.site_location || "-"}</td>
                       <td data-label="Risk" style={imsTableCellStyle}>{record.risk_level || "-"}</td>
                       <td data-label="Status" style={imsTableCellStyle}><StatusPill status={record.status || "New"} /></td>
@@ -680,7 +683,7 @@ export default function HseObservationsPage() {
                     </tr>
                   ))}
                   {!filteredRecords.length ? (
-                    <tr><td colSpan={9} style={emptyCellStyle}>No observations match the current filters.</td></tr>
+                    <tr><td colSpan={10} style={emptyCellStyle}>No observations match the current filters.</td></tr>
                   ) : null}
                 </tbody>
               </table>
@@ -786,6 +789,7 @@ function ObservationDetail({
         <Info label="Type" value={record.observation_type} />
         <Info label="Risk / Attention" value={record.risk_level} />
         <Info label="Project" value={record.project} />
+        <Info label="Vessel / Worksite" value={record.vessel_worksite} />
         <Info label="Location" value={record.site_location} />
         <Info label="Date" value={`${formatDate(record.observation_date)}${record.observation_time ? ` ${record.observation_time}` : ""}`} />
       </div>
