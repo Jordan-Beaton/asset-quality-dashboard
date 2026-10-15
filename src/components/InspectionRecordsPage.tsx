@@ -195,6 +195,7 @@ const msgStyle = (type: "ok" | "err"): CSSProperties => ({
 export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
   const [records, setRecords] = useState<InspectionRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [packBusyId, setPackBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"ok" | "err">("ok");
 
@@ -293,6 +294,26 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
       if (signed?.signedUrl) urls[f.id] = signed.signedUrl;
     }
     setSignedUrls(urls);
+  }
+
+  // The same ZIP the recipients are emailed: every file on the record, one download.
+  async function downloadPack(record: InspectionRecord) {
+    setPackBusyId(record.id);
+    try {
+      const response = await fetch("/api/projects/inspection-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "pack-link", recordId: record.id }),
+      });
+      const result = await response.json().catch(() => ({})) as { url?: string; error?: string };
+      if (!response.ok || !result.url) throw new Error(result.error || "The document pack could not be prepared.");
+      window.location.assign(result.url);
+      showMsg(`Downloading the document pack for NOI-${record.noi_number}.`);
+    } catch (err) {
+      showMsg(err instanceof Error ? err.message : "The document pack could not be prepared.", "err");
+    } finally {
+      setPackBusyId(null);
+    }
   }
 
   function closeEvidence() { setEvidenceRecord(null); setEvidenceNotifs([]); setSignedUrls({}); }
@@ -460,7 +481,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
             <table style={imsTableStyle}>
               <thead>
                 <tr>
-                  {["NOI Ref", "ITP Points", "Description", "Recipients", "Files", "Uploaded", "Status", ""].map(h => (
+                  {["NOI Ref", "ITP Points", "Description", "Recipients", "Files", "Uploaded", "Status", "Document Pack", "Evidence"].map(h => (
                     <th key={h} style={imsTableHeadStyle}>{h}</th>
                   ))}
                 </tr>
@@ -501,6 +522,18 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
                       </td>
                       <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}>{fmtDate(record.created_at)}</td>
                       <td style={imsTableCellStyle}><Pill status={hasFiles ? "complete" : "pending"} /></td>
+                      <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}>
+                        {hasFiles ? (
+                          <button
+                            style={{ ...imsGhostButtonStyle, fontSize: 11, padding: "5px 10px", minHeight: 0, opacity: packBusyId === record.id ? 0.6 : 1 }}
+                            disabled={packBusyId === record.id}
+                            title={`Download all ${record.inspection_record_files.length} file${record.inspection_record_files.length === 1 ? "" : "s"} as one ZIP`}
+                            onClick={() => void downloadPack(record)}
+                          >
+                            {packBusyId === record.id ? "Preparing..." : "Download ZIP"}
+                          </button>
+                        ) : <span style={{ color: imsColours.muted }}>—</span>}
+                      </td>
                       <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}>
                         {hasFiles ? (
                           <button style={{ ...imsGhostButtonStyle, fontSize: 11, padding: "5px 10px", minHeight: 0 }} onClick={() => openEvidence(record)}>
