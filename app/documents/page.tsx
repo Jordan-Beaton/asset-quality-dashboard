@@ -49,7 +49,10 @@ type DocumentTypeOption =
   | "Template"
   | "Plan"
   | "Chart"
-  | "Report";
+  | "Report"
+  | "Risk Assessment"
+  | "Training"
+  | "Exam";
 
 type DepartmentOwnerOption =
   | "HSEQ"
@@ -219,6 +222,9 @@ const DOCUMENT_TYPE_OPTIONS: DocumentTypeOption[] = [
   "Plan",
   "Chart",
   "Report",
+  "Risk Assessment",
+  "Training",
+  "Exam",
 ];
 
 const DEPARTMENT_OWNER_OPTIONS: DepartmentOwnerOption[] = [
@@ -247,6 +253,9 @@ const TYPE_CODE_MAP: Record<DocumentTypeOption, string> = {
   Plan: "PLA",
   Chart: "CHT",
   Report: "RPT",
+  "Risk Assessment": "RA",
+  Training: "TRN",
+  Exam: "EXM",
 };
 
 const DEPARTMENT_CODE_MAP: Record<DepartmentOwnerOption, string> = {
