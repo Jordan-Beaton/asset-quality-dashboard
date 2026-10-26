@@ -48,7 +48,7 @@ type NoiRecord = {
   startDate: Date | null;
   endDate: Date | null;
   dateConfidence: "Exact" | "Week" | "Range" | "Unresolved";
-  source: "IMS NOI" | "Excel";
+  source: "IMS NOI" | "IMS Manual" | "Excel";
   status: string;
 };
 
@@ -454,7 +454,7 @@ export default function ProjectReportsPage() {
   useEffect(() => {
     void (async () => {
       setNoiLoading(true);
-      const [pointResult, itpResult] = await Promise.all([
+      const [pointResult, itpResult, manualResult] = await Promise.all([
         supabase
           .from("project_noi_points")
           .select("id,itp_id,section_number,activity_description,intervention_type,planned_date,noi_number,status")
@@ -464,6 +464,13 @@ export default function ProjectReportsPage() {
           .from("project_itps")
           .select("id,document_number,title,supplier,scope,package_name")
           .eq("project_key", "wadden-sea"),
+        // Inspections added by hand on Overall Inspections. Only those marked client visible go in a client annex.
+        supabase
+          .from("project_manual_inspections")
+          .select("id,title,itp_reference,supplier,intervention_type,inspection_date,duration,location,status,noi_number")
+          .eq("project_key", "wadden-sea")
+          .eq("client_visible", true)
+          .order("inspection_date", { ascending: true }),
       ]);
       if (pointResult.error || itpResult.error) {
         setMessage(`NOI lookahead data failed to load: ${pointResult.error?.message || itpResult.error?.message}`);
@@ -494,12 +501,38 @@ export default function ProjectReportsPage() {
           status: String(point.status || "Planned"),
         };
       });
-      setImsRecords(liveRecords);
+      // Manual inspections resolve their supplier, package and scope from the ITP they reference, as Overall Inspections does.
+      const itpsByNumber = new Map((itpResult.data || []).map((itp) => [String(itp.document_number || "").trim().toLowerCase(), itp]));
+      const manualRecords = manualResult.error ? [] : (manualResult.data || []).map((row): NoiRecord => {
+        const itp = row.itp_reference ? itpsByNumber.get(String(row.itp_reference).trim().toLowerCase()) : undefined;
+        const startDate = row.inspection_date ? new Date(`${row.inspection_date}T00:00:00`) : null;
+        return {
+          id: `ims-manual-${row.id}`,
+          sourceRow: 0,
+          packageName: String(itp?.package_name || ""),
+          supplier: String(itp?.supplier || row.supplier || ""),
+          scope: String(itp?.scope || ""),
+          itpReference: String(row.itp_reference || ""),
+          activity: String(row.title || "Inspection activity"),
+          inspectionType: String(row.intervention_type || ""),
+          inspectionDateRaw: String(row.inspection_date || ""),
+          noiReceived: String(row.noi_number || ""),
+          location: String(row.location || ""),
+          witnessHours: String(row.duration || ""),
+          startDate,
+          endDate: startDate,
+          dateConfidence: startDate ? "Exact" : "Unresolved",
+          source: "IMS Manual",
+          status: String(row.status || "Planned"),
+        };
+      });
+      const allLiveRecords = [...liveRecords, ...manualRecords];
+      setImsRecords(allLiveRecords);
       setSelectedIds((current) => Array.from(new Set([
         ...current,
-        ...liveRecords.filter((record) => record.startDate).map((record) => record.id),
+        ...allLiveRecords.filter((record) => record.startDate).map((record) => record.id),
       ])));
-      setMessage(`Live NOI register loaded: ${liveRecords.length} inspection requirements available.`);
+      setMessage(`Live inspection register loaded: ${liveRecords.length} NOI requirement${liveRecords.length === 1 ? "" : "s"} and ${manualRecords.length} manual inspection${manualRecords.length === 1 ? "" : "s"} available.`);
       setNoiLoading(false);
     })();
   }, []);
@@ -882,7 +915,7 @@ export default function ProjectReportsPage() {
                 record.packageName,
                 record.supplier,
                 record.activity,
-                record.inspectionType,
+                record.inspectionType || "-",
                 formatDate(record.startDate),
                 formatDate(record.endDate),
                 record.noiReceived || "-",
@@ -1084,7 +1117,7 @@ export default function ProjectReportsPage() {
           record.packageName,
           record.supplier,
           record.activity,
-          record.inspectionType,
+          record.inspectionType || "-",
           formatDate(record.startDate),
           formatDate(record.endDate),
           record.noiReceived || "-",
@@ -1415,7 +1448,7 @@ export default function ProjectReportsPage() {
 
         {sourceReady ? (
           <div style={validationGridStyle}>
-            <div style={validationCardStyle}><span>Primary source</span><strong>Live NOI register</strong><small>{imsRecords.length} controlled requirements</small></div>
+            <div style={validationCardStyle}><span>Primary source</span><strong>Live inspection register</strong><small>{imsRecords.length} NOI and manual inspections</small></div>
             <div style={validationCardStyle}><span>Excel additions</span><strong>{workbookSummary ? workbookSummary.activities : 0}</strong><small>{workbookSummary ? `${workbookSummary.fileName} · ${workbookSummary.uploadedAt}` : "No workbook added"}</small></div>
             <div style={validationCardStyle}><span>In eight weeks</span><strong>{lookaheadMetrics.total}</strong><small>{selectedLookaheadRecords.length} selected for annex</small></div>
             <button type="button" style={warningCardStyle} onClick={() => setShowUnresolved((current) => !current)}>
@@ -1459,7 +1492,7 @@ export default function ProjectReportsPage() {
                       {weekRecords.length ? weekRecords.map((record) => (
                         <div key={`${formatInputDate(weekStart)}-${record.id}`} style={inspectionCardStyle}>
                           <div style={inspectionCardTopStyle}>
-                            <span style={record.inspectionType.includes("H") ? holdPointStyle : witnessPointStyle}>{record.inspectionType}</span>
+                            <span style={record.inspectionType.includes("H") ? holdPointStyle : witnessPointStyle}>{record.inspectionType || "-"}</span>
                             <small>{record.startDate ? formatDate(record.startDate) : ""}</small>
                           </div>
                           <strong>{record.supplier || "Supplier TBC"}</strong>
