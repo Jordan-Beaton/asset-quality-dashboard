@@ -8,6 +8,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { ImsButton, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
+import { ReviewPointsPanel } from "../../src/components/ReviewPointsPanel";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { imsColours, imsFieldStyle, imsFilterGridStyle, imsInputStyle, imsLabelStyle, imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../src/components/imsTheme";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
@@ -158,7 +159,7 @@ export default function OverallInspectionsPage() {
   const [events, setEvents] = useState<InspectionEvent[]>([]);
   const [message, setMessage] = useState("Loading inspections...");
   const [busy, setBusy] = useState(false);
-  const [view, setView] = useState<"lookahead" | "register">("lookahead");
+  const [view, setView] = useState<"lookahead" | "register" | "review">("lookahead");
 
   const [projectFilter, setProjectFilter] = useState("All");
   const [sourceFilter, setSourceFilter] = useState<"All" | "NOI" | "Manual">("All");
@@ -754,12 +755,13 @@ export default function OverallInspectionsPage() {
       />
 
       <ImsTabs
-        tabs={[{ value: "lookahead", label: "8-Week Lookahead" }, { value: "register", label: "Full Register" }]}
+        tabs={[{ value: "lookahead", label: "8-Week Lookahead" }, { value: "register", label: "Full Register" }, { value: "review", label: "Review Points" }]}
         active={view}
         onChange={setView}
         ariaLabel="Overall Inspections views"
       />
 
+      {view !== "review" ? (<>
       <section style={metrics} className="quality-kpi-grid">
         <QualityKpiCard title="In 8-Week Window" value={gridEvents.length} accent="#005670" />
         <QualityKpiCard title="Projects Tracked" value={gridProjects.length} accent="#63B1BC" />
@@ -909,6 +911,7 @@ export default function OverallInspectionsPage() {
           </table>
         </div>
       </ImsPanel>
+      </>) : <ReviewPointsPanel />}
 
       {selectedEvent && detailEdit ? (
         <div style={overlayStyle} onClick={() => { setSelectedEvent(null); setDetailEdit(null); }}>

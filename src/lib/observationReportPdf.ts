@@ -46,7 +46,7 @@ const RISK_RANK: Record<string, number> = { "immediate attention": 4, high: 3, m
 // jsPDF's built-in fonts cover Western European text only. Typographic punctuation is
 // mapped to plain equivalents and anything else outside that range is dropped, so a stray
 // emoji or symbol in a free-text description cannot corrupt the line it sits in.
-function printable(value: unknown) {
+export function printable(value: unknown) {
   return String(value ?? "")
     .replace(/[‘’‚]/g, "'")
     .replace(/[“”„]/g, '"')

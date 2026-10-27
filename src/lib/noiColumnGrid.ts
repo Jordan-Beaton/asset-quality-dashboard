@@ -725,6 +725,32 @@ export function addColumnChoicePrefix(fingerprint: string) {
   return `column-choice-${fingerprint}`;
 }
 
+// The review (R) and approval (A) points in the chosen column: the second list offered with the W/H points.
+export type ReviewCandidate = { sectionNumber: string; activityDescription: string; code: string; sourceLocation: string };
+
+export function reviewCandidatesForColumn(grid: GridResult, columnId: string): ReviewCandidate[] {
+  const column = grid.columns.find((entry) => entry.id === columnId);
+  if (!column) return [];
+  const seen = new Set<string>();
+  return grid.rows.flatMap((row): ReviewCandidate[] => {
+    const cell = row.cells[columnId];
+    if (!cell) return [];
+    const code = normaliseCode(cell);
+    const parts = code.split("/");
+    // R, R/A, A, A/V, M/R; never W or H (NOI points) or N/A
+    if (!/^[A-Z](?:\/[A-Z])*$/.test(code) || parts.includes("W") || parts.includes("H") || parts.includes("N") || !(parts.includes("R") || parts.includes("A"))) return [];
+    const key = `${row.section}|${code}|${row.description}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{
+      sectionNumber: row.section,
+      activityDescription: row.description || `Item ${row.section}`,
+      code,
+      sourceLocation: `${row.via === "position" ? "Column position" : "Visual reading"} · ${grid.locationLabels?.[row.page - 1] || `${grid.unit || "Page"} ${row.page || "?"}`}`,
+    }];
+  });
+}
+
 // The W/H points in the chosen column, ready for review.
 export function candidatesForColumn(grid: GridResult, columnId: string): GridCandidate[] {
   const column = grid.columns.find((entry) => entry.id === columnId);

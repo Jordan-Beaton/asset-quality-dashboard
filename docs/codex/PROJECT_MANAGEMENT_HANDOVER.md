@@ -60,6 +60,16 @@ At phone widths the workspace inherits the whole-IMS bottom navigation, one-colu
 - The scan runs as short phased requests (`grid`, `visual-grid-chunk`, `grid-merge`); the server reads the stored ITP from its file path so no upload size limit applies.
 - Pages / tables / sheets without a numbered row use the closest reference printed on the row, or `n/a`.
 
+## ITP Review Points
+
+- Tracks the review (R) and approval (A) points in the Enshore column of each ITP. Code: `src/lib/reviewPoints.ts` (rules), `src/lib/reviewPointsServer.ts` + `app/api/projects/review-points/route.ts` (all writes), `src/components/ReviewPointsPanel.tsx` (UI), `src/lib/reviewPointsReport.ts` (PDF / Excel). Setup: run `scripts/sql/project_review_points.sql` once (tables `project_review_points`, `project_review_point_events`, `project_review_signers`); until then the pages show a setup notice.
+- Where it appears: a **Review Points** tab in each project workspace (`/projects/{projectKey}/review-points`, register and by-ITP views, scan button) and a **Review Points** tab on Overall Inspections (all projects, with open points by reviewer and by project for resource planning).
+- Which marks count: R, R/A, A, A/V, M/R. Anything containing W or H stays a witness / hold point in the NOI Tracker (never duplicated here), M on its own is not tracked, N/A is never a review point.
+- Points come in from the NOI Tracker scan (a second list under the W/H points, from the same confirmed column) or from **Scan ITPs for review points** on the project page, which uses each ITP's remembered or suggested Enshore column and lists ITPs that need a column picked or are scanned PDFs. Re-scanning never duplicates a point; a new ITP revision's points start as Pending.
+- Workflow: Pending, then Accepted or Failed (a reason is required to fail). Reopen returns a point to Pending and is logged. No attachments.
+- Sign-off is digital: the signer's name (from People Management, matched on login email), the date and the time are set by the server at the moment of the decision, never taken from the browser. Only emails in `project_review_signers` can accept, fail or reopen (currently Jordan Beaton and Louise Harvey; add a row to widen it). Bulk sign-off writes one decision and one history entry per point. Anyone with edit access can assign a reviewer and target date. Every change is kept in `project_review_point_events`.
+- Reports: PDF and Excel from the tracker's filters. The **Client** version shows a failed point as "Pending - resubmission required" and omits failure reasons, reviewers and target dates; the **Internal** version includes them.
+
 ## NOI Creator
 
 - Controlled source template: `assets/templates/ENS-HSEQ-FRM-074-Notice-of-Inspection.docx`.

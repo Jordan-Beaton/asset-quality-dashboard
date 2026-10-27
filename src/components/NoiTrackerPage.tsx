@@ -12,7 +12,8 @@ import { QualityPageHero } from "./QualityPageHero";
 import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
 import { supabase } from "../lib/supabase";
 import { getProject } from "../lib/projectRegistry";
-import { addColumnChoicePrefix, candidatesForColumn, sameColumnLabel, type GridResult } from "../lib/noiColumnGrid";
+import { addColumnChoicePrefix, candidatesForColumn, reviewCandidatesForColumn, sameColumnLabel, type GridResult, type ReviewCandidate } from "../lib/noiColumnGrid";
+import { postScan } from "../lib/noiScanClient";
 
 const STORAGE_BUCKET = "project-documents";
 
@@ -38,37 +39,6 @@ const emptyManualPoint = {
   status: "Planned",
   notes: "",
 };
-
-// The scan endpoint always answers with JSON, but a host timeout, size limit or
-// expired session answers with an HTML page. Turn that into a readable message.
-async function readScanJson(response: Response) {
-  const raw = await response.text();
-  try {
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    let redirectedTo = "";
-    try {
-      redirectedTo = response.redirected ? new URL(response.url).pathname : "";
-    } catch {
-      redirectedTo = "";
-    }
-    const detail = `Technical detail: HTTP ${response.status}${redirectedTo ? `, redirected to ${redirectedTo}` : ""}, ${response.headers.get("content-type") || "unknown content type"}.`;
-    if (redirectedTo.includes("/login")) throw new Error(`Your session has expired. Refresh the page, sign in again, and retry the scan. ${detail}`);
-    if (response.status === 504 || response.status === 408) throw new Error(`The server stopped this part of the scan because it took too long. Please retry. ${detail}`);
-    if (response.status === 413) throw new Error(`This ITP is too large to send for scanning in one go. Split it into smaller files and retry. ${detail}`);
-    throw new Error(`The server returned an unexpected response instead of scan results. Please retry; if it keeps happening, send this message to an IMS admin. ${detail}`);
-  }
-}
-
-async function postScan(form: FormData) {
-  const response = await fetch("/api/projects/noi-extract", { method: "POST", body: form });
-  const result = await readScanJson(response);
-  if (!response.ok) {
-    const detail = result.detail ? ` Server detail: ${String(result.detail)}` : "";
-    throw new Error(`${String(result.error || "The ITP could not be scanned.")}${detail}`);
-  }
-  return result;
-}
 
 function currentRevision(itp: Itp) {
   return (itp.project_itp_revisions || []).find((revision) => revision.is_current)
@@ -116,6 +86,8 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
   const [rememberColumn, setRememberColumn] = useState(true);
   const [rememberedColumn, setRememberedColumn] = useState("");
   const [gridNotice, setGridNotice] = useState("");
+  // Review (R) and approval (A) points from the same chosen column; they go to the Review Points tracker.
+  const [reviewCandidates, setReviewCandidates] = useState<Array<ReviewCandidate & { selected: boolean }>>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   // The scanner panel collapses by default so the register (what people use
   // day-to-day) isn't pushed below the fold, but it stays open automatically
@@ -234,6 +206,7 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
   function pickColumn(result: GridResult, columnId: string) {
     setChosenColumn(columnId);
     setCandidates(columnId ? candidatesForColumn(result, columnId).map((candidate) => ({ ...candidate, selected: true })) : []);
+    setReviewCandidates(columnId ? reviewCandidatesForColumn(result, columnId).map((candidate) => ({ ...candidate, selected: true })) : []);
   }
 
   // Reads every inspection column of the ITP (PDF, Word or Excel), lets the person choose
@@ -242,6 +215,7 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
     if (!selectedItp) return;
     setBusy(true);
     setCandidates([]);
+    setReviewCandidates([]);
     setGrid(null);
     setChosenColumn("");
     setGridNotice("");
@@ -406,6 +380,40 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
       await load();
     }
     setBusy(false);
+  }
+
+  // Adds the ticked review / approval points to the Review Points tracker (as Pending). The server does the
+  // writing so duplicates are skipped and every new point gets its history entry.
+  async function saveReviewCandidates() {
+    if (!selectedItp) return;
+    const revision = currentRevision(selectedItp);
+    const selected = reviewCandidates.filter((candidate) => candidate.selected);
+    if (!revision || !selected.length) {
+      setMessage("Select at least one review point.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch("/api/projects/review-points", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "import",
+          projectKey,
+          itpId: selectedItp.id,
+          revisionId: revision.id,
+          points: selected.map(({ sectionNumber, activityDescription, code, sourceLocation }) => ({ sectionNumber, activityDescription, code, sourceLocation })),
+        }),
+      });
+      const result = await response.json().catch(() => ({})) as { added?: number; skipped?: number; error?: string };
+      if (!response.ok) throw new Error(result.error || "The review points could not be added.");
+      setMessage(`${result.added || 0} review point${result.added === 1 ? "" : "s"} added to Review Points as Pending${result.skipped ? `; ${result.skipped} already there` : ""}.`);
+      setReviewCandidates([]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The review points could not be added.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function saveManualPoint(event: React.FormEvent) {
@@ -635,7 +643,7 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
         {message && <div style={notice}>{message}</div>}
         {scannerExpanded && <>
         <div style={scanner}>
-          <label style={field}><span>Current ITP</span><select style={input} value={selectedItpId} onChange={(event) => { setSelectedItpId(event.target.value); setCandidates([]); setGrid(null); setChosenColumn(""); setGridNotice(""); }}>{itps.map((itp) => {
+          <label style={field}><span>Current ITP</span><select style={input} value={selectedItpId} onChange={(event) => { setSelectedItpId(event.target.value); setCandidates([]); setReviewCandidates([]); setGrid(null); setChosenColumn(""); setGridNotice(""); }}>{itps.map((itp) => {
             const revision = currentRevision(itp);
             return <option key={itp.id} value={itp.id}>{itp.document_number} · Rev {revision?.revision || "—"} · {itp.supplier || "No supplier"}</option>;
           })}</select></label>
@@ -688,6 +696,17 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
             <span style={source}><strong>{candidate.partyHeading}</strong><small>{candidate.sourceLocation} · {candidate.confidence}</small></span>
           </div>)}
           <div style={candidateActions}><button style={secondaryButton} onClick={() => setCandidates([])}>Discard</button><button style={primaryButton} disabled={busy} onClick={() => void saveCandidates()}>Add selected points to register</button></div>
+        </div>}
+        {reviewCandidates.length > 0 && <div style={candidatePanel}>
+          <div style={candidateHeader}><strong>Review points ({reviewCandidates.length})</strong><span>Review (R) and approval (A) points in the same column. These go to Review Points, not the NOI register.</span></div>
+          {reviewCandidates.map((candidate, index) => <div key={`review-${candidate.sectionNumber}-${index}`} style={candidateRow}>
+            <input type="checkbox" aria-label={`Include review point ${candidate.sectionNumber}`} checked={candidate.selected} onChange={(event) => setReviewCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, selected: event.target.checked } : item))} />
+            <input style={compactInput} value={candidate.sectionNumber} onChange={(event) => setReviewCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, sectionNumber: event.target.value } : item))} />
+            <input style={{ ...wideInput, fontSize: 12, color: "#000000" }} value={candidate.activityDescription} onChange={(event) => setReviewCandidates((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, activityDescription: event.target.value } : item))} />
+            <span style={{ ...compactInput, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#ECECE7", color: "#005670", fontWeight: 900 }}>{candidate.code}</span>
+            <span style={source}><small>{candidate.sourceLocation}</small></span>
+          </div>)}
+          <div style={candidateActions}><button style={secondaryButton} onClick={() => setReviewCandidates([])}>Discard</button><button style={primaryButton} disabled={busy} onClick={() => void saveReviewCandidates()}>Add selected review points</button></div>
         </div>}
         </>}
       </section>
