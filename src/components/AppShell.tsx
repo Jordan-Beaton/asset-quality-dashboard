@@ -111,6 +111,7 @@ const projectNavItems: NavItem[] = [
   { href: "/projects/wadden-sea", label: "Wadden Sea", icon: "assets" },
   { href: "/projects/baltic-power", label: "Baltic Power", icon: "assets" },
   { href: "/inspections", label: "Overall Inspections", icon: "inspection" },
+  { href: "/guides?guide=review-points", label: "Process Guides", icon: "lessons" },
 ];
 
 const qualityNavItems: NavItem[] = [
@@ -571,7 +572,7 @@ function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleA
   if (area === "management-review") return !isExplicitNone(moduleAccess.managementReview) && (hasExplicitAccess(moduleAccess.managementReview) || role === "Admin" || role === "Manager" || role === "Viewer");
   if (area === "projects") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
   if (area === "admin") return !isExplicitNone(moduleAccess.admin) && (hasExplicitAccess(moduleAccess.admin) || role === "Admin");
-  if (area === "guides") return isAreaAllowed("quality", role, moduleAccess) || isAreaAllowed("documents", role, moduleAccess) || isAreaAllowed("hse", role, moduleAccess);
+  if (area === "guides") return isAreaAllowed("quality", role, moduleAccess) || isAreaAllowed("documents", role, moduleAccess) || isAreaAllowed("hse", role, moduleAccess) || isAreaAllowed("projects", role, moduleAccess);
   return false;
 }
 

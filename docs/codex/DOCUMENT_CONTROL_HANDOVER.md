@@ -9,7 +9,7 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 - Certification: `app/certification/page.tsx`
 - Notification API: `app/api/document-notifications/route.ts`
 - Workflow action API: `app/api/document-workflow-action/route.ts`
-- Process Guides: `app/guides/page.tsx` — inline user guide hub covering Document Control, NCR, MOC, and AINM (a guide switcher at the top selects which). Document Control's guide content lives in `src/components/guides/documentControlGuideContent.tsx`; shared styling/mock-UI helpers are in `src/components/guides/guideKit.tsx`. Staff access at `/guides` via the Document Control sidebar nav item "Process Guides" (Quality and HSE sidebars link to the same page with a `?guide=` param preselecting NCR/MOC or AINM). All content is embedded directly (no Claude artifact dependency).
+- Process Guides: `app/guides/page.tsx` — inline user guide hub covering Document Control, NCR, MOC, AINM, and ITP Review Points (a guide switcher at the top selects which). Document Control's guide content lives in `src/components/guides/documentControlGuideContent.tsx`; shared styling/mock-UI helpers are in `src/components/guides/guideKit.tsx`. Staff access at `/guides` via the Document Control sidebar nav item "Process Guides" (Quality and HSE sidebars link to the same page with a `?guide=` param preselecting NCR/MOC or AINM). All content is embedded directly (no Claude artifact dependency).
 
 ## Numbering Rules
 
