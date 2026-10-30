@@ -633,7 +633,7 @@ export default function HandlerConsole() {
                       <td><strong>{item.reference}</strong></td>
                       <td>{item.category}</td>
                       <td><Chip text={item.status} /></td>
-                      <td>{item.assignedTo ? (item.assignedTo === me.id ? "You" : item.assignedToName || "Another handler") : item.status === "Closed" ? "-" : <Chip text="Unassigned" tone="warn" />}</td>
+                      <td>{item.assignedTo ? (item.assignedToName || "Another handler") : item.status === "Closed" ? "-" : <Chip text="Unassigned" tone="warn" />}</td>
                       <td>{item.involvesSenior ? "Independent" : "Case handlers"}</td>
                       <td>{item.mode === "anonymous" ? "Anonymous" : item.mode === "confidential" ? "Confidential" : "Named"}</td>
                       <td>{dateText(item.receivedAt)}</td>
@@ -836,7 +836,7 @@ function CaseView(props: {
           <span style={rowStyle}>
             <Chip text={item.status} />
             {item.involvesSenior ? <Chip text="Independent route" /> : null}
-            {item.assignedTo ? <Chip text={`Assigned to ${item.assignedTo === me.id ? "you" : item.assignedToName || "a handler"}`} /> : item.status !== "Closed" ? <Chip text="Unassigned" tone="warn" /> : null}
+            {item.assignedTo ? <Chip text={`Assigned to ${item.assignedToName || "a handler"}`} /> : item.status !== "Closed" ? <Chip text="Unassigned" tone="warn" /> : null}
             {item.outcome ? <Chip text={`Outcome: ${SPEAK_UP_OUTCOME_LABELS[item.outcome as SpeakUpOutcome] || item.outcome}`} /> : null}
             {item.retentionUntil ? <Chip text={`Keep until ${dateText(item.retentionUntil)}`} /> : null}
             {slaChips(item).map((chip) => <Chip key={chip.text} text={chip.text} tone={chip.tone} />)}
@@ -867,7 +867,7 @@ function CaseView(props: {
 
       <ImsPanel title="Assigned to" subtitle="One handler looks after each case and is the only person emailed when the reporter writes back. Everyone who can open the case can still see it.">
         <div style={stackStyle}>
-          <p style={paraStyle}>{item.assignedTo ? (item.assignedTo === me.id ? "You" : item.assignedToName || "Another handler") : "Nobody yet. Every handler was emailed when this report arrived."}</p>
+          <p style={paraStyle}>{item.assignedTo ? (item.assignedToName || "Another handler") : "Nobody yet. Every handler was emailed when this report arrived."}</p>
           {item.status !== "Closed" ? (
             <>
               <div style={rowStyle}>
@@ -883,7 +883,9 @@ function CaseView(props: {
                     </select>
                   </Field>
                 </div>
-              ) : null}
+              ) : (
+                <p style={smallStyle}>{detail.raw.eligible.length ? "To assign this case to a colleague, first share it with them under Who can see this case, below." : "No other approved handler can open this case yet, so it can only be assigned to you. Once a colleague has joined Speak Up and been approved, share the case with them and then assign it."}</p>
+              )}
               {assignId ? <div style={rowStyle}><ImsButton variant="secondary" disabled={busy} onClick={() => void assign(assignId)}>Assign</ImsButton></div> : null}
             </>
           ) : null}
