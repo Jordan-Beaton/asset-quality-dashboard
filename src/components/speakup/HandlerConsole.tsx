@@ -722,7 +722,7 @@ export default function HandlerConsole() {
                     <td><strong>{person.name}</strong></td>
                     <td><span style={rowStyle}>{person.roles.map((role) => <Chip key={role} text={role === "independent" ? "Independent" : "Handler"} />)}</span></td>
                     <td><span style={rowStyle}>{person.roles.map((role) => <Chip key={role} text={person.approvedRoles.includes(role) ? "Approved" : "Waiting"} tone={person.approvedRoles.includes(role) ? "plain" : "warn"} />)}</span></td>
-                    <td>{person.publicKey ? <span style={{ display: "grid", gap: "4px" }}><Chip text={person.id === me.id ? "Set up (you)" : "Set up"} /><span style={smallStyle}>{person.fingerprint}</span></span> : <Chip text="Not set up yet" tone="warn" />}</td>
+                    <td>{person.publicKey ? <span style={{ display: "grid", gap: "4px", justifyItems: "start" }}><Chip text={person.id === me.id ? "Set up (you)" : "Set up"} /><span style={smallStyle}>{person.fingerprint}</span></span> : <Chip text="Not set up yet" tone="warn" />}</td>
                   </tr>
                 ))}
               </tbody>

@@ -476,7 +476,7 @@ export default function SpeakUpPage() {
             </div>
             <div style={{ display: "grid", gap: "6px" }}>
               <span style={small}>Access code</span>
-              <strong style={{ fontSize: "24px", fontFamily: "ui-monospace, Menlo, Consolas, monospace", letterSpacing: "0.04em", wordBreak: "break-all" }}>{result.code}</strong>
+              <strong style={{ fontSize: "clamp(16px, 5vw, 24px)", fontFamily: "ui-monospace, Menlo, Consolas, monospace", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>{result.code}</strong>
               <button type="button" style={secondary} onClick={() => void copy(result.code, "code")}>{copied === "code" ? "Copied" : "Copy access code"}</button>
             </div>
             <div style={warning}>Save them somewhere private that is not shared with others, such as a password manager. This code is shown only once.</div>

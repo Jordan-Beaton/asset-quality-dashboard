@@ -199,7 +199,7 @@ export default function SpeakUpAdminPanel() {
                       </select>
                     </td>
                     <td><span style={rowStyle}>{handler.roles.map((role) => <Chip key={role} text={handler.approvedRoles.includes(role) ? "Approved" : "Waiting"} tone={handler.approvedRoles.includes(role) ? "plain" : "warn"} />)}</span></td>
-                    <td>{handler.keySetUp ? <span style={{ display: "grid", gap: "4px" }}><Chip text="Set up" /><span style={smallStyle}>{handler.fingerprint}</span></span> : <Chip text="Not set up yet" tone="warn" />}</td>
+                    <td>{handler.keySetUp ? <span style={{ display: "grid", gap: "4px", justifyItems: "start" }}><Chip text="Set up" /><span style={smallStyle}>{handler.fingerprint}</span></span> : <Chip text="Not set up yet" tone="warn" />}</td>
                     <td><Chip text={handler.active ? "Active" : "Removed"} tone={handler.active ? "plain" : "warn"} /></td>
                     <td>
                       <span style={rowStyle}>
