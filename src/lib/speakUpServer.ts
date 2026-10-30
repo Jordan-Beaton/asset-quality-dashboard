@@ -186,7 +186,7 @@ export async function caseHolderIds(supabase: SupabaseClient, caseId: string) {
 
 // A short email to named handlers about a case. It says that something needs attention and where to look, and never
 // contains anything the reporter wrote, so it is safe to arrive in an ordinary mailbox.
-export async function mailCaseHandlers(supabase: SupabaseClient, handlerIds: string[], origin: string, subject: string, message: string) {
+export async function mailCaseHandlers(supabase: SupabaseClient, handlerIds: string[], origin: string, subject: string, message: string, caseId?: string) {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.DOCUMENT_NOTIFICATIONS_FROM_EMAIL;
   if (!key || !from || !handlerIds.length) return;
@@ -194,8 +194,9 @@ export async function mailCaseHandlers(supabase: SupabaseClient, handlerIds: str
     const { data } = await supabase.from("speak_up_handlers").select("email").eq("active", true).in("id", handlerIds);
     const to = (data || []).map((row) => String(row.email)).filter(Boolean);
     if (!to.length) return;
-    const link = origin ? origin + "/speak-up/cases" : "";
-    const html = "<p>" + escapeHtml(message) + "</p>" + (link ? '<p><a href="' + escapeHtml(link) + '">Open Speak Up cases</a></p>' : "") + '<p style="color:#53565A">This email contains no details of the report. Sign in to the IMS to read it.</p>';
+    // a link straight to the case when there is one; the page asks for sign-in and the passphrase before showing anything
+    const link = origin ? origin + "/speak-up/cases" + (caseId ? "?case=" + encodeURIComponent(caseId) : "") : "";
+    const html = "<p>" + escapeHtml(message) + "</p>" + (link ? '<p><a href="' + escapeHtml(link) + '">' + (caseId ? "Open this case" : "Open Speak Up cases") + "</a></p>" : "") + '<p style="color:#53565A">This email contains no details of the report. Sign in to the IMS to read it.</p>';
     await new Resend(key).emails.send({ from, to, subject, html });
   } catch {
     // an email that cannot be sent must never block or reveal a report

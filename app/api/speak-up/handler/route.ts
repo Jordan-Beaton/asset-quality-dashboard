@@ -280,10 +280,10 @@ export async function POST(request: Request) {
         const origin = getSiteOrigin(request);
         const reference = caseRow.reference;
         if (targetId && targetId !== handler.id) {
-          after(() => mailCaseHandlers(supabase, [targetId], origin, `Speak Up: ${reference} has been assigned to you`, `${handler.name} has assigned case ${reference} to you.`));
+          after(() => mailCaseHandlers(supabase, [targetId], origin, `Speak Up: ${reference} has been assigned to you`, `${handler.name} has assigned case ${reference} to you.`, caseRow.id));
         } else if (!targetId) {
           const caseId = caseRow.id;
-          after(async () => mailCaseHandlers(supabase, (await caseHolderIds(supabase, caseId)).filter((id) => id !== handler.id), origin, `Speak Up: ${reference} needs a handler`, `${handler.name} has returned case ${reference} to the unassigned list. Please open Speak Up cases and assign it.`));
+          after(async () => mailCaseHandlers(supabase, (await caseHolderIds(supabase, caseId)).filter((id) => id !== handler.id), origin, `Speak Up: ${reference} needs a handler`, `${handler.name} has returned case ${reference} to the unassigned list. Please open Speak Up cases and assign it.`, caseId));
         }
         return NextResponse.json({ ok: true }, { headers });
       }
@@ -362,7 +362,7 @@ export async function POST(request: Request) {
         await logAudit(supabase, { caseId: caseRow.id, reference: caseRow.reference, handler, type: "recused", detail: `Passed to ${target === "independent" ? "the independent handler" : "the handlers"}: ${reason}` });
         const origin = getSiteOrigin(request);
         const reference = caseRow.reference;
-        after(() => mailCaseHandlers(supabase, keep, origin, "Speak Up: a case has been passed to you", `Case ${reference} has been passed to ${target === "independent" ? "the independent handler" : "the case handlers"}. It has not been assigned yet. Please open Speak Up cases and assign it.`));
+        after(() => mailCaseHandlers(supabase, keep, origin, "Speak Up: a case has been passed to you", `Case ${reference} has been passed to ${target === "independent" ? "the independent handler" : "the case handlers"}. It has not been assigned yet. Please open Speak Up cases and assign it.`, caseRow.id));
         return NextResponse.json({ ok: true }, { headers });
       }
 

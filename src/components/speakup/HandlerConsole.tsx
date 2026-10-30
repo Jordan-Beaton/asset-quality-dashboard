@@ -451,6 +451,20 @@ export default function HandlerConsole() {
     }
   }
 
+  // An emailed link (/speak-up/cases?case=...) opens that case once the handler has signed in and unlocked.
+  const deepLink = useRef<string | null>(null);
+  useEffect(() => {
+    deepLink.current = new URLSearchParams(window.location.search).get("case");
+  }, []);
+  useEffect(() => {
+    const target = deepLink.current;
+    if (!target || !privateKey || !casesLoaded) return;
+    deepLink.current = null;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (cases.some((item) => item.id === target)) void openCase(target);
+     
+  }, [privateKey, casesLoaded, cases]);
+
   // ---- render ---------------------------------------------------------------------------------
 
   const statusLine = error ? <><strong>Status:</strong> {error}</> : <><strong>Status:</strong> {message || (loading ? "Loading..." : "Ready.")}</>;

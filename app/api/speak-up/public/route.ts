@@ -126,7 +126,7 @@ export async function POST(request: Request) {
         // every handler who can open the case is told the same thing; one of them then assigns it
         const origin = getSiteOrigin(request);
         const recipientIds = wraps.map((wrap) => String(wrap.handlerId));
-        after(() => mailCaseHandlers(supabase, recipientIds, origin, "Speak Up: a new report has been received", `A new report (${created.reference}) has been received${involves ? " on the independent route" : ""}. It has not been assigned yet. Please open Speak Up cases and assign it to yourself or to another handler.`));
+        after(() => mailCaseHandlers(supabase, recipientIds, origin, "Speak Up: a new report has been received", `A new report (${created.reference}) has been received${involves ? " on the independent route" : ""}. It has not been assigned yet. Please open Speak Up cases and assign it to yourself or to another handler.`, created.id));
         return NextResponse.json({ reference: created.reference }, { headers });
       }
 
@@ -173,7 +173,7 @@ export async function POST(request: Request) {
           const origin = getSiteOrigin(request);
           const reference = found.reference;
           const caseId = found.id;
-          after(async () => mailCaseHandlers(supabase, assignee ? [assignee] : await caseHolderIds(supabase, caseId), origin, `Speak Up: a new message on ${reference}`, `The reporter has added a message to case ${reference}.${assignee ? "" : " The case is not assigned yet."}`));
+          after(async () => mailCaseHandlers(supabase, assignee ? [assignee] : await caseHolderIds(supabase, caseId), origin, `Speak Up: a new message on ${reference}`, `The reporter has added a message to case ${reference}.${assignee ? "" : " The case is not assigned yet."}`, caseId));
         }
         if (found.status === "Awaiting reporter") await supabase.from("speak_up_cases").update({ status: "Investigating" }).eq("id", found.id);
         await logAudit(supabase, { caseId: found.id, reference: found.reference, type: "reporter_replied" });
