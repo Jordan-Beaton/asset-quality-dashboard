@@ -128,6 +128,28 @@ export default function SpeakUpAdminPanel() {
     }
   };
 
+  const resetKey = async (handler: AdminHandler) => {
+    if (!window.confirm(`Reset ${handler.name}'s key? Use this only if they have lost their passphrase. They will set a new key and need a current handler to approve them again.`)) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      try {
+        await api({ action: "reset-key", id: handler.id });
+      } catch (failure) {
+        if ((failure as { code?: string }).code !== "sole-holder") throw failure;
+        if (!window.confirm(`${(failure as Error).message}`)) return;
+        await api({ action: "reset-key", id: handler.id, force: true });
+      }
+      await load();
+      setMessage(`${handler.name}'s key was reset. They can now set a new one.`);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const makePoster = async () => {
     setBusy(true);
     setError("");
@@ -180,9 +202,12 @@ export default function SpeakUpAdminPanel() {
                     <td>{handler.keySetUp ? <span style={{ display: "grid", gap: "4px" }}><Chip text="Set up" /><span style={smallStyle}>{handler.fingerprint}</span></span> : <Chip text="Not set up yet" tone="warn" />}</td>
                     <td><Chip text={handler.active ? "Active" : "Removed"} tone={handler.active ? "plain" : "warn"} /></td>
                     <td>
-                      {handler.active
-                        ? <ImsButton variant="danger" disabled={busy} onClick={() => void setActive(handler, false)}>Remove</ImsButton>
-                        : <ImsButton variant="secondary" disabled={busy} onClick={() => void setActive(handler, true)}>Reactivate</ImsButton>}
+                      <span style={rowStyle}>
+                        {handler.active
+                          ? <ImsButton variant="danger" disabled={busy} onClick={() => void setActive(handler, false)}>Remove</ImsButton>
+                          : <ImsButton variant="secondary" disabled={busy} onClick={() => void setActive(handler, true)}>Reactivate</ImsButton>}
+                        {handler.active && handler.keySetUp ? <ImsButton variant="secondary" disabled={busy} onClick={() => void resetKey(handler)}>Reset key</ImsButton> : null}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -216,7 +241,7 @@ export default function SpeakUpAdminPanel() {
             <input id="speak-up-poster-address" style={imsInputStyle} value={address} onChange={(event) => setAddress(event.target.value)} />
           </Field>
           {isLocal ? <div style={noticeStyle}>This is a local address, which would not work on a phone, so the poster cannot be made from it. Open the IMS at its live address to make the poster, or type the live address above.</div> : null}
-          <p style={smallStyle}>Use one shared address on every poster. Do not add a site name to it, because that would show which site a report came from and could narrow down who wrote it. Place posters out of camera view, and keep them separate from the Observation Card QR codes. The Dutch and Polish wording should be checked by a native speaker before printing.</p>
+          <p style={smallStyle}>Use one shared address on every poster. Do not add a site name to it, because that would show which site a report came from and could narrow down who wrote it. Place posters out of camera view, and keep them separate from the Observation Card QR codes.</p>
           <div style={rowStyle}><ImsButton disabled={busy || !address.trim() || isLocal} onClick={() => void makePoster()}>Download poster (PDF)</ImsButton></div>
         </div>
       </ImsPanel>

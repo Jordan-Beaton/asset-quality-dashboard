@@ -203,6 +203,20 @@ export async function mailCaseHandlers(supabase: SupabaseClient, handlerIds: str
   }
 }
 
+// One handler's daily summary of cases that need attention: references and dates only, never anything the reporter wrote.
+export async function mailHandlerDigest(to: string, origin: string, subject: string, lines: string[]) {
+  const key = process.env.RESEND_API_KEY;
+  const from = process.env.DOCUMENT_NOTIFICATIONS_FROM_EMAIL;
+  if (!key || !from || !to || !lines.length) return;
+  try {
+    const link = origin ? origin + "/speak-up/cases" : "";
+    const html = "<p>These Speak Up cases need attention:</p><ul>" + lines.map((line) => "<li>" + escapeHtml(line) + "</li>").join("") + "</ul>" + (link ? '<p><a href="' + escapeHtml(link) + '">Open Speak Up cases</a></p>' : "") + '<p style="color:#53565A">This email contains no details of any report. Sign in to the IMS to read them.</p>';
+    await new Resend(key).emails.send({ from, to, subject, html });
+  } catch {
+    // a reminder that cannot be sent must never block anything else
+  }
+}
+
 // The public reporter page and its APIs stay closed until this is switched on for the environment. Until then the feature
 // can be used by signed-in handlers and administrators only.
 export function requirePublicChannelOpen() {

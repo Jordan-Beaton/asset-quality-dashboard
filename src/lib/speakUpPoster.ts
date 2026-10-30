@@ -1,4 +1,4 @@
-// Builds the A4 Speak Up poster in the browser: drawn at 300 dpi on a canvas (so every language prints correctly),
+// Builds the A4 Speak Up poster in the browser: drawn at 300 dpi on a canvas,
 // with the QR code drawn as crisp squares, then placed on a PDF page.
 
 const WIDTH = 2480;
@@ -85,16 +85,16 @@ export function drawSpeakUpPoster(context: Context, logo: { width: number; heigh
   context.font = `700 96px ${FONT}`;
   context.fillStyle = BRAND;
   context.fillText("See something that is not right?", MARGIN, y);
-  y = paragraph(context, "Raise a safety, quality, environmental, legal or integrity concern. You choose whether to give your name. Your report is locked on your phone before it is sent, so only the people who handle reports can read it.", MARGIN, y + 100, textWidth, 66, "400", INK, 1.32);
+  y = paragraph(context, "Raise a safety, quality, environmental, legal or integrity concern. You choose whether to give your name. Your report is locked on your phone before it is sent, so only the people who handle reports can read it.", MARGIN, y + 105, textWidth, 66, "400", INK, 1.32);
 
   // QR code, as large as the page allows, with the call to action directly under it
   const modules = qr.modules.size;
-  const unit = Math.floor(960 / modules);
+  const unit = Math.floor(1130 / modules);
   const drawn = unit * modules;
   const padding = 100;
   const boxSize = drawn + padding * 2;
   const boxX = (WIDTH - boxSize) / 2;
-  const boxY = y + 20;
+  const boxY = y + 70;
   context.fillStyle = WHITE;
   context.strokeStyle = BRAND;
   context.lineWidth = 14;
@@ -108,7 +108,7 @@ export function drawSpeakUpPoster(context: Context, logo: { width: number; heigh
     }
   }
 
-  y = boxY + boxSize + 100;
+  y = boxY + boxSize + 115;
   context.textAlign = "center";
   context.fillStyle = BRAND;
   context.font = `700 84px ${FONT}`;
@@ -124,39 +124,17 @@ export function drawSpeakUpPoster(context: Context, logo: { width: number; heigh
   context.fillText(address, WIDTH / 2, y + 86);
   context.textAlign = "left";
 
-  // the same message in the other languages used on site
-  y += 165;
-  const languages: Array<[string, string]> = [
-    ["English", "Scan to report safely. You can stay anonymous."],
-    ["Nederlands", "Scan om veilig te melden. U kunt anoniem blijven."],
-    ["Polski", "Zeskanuj, aby bezpiecznie zgłosić. Możesz pozostać anonimowy."],
-  ];
-  const rowHeight = 80;
-  context.fillStyle = SOFT;
-  roundedRect(context, MARGIN, y, textWidth, languages.length * rowHeight + 60, 28);
-  context.fill();
-  let languageY = y + 40 + 40;
-  for (const [language, line] of languages) {
-    context.fillStyle = BRAND;
-    context.font = `700 52px ${FONT}`;
-    context.fillText(language, MARGIN + 60, languageY);
-    context.fillStyle = INK;
-    context.font = `400 52px ${FONT}`;
-    context.fillText(line, MARGIN + 60 + 400, languageY);
-    languageY += rowHeight;
-  }
-
   // other routes and safety
-  const noteTop = y + languages.length * rowHeight + 60 + 36;
+  const noteTop = y + 190;
   const noteText = "Other ways to raise a concern: your manager, HR, or the HSE and Quality team. For extra privacy, use mobile data, not company Wi-Fi. If anyone is in danger now, stop work and call 999.";
-  context.font = `400 46px ${FONT}`;
+  context.font = `400 54px ${FONT}`;
   const noteLines = wrap(context, noteText, textWidth - 120);
-  const noteHeight = noteLines.length * 46 * 1.38 + 64;
+  const noteHeight = noteLines.length * 54 * 1.38 + 70;
   context.strokeStyle = WARNING;
   context.lineWidth = 10;
   roundedRect(context, MARGIN, noteTop, textWidth, noteHeight, 28);
   context.stroke();
-  paragraph(context, noteText, MARGIN + 60, noteTop + 78, textWidth - 120, 46, "400", INK, 1.38);
+  paragraph(context, noteText, MARGIN + 60, noteTop + 88, textWidth - 120, 54, "400", INK, 1.38);
 
   return noteTop + noteHeight;
 }

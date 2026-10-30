@@ -9,13 +9,18 @@ import { ncrGuide } from "../../src/components/guides/ncrGuideContent";
 import { mocGuide } from "../../src/components/guides/mocGuideContent";
 import { ainmGuide } from "../../src/components/guides/ainmGuideContent";
 import { reviewPointsGuide } from "../../src/components/guides/reviewPointsGuideContent";
+import { speakUpGuide } from "../../src/components/guides/speakUpGuideContent";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { page, guideSwitchBar, guideSwitchBtn, navBar, navGroup, navBtn, content } from "../../src/components/guides/guideKit";
 import type { GuideDefinition } from "../../src/components/guides/guideKit";
 
-const guides: GuideDefinition[] = [documentControlGuide, ncrGuide, mocGuide, ainmGuide, reviewPointsGuide];
+const allGuides: GuideDefinition[] = [documentControlGuide, ncrGuide, mocGuide, ainmGuide, reviewPointsGuide, speakUpGuide];
 
 function GuidesPageContent() {
   const searchParams = useSearchParams();
+  // The Speak Up guide is for Administrators only until HR agree to use the system, so nobody else learns of it from here.
+  const permissions = useImsPermissions();
+  const guides = useMemo(() => allGuides.filter((guide) => guide.id !== speakUpGuide.id || permissions.isAdmin), [permissions.isAdmin]);
   const linkedGuide = searchParams.get("guide")?.trim() || "";
 
   const initialGuide = guides.find((g) => g.id === linkedGuide) || documentControlGuide;

@@ -6,7 +6,7 @@ export async function updateSession(request: NextRequest) {
   // session check, and the visitor's cookies are removed from the request, so nothing links a signed-in member of
   // staff to a report. The marker header tells the layout not to load the signed-in IMS shell around the page.
   const publicPath = request.nextUrl.pathname;
-  if (publicPath === "/speak-up" || publicPath === "/api/speak-up/public" || publicPath === "/api/speak-up/evidence") {
+  if (publicPath === "/speak-up" || publicPath === "/api/speak-up/public" || publicPath === "/api/speak-up/evidence" || publicPath === "/api/speak-up/reminders") {
     const forwarded = new Headers(request.headers);
     forwarded.delete("cookie");
     forwarded.set("x-speak-up-public", "1");

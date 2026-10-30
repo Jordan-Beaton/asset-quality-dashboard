@@ -127,6 +127,33 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true }, { headers });
       }
 
+      case "reset-key": {
+        // For a handler who has lost their passphrase. Their old key is abandoned: they set a new one and need approving again.
+        const id = text(body.id, 40);
+        const { data: existing } = await supabase.from("speak_up_handlers").select("name,public_key").eq("id", id).maybeSingle();
+        if (!existing) throw new SpeakUpError("That handler could not be found.", 404);
+        if (!existing.public_key) throw new SpeakUpError("They have not set up a key, so there is nothing to reset.");
+        const { data: mine } = await supabase.from("speak_up_case_keys").select("case_id").eq("handler_id", id);
+        const caseIds = (mine || []).map((row) => row.case_id as string);
+        if (caseIds.length) {
+          const { data: holders } = await supabase.from("speak_up_case_keys").select("case_id").in("case_id", caseIds);
+          const counts = new Map<string, number>();
+          for (const row of holders || []) counts.set(row.case_id as string, (counts.get(row.case_id as string) || 0) + 1);
+          const only = caseIds.filter((caseId) => counts.get(caseId) === 1).length;
+          if (only && body.force !== true) {
+            throw new SpeakUpError(`${existing.name} is the only person who can open ${only} case${only === 1 ? "" : "s"}. Their old key cannot be recovered, so ${only === 1 ? "it" : "they"} will stay locked for good. Confirm to reset anyway.`, 409, "sole-holder");
+          }
+        }
+        const { error } = await supabase.from("speak_up_handlers").update({ public_key: null, encrypted_private_key: null, keys_created_at: null, approved_roles: [], approved_by: null, approved_at: null }).eq("id", id);
+        if (error) failFrom(error);
+        // the locked copies made for the old key are of no further use to anyone
+        await supabase.from("speak_up_case_keys").delete().eq("handler_id", id);
+        await supabase.from("speak_up_cases").update({ assigned_to: null, assigned_at: null }).eq("assigned_to", id);
+        await logAdminAudit(supabase, adminEmail, "handler_key_reset", `${existing.name}, waiting to set a new key and be approved`);
+        after(() => notifyHandlers(supabase, "Speak Up: a handler's key has been reset", `${existing.name}'s Speak Up key was reset by ${adminEmail}. They need to set a new key and be approved again before they receive reports.`));
+        return NextResponse.json({ ok: true }, { headers });
+      }
+
       default:
         throw new SpeakUpError("Unknown request.");
     }

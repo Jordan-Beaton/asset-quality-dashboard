@@ -23,6 +23,17 @@ work cases in the IMS (`/speak-up/cases`); the IMS administrator manages handler
 - A new report emails every handler who holds it (no content). One handler assigns it; from then on only the assignee is emailed about
   reporter replies. There is deliberately no shared mailbox.
 
+## Reminders
+`/api/speak-up/reminders` runs daily at 07:00 UTC (`vercel.json`). Each joined handler gets one content-free email listing their cases that
+are near or past the 7-day acknowledgement or 3-month feedback target, unassigned for over a day, or holding a reporter message for over
+2 days. `?dry=1` (with the bearer secret) reports counts without sending.
+
+## Lost passphrase
+Admin > Speak Up > **Reset key** abandons the handler's old key; they set a new one and must be approved again. Cases only they could open stay locked.
+
+## Handler guide
+Process Guides > Speak Up (handlers), shown to Admin users only until HR agree (`app/guides/page.tsx`).
+
 ## Setup order (Supabase SQL editor, once each)
 1. `scripts/sql/speak_up.sql`
 2. `scripts/sql/speak_up_hardening.sql`
@@ -34,6 +45,7 @@ Pushing does not run these. Enable MFA (TOTP) under Supabase Authentication befo
   handlers and administrators can use the feature. Set it for the live phone test and for launch.
 - `SPEAK_UP_REQUIRE_MFA=false` turns the second sign-in step off. For local testing only; never set it on Vercel.
 - `NEXT_PUBLIC_SITE_URL` (or the Vercel production URL) is the address used in email links and as the poster QR default.
+- `CRON_SECRET` (any long random string) protects the daily reminder job. Vercel sends it automatically to the schedule in `vercel.json`. Without it the reminder route refuses to run.
 - Uses the existing `RESEND_API_KEY` and `DOCUMENT_NOTIFICATIONS_FROM_EMAIL`.
 
 ## Visibility
@@ -46,8 +58,9 @@ The home tile shows for Admin users only (`app/home/page.tsx`). Opening the scre
 - A recused or removed handler keeps what they have already read (case keys are not rotated).
 - Category, report mode and dates are readable by the database owner. Retention (12 months no action / 6 years action taken) is
   to be confirmed by HR and legal.
-- Not built yet: daily deadline reminder emails (need a scheduled job on the live site), and the HR-owned procedure, privacy notice and DPIA.
+- Not built (HR-owned): the whistleblowing procedure, privacy notice and DPIA.
 
 ## Files
-`app/speak-up/*`, `app/api/speak-up/{public,evidence,handler,admin}/route.ts`, `src/components/speakup/*`,
+`app/speak-up/*`, `app/api/speak-up/{public,evidence,handler,admin,reminders}/route.ts`, `src/components/speakup/*`,
+`src/components/guides/speakUpGuideContent.tsx`, `vercel.json`,
 `src/lib/speakUp{Config,Crypto,Server,Poster}.ts`, `scripts/sql/speak_up*.sql`.
