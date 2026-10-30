@@ -25,6 +25,21 @@ const nextConfig: NextConfig = {
       "./node_modules/@napi-rs/canvas-*/**/*",
     ],
   },
+
+  // Speak Up pages and APIs must not be framed by another site, and must not tell other sites where the visitor came from.
+  async headers() {
+    const secure = [
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+      { key: "Referrer-Policy", value: "no-referrer" },
+      { key: "Cache-Control", value: "no-store" },
+    ];
+    return [
+      { source: "/speak-up", headers: secure },
+      { source: "/speak-up/:path*", headers: secure },
+      { source: "/api/speak-up/:path*", headers: secure },
+    ];
+  },
 };
 
 export default nextConfig;

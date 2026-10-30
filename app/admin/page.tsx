@@ -6,6 +6,7 @@ import { ImsPermissionNotice, useImsPermissions } from "../../src/components/Ims
 import { ImsButton, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import SpeakUpAdminPanel from "../../src/components/speakup/SpeakUpAdminPanel";
 import { IMS_PERMISSION_REGISTRY } from "../../src/lib/imsPermissionRegistry";
 import {
   imsColours,
@@ -17,7 +18,7 @@ import {
   imsTableStyle,
 } from "../../src/components/imsTheme";
 
-type AdminView = "dashboard" | "users" | "roles" | "company" | "reference" | "notifications" | "audit";
+type AdminView = "dashboard" | "users" | "roles" | "company" | "reference" | "notifications" | "audit" | "speakup";
 
 type PersonRow = {
   id: string;
@@ -134,6 +135,7 @@ type AdminData = {
 const adminTabs: Array<{ value: AdminView; label: string }> = [
   { value: "users", label: "Users & Access" },
   { value: "reference", label: "Reference Data" },
+  { value: "speakup", label: "Speak Up" },
   { value: "audit", label: "Audit Log" },
 ];
 
@@ -1551,6 +1553,8 @@ export default function AdminDashboardPage() {
           </ImsPanel>
         </section>
       ) : null}
+
+      {activeView === "speakup" ? <SpeakUpAdminPanel /> : null}
 
       {activeView === "notifications" ? (
         <ImsPanel title="Notification Settings" subtitle="Planned settings area for due-date reminders and escalation rules.">

@@ -184,6 +184,11 @@ const peopleNavItems: NavItem[] = [
   { href: "/people", label: "People", icon: "people" },
 ];
 
+const speakUpNavItems: NavItem[] = [
+  { href: "/home", label: "Home", icon: "home" },
+  { href: "/speak-up/cases", label: "Cases", icon: "observations" },
+];
+
 const actionNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/actions", label: "Actions", icon: "actions" },
@@ -215,7 +220,7 @@ function getAllowedModuleKeys(role: SystemRole) {
 }
 
 function getAccessAreaFromHref(href: string): AccessArea {
-  if (href === "/home" || href === "/" || href === "/field-tools") return "home";
+  if (href === "/home" || href === "/" || href === "/field-tools" || href.startsWith("/speak-up")) return "home";
   if (href === "/actions") return "actions";
   if (href === "/people") return "people";
   if (href === "/management-review") return "management-review";
@@ -748,7 +753,8 @@ export default function AppShell({ children }: AppShellProps) {
   const isPublicItpSignOffPage = pathname === "/projects/itp-sign-off-action";
   const isPublicAinmSignOffPage = pathname === "/hse/ainm/signoff-action";
   const isPublicInvitePage = pathname === "/invite";
-  const isPublicStandalonePage = isPublicObservationPage || isPublicItpSignOffPage || isPublicAinmSignOffPage || isPublicInvitePage;
+  const isPublicSpeakUpPage = pathname === "/speak-up";
+  const isPublicStandalonePage = isPublicObservationPage || isPublicSpeakUpPage || isPublicItpSignOffPage || isPublicAinmSignOffPage || isPublicInvitePage;
   const isHomePage = pathname === "/home";
   const isFieldToolsPage = pathname === "/field-tools";
   const isAssetModule = pathname.startsWith("/assets");
@@ -757,6 +763,7 @@ export default function AppShell({ children }: AppShellProps) {
   const isDocumentModule = pathname.startsWith("/documents") || pathname.startsWith("/certification");
   const isAdminModule = pathname.startsWith("/admin");
   const isPeopleModule = pathname.startsWith("/people");
+  const isSpeakUpModule = pathname.startsWith("/speak-up") && !isPublicSpeakUpPage;
   const isActionModule = pathname === "/actions";
   const isProjectModule = pathname.startsWith("/projects") || pathname.startsWith("/inspections");
   const isLessonsModule = pathname.startsWith("/lessons-learned");
@@ -794,6 +801,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? "HSE Management"
     : isAdminModule
     ? "Admin / Settings"
+    : isSpeakUpModule
+    ? "Speak Up"
     : isPeopleModule
     ? "People Management"
     : "Quality Management";
@@ -817,6 +826,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? "Health, safety and environment system"
     : isAdminModule
     ? "Master data and system configuration"
+    : isSpeakUpModule
+    ? "Confidential reports and case handling"
     : isPeopleModule
     ? "Shared people directory and status management"
     : "Quality management system";
@@ -830,6 +841,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? hseNavItems
     : isAdminModule
     ? adminNavItems
+    : isSpeakUpModule
+    ? speakUpNavItems
     : isPeopleModule
     ? peopleNavItems
     : isActionModule
@@ -909,6 +922,11 @@ export default function AppShell({ children }: AppShellProps) {
     let isMounted = true;
 
     async function loadSignedInName() {
+      // the public Speak Up page must never look up who is viewing it
+      if (window.location.pathname === "/speak-up") {
+        setPermissionsLoaded(true);
+        return;
+      }
       setPermissionsLoaded(false);
       const {
         data: { user },

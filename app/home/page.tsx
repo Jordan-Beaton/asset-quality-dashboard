@@ -139,6 +139,17 @@ const moduleCards = [
     cta: "Open",
   },
   {
+    title: "Speak Up",
+    short: "Speak Up",
+    icon: "speakup",
+    description: "Confidential reports from staff, handled by the named case handlers.",
+    href: "/speak-up/cases",
+    moduleKey: "speak-up",
+    status: "Ready",
+    group: "Governance",
+    cta: "Open",
+  },
+  {
     title: "Admin / Settings",
     short: "Admin",
     icon: "admin",
@@ -308,6 +319,15 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
     );
   }
 
+  if (icon === "speakup") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
+        <path {...common} d="M4 5h16v11H9l-5 4V5z" />
+        <path {...common} d="M8.5 10h7M8.5 13h4" />
+      </svg>
+    );
+  }
+
   if (icon === "people") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
@@ -399,6 +419,7 @@ export default function HomePage() {
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, [effectiveHomeView]);
+  const visibleCards = moduleCards.filter((card) => card.moduleKey !== "speak-up" || permissions.isAdmin);
   const isModuleAccessible = (moduleKey: (typeof moduleCards)[number]["moduleKey"]) => {
     if (!permissions.loaded) return true;
     if (moduleKey === "field-tools") {
@@ -563,7 +584,7 @@ export default function HomePage() {
   const constellationClusters = CONSTELLATION_GROUP_ORDER.map((group) => ({
     group,
     pos: GROUP_POSITIONS[group] || [50, 50],
-    cards: moduleCards.filter((card) => card.group === group),
+    cards: visibleCards.filter((card) => card.group === group),
   })).filter((cluster) => cluster.cards.length > 0);
 
   return (
@@ -904,10 +925,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {effectiveHomeView === "grid" ? <div style={moduleGridStyle}>{moduleCards.map((card, index) => renderModuleCard(card, index))}</div> : null}
+        {effectiveHomeView === "grid" ? <div style={moduleGridStyle}>{visibleCards.map((card, index) => renderModuleCard(card, index))}</div> : null}
 
-        {effectiveHomeView === "compact" ? <div className="module-compact-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "compact"))}</div> : null}
-        {effectiveHomeView === "list" ? <div className="module-list-view">{moduleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
+        {effectiveHomeView === "compact" ? <div className="module-compact-view">{visibleCards.map((card, index) => renderModuleCard(card, index, "compact"))}</div> : null}
+        {effectiveHomeView === "list" ? <div className="module-list-view">{visibleCards.map((card, index) => renderModuleCard(card, index, "list"))}</div> : null}
         {effectiveHomeView === "hub" ? (
           <div className="module-hub-view">
             <div className="hub-connection-ring" aria-hidden="true" />
@@ -916,8 +937,8 @@ export default function HomePage() {
                 <source src="/enshore-e-outline-loop.mp4" type="video/mp4" />
               </video>
             </div>
-            {moduleCards.map((card, index) => {
-              const angle = (index / moduleCards.length) * Math.PI * 2 - Math.PI / 2;
+            {visibleCards.map((card, index) => {
+              const angle = (index / visibleCards.length) * Math.PI * 2 - Math.PI / 2;
               return (
                 <div
                   className="hub-module-position"
@@ -943,11 +964,11 @@ export default function HomePage() {
             <div className="mc-head">
               <div className="mc-head-title">
                 Enshore IMS
-                <span>Workspace status &middot; {moduleCards.length} systems</span>
+                <span>Workspace status &middot; {visibleCards.length} systems</span>
               </div>
               <div className="mc-clock"><span className="mc-live-dot" aria-hidden="true" />{missionClock}</div>
             </div>
-            <div className="mc-grid">{moduleCards.map((card, index) => renderMissionTile(card, index))}</div>
+            <div className="mc-grid">{visibleCards.map((card, index) => renderMissionTile(card, index))}</div>
           </div>
         ) : null}
 
@@ -996,9 +1017,9 @@ export default function HomePage() {
             </div>
             <div className="holo-head">
               <div className="holo-eyebrow">Enshore IMS</div>
-              <h2 className="holo-heading">Holo Deck &middot; {moduleCards.length} workspaces</h2>
+              <h2 className="holo-heading">Holo Deck &middot; {visibleCards.length} workspaces</h2>
             </div>
-            <div className="holo-grid">{moduleCards.map((card, index) => renderHoloCard(card, index))}</div>
+            <div className="holo-grid">{visibleCards.map((card, index) => renderHoloCard(card, index))}</div>
           </div>
         ) : null}
       </section>

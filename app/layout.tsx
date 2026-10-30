@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import AppShell from "../src/components/AppShell";
 
@@ -7,11 +8,13 @@ export const metadata: Metadata = {
   description: "Quality management system",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The public Speak Up page is served without the signed-in IMS shell, so it never looks up who is viewing it.
+  const publicSpeakUp = (await headers()).get("x-speak-up-public") === "1";
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -23,7 +26,7 @@ export default function RootLayout({
           color: "#000000",
         }}
       >
-        <AppShell>{children}</AppShell>
+        {publicSpeakUp ? children : <AppShell>{children}</AppShell>}
       </body>
     </html>
   );
