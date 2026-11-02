@@ -6,6 +6,7 @@ import { imsColours, imsInputStyle } from "../../src/components/imsTheme";
 import { SPEAK_UP_REPORTER_GROUPS, type SpeakUpReportMode } from "../../src/lib/speakUpConfig";
 import {
   ACCESS_CODE_ITERATIONS,
+  decryptBytes,
   decryptText,
   deriveFromAccessCode,
   encryptBytes,
@@ -42,7 +43,10 @@ type OpenCase = {
   outcome: string | null;
   body: string;
   messages: CaseMessage[];
+  documents: Array<{ id: string; name: string; size: number; fileIv: string; createdAt: string }>;
 };
+
+type CaseDocument = { id: string; size: number; fileIv: string; nameCipher: string; nameIv: string; createdAt: string };
 
 const MODES: Array<{ value: SpeakUpReportMode; title: string; text: string }> = [
   { value: "anonymous", title: "Anonymous", text: "Nothing about you is collected. We can only reply through your reference and access code." },
@@ -124,6 +128,17 @@ function formatReference(input: string) {
   const year = digits.slice(0, 4);
   const number = digits.slice(4, 10);
   return REFERENCE_PREFIX + [year, number].filter(Boolean).join("-");
+}
+
+function saveBytes(name: string, bytes: Uint8Array) {
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/octet-stream" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 function formatDate(value: string | null) {
@@ -297,6 +312,7 @@ export default function SpeakUpPage() {
       reference: string; status: string; category: string; receivedAt: string; acknowledgedAt: string | null; outcomeSharedAt: string | null; closedAt: string | null; outcome: string | null;
       reporterWrappedKey: string; reporterWrapIv: string; bodyCipher: string; bodyIv: string;
       messages: Array<{ id: string; authorRole: string; cipher: string; iv: string; createdAt: string }>;
+      documents: CaseDocument[];
     }>({ action: "case", reference, authToken });
     const caseKey = await unwrapCaseKeyForReporter(wrapKey, data.reporterWrappedKey, data.reporterWrapIv);
     session.current = { reference: data.reference, authToken, caseKey };
@@ -306,6 +322,7 @@ export default function SpeakUpPage() {
       createdAt: message.createdAt,
       text: await decryptText(caseKey, message.cipher, message.iv).catch(() => "(This message could not be read.)"),
     })));
+    const documents = await Promise.all((data.documents || []).map(async (file) => ({ id: file.id, size: file.size, fileIv: file.fileIv, createdAt: file.createdAt, name: await decryptText(caseKey, file.nameCipher, file.nameIv).catch(() => "document") })));
     setOpenCase({
       reference: data.reference,
       status: data.status,
@@ -317,7 +334,25 @@ export default function SpeakUpPage() {
       outcome: data.outcome,
       body: await decryptText(caseKey, data.bodyCipher, data.bodyIv),
       messages,
+      documents,
     });
+  }
+
+  // A document a handler attached: fetched still locked, through our own server, and unlocked here on this device.
+  async function downloadDocument(file: OpenCase["documents"][number]) {
+    const current = session.current;
+    if (!current) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/speak-up/evidence/download", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reference: current.reference, authToken: current.authToken, evidenceId: file.id }) });
+      if (!response.ok) throw new Error("The document could not be downloaded. Please try again.");
+      saveBytes(file.name, await decryptBytes(current.caseKey, new Uint8Array(await response.arrayBuffer()), file.fileIv));
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : "The document could not be downloaded.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function openFromForm() {
@@ -346,14 +381,16 @@ export default function SpeakUpPage() {
       const data = await postJson<{
         status: string; acknowledgedAt: string | null; outcomeSharedAt: string | null; closedAt: string | null; outcome: string | null;
         messages: Array<{ id: string; authorRole: string; cipher: string; iv: string; createdAt: string }>;
+        documents: CaseDocument[];
       }>({ action: "case", reference: current.reference, authToken: current.authToken });
+      const documents = await Promise.all((data.documents || []).map(async (file) => ({ id: file.id, size: file.size, fileIv: file.fileIv, createdAt: file.createdAt, name: await decryptText(current.caseKey, file.nameCipher, file.nameIv).catch(() => "document") })));
       const messages = await Promise.all(data.messages.map(async (message) => ({
         id: message.id,
         authorRole: message.authorRole,
         createdAt: message.createdAt,
         text: await decryptText(current.caseKey, message.cipher, message.iv).catch(() => "(This message could not be read.)"),
       })));
-      setOpenCase((existing) => (existing ? { ...existing, status: data.status, acknowledgedAt: data.acknowledgedAt, outcomeSharedAt: data.outcomeSharedAt, closedAt: data.closedAt, outcome: data.outcome, messages } : existing));
+      setOpenCase((existing) => (existing ? { ...existing, status: data.status, acknowledgedAt: data.acknowledgedAt, outcomeSharedAt: data.outcomeSharedAt, closedAt: data.closedAt, outcome: data.outcome, messages, documents } : existing));
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : "The case could not be refreshed.");
     } finally {
@@ -523,6 +560,18 @@ export default function SpeakUpPage() {
               <h2 style={subheading}>Your report</h2>
               <p style={{ ...para, whiteSpace: "pre-wrap" }}>{openCase.body}</p>
             </section>
+            {openCase.documents.length ? (
+              <section style={card}>
+                <h2 style={subheading}>Documents from the case handler</h2>
+                {openCase.documents.map((file) => (
+                  <div key={file.id} style={{ padding: "12px 14px", borderRadius: "12px", border: `1px solid ${imsColours.border}`, display: "grid", gap: "8px" }}>
+                    <span style={para}>{file.name}</span>
+                    <span style={small}>{Math.max(1, Math.round(file.size / 1024))} KB, added {formatDate(file.createdAt)}</span>
+                    <button type="button" style={secondary} disabled={busy} onClick={() => void downloadDocument(file)}>Download</button>
+                  </div>
+                ))}
+              </section>
+            ) : null}
             <section style={card}>
               <h2 style={subheading}>Messages</h2>
               {openCase.messages.length === 0 ? <p style={small}>No messages yet. Check back later, or add something below.</p> : null}

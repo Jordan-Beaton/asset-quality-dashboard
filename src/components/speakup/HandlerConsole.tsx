@@ -15,6 +15,8 @@ import {
   imsTextareaStyle,
 } from "../imsTheme";
 import {
+  SPEAK_UP_DOCUMENT_EXTENSIONS,
+  SPEAK_UP_LIMITS,
   SPEAK_UP_OUTCOME_LABELS,
   SPEAK_UP_STATUSES,
   type SpeakUpOutcome,
@@ -22,6 +24,7 @@ import {
 import {
   decryptBytes,
   decryptText,
+  encryptBytes,
   encryptText,
   generateCaseKey,
   generateHandlerKeyPair,
@@ -60,7 +63,6 @@ type CaseSummary = {
   outcomeSharedAt: string | null;
   closedAt: string | null;
   outcome: string | null;
-  retentionUntil: string | null;
   assignedTo: string | null;
   assignedToName: string | null;
   lastMessageRole?: string | null;
@@ -77,7 +79,7 @@ type CaseDetailRaw = {
   contactIv: string | null;
   reporterGroup: string | null;
   messages: Array<{ id: string; authorRole: string; authorName: string | null; cipher: string; iv: string; createdAt: string }>;
-  evidence: Array<{ id: string; size: number; fileIv: string; nameCipher: string; nameIv: string; createdAt: string }>;
+  evidence: Array<{ id: string; size: number; fileIv: string; nameCipher: string; nameIv: string; createdAt: string; addedBy: string; addedByName: string | null }>;
   audit: Array<{ id: string; actor: string | null; type: string; detail: string | null; at: string }>;
   access: Person[];
   eligible: Person[];
@@ -89,10 +91,10 @@ type CaseDetail = {
   body: string;
   contact: string | null;
   messages: Array<{ id: string; authorRole: string; authorName: string | null; text: string; createdAt: string }>;
-  evidence: Array<{ id: string; name: string; size: number; fileIv: string }>;
+  evidence: Array<{ id: string; name: string; size: number; fileIv: string; createdAt: string; addedBy: string; addedByName: string | null }>;
 };
 
-type Tab = "cases" | "retention" | "team";
+type Tab = "cases" | "team";
 
 const AUTO_LOCK_MS = 15 * 60 * 1000;
 
@@ -150,8 +152,29 @@ function slaChips(item: CaseSummary) {
   return chips;
 }
 
-function isDueForDeletion(item: CaseSummary) {
-  return item.status === "Closed" && Boolean(item.retentionUntil) && item.retentionUntil! <= new Date().toISOString().slice(0, 10);
+// Every handler sees every case in the register, but a case that someone else is looking after is for information only. The
+// server enforces the same rule, so this only decides what looks clickable.
+const canOpenCase = (item: CaseSummary, handlerId: string) => !item.assignedTo || item.assignedTo === handlerId;
+
+const MIME_TYPES: Record<string, string> = {
+  pdf: "application/pdf", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  txt: "text/plain", csv: "text/csv", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+};
+const extensionOf = (name: string) => name.split(".").pop()?.toLowerCase() || "";
+const mimeFor = (name: string) => MIME_TYPES[extensionOf(name)] || "application/octet-stream";
+const isImageName = (name: string) => ["png", "jpg", "jpeg"].includes(extensionOf(name));
+
+function saveBytes(name: string, bytes: Uint8Array, type: string) {
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 function Chip({ text, tone = "plain" }: { text: string; tone?: "bad" | "warn" | "plain" }) {
@@ -389,7 +412,7 @@ export default function HandlerConsole() {
         body: await read(raw.bodyCipher, raw.bodyIv),
         contact: raw.contactCipher && raw.contactIv ? await read(raw.contactCipher, raw.contactIv) : null,
         messages: await Promise.all(raw.messages.map(async (entry) => ({ id: entry.id, authorRole: entry.authorRole, authorName: entry.authorName, createdAt: entry.createdAt, text: await read(entry.cipher, entry.iv) }))),
-        evidence: await Promise.all(raw.evidence.map(async (file) => ({ id: file.id, name: await read(file.nameCipher, file.nameIv), size: file.size, fileIv: file.fileIv }))),
+        evidence: await Promise.all(raw.evidence.map(async (file) => ({ id: file.id, name: await read(file.nameCipher, file.nameIv), size: file.size, fileIv: file.fileIv, createdAt: file.createdAt, addedBy: file.addedBy, addedByName: file.addedByName }))),
       });
       setMessage(`Opened ${raw.case.reference}.`);
       window.setTimeout(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -436,21 +459,6 @@ export default function HandlerConsole() {
     if (privateKey) void loadTeam().catch((failure) => setError(failure instanceof Error ? failure.message : "The handlers could not be loaded."));
   }, [privateKey, tab]);
 
-  async function deleteCase(item: CaseSummary) {
-    if (!window.confirm(`Permanently delete ${item.reference} and its files? This cannot be undone.`)) return;
-    setBusy(true);
-    setError("");
-    try {
-      await api({ action: "delete-case", caseId: item.id });
-      await loadCases();
-      setMessage(`${item.reference} was deleted.`);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "The case could not be deleted.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   // An emailed link (/speak-up/cases?case=...) opens that case once the handler has signed in and unlocked.
   const deepLink = useRef<string | null>(null);
   useEffect(() => {
@@ -461,7 +469,8 @@ export default function HandlerConsole() {
     if (!target || !privateKey || !casesLoaded) return;
     deepLink.current = null;
     window.history.replaceState(null, "", window.location.pathname);
-    if (cases.some((item) => item.id === target)) void openCase(target);
+    const linked = cases.find((item) => item.id === target);
+    if (linked && me && canOpenCase(linked, me.id)) void openCase(target);
      
   }, [privateKey, casesLoaded, cases]);
 
@@ -537,7 +546,7 @@ export default function HandlerConsole() {
   const openCases = cases.filter((item) => item.status !== "Closed");
   const attention = openCases.filter((item) => slaChips(item).some((chip) => chip.tone === "bad"));
   const unassigned = openCases.filter((item) => !item.assignedTo);
-  const dueForDeletion = cases.filter(isDueForDeletion);
+  const closedCases = cases.filter((item) => item.status === "Closed");
   const query = search.trim().toLowerCase();
   const visible = cases.filter((item) => {
     if (!showClosed && !statusFilter && item.status === "Closed") return false;
@@ -574,7 +583,7 @@ export default function HandlerConsole() {
         <div style={{ ...noticeStyle, marginBottom: "16px" }}>{pending.length === 1 ? "One person is" : `${pending.length} people are`} waiting for your approval. Open the Handlers tab to review.</div>
       ) : null}
       <ImsTabs
-        tabs={[{ value: "cases", label: "Cases" }, { value: "retention", label: "Due for deletion" }, { value: "team", label: "Handlers" }]}
+        tabs={[{ value: "cases", label: "Cases" }, { value: "team", label: "Handlers" }]}
         active={tab}
         onChange={(value) => { setTab(value); setError(""); }}
         ariaLabel="Speak Up views"
@@ -586,7 +595,7 @@ export default function HandlerConsole() {
             <QualityKpiCard title="Open cases" value={openCases.length} accent={imsColours.brand} onClick={() => { clearFilters(); }} />
             <QualityKpiCard title="Overdue" value={attention.length} accent={imsColours.danger} onClick={() => { clearFilters(); setAttentionOnly(true); }} active={attentionOnly} />
             <QualityKpiCard title="Unassigned" value={unassigned.length} accent={imsColours.warning} onClick={() => { clearFilters(); setAssignmentFilter("unassigned"); }} active={assignmentFilter === "unassigned"} />
-            <QualityKpiCard title="Due for deletion" value={dueForDeletion.length} accent={imsColours.muted} onClick={() => setTab("retention")} />
+            <QualityKpiCard title="Closed" value={closedCases.length} accent={imsColours.muted} onClick={() => { clearFilters(); setShowClosed(true); }} active={showClosed} />
           </section>
 
           <ImsFilterPanel search={search} onSearchChange={setSearch} searchPlaceholder="Search reference, category or status" showFilters={showFilters} onToggleFilters={() => setShowFilters((value) => !value)} actions={<ImsButton variant="secondary" onClick={clearFilters}>Clear Filters</ImsButton>}>
@@ -620,16 +629,16 @@ export default function HandlerConsole() {
             </div>
           </ImsFilterPanel>
 
-          <ImsPanel title="Case register" subtitle="Click a case to open it.">
+          <ImsPanel title="Case register" subtitle="Click a case to open it. A case another handler is looking after is shown for information only.">
             <div style={{ overflowX: "auto" }}>
               <table className="ims-data-table" style={{ width: "100%" }}>
                 <thead>
-                  <tr><th>Reference</th><th>Category</th><th>Status</th><th>Assigned to</th><th>Route</th><th>Reporter</th><th>Received</th><th>Outcome</th><th>Keep until</th><th>Deadlines</th></tr>
+                  <tr><th>Reference</th><th>Category</th><th>Status</th><th>Assigned to</th><th>Route</th><th>Reporter</th><th>Received</th><th>Outcome</th><th>Deadlines</th></tr>
                 </thead>
                 <tbody>
-                  {visible.length === 0 ? <tr><td colSpan={10}>{casesLoaded ? "No cases match." : "Loading..."}</td></tr> : null}
+                  {visible.length === 0 ? <tr><td colSpan={9}>{casesLoaded ? "No cases match." : "Loading..."}</td></tr> : null}
                   {visible.map((item) => (
-                    <tr key={item.id} onClick={() => void openCase(item.id)} style={{ cursor: "pointer" }} data-selected={detail?.raw.case.id === item.id ? "true" : undefined}>
+                    <tr key={item.id} onClick={() => { if (canOpenCase(item, me.id)) void openCase(item.id); }} title={canOpenCase(item, me.id) ? undefined : `Being handled by ${item.assignedToName || "another handler"}. Only they can open it.`} style={{ cursor: canOpenCase(item, me.id) ? "pointer" : "default", opacity: canOpenCase(item, me.id) ? 1 : 0.7 }} data-selected={detail?.raw.case.id === item.id ? "true" : undefined}>
                       <td><strong>{item.reference}</strong></td>
                       <td>{item.category}</td>
                       <td><Chip text={item.status} /></td>
@@ -638,7 +647,6 @@ export default function HandlerConsole() {
                       <td>{item.mode === "anonymous" ? "Anonymous" : item.mode === "confidential" ? "Confidential" : "Named"}</td>
                       <td>{dateText(item.receivedAt)}</td>
                       <td>{item.outcome ? SPEAK_UP_OUTCOME_LABELS[item.outcome as SpeakUpOutcome] || item.outcome : "-"}</td>
-                      <td>{item.retentionUntil ? dateText(item.retentionUntil) : "-"}</td>
                       <td><span style={rowStyle}>{slaChips(item).length ? slaChips(item).map((chip) => <Chip key={chip.text} text={chip.text} tone={chip.tone} />) : "-"}</span></td>
                     </tr>
                   ))}
@@ -663,29 +671,6 @@ export default function HandlerConsole() {
             ) : <ImsPanel title="Case detail"><p style={smallStyle}>Click a case in the register to open the full detail panel.</p></ImsPanel>}
           </div>
         </div>
-      ) : null}
-
-      {tab === "retention" ? (
-        <ImsPanel title="Closed cases past their retention date" subtitle="Closed cases are kept for 12 months when no further action was taken and 6 years when action was taken (to be confirmed by HR and legal).">
-          {dueForDeletion.length === 0 ? <p style={paraStyle}>Nothing is due for deletion.</p> : (
-            <div style={{ overflowX: "auto" }}>
-              <table className="ims-data-table" style={{ width: "100%" }}>
-                <thead><tr><th>Reference</th><th>Closed</th><th>Keep until</th><th>Outcome</th><th>Action</th></tr></thead>
-                <tbody>
-                  {dueForDeletion.map((item) => (
-                    <tr key={item.id}>
-                      <td><strong>{item.reference}</strong></td>
-                      <td>{dateText(item.closedAt)}</td>
-                      <td>{dateText(item.retentionUntil)}</td>
-                      <td>{SPEAK_UP_OUTCOME_LABELS[item.outcome as SpeakUpOutcome] || "-"}</td>
-                      <td><ImsButton variant="danger" disabled={busy} onClick={() => void deleteCase(item)}>Delete permanently</ImsButton></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </ImsPanel>
       ) : null}
 
       {tab === "team" ? (
@@ -766,6 +751,7 @@ function CaseView(props: {
   const [grantId, setGrantId] = useState("");
   const [assignId, setAssignId] = useState("");
   const [preview, setPreview] = useState<{ id: string; url: string } | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview.url); }, [preview]);
 
@@ -821,24 +807,89 @@ function CaseView(props: {
     onPassedOn();
   });
 
-  const showFile = (file: CaseDetail["evidence"][number]) => run(async () => {
+  // A file is fetched still locked, through a short-lived link, and unlocked here in the browser.
+  const fetchFile = async (file: CaseDetail["evidence"][number]) => {
     const { url } = await api<{ url: string }>({ action: "evidence-url", caseId: item.id, evidenceId: file.id });
     const response = await fetch(url);
     if (!response.ok) throw new Error("The file could not be downloaded.");
-    const plain = await decryptBytes(detail.caseKey, new Uint8Array(await response.arrayBuffer()), file.fileIv);
-    setPreview({ id: file.id, url: URL.createObjectURL(new Blob([plain as BlobPart], { type: "image/jpeg" })) });
+    return decryptBytes(detail.caseKey, new Uint8Array(await response.arrayBuffer()), file.fileIv);
+  };
+
+  const showFile = (file: CaseDetail["evidence"][number]) => run(async () => {
+    const plain = await fetchFile(file);
+    setPreview({ id: file.id, url: URL.createObjectURL(new Blob([plain as BlobPart], { type: mimeFor(file.name) })) });
+  });
+
+  const saveFile = (file: CaseDetail["evidence"][number]) => run(async () => {
+    saveBytes(file.name, await fetchFile(file), mimeFor(file.name));
+  });
+
+  // Attach a document for the reporter. It is locked here with the case key before it leaves the browser, and a note goes into
+  // the conversation so the reporter knows to look.
+  const addDocument = (file: File) => run(async () => {
+    if (!SPEAK_UP_DOCUMENT_EXTENSIONS.includes(extensionOf(file.name))) throw new Error(`That type of file cannot be attached. Use one of: ${SPEAK_UP_DOCUMENT_EXTENSIONS.join(", ")}.`);
+    if (file.size > SPEAK_UP_LIMITS.evidenceBytes) throw new Error(`That file is larger than ${Math.round(SPEAK_UP_LIMITS.evidenceBytes / 1_000_000)} MB. Use a smaller file.`);
+    const encrypted = await encryptBytes(detail.caseKey, new Uint8Array(await file.arrayBuffer()));
+    const name = await encryptText(detail.caseKey, file.name);
+    const response = await fetch("/api/speak-up/handler-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream", "x-speakup-case": item.id, "x-speakup-iv": encrypted.iv, "x-speakup-name": name.cipher, "x-speakup-name-iv": name.iv },
+      body: new Blob([encrypted.cipher as BlobPart]),
+    });
+    if (!response.ok) {
+      const result = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(result.error || "The document could not be added.");
+    }
+    const note = await encryptText(detail.caseKey, `A document has been attached to this case: ${file.name}. You can download it under Documents.`);
+    await api({ action: "reply", caseId: item.id, cipher: note.cipher, iv: note.iv });
+    onChanged("Document added, and the reporter has been told in the conversation.");
+  });
+
+  // A copy of the whole case, made here because this is the only place it can be read. When everything attached fits inside a
+  // PDF (photos and PDFs) it is one PDF; otherwise a ZIP with the PDF and every original file.
+  const needsZip = detail.evidence.some((file) => !["pdf", "png", "jpg", "jpeg"].includes(extensionOf(file.name)));
+  const downloadCase = () => run(async () => {
+    const files = [];
+    for (const file of detail.evidence) {
+      files.push({ id: file.id, name: file.name, addedBy: file.addedBy === "handler" ? file.addedByName || "a handler" : "Reporter", addedAt: file.createdAt, bytes: await fetchFile(file) });
+    }
+    const { buildCaseDownload } = await import("../../lib/speakUpCasePdf");
+    const result = await buildCaseDownload({
+      reference: item.reference,
+      category: item.category,
+      route: item.involvesSenior ? "Independent handler" : "Case handlers",
+      reporterMode: item.mode === "anonymous" ? "Anonymous" : item.mode === "confidential" ? "Confidential" : "In their own name",
+      reporterGroup: detail.raw.reporterGroup,
+      receivedAt: item.receivedAt,
+      acknowledgeBy: item.acknowledgeBy,
+      feedbackBy: item.feedbackBy,
+      acknowledgedAt: item.acknowledgedAt,
+      status: item.status,
+      assignedTo: item.assignedToName,
+      outcome: item.outcome ? SPEAK_UP_OUTCOME_LABELS[item.outcome as SpeakUpOutcome] || item.outcome : null,
+      closedAt: item.closedAt,
+      body: detail.body,
+      contact: detail.contact,
+      messages: detail.messages.map((entry) => ({ from: entry.authorRole === "handler" ? entry.authorName || "Handler" : "Reporter", at: entry.createdAt, text: entry.text })),
+      activity: detail.raw.audit.map((entry) => ({ at: entry.at, text: `${entry.actor || "Reporter or system"}: ${entry.type.replace(/_/g, " ")}${entry.detail ? ` (${entry.detail})` : ""}` })),
+      files,
+      generatedBy: me.name,
+      generatedAt: new Date().toISOString(),
+    });
+    saveBytes(result.name, result.bytes, result.mime);
+    await api({ action: "log-export", caseId: item.id, kind: result.kind });
+    onChanged(result.kind === "zip" ? "Downloaded the PDF with the attached files, as a ZIP." : "Downloaded the case as a PDF.");
   });
 
   return (
     <div style={stackStyle}>
-      <ImsPanel title={item.reference} subtitle={`${item.category}. Received ${dateText(item.receivedAt)}.`} actions={<ImsButton variant="secondary" onClick={onClose}>Close</ImsButton>}>
+      <ImsPanel title={item.reference} subtitle={`${item.category}. Received ${dateText(item.receivedAt)}.`} actions={<span style={rowStyle}><ImsButton variant="secondary" disabled={busy} onClick={() => void downloadCase()}>{needsZip ? "Download PDF and files (ZIP)" : "Download PDF"}</ImsButton><ImsButton variant="secondary" onClick={onClose}>Close</ImsButton></span>}>
         <div style={stackStyle}>
           <span style={rowStyle}>
             <Chip text={item.status} />
             {item.involvesSenior ? <Chip text="Independent route" /> : null}
             {item.assignedTo ? <Chip text={`Assigned to ${item.assignedToName || "a handler"}`} /> : item.status !== "Closed" ? <Chip text="Unassigned" tone="warn" /> : null}
             {item.outcome ? <Chip text={`Outcome: ${SPEAK_UP_OUTCOME_LABELS[item.outcome as SpeakUpOutcome] || item.outcome}`} /> : null}
-            {item.retentionUntil ? <Chip text={`Keep until ${dateText(item.retentionUntil)}`} /> : null}
             {slaChips(item).map((chip) => <Chip key={chip.text} text={chip.text} tone={chip.tone} />)}
           </span>
           <p style={smallStyle}>Acknowledge by {dateText(item.acknowledgeBy)}. Feedback by {dateText(item.feedbackBy)}.{detail.raw.reporterGroup ? ` Reporter: ${detail.raw.reporterGroup}.` : ""}</p>
@@ -848,22 +899,31 @@ function CaseView(props: {
         </div>
       </ImsPanel>
 
-      {detail.evidence.length ? (
-        <ImsPanel title="Photos and screenshots">
-          <div style={stackStyle}>
-            {detail.evidence.map((file) => (
-              <div key={file.id} style={{ display: "grid", gap: "8px" }}>
-                <div style={rowStyle}>
-                  <span style={paraStyle}>{file.name} ({Math.round(file.size / 1024)} KB)</span>
-                  <ImsButton variant="secondary" disabled={busy} onClick={() => void showFile(file)}>View</ImsButton>
-                </div>
-                { }
-                {preview?.id === file.id ? <img src={preview.url} alt={file.name} style={{ maxWidth: "100%", borderRadius: "10px", border: `1px solid ${imsColours.border}` }} /> : null}
+      <ImsPanel title="Documents and photos" subtitle="Photos from the reporter and documents added by handlers. Every file is locked on the device that added it, so only handlers can open it. The reporter can download the documents a handler adds.">
+        <div style={stackStyle}>
+          {detail.evidence.length === 0 ? <p style={smallStyle}>Nothing has been attached yet.</p> : null}
+          {detail.evidence.map((file) => (
+            <div key={file.id} style={{ display: "grid", gap: "8px" }}>
+              <div style={rowStyle}>
+                <span style={paraStyle}>{file.name} ({Math.round(file.size / 1024)} KB)</span>
+                <span style={smallStyle}>Added by {file.addedBy === "handler" ? file.addedByName || "a handler" : "the reporter"}, {dateText(file.createdAt)}</span>
               </div>
-            ))}
-          </div>
-        </ImsPanel>
-      ) : null}
+              <div style={rowStyle}>
+                {isImageName(file.name) ? <ImsButton variant="secondary" disabled={busy} onClick={() => void showFile(file)}>View</ImsButton> : null}
+                <ImsButton variant="secondary" disabled={busy} onClick={() => void saveFile(file)}>Download</ImsButton>
+              </div>
+              {preview?.id === file.id ? <img src={preview.url} alt={file.name} style={{ maxWidth: "100%", borderRadius: "10px", border: `1px solid ${imsColours.border}` }} /> : null}
+            </div>
+          ))}
+          {item.status !== "Closed" ? (
+            <>
+              <input ref={fileInput} id="speak-up-document" type="file" hidden accept={SPEAK_UP_DOCUMENT_EXTENSIONS.map((entry) => `.${entry}`).join(",")} onChange={(event) => { const picked = event.target.files?.[0]; event.target.value = ""; if (picked) void addDocument(picked); }} />
+              <div style={rowStyle}><ImsButton disabled={busy} onClick={() => fileInput.current?.click()}>Attach a document</ImsButton></div>
+              <p style={smallStyle}>PDF, Word, Excel, PowerPoint, text and image files, up to {Math.round(SPEAK_UP_LIMITS.evidenceBytes / 1_000_000)} MB each. A note is added to the conversation so the reporter knows to look. Do not attach anything that identifies someone the reporter has chosen not to name.</p>
+            </>
+          ) : null}
+        </div>
+      </ImsPanel>
 
       <ImsPanel title="Assigned to" subtitle="One handler looks after each case and is the only person emailed when the reporter writes back. Everyone who can open the case can still see it.">
         <div style={stackStyle}>
@@ -913,7 +973,7 @@ function CaseView(props: {
         </div>
       </ImsPanel>
 
-      <ImsPanel title="Status" subtitle="Closing a case sets its retention date. The reporter can still see the status, but not add messages.">
+      <ImsPanel title="Status" subtitle="Closing a case records how it ended. The reporter can still see the status and outcome, but not add messages. Cases are kept permanently.">
         <div style={imsFormGridStyle}>
           <Field label="Status">
             <select id="speak-up-status" style={imsInputStyle} value={status} onChange={(event) => setStatus(event.target.value)}>

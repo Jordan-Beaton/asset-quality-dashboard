@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const nameCipher = b64(request.headers.get("x-speakup-name"), 2000, "file name");
     const nameIv = b64(request.headers.get("x-speakup-name-iv"), 40, "file name");
 
-    const { count } = await supabase.from("speak_up_evidence").select("id", { count: "exact", head: true }).eq("case_id", found.id);
+    const { count } = await supabase.from("speak_up_evidence").select("id", { count: "exact", head: true }).eq("case_id", found.id).eq("added_by", "reporter");
     if ((count || 0) >= SPEAK_UP_LIMITS.evidenceFiles) throw new SpeakUpError(`A case can hold up to ${SPEAK_UP_LIMITS.evidenceFiles} files.`);
 
     const path = `${found.id}/${randomUUID()}`;

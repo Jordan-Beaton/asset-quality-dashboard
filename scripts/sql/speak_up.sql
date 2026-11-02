@@ -99,6 +99,9 @@ create table if not exists public.speak_up_evidence (
   file_iv text not null,
   name_cipher text not null,
   name_iv text not null,
+  -- 'reporter' for the reporter's photos, 'handler' for documents a handler attaches for the reporter
+  added_by text not null default 'reporter',
+  added_by_handler_id uuid references public.speak_up_handlers(id) on delete set null,
   created_at timestamptz not null default now()
 );
 

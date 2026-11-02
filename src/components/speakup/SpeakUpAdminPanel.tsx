@@ -150,6 +150,22 @@ export default function SpeakUpAdminPanel() {
     }
   };
 
+  const releaseCases = async (handler: AdminHandler) => {
+    if (!window.confirm(`Return all of ${handler.name}'s cases to the unassigned list so other handlers can pick them up? Use this if they are away or have left. You will not be able to read the cases.`)) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api<{ released: number }>({ action: "release-cases", id: handler.id });
+      await load();
+      setMessage(result.released ? `${result.released} case${result.released === 1 ? " was" : "s were"} returned to the unassigned list, and the handlers were emailed.` : `${handler.name} had no cases assigned.`);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const makePoster = async () => {
     setBusy(true);
     setError("");
@@ -207,6 +223,7 @@ export default function SpeakUpAdminPanel() {
                           ? <ImsButton variant="danger" disabled={busy} onClick={() => void setActive(handler, false)}>Remove</ImsButton>
                           : <ImsButton variant="secondary" disabled={busy} onClick={() => void setActive(handler, true)}>Reactivate</ImsButton>}
                         {handler.active && handler.keySetUp ? <ImsButton variant="secondary" disabled={busy} onClick={() => void resetKey(handler)}>Reset key</ImsButton> : null}
+                        {handler.active ? <ImsButton variant="secondary" disabled={busy} onClick={() => void releaseCases(handler)}>Release cases</ImsButton> : null}
                       </span>
                     </td>
                   </tr>

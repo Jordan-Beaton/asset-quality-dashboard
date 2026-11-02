@@ -2,7 +2,7 @@ import { NextResponse, after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   SPEAK_UP_EVIDENCE_BUCKET,
-  SPEAK_UP_RETENTION_MONTHS,
+  SPEAK_UP_OUTCOMES,
   SPEAK_UP_STATUSES,
   type SpeakUpOutcome,
 } from "../../../../src/lib/speakUpConfig";
@@ -10,7 +10,7 @@ import { getSiteOrigin } from "../../../../src/lib/inviteLinks";
 import { keyFingerprint } from "../../../../src/lib/speakUpCrypto";
 import {
   SpeakUpError,
-  addMonths,
+  assertCaseAccess,
   b64,
   caseHolderIds,
   failFrom,
@@ -52,7 +52,6 @@ type CaseRow = {
   outcome_shared_at: string | null;
   closed_at: string | null;
   outcome: string | null;
-  retention_until: string | null;
   body_cipher: string;
   body_iv: string;
   contact_cipher: string | null;
@@ -61,25 +60,17 @@ type CaseRow = {
   assigned_at: string | null;
 };
 
-const CASE_COLUMNS = "id,reference,category,involves_senior,reporter_mode,reporter_group,status,received_at,acknowledge_by,feedback_by,acknowledged_at,outcome_shared_at,closed_at,outcome,retention_until,body_cipher,body_iv,contact_cipher,contact_iv,assigned_to,assigned_at";
+const CASE_COLUMNS = "id,reference,category,involves_senior,reporter_mode,reporter_group,status,received_at,acknowledge_by,feedback_by,acknowledged_at,outcome_shared_at,closed_at,outcome,body_cipher,body_iv,contact_cipher,contact_iv,assigned_to,assigned_at";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// A handler may only act on a case whose key has been wrapped for them, and only while their role still covers it.
+// A handler may only open and act on a case whose key has been wrapped for them, that their role covers, and that is either
+// unassigned or assigned to them. See assertCaseAccess.
 async function ownCase(supabase: SupabaseClient, handler: HandlerRow, caseId: unknown) {
-  const id = String(caseId || "");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new SpeakUpError("That case could not be found.", 404);
-  const { data: key, error } = await supabase.from("speak_up_case_keys").select("wrapped_key").eq("case_id", id).eq("handler_id", handler.id).maybeSingle();
-  if (error) failFrom(error);
-  if (!key) throw new SpeakUpError("That case could not be found.", 404);
-  const { data: found, error: caseError } = await supabase.from("speak_up_cases").select(CASE_COLUMNS).eq("id", id).maybeSingle();
-  if (caseError) failFrom(caseError);
-  if (!found) throw new SpeakUpError("That case could not be found.", 404);
-  const caseRow = found as CaseRow;
-  if (!handler.roles.includes(caseRow.involves_senior ? "independent" : "handler")) throw new SpeakUpError("That case could not be found.", 404);
-  return { caseRow, wrappedKey: key.wrapped_key as string };
+  const { caseRow, wrappedKey } = await assertCaseAccess(supabase, handler, caseId, CASE_COLUMNS);
+  return { caseRow: caseRow as unknown as CaseRow, wrappedKey };
 }
 
 function summary(row: CaseRow, names: Map<string, string>) {
@@ -99,7 +90,6 @@ function summary(row: CaseRow, names: Map<string, string>) {
     outcomeSharedAt: row.outcome_shared_at,
     closedAt: row.closed_at,
     outcome: row.outcome,
-    retentionUntil: row.retention_until,
   };
 }
 
@@ -244,11 +234,19 @@ export async function POST(request: Request) {
         const { caseRow, wrappedKey } = await ownCase(supabase, handler, body.caseId);
         const [{ data: messages }, { data: evidence }, { data: audit }, { data: keyRows }] = await Promise.all([
           supabase.from("speak_up_messages").select("id,author_role,author_handler_id,cipher,iv,created_at").eq("case_id", caseRow.id).order("created_at", { ascending: true }),
-          supabase.from("speak_up_evidence").select("id,size_bytes,file_iv,name_cipher,name_iv,created_at").eq("case_id", caseRow.id).order("created_at", { ascending: true }),
+          supabase.from("speak_up_evidence").select("id,size_bytes,file_iv,name_cipher,name_iv,created_at,added_by,added_by_handler_id").eq("case_id", caseRow.id).order("created_at", { ascending: true }),
           supabase.from("speak_up_audit").select("id,actor_name,event_type,detail,created_at").eq("case_id", caseRow.id).order("created_at", { ascending: true }),
           supabase.from("speak_up_case_keys").select("handler_id").eq("case_id", caseRow.id),
         ]);
         const people = await activeHandlers(supabase);
+        // Names come from every handler who ever wrote or attached something here, including anyone since removed or moved
+        // on, so the whole conversation always shows who said what.
+        const authorIds = [...new Set([...(messages || []).map((m) => m.author_handler_id as string | null), ...(evidence || []).map((e) => e.added_by_handler_id as string | null)].filter(Boolean) as string[])];
+        const authorNames = new Map<string, string>();
+        if (authorIds.length) {
+          const { data: authors } = await supabase.from("speak_up_handlers").select("id,name").in("id", authorIds);
+          for (const author of authors || []) authorNames.set(author.id as string, author.name as string);
+        }
         const withAccess = new Set((keyRows || []).map((row) => row.handler_id as string));
         const route: HandlerRole = caseRow.involves_senior ? "independent" : "handler";
         const eligible = (await recipientsFor(supabase, route)).filter((person) => !withAccess.has(person.id));
@@ -263,8 +261,8 @@ export async function POST(request: Request) {
           contactCipher: caseRow.contact_cipher,
           contactIv: caseRow.contact_iv,
           reporterGroup: caseRow.reporter_group,
-          messages: (messages || []).map((m) => ({ id: m.id, authorRole: m.author_role, authorName: people.find((person) => person.id === m.author_handler_id)?.name || null, cipher: m.cipher, iv: m.iv, createdAt: m.created_at })),
-          evidence: (evidence || []).map((e) => ({ id: e.id, size: e.size_bytes, fileIv: e.file_iv, nameCipher: e.name_cipher, nameIv: e.name_iv, createdAt: e.created_at })),
+          messages: (messages || []).map((m) => ({ id: m.id, authorRole: m.author_role, authorName: authorNames.get(m.author_handler_id as string) || null, cipher: m.cipher, iv: m.iv, createdAt: m.created_at })),
+          evidence: (evidence || []).map((e) => ({ id: e.id, size: e.size_bytes, fileIv: e.file_iv, nameCipher: e.name_cipher, nameIv: e.name_iv, createdAt: e.created_at, addedBy: e.added_by, addedByName: e.added_by_handler_id ? authorNames.get(e.added_by_handler_id as string) || null : null })),
           audit: (audit || []).map((a) => ({ id: a.id, actor: a.actor_name, type: a.event_type, detail: a.detail, at: a.created_at })),
           access: people.filter((person) => withAccess.has(person.id)).map((person) => ({ id: person.id, name: person.name })),
           eligible: eligible.map((person) => ({ id: person.id, name: person.name, publicKey: person.jwk })),
@@ -321,20 +319,18 @@ export async function POST(request: Request) {
         if (status === "Outcome shared") patch.outcome_shared_at = now.toISOString();
         if (status === "Closed") {
           const outcome = body.outcome as SpeakUpOutcome;
-          if (typeof outcome !== "string" || !Object.hasOwn(SPEAK_UP_RETENTION_MONTHS, outcome)) throw new SpeakUpError("Say what the outcome was before closing the case.");
+          if (typeof outcome !== "string" || !(SPEAK_UP_OUTCOMES as readonly string[]).includes(outcome)) throw new SpeakUpError("Say what the outcome was before closing the case.");
           patch.outcome = outcome;
           patch.closed_at = now.toISOString();
-          patch.retention_until = addMonths(now, SPEAK_UP_RETENTION_MONTHS[outcome]).toISOString().slice(0, 10);
           if (!caseRow.acknowledged_at) patch.acknowledged_at = now.toISOString();
         } else if (caseRow.status === "Closed") {
           patch.closed_at = null;
           patch.outcome = null;
-          patch.retention_until = null;
         }
         const { error } = await supabase.from("speak_up_cases").update(patch).eq("id", caseRow.id);
         if (error) failFrom(error);
         await logAudit(supabase, { caseId: caseRow.id, reference: caseRow.reference, handler, type: caseRow.status === "Closed" && status !== "Closed" ? "reopened" : "status_changed", detail: `${caseRow.status} to ${status}${status === "Closed" ? ` (${patch.outcome})` : ""}` });
-        return NextResponse.json({ ok: true, retentionUntil: patch.retention_until || null }, { headers });
+        return NextResponse.json({ ok: true }, { headers });
       }
 
       case "grant": {
@@ -386,16 +382,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ url: data.signedUrl }, { headers });
       }
 
-      case "delete-case": {
+      case "log-export": {
+        // The copy is made in the handler's browser, where the case is readable. This only records that it happened.
         const { caseRow } = await ownCase(supabase, handler, body.caseId);
-        if (caseRow.status !== "Closed" || !caseRow.retention_until || caseRow.retention_until > today()) {
-          throw new SpeakUpError("A case can only be deleted once it is closed and its retention period has passed.");
-        }
-        const { data: files } = await supabase.from("speak_up_evidence").select("storage_path").eq("case_id", caseRow.id);
-        if (files?.length) await supabase.storage.from(SPEAK_UP_EVIDENCE_BUCKET).remove(files.map((file) => file.storage_path as string));
-        const { error } = await supabase.from("speak_up_cases").delete().eq("id", caseRow.id);
-        if (error) failFrom(error);
-        await logAudit(supabase, { caseId: null, reference: caseRow.reference, handler, type: "deleted", detail: "Deleted after the retention period" });
+        await logAudit(supabase, { caseId: caseRow.id, reference: caseRow.reference, handler, type: "exported", detail: body.kind === "zip" ? "PDF and files (ZIP)" : "PDF" });
         return NextResponse.json({ ok: true }, { headers });
       }
 

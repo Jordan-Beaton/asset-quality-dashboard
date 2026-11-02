@@ -127,6 +127,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true }, { headers });
       }
 
+      case "release-cases": {
+        // Only the handler a case is assigned to can open it, so if that person is away or has left the administrator can return
+        // their cases to the unassigned list. This lets another handler pick them up; it gives the administrator no access to
+        // any case.
+        const id = text(body.id, 40);
+        const { data: existing } = await supabase.from("speak_up_handlers").select("name").eq("id", id).maybeSingle();
+        if (!existing) throw new SpeakUpError("That handler could not be found.", 404);
+        const { data: released, error } = await supabase.from("speak_up_cases").update({ assigned_to: null, assigned_at: null }).eq("assigned_to", id).select("id");
+        if (error) failFrom(error);
+        const count = released?.length || 0;
+        await logAdminAudit(supabase, adminEmail, "cases_released", `${existing.name}: ${count} case${count === 1 ? "" : "s"} returned to the unassigned list`);
+        if (count) after(() => notifyHandlers(supabase, "Speak Up: cases need a handler", `${count} case${count === 1 ? "" : "s"} that ${existing.name} was handling ${count === 1 ? "was" : "were"} returned to the unassigned list by ${adminEmail}. Please open Speak Up cases and assign ${count === 1 ? "it" : "them"}.`));
+        return NextResponse.json({ ok: true, released: count }, { headers });
+      }
+
       case "reset-key": {
         // For a handler who has lost their passphrase. Their old key is abandoned: they set a new one and need approving again.
         const id = text(body.id, 40);

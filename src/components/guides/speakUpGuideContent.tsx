@@ -86,13 +86,17 @@ function SectionArrives() {
       <p style={pStyle}>Every approved handler who can open the report gets the same short email: <em>Speak Up: a new report has been received</em>. It holds the reference only, never any detail of the report.</p>
       <div style={stepList}>
         <Step n={1}>Click <strong>Open this case</strong> in the email. Sign in, enter your authenticator number and passphrase, and the case opens.</Step>
-        <Step n={2}>Read the report. Look at the category, whether contact details were given, and any photos (<strong>View</strong>).</Step>
+        <Step n={2}>Read the report. Look at the category, whether contact details were given, and any photos or documents under <strong>Documents and photos</strong> (<strong>View</strong> or <strong>Download</strong>).</Step>
         <Step n={3}>In <strong>Assigned to</strong>, click <strong>Assign to me</strong>, or choose a colleague who can open the case and click <strong>Assign</strong>. The assigned handler looks after the case, and is the only person emailed when the reporter writes back.</Step>
         <Step n={4}>Acknowledge the report within 7 days: send the reporter a message, or set the status to <span style={statusPill("Acknowledged")}>Acknowledged</span>.</Step>
       </div>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>Until someone assigns the case it shows an amber <strong>Unassigned</strong> badge and counts under the <strong>Unassigned</strong> card on the register. If you cannot take it, you can leave it for a colleague, or return it with <strong>Return to unassigned</strong>, and everyone is emailed again.</div>
+      </div>
+      <div style={callout("info")}>
+        <span>ℹ</span>
+        <div><strong>Only the handler a case is assigned to can open it.</strong> Every handler can see every case in the register, with its category, status and who is handling it, but a case assigned to someone else is for information only and cannot be opened. An unassigned case can be opened by any handler who holds it, so it can be picked up.</div>
       </div>
       <p style={pStyle}>A colleague can only be assigned a case they can already open. A handler approved after a report arrived does not see it until you share it with them under <strong>Who can see this case</strong>.</p>
     </>
@@ -116,10 +120,16 @@ function SectionWorking() {
           <tr><td style={imsTableCellStyle}><span style={statusPill("Investigating")}>Investigating</span></td><td style={imsTableCellStyle}>Under investigation.</td></tr>
           <tr><td style={imsTableCellStyle}><span style={statusPill("Awaiting reporter")}>Awaiting reporter</span></td><td style={imsTableCellStyle}>You have asked the reporter something. Sending a message sets this automatically; their reply moves it back to Investigating.</td></tr>
           <tr><td style={imsTableCellStyle}><span style={statusPill("Outcome shared")}>Outcome shared</span></td><td style={imsTableCellStyle}>The reporter has been told what happened.</td></tr>
-          <tr><td style={imsTableCellStyle}><span style={statusPill("Closed", "brand")}>Closed</span></td><td style={imsTableCellStyle}>Finished. Needs an outcome and starts the retention clock.</td></tr>
+          <tr><td style={imsTableCellStyle}><span style={statusPill("Closed", "brand")}>Closed</span></td><td style={imsTableCellStyle}>Finished. Needs an outcome. The case is kept permanently and can be reopened.</td></tr>
         </tbody>
       </table>
       <p style={pStyle}>Every opening, message, status change, assignment and share is recorded in the case&apos;s <strong>Activity log</strong>. The log never holds anything the reporter wrote.</p>
+      <h3 style={h3Style}>Sending a document</h3>
+      <p style={pStyle}>Under <strong>Documents and photos</strong>, click <strong>Attach a document</strong> to send the reporter a letter, a policy or similar: PDF, Word, Excel, PowerPoint, text or image files, up to 4 MB each, ten per case. It is locked in your browser before it is stored, a note goes into the conversation so the reporter knows to look, and they can download it from their case page. Do not attach anything that identifies someone the reporter has chosen not to name.</p>
+      <h3 style={h3Style}>Downloading a case</h3>
+      <p style={pStyle}>The <strong>Download PDF</strong> button at the top of an open case saves the whole case: details, report, messages, activity log, and the attachments. Photos and PDF attachments are placed inside the PDF. If a case has Word, Excel or other files, which cannot sit inside a PDF, the button becomes <strong>Download PDF and files (ZIP)</strong> and you receive the PDF with every original file beside it. The download is recorded in the activity log. It is a readable copy of confidential information, so keep it somewhere secure and share it only with people who need it.</p>
+      <h3 style={h3Style}>If a case changes hands</h3>
+      <p style={pStyle}>Nothing is lost. The report, every message and document, and the whole activity log belong to the case, not to a handler, so whoever picks it up sees the full history. Each message shows the name of the handler who wrote it, even if they have since moved on. The reporter sees no change: they keep talking to &ldquo;the case handler&rdquo;.</p>
     </>
   );
 }
@@ -148,10 +158,10 @@ function SectionClosing() {
       <div style={stepList}>
         <Step n={1}>Tell the reporter what happened, in a message, in general terms. Set the status to <span style={statusPill("Outcome shared")}>Outcome shared</span> if you want that recorded.</Step>
         <Step n={2}>In <strong>Status</strong>, choose <span style={statusPill("Closed", "brand")}>Closed</span>, then an <strong>Outcome</strong>: <em>No further action</em> or <em>Action taken</em>. Click <strong>Update status</strong>.</Step>
-        <Step n={3}>The case now shows a <strong>Keep until</strong> date. The reporter sees the outcome in plain words when they check their case, and can no longer add messages.</Step>
+        <Step n={3}>The reporter sees the outcome in plain words when they check their case, and can no longer add messages.</Step>
       </div>
-      <h3 style={h3Style}>Keeping and deleting</h3>
-      <p style={pStyle}>Closed cases are kept for <strong>12 months</strong> when no further action was taken and <strong>6 years</strong> when action was taken. These periods are subject to confirmation by HR and legal. When the date passes, the case appears under <strong>Due for deletion</strong>, where it can be deleted permanently, including its photos. Deletion cannot be undone. A closed case can be reopened by changing its status.</p>
+      <h3 style={h3Style}>Records are kept</h3>
+      <p style={pStyle}>Cases are kept permanently. Speak Up has no way to delete a case, a message or a file, and a closed case can be reopened by changing its status. If HR later decide on a retention period, that is a change to the system, not something a handler does.</p>
     </>
   );
 }
@@ -206,9 +216,9 @@ function SectionProblems() {
           <tr><td style={imsTableCellStyle}>You forgot your passphrase</td><td style={imsTableCellStyle}>It cannot be recovered. Tell the IMS administrator, who resets your key in <code style={codeStyle}>Admin / Settings, Speak Up</code>. You then set a new passphrase and need approval again. Ask a colleague to share your open cases with themselves first, as any case only you could open becomes unreadable.</td></tr>
           <tr><td style={imsTableCellStyle}>A message says your key does not match or has changed</td><td style={imsTableCellStyle}>Do not open cases. Tell HR and the IMS administrator straight away.</td></tr>
           <tr><td style={imsTableCellStyle}>A reporter lost their access code</td><td style={imsTableCellStyle}>It cannot be recovered and you cannot identify them. They can send a new report.</td></tr>
-          <tr><td style={imsTableCellStyle}>A case was assigned to the wrong person</td><td style={imsTableCellStyle}>Open it and assign it again, or use <strong>Return to unassigned</strong>.</td></tr>
+          <tr><td style={imsTableCellStyle}>A case was assigned to the wrong person</td><td style={imsTableCellStyle}>The handler it is assigned to can assign it again, or use <strong>Return to unassigned</strong>. If they are away, the IMS administrator can release their cases.</td></tr>
           <tr><td style={imsTableCellStyle}>A case was closed by mistake</td><td style={imsTableCellStyle}>Change its status to reopen it. The outcome and keep-until date clear.</td></tr>
-          <tr><td style={imsTableCellStyle}>You are going away</td><td style={imsTableCellStyle}>Return your assigned cases to unassigned, or assign them to a colleague who can open them, before you go.</td></tr>
+          <tr><td style={imsTableCellStyle}>You are going away</td><td style={imsTableCellStyle}>Return your assigned cases to unassigned, or assign them to a colleague who can open them, before you go. If you cannot, the IMS administrator can release your cases from <strong>Admin / Settings, Speak Up</strong>.</td></tr>
         </tbody>
       </table>
     </>

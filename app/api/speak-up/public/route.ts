@@ -142,6 +142,7 @@ export async function POST(request: Request) {
         rateLimit(request, "lookup", 60, 10 * 60 * 1000);
         const found = await openCaseByCode(supabase, body.reference, body.authToken);
         const { data: messages } = await supabase.from("speak_up_messages").select("id,author_role,cipher,iv,created_at").eq("case_id", found.id).order("created_at", { ascending: true });
+        const { data: documents } = await supabase.from("speak_up_evidence").select("id,size_bytes,file_iv,name_cipher,name_iv,created_at").eq("case_id", found.id).eq("added_by", "handler").order("created_at", { ascending: true });
         return NextResponse.json({
           reference: found.reference,
           status: found.status,
@@ -156,6 +157,7 @@ export async function POST(request: Request) {
           bodyCipher: found.body_cipher,
           bodyIv: found.body_iv,
           messages: (messages || []).map((message) => ({ id: message.id, authorRole: message.author_role, cipher: message.cipher, iv: message.iv, createdAt: message.created_at })),
+          documents: (documents || []).map((file) => ({ id: file.id, size: file.size_bytes, fileIv: file.file_iv, nameCipher: file.name_cipher, nameIv: file.name_iv, createdAt: file.created_at })),
         }, { headers });
       }
 

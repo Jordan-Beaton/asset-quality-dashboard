@@ -25,12 +25,12 @@ export function serviceClient(): SupabaseClient {
 }
 
 export function missingTable(message: string) {
-  return (/speak_up_/.test(message) || /approved_(roles|by|at)/.test(message)) && /(does not exist|schema cache|could not find)/i.test(message);
+  return (/speak_up_/.test(message) || /approved_(roles|by|at)|assigned_(to|at)|added_by/.test(message)) && /(does not exist|schema cache|could not find)/i.test(message);
 }
 
 export function failFrom(error: { message: string; code?: string }): never {
   if (missingTable(error.message)) {
-    throw new SpeakUpError("Speak Up needs its database set-up scripts (scripts/sql/speak_up.sql and speak_up_hardening.sql) to be run first.", 503, "setup");
+    throw new SpeakUpError("Speak Up needs its database set-up scripts (everything in scripts/sql starting speak_up) to be run first.", 503, "setup");
   }
   // the database's own wording can quote stored values, so only its error code is logged and nothing is sent back
   console.error("speak-up database error", error.code || "unknown");
@@ -274,6 +274,24 @@ export async function requireImsAdmin(supabase: SupabaseClient) {
 
 export async function logAdminAudit(supabase: SupabaseClient, adminEmail: string, type: string, detail: string) {
   await supabase.from("speak_up_audit").insert({ case_id: null, reference: "ADMIN", actor_name: adminEmail, event_type: type, detail });
+}
+
+// The one place that decides whether a handler may open and act on a case: a locked copy of its key exists for them, their
+// role covers its route, and, once someone is looking after it, they are that person. An unassigned case can be opened by
+// any handler who holds it, so that it can be picked up. Everyone can still see other handlers' cases in the register.
+export async function assertCaseAccess(supabase: SupabaseClient, handler: HandlerRow, caseId: unknown, columns = "id,reference,status,involves_senior,assigned_to") {
+  const id = String(caseId || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new SpeakUpError("That case could not be found.", 404);
+  const { data: key, error } = await supabase.from("speak_up_case_keys").select("wrapped_key").eq("case_id", id).eq("handler_id", handler.id).maybeSingle();
+  if (error) failFrom(error);
+  if (!key) throw new SpeakUpError("That case could not be found.", 404);
+  const { data: found, error: caseError } = await supabase.from("speak_up_cases").select(columns).eq("id", id).maybeSingle();
+  if (caseError) failFrom(caseError);
+  if (!found) throw new SpeakUpError("That case could not be found.", 404);
+  const caseRow = found as unknown as Record<string, unknown> & { id: string; reference: string; status: string; involves_senior: boolean; assigned_to: string | null };
+  if (!handler.roles.includes(caseRow.involves_senior ? "independent" : "handler")) throw new SpeakUpError("That case could not be found.", 404);
+  if (caseRow.assigned_to && caseRow.assigned_to !== handler.id) throw new SpeakUpError("This case is being handled by another handler, so it cannot be opened from here.", 403, "assigned-elsewhere");
+  return { caseRow, wrappedKey: key.wrapped_key as string };
 }
 
 export async function logAudit(supabase: SupabaseClient, input: { caseId: string | null; reference: string; handler?: Pick<HandlerRow, "id" | "name"> | null; type: string; detail?: string | null }) {

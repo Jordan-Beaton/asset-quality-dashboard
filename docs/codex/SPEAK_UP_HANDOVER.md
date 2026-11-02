@@ -28,6 +28,19 @@ work cases in the IMS (`/speak-up/cases`); the IMS administrator manages handler
 are near or past the 7-day acknowledgement or 3-month feedback target, unassigned for over a day, or holding a reporter message for over
 2 days. `?dry=1` (with the bearer secret) reports counts without sending.
 
+## Who can open a case
+Every handler sees every case in the register (category, status, who is handling it). Only the handler a case is assigned to can open or act
+on it; an unassigned case can be opened by any handler who holds it, so it can be picked up. The rule lives in one place,
+`assertCaseAccess` in `src/lib/speakUpServer.ts`, and is enforced by the API, not just the screen. Admin > Speak Up > **Release cases**
+returns a handler's cases to the unassigned list (for absence or leaving) without giving the administrator any access.
+
+## Documents and downloads
+A handler can attach a document to a case (PDF, Word, Excel, PowerPoint, text, images; 4 MB each, ten per case). It is locked in the
+browser, stored through `/api/speak-up/handler-file`, and the reporter downloads it through `/api/speak-up/evidence/download`, so the
+reporter's device never contacts storage directly. The case PDF (`src/lib/speakUpCasePdf.ts`) is built in the handler's browser, the only
+place the case is readable: photos and PDF attachments go inside it; if other file types are attached the download is a ZIP of the PDF and
+every original. Each download is recorded in the case's activity log. Handler messages show the author's name even if they have since left.
+
 ## Lost passphrase
 Admin > Speak Up > **Reset key** abandons the handler's old key; they set a new one and must be approved again. Cases only they could open stay locked.
 
@@ -38,6 +51,7 @@ Process Guides > Speak Up (handlers), shown to Admin users only until HR agree (
 1. `scripts/sql/speak_up.sql`
 2. `scripts/sql/speak_up_hardening.sql`
 3. `scripts/sql/speak_up_assignment.sql`
+4. `scripts/sql/speak_up_documents.sql`
 Pushing does not run these. Enable MFA (TOTP) under Supabase Authentication before handlers or administrators use the live screens.
 
 ## Environment switches
@@ -58,8 +72,9 @@ matrix access alone, whereas the handler list needs an administrator to add a pe
 - Whoever owns the database or can deploy code could in principle alter keys or served code. The approval step, emails, visible change record
   and key self-check make that detectable rather than impossible.
 - A recused or removed handler keeps what they have already read (case keys are not rotated).
-- Category, report mode and dates are readable by the database owner. Retention (12 months no action / 6 years action taken) is
-  to be confirmed by HR and legal.
+- Category, report mode and dates are readable by the database owner. Cases are kept permanently (HR's decision, 2 Nov 2026):
+  there is no retention period and no way to delete a case from the app. The database owner can still delete rows directly, and HR and legal
+  should confirm that keeping records indefinitely is covered by the privacy notice and the data protection impact assessment.
 - Not built (HR-owned): the whistleblowing procedure, privacy notice and DPIA.
 
 ## Files
