@@ -854,6 +854,12 @@ function CaseView(props: {
       files.push({ id: file.id, name: file.name, addedBy: file.addedBy === "handler" ? file.addedByName || "a handler" : "Reporter", addedAt: file.createdAt, bytes: await fetchFile(file) });
     }
     const { buildCaseDownload } = await import("../../lib/speakUpCasePdf");
+    // the Enshore logo for the header; the PDF is still produced if it cannot be loaded
+    const logos = await Promise.all(["/enshore-primary-logo-reverse.png", "/enshore-primary-logo-colour.png"].map(async (path) => {
+      const response = await fetch(path);
+      if (!response.ok) throw new Error("logo");
+      return new Uint8Array(await response.arrayBuffer());
+    })).then(([reverse, colour]) => ({ reverse, colour })).catch(() => undefined);
     const result = await buildCaseDownload({
       reference: item.reference,
       category: item.category,
@@ -875,7 +881,7 @@ function CaseView(props: {
       files,
       generatedBy: me.name,
       generatedAt: new Date().toISOString(),
-    });
+    }, { logos });
     saveBytes(result.name, result.bytes, result.mime);
     await api({ action: "log-export", caseId: item.id, kind: result.kind });
     onChanged(result.kind === "zip" ? "Downloaded the PDF with the attached files, as a ZIP." : "Downloaded the case as a PDF.");
