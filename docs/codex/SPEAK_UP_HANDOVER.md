@@ -49,8 +49,10 @@ Pushing does not run these. Enable MFA (TOTP) under Supabase Authentication befo
 - Uses the existing `RESEND_API_KEY` and `DOCUMENT_NOTIFICATIONS_FROM_EMAIL`.
 
 ## Visibility
-The home tile shows for Admin users only (`app/home/page.tsx`). Opening the screens needs a place on the handler list
-(`speak_up_handlers`, matched by login email). Handlers on the list who have not joined (no key, not approved) are not emailed.
+The home tile and the handler guide show for Admin users and for anyone on the handler list (`app/home/page.tsx`,
+`app/guides/page.tsx`, via the `access` action of the handler API). Opening the screens needs a place on the handler list
+(`speak_up_handlers`, matched by login email). Speak Up is deliberately not in the Admin permission matrix: an administrator can grant
+matrix access alone, whereas the handler list needs an administrator to add a person and another handler to approve them. Handlers on the list who have not joined (no key, not approved) are not emailed.
 
 ## Known limits (for the HR paperwork)
 - Whoever owns the database or can deploy code could in principle alter keys or served code. The approval step, emails, visible change record

@@ -347,6 +347,15 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
 
 export default function HomePage() {
   const permissions = useImsPermissions();
+  // Speak Up shows for administrators and for anyone on the handler list. The list itself, which needs the administrator
+  // to add a person and another handler to approve them, is the real gate; this only decides who sees the tile.
+  const [speakUpHandler, setSpeakUpHandler] = useState(false);
+  useEffect(() => {
+    void fetch("/api/speak-up/handler", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "access" }) })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((json) => setSpeakUpHandler(Boolean(json?.handler)))
+      .catch(() => undefined);
+  }, []);
   const [pendingRequests, setPendingRequests] = useState<Array<{ id: string; first_name: string; last_name: string; email: string; department: string; requested_modules: string[]; submitted_at: string }>>([]);
   const [heroTilt, setHeroTilt] = useState({ x: 0, y: 0 });
   const [homeView, setHomeView] = useState<HomeView>("grid");
@@ -419,9 +428,10 @@ export default function HomePage() {
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, [effectiveHomeView]);
-  const visibleCards = moduleCards.filter((card) => card.moduleKey !== "speak-up" || permissions.isAdmin);
+  const visibleCards = moduleCards.filter((card) => card.moduleKey !== "speak-up" || permissions.isAdmin || speakUpHandler);
   const isModuleAccessible = (moduleKey: (typeof moduleCards)[number]["moduleKey"]) => {
     if (!permissions.loaded) return true;
+    if (moduleKey === "speak-up") return permissions.isAdmin || speakUpHandler;
     if (moduleKey === "field-tools") {
       return permissions.canAccessModule("hse") || permissions.canAccessModule("assets");
     }

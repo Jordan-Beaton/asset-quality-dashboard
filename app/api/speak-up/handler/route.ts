@@ -145,6 +145,16 @@ export async function POST(request: Request) {
       }, { headers });
     }
 
+    // Lets the home page and the guides decide whether to show Speak Up to this person. It says nothing about anyone else.
+    if (body.action === "access") {
+      const userClient = await createServerSupabaseClient();
+      const { data: auth } = await userClient.auth.getUser();
+      const email = auth.user?.email?.trim().toLowerCase();
+      if (!email) return NextResponse.json({ handler: false }, { headers });
+      const { data: listed } = await supabase.from("speak_up_handlers").select("id").eq("email", email).eq("active", true).maybeSingle();
+      return NextResponse.json({ handler: Boolean(listed) }, { headers });
+    }
+
     const { handler } = await requireHandler(supabase);
 
     switch (body.action) {

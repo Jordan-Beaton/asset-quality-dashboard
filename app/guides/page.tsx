@@ -18,9 +18,16 @@ const allGuides: GuideDefinition[] = [documentControlGuide, ncrGuide, mocGuide, 
 
 function GuidesPageContent() {
   const searchParams = useSearchParams();
-  // The Speak Up guide is for Administrators only until HR agree to use the system, so nobody else learns of it from here.
+  // The Speak Up guide shows for Administrators and for people on the handler list, so nobody else learns of it from here.
   const permissions = useImsPermissions();
-  const guides = useMemo(() => allGuides.filter((guide) => guide.id !== speakUpGuide.id || permissions.isAdmin), [permissions.isAdmin]);
+  const [speakUpHandler, setSpeakUpHandler] = useState(false);
+  useEffect(() => {
+    void fetch("/api/speak-up/handler", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "access" }) })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((json) => setSpeakUpHandler(Boolean(json?.handler)))
+      .catch(() => undefined);
+  }, []);
+  const guides = useMemo(() => allGuides.filter((guide) => guide.id !== speakUpGuide.id || permissions.isAdmin || speakUpHandler), [permissions.isAdmin, speakUpHandler]);
   const linkedGuide = searchParams.get("guide")?.trim() || "";
 
   const initialGuide = guides.find((g) => g.id === linkedGuide) || documentControlGuide;
