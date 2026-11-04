@@ -754,7 +754,9 @@ export default function AppShell({ children }: AppShellProps) {
   const isPublicAinmSignOffPage = pathname === "/hse/ainm/signoff-action";
   const isPublicInvitePage = pathname === "/invite";
   const isPublicSpeakUpPage = pathname === "/speak-up";
-  const isPublicStandalonePage = isPublicObservationPage || isPublicSpeakUpPage || isPublicItpSignOffPage || isPublicAinmSignOffPage || isPublicInvitePage;
+  // The bulk review link page is a sign-in-only confirmation page like the sign-off pages: no side rail, and the API checks who is allowed.
+  const isBulkReviewPage = pathname === "/documents/bulk-review";
+  const isPublicStandalonePage = isPublicObservationPage || isPublicSpeakUpPage || isPublicItpSignOffPage || isPublicAinmSignOffPage || isPublicInvitePage || isBulkReviewPage;
   const isHomePage = pathname === "/home";
   const isFieldToolsPage = pathname === "/field-tools";
   const isAssetModule = pathname.startsWith("/assets");

@@ -48,6 +48,15 @@ Document Control is a central IMS hub, not just a Quality tab. Treat it carefull
 - Approver accepts or rejects.
 - Email buttons are planned/partly implemented.
 
+## Bulk Review Round (overdue reviews)
+
+- Purpose: put a group of documents (for example every overdue HSEQ document before an audit) through the normal review and approval workflow with one email link per person instead of one per document.
+- Setup SQL: `scripts/sql/document_control_bulk_review.sql` (table `document_workflow_batches`, service-only RLS). Run manually in Supabase.
+- Start a round: `scripts/start_hseq_bulk_review.ts` (dry run by default; `--execute --origin=https://<production site>` to run). It selects documents whose number contains the prefix (default HSEQ) with `next_review_date` before today, skipping Archived, Superseded and Draft. It sets reviewer and approver, resets the issue date to today (document and current revision row), moves each to Pending Review, writes an activity row per document that records the previous reviewer, approver, issue date and review due date, saves a JSON backup of the original rows to `tmp/`, and emails the reviewer a digest ("You have N documents to review").
+- Reviewer link: `/documents/bulk-review?token=...` (page `app/documents/bulk-review/page.tsx`, API `app/api/document-bulk-review/route.ts`, shared code `src/lib/documentBulkReview.ts`). It lists the documents still waiting, lets the person untick any, and one button accepts the review for all ticked documents. The approver is then emailed their own digest link automatically ("You have N documents to approve"); approving sets them Live, and the existing database trigger resets `next_review_date` from the approval date and review cycle.
+- Control: the link only works while signed in to the IMS as the person it was addressed to (the API compares the signed-in email with the batch's `intended_email`), so the activity log records who really confirmed it. Links expire after 14 days and act only on documents still in the expected status, so repeating a click is harmless.
+- Every document gets its own `document_workflow_activity` rows (`sent_to_reviewer`, `accept_review`, `sent_to_approver`, `approve_document`). Approval sends one summary email to the reviewer and approver, not one per document.
+
 ## Revision History Warnings
 
 - Preserve historic revision names, dates, and files.
