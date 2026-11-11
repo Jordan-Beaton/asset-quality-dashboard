@@ -24,6 +24,7 @@ import { imsColours, imsShadows } from "../../src/components/imsTheme";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlState } from "../../src/lib/useUrlState";
 
 type Ncr = {
   id: string;
@@ -331,9 +332,11 @@ function QualityDashboardContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
-  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning" | "architecture">(
-    linkedView === "planning" || linkedView === "analytics" ? linkedView : "overview"
+  const [yearFilter, setYearFilter] = useUrlState("year", String(new Date().getFullYear()));
+  const [dashboardView, setDashboardView] = useUrlState<"overview" | "analytics" | "planning" | "architecture">(
+    "view",
+    "overview",
+    ["overview", "analytics", "planning", "architecture"]
   );
   const criticalPressureRef = useRef<HTMLDivElement | null>(null);
   const openWorkloadRef = useRef<HTMLDivElement | null>(null);

@@ -9,6 +9,7 @@ import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 type Asset = {
   id: string;
@@ -366,9 +367,9 @@ export default function AssetReportsPage() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [form, setForm] = useState<ReportForm>(defaultForm);
-  const [savedReportSearch, setSavedReportSearch] = useState("");
-  const [savedReportYearFilter, setSavedReportYearFilter] = useState("All Years");
-  const [showSavedReportFilters, setShowSavedReportFilters] = useState(false);
+  const [savedReportSearch, setSavedReportSearch] = useUrlState("search", "");
+  const [savedReportYearFilter, setSavedReportYearFilter] = useUrlState("year", "All Years");
+  const [showSavedReportFilters, setShowSavedReportFilters] = useUrlFlag("filters");
 
   async function loadData() {
     const [assetsRes, calibrationsRes, inspectionsRes, maintenanceRes, actionsRes, reportsRes] = await Promise.all([

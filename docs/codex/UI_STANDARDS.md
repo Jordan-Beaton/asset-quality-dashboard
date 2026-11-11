@@ -181,7 +181,7 @@ Use `ImsTopMetaRow` for the row beneath the hero.
 
 Standard behavior:
 
-- Left side: the exact link `Back to IMS Home`, Enshore dark blue and bold. Nested workspaces do not substitute a module-level back destination in this bar.
+- Left side: the shared `ImsBackNav` control (`src/components/ImsBackNav.tsx`), never a hand-written link. It reads `← Back to <previous screen>` (for example `Back to HSE Actions`) with a small `IMS Home` button beside it, and returns to the previous screen with its filters. With no previous screen (for example a page opened from an email link) or when the previous screen is IMS Home, it is just `← Back to IMS Home`. On phones the wording shortens to `← HSE Actions` and `Home`. `ImsTopMetaRow` renders it; the `backHref` and `backLabel` props are ignored. The previous screen comes from a per-tab record kept in `sessionStorage` by `NavTracker` in `AppShell` (`src/lib/navHistory.ts`), and screen names come from the route table in that file, so add a label there when adding a route.
 - Right side: the status message only.
 - Refresh, PDF, create, export and other page commands must sit in the relevant tab/panel or a separate action row beneath the meta bar; they must never appear inside the white meta bar.
 - Do not show standalone `Refresh` buttons beneath or beside the meta bar. Pages load automatically on entry and refresh their data after successful create, edit, delete, import or workflow operations. The dynamic status message communicates loading, readiness and errors.
@@ -498,6 +498,16 @@ Do Not:
 
 - Build dashboards as static mockups.
 - Use one-off oversized decorative cards where a shared KPI/report/card pattern exists.
+
+## Remembered Filters
+
+Every page with filters, search, sorting, an internal tab or a master/detail selection must keep that state in the page address so that leaving and pressing Back restores the same screen, and so a filtered view can be shared as a link.
+
+- Use the hooks in `src/lib/useUrlState.ts` instead of `useState` for those values: `useUrlState(key, default, allowed?)`, `useUrlFlag(key, default)` and `useUrlList(key)`. They behave like `useState`, leave default values out of the address and keep the Back button's record up to date.
+- Persist: search text, filters, sort, page, the active tab or view, the "show filters" toggle, and the selected record id (`selected`) when a row opens a detail pane.
+- Do not persist: create/edit form drafts, import state, loaded data, or anything typed into a record. Never persist anything in Speak Up.
+- Typed values need an explicit generic and an `allowed` list so an unknown address value falls back to the default. Reuse an existing deep-link parameter name where the page already reads one. When two components share a page, prefix the keys.
+- A page using the hooks needs `useSearchParams`, so give it `export const dynamic = "force-dynamic"` or a `Suspense` boundary, as the existing pages do.
 
 ## Navigation
 

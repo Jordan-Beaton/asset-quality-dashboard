@@ -1,5 +1,6 @@
 "use client";
 
+import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +9,7 @@ import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -359,14 +361,14 @@ export default function HseActionsPage() {
   const [assetMaintenanceOptions, setAssetMaintenanceOptions] = useState<AssetMaintenanceOption[]>([]);
   const [assetCalibrationOptions, setAssetCalibrationOptions] = useState<AssetCalibrationOption[]>([]);
   const [hseInspectionOptions, setHseInspectionOptions] = useState<HseInspectionOption[]>([]);
-  const [activeView, setActiveView] = useState<HseActionView>("dashboard");
-  const [selectedId, setSelectedId] = useState("");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
-  const [pressureFilter, setPressureFilter] = useState<"" | "overdue" | "dueWeek">("");
+  const [activeView, setActiveView] = useUrlState<HseActionView>("view", "dashboard", ["dashboard", "register", "create"]);
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
+  const [priorityFilter, setPriorityFilter] = useUrlState("priority", "");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
+  const [pressureFilter, setPressureFilter] = useUrlState<"" | "overdue" | "dueWeek">("pressure", "", ["", "overdue", "dueWeek"]);
   const [form, setForm] = useState<ActionForm>(emptyForm);
   const [message, setMessage] = useState("Loading HSE actions...");
   const [loading, setLoading] = useState(true);
@@ -1110,7 +1112,7 @@ export default function HseActionsPage() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link>
+        <ImsBackNav />
         <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
@@ -1518,7 +1520,6 @@ const topMetaRowStyle: CSSProperties = {
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 const topMetaActionsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
-const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#000000" };
 const primaryLinkStyle: CSSProperties = { background: "#005670", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
 const smallLinkStyle: CSSProperties = { ...primaryLinkStyle, padding: "8px 10px", fontSize: 12 };

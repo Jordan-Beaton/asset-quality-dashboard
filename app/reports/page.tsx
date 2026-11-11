@@ -1,5 +1,6 @@
 "use client";
 
+import { ImsBackNav } from "../../src/components/ImsBackNav";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import jsPDF from "jspdf";
@@ -7,6 +8,7 @@ import autoTable from "jspdf-autotable";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 
 type Ncr = {
   id: string;
@@ -415,9 +417,9 @@ export default function ReportsPage() {
   const [logoFileName, setLogoFileName] = useState("/enshore-primary-logo-colour.png");
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
   const [form, setForm] = useState<ReportForm>(defaultForm);
-  const [savedReportSearch, setSavedReportSearch] = useState("");
-  const [savedReportYearFilter, setSavedReportYearFilter] = useState("All Years");
-  const [showSavedReportFilters, setShowSavedReportFilters] = useState(false);
+  const [savedReportSearch, setSavedReportSearch] = useUrlState("search", "");
+  const [savedReportYearFilter, setSavedReportYearFilter] = useUrlState("year", "All Years");
+  const [showSavedReportFilters, setShowSavedReportFilters] = useUrlFlag("filters");
 
   const canCreateReport = useMemo(() => {
     return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
@@ -1085,9 +1087,7 @@ export default function ReportsPage() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>
-          ← Back to IMS Home
-        </Link>
+        <ImsBackNav />
         <div style={{ ...statusBannerStyle, marginBottom: 0, borderRadius: "12px", padding: "8px 12px" }}>
           <strong>Status:</strong> {message}
         </div>
@@ -1405,12 +1405,6 @@ const heroMetaLabelStyle: React.CSSProperties = {
 const heroMetaValueStyle: React.CSSProperties = {
   fontSize: "18px",
   fontWeight: 700,
-};
-
-const backLinkStyle: React.CSSProperties = {
-  color: "#005670",
-  fontWeight: 700,
-  textDecoration: "none",
 };
 
 const topMetaRowStyle: React.CSSProperties = {

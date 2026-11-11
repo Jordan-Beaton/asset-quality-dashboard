@@ -1,3 +1,4 @@
+import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
@@ -17,9 +18,7 @@ export default function RiskActionsPage() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>
-          ← Back to IMS Home
-        </Link>
+        <ImsBackNav />
 
         <div style={statusBannerStyle}>
           <strong>Status:</strong> Risk action linking will use the existing central Actions register.
@@ -80,12 +79,6 @@ const topMetaActionsStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   alignItems: "center",
-};
-
-const backLinkStyle: CSSProperties = {
-  color: "#005670",
-  fontWeight: 700,
-  textDecoration: "none",
 };
 
 const statusBannerStyle: CSSProperties = {

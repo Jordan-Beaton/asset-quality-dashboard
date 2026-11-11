@@ -9,6 +9,7 @@ import { QualityPageHero } from "./QualityPageHero";
 import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
 import { supabase } from "../lib/supabase";
 import { getProject } from "../lib/projectRegistry";
+import { useUrlState } from "../lib/useUrlState";
 
 const STORAGE_BUCKET = "project-documents";
 
@@ -245,10 +246,10 @@ export function ItpTrackerPage({ projectKey }: { projectKey: string }) {
   const [rows, setRows] = useState<Itp[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [query, setQuery] = useState("");
-  const [stage, setStage] = useState("All");
-  const [scope, setScope] = useState("All");
-  const [registerView, setRegisterView] = useState<"current" | "archive">("current");
+  const [query, setQuery] = useUrlState("search", "");
+  const [stage, setStage] = useUrlState("stage", "All");
+  const [scope, setScope] = useUrlState("scope", "All");
+  const [registerView, setRegisterView] = useUrlState<"current" | "archive">("view", "current", ["current", "archive"]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<Itp | null>(null);
   const [file, setFile] = useState<File | null>(null);

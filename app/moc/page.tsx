@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CSSProperties, ChangeEvent, ReactNode } from "react";
 import jsPDF from "jspdf";
@@ -31,6 +31,7 @@ import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlState } from "../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -852,6 +853,10 @@ function buildMocHref(params?: Record<string, string | number | null | undefined
   return query ? `/moc?${query}` : "/moc";
 }
 
+const MOC_STATUS_FILTER_VALUES: readonly ("All" | "Active" | MocStatus)[] = ["All", "Active", "Draft", "In Review", "Approved", "Closed"];
+const MOC_CHANGE_TYPE_FILTER_VALUES: readonly ("All" | ChangeType)[] = ["All", "Permanent", "Temporary"];
+const MOC_WORKSPACE_VIEW_VALUES: readonly (MocWorkspaceView | "")[] = ["", "dashboard", "register", "create", "reports"];
+
 function parseMocStatusFilter(value: string | null | undefined): "All" | "Active" | MocStatus {
   if (value === "Active") return "Active";
   if (value === "Draft" || value === "In Review" || value === "Approved" || value === "Closed") return value;
@@ -889,31 +894,36 @@ function MOCPageContent() {
   const [message, setMessage] = useState("Loading MOC register...");
   const [messageTone, setMessageTone] = useState<NoticeTone>("neutral");
   const [refreshStamp, setRefreshStamp] = useState("");
-  const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState<"All" | "Active" | MocStatus>(parseMocStatusFilter(linkedStatus));
-  const [changeTypeFilter, setChangeTypeFilter] = useState<"All" | ChangeType>(
-    linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All"
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState<"All" | "Active" | MocStatus>("status", "All", MOC_STATUS_FILTER_VALUES);
+  const [changeTypeFilter, setChangeTypeFilter] = useUrlState<"All" | ChangeType>("change_type", "All", MOC_CHANGE_TYPE_FILTER_VALUES);
+  // ?attention= and ?recent=1 are deep links that pick the starting view filter; after that the choice lives in ?view=.
+  const [initialViewFilter] = useState<MocViewFilter>(
+    linkedAttention === "expired-temporary"
+      ? "Expired Temporary"
+      : linkedAttention === "expiry-soon"
+      ? "Expiry Soon"
+      : linkedAttention === "draft-ageing"
+      ? "Draft Ageing"
+      : linkedRecent === "1"
+      ? "Recent"
+      : "All"
   );
-  const [viewFilter, setViewFilter] = useState<MocViewFilter>(
-  linkedAttention === "expired-temporary"
-    ? "Expired Temporary"
-    : linkedAttention === "expiry-soon"
-    ? "Expiry Soon"
-    : linkedAttention === "draft-ageing"
-    ? "Draft Ageing"
-    : linkedRecent === "1"
-    ? "Recent"
-    : "All"
-);
-  const [activeView, setActiveView] = useState<MocWorkspaceView>(() =>
+  const [viewFilter, setViewFilter] = useUrlState<MocViewFilter>("view", initialViewFilter, mocViewOptions);
+  // The tab is stored in ?tab= once someone picks one; until then the deep-link params decide which tab opens.
+  const [initialWorkspaceView] = useState<MocWorkspaceView>(() =>
     linkedSearch || linkedStatus !== "All" || linkedChangeType !== "All" || linkedRecent || linkedAttention
       ? "register"
       : "dashboard"
   );
+  const [storedWorkspaceView, setActiveView] = useUrlState<MocWorkspaceView | "">("tab", "", MOC_WORKSPACE_VIEW_VALUES);
+  const activeView: MocWorkspaceView = storedWorkspaceView || initialWorkspaceView;
   const [showRegisterFilters, setShowRegisterFilters] = useState(
     Boolean(linkedStatus !== "All" || linkedChangeType !== "All" || linkedRecent || linkedAttention)
   );
   const [selectedReportId, setSelectedReportId] = useState("");
+  // The open record is remembered in ?selected=; the record's details are loaded back into the panel once the register has loaded.
+  const [urlReportId, setUrlReportId] = useUrlState("selected", "");
   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());
   const [detailReport, setDetailReport] = useState<MocReport>(createEmptyReport());
   const [detailActionItems, setDetailActionItems] = useState<MocActionPlanItem[]>([createActionItem(0)]);
@@ -1070,25 +1080,16 @@ function MOCPageContent() {
       ? "Approved records stay live for implementation and close-out updates, but proposal and review structure is locked."
       : "Closed records are fully locked.";
 
+  // Search, status and change type follow the address automatically. When a link changes them while the page is open, show the register.
+  const linkedSignature = [linkedSearch, linkedStatus, linkedChangeType, linkedRecent, linkedAttention].join("|");
+  const lastLinkedSignature = useRef(linkedSignature);
   useEffect(() => {
-    setSearch(linkedSearch);
-    setStatusFilter(parseMocStatusFilter(linkedStatus));
-    setChangeTypeFilter(linkedChangeType === "Permanent" || linkedChangeType === "Temporary" ? linkedChangeType : "All");
-    setViewFilter(
-      linkedAttention === "expired-temporary"
-        ? "Expired Temporary"
-        : linkedAttention === "expiry-soon"
-        ? "Expiry Soon"
-        : linkedAttention === "draft-ageing"
-        ? "Draft Ageing"
-        : linkedRecent === "1"
-        ? "Recent"
-        : "All"
-    );
+    if (lastLinkedSignature.current === linkedSignature) return;
+    lastLinkedSignature.current = linkedSignature;
     if (linkedSearch || linkedStatus !== "All" || linkedChangeType !== "All" || linkedRecent || linkedAttention) {
       setActiveView("register");
     }
-  }, [linkedAttention, linkedChangeType, linkedRecent, linkedSearch, linkedStatus]);
+  }, [linkedAttention, linkedChangeType, linkedRecent, linkedSearch, linkedSignature, linkedStatus, setActiveView]);
 
   const showMessage = useCallback((text: string, tone: NoticeTone = "neutral") => {
     setMessage(text);
@@ -1280,6 +1281,13 @@ function MOCPageContent() {
     };
   }, [loadData]);
 
+  // Re-open the record named in ?selected= once the register has loaded (for example after pressing Back).
+  useEffect(() => {
+    if (!urlReportId || selectedReportId || reports.length === 0) return;
+    if (reports.some((report) => report.id === urlReportId)) openBundle(urlReportId);
+    else setUrlReportId("");
+  }, [reports, urlReportId, selectedReportId]);
+
   function getBundleFromData(
     reportId: string,
     source?: {
@@ -1338,6 +1346,7 @@ function MOCPageContent() {
     if (!bundle) return;
 
     setSelectedReportId(reportId);
+    setUrlReportId(reportId);
     setDetailReport(bundle.report);
     setDetailActionItems(bundle.actionItems.length ? bundle.actionItems : [createActionItem(0)]);
     setDetailAffectedDocuments(bundle.affectedDocuments.length ? bundle.affectedDocuments : [createDocumentRow(0)]);
@@ -1548,6 +1557,7 @@ function MOCPageContent() {
 
   function hideDetailPanel() {
     setSelectedReportId("");
+    setUrlReportId("");
     setDetailReport(createEmptyReport());
     setDetailActionItems([createActionItem(0)]);
     setDetailAffectedDocuments([createDocumentRow(0)]);
@@ -2075,6 +2085,7 @@ function MOCPageContent() {
       const deleteRes = await supabase.from("moc_reports").delete().eq("id", selectedReportId);
       if (deleteRes.error) throw new Error(deleteRes.error.message);
       setSelectedReportId("");
+      setUrlReportId("");
       setDetailReport(createEmptyReport());
       setDetailActionItems([createActionItem(0)]);
       setDetailAffectedDocuments([createDocumentRow(0)]);

@@ -1,5 +1,7 @@
 "use client";
 
+import { ImsBackNav } from "../../src/components/ImsBackNav";
+import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -38,6 +40,12 @@ type FindingStatus = "Open" | "In Progress" | "Closed";
 type SortKey = "audit_month" | "audit_number" | "title" | "audit_type" | "lead_auditor" | "findings";
 type AuditWorkspaceView = "dashboard" | "programme" | "create" | "findings" | "reports";
 type ProgrammeSnapshotScope = "All" | "Completed" | "Upcoming";
+
+const AUDIT_STATUS_FILTER_VALUES: readonly (AuditStatus | "All")[] = ["All", "Planned", "In Progress", "Completed", "Overdue", "Cancelled"];
+const AUDIT_TYPE_FILTER_VALUES: readonly (AuditType | "All")[] = ["All", "Internal", "External", "Supplier"];
+const FINDING_SEVERITY_FILTER_VALUES: readonly (FindingSeverity | "All")[] = ["All", "Major", "Minor", "OFI", "OBS"];
+const SORT_KEY_VALUES: readonly SortKey[] = ["audit_month", "audit_number", "title", "audit_type", "lead_auditor", "findings"];
+const AUDIT_WORKSPACE_VIEW_VALUES: readonly (AuditWorkspaceView | "")[] = ["", "dashboard", "programme", "create", "findings", "reports"];
 
 type AuditRecord = {
   id: string;
@@ -633,15 +641,16 @@ function AuditsPageContent() {
   const [audits, setAudits] = useState<AuditRecord[]>([]);
   const [auditFiles, setAuditFiles] = useState<AuditFileRow[]>([]);
   const [findings, setFindings] = useState<FindingRecord[]>([]);
-  const [selectedAuditId, setSelectedAuditId] = useState<string>("");
+  const [selectedAuditId, setSelectedAuditId] = useUrlState("selected", "");
   const [lastRefreshed, setLastRefreshed] = useState("");
-  const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState<AuditStatus | "All">(linkedStatus as AuditStatus | "All");
-  const [typeFilter, setTypeFilter] = useState<AuditType | "All">(linkedType as AuditType | "All");
-  const [monthFilter, setMonthFilter] = useState<string>(linkedMonth);
-  const [sortKey, setSortKey] = useState<SortKey>("audit_month");
-  const [sortAsc, setSortAsc] = useState<boolean>(true);
-  const [auditQuickFilter, setAuditQuickFilter] = useState<"" | "Major">("");
+  // The search box uses ?q= (not ?search=) because ?search= is the deep-link param that shows the "Linked search" banner and auto-selects an audit.
+  const [search, setSearch] = useUrlState("q", "");
+  const [statusFilter, setStatusFilter] = useUrlState<AuditStatus | "All">("status", "All", AUDIT_STATUS_FILTER_VALUES);
+  const [typeFilter, setTypeFilter] = useUrlState<AuditType | "All">("type", "All", AUDIT_TYPE_FILTER_VALUES);
+  const [monthFilter, setMonthFilter] = useUrlState("month", "All");
+  const [sortKey, setSortKey] = useUrlState<SortKey>("sort", "audit_month", SORT_KEY_VALUES);
+  const [sortAsc, setSortAsc] = useUrlFlag("asc", true);
+  const [auditQuickFilter, setAuditQuickFilter] = useUrlState<"" | "Major">("quick", "", ["", "Major"]);
   const [message, setMessage] = useState("Loading audits...");
   const [showFindingForm, setShowFindingForm] = useState(false);
   const [isUploadingReport, setIsUploadingReport] = useState(false);
@@ -652,12 +661,14 @@ function AuditsPageContent() {
   const [findingImportPreview, setFindingImportPreview] = useState<FindingImportPreview | null>(null);
   const [applyingFindingImport, setApplyingFindingImport] = useState(false);
   const [isSavingLinks, setIsSavingLinks] = useState(false);
-  const [selectedOpenFindingId, setSelectedOpenFindingId] = useState("");
-  const [openFindingCategoryFilter, setOpenFindingCategoryFilter] = useState<
-    FindingSeverity | "All"
-  >("All");
-  const [openFindingTypeFilter, setOpenFindingTypeFilter] = useState<AuditType | "All">("All");
-  const [openFindingAuditTitleFilter, setOpenFindingAuditTitleFilter] = useState("All");
+  const [selectedOpenFindingId, setSelectedOpenFindingId] = useUrlState("finding", "");
+  const [openFindingCategoryFilter, setOpenFindingCategoryFilter] = useUrlState<FindingSeverity | "All">(
+    "fcat",
+    "All",
+    FINDING_SEVERITY_FILTER_VALUES
+  );
+  const [openFindingTypeFilter, setOpenFindingTypeFilter] = useUrlState<AuditType | "All">("ftype", "All", AUDIT_TYPE_FILTER_VALUES);
+  const [openFindingAuditTitleFilter, setOpenFindingAuditTitleFilter] = useUrlState("faudit", "All");
   const [showFindingsFilters, setShowFindingsFilters] = useState(
     linkedView === "open-findings" ||
       linkedView === "closed-findings" ||
@@ -683,7 +694,8 @@ function AuditsPageContent() {
   const [customReportFindingStatus, setCustomReportFindingStatus] = useState<FindingStatus | "All">("All");
   const [customReportCategoryFilter, setCustomReportCategoryFilter] = useState<FindingSeverity | "All">("All");
   const [generatingAuditPdf, setGeneratingAuditPdf] = useState(false);
-  const [activeView, setActiveView] = useState<AuditWorkspaceView>(() => {
+  // The tab is stored in ?tab= once someone picks one; until then the deep-link params decide which tab opens.
+  const [initialView] = useState<AuditWorkspaceView>(() => {
     if (linkedView === "reports") return "reports";
     if (linkedView === "open-findings" || linkedView === "closed-findings" || directFindingId) return "findings";
     if (
@@ -699,6 +711,8 @@ function AuditsPageContent() {
 
     return "dashboard";
   });
+  const [storedView, setActiveView] = useUrlState<AuditWorkspaceView | "">("tab", "", AUDIT_WORKSPACE_VIEW_VALUES);
+  const activeView: AuditWorkspaceView = storedView || initialView;
   const [showProgrammeFilters, setShowProgrammeFilters] = useState(
     linkedStatus !== "All" || linkedType !== "All" || linkedMonth !== "All"
   );
@@ -904,6 +918,11 @@ function AuditsPageContent() {
   }
 
   useEffect(() => {
+    // A ?search= deep link also fills the search box, once, when the page opens.
+    if (linkedSearch && !searchParams.get("q")) setSearch(linkedSearch);
+  }, []);
+
+  useEffect(() => {
     void (async () => {
       await Promise.all([loadAudits(), loadLinkOptions(), loadPeopleOptions()]);
     })();
@@ -1097,6 +1116,7 @@ function AuditsPageContent() {
 
   useEffect(() => {
     if (openFindingAuditTitleFilter === "All") return;
+    if (findingAuditTitleOptions.length === 0) return;
     if (findingAuditTitleOptions.includes(openFindingAuditTitleFilter)) return;
     setOpenFindingAuditTitleFilter("All");
   }, [findingAuditTitleOptions, openFindingAuditTitleFilter]);
@@ -1251,13 +1271,18 @@ function AuditsPageContent() {
 
     const match = activeFindingsWorkspaceRows.find((finding) => finding.id === selectedOpenFindingId);
     if (!match) {
+      // Findings load after the page opens; keep a selection restored from the address until they arrive.
+      if (findings.length === 0) {
+        setOpenFindingForm(null);
+        return;
+      }
       setSelectedOpenFindingId("");
       setOpenFindingForm(null);
       return;
     }
 
     setOpenFindingForm(match);
-  }, [activeFindingsWorkspaceRows, selectedOpenFindingId]);
+  }, [activeFindingsWorkspaceRows, findings.length, selectedOpenFindingId]);
 
   useEffect(() => {
     if (!directFindingId || activeFindingsWorkspaceRows.length === 0) return;
@@ -1532,27 +1557,36 @@ function AuditsPageContent() {
     });
   }
 
-  function setAuditView(view: "open-findings" | "closed-findings" | null) {
+  // The address changes below happen immediately, while the page's own filter writes are slightly delayed,
+  // so the values being changed are written into the new address here as well.
+  function setAuditView(view: "open-findings" | "closed-findings" | null, extra?: (params: URLSearchParams) => void) {
     const params = new URLSearchParams(searchParams.toString());
     if (view) {
       params.set("view", view);
+      params.set("tab", "findings");
       setActiveView("findings");
     } else {
       params.delete("view");
+      params.set("tab", "programme");
       setActiveView("programme");
     }
+    extra?.(params);
     router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
   }
 
   function openFindingStatusByType(auditType: AuditType, status: "open" | "closed") {
     setOpenFindingTypeFilter(auditType);
     setOpenFindingCategoryFilter("All");
-    setAuditView(status === "closed" ? "closed-findings" : "open-findings");
+    setAuditView(status === "closed" ? "closed-findings" : "open-findings", (params) => {
+      params.set("ftype", auditType);
+      params.delete("fcat");
+    });
   }
 
-  function clearFindingViewParam() {
+  function clearFindingViewParam(nextTab: AuditWorkspaceView) {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("view");
+    params.set("tab", nextTab);
     router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
   }
 
@@ -1564,19 +1598,19 @@ function AuditsPageContent() {
       return;
     }
 
-    if (isOpenFindingsView || isClosedFindingsView) {
-      clearFindingViewParam();
+    if (isOpenFindingsView || isClosedFindingsView || linkedView === "reports") {
+      clearFindingViewParam(view);
     }
   }
 
   function applyAuditStatusKpiFilter(status: AuditStatus) {
-    setAuditView(null);
+    setAuditView(null, (params) => params.set("status", status));
     setActiveView("programme");
     setStatusFilter(status);
   }
 
   function applyMajorFindingsFilter() {
-    setAuditView(null);
+    setAuditView(null, (params) => params.set("quick", "Major"));
     setActiveView("programme");
     setAuditQuickFilter("Major");
   }
@@ -4132,9 +4166,7 @@ function AuditsPageContent() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>
-          ← Back to IMS Home
-        </Link>
+        <ImsBackNav />
 
         <div style={statusBannerStyle}>
           <strong>Status:</strong> {message}
@@ -6426,12 +6458,6 @@ const topMetaRowStyle: CSSProperties = {
   borderRadius: "14px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
-};
-
-const backLinkStyle: CSSProperties = {
-  color: "#005670",
-  fontWeight: 700,
-  textDecoration: "none",
 };
 
 const statusBannerStyle: CSSProperties = {

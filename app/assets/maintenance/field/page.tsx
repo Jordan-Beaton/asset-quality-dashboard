@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { supabase } from "../../../../src/lib/supabase";
+import { useUrlState } from "../../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ function buildAssetRouteValue(asset: Asset) {
 
 export default function AssetMaintenanceFieldPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useUrlState("search", "");
   const [message, setMessage] = useState("Loading assets...");
 
   useEffect(() => {

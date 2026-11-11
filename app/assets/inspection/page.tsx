@@ -18,6 +18,7 @@ import {
   imsTableStyle,
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -205,31 +206,24 @@ function InspectionPageContent() {
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [form, setForm] = useState<InspectionForm>(emptyForm);
   const [detailForm, setDetailForm] = useState<InspectionForm>(emptyForm);
-  const [assetFilter, setAssetFilter] = useState(linkedAssetParam);
-  const [resultFilter, setResultFilter] = useState("");
-  const [dueStatusFilter, setDueStatusFilter] = useState<"" | InspectionStatus>("");
-  const [registerSearch, setRegisterSearch] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAssetParam));
-  const [activeView, setActiveView] = useState<InspectionWorkspaceView>("dashboard");
+  const [assetFilter, setAssetFilter] = useUrlState("assetFilter", "");
+  const [resultFilter, setResultFilter] = useUrlState("result", "");
+  const [dueStatusFilter, setDueStatusFilter] = useUrlState<"" | InspectionStatus>("due", "", ["", "Overdue", "Due Soon", "In Date", "Not Set"]);
+  const [registerSearch, setRegisterSearch] = useUrlState("search", "");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
+  const [activeView, setActiveView] = useUrlState<InspectionWorkspaceView>("view", "dashboard", ["dashboard", "register", "create"]);
   const [fieldQrDataUrl, setFieldQrDataUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [openingId, setOpeningId] = useState("");
   const [deletingId, setDeletingId] = useState("");
-  const [selectedRecordId, setSelectedRecordId] = useState("");
+  const [selectedRecordId, setSelectedRecordId] = useUrlState("selected", "");
   const detailPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     void loadData();
   }, []);
-
-  useEffect(() => {
-    const requestedView = searchParams.get("view");
-    if (requestedView === "create" || requestedView === "register" || requestedView === "dashboard") {
-      setActiveView(requestedView);
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -303,6 +297,12 @@ function InspectionPageContent() {
     () => records.find((record) => record.id === selectedRecordId) || null,
     [records, selectedRecordId]
   );
+
+  // A record selected through the address (after Back) has no edit form yet, so fill it once the record has loaded.
+  useEffect(() => {
+    if (!selectedRecord) return;
+    setDetailForm((prev) => (prev.assetId ? prev : buildInspectionForm(selectedRecord)));
+  }, [selectedRecord]);
   const fieldAsset = useMemo(() => (form.assetId ? assetMap.get(form.assetId) || null : null), [assetMap, form.assetId]);
 
   async function getNextInspectionNumber() {

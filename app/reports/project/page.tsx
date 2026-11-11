@@ -29,6 +29,7 @@ import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { WaddenSeaOpenPoints } from "../../../src/components/WaddenSeaOpenPoints";
 import { ProjectWorkspaceNav } from "../../../src/components/ProjectWorkspaceNav";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 type RawCell = string | number | boolean | Date | null | undefined;
 
@@ -380,27 +381,27 @@ function downloadBlob(blob: Blob, fileName: string) {
 
 export default function ProjectReportsPage() {
   const today = useMemo(() => new Date(), []);
-  const [reportingDate, setReportingDate] = useState(formatInputDate(today));
+  const [reportingDate, setReportingDate] = useUrlState("date", formatInputDate(today));
   const [imsRecords, setImsRecords] = useState<NoiRecord[]>([]);
   const [uploadedRecords, setUploadedRecords] = useState<NoiRecord[]>([]);
   const [noiLoading, setNoiLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [workbookSummary, setWorkbookSummary] = useState<WorkbookSummary | null>(null);
   const [message, setMessage] = useState("Upload the current NOI tracker to build the Wadden Sea annex.");
-  const [supplierFilter, setSupplierFilter] = useState("All");
-  const [packageFilter, setPackageFilter] = useState("All");
-  const [search, setSearch] = useState("");
-  const [showUnresolved, setShowUnresolved] = useState(false);
+  const [supplierFilter, setSupplierFilter] = useUrlState("supplier", "All");
+  const [packageFilter, setPackageFilter] = useUrlState("package", "All");
+  const [search, setSearch] = useUrlState("search", "");
+  const [showUnresolved, setShowUnresolved] = useUrlFlag("unresolved");
   const [isGenerating, setIsGenerating] = useState<"" | "word" | "pdf">("");
-  const [activeAnnex, setActiveAnnex] = useState<ProjectAnnex>("lookahead");
+  const [activeAnnex, setActiveAnnex] = useUrlState<ProjectAnnex>("annex", "lookahead", ["audit-ncr", "audit-programme", "lookahead", "open-points"]);
   const [projectAudits, setProjectAudits] = useState<ProjectAudit[]>([]);
   const [projectAuditFindings, setProjectAuditFindings] = useState<ProjectAuditFinding[]>([]);
   const [auditDataLoading, setAuditDataLoading] = useState(true);
-  const [auditSearch, setAuditSearch] = useState("");
-  const [auditTypeFilter, setAuditTypeFilter] = useState("All");
-  const [auditStatusFilter, setAuditStatusFilter] = useState("All");
-  const [findingStatusFilter, setFindingStatusFilter] = useState("All");
-  const [findingCategoryFilter, setFindingCategoryFilter] = useState("All");
+  const [auditSearch, setAuditSearch] = useUrlState("auditsearch", "");
+  const [auditTypeFilter, setAuditTypeFilter] = useUrlState("audittype", "All");
+  const [auditStatusFilter, setAuditStatusFilter] = useUrlState("auditstatus", "All");
+  const [findingStatusFilter, setFindingStatusFilter] = useUrlState("findingstatus", "All");
+  const [findingCategoryFilter, setFindingCategoryFilter] = useUrlState("findingcategory", "All");
   const [selectedNcrAuditIds, setSelectedNcrAuditIds] = useState<string[]>([]);
   const [selectedProgrammeAuditIds, setSelectedProgrammeAuditIds] = useState<string[]>([]);
   const [generatingAuditAnnex, setGeneratingAuditAnnex] = useState<"" | "ncr-word" | "ncr-pdf" | "programme-word" | "programme-pdf">("");

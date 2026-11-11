@@ -7,6 +7,7 @@ import { ImsTopMetaRow } from "./ImsPrimitives";
 import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
 import { QualityKpiCard } from "./QualityKpiCard";
 import { supabase } from "../lib/supabase";
+import { useUrlState } from "../lib/useUrlState";
 import {
   imsColours, imsPanelStyle, imsTableStyle,
   imsTableHeadStyle, imsTableCellStyle, imsPrimaryButtonStyle,
@@ -221,7 +222,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
   const [uploadingMore, setUploadingMore] = useState(false);
   const moreFileRef = useRef<HTMLInputElement>(null);
 
-  const [filterStatus, setFilterStatus] = useState<"all" | "complete" | "pending">("all");
+  const [filterStatus, setFilterStatus] = useUrlState<"all" | "complete" | "pending">("status", "all", ["all", "complete", "pending"]);
 
   // ── Data loading ──────────────────────────────────────────────────────────
 

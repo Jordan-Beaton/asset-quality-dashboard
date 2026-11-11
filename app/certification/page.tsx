@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import {
@@ -20,6 +20,7 @@ import {
   imsColours,
 } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import type { CSSProperties } from "react";
 
 type CertificationView = "dashboard" | "register" | "upload";
@@ -132,15 +133,15 @@ function getErrorMessage(error: unknown) {
   return "Unknown error";
 }
 
-export default function CertificationPage() {
+function CertificationPageContent() {
   const [rows, setRows] = useState<CertificationRow[]>([]);
-  const [activeView, setActiveView] = useState<CertificationView>("dashboard");
-  const [selectedId, setSelectedId] = useState("");
+  const [activeView, setActiveView] = useUrlState<CertificationView>("tab", "dashboard", ["dashboard", "register", "upload"]);
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
   const [form, setForm] = useState<CertificationForm>(emptyForm);
-  const [search, setSearch] = useState("");
-  const [standardFilter, setStandardFilter] = useState("All Standards");
-  const [statusFilter, setStatusFilter] = useState("All Statuses");
-  const [showFilters, setShowFilters] = useState(false);
+  const [search, setSearch] = useUrlState("search", "");
+  const [standardFilter, setStandardFilter] = useUrlState("standard", "All Standards");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "All Statuses");
+  const [showFilters, setShowFilters] = useUrlFlag("filters", false);
   const [message, setMessage] = useState("Loading certification register...");
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [saving, setSaving] = useState(false);
@@ -766,3 +767,11 @@ const detailItemValueStyle: CSSProperties = {
   fontWeight: 800,
   marginTop: "5px",
 };
+
+export default function CertificationPage() {
+  return (
+    <Suspense fallback={null}>
+      <CertificationPageContent />
+    </Suspense>
+  );
+}

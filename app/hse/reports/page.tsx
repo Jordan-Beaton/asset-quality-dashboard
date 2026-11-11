@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import jsPDF from "jspdf";
@@ -8,6 +8,7 @@ import autoTable from "jspdf-autotable";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -247,9 +248,9 @@ export default function HseReportsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDraftingSummary, setIsDraftingSummary] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [savedReportSearch, setSavedReportSearch] = useState("");
-  const [savedReportYearFilter, setSavedReportYearFilter] = useState("All Years");
-  const [showSavedReportFilters, setShowSavedReportFilters] = useState(false);
+  const [savedReportSearch, setSavedReportSearch] = useUrlState("search", "");
+  const [savedReportYearFilter, setSavedReportYearFilter] = useUrlState("year", "All Years");
+  const [showSavedReportFilters, setShowSavedReportFilters] = useUrlFlag("filters");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [message, setMessage] = useState("Loading HSE monthly management reporting workspace...");
 
@@ -761,9 +762,7 @@ export default function HseReportsPage() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>
-          &larr; Back to IMS Home
-        </Link>
+        <ImsBackNav />
         <div style={{ ...statusBannerStyle, marginBottom: 0, borderRadius: "12px", padding: "8px 12px" }}>
           <strong>Status:</strong> {message}
         </div>
@@ -974,12 +973,6 @@ export default function HseReportsPage() {
     </main>
   );
 }
-
-const backLinkStyle: CSSProperties = {
-  color: "#005670",
-  fontWeight: 700,
-  textDecoration: "none",
-};
 
 const topMetaRowStyle: CSSProperties = {
   marginBottom: 20,

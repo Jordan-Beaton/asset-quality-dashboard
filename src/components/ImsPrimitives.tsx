@@ -4,9 +4,9 @@ import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
 import { ModuleSectionHeader } from "./ModuleSectionHeader";
+import { ImsBackNav } from "./ImsBackNav";
 import {
   imsActiveTabButtonStyle,
-  imsBackLinkStyle,
   imsDangerButtonStyle,
   imsFilterActionRowStyle,
   imsFilterGridStyle,
@@ -95,13 +95,10 @@ export function ImsTopMetaRow({
   status?: ReactNode;
   actions?: ReactNode;
 }) {
-  const backLabel = "Back to IMS Home";
   return (
     <>
     <div className="ims-top-meta-row" style={imsTopMetaRowStyle}>
-      <Link href="/home" style={imsBackLinkStyle}>
-        ← {backLabel}
-      </Link>
+      <ImsBackNav />
       {status ? <div className="ims-top-meta-status" style={imsStatusBannerStyle}>{status}</div> : null}
     </div>
     {actions ? <div className="ims-page-actions">{actions}</div> : null}

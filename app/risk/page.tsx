@@ -7,6 +7,7 @@ import { ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlState } from "../../src/lib/useUrlState";
 
 type RiskRating = "Low" | "Medium" | "High" | "Critical";
 
@@ -69,11 +70,13 @@ function countBy(values: Array<string | null | undefined>) {
   }, {});
 }
 
+export const dynamic = "force-dynamic";
+
 export default function RiskDashboardPage() {
   const [risks, setRisks] = useState<RiskRow[]>([]);
   const [message, setMessage] = useState("Loading Risk Management dashboard...");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [dashboardView, setDashboardView] = useState<"overview" | "analytics">("overview");
+  const [dashboardView, setDashboardView] = useUrlState<"overview" | "analytics">("view", "overview", ["overview", "analytics"]);
 
   async function loadRisks() {
     const { data, error } = await supabase

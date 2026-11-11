@@ -14,6 +14,7 @@ import { supabase } from "../lib/supabase";
 import { getProject } from "../lib/projectRegistry";
 import { addColumnChoicePrefix, candidatesForColumn, reviewCandidatesForColumn, sameColumnLabel, type GridResult, type ReviewCandidate } from "../lib/noiColumnGrid";
 import { postScan } from "../lib/noiScanClient";
+import { useUrlState } from "../lib/useUrlState";
 
 const STORAGE_BUCKET = "project-documents";
 
@@ -72,12 +73,12 @@ export function NoiTrackerPage({ projectKey }: { projectKey: string }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [itpNumberFilter, setItpNumberFilter] = useState("All");
-  const [itpTitleFilter, setItpTitleFilter] = useState("All");
-  const [supplierFilter, setSupplierFilter] = useState("All");
+  const [query, setQuery] = useUrlState("search", "");
+  const [typeFilter, setTypeFilter] = useUrlState("type", "All");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "All");
+  const [itpNumberFilter, setItpNumberFilter] = useUrlState("itp", "All");
+  const [itpTitleFilter, setItpTitleFilter] = useUrlState("title", "All");
+  const [supplierFilter, setSupplierFilter] = useUrlState("supplier", "All");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualPoint, setManualPoint] = useState(emptyManualPoint);

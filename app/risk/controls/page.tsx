@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import type { CSSProperties, ReactNode } from "react";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
@@ -69,9 +69,7 @@ function RiskShellPage({
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>
-          ← Back to IMS Home
-        </Link>
+        <ImsBackNav />
 
         <div style={statusBannerStyle}>
           <strong>Status:</strong> {status}
@@ -116,12 +114,6 @@ const topMetaRowStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
-};
-
-const backLinkStyle: CSSProperties = {
-  color: "#005670",
-  fontWeight: 700,
-  textDecoration: "none",
 };
 
 const statusBannerStyle: CSSProperties = {

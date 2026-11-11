@@ -8,6 +8,7 @@ import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { ProjectWorkspaceNav } from "../../../src/components/ProjectWorkspaceNav";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlState } from "../../../src/lib/useUrlState";
 
 type ItpRow = {
   id: string;
@@ -45,7 +46,7 @@ function formatDate(value: string | null) {
 export default function WaddenSeaPage() {
   const [itps, setItps] = useState<ItpRow[]>([]);
   const [noiPoints, setNoiPoints] = useState<NoiRow[]>([]);
-  const [dashboardView, setDashboardView] = useState<"overview" | "planning" | "controls">("overview");
+  const [dashboardView, setDashboardView] = useUrlState<"overview" | "planning" | "controls">("view", "overview", ["overview", "planning", "controls"]);
   const [message, setMessage] = useState("Loading Baltic Power project controls...");
 
   useEffect(() => {

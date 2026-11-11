@@ -1,13 +1,15 @@
 "use client";
 
+import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -226,7 +228,10 @@ function countByOwner(actions: ActionItem[]) {
 function QualityActionsPageContent() {
   const imsPermissions = useImsPermissions();
   const searchParams = useSearchParams();
-  const linkedSearch = searchParams.get("search")?.trim() || "";
+  // Read once on arrival: later changes to ?search= come from the search box and must not open a record.
+  const [linkedSearch] = useState(() => searchParams.get("search")?.trim() || "");
+  const [selectedIdOnArrival] = useState(() => searchParams.get("selected") || "");
+  const linkOpenedRef = useRef(false);
   const directActionId = searchParams.get("actionId")?.trim() || "";
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [currentUserEmail, setCurrentUserEmail] = useState("");
@@ -240,14 +245,14 @@ function QualityActionsPageContent() {
   const [assetInspectionOptions, setAssetInspectionOptions] = useState<AssetInspectionOption[]>([]);
   const [assetMaintenanceOptions, setAssetMaintenanceOptions] = useState<AssetMaintenanceOption[]>([]);
   const [assetCalibrationOptions, setAssetCalibrationOptions] = useState<AssetCalibrationOption[]>([]);
-  const [activeView, setActiveView] = useState<QualityActionView>("dashboard");
-  const [selectedId, setSelectedId] = useState("");
-  const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
-  const [pressureFilter, setPressureFilter] = useState<"" | "overdue" | "dueWeek">("");
+  const [activeView, setActiveView] = useUrlState<QualityActionView>("view", "dashboard", ["dashboard", "register", "create"]);
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
+  const [priorityFilter, setPriorityFilter] = useUrlState("priority", "");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
+  const [pressureFilter, setPressureFilter] = useUrlState<"" | "overdue" | "dueWeek">("pressure", "", ["", "overdue", "dueWeek"]);
   const [form, setForm] = useState<ActionForm>(emptyForm);
   const [message, setMessage] = useState("Loading Quality actions...");
   const [loading, setLoading] = useState(true);
@@ -391,6 +396,9 @@ function QualityActionsPageContent() {
 
   useEffect(() => {
     if ((!linkedSearch && !directActionId) || actions.length === 0) return;
+    // A record that was open when the address was saved stays open instead of jumping to the first search match.
+    if (!directActionId && selectedIdOnArrival) return;
+    if (linkOpenedRef.current) return;
     const value = linkedSearch.toLowerCase();
     const match = actions.find((action) => (
       (directActionId && action.id === directActionId) ||
@@ -400,6 +408,7 @@ function QualityActionsPageContent() {
       ))
     ));
     if (!match) return;
+    linkOpenedRef.current = true;
     setSelectedId(match.id);
     setActiveView("register");
   }, [actions, directActionId, linkedSearch]);
@@ -709,7 +718,7 @@ function QualityActionsPageContent() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link>
+        <ImsBackNav />
         <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
@@ -1023,7 +1032,6 @@ const topMetaRowStyle: CSSProperties = {
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
 const topMetaActionsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
-const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#000000" };
 const primaryLinkStyle: CSSProperties = { background: "#005670", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 800, textDecoration: "none", display: "inline-flex", alignItems: "center" };
 const smallLinkStyle: CSSProperties = { ...primaryLinkStyle, padding: "8px 10px", fontSize: 12 };

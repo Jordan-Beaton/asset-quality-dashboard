@@ -18,6 +18,7 @@ import {
   imsTableStyle,
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -200,30 +201,23 @@ function MaintenancePageContent() {
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [newMaintenance, setNewMaintenance] = useState<NewMaintenanceForm>(emptyNewMaintenance);
   const [detailForm, setDetailForm] = useState<NewMaintenanceForm>(emptyNewMaintenance);
-  const [assetFilter, setAssetFilter] = useState(linkedAssetParam);
-  const [typeFilter, setTypeFilter] = useState("");
-  const [dueStatusFilter, setDueStatusFilter] = useState<"" | DueStatus>("");
-  const [registerSearch, setRegisterSearch] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAssetParam));
-  const [activeView, setActiveView] = useState<MaintenanceWorkspaceView>("dashboard");
+  const [assetFilter, setAssetFilter] = useUrlState("assetFilter", "");
+  const [typeFilter, setTypeFilter] = useUrlState("type", "");
+  const [dueStatusFilter, setDueStatusFilter] = useUrlState<"" | DueStatus>("due", "", ["", "Overdue", "Due Soon", "In Date", "Not Set"]);
+  const [registerSearch, setRegisterSearch] = useUrlState("search", "");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
+  const [activeView, setActiveView] = useUrlState<MaintenanceWorkspaceView>("view", "dashboard", ["dashboard", "register", "create"]);
   const [fieldQrDataUrl, setFieldQrDataUrl] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [openingId, setOpeningId] = useState("");
   const [deletingId, setDeletingId] = useState("");
-  const [selectedRecordId, setSelectedRecordId] = useState("");
+  const [selectedRecordId, setSelectedRecordId] = useUrlState("selected", "");
   const detailPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     void loadData();
   }, []);
-
-  useEffect(() => {
-    const requestedView = searchParams.get("view");
-    if (requestedView === "create" || requestedView === "register" || requestedView === "dashboard") {
-      setActiveView(requestedView);
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -297,6 +291,12 @@ function MaintenancePageContent() {
     () => records.find((record) => record.id === selectedRecordId) || null,
     [records, selectedRecordId]
   );
+
+  // A record selected through the address (after Back) has no edit form yet, so fill it once the record has loaded.
+  useEffect(() => {
+    if (!selectedRecord) return;
+    setDetailForm((prev) => (prev.asset_id ? prev : buildMaintenanceForm(selectedRecord)));
+  }, [selectedRecord]);
   const fieldAsset = useMemo(
     () => (newMaintenance.asset_id ? assetMap.get(newMaintenance.asset_id) || null : null),
     [assetMap, newMaintenance.asset_id]

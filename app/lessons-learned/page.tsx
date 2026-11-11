@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ChangeEvent } from "react";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
@@ -11,6 +11,7 @@ import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { LessonsPreventionIntelligence } from "../../src/components/LessonsPreventionIntelligence";
 import { imsColours, imsInputStyle } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 
 type View = "dashboard" | "register" | "create" | "import" | "trends" | "intelligence";
 type AnalysisFilter = "all" | "open-actions" | "high-critical" | "repeat-lessons" | "unowned-actions" | "cross-project-repeats" | "with-evidence" | "missing-root-cause" | "ai-results";
@@ -31,6 +32,9 @@ type PersonOption = { id: string; name: string; role: string | null; department:
 type AssetOption = { id: string; name: string; code: string };
 type ReferenceContextValue = { projects: ProjectOption[]; people: PersonOption[]; assets: AssetOption[]; departments: string[]; onSelectProject: (id: string) => void; showNewProject: boolean; setShowNewProject: (value: boolean) => void; newProjectCode: string; setNewProjectCode: (value: string) => void; newProjectName: string; setNewProjectName: (value: string) => void; onAddProject: () => void };
 const ReferenceContext = createContext<ReferenceContextValue | null>(null);
+
+const VIEW_VALUES: readonly View[] = ["dashboard", "register", "create", "import", "trends", "intelligence"];
+const ANALYSIS_FILTER_VALUES: readonly AnalysisFilter[] = ["all", "open-actions", "high-critical", "repeat-lessons", "unowned-actions", "cross-project-repeats", "with-evidence", "missing-root-cause", "ai-results"];
 
 const tabs: Array<{ value: View; label: string }> = [
   { value: "dashboard", label: "Dashboard" }, { value: "register", label: "Register" },
@@ -94,19 +98,21 @@ function compareProjects(a: ProjectOption, b: ProjectOption) {
   return projectCodeCollator.compare(a.code, b.code) || a.name.localeCompare(b.name);
 }
 
-export default function LessonsLearnedPage() {
+function LessonsLearnedPageContent() {
   const permission = useImsPermissions();
-  const [view, setView] = useState<View>("dashboard"); const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [view, setView] = useUrlState<View>("view", "dashboard", VIEW_VALUES); const [lessons, setLessons] = useState<Lesson[]>([]);
   const [evidence, setEvidence] = useState<Evidence[]>([]); const [selected, setSelected] = useState<Lesson | null>(null);
+  // The open record is remembered in ?selected=; its details are loaded back into the panel once the lessons have loaded.
+  const [selectedLessonId, setSelectedLessonId] = useUrlState("selected", "");
   const [form, setForm] = useState(emptyForm); const [message, setMessage] = useState("Loading lessons learnt...");
-  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [search, setSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(false); const [projectFilter, setProjectFilter] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState(""); const [statusFilter, setStatusFilter] = useState("");
-  const [criticalityFilter, setCriticalityFilter] = useState(""); const [outcomeFilter, setOutcomeFilter] = useState("");
-  const [analysisFilter, setAnalysisFilter] = useState<AnalysisFilter>("all"); const [analysisLabel, setAnalysisLabel] = useState("All lessons");
+  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [search, setSearch] = useUrlState("search", "");
+  const [showFilters, setShowFilters] = useUrlFlag("filters", false); const [projectFilter, setProjectFilter] = useUrlState("project", "");
+  const [departmentFilter, setDepartmentFilter] = useUrlState("department", ""); const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [criticalityFilter, setCriticalityFilter] = useUrlState("criticality", ""); const [outcomeFilter, setOutcomeFilter] = useUrlState("outcome", "");
+  const [analysisFilter, setAnalysisFilter] = useUrlState<AnalysisFilter>("analysis", "all", ANALYSIS_FILTER_VALUES); const [analysisLabel, setAnalysisLabel] = useUrlState("label", "All lessons");
   const [aiLessonIds, setAiLessonIds] = useState<Set<string>>(new Set());
-  const [repeatGroupFilter, setRepeatGroupFilter] = useState("");
-  const [yearFilter, setYearFilter] = useState(""); const [importRows, setImportRows] = useState<ImportRow[]>([]);
+  const [repeatGroupFilter, setRepeatGroupFilter] = useUrlState("repeat", "");
+  const [yearFilter, setYearFilter] = useUrlState("year", ""); const [importRows, setImportRows] = useState<ImportRow[]>([]);
   const [importName, setImportName] = useState(""); const [importing, setImporting] = useState(false); const [files, setFiles] = useState<File[]>([]);
   const [evidenceNotes, setEvidenceNotes] = useState(""); const detailRef = useRef<HTMLElement | null>(null);
   const [learningIndex, setLearningIndex] = useState(0); const [learningPaused, setLearningPaused] = useState(false);
@@ -123,6 +129,7 @@ export default function LessonsLearnedPage() {
     setIsFieldMode(fieldMode);
     if (fieldMode || params.get("view") === "create") {
       setSelected(null);
+      setSelectedLessonId("");
       setForm(fieldMode ? { ...emptyForm, report_date: todayValue() } : emptyForm);
       setView("create");
     } else if (params.get("view") === "register") {
@@ -218,7 +225,19 @@ export default function LessonsLearnedPage() {
       (analysisFilter === "missing-root-cause" && !clean(item.root_cause));
     return (!search || haystack.includes(search.toLowerCase())) && (!departmentFilter || (departmentFilter === "Unassigned" ? !clean(item.department) : item.department === departmentFilter)) && (!statusFilter || item.status === statusFilter) && (!criticalityFilter || item.criticality === criticalityFilter) && (!outcomeFilter || item.outcome_type === outcomeFilter) && (!yearFilter || item.report_date?.startsWith(yearFilter)) && (!repeatGroupFilter || clean(item.repeat_group).toLowerCase() === repeatGroupFilter.toLowerCase()) && matchesAnalysis;
   }).map((item) => item.project_name).filter(Boolean))].sort(), [lessons, search, departmentFilter, statusFilter, criticalityFilter, outcomeFilter, yearFilter, repeatGroupFilter, analysisFilter, repeatedLessonIds, crossProjectLessonIds, evidenceCounts, aiLessonIds]);
-  useEffect(() => { if (projectFilter && !availableProjects.includes(projectFilter)) setProjectFilter(""); }, [availableProjects, projectFilter]);
+  useEffect(() => { if (projectFilter && lessons.length > 0 && !availableProjects.includes(projectFilter)) setProjectFilter(""); }, [availableProjects, lessons.length, projectFilter]);
+  // AI search results are not kept in the address, so an address that asks for them falls back to all lessons.
+  const startedOnAiResults = useRef(analysisFilter === "ai-results");
+  useEffect(() => {
+    if (startedOnAiResults.current && aiLessonIds.size === 0) { setAnalysisFilter("all"); setAnalysisLabel("All lessons"); }
+    startedOnAiResults.current = false;
+  }, []);
+  // Re-open the record named in ?selected= once the lessons have loaded (for example after pressing Back).
+  useEffect(() => {
+    if (!selectedLessonId || selected || lessons.length === 0) return;
+    const match = lessons.find((item) => item.id === selectedLessonId);
+    if (match) openLesson(match); else setSelectedLessonId("");
+  }, [lessons, selectedLessonId, selected]);
   const filtered = useMemo(() => lessons.filter((item) => {
     const haystack = [item.lesson_number, item.project_code, item.project_name, item.department, item.subject, item.issue_description, item.root_cause, item.lesson_learned, item.recommended_action, item.keywords?.join(" ")].join(" ").toLowerCase();
     const matchesAnalysis = analysisFilter === "all" ||
@@ -333,7 +352,7 @@ export default function LessonsLearnedPage() {
     setForm((current) => ({ ...current, project_code: code, project_name: name })); setNewProjectCode(""); setNewProjectName(""); setShowNewProject(false); setMessage(`${code} · ${name} added to the project register.`);
   }
   function openLesson(item: Lesson) {
-    setSelected(item); setView("register"); setForm({
+    setSelected(item); setSelectedLessonId(item.id); setView("register"); setForm({
       project_code: item.project_code || "", project_name: item.project_name, report_date: item.report_date || "", incident_date: item.incident_date || "",
       vessel_office: item.vessel_office || "", assets: item.assets || "", department: item.department || "", originator: item.originator || "",
       line_manager: item.line_manager || "", stage_phase: item.stage_phase || "", outcome_type: item.outcome_type, status: item.status,
@@ -375,9 +394,9 @@ export default function LessonsLearnedPage() {
     else { const next = Math.max(0, ...lessons.map((x) => Number(x.lesson_number.replace(/\D/g, "")) || 0)) + 1; const { data, error } = await supabase.from("lessons_learned").insert({ ...payload(), lesson_number: lessonNo(next) }).select("id").single(); if (error) { setMessage(`Create failed: ${error.message}`); setSaving(false); return; } recordId = data.id; }
     const uploadError = await uploadEvidence(recordId); setMessage(uploadError ? `Lesson saved, but evidence failed: ${uploadError}` : "Lesson saved to the central repository.");
     await refreshLessonIndex([recordId]);
-    setSaving(false); setFiles([]); setEvidenceNotes(""); setForm(isFieldMode ? { ...emptyForm, report_date: todayValue() } : emptyForm); setSelected(null); await loadData(); setView(isFieldMode ? "create" : "register");
+    setSaving(false); setFiles([]); setEvidenceNotes(""); setForm(isFieldMode ? { ...emptyForm, report_date: todayValue() } : emptyForm); setSelected(null); setSelectedLessonId(""); await loadData(); setView(isFieldMode ? "create" : "register");
   }
-  async function deleteLesson() { if (!selected || !requireEdit("delete lessons") || !window.confirm(`Delete ${selected.lesson_number}?`)) return; const { error } = await supabase.from("lessons_learned").delete().eq("id", selected.id); setMessage(error ? `Delete failed: ${error.message}` : `${selected.lesson_number} deleted.`); if (!error) { setSelected(null); setForm(emptyForm); await loadData(); } }
+  async function deleteLesson() { if (!selected || !requireEdit("delete lessons") || !window.confirm(`Delete ${selected.lesson_number}?`)) return; const { error } = await supabase.from("lessons_learned").delete().eq("id", selected.id); setMessage(error ? `Delete failed: ${error.message}` : `${selected.lesson_number} deleted.`); if (!error) { setSelected(null); setSelectedLessonId(""); setForm(emptyForm); await loadData(); } }
   async function openEvidence(item: Evidence) { const { data, error } = await supabase.storage.from("lessons-learned-evidence").createSignedUrl(item.file_path, 60 * 60 * 24 * 180); if (error) setMessage(`Evidence open failed: ${error.message}`); else window.open(data.signedUrl, "_blank", "noopener,noreferrer"); }
 
   function previewImport(event: ChangeEvent<HTMLInputElement>) {
@@ -433,7 +452,7 @@ export default function LessonsLearnedPage() {
   return <ReferenceContext.Provider value={{ projects: referenceProjects, people: peopleOptions, assets: assetOptions, departments: departmentOptions, onSelectProject: selectProjectReference, showNewProject, setShowNewProject, newProjectCode, setNewProjectCode, newProjectName, setNewProjectName, onAddProject: addProjectReference }}><main className={isFieldMode ? "lessons-field-mode" : undefined}>
     {isFieldMode ? <section style={fieldIntroStyle}><span style={fieldIntroIconStyle}><LearningFieldIcon /></span><span><strong style={fieldIntroTitleStyle}>Capture a Lesson</strong><small style={fieldIntroTextStyle}>Record the learning now; optional detail can be added or refined later.</small></span></section> : <QualityPageHero label="LESSONS LEARNT" title="Lessons Learnt" description="Central repository for searchable project knowledge, repeat-failure prevention, evidence, actions, and trend analysis." />}
     <ImsTopMetaRow backHref={isFieldMode ? "/field-tools" : "/home"} backLabel={isFieldMode ? "Back to Field Tools" : "Back to IMS Home"} status={<><strong>Status:</strong> {message}</>} />
-    {!isFieldMode ? <ImsTabs tabs={tabs} active={view} onChange={(next) => { setView(next); setIntelligenceDrilldown(false); if (next === "create") { setSelected(null); setForm(emptyForm); } }} ariaLabel="Lessons Learnt views" /> : null}
+    {!isFieldMode ? <ImsTabs tabs={tabs} active={view} onChange={(next) => { setView(next); setIntelligenceDrilldown(false); if (next === "create") { setSelected(null); setSelectedLessonId(""); setForm(emptyForm); } }} ariaLabel="Lessons Learnt views" /> : null}
     {!isFieldMode ? <section className="quality-kpi-grid" style={kpiGrid}>
       <QualityKpiCard title="Total Lessons" value={kpis.total} accent={imsColours.brand} active={analysisFilter === "all" && analysisLabel === "All lessons"} onClick={() => { clearAllFilters(); setView("register"); }} />
       <QualityKpiCard title="Open Actions" value={kpis.open} accent={imsColours.warning} active={analysisFilter === "open-actions"} onClick={() => openAnalysis("open-actions", "Open actions requiring follow-up")} />
@@ -611,3 +630,11 @@ const fieldOptionalTextStyle: CSSProperties = { margin: "0 0 12px", color: imsCo
 const fieldSaveRowStyle: CSSProperties = { position: "sticky", bottom: 0, zIndex: 5, display: "grid", margin: "16px -12px -12px", padding: "12px", borderTop: `1px solid ${imsColours.brandBorder}`, background: "rgba(255,255,255,.96)", backdropFilter: "blur(8px)" };
 
 function LearningFieldIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 25, height: 25 }} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22zM20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22z" /></svg>; }
+
+export default function LessonsLearnedPage() {
+  return (
+    <Suspense fallback={null}>
+      <LessonsLearnedPageContent />
+    </Suspense>
+  );
+}

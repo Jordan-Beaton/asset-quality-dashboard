@@ -8,6 +8,7 @@ import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import SpeakUpAdminPanel from "../../src/components/speakup/SpeakUpAdminPanel";
 import { IMS_PERMISSION_REGISTRY } from "../../src/lib/imsPermissionRegistry";
+import { useUrlState } from "../../src/lib/useUrlState";
 import {
   imsColours,
   imsInputStyle,
@@ -361,9 +362,11 @@ function StatusPill({ children, tone = "neutral" }: { children: ReactNode; tone?
   );
 }
 
+export const dynamic = "force-dynamic";
+
 export default function AdminDashboardPage() {
   const imsPermissions = useImsPermissions();
-  const [activeView, setActiveView] = useState<AdminView>("users");
+  const [activeView, setActiveView] = useUrlState<AdminView>("view", "users", ["dashboard", "users", "roles", "company", "reference", "notifications", "audit", "speakup"]);
   const [data, setData] = useState<AdminData | null>(null);
   const [message, setMessage] = useState("Loading Admin / Settings...");
   const [isLoading, setIsLoading] = useState(true);
@@ -391,9 +394,9 @@ export default function AdminDashboardPage() {
   const [newDepartment, setNewDepartment] = useState({ name: "", code: "" });
   const [newProject, setNewProject] = useState({ code: "", name: "", type: "Project" });
   const [personDrafts, setPersonDrafts] = useState<Record<string, Partial<PersonRow>>>({});
-  const [userSearch, setUserSearch] = useState("");
+  const [userSearch, setUserSearch] = useUrlState("search", "");
   const [showInvitePanel, setShowInvitePanel] = useState(false);
-  const [selectedOverridePersonId, setSelectedOverridePersonId] = useState("");
+  const [selectedOverridePersonId, setSelectedOverridePersonId] = useUrlState("selected", "");
   const [roleDrafts, setRoleDrafts] = useState<Record<string, Partial<RoleRow>>>({});
   const [tabPermissionDrafts, setTabPermissionDrafts] = useState<Record<string, Record<string, TabPermissionRow>>>({});
   const [inviteTabPermissionDrafts, setInviteTabPermissionDrafts] = useState<Record<string, TabPermissionRow>>({});

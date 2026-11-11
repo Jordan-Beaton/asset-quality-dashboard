@@ -15,6 +15,7 @@ import {
   imsTableStyle,
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -244,14 +245,14 @@ export default function AssetActionsPage() {
   const [assetInspectionOptions, setAssetInspectionOptions] = useState<AssetInspectionOption[]>([]);
   const [assetMaintenanceOptions, setAssetMaintenanceOptions] = useState<AssetMaintenanceOption[]>([]);
   const [assetCalibrationOptions, setAssetCalibrationOptions] = useState<AssetCalibrationOption[]>([]);
-  const [activeView, setActiveView] = useState<AssetActionView>("dashboard");
-  const [selectedId, setSelectedId] = useState("");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
-  const [pressureFilter, setPressureFilter] = useState<"" | "overdue" | "dueWeek">("");
+  const [activeView, setActiveView] = useUrlState<AssetActionView>("view", "dashboard", ["dashboard", "register", "create"]);
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
+  const [priorityFilter, setPriorityFilter] = useUrlState("priority", "");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
+  const [pressureFilter, setPressureFilter] = useUrlState<"" | "overdue" | "dueWeek">("pressure", "", ["", "overdue", "dueWeek"]);
   const [form, setForm] = useState<ActionForm>(emptyForm);
   const [message, setMessage] = useState("Loading Asset actions...");
   const [loading, setLoading] = useState(true);

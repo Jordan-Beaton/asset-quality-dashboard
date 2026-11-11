@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
+import { ImsBackNav } from "../../src/components/ImsBackNav";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import * as XLSX from "xlsx";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { imsBackLinkStyle } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlState } from "../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -128,10 +129,10 @@ function PeoplePageContent() {
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [newPerson, setNewPerson] = useState<PersonForm>(emptyPersonForm);
   const [detailForm, setDetailForm] = useState<PersonForm>(emptyPersonForm);
-  const [departmentFilter, setDepartmentFilter] = useState<"" | Department>("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [search, setSearch] = useState("");
-  const [selectedPersonId, setSelectedPersonId] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useUrlState<"" | Department>("department", "", ["", ...DEPARTMENTS]);
+  const [statusFilter, setStatusFilter] = useUrlState<"all" | "active" | "inactive">("status", "all", ["all", "active", "inactive"]);
+  const [search, setSearch] = useUrlState("search", "");
+  const [selectedPersonId, setSelectedPersonId] = useUrlState("selected", "");
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
@@ -442,7 +443,7 @@ function PeoplePageContent() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={imsBackLinkStyle}>&larr; Back to IMS Home</Link>
+        <ImsBackNav />
         <div style={statusBannerStyle}>
           <strong>Status:</strong> {message}
         </div>

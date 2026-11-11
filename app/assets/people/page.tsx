@@ -13,6 +13,7 @@ import {
   imsTableStyle,
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -63,10 +64,10 @@ function PeoplePageContent() {
   const [lastRefreshed, setLastRefreshed] = useState("");
   const [newPerson, setNewPerson] = useState<PersonForm>(emptyPersonForm);
   const [detailForm, setDetailForm] = useState<PersonForm>(emptyPersonForm);
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [search, setSearch] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
-  const [selectedPersonId, setSelectedPersonId] = useState("");
+  const [statusFilter, setStatusFilter] = useUrlState<"all" | "active" | "inactive">("status", "all", ["all", "active", "inactive"]);
+  const [search, setSearch] = useUrlState("search", "");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
+  const [selectedPersonId, setSelectedPersonId] = useUrlState("selected", "");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
@@ -111,6 +112,14 @@ function PeoplePageContent() {
     () => people.find((person) => person.id === selectedPersonId) || null,
     [people, selectedPersonId]
   );
+
+  // A person selected through the address (after Back) has no edit form yet, so fill it once the people have loaded.
+  useEffect(() => {
+    if (!selectedPerson) return;
+    setDetailForm((prev) =>
+      prev.name || prev.role ? prev : { name: selectedPerson.name, role: selectedPerson.role || "", active: selectedPerson.active }
+    );
+  }, [selectedPerson]);
 
   const activeCount = people.filter((person) => person.active).length;
   const inactiveCount = people.length - activeCount;

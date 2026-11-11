@@ -25,6 +25,7 @@ import { imsColours, imsPanelStyle, imsShadows } from "../../src/components/imsT
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlState } from "../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -206,8 +207,8 @@ export default function HseDashboardPage() {
   const [refreshDate, setRefreshDate] = useState<Date | null>(null);
   const [message, setMessage] = useState("Loading HSE dashboard...");
   const [loading, setLoading] = useState(false);
-  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
-  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning">("overview");
+  const [yearFilter, setYearFilter] = useUrlState("year", String(new Date().getFullYear()));
+  const [dashboardView, setDashboardView] = useUrlState<"overview" | "analytics" | "planning">("view", "overview", ["overview", "analytics", "planning"]);
 
   async function loadDashboard() {
     setLoading(true);

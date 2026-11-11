@@ -28,6 +28,7 @@ import { imsColours, imsPanelStyle, imsTableCellStyle, imsTableHeadStyle, imsTab
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 type PtwView = "dashboard" | "register" | "create" | "template";
 type YesNo = "" | "Yes" | "No";
@@ -401,7 +402,7 @@ function hydrateRecord(record: HsePtwRecord): PtwForm {
 }
 
 export default function HsePermitToWorkPage() {
-  const [activeView, setActiveView] = useState<PtwView>("dashboard");
+  const [activeView, setActiveView] = useUrlState<PtwView>("view", "dashboard", ["dashboard", "register", "template"]);
   const [draft, setDraft] = useState<PtwForm>(emptyForm);
   const [records, setRecords] = useState<HsePtwRecord[]>([]);
   const [attachments, setAttachments] = useState<PtwAttachment[]>([]);
@@ -410,10 +411,10 @@ export default function HsePermitToWorkPage() {
   const [selectedId, setSelectedId] = useState("");
   const [peopleOptions, setPeopleOptions] = useState<PeopleOption[]>([]);
   const [statusMessage, setStatusMessage] = useState("Loading PTW records...");
-  const [registerSearch, setRegisterSearch] = useState("");
-  const [registerStatusFilter, setRegisterStatusFilter] = useState("");
-  const [registerWorkTypeFilter, setRegisterWorkTypeFilter] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
+  const [registerSearch, setRegisterSearch] = useUrlState("search", "");
+  const [registerStatusFilter, setRegisterStatusFilter] = useUrlState("status", "");
+  const [registerWorkTypeFilter, setRegisterWorkTypeFilter] = useUrlState("worktype", "");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
 
   const selectedWorkTypes = useMemo(() => draft.workTypes.length || "0", [draft.workTypes.length]);
   const selectedPrecautions = useMemo(() => draft.precautions.length || "0", [draft.precautions.length]);

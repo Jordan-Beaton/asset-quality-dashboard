@@ -227,6 +227,50 @@ label.audit-upload-label,
   text-decoration: none !important;
 }
 
+/* The Back control (src/components/ImsBackNav.tsx): a back link to the previous screen plus a small IMS Home button. */
+.ims-back-nav {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ims-top-meta-row .ims-back-nav > a:first-child {
+  color: var(--enshore-brand) !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  text-decoration: none !important;
+}
+
+.ims-back-nav .ims-back-home {
+  color: var(--enshore-muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 5px 12px;
+  border: 1px solid var(--enshore-border);
+  border-radius: 10px;
+}
+
+.ims-back-nav .ims-back-home:hover {
+  background: var(--enshore-page);
+  color: var(--enshore-brand);
+}
+
+.ims-back-short {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .ims-back-nav .ims-back-long {
+    display: none;
+  }
+
+  .ims-back-nav .ims-back-short {
+    display: inline;
+  }
+}
+
 .ims-page-actions {
   display: flex;
   justify-content: flex-end;

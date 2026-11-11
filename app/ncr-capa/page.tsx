@@ -1,5 +1,6 @@
 "use client";
 
+import { ImsBackNav } from "../../src/components/ImsBackNav";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -32,6 +33,7 @@ import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { exportColours, exportRgb, exportTypography } from "../../src/lib/exportTheme";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -866,10 +868,13 @@ function NcrCapaPageContent() {
   const [saving, setSaving] = useState(false);
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
   const [activeCreateTab] = useState<"NCR" | "CAPA">("NCR");
-  const [activeWorkspaceView, setActiveWorkspaceView] = useState<NcrWorkspaceView>(
-    hasRegisterQuery ? "register" : requestedWorkspaceView || "dashboard"
-  );
+  // The chosen screen lives in the address (?view=); with none chosen, a search/filter link opens the register.
+  const [workspaceViewParam, setWorkspaceViewParam] = useUrlState("view", "");
+  const activeWorkspaceView: NcrWorkspaceView =
+    parseNcrWorkspaceView(workspaceViewParam) || (hasRegisterQuery ? "register" : "dashboard");
+  const setActiveWorkspaceView = (view: NcrWorkspaceView) => setWorkspaceViewParam(view);
   const [selectedRow, setSelectedRow] = useState<CombinedRow | null>(null);
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
   const selectedDetailRef = useRef<HTMLDivElement | null>(null);
   const [refreshStamp, setRefreshStamp] = useState<string>("");
   const [message, setMessage] = useState("");
@@ -877,22 +882,35 @@ function NcrCapaPageContent() {
   const [importingNcrWordId, setImportingNcrWordId] = useState("");
   const [applyingNcrImport, setApplyingNcrImport] = useState(false);
 
-  const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState(linkedStatus);
-  const [severityFilter, setSeverityFilter] = useState(linkedSeverity);
-  const [sourceFilter, setSourceFilter] = useState(linkedSource);
-  const [projectFilter, setProjectFilter] = useState(linkedProject);
-  const [showRegisterFilters, setShowRegisterFilters] = useState(
+  const [search, setSearchValue] = useUrlState("search", "");
+  // Remembers what was typed, so typing in the search box is not mistaken for a "?search=" link that opens a record.
+  const typedSearchRef = useRef<string | null>(null);
+  function setSearch(value: string) {
+    typedSearchRef.current = value.trim();
+    setSearchValue(value);
+  }
+  const [statusFilter, setStatusFilter] = useUrlState("status", "All");
+  const [severityFilter, setSeverityFilter] = useUrlState("severity", "All");
+  const [sourceFilter, setSourceFilter] = useUrlState("source", "All");
+  const [projectFilter, setProjectFilter] = useUrlState("project", "All");
+  // A link that arrives with filters opens the filter panel, unless the address says otherwise.
+  const [registerFiltersOpenByDefault] = useState(
     Boolean(linkedStatus !== "All" || linkedSeverity !== "All" || linkedSource !== "All" || linkedProject !== "All")
   );
-  const [showReportFilters, setShowReportFilters] = useState(false);
-  const [showAttentionOnly, setShowAttentionOnly] = useState(false);
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters", registerFiltersOpenByDefault);
+  const [showReportFilters, setShowReportFilters] = useUrlFlag("reportfilters");
+  const [showAttentionOnly, setShowAttentionOnly] = useUrlFlag("attention");
   // Closed NCRs are hidden from the register unless this is ticked.
-  const [showClosedNcrs, setShowClosedNcrs] = useState(false);
-  const [activeLogTab, setActiveLogTab] = useState<"NCR" | "CAPA">("NCR");
-  const [ncrQuickFilter, setNcrQuickFilter] = useState<NcrQuickFilter>("");
-  const [yearFilter, setYearFilter] = useState(linkedYear === "All Years" ? "All Years" : String(new Date().getFullYear()));
-  const [ncrSort, setNcrSort] = useState<{ key: NcrSortKey; direction: SortDirection } | null>(null);
+  const [showClosedNcrs, setShowClosedNcrs] = useUrlFlag("closed");
+  const [activeLogTab, setActiveLogTab] = useUrlState<"NCR" | "CAPA">("tab", "NCR", ["NCR", "CAPA"]);
+  const [ncrQuickFilter, setNcrQuickFilter] = useUrlState<NcrQuickFilter>("quick", "", ["", "Open", "In Progress", "Closed", "Overdue", "DueSoon", "All"]);
+  const [yearFilter, setYearFilter] = useUrlState("year", String(new Date().getFullYear()));
+  const [ncrSortKey, setNcrSortKey] = useUrlState<"" | NcrSortKey>("sort", "", ["", "number", "severity", "status", "due_date"]);
+  const [ncrSortDirection, setNcrSortDirection] = useUrlState<SortDirection>("dir", "asc", ["asc", "desc"]);
+  const ncrSort = useMemo(
+    () => (ncrSortKey ? { key: ncrSortKey, direction: ncrSortDirection } : null),
+    [ncrSortKey, ncrSortDirection]
+  );
 
   const [ncrOptions, setNcrOptions] = useState<LinkedOption[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
@@ -1076,13 +1094,14 @@ function NcrCapaPageContent() {
   }, []);
 
   useEffect(() => {
-    if (hasRegisterQuery) {
-      setActiveWorkspaceView("register");
+    // A screen chosen in the address (including one the person picked themselves) wins; otherwise a filter link opens the register.
+    if (requestedWorkspaceView) {
+      setActiveWorkspaceView(requestedWorkspaceView);
       return;
     }
 
-    if (requestedWorkspaceView) {
-      setActiveWorkspaceView(requestedWorkspaceView);
+    if (hasRegisterQuery) {
+      setActiveWorkspaceView("register");
     }
   }, [hasRegisterQuery, requestedWorkspaceView]);
 
@@ -1167,8 +1186,24 @@ function NcrCapaPageContent() {
     });
   }, [ncrs, capas]);
 
+  // A record that was open when the address was saved is reopened once the data has loaded.
+  const selectionRestoredRef = useRef(false);
+  const selectionInAddressOnLoadRef = useRef(selectedId !== "");
+  const handledLinkRef = useRef("");
+
   useEffect(() => {
     if ((!linkedSearch && !directNcrNumber && !directNcrId) || combinedRows.length === 0) return;
+
+    // Typing in the search box (or reloading a saved search) is not a link to a record: do not open the first match.
+    const linkKey = `${linkedSearch}|${directNcrNumber}|${directNcrId}`;
+    if (!directNcrNumber && !directNcrId) {
+      if (typedSearchRef.current === linkedSearch) return;
+      if (selectionInAddressOnLoadRef.current && !handledLinkRef.current) {
+        handledLinkRef.current = linkKey;
+        return;
+      }
+    }
+    if (handledLinkRef.current === linkKey) return;
 
     const value = (directNcrNumber || linkedSearch).toLowerCase();
     const match = combinedRows.find(
@@ -1184,11 +1219,29 @@ function NcrCapaPageContent() {
     );
 
     if (match) {
+      handledLinkRef.current = linkKey;
       setActiveLogTab(match.type);
       setActiveWorkspaceView("register");
       setSelectedRow((current) => (current?.id === match.id ? current : match));
     }
   }, [directNcrId, directNcrNumber, linkedSearch, combinedRows]);
+
+  useEffect(() => {
+    if (!selectionRestoredRef.current) {
+      if (!selectedId) {
+        selectionRestoredRef.current = true;
+        return;
+      }
+      if (combinedRows.length === 0) return;
+      selectionRestoredRef.current = true;
+      const saved =
+        combinedRows.find((row) => row.id === selectedId && row.type === activeLogTab) ||
+        combinedRows.find((row) => row.id === selectedId);
+      if (saved) setSelectedRow((current) => current || saved);
+      return;
+    }
+    setSelectedId(selectedRow?.id ?? "");
+  }, [selectedRow, selectedId, combinedRows]);
 
   const evidenceCountMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -1453,10 +1506,12 @@ function NcrCapaPageContent() {
   }
 
   function toggleNcrSort(key: NcrSortKey) {
-    setNcrSort((current) => {
-      if (!current || current.key !== key) return { key, direction: "asc" };
-      return { key, direction: current.direction === "asc" ? "desc" : "asc" };
-    });
+    if (!ncrSort || ncrSort.key !== key) {
+      setNcrSortKey(key);
+      setNcrSortDirection("asc");
+      return;
+    }
+    setNcrSortDirection(ncrSort.direction === "asc" ? "desc" : "asc");
   }
 
   function ncrSortLabel(key: NcrSortKey, label: string) {
@@ -3460,9 +3515,7 @@ function NcrCapaPageContent() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>
-          ← Back to IMS Home
-        </Link>
+        <ImsBackNav />
 
         <div style={statusBannerStyle}>
           <strong>Status:</strong> {message || "Ready"}
@@ -5558,12 +5611,6 @@ const topMetaActionsStyle: CSSProperties = {
   gap: "10px",
   flexWrap: "wrap",
   alignItems: "center",
-};
-
-const backLinkStyle: CSSProperties = {
-  color: "#005670",
-  fontWeight: 700,
-  textDecoration: "none",
 };
 
 const statusBannerStyle: CSSProperties = {

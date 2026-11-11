@@ -1,5 +1,5 @@
+import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import type { CSSProperties, ReactNode } from "react";
-import Link from "next/link";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 
@@ -31,7 +31,7 @@ export default function HseEnvironmentalPage() {
 }
 
 function TopRow({ status }: { status: string }) {
-  return <div style={topMetaRowStyle}><Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link><div style={statusBannerStyle}><strong>Status:</strong> {status}</div></div>;
+  return <div style={topMetaRowStyle}><ImsBackNav /><div style={statusBannerStyle}><strong>Status:</strong> {status}</div></div>;
 }
 
 function SectionCard({ title, children }: { title: string; children: ReactNode }) {
@@ -51,7 +51,6 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", color: "#000000" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };

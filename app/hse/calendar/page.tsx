@@ -15,6 +15,7 @@ import {
   imsTableStyle,
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -461,28 +462,36 @@ function buildEvents({
   return events.filter((event) => event.date).sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
 }
 
+// The calendar month travels in the address as YYYY-MM.
+function monthKeyOf(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default function HseCalendarPage() {
   const router = useRouter();
   const [items, setItems] = useState<PlannerItem[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
-  const [activeView, setActiveView] = useState<CalendarView>("dashboard");
+  const [activeView, setActiveView] = useUrlState<CalendarView>("view", "dashboard", ["dashboard", "calendar", "register", "create"]);
   const [message, setMessage] = useState("Loading HSE calendar...");
   const [loading, setLoading] = useState(false);
   const [refreshStamp, setRefreshStamp] = useState("");
-  const [selectedId, setSelectedId] = useState("");
-  const [selectedDateKey, setSelectedDateKey] = useState("");
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
+  const [selectedDateKey, setSelectedDateKey] = useUrlState("date", "");
   const [createForm, setCreateForm] = useState<PlannerForm>(emptyForm);
   const [detailForm, setDetailForm] = useState<PlannerForm>(emptyForm);
-  const [search, setSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("");
-  const [monthCursor, setMonthCursor] = useState(() => {
+  const [search, setSearch] = useUrlState("search", "");
+  const [showFilters, setShowFilters] = useUrlFlag("filters");
+  const [sourceFilter, setSourceFilter] = useUrlState("source", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
+  const [monthKey, setMonthKey] = useUrlState("month", monthKeyOf(new Date()));
+  const monthCursor = useMemo(() => {
+    const match = /^(\d{4})-(\d{2})$/.exec(monthKey);
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+    return match ? new Date(Number(match[1]), Number(match[2]) - 1, 1) : new Date(now.getFullYear(), now.getMonth(), 1);
+  }, [monthKey]);
+  const setMonthCursor = (date: Date) => setMonthKey(monthKeyOf(date));
 
   const selected = useMemo(() => events.find((event) => event.id === selectedId) || null, [events, selectedId]);
   const selectedPlanner = selected?.planner || null;

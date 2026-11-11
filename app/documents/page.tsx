@@ -1,11 +1,11 @@
 "use client";
 
+import { ImsBackNav } from "../../src/components/ImsBackNav";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
@@ -588,13 +588,6 @@ function extractAdditionalNotificationEmails(
 
 function DocumentsPageContent() {
   const imsPermissions = useImsPermissions();
-  const searchParams = useSearchParams();
-  const linkedSearch = searchParams.get("search")?.trim() || "";
-  const linkedStatus = searchParams.get("status")?.trim() || "";
-  const linkedType = searchParams.get("type")?.trim() || "";
-  const linkedOwner = searchParams.get("owner")?.trim() || "";
-  const linkedReview = searchParams.get("review")?.trim() || "";
-  const linkedApproval = searchParams.get("approval")?.trim() || "";
 
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [revisionsByDocumentId, setRevisionsByDocumentId] = useState<Record<string, DocumentRevisionRow[]>>({});
@@ -604,27 +597,41 @@ function DocumentsPageContent() {
   const [, setContacts] = useState<NotificationContactRow[]>([]);
   const [message, setMessage] = useState("Loading documents...");
   const [lastRefreshed, setLastRefreshed] = useState("");
-  const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState(linkedStatus);
-  const [typeFilter, setTypeFilter] = useState(linkedType);
-  const [ownerFilter, setOwnerFilter] = useState(linkedOwner);
-  const [reviewFilter, setReviewFilter] = useState(linkedReview);
-  const [approvalFilter, setApprovalFilter] = useState(linkedApproval);
-  const [selectedDocumentId, setSelectedDocumentId] = useState("");
-  const [showDetailPanel, setShowDetailPanel] = useState(false);
-  const [activeDetailTab, setActiveDetailTab] = useState<"details" | "file" | "history">("details");
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [typeFilter, setTypeFilter] = useUrlState("type", "");
+  const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
+  const [reviewFilter, setReviewFilter] = useUrlState("review", "");
+  const [approvalFilter, setApprovalFilter] = useUrlState("approval", "");
+  // The record is kept in the address (?selected=) only while its detail panel is open; the first record is still
+  // selected silently after a load, so that auto-selection never ends up in the address.
+  const [urlSelectedId, setUrlSelectedId] = useUrlState("selected", "");
+  const [selectedDocumentId, setSelectedDocumentId] = useState(urlSelectedId);
+  const [showDetailPanel, setShowDetailPanel] = useState(Boolean(urlSelectedId));
+  const [activeDetailTab, setActiveDetailTab] = useUrlState<"details" | "file" | "history">("tab", "details", ["details", "file", "history"]);
   const [showPersonsModal, setShowPersonsModal] = useState(false);
   const [personsModalForm, setPersonsModalForm] = useState<{ originator_name: string; originator_email: string; reviewed_by: string; reviewer_email: string; approved_by: string; approver_email: string }>({ originator_name: "", originator_email: "", reviewed_by: "", reviewer_email: "", approved_by: "", approver_email: "" });
   const [personsModalSearch, setPersonsModalSearch] = useState<{ originator_name: string; reviewed_by: string; approved_by: string }>({ originator_name: "", reviewed_by: "", approved_by: "" });
   const detailPanelRef = useRef<HTMLElement | null>(null);
   const shouldScrollToDetailRef = useRef(false);
   const [showCreatePanel, setShowCreatePanel] = useState(false);
-  const [activeView, setActiveView] = useState<DocumentWorkspaceView>(
-    linkedSearch || linkedStatus || linkedType || linkedOwner || linkedReview || linkedApproval ? "register" : "dashboard"
-  );
-  const [showRegisterFilters, setShowRegisterFilters] = useState(
-    Boolean(linkedStatus || linkedType || linkedOwner || linkedReview || linkedApproval)
-  );
+  const [activeView, setActiveView] = useUrlState<DocumentWorkspaceView>("view", "dashboard", ["dashboard", "register", "create", "workflow", "archive", "reports"]);
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
+
+  useEffect(() => {
+    setUrlSelectedId(showDetailPanel ? selectedDocumentId : "");
+  }, [showDetailPanel, selectedDocumentId, setUrlSelectedId]);
+
+  // Dashboard links such as /documents?status=Live open the register, with the filter panel showing when a filter is set.
+  const deepLinkAppliedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkAppliedRef.current) return;
+    deepLinkAppliedRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const hasPanelFilter = ["status", "type", "owner", "review", "approval"].some((key) => params.get(key)?.trim());
+    if (!params.has("view") && (hasPanelFilter || params.get("search")?.trim())) setActiveView("register");
+    if (!params.has("filters") && hasPanelFilter) setShowRegisterFilters(true);
+  }, [setActiveView, setShowRegisterFilters]);
 
   const [form, setForm] = useState<DocumentForm>(emptyForm);
   const [detailForm, setDetailForm] = useState<DocumentForm>(emptyForm);
@@ -2968,9 +2975,7 @@ function DocumentsPageContent() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>
-          ← Back to IMS Home
-        </Link>
+        <ImsBackNav />
 
         <div style={statusBannerStyle}>
           <strong>Status:</strong> {message}
@@ -4671,12 +4676,6 @@ const topMetaRowStyle: CSSProperties = {
   borderRadius: "14px",
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
-};
-
-const backLinkStyle: CSSProperties = {
-  color: "#005670",
-  fontWeight: 700,
-  textDecoration: "none",
 };
 
 const statusBannerStyle: CSSProperties = {

@@ -16,6 +16,7 @@ import {
   imsTableStyle,
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -418,12 +419,17 @@ function CalibrationPageContent() {
   const [form, setForm] = useState<CalibrationForm>(emptyForm);
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [renewalCertificateFile, setRenewalCertificateFile] = useState<File | null>(null);
-  const [assetFilter, setAssetFilter] = useState(linkedAsset);
-  const [searchFilter, setSearchFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"" | CalibrationStatus>("");
-  const [itemStatusFilter, setItemStatusFilter] = useState<CalibrationItemStatusFilter>(defaultItemStatusFilter);
-  const [showRegisterFilters, setShowRegisterFilters] = useState(Boolean(linkedAsset));
-  const [activeView, setActiveView] = useState<CalibrationWorkspaceView>("dashboard");
+  const [assetFilter, setAssetFilter] = useUrlState("asset", "");
+  const [searchFilter, setSearchFilter] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState<"" | CalibrationStatus>("status", "", ["", "Overdue", "Due Soon", "In Date", "Not Set"]);
+  const [itemStatusFilter, setItemStatusFilter] = useUrlState<CalibrationItemStatusFilter>("itemStatus", defaultItemStatusFilter, ["active", "all", "In Use", "Not In Use", "Damaged", "Missing / Lost", "Historic"]);
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
+  const [activeView, setActiveView] = useUrlState<CalibrationWorkspaceView>("view", "dashboard", ["dashboard", "register", "create", "bulk"]);
+
+  // A link carrying an asset (from another module) opens the register filters, as before.
+  useEffect(() => {
+    if (linkedAsset) setShowRegisterFilters(true);
+  }, [linkedAsset, setShowRegisterFilters]);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isOpeningId, setIsOpeningId] = useState<string>("");

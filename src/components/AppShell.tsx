@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { ImsPermissionNotice, ImsPermissionProvider, type ImsPermissionValue } from "./ImsPermissions";
 import { MobileTableEnhancer } from "./MobileTableEnhancer";
 import { MobileCompatibilityGuard } from "./MobileCompatibilityGuard";
+import { NavTracker } from "./NavTracker";
 import NotificationBell from "./NotificationBell";
 import { supabase } from "../lib/supabase";
 import { getPermissionTargetFromPath } from "../lib/imsPermissionRegistry";
@@ -1085,6 +1086,7 @@ export default function AppShell({ children }: AppShellProps) {
     <ImsPermissionProvider value={activePermission}>
     <MobileTableEnhancer routeKey={pathname} />
     <MobileCompatibilityGuard routeKey={pathname} />
+    <NavTracker />
     <div
       className="ims-app-root"
       data-theme={isDarkMode ? "dark" : "light"}

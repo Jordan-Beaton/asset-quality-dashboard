@@ -7,6 +7,7 @@ import { ImsButton, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPr
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -264,7 +265,7 @@ function DashboardContent() {
   const [linkedActions, setLinkedActions] = useState<AssetLinkedAction[]>([]);
   const [message, setMessage] = useState("Loading asset dashboard...");
   const [lastRefreshed, setLastRefreshed] = useState("");
-  const [dashboardView, setDashboardView] = useState<"overview" | "analytics" | "planning">("overview");
+  const [dashboardView, setDashboardView] = useUrlState<"overview" | "analytics" | "planning">("view", "overview", ["overview", "analytics", "planning"]);
 
   async function loadDashboardData() {
     const [assetsRes, calibrationsRes, inspectionsRes, maintenanceRes, filesRes, actionsRes] = await Promise.all([

@@ -1,5 +1,6 @@
 "use client";
 
+import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import type { ChangeEvent, CSSProperties, ReactNode, RefObject } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -10,6 +11,7 @@ import { ImsPermissionNotice, useImsPermissions } from "../../../src/components/
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -954,13 +956,20 @@ export default function HseInspectionsPage() {
   const [evidence, setEvidence] = useState<InspectionEvidence[]>([]);
   const [centralActions, setCentralActions] = useState<CentralAction[]>([]);
   const [people, setPeople] = useState<PeopleOption[]>([]);
-  const [activeView, setActiveView] = useState<InspectionView>("dashboard");
+  // The create form holds an unsaved draft (and on mobile hides the page navigation), so only dashboard / register live in the address.
+  const [persistedView, setPersistedView] = useUrlState<"dashboard" | "register">("view", "dashboard", ["dashboard", "register"]);
+  const [createViewOpen, setCreateViewOpen] = useState(false);
+  const activeView: InspectionView = createViewOpen ? "create" : persistedView;
+  const setActiveView = (view: InspectionView) => {
+    setCreateViewOpen(view === "create");
+    if (view !== "create") setPersistedView(view);
+  };
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId);
   const [draft, setDraft] = useState<HseInspectionRecord>(() => makeDraft());
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
   const selectedDetailRef = useRef<HTMLDivElement | null>(null);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
   const [message, setMessage] = useState("Loading HSE inspections...");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -1190,6 +1199,8 @@ export default function HseInspectionsPage() {
     const inspectionId = (params.get("inspectionId") || "").trim();
     const inspectionNumber = (params.get("inspection") || "").trim().toLowerCase();
     if (!inspectionId && !inspectionNumber) return;
+    // A record the user chose afterwards (kept in the address as ?selected=) wins over the original deep link.
+    if (params.has("selected")) return;
 
     const matchedRecord = records.find((record) => {
       return (
@@ -1203,6 +1214,17 @@ export default function HseInspectionsPage() {
     setSearch(matchedRecord.inspection_number || "");
     setStatusFilter("");
   }, [records]);
+
+  // A record restored from the address (?selected=) needs its form filled in, exactly as clicking the row does.
+  useEffect(() => {
+    if (!selected || draft.id === selected.id) return;
+    setDraft({
+      ...selected,
+      checklist_responses: normalizeChecklist(selected.checklist_responses),
+      actions: normalizeActions(selected.actions),
+    });
+    setSelectedTemplateId(selected.form_id || defaultTemplateId);
+  }, [selected]);
 
   function startCreate(templateId = defaultTemplateId) {
     if (!requireCreatePermission("create HSE inspections")) return;
@@ -1938,7 +1960,7 @@ function MobileInspectionHero({ latestSummary }: { latestSummary: string }) {
 function TopRow({ status }: { status: string }) {
   return (
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-      <Link href="/home" style={backLinkStyle}>&larr; Back to IMS Home</Link>
+      <ImsBackNav />
       <div style={statusBannerStyle}><strong>Status:</strong> {status}</div>
     </div>
   );
@@ -2090,7 +2112,7 @@ function RegisterView({
   isMobile: boolean;
   detailPanelRef: RefObject<HTMLDivElement | null>;
 }) {
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useUrlFlag("filters");
 
   return (
     <section style={splitGridStyle}>
@@ -2761,7 +2783,6 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", color: "#000000" };
 const tabRowStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "20px" };
 const tabButtonStyle: CSSProperties = { border: "none", borderRadius: "10px", padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };

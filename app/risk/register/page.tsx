@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, FormEvent, ReactNode } from "react";
 import jsPDF from "jspdf";
@@ -9,6 +9,7 @@ import { ImsPermissionNotice, useImsPermissions } from "../../../src/components/
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 type RiskRating = "Low" | "Medium" | "High" | "Critical";
 
@@ -328,28 +329,30 @@ function buildRiskPayload(form: RiskForm) {
   };
 }
 
+export const dynamic = "force-dynamic";
+
 export default function RiskRegisterPage() {
   const imsPermissions = useImsPermissions();
   const [risks, setRisks] = useState<RiskRow[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [form, setForm] = useState<RiskForm>(emptyForm);
   const [editForm, setEditForm] = useState<RiskForm>(emptyForm);
-  const [selectedRiskId, setSelectedRiskId] = useState("");
+  const [selectedRiskId, setSelectedRiskId] = useUrlState("selected", "");
   const [showCreateRisk, setShowCreateRisk] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useUrlFlag("details");
   const [message, setMessage] = useState("Loading risk register...");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
-  const [statusFilter, setStatusFilter] = useState("");
-  const [ratingFilter, setRatingFilter] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const [projectFilter, setProjectFilter] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [ratingFilter, setRatingFilter] = useUrlState("rating", "");
+  const [departmentFilter, setDepartmentFilter] = useUrlState("department", "");
+  const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
+  const [categoryFilter, setCategoryFilter] = useUrlState("category", "");
+  const [projectFilter, setProjectFilter] = useUrlState("project", "");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
 
   async function loadData(showLoadedMessage = true) {
     setIsLoading(true);
@@ -755,9 +758,7 @@ export default function RiskRegisterPage() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>
-          ← Back to IMS Home
-        </Link>
+        <ImsBackNav />
 
         <div style={statusBannerStyle}>
           <strong>Status:</strong> {message}
@@ -1246,7 +1247,6 @@ const topMetaRowStyle: CSSProperties = {
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
 const topMetaActionsStyle: CSSProperties = { display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" };
-const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: "12px", padding: "12px 16px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", color: "#000000" };
 const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", marginBottom: "20px" };

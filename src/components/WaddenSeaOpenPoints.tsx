@@ -9,6 +9,7 @@ import { AlignmentType, BorderStyle, Document as WordDocument, Footer, Packer, P
 import { QualityKpiCard } from "./QualityKpiCard";
 import { ImsButton, ImsFilterPanel, ImsPanel } from "./ImsPrimitives";
 import { useImsPermissions } from "./ImsPermissions";
+import { useUrlFlag, useUrlState } from "../lib/useUrlState";
 import { supabase } from "../lib/supabase";
 
 type View = "dashboard" | "register" | "create" | "settings";
@@ -51,13 +52,13 @@ function download(blob: Blob, name: string) { const url = URL.createObjectURL(bl
 
 export function WaddenSeaOpenPoints() {
   const permission = useImsPermissions();
-  const [view, setView] = useState<View>("dashboard"); const [points, setPoints] = useState<OpenPoint[]>([]); const [evidence, setEvidence] = useState<Evidence[]>([]);
+  const [view, setView] = useUrlState<View>("op_view", "dashboard", ["dashboard", "register", "create", "settings"]); const [points, setPoints] = useState<OpenPoint[]>([]); const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [people, setPeople] = useState<Option[]>([]); const [ncrs, setNcrs] = useState<Option[]>([]);
   const [settings, setSettings] = useState<Settings>({ taking_over_date: "", phase_milestones: [], sbs_options: [], wbs_options: [], cde_mirror_weekday: 5 });
   const [form, setForm] = useState(emptyForm); const [selected, setSelected] = useState<OpenPoint | null>(null); const [message, setMessage] = useState("Loading Open Points..."); const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState(""); const [statusFilter, setStatusFilter] = useState("All"); const [severityFilter, setSeverityFilter] = useState("All"); const [ownerFilter, setOwnerFilter] = useState("All"); const [sourceFilter, setSourceFilter] = useState("All");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
-  const [showOnlyOverdue, setShowOnlyOverdue] = useState(false); const [evidenceType, setEvidenceType] = useState("Supporting Evidence"); const [evidenceNote, setEvidenceNote] = useState("");
+  const [search, setSearch] = useUrlState("op_search", ""); const [statusFilter, setStatusFilter] = useUrlState("op_status", "All"); const [severityFilter, setSeverityFilter] = useUrlState("op_severity", "All"); const [ownerFilter, setOwnerFilter] = useUrlState("op_owner", "All"); const [sourceFilter, setSourceFilter] = useUrlState("op_source", "All");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("op_filters");
+  const [showOnlyOverdue, setShowOnlyOverdue] = useUrlFlag("op_overdue"); const [evidenceType, setEvidenceType] = useState("Supporting Evidence"); const [evidenceNote, setEvidenceNote] = useState("");
   const [settingsDraft, setSettingsDraft] = useState({ takingOver: "", phases: "", sbs: "", wbs: "" });
 
   const canEdit = permission.isMasterAdmin || permission.fullAccess || permission.canEdit || permission.canCreate;

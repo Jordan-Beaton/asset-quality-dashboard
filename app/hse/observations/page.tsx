@@ -29,6 +29,7 @@ import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 import {
   createObservationReportPdf,
   observationReportFileName,
@@ -162,22 +163,22 @@ export default function HseObservationsPage() {
   const [evidence, setEvidence] = useState<EvidenceRecord[]>([]);
   const [actions, setActions] = useState<LinkedActionRecord[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
-  const [activeView, setActiveView] = useState<View>("dashboard");
-  const [selectedId, setSelectedId] = useState("");
+  const [activeView, setActiveView] = useUrlState<View>("view", "dashboard", ["dashboard", "register", "qr"]);
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
   const selectedDetailRef = useRef<HTMLDivElement | null>(null);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [riskFilter, setRiskFilter] = useState("");
-  const [reporterTypeFilter, setReporterTypeFilter] = useState("");
-  const [projectFilter, setProjectFilter] = useState("");
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [typeFilter, setTypeFilter] = useUrlState("type", "");
+  const [riskFilter, setRiskFilter] = useUrlState("risk", "");
+  const [reporterTypeFilter, setReporterTypeFilter] = useUrlState("reporter", "");
+  const [projectFilter, setProjectFilter] = useUrlState("project", "");
   const [showExport, setShowExport] = useState(false);
   const [exportGroup, setExportGroup] = useState<ObservationReportGroup>("project");
   const [exportSort, setExportSort] = useState<ObservationReportSort>("newest");
   const [exportExtras, setExportExtras] = useState({ immediate: false, suggested: false, assigned: false, closeout: false });
   const [exporting, setExporting] = useState(false);
-  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
-  const [showFilters, setShowFilters] = useState(false);
+  const [yearFilter, setYearFilter] = useUrlState("year", String(new Date().getFullYear()));
+  const [showFilters, setShowFilters] = useUrlFlag("filters");
   const [message, setMessage] = useState("Loading observations...");
   const [loading, setLoading] = useState(false);
 
@@ -206,6 +207,8 @@ export default function HseObservationsPage() {
     const params = new URLSearchParams(window.location.search);
     const target = params.get("observation") || params.get("observationId") || "";
     if (!target) return;
+    // A record the user chose afterwards (kept in the address as ?selected=) wins over the original deep link.
+    if (params.has("selected")) return;
     const matched = records.find((record) => record.id === target || record.observation_number === target);
     if (!matched) return;
     setSelectedId(matched.id);

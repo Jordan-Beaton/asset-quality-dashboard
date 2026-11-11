@@ -10,6 +10,7 @@ import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import {
   imsInputStyle,
   imsTableCellStyle,
@@ -442,18 +443,19 @@ function AssetsPageContent() {
   const qualityLinkedOnly = searchParams.get("qualityLinked") === "1";
   const linkedAssetCode = searchParams.get("asset")?.trim() || "";
   const linkedAssetId = searchParams.get("assetId")?.trim() || "";
+  const linkedView = searchParams.get("view");
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [message, setMessage] = useState("Loading assets...");
   const [lastRefreshed, setLastRefreshed] = useState("");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [locationFilter, setLocationFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("");
-  const [qualityLinkedFilter, setQualityLinkedFilter] = useState(false);
-  const [activeView, setActiveView] = useState<AssetWorkspaceView>("dashboard");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
-  const [selectedAssetId, setSelectedAssetId] = useState<string>("");
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [locationFilter, setLocationFilter] = useUrlState("location", "");
+  const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
+  const [qualityLinkedFilter, setQualityLinkedFilter] = useUrlFlag("qualityLinked");
+  const [activeView, setActiveView] = useUrlState<AssetWorkspaceView>("view", "dashboard", ["dashboard", "register", "create", "reports"]);
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
+  const [selectedAssetId, setSelectedAssetId] = useUrlState("selected", "");
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(true);
   const [qualityLinkedAssetIds, setQualityLinkedAssetIds] = useState<string[]>([]);
 
@@ -725,16 +727,15 @@ function AssetsPageContent() {
   }, [assets]);
 
   useEffect(() => {
-    setSearch(linkedSearch);
-    setStatusFilter(linkedStatus);
-    setLocationFilter(linkedLocation);
-    setOwnerFilter(linkedOwner);
+    // The filter values themselves now live in the address (see useUrlState). Only an incoming link without a view
+    // (for example from another module) still has to switch to the register and reveal the filters.
+    if (linkedView === "register") return;
 
     if (linkedSearch || linkedStatus || linkedLocation || linkedOwner || qualityLinkedOnly) {
       setActiveView("register");
       setShowRegisterFilters(true);
     }
-  }, [linkedSearch, linkedStatus, linkedLocation, linkedOwner, qualityLinkedOnly]);
+  }, [linkedView, linkedSearch, linkedStatus, linkedLocation, linkedOwner, qualityLinkedOnly, setActiveView, setShowRegisterFilters]);
 
   useEffect(() => {
     if (assets.length === 0) return;
@@ -841,6 +842,9 @@ function AssetsPageContent() {
   }, [assets, linkedAssetCode, linkedAssetId]);
 
   useEffect(() => {
+    // Wait for the assets to load so a selection restored from the address is not cleared first.
+    if (assets.length === 0) return;
+
     if (filteredAssets.length === 0) {
       setSelectedAssetId("");
       setIsDetailPanelOpen(false);
@@ -859,7 +863,7 @@ function AssetsPageContent() {
       setSelectedAssetId(filteredAssets[0].id);
       setIsDetailPanelOpen(true);
     }
-  }, [deepLinkedAssetId, filteredAssets, isDetailPanelOpen, selectedAssetId]);
+  }, [assets.length, deepLinkedAssetId, filteredAssets, isDetailPanelOpen, selectedAssetId, setSelectedAssetId]);
 
   const selectedAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedAssetId) || null,

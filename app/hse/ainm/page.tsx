@@ -1,5 +1,6 @@
 "use client";
 
+import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import React, { ChangeEvent, CSSProperties, ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +39,7 @@ import {
   imsTableStyle,
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 import { exportColours, exportRgb, exportTypography } from "../../../src/lib/exportTheme";
 
 export const dynamic = "force-dynamic";
@@ -686,12 +688,12 @@ function HseAinmPageContent() {
   const [peopleOptions, setPeopleOptions] = useState<PeopleOption[]>([]);
   const [signoffRequests, setSignoffRequests] = useState<AinmSignoffRequest[]>([]);
   const [sendingSignoffRole, setSendingSignoffRole] = useState("");
-  const [activeView, setActiveView] = useState<AINMView>("dashboard");
-  const [detailTab, setDetailTab] = useState<DetailTab>("notification");
-  const [selectedId, setSelectedId] = useState("");
+  const [activeView, setActiveView] = useUrlState<AINMView>("view", "dashboard", ["dashboard", "register", "create", "external", "reports"]);
+  const [detailTab, setDetailTab] = useUrlState<DetailTab>("tab", "notification", ["notification", "part1", "part2", "actions", "evidence", "reports"]);
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const selectedDetailRef = useRef<HTMLDivElement | null>(null);
-  const [selectedExternalId, setSelectedExternalId] = useState("");
+  const [selectedExternalId, setSelectedExternalId] = useUrlState("extselected", "");
   const [draft, setDraft] = useState<AINMRecord>(emptyRecord);
   const [externalDraft, setExternalDraft] = useState<ExternalAINMRecord>(emptyExternalRecord);
   const [newExternalRecord, setNewExternalRecord] = useState<ExternalAINMRecord>(emptyExternalRecord);
@@ -706,12 +708,12 @@ function HseAinmPageContent() {
   const [message, setMessage] = useState("Loading AINM records...");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [stageFilter, setStageFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"" | AINMType>("");
-  const [classificationFilter, setClassificationFilter] = useState("");
-  const [showRegisterFilters, setShowRegisterFilters] = useState(false);
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [stageFilter, setStageFilter] = useUrlState("stage", "");
+  const [typeFilter, setTypeFilter] = useUrlState<"" | AINMType>("type", "", ["", "Incident", "Accident"]);
+  const [classificationFilter, setClassificationFilter] = useUrlState("classification", "");
+  const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
   const [importWorkbook, setImportWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [importSheets, setImportSheets] = useState<string[]>([]);
   const [selectedImportSheet, setSelectedImportSheet] = useState("");
@@ -720,15 +722,18 @@ function HseAinmPageContent() {
   const [uploading, setUploading] = useState(false);
   const [evidenceStage, setEvidenceStage] = useState("General");
   const [generatingStage, setGeneratingStage] = useState("");
-  const [reportTypeFilter, setReportTypeFilter] = useState<"" | "IR" | "AR">("");
-  const [showReportFilters, setShowReportFilters] = useState(false);
-  const [selectedReportGroupKey, setSelectedReportGroupKey] = useState("");
-  const [dashboardYear, setDashboardYear] = useState(String(new Date().getFullYear()));
-  const [dashboardScope, setDashboardScope] = useState<DashboardScope>("internal");
-  const [externalSearch, setExternalSearch] = useState("");
-  const [externalStatusFilter, setExternalStatusFilter] = useState("");
-  const [externalTypeFilter, setExternalTypeFilter] = useState("");
-  const [showExternalFilters, setShowExternalFilters] = useState(false);
+  const [reportTypeFilter, setReportTypeFilter] = useUrlState<"" | "IR" | "AR">("reporttype", "", ["", "IR", "AR"]);
+  const [showReportFilters, setShowReportFilters] = useUrlFlag("reportfilters");
+  const [selectedReportGroupKey, setSelectedReportGroupKey] = useUrlState("reportgroup", "");
+  // "All Years" is the empty string, which the address would drop, so it travels as "all".
+  const [dashboardYearParam, setDashboardYearParam] = useUrlState("year", String(new Date().getFullYear()));
+  const dashboardYear = dashboardYearParam === "all" ? "" : dashboardYearParam;
+  const setDashboardYear = (value: string) => setDashboardYearParam(value === "" ? "all" : value);
+  const [dashboardScope, setDashboardScope] = useUrlState<DashboardScope>("scope", "internal", ["internal", "external", "combined"]);
+  const [externalSearch, setExternalSearch] = useUrlState("extsearch", "");
+  const [externalStatusFilter, setExternalStatusFilter] = useUrlState("extstatus", "");
+  const [externalTypeFilter, setExternalTypeFilter] = useUrlState("exttype", "");
+  const [showExternalFilters, setShowExternalFilters] = useUrlFlag("extfilters");
   const [showAddReviewer, setShowAddReviewer] = useState(false);
   const [newReviewerName, setNewReviewerName] = useState("");
   const [newReviewerRole, setNewReviewerRole] = useState("");
@@ -780,6 +785,8 @@ function HseAinmPageContent() {
 
   useEffect(() => {
     if (!directAinmId || records.length === 0) return;
+    // A record the user chose afterwards (kept in the address as ?selected=) wins over the original deep link.
+    if (new URLSearchParams(window.location.search).has("selected")) return;
     const match = records.find((record) => record.id === directAinmId);
     if (!match) return;
     setActiveView("register");
@@ -1109,6 +1116,7 @@ function HseAinmPageContent() {
     const directId = params.get("ainmId")?.trim() || "";
     const directNumber = params.get("ainm")?.trim() || "";
     if (!directId && !directNumber) return;
+    if (params.has("selected")) return;
     const matched = records.find((record) => record.id === directId || record.ainm_number === directNumber);
     if (!matched) return;
     setSelectedId(matched.id);
@@ -3072,7 +3080,7 @@ function HseAinmPageContent() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>← Back to IMS Home</Link>
+        <ImsBackNav />
         <div style={statusBannerStyle}><strong>Status:</strong> {message}</div>
       </div>
 
@@ -4509,7 +4517,6 @@ const topMetaRowStyle: CSSProperties = {
   padding: "12px 14px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
-const backLinkStyle: CSSProperties = { color: "#005670", fontWeight: 700, textDecoration: "none" };
 const statusBannerStyle: CSSProperties = { background: "white", borderRadius: 12, padding: "12px 16px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)", color: "#000000" };
 const viewNavStyle: CSSProperties = { display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 };
 const viewButtonStyle: CSSProperties = { background: "#ECECE7", color: "#000000", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };

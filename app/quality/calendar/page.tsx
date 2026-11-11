@@ -15,6 +15,7 @@ import {
   imsTableStyle,
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -453,23 +454,29 @@ export default function QualityCalendarPage() {
   const [manualItems, setManualItems] = useState<ManualCalendarItem[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [activeView, setActiveView] = useState<CalendarView>("dashboard");
+  const [activeView, setActiveView] = useUrlState<CalendarView>("view", "dashboard", ["dashboard", "calendar", "register", "create"]);
   const [message, setMessage] = useState("Loading Quality calendar...");
   const [loading, setLoading] = useState(false);
   const [refreshStamp, setRefreshStamp] = useState("");
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useUrlState("selected", "");
   const [createForm, setCreateForm] = useState<ManualForm>(emptyForm);
   const [detailForm, setDetailForm] = useState<ManualForm>(emptyForm);
-  const [search, setSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState("");
-  const [selectedDateKey, setSelectedDateKey] = useState("");
-  const [monthCursor, setMonthCursor] = useState(() => {
+  const [search, setSearch] = useUrlState("search", "");
+  const [showFilters, setShowFilters] = useUrlFlag("filters");
+  const [sourceFilter, setSourceFilter] = useUrlState("source", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
+  const [selectedDateKey, setSelectedDateKey] = useUrlState("date", "");
+  // The month on show is kept in the address as ?month=YYYY-MM; with none, it is the current month.
+  const [monthParam, setMonthParam] = useUrlState("month", "");
+  const monthCursor = useMemo(() => {
+    const match = /^(\d{4})-(\d{2})$/.exec(monthParam);
+    if (match && Number(match[2]) >= 1 && Number(match[2]) <= 12) return new Date(Number(match[1]), Number(match[2]) - 1, 1);
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  }, [monthParam]);
+  const setMonthCursor = (month: Date) =>
+    setMonthParam(`${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`);
 
   const selected = useMemo(() => events.find((event) => event.id === selectedId) || null, [events, selectedId]);
 

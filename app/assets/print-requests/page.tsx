@@ -22,6 +22,7 @@ import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { exportPdfTableTheme, exportRgb, exportTypography } from "../../../src/lib/exportTheme";
 import { supabase } from "../../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -244,26 +245,26 @@ function mapObject(row: Record<string, unknown>): PrintObject {
 
 export default function PrintRequestsPage() {
   const permissions = useImsPermissions();
-  const [activeView, setActiveView] = useState<View>("register");
+  const [activeView, setActiveView] = useUrlState<View>("view", "register", ["register", "create", "team"]);
   const [requests, setRequests] = useState<PrintRequest[]>([]);
   const [objects, setObjects] = useState<PrintObject[]>([]);
   const [files, setFiles] = useState<PrintFile[]>([]);
   const [roster, setRoster] = useState<PrintRole[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [currentUserEmail, setCurrentUserEmail] = useState("");
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useUrlState("job", "");
   const [message, setMessage] = useState("Loading 3D print requests...");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
-  const [search, setSearch] = useState("");
-  const [showFilters, setShowFilters] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [projectFilter, setProjectFilter] = useState("");
-  const [requesterFilter, setRequesterFilter] = useState("");
-  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("");
-  const [queueScope, setQueueScope] = useState<QueueScope>("all");
+  const [search, setSearch] = useUrlState("search", "");
+  const [showFilters, setShowFilters] = useUrlFlag("filters");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [priorityFilter, setPriorityFilter] = useUrlState("priority", "");
+  const [projectFilter, setProjectFilter] = useUrlState("project", "");
+  const [requesterFilter, setRequesterFilter] = useUrlState("requester", "");
+  const [urgencyFilter, setUrgencyFilter] = useUrlState<UrgencyFilter>("urgency", "", ["", "overdue", "high", "open", "unassigned"]);
+  const [queueScope, setQueueScope] = useUrlState<QueueScope>("scope", "all", ["all", "mine"]);
   const [formProject, setFormProject] = useState("");
   const [formJustification, setFormJustification] = useState("");
   const [teamPersonId, setTeamPersonId] = useState("");

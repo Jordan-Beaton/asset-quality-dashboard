@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import XLSXStyle from "xlsx-js-style";
 import { supabase } from "../lib/supabase";
 import { useImsPermissions } from "./ImsPermissions";
+import { useUrlState } from "../lib/useUrlState";
 import { getProject } from "../lib/projectRegistry";
 import { findReviewPoints, type ReviewScanResult } from "../lib/noiScanClient";
 import { daysUntil, formatDay, formatDayTime, isPastTarget, todayIso, type ReviewEvent, type ReviewPoint } from "../lib/reviewPoints";
@@ -62,12 +63,12 @@ export function ReviewPointsPanel({ projectKey }: { projectKey?: string }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const [view, setView] = useState<View>("register");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [projectFilter, setProjectFilter] = useState("");
-  const [itpFilter, setItpFilter] = useState("");
-  const [reviewerFilter, setReviewerFilter] = useState("");
-  const [query, setQuery] = useState("");
+  const [view, setView] = useUrlState<View>("rp_view", "register", ["register", "itp"]);
+  const [statusFilter, setStatusFilter] = useUrlState<StatusFilter>("rp_status", "all", ["all", "Pending", "Accepted", "Failed"]);
+  const [projectFilter, setProjectFilter] = useUrlState("rp_project", "");
+  const [itpFilter, setItpFilter] = useUrlState("rp_itp", "");
+  const [reviewerFilter, setReviewerFilter] = useUrlState("rp_reviewer", "");
+  const [query, setQuery] = useUrlState("rp_search", "");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
 
   const [dialog, setDialog] = useState<DialogState>(null);

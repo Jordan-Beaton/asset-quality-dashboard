@@ -21,6 +21,7 @@ import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { imsColours, imsPanelStyle, imsShadows } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlState } from "../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
 
@@ -333,9 +334,9 @@ export default function ManagementReviewPage() {
   const [message, setMessage] = useState("Loading management review...");
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [view, setView] = useState<MrView>("overview");
+  const [view, setView] = useUrlState<MrView>("view", "overview", ["overview", "areas"]);
   const currentYear = new Date().getFullYear();
-  const [period, setPeriod] = useState<string>(String(currentYear));
+  const [period, setPeriod] = useUrlState("period", String(currentYear));
 
   async function loadSnapshot() {
     setIsLoading(true);

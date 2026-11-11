@@ -13,6 +13,7 @@ import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { imsColours, imsFieldStyle, imsFilterGridStyle, imsInputStyle, imsLabelStyle, imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../src/components/imsTheme";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
+import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import { projects as projectRegistry, getProject } from "../../src/lib/projectRegistry";
 import { exportPdfTableTheme, exportRgb, exportTypography } from "../../src/lib/exportTheme";
 
@@ -159,15 +160,15 @@ export default function OverallInspectionsPage() {
   const [events, setEvents] = useState<InspectionEvent[]>([]);
   const [message, setMessage] = useState("Loading inspections...");
   const [busy, setBusy] = useState(false);
-  const [view, setView] = useState<"lookahead" | "register" | "review">("lookahead");
+  const [view, setView] = useUrlState<"lookahead" | "register" | "review">("view", "lookahead", ["lookahead", "register", "review"]);
 
-  const [projectFilter, setProjectFilter] = useState("All");
-  const [sourceFilter, setSourceFilter] = useState<"All" | "NOI" | "Manual">("All");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [supplierFilter, setSupplierFilter] = useState("All");
-  const [typeFilter, setTypeFilter] = useState<"All" | "W" | "H">("All");
-  const [clientVisibleOnly, setClientVisibleOnly] = useState(false);
-  const [attendeeSearch, setAttendeeSearch] = useState("");
+  const [projectFilter, setProjectFilter] = useUrlState("project", "All");
+  const [sourceFilter, setSourceFilter] = useUrlState<"All" | "NOI" | "Manual">("source", "All", ["All", "NOI", "Manual"]);
+  const [statusFilter, setStatusFilter] = useUrlState("status", "All");
+  const [supplierFilter, setSupplierFilter] = useUrlState("supplier", "All");
+  const [typeFilter, setTypeFilter] = useUrlState<"All" | "W" | "H">("type", "All", ["All", "W", "H"]);
+  const [clientVisibleOnly, setClientVisibleOnly] = useUrlFlag("client");
+  const [attendeeSearch, setAttendeeSearch] = useUrlState("search", "");
   const [selectedEvent, setSelectedEvent] = useState<InspectionEvent | null>(null);
   const [detailEdit, setDetailEdit] = useState<{ date: string; location: string; duration: string; notes: string; attendees: Attendee[] } | null>(null);
   const [savingDetail, setSavingDetail] = useState(false);

@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { ImsBackNav } from "../../src/components/ImsBackNav";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -27,6 +28,7 @@ import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
+import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import { supabase } from "../../src/lib/supabase";
 
 type ActionItem = {
@@ -399,6 +401,11 @@ const actionViews: Array<{ id: ActionView; label: string }> = [
 function isActionView(value: string): value is ActionView {
   return actionViews.some((view) => view.id === value);
 }
+
+// Allowed address values for the typed filters kept in the page address.
+const actionViewIds: readonly ActionView[] = actionViews.map((view) => view.id);
+const quickFilterValues: readonly QuickFilter[] = ["", "my", "overdue", "dueWeek", "highPriority"];
+const myActionFilterValues: readonly MyActionFilter[] = ["all", "open", "closed", "overdue", "dueWeek"];
 
 function normaliseStatus(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
@@ -989,28 +996,33 @@ function ActionsPageContent() {
   const [createFiles, setCreateFiles] = useState<File[]>([]);
   const [createEvidenceNotes, setCreateEvidenceNotes] = useState("");
 
-  const [search, setSearch] = useState(linkedSearch);
-  const [statusFilter, setStatusFilter] = useState(linkedStatus);
-  const [priorityFilter, setPriorityFilter] = useState(linkedPriority);
-  const [ownerFilter, setOwnerFilter] = useState(linkedOwner);
-  const [projectFilter, setProjectFilter] = useState(linkedProject);
-  const [sourceFilter, setSourceFilter] = useState(linkedSource);
-  const [departmentFilter, setDepartmentFilter] = useState(linkedDepartment);
-  const [showOverdueOnly, setShowOverdueOnly] = useState(linkedOverdueOnly);
-  const [showOpenOnly, setShowOpenOnly] = useState(false);
-  const [showClosedOnly, setShowClosedOnly] = useState(false);
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>("");
-  const [myActionFilter, setMyActionFilter] = useState<MyActionFilter>("all");
-  const [showMyItemFilters, setShowMyItemFilters] = useState(false);
-  const [myItemStatusFilter, setMyItemStatusFilter] = useState("");
-  const [myItemTypeFilter, setMyItemTypeFilter] = useState("");
-  const [showEvidenceOnly, setShowEvidenceOnly] = useState(false);
-  const [showLinkedIssuesOnly, setShowLinkedIssuesOnly] = useState(false);
-  const [dueStartFilter, setDueStartFilter] = useState(0);
-  const [dueWindowFilter, setDueWindowFilter] = useState(dueWindow);
-  const [showNoDueDateOnly, setShowNoDueDateOnly] = useState(false);
-  const [createdMonthFilter, setCreatedMonthFilter] = useState(linkedCreatedMonth);
-  const [closedMonthFilter, setClosedMonthFilter] = useState(linkedClosedMonth);
+  // Filters live in the page address (same names the deep links already use), so Back restores the same register.
+  const [search, setSearch] = useUrlState("search", "");
+  const [statusFilter, setStatusFilter] = useUrlState("status", "");
+  const [priorityFilter, setPriorityFilter] = useUrlState("priority", "");
+  const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
+  const [projectFilter, setProjectFilter] = useUrlState("project", "");
+  const [sourceFilter, setSourceFilter] = useUrlState("source", "");
+  const [departmentFilter, setDepartmentFilter] = useUrlState("department", "");
+  const [showOverdueOnly, setShowOverdueOnly] = useUrlFlag("overdue", false);
+  const [showOpenOnly, setShowOpenOnly] = useUrlFlag("open", false);
+  const [showClosedOnly, setShowClosedOnly] = useUrlFlag("closed", false);
+  const [quickFilter, setQuickFilter] = useUrlState<QuickFilter>("quick", "", quickFilterValues);
+  const [myActionFilter, setMyActionFilter] = useUrlState<MyActionFilter>("myfilter", "all", myActionFilterValues);
+  const [showMyItemFilters, setShowMyItemFilters] = useUrlFlag("myfilters", false);
+  const [myItemStatusFilter, setMyItemStatusFilter] = useUrlState("mystatus", "");
+  const [myItemTypeFilter, setMyItemTypeFilter] = useUrlState("mytype", "");
+  const [showEvidenceOnly, setShowEvidenceOnly] = useUrlFlag("evidence", false);
+  const [showLinkedIssuesOnly, setShowLinkedIssuesOnly] = useUrlFlag("linked", false);
+  const [dueStartParam, setDueStartParam] = useUrlState("dueStart", "0");
+  const [dueWindowParam, setDueWindowParam] = useUrlState("dueWindow", "0");
+  const dueStartFilter = Number(dueStartParam) || 0;
+  const dueWindowFilter = Number(dueWindowParam) || 0;
+  const setDueStartFilter = (value: number) => setDueStartParam(String(value));
+  const setDueWindowFilter = (value: number) => setDueWindowParam(String(value));
+  const [showNoDueDateOnly, setShowNoDueDateOnly] = useUrlFlag("nodue", false);
+  const [createdMonthFilter, setCreatedMonthFilter] = useUrlState("createdMonth", "");
+  const [closedMonthFilter, setClosedMonthFilter] = useUrlState("closedMonth", "");
   const [showRegisterFilters, setShowRegisterFilters] = useState(
     Boolean(
       linkedSearch ||
@@ -1026,7 +1038,10 @@ function ActionsPageContent() {
         linkedClosedMonth
     )
   );
-  const [activeView, setActiveView] = useState<ActionView>(initialView);
+  // The tab is kept in ?view=. With no ?view=, the first-load default (register for filter links, create for prefill links) applies.
+  const [initialViewFallback] = useState<ActionView>(initialView);
+  const [viewParam, setActiveView] = useUrlState<ActionView | "">("view", "", actionViewIds);
+  const activeView: ActionView = viewParam || initialViewFallback;
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [currentPersonName, setCurrentPersonName] = useState("");
   const [currentPersonNotice, setCurrentPersonNotice] = useState("");
@@ -1035,6 +1050,8 @@ function ActionsPageContent() {
 
   const actionDetailRef = useRef<HTMLDivElement | null>(null);
   const [selectedEvidenceAction, setSelectedEvidenceAction] = useState<ActionItem | null>(null);
+  const [selectedActionId, setSelectedActionId] = useUrlState("selected", "");
+  const hasRestoredSelection = useRef(false);
   const [selectedEvidenceFiles, setSelectedEvidenceFiles] = useState<File[]>([]);
   const [selectedEvidenceNotes, setSelectedEvidenceNotes] = useState("");
   const [hasAppliedPrefill, setHasAppliedPrefill] = useState(false);
@@ -2025,6 +2042,24 @@ function ActionsPageContent() {
     setSelectedEvidenceAction((current) => (current?.id === match.id ? current : match));
     if (match.action_number) setSearch(match.action_number);
   }, [actions, directActionId, directActionNumber, hasCreatePrefillParams]);
+
+  // Re-open the action that was selected (?selected=) once the register has loaded, e.g. after pressing Back.
+  useEffect(() => {
+    if (actions.length === 0) return;
+    hasRestoredSelection.current = true;
+    if (!selectedActionId) return;
+    const match = actions.find((action) => action.id === selectedActionId);
+    if (!match) {
+      setSelectedActionId("");
+      return;
+    }
+    setSelectedEvidenceAction((current) => (current?.id === match.id ? current : match));
+  }, [actions, selectedActionId, setSelectedActionId]);
+
+  useEffect(() => {
+    if (selectedEvidenceAction) setSelectedActionId(selectedEvidenceAction.id);
+    else if (hasRestoredSelection.current) setSelectedActionId("");
+  }, [selectedEvidenceAction, setSelectedActionId]);
 
   useEffect(() => {
     if (!selectedEvidenceAction) return;
@@ -3535,9 +3570,7 @@ function ActionsPageContent() {
       />
 
       <div className="ims-top-meta-row" style={topMetaRowStyle}>
-        <Link href="/home" style={backLinkStyle}>
-          ← Back to IMS Home
-        </Link>
+        <ImsBackNav />
 
         <div style={statusBannerStyleInline}>
           <strong>Status:</strong> {message}
