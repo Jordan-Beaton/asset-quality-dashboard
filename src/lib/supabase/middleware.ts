@@ -13,6 +13,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request: { headers: forwarded } });
   }
 
+  // The ITP reminder job is called by the scheduler, which has no sign-in. The route refuses anything that does not carry
+  // the CRON_SECRET bearer token, so letting it past the sign-in check exposes nothing.
+  if (publicPath === "/api/projects/itp-workflow/reminders") {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({
     request,
   });

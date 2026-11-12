@@ -77,6 +77,7 @@ const ROUTE_LABELS: Record<string, string> = {
 
 const PROJECT_PAGE_LABELS: Array<[RegExp, string]> = [
   [/^\/projects\/[^/]+\/itp$/, "ITP Tracker"],
+  [/^\/projects\/[^/]+\/itp\/[^/]+$/, "ITP Record"],
   [/^\/projects\/[^/]+\/itp-sign-off$/, "ITP Sign-off"],
   [/^\/projects\/[^/]+\/noi$/, "NOI Tracker"],
   [/^\/projects\/[^/]+\/noi\/create$/, "NOI Creator"],
