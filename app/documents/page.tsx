@@ -51,6 +51,7 @@ type DocumentTypeOption =
   | "Chart"
   | "Report"
   | "Risk Assessment"
+  | "Rescue Plan"
   | "Training"
   | "Exam";
 
@@ -223,6 +224,7 @@ const DOCUMENT_TYPE_OPTIONS: DocumentTypeOption[] = [
   "Chart",
   "Report",
   "Risk Assessment",
+  "Rescue Plan",
   "Training",
   "Exam",
 ];
@@ -254,6 +256,7 @@ const TYPE_CODE_MAP: Record<DocumentTypeOption, string> = {
   Chart: "CHT",
   Report: "RPT",
   "Risk Assessment": "RA",
+  "Rescue Plan": "RP",
   Training: "TRN",
   Exam: "EXM",
 };
