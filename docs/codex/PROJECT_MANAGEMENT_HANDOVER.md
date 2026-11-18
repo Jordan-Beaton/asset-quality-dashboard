@@ -108,6 +108,15 @@ At phone widths the workspace inherits the whole-IMS bottom navigation, one-colu
 - NOI, ITP and Risk links were deliberately removed from Open Points because they complicated normal use without a reliable operational relationship. Historic database columns remain available for traceability.
 - Project phases are controlled dropdown values with Add New support; phase/settings changes are retained in `project_open_point_settings_history`.
 - Excel, Word and PDF register outputs share the same controlled eight-column structure and Wadden Sea/IMS report identity.
+
+### MOC Register annex (Project Reports tab: MOC Register)
+
+- Nexans asked for a Management of Change register annex in the monthly report, one per project (BA3, LW2, LW4). The register itself is a SharePoint workbook (`Wadden-Sea-MOC-Register.xlsx`, sheets Register, Actions, Guide) that MOC coordinators keep up to date; nothing is stored in the IMS database.
+- UI: `src/components/WaddenSeaMocRegister.tsx`. The user uploads the workbook, picks the project and the report date, checks the preview (warnings for statuses still marked To confirm and for MOCs past their implementation end date), then generates Word or PDF.
+- Logic: `src/lib/mocRegister.ts` (parse workbook with SheetJS using Excel serial dates, filter by Applies to, counts) and `src/lib/mocRegisterDocs.ts` (Word and PDF in the same house style as the other annexes). Cost and the workbook Internal Notes column are deliberately never output.
+- Header names on the Register and Actions sheets are matched by label, so columns can be reordered but not renamed. Applies to accepts All, BA3, LW2, LW4 or combinations such as BA3 & LW2.
+- MOC-007 must not be shown as closed until Daniel Fraser updates it himself. Statuses for MOC-001 to MOC-005 were inferred and are marked To confirm in the workbook.
+
 - The compliance and acceptance map is in `docs/codex/WADDEN_SEA_OPEN_POINTS_COMPLIANCE.md`.
 - The Employer source identifies the activity as `CA_Act_1699`; do not relabel it `CA_ACT_1669` without a revised controlled source.
 - CDE upload and Employer decisions remain human-controlled steps. The IMS tracks due dates, references and evidence but does not integrate directly with the Employer CDE.

@@ -27,6 +27,7 @@ import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { WaddenSeaOpenPoints } from "../../../src/components/WaddenSeaOpenPoints";
+import { WaddenSeaMocRegister } from "../../../src/components/WaddenSeaMocRegister";
 import { ProjectWorkspaceNav } from "../../../src/components/ProjectWorkspaceNav";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
@@ -90,7 +91,7 @@ type ProjectAuditFinding = {
   corrective_action: string;
 };
 
-type ProjectAnnex = "audit-ncr" | "audit-programme" | "lookahead" | "open-points";
+type ProjectAnnex = "audit-ncr" | "audit-programme" | "lookahead" | "open-points" | "moc";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -393,7 +394,7 @@ export default function ProjectReportsPage() {
   const [search, setSearch] = useUrlState("search", "");
   const [showUnresolved, setShowUnresolved] = useUrlFlag("unresolved");
   const [isGenerating, setIsGenerating] = useState<"" | "word" | "pdf">("");
-  const [activeAnnex, setActiveAnnex] = useUrlState<ProjectAnnex>("annex", "lookahead", ["audit-ncr", "audit-programme", "lookahead", "open-points"]);
+  const [activeAnnex, setActiveAnnex] = useUrlState<ProjectAnnex>("annex", "lookahead", ["audit-ncr", "audit-programme", "lookahead", "open-points", "moc"]);
   const [projectAudits, setProjectAudits] = useState<ProjectAudit[]>([]);
   const [projectAuditFindings, setProjectAuditFindings] = useState<ProjectAuditFinding[]>([]);
   const [auditDataLoading, setAuditDataLoading] = useState(true);
@@ -1217,6 +1218,7 @@ export default function ProjectReportsPage() {
           ["audit-programme", "Audit Programme"],
           ["lookahead", "8-Week Lookahead"],
           ["open-points", "Open Points"],
+          ["moc", "MOC Register"],
         ].map(([view, label]) => (
           <button
             key={view}
@@ -1242,6 +1244,8 @@ export default function ProjectReportsPage() {
       </section>
 
       {activeAnnex === "open-points" ? <WaddenSeaOpenPoints /> : null}
+
+      {activeAnnex === "moc" ? <WaddenSeaMocRegister /> : null}
 
       {activeAnnex === "audit-ncr" || activeAnnex === "audit-programme" ? (
         <section style={panelStyle}>
