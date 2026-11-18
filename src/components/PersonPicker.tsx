@@ -128,7 +128,7 @@ export function PersonPicker({
   };
 
   return (
-    <div style={{ position: "relative", minWidth: 0 }}>
+    <div className="ims-person-picker" style={{ position: "relative", minWidth: 0 }}>
       <div
         ref={boxRef}
         style={boxStyle}
@@ -189,6 +189,7 @@ export function PersonPicker({
         ) : (
           <input
             type="text"
+            className="ims-person-picker-input"
             role="combobox"
             aria-expanded={open}
             aria-controls={listId}

@@ -4770,7 +4770,7 @@ function MOCPageContent() {
                                 value={row.description}
                                 onChange={(e) => updateActionRow(index, "description", e.target.value)}
                                 onPaste={(e) => pasteActionRows(index, e)}
-                                style={{ ...gridInputStyle, resize: "vertical" }}
+                                className="ims-moc-cell" style={{ ...gridInputStyle, resize: "vertical" }}
                                 aria-label={`Action ${index + 1} description`}
                               />
                             </td>
@@ -4790,7 +4790,7 @@ function MOCPageContent() {
                                 type="date"
                                 value={row.target_date}
                                 onChange={(e) => updateActionRow(index, "target_date", e.target.value)}
-                                style={gridInputStyle}
+                                className="ims-moc-cell" style={gridInputStyle}
                                 aria-label={`Action ${index + 1} target date`}
                               />
                             </td>
@@ -4798,7 +4798,7 @@ function MOCPageContent() {
                               <select
                                 value={normaliseActionPlanStatus(row.status)}
                                 onChange={(e) => updateActionRow(index, "status", e.target.value)}
-                                style={gridInputStyle}
+                                className="ims-moc-cell" style={gridInputStyle}
                                 aria-label={`Action ${index + 1} status`}
                               >
                                 {actionPlanStatusOptions.map((option) => (
@@ -5239,15 +5239,15 @@ function MOCPageContent() {
                     <tbody>
                       {detailReviewRows.map((row, index) => (
                         <tr key={`${row.id || "new"}-${index}`}>
-                          <td style={{ ...gridCellStyle, minWidth: 130 }}>
+                          <td style={{ ...gridCellStyle, verticalAlign: "middle", minWidth: 130 }}>
                             <input
                               value={row.involved_party}
                               onChange={(e) => updateReviewRow(index, "involved_party", e.target.value)}
-                              style={{ ...gridInputStyle, fontWeight: 700 }}
+                              className="ims-moc-cell" style={{ ...gridInputStyle, fontWeight: 700 }}
                               aria-label={`Review row ${index + 1} party`}
                             />
                           </td>
-                          <td style={{ ...gridCellStyle, minWidth: 190, padding: "4px 6px" }}>
+                          <td style={{ ...gridCellStyle, verticalAlign: "middle", minWidth: 190, padding: "4px 6px" }}>
                             <PersonPicker
                               compact
                               value={row.name}
@@ -5258,15 +5258,15 @@ function MOCPageContent() {
                               ariaLabel={`Review row ${index + 1} person`}
                             />
                           </td>
-                          <td style={{ ...gridCellStyle, minWidth: 130 }}>
+                          <td style={{ ...gridCellStyle, verticalAlign: "middle", minWidth: 130 }}>
                             <input
                               value={row.position}
                               onChange={(e) => updateReviewRow(index, "position", e.target.value)}
-                              style={gridInputStyle}
+                              className="ims-moc-cell" style={gridInputStyle}
                               aria-label={`Review row ${index + 1} position`}
                             />
                           </td>
-                          <td style={{ ...gridCellStyle, textAlign: "center", paddingTop: 11 }}>
+                          <td style={{ ...gridCellStyle, verticalAlign: "middle", textAlign: "center" }}>
                             <input
                               type="checkbox"
                               checked={row.approve_flag}
@@ -5274,7 +5274,7 @@ function MOCPageContent() {
                               aria-label={`Approve: ${row.involved_party}`}
                             />
                           </td>
-                          <td style={{ ...gridCellStyle, textAlign: "center", paddingTop: 11 }}>
+                          <td style={{ ...gridCellStyle, verticalAlign: "middle", textAlign: "center" }}>
                             <input
                               type="checkbox"
                               checked={row.inform_flag}
@@ -5282,13 +5282,14 @@ function MOCPageContent() {
                               aria-label={`Inform: ${row.involved_party}`}
                             />
                           </td>
-                          <td style={{ ...gridCellStyle, minWidth: 150, padding: "10px 8px", fontSize: 12.5 }}>
+                          <td style={{ ...gridCellStyle, verticalAlign: "middle", minWidth: 150, padding: "10px 8px", fontSize: 12.5 }}>
                             {row.approved_value === "Yes" ? "Approved" : row.approved_value === "No" ? "Rejected" : "Awaiting"}
                             {row.review_date ? ` - ${getPdfDate(row.review_date)}` : ""}
                             {row.comments ? <div style={{ color: "#53565A", marginTop: 2 }}>“{row.comments}”</div> : null}
                           </td>
-                          <td style={{ ...gridCellStyle, minWidth: 210, padding: "6px 8px" }}>
+                          <td style={{ ...gridCellStyle, verticalAlign: "middle", minWidth: 210, padding: "6px 8px" }}>
                             <SignoffStatusControl
+                              centered
                               request={signoffRequestFor("moc_review_endorsement_rows", index)}
                               recipientName={row.name}
                               disabled={!canEditReviewSections}
@@ -5306,7 +5307,7 @@ function MOCPageContent() {
                               }
                             />
                           </td>
-                          <td style={{ ...gridCellStyle, padding: "6px 8px", whiteSpace: "nowrap" }}>
+                          <td style={{ ...gridCellStyle, verticalAlign: "middle", padding: "6px 8px", whiteSpace: "nowrap" }}>
                             <RowOrderControls
                               index={index}
                               total={detailReviewRows.length}
@@ -5568,7 +5569,9 @@ function SignoffStatusControl({
   onSend,
   blockedHint,
   sendLabel,
+  centered = false,
 }: {
+  centered?: boolean;
   request: MocSignoffRequest | null;
   recipientName: string;
   disabled?: boolean;
@@ -5579,7 +5582,7 @@ function SignoffStatusControl({
 }) {
   const tone = request ? signoffStatusTone(request.status) : null;
   return (
-    <div style={signoffStatusStackStyle}>
+    <div style={centered ? { ...signoffStatusStackStyle, flexDirection: "column", justifyContent: "center", textAlign: "center", gap: 6 } : signoffStatusStackStyle}>
       {request ? (
         <>
           <span style={{ ...statusDotStyle, background: tone!.color }} />
@@ -5643,13 +5646,13 @@ function SimpleDocumentTable({
           {rows.map((row, index) => (
             <tr key={`${row.id || "new"}-${index}`}>
               <td style={{ ...gridCellStyle, minWidth: 140 }}>
-                <input value={row.number} onChange={(e) => onChange(index, "number", e.target.value)} style={gridInputStyle} aria-label={`Document ${index + 1} number`} />
+                <input value={row.number} onChange={(e) => onChange(index, "number", e.target.value)} className="ims-moc-cell" style={gridInputStyle} aria-label={`Document ${index + 1} number`} />
               </td>
               <td style={{ ...gridCellStyle, minWidth: 220 }}>
-                <input value={row.title} onChange={(e) => onChange(index, "title", e.target.value)} style={gridInputStyle} aria-label={`Document ${index + 1} title`} />
+                <input value={row.title} onChange={(e) => onChange(index, "title", e.target.value)} className="ims-moc-cell" style={gridInputStyle} aria-label={`Document ${index + 1} title`} />
               </td>
               <td style={{ ...gridCellStyle, width: 80 }}>
-                <input value={row.rev} onChange={(e) => onChange(index, "rev", e.target.value)} style={gridInputStyle} aria-label={`Document ${index + 1} revision`} />
+                <input value={row.rev} onChange={(e) => onChange(index, "rev", e.target.value)} className="ims-moc-cell" style={gridInputStyle} aria-label={`Document ${index + 1} revision`} />
               </td>
               <td style={{ ...gridCellStyle, padding: "6px 8px", whiteSpace: "nowrap" }}>
                 <RowOrderControls index={index} total={rows.length} onMove={(direction) => onMove(index, direction)} disabled={disabled} />

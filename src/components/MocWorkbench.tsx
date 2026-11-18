@@ -203,7 +203,7 @@ export function MocLivePreview({ data, onJump, wide = false }: { data: MocPrevie
 
   return (
     <aside
-      style={wide ? { display: "grid", gap: 10, alignContent: "start", maxWidth: 980, width: "100%", margin: "0 auto" } : { display: "grid", gap: 10, alignContent: "start", position: "sticky", top: 12 }}
+      style={wide ? { display: "grid", gap: 10, alignContent: "start", maxWidth: 980, width: "100%", margin: "0 auto" } : { display: "grid", gap: 10, alignContent: "start", position: "sticky", top: 12, maxHeight: "calc(100vh - 24px)", overflowY: "auto", overscrollBehavior: "contain", paddingRight: 4 }}
       aria-label="Live MOC document preview"
     >
       <div style={{ border: `1px solid ${gaps.length ? "#FFAD00" : "#005670"}`, background: gaps.length ? "#ECECE7" : "#EEF7F8", borderRadius: 8, padding: "10px 12px", fontSize: 12.5 }}>

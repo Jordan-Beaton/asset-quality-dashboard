@@ -1494,3 +1494,37 @@ textarea {
 @media (max-width: 760px) {
   .itp-node .itp-dot { grid-row: 1 / span 3; }
 }
+
+/* MOC form: the person picker owns its border, so its inner text box must not draw a second one. */
+.ims-page-container .ims-person-picker input.ims-person-picker-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+.ims-page-container .ims-person-picker input.ims-person-picker-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):focus {
+  width: auto !important;
+  flex: 1 1 0%;
+  min-width: 0;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 4px 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  font-size: var(--ims-text-base) !important;
+}
+
+/* MOC form: compact table cells use the same box language as the forms (38px, tinted). */
+.ims-page-container table tbody .ims-moc-cell:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+  min-height: 38px !important;
+  height: 38px !important;
+  padding: 8px 10px !important;
+  border: 1px solid var(--enshore-border) !important;
+  border-radius: 10px !important;
+  background: #F4F8F8 !important;
+  font-size: var(--ims-text-base) !important;
+  box-sizing: border-box;
+}
+
+.ims-page-container table tbody textarea.ims-moc-cell:not([type="checkbox"]) {
+  height: auto !important;
+  min-height: 64px !important;
+}
