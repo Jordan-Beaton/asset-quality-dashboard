@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { CSSProperties, ChangeEvent, ReactNode } from "react";
+import type { CSSProperties, ChangeEvent, ClipboardEvent as ReactClipboardEvent, ReactNode } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -30,6 +30,8 @@ import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
+import { MocLivePreview, MocStageBar, computeMocChecks } from "../../src/components/MocWorkbench";
+import type { MocStage } from "../../src/components/MocWorkbench";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlState } from "../../src/lib/useUrlState";
 
@@ -972,6 +974,11 @@ function MOCPageContent() {
     Boolean(linkedStatus !== "All" || linkedChangeType !== "All" || linkedRecent || linkedAttention)
   );
   const [selectedReportId, setSelectedReportId] = useState("");
+  // Which of the four workbench stages is open. Reset to the first stage when a different MOC is opened.
+  const [detailStage, setDetailStage] = useState<MocStage>("describe");
+  useEffect(() => {
+    setDetailStage("describe");
+  }, [selectedReportId]);
   // The open record is remembered in ?selected=; the record's details are loaded back into the panel once the register has loaded.
   const [urlReportId, setUrlReportId] = useUrlState("selected", "");
   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());
@@ -1125,6 +1132,16 @@ function MOCPageContent() {
   const canEditStructural = canEditMoc && detailReport.status === "Draft";
   const canEditImplementationStructure = canEditMoc && detailReport.status === "Draft";
   const canEditReviewSections = canEditMoc && (detailReport.status === "Draft" || detailReport.status === "In Review");
+  const workbenchData = {
+    report: detailReport,
+    actions: detailActionItems,
+    affectedDocuments: detailAffectedDocuments,
+    riskDocuments: detailRiskDocuments,
+    reviews: detailReviewRows,
+    acceptance: detailAcceptanceRows,
+    closeout: detailCloseoutRows,
+  };
+  const workbenchChecks = computeMocChecks(workbenchData);
   const canEditCloseout = canEditMoc && detailReport.status !== "Closed";
   const canEditCloseoutStructure = canEditMoc && (detailReport.status === "Draft" || detailReport.status === "Approved");
   const canManageAttachments = canEditMoc && detailReport.status !== "Closed";
@@ -1571,7 +1588,8 @@ function MOCPageContent() {
     sortOrder: number,
     rowLabel: string,
     recipientName: string,
-    mode: "decision" | "inform" = "decision"
+    mode: "decision" | "inform" = "decision",
+    skipSave = false
   ) {
     if (!requireEditPermission("Sending MOC sign-off")) return;
     if (!selectedReportId) return;
@@ -1589,7 +1607,7 @@ function MOCPageContent() {
     const key = `${targetTable}:${sortOrder}`;
     setSendingSignoffKey(key);
     try {
-      await saveSelectedMoc();
+      if (!skipSave) await saveSelectedMoc();
       const response = await fetch("/api/moc-signoff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1614,6 +1632,35 @@ function MOCPageContent() {
       showMessage(getErrorMessage(error), "error");
     } finally {
       setSendingSignoffKey("");
+    }
+  }
+
+  // Emails every review row that has Approve or Inform ticked and a person chosen, and has not been sent yet.
+  async function sendAllReviewSignoffs() {
+    if (!requireEditPermission("Sending MOC sign-off")) return;
+    const targets = detailReviewRows
+      .map((row, index) => ({ row, index }))
+      .filter(({ row, index }) => (row.approve_flag || row.inform_flag) && row.name.trim() && !signoffRequestFor("moc_review_endorsement_rows", index));
+    if (!targets.length) {
+      showMessage("Nothing left to send. Tick Approve or Inform and choose a person on each row first; rows already sent are skipped.", "warning");
+      return;
+    }
+    const summary = targets.map(({ row }) => `${row.involved_party || "Reviewer"}: ${row.name} (${row.approve_flag ? "sign-off" : "information"})`).join("\n");
+    if (!window.confirm(`Send ${targets.length} email${targets.length === 1 ? "" : "s"} now?\n\n${summary}`)) return;
+    try {
+      await saveSelectedMoc();
+      for (const { row, index } of targets) {
+        await sendSignoffRequest(
+          "moc_review_endorsement_rows",
+          index,
+          row.involved_party || `Review row ${index + 1}`,
+          row.name,
+          row.approve_flag ? "decision" : "inform",
+          true
+        );
+      }
+    } catch (error) {
+      showMessage(getErrorMessage(error), "error");
     }
   }
 
@@ -2215,6 +2262,40 @@ function MOCPageContent() {
         prev.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row))
       )
     );
+  }
+
+  // Paste rows copied from Excel (tab-separated: Action, Owner, Target, Status) into the action table.
+  function pasteActionRows(index: number, event: ReactClipboardEvent<HTMLTextAreaElement>) {
+    const pasted = event.clipboardData.getData("text");
+    if (!pasted.includes("\n") && !pasted.includes("\t")) return;
+    if (!canEditImplementationStructure) return;
+    event.preventDefault();
+    const lines = pasted.split(/\r?\n/).filter((line) => line.trim());
+    const parseTarget = (value: string | undefined) => {
+      const text = (value || "").trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+      const match = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+      if (!match) return "";
+      return `${match[3].length === 2 ? `20${match[3]}` : match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+    };
+    setDetailActionItems((prev) => {
+      const next = [...prev];
+      lines.forEach((line, offset) => {
+        const cells = line.split("\t");
+        const target = index + offset;
+        const current = next[target] || createActionItem(target);
+        next[target] = {
+          ...current,
+          description: (cells[0] || "").trim() || current.description,
+          responsible_person: cells.length > 1 ? (cells[1] || "").trim() : current.responsible_person,
+          target_date: parseTarget(cells[2]) || current.target_date,
+          status: cells[3] && actionPlanStatusOptions.some((option) => option.toLowerCase() === cells[3].trim().toLowerCase())
+            ? actionPlanStatusOptions.find((option) => option.toLowerCase() === cells[3].trim().toLowerCase())!
+            : current.status,
+        };
+      });
+      return syncActionOrders(next);
+    });
   }
 
   function removeActionRow(index: number) {
@@ -4368,9 +4449,11 @@ function MOCPageContent() {
               </div>
             </div>
 
+            <MocStageBar stage={detailStage} onChange={setDetailStage} checks={workbenchChecks} />
+            <div style={workbenchGridStyle}>
             <div style={subSectionStackStyle}>
               {detailReport.project_key ? (
-                <DetailSubsection title="PROJECT REPORTING">
+                <DetailSubsection title="PROJECT REPORTING" visible={detailStage === "describe"}>
                   <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditMoc || detailReport.status === "Closed"}>
                     <div style={detailFormGridStyle}>
                       <div style={{ gridColumn: "1 / -1" }}>
@@ -4473,7 +4556,7 @@ function MOCPageContent() {
                   </fieldset>
                 </DetailSubsection>
               ) : null}
-              <DetailSubsection title="A. MOC REPORT DETAILS">
+              <DetailSubsection title="A. MOC REPORT DETAILS" visible={detailStage === "describe"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <div style={detailFormGridStyle}>
                   <Field label="MOC Report No.">
@@ -4534,7 +4617,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="B. CHANGE IDENTIFICATION">
+              <DetailSubsection title="B. CHANGE IDENTIFICATION" visible={detailStage === "describe"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
@@ -4623,7 +4706,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="C. ACTION PLAN">
+              <DetailSubsection title="C. ACTION PLAN" visible={detailStage === "plan"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <div style={actionPlanIntroStyle}>
                   <div>
@@ -4633,47 +4716,99 @@ function MOCPageContent() {
                     </span>
                   </div>
                 </div>
-                <div style={repeatCardStackStyle}>
-                  {detailActionItems.map((row, index) => (
-                    <div key={`${row.id || "new"}-${index}`} style={repeatCardStyle}>
-                      <div style={repeatCardHeaderStyle}>
-                        <div>
-                          <div style={repeatCardKickerStyle}>Action item</div>
-                          <div style={actionPlanCardTitleRowStyle}>
-                            <span style={repeatCardTitleStyle}>{row.action_no || `Action ${index + 1}`}</span>
-                            <span style={{ ...badgeStyle, ...getActionPlanStatusTone(normaliseActionPlanStatus(row.status)) }}>
-                              {normaliseActionPlanStatus(row.status)}
-                            </span>
-                          </div>
-                        </div>
-                        <div style={rowActionsWrapStyle}>
-                          <Link
-                            href={`/actions?search=${encodeURIComponent(detailReport.moc_report_no)}`}
-                            style={centralActionLinkStyle}
-                          >
-                            View in Action Management ↗
-                          </Link>
-                          <RowOrderControls
-                            index={index}
-                            total={detailActionItems.length}
-                            onMove={(direction) => moveActionRow(index, direction)}
-                            disabled={!canEditImplementationStructure}
-                          />
-                          <button
-                            type="button"
-                            style={removeRowButtonStyle}
-                            onClick={() => removeActionRow(index)}
-                            disabled={!canEditImplementationStructure}
-                          >
-                            Remove
-                          </button>
-                          <details style={optionsMenuStyle}>
-                            <summary style={optionsSummaryStyle}>More options ···</summary>
-                            <div style={optionsMenuPanelStyle}>
-                              <label style={optionsMenuItemStyle}>
-                                {row.link_key && uploadingActionAttachmentKey === row.link_key
-                                  ? "Uploading..."
-                                  : "Upload Attachment"}
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+                  <span style={quietHintTextStyle}>Tip: paste rows from Excel (Action, Owner, Target, Status) into any Action cell to add them all.</span>
+                  <Link href={`/actions?search=${encodeURIComponent(detailReport.moc_report_no)}`} style={centralActionLinkStyle}>
+                    View in Action Management ↗
+                  </Link>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={gridTableStyle}>
+                    <thead>
+                      <tr>
+                        <th style={gridHeadCellStyle}>No.</th>
+                        <th style={gridHeadCellStyle}>Action</th>
+                        <th style={gridHeadCellStyle}>Owner</th>
+                        <th style={gridHeadCellStyle}>Target</th>
+                        <th style={gridHeadCellStyle}>Status</th>
+                        <th style={gridHeadCellStyle}>Files</th>
+                        <th style={gridHeadCellStyle}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailActionItems.map((row, index) => {
+                        const rowFiles = actionAttachments.filter((file) => file.action_item_link_key === row.link_key);
+                        return (
+                          <tr key={`${row.id || "new"}-${index}`}>
+                            <td style={{ ...gridCellStyle, width: 44, textAlign: "center", color: "#53565A", fontSize: 12, paddingTop: 11 }}>
+                              {row.action_no || index + 1}
+                            </td>
+                            <td style={{ ...gridCellStyle, minWidth: 260 }}>
+                              <textarea
+                                rows={2}
+                                value={row.description}
+                                onChange={(e) => updateActionRow(index, "description", e.target.value)}
+                                onPaste={(e) => pasteActionRows(index, e)}
+                                style={{ ...gridInputStyle, resize: "vertical" }}
+                                aria-label={`Action ${index + 1} description`}
+                              />
+                            </td>
+                            <td style={{ ...gridCellStyle, minWidth: 150 }}>
+                              <input
+                                list="moc-people-options"
+                                value={row.responsible_person}
+                                onChange={(e) => updateActionRow(index, "responsible_person", e.target.value)}
+                                placeholder="Owner"
+                                style={gridInputStyle}
+                                aria-label={`Action ${index + 1} owner`}
+                              />
+                            </td>
+                            <td style={{ ...gridCellStyle, minWidth: 130 }}>
+                              <input
+                                type="date"
+                                value={row.target_date}
+                                onChange={(e) => updateActionRow(index, "target_date", e.target.value)}
+                                style={gridInputStyle}
+                                aria-label={`Action ${index + 1} target date`}
+                              />
+                            </td>
+                            <td style={{ ...gridCellStyle, minWidth: 110 }}>
+                              <select
+                                value={normaliseActionPlanStatus(row.status)}
+                                onChange={(e) => updateActionRow(index, "status", e.target.value)}
+                                style={gridInputStyle}
+                                aria-label={`Action ${index + 1} status`}
+                              >
+                                {actionPlanStatusOptions.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td style={{ ...gridCellStyle, minWidth: 130, padding: "6px 8px" }}>
+                              {rowFiles.map((file) => (
+                                <div key={file.id} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
+                                  <button
+                                    type="button"
+                                    style={actionAttachmentLinkButtonStyle}
+                                    onClick={() => void openActionAttachment(file)}
+                                    disabled={actionAttachmentActionId === file.id}
+                                  >
+                                    📎 {file.file_name}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    style={actionAttachmentRemoveButtonStyle}
+                                    onClick={() => void removeActionAttachment(file)}
+                                    disabled={!canEditImplementationFields || actionAttachmentActionId === file.id}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                              <label style={{ fontSize: 12, color: "#005670", cursor: "pointer", fontWeight: 700 }}>
+                                {row.link_key && uploadingActionAttachmentKey === row.link_key ? "Uploading..." : "+ Add file"}
                                 <input
                                   type="file"
                                   multiple
@@ -4685,104 +4820,28 @@ function MOCPageContent() {
                                   }}
                                 />
                               </label>
-                            </div>
-                          </details>
-                        </div>
-                      </div>
-                      <div style={actionPlanSummaryStyle}>
-                        <div>
-                          <span style={miniMetaLabelStyle}>Owner</span>
-                          <strong style={miniMetaValueStyle}>{row.responsible_person || "-"}</strong>
-                        </div>
-                        <div>
-                          <span style={miniMetaLabelStyle}>Target</span>
-                          <strong style={miniMetaValueStyle}>{formatDate(row.target_date)}</strong>
-                        </div>
-                        <div>
-                          <span style={miniMetaLabelStyle}>Central tracking</span>
-                          <strong style={miniMetaValueStyle}>Linked automatically · kept in sync on save</strong>
-                        </div>
-                      </div>
-                      <div style={actionPlanCardGridStyle}>
-                        <Field label="Action No.">
-                          <input value={row.action_no} readOnly style={readOnlyInputStyle} />
-                        </Field>
-                        <Field label="Responsible Person">
-                          <PeopleNameInput
-                            value={row.responsible_person}
-                            onChange={(e) => updateActionRow(index, "responsible_person", e.target.value)}
-                            listId="moc-people-options"
-                            placeholder="Responsible person"
-                          />
-                        </Field>
-                        <Field label="Target Date">
-                          <input
-                            type="date"
-                            value={row.target_date}
-                            onChange={(e) => updateActionRow(index, "target_date", e.target.value)}
-                            style={inputStyle}
-                          />
-                        </Field>
-                        <Field label="Status">
-                          <select
-                            value={normaliseActionPlanStatus(row.status)}
-                            onChange={(e) => updateActionRow(index, "status", e.target.value)}
-                            style={inputStyle}
-                          >
-                            {actionPlanStatusOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                        </Field>
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <Field label="Description of Action">
-                            <textarea
-                              value={row.description}
-                              onChange={(e) => updateActionRow(index, "description", e.target.value)}
-                              style={textareaStyle}
-                            />
-                          </Field>
-                        </div>
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <Field label="Attachments">
-                            {actionAttachments.filter((file) => file.action_item_link_key === row.link_key).length ? (
-                              <div style={actionAttachmentListStyle}>
-                                {actionAttachments
-                                  .filter((file) => file.action_item_link_key === row.link_key)
-                                  .map((file) => (
-                                    <div key={file.id} style={actionAttachmentChipStyle}>
-                                      <span>📎 {file.file_name}</span>
-                                      <button
-                                        type="button"
-                                        style={actionAttachmentLinkButtonStyle}
-                                        onClick={() => void openActionAttachment(file)}
-                                        disabled={actionAttachmentActionId === file.id}
-                                      >
-                                        Open
-                                      </button>
-                                      <button
-                                        type="button"
-                                        style={actionAttachmentRemoveButtonStyle}
-                                        onClick={() => void removeActionAttachment(file)}
-                                        disabled={!canEditImplementationFields || actionAttachmentActionId === file.id}
-                                      >
-                                        ✕
-                                      </button>
-                                    </div>
-                                  ))}
-                              </div>
-                            ) : (
-                              <div style={compactAttachmentEmptyStateStyle}>
-                                No attachments yet — use More options to add one.
-                              </div>
-                            )}
-                          </Field>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                            </td>
+                            <td style={{ ...gridCellStyle, padding: "6px 8px", whiteSpace: "nowrap" }}>
+                              <RowOrderControls
+                                index={index}
+                                total={detailActionItems.length}
+                                onMove={(direction) => moveActionRow(index, direction)}
+                                disabled={!canEditImplementationStructure}
+                              />
+                              <button
+                                type="button"
+                                style={removeRowButtonStyle}
+                                onClick={() => removeActionRow(index)}
+                                disabled={!canEditImplementationStructure}
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
                 <RepeatTableToolbar
                   onAdd={addActionRow}
@@ -4792,7 +4851,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="D. CHANGE IMPACT">
+              <DetailSubsection title="D. CHANGE IMPACT" visible={detailStage === "assess"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <div style={impactGridStyle}>
                   <ImpactToggle
@@ -4882,7 +4941,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="E. AFFECTED DOCUMENTATION">
+              <DetailSubsection title="E. AFFECTED DOCUMENTATION" visible={detailStage === "plan"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <SimpleDocumentTable
                   rows={detailAffectedDocuments}
@@ -4895,7 +4954,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="F. RISK MANAGEMENT">
+              <DetailSubsection title="F. RISK MANAGEMENT" visible={detailStage === "assess"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <SimpleDocumentTable
                   rows={detailRiskDocuments}
@@ -4975,7 +5034,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="G. HAZARDS & MITIGATING ACTIONS">
+              <DetailSubsection title="G. HAZARDS & MITIGATING ACTIONS" visible={detailStage === "assess"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <div style={detailFormGridStyle}>
                   <div>
@@ -5000,7 +5059,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="H. COST REVIEW">
+              <DetailSubsection title="H. COST REVIEW" visible={detailStage === "assess"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <Field label="Description of cost impact (incl. future savings)">
                   <textarea
@@ -5012,7 +5071,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="I. SCHEDULE REVIEW">
+              <DetailSubsection title="I. SCHEDULE REVIEW" visible={detailStage === "assess"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <Field label="Description of the schedule impact (incl. future savings)">
                   <textarea
@@ -5024,7 +5083,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="J. SUPPORTING DOCUMENTATION AND INFORMATION">
+              <DetailSubsection title="J. SUPPORTING DOCUMENTATION AND INFORMATION" visible={detailStage === "plan"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
@@ -5126,115 +5185,90 @@ function MOCPageContent() {
                 )}
               </DetailSubsection>
 
-              <DetailSubsection title="K. REVIEW AND ENDORSEMENT">
+              <DetailSubsection title="K. REVIEW AND ENDORSEMENT" visible={detailStage === "signoff"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditReviewSections}>
-                <div style={repeatCardStackStyle}>
-                  {detailReviewRows.map((row, index) => (
-                    <div key={`${row.id || "new"}-${index}`} style={repeatCardStyle}>
-                      <div style={repeatCardHeaderStyle}>
-                        <div>
-                          <div style={repeatCardKickerStyle}>Review / endorsement</div>
-                          <div style={repeatCardTitleStyle}>{row.involved_party || `Review row ${index + 1}`}</div>
-                        </div>
-                        <div style={rowActionsWrapStyle}>
-                          <RowOrderControls
-                            index={index}
-                            total={detailReviewRows.length}
-                            onMove={(direction) => moveReviewRow(index, direction)}
-                            disabled={!canEditStructural}
-                          />
-                          <button
-                            type="button"
-                            style={removeRowButtonStyle}
-                            onClick={() => removeReviewRow(index)}
-                            disabled={!canEditStructural}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                      <div style={reviewIntentGridStyle}>
-                        <label
-                          style={{
-                            ...reviewChoiceStyle,
-                            background: row.approve_flag ? "#ECECE7" : "#ffffff",
-                            borderColor: row.approve_flag ? "#005670" : "#D0D0CE",
-                            color: row.approve_flag ? "#005670" : "#000000",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={row.approve_flag}
-                            onChange={(e) => updateReviewRow(index, "approve_flag", e.target.checked)}
-                          />
-                          <span>Approve</span>
-                        </label>
-                        <label
-                          style={{
-                            ...reviewChoiceStyle,
-                            background: row.inform_flag ? "#ECECE7" : "#ffffff",
-                            borderColor: row.inform_flag ? "#005670" : "#D0D0CE",
-                            color: row.inform_flag ? "#005670" : "#000000",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={row.inform_flag}
-                            onChange={(e) => updateReviewRow(index, "inform_flag", e.target.checked)}
-                          />
-                          <span>Inform</span>
-                        </label>
-                      </div>
-                      <div style={reviewCardGridStyle}>
-                        <Field label="Involved Party">
-                          <input
-                            value={row.involved_party}
-                            onChange={(e) => updateReviewRow(index, "involved_party", e.target.value)}
-                            style={inputStyle}
-                          />
-                        </Field>
-                        <Field label="Name">
-                          <PeopleEmailSelect
-                            value={row.name}
-                            onChange={(value) => updateReviewRow(index, "name", value)}
-                            people={peopleOptions}
-                            disabled={!canEditReviewSections}
-                          />
-                        </Field>
-                        <Field label="Position">
-                          <input
-                            value={row.position}
-                            onChange={(e) => updateReviewRow(index, "position", e.target.value)}
-                            style={inputStyle}
-                          />
-                        </Field>
-                        <Field label="Decision">
-                          <div style={readOnlyValueStyle}>
-                            {row.approved_value === "Yes"
-                              ? "Approved"
-                              : row.approved_value === "No"
-                              ? "Rejected"
-                              : "Awaiting decision"}
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+                  <span style={quietHintTextStyle}>
+                    Nobody is chosen for you. For each party that needs to see this MOC, tick Approve (needs a decision) or Inform (for information only) and choose a person. Each person is emailed a link with a PDF summary.
+                  </span>
+                  <button
+                    type="button"
+                    style={sendSignoffButtonStyle}
+                    onClick={() => void sendAllReviewSignoffs()}
+                    disabled={!canEditReviewSections || Boolean(sendingSignoffKey)}
+                  >
+                    Email all chosen reviewers
+                  </button>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={gridTableStyle}>
+                    <thead>
+                      <tr>
+                        <th style={gridHeadCellStyle}>Involved party</th>
+                        <th style={gridHeadCellStyle}>Person</th>
+                        <th style={gridHeadCellStyle}>Position</th>
+                        <th style={{ ...gridHeadCellStyle, textAlign: "center" }}>Approve</th>
+                        <th style={{ ...gridHeadCellStyle, textAlign: "center" }}>Inform</th>
+                        <th style={gridHeadCellStyle}>Decision</th>
+                        <th style={gridHeadCellStyle}>Email</th>
+                        <th style={gridHeadCellStyle}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailReviewRows.map((row, index) => (
+                        <tr key={`${row.id || "new"}-${index}`} style={{ background: row.approve_flag || row.inform_flag ? "#F4F8F8" : "transparent" }}>
+                          <td style={{ ...gridCellStyle, minWidth: 130 }}>
+                            <input
+                              value={row.involved_party}
+                              onChange={(e) => updateReviewRow(index, "involved_party", e.target.value)}
+                              style={{ ...gridInputStyle, fontWeight: 700 }}
+                              aria-label={`Review row ${index + 1} party`}
+                            />
+                          </td>
+                          <td style={{ ...gridCellStyle, minWidth: 190, padding: "4px 6px" }}>
+                            <PeopleEmailSelect
+                              value={row.name}
+                              onChange={(value) => updateReviewRow(index, "name", value)}
+                              people={peopleOptions}
+                              disabled={!canEditReviewSections}
+                            />
+                          </td>
+                          <td style={{ ...gridCellStyle, minWidth: 130 }}>
+                            <input
+                              value={row.position}
+                              onChange={(e) => updateReviewRow(index, "position", e.target.value)}
+                              style={gridInputStyle}
+                              aria-label={`Review row ${index + 1} position`}
+                            />
+                          </td>
+                          <td style={{ ...gridCellStyle, textAlign: "center", paddingTop: 11 }}>
+                            <input
+                              type="checkbox"
+                              checked={row.approve_flag}
+                              onChange={(e) => updateReviewRow(index, "approve_flag", e.target.checked)}
+                              aria-label={`Approve: ${row.involved_party}`}
+                            />
+                          </td>
+                          <td style={{ ...gridCellStyle, textAlign: "center", paddingTop: 11 }}>
+                            <input
+                              type="checkbox"
+                              checked={row.inform_flag}
+                              onChange={(e) => updateReviewRow(index, "inform_flag", e.target.checked)}
+                              aria-label={`Inform: ${row.involved_party}`}
+                            />
+                          </td>
+                          <td style={{ ...gridCellStyle, minWidth: 150, padding: "10px 8px", fontSize: 12.5 }}>
+                            {row.approved_value === "Yes" ? "Approved" : row.approved_value === "No" ? "Rejected" : "Awaiting"}
                             {row.review_date ? ` - ${getPdfDate(row.review_date)}` : ""}
-                          </div>
-                        </Field>
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <Field label="Comments">
-                            <div style={readOnlyValueStyle}>{row.comments || "No comments returned."}</div>
-                          </Field>
-                        </div>
-                        <div style={{ gridColumn: "1 / -1" }}>
-                          <Field label="Sign-Off">
+                            {row.comments ? <div style={{ color: "#53565A", marginTop: 2 }}>“{row.comments}”</div> : null}
+                          </td>
+                          <td style={{ ...gridCellStyle, minWidth: 210, padding: "6px 8px" }}>
                             <SignoffStatusControl
                               request={signoffRequestFor("moc_review_endorsement_rows", index)}
                               recipientName={row.name}
                               disabled={!canEditReviewSections}
                               sending={sendingSignoffKey === `moc_review_endorsement_rows:${index}`}
-                              blockedHint={
-                                !row.approve_flag && !row.inform_flag
-                                  ? "Tick Approve or Inform above to send this row."
-                                  : undefined
-                              }
+                              blockedHint={!row.approve_flag && !row.inform_flag ? "Not included" : undefined}
                               sendLabel={row.approve_flag ? "Send for Sign-Off" : "Send for Information"}
                               onSend={() =>
                                 void sendSignoffRequest(
@@ -5246,17 +5280,28 @@ function MOCPageContent() {
                                 )
                               }
                             />
-                          </Field>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                          </td>
+                          <td style={{ ...gridCellStyle, padding: "6px 8px", whiteSpace: "nowrap" }}>
+                            <RowOrderControls
+                              index={index}
+                              total={detailReviewRows.length}
+                              onMove={(direction) => moveReviewRow(index, direction)}
+                              disabled={!canEditStructural}
+                            />
+                            <button type="button" style={removeRowButtonStyle} onClick={() => removeReviewRow(index)} disabled={!canEditStructural}>
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
                 <RepeatTableToolbar onAdd={addReviewRow} label="Add Review Row" disabled={!canEditStructural} />
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="L. MOC CHANGE ACCEPTANCE">
+              <DetailSubsection title="L. MOC CHANGE ACCEPTANCE" visible={detailStage === "signoff"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditReviewSections}>
                 <SimpleSignoffTable
                   rows={detailAcceptanceRows}
@@ -5274,7 +5319,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
 
-              <DetailSubsection title="M. MOC CLOSE-OUT VERIFICATION">
+              <DetailSubsection title="M. MOC CLOSE-OUT VERIFICATION" visible={detailStage === "signoff"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCloseout}>
                 <SimpleSignoffTable
                   rows={detailCloseoutRows}
@@ -5295,6 +5340,8 @@ function MOCPageContent() {
                 />
                 </fieldset>
               </DetailSubsection>
+            </div>
+            <MocLivePreview data={workbenchData} onJump={setDetailStage} />
             </div>
 
             <div style={detailButtonRowStyle}>
@@ -5405,7 +5452,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function DetailSubsection({ title, children }: { title: string; children: ReactNode }) {
+function DetailSubsection({ title, children, visible = true }: { title: string; children: ReactNode; visible?: boolean }) {
+  if (!visible) return null;
   return (
     <>
       <div style={detailSectionTitleStyle}>{title}</div>
@@ -5594,39 +5642,38 @@ function SimpleDocumentTable({
   disabled?: boolean;
 }) {
   return (
-    <div style={repeatCardStackStyle}>
-      {rows.map((row, index) => (
-        <div key={`${row.id || "new"}-${index}`} style={repeatCardStyle}>
-          <div style={repeatCardHeaderStyle}>
-            <div>
-              <div style={repeatCardKickerStyle}>Document row</div>
-              <div style={repeatCardTitleStyle}>{row.number || `Document ${index + 1}`}</div>
-            </div>
-            <div style={rowActionsWrapStyle}>
-              <RowOrderControls
-                index={index}
-                total={rows.length}
-                onMove={(direction) => onMove(index, direction)}
-                disabled={disabled}
-              />
-              <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
-                Remove
-              </button>
-            </div>
-          </div>
-          <div style={documentCardGridStyle}>
-            <Field label="Number">
-              <input value={row.number} onChange={(e) => onChange(index, "number", e.target.value)} style={inputStyle} />
-            </Field>
-            <Field label="Title">
-              <input value={row.title} onChange={(e) => onChange(index, "title", e.target.value)} style={inputStyle} />
-            </Field>
-            <Field label="Rev.">
-              <input value={row.rev} onChange={(e) => onChange(index, "rev", e.target.value)} style={inputStyle} />
-            </Field>
-          </div>
-        </div>
-      ))}
+    <div style={{ overflowX: "auto" }}>
+      <table style={gridTableStyle}>
+        <thead>
+          <tr>
+            <th style={gridHeadCellStyle}>Number</th>
+            <th style={gridHeadCellStyle}>Title</th>
+            <th style={gridHeadCellStyle}>Rev.</th>
+            <th style={gridHeadCellStyle}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${row.id || "new"}-${index}`}>
+              <td style={{ ...gridCellStyle, minWidth: 140 }}>
+                <input value={row.number} onChange={(e) => onChange(index, "number", e.target.value)} style={gridInputStyle} aria-label={`Document ${index + 1} number`} />
+              </td>
+              <td style={{ ...gridCellStyle, minWidth: 220 }}>
+                <input value={row.title} onChange={(e) => onChange(index, "title", e.target.value)} style={gridInputStyle} aria-label={`Document ${index + 1} title`} />
+              </td>
+              <td style={{ ...gridCellStyle, width: 80 }}>
+                <input value={row.rev} onChange={(e) => onChange(index, "rev", e.target.value)} style={gridInputStyle} aria-label={`Document ${index + 1} revision`} />
+              </td>
+              <td style={{ ...gridCellStyle, padding: "6px 8px", whiteSpace: "nowrap" }}>
+                <RowOrderControls index={index} total={rows.length} onMove={(direction) => onMove(index, direction)} disabled={disabled} />
+                <button type="button" style={removeRowButtonStyle} onClick={() => onRemove(index)} disabled={disabled}>
+                  Remove
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -6142,6 +6189,18 @@ const subSectionStackStyle: CSSProperties = {
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
   minWidth: 0,
 };
+
+const workbenchGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 460px), 1fr))",
+  gap: "16px",
+  alignItems: "start",
+};
+
+const gridTableStyle: CSSProperties = { width: "100%", borderCollapse: "collapse", background: "#ffffff", border: "1px solid #D0D0CE" };
+const gridHeadCellStyle: CSSProperties = { textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: "#53565A", padding: "7px 8px", borderBottom: "1px solid #D0D0CE", whiteSpace: "nowrap" };
+const gridCellStyle: CSSProperties = { padding: 0, borderBottom: "1px solid #ECECE7", verticalAlign: "top" };
+const gridInputStyle: CSSProperties = { width: "100%", border: 0, background: "transparent", padding: "9px 8px", font: "inherit", fontSize: 13, color: "#000000", minWidth: 0 };
 
 const detailSectionTitleStyle: CSSProperties = {
   fontSize: "13px",

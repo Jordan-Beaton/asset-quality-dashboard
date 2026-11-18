@@ -76,7 +76,7 @@ type PeopleAccessRecord = {
   admin_access?: string | null;
 };
 
-type AccessArea = "public" | "login" | "home" | "people" | "quality" | "lessons" | "documents" | "hse" | "assets" | "risk" | "actions" | "management-review" | "projects" | "admin" | "guides";
+type AccessArea = "public" | "login" | "home" | "people" | "quality" | "moc" | "lessons" | "documents" | "hse" | "assets" | "risk" | "actions" | "management-review" | "projects" | "admin" | "guides";
 
 type NavIconKey =
   | "home"
@@ -119,12 +119,16 @@ const qualityNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/quality", label: "Dashboard", icon: "dashboard" },
   { href: "/quality/calendar", label: "Calendar", icon: "calendar" },
-  { href: "/moc", label: "MOC", icon: "moc" },
   { href: "/ncr-capa", label: "NCR", icon: "ncr" },
   { href: "/audits", label: "Audits", icon: "audits" },
   { href: "/quality/actions", label: "Actions", icon: "actions" },
   { href: "/reports", label: "Reports", icon: "reports" },
   { href: "/guides?guide=ncr", label: "Process Guides", icon: "lessons" },
+];
+
+const mocNavItems: NavItem[] = [
+  { href: "/home", label: "Home", icon: "home" },
+  { href: "/moc", label: "MOC Register", icon: "moc" },
 ];
 
 const lessonsNavItems: NavItem[] = [
@@ -209,13 +213,13 @@ function normaliseSystemRole(role: string | null | undefined): SystemRole {
 }
 
 function getAllowedModuleKeys(role: SystemRole) {
-  if (role === "Admin") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "management-review", "people", "admin"]);
-  if (role === "Manager") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "management-review", "people"]);
+  if (role === "Admin") return new Set(["home", "quality", "moc", "documents", "hse", "assets", "risk", "actions", "management-review", "people", "admin"]);
+  if (role === "Manager") return new Set(["home", "quality", "moc", "documents", "hse", "assets", "risk", "actions", "management-review", "people"]);
   if (role === "HSE Officer") return new Set(["home", "hse", "actions", "people"]);
-  if (role === "Quality Engineer") return new Set(["home", "quality", "actions", "people"]);
+  if (role === "Quality Engineer") return new Set(["home", "quality", "moc", "actions", "people"]);
   if (role === "Document Controller") return new Set(["home", "documents", "actions", "people"]);
   if (role === "Asset Manager") return new Set(["home", "assets", "actions", "people"]);
-  if (role === "Viewer") return new Set(["home", "quality", "documents", "hse", "assets", "risk", "actions", "people"]);
+  if (role === "Viewer") return new Set(["home", "quality", "moc", "documents", "hse", "assets", "risk", "actions", "people"]);
   if (role === "Contractor") return new Set(["home"]);
   return new Set(["home"]);
 }
@@ -229,6 +233,7 @@ function getAccessAreaFromHref(href: string): AccessArea {
   if (href.startsWith("/projects")) return "projects";
   if (href.startsWith("/inspections")) return "projects";
   if (href.startsWith("/lessons-learned")) return "lessons";
+  if (href === "/moc" || href.startsWith("/moc/") || href.startsWith("/moc?")) return "moc";
   if (href.startsWith("/hse")) return "hse";
   if (href.startsWith("/assets")) return "assets";
   if (href.startsWith("/risk")) return "risk";
@@ -255,7 +260,7 @@ function getNormalisedAccess(value: string | null | undefined) {
 }
 
 function getModuleAccessValue(moduleKey: string, moduleAccess: ModuleAccess) {
-  if (moduleKey === "quality") return moduleAccess.quality;
+  if (moduleKey === "quality" || moduleKey === "moc") return moduleAccess.quality;
   if (moduleKey === "documents") return moduleAccess.documents;
   if (moduleKey === "hse") return moduleAccess.hse;
   if (moduleKey === "assets") return moduleAccess.assets;
@@ -274,7 +279,6 @@ function getPermissionTargetFromHref(href: string): PermissionTarget | null {
   if (href.startsWith("/projects")) return { moduleKey: "quality", areaKey: "reports" };
   if (href === "/quality") return { moduleKey: "quality", areaKey: "dashboard" };
   if (href === "/quality/calendar") return { moduleKey: "quality", areaKey: "calendar" };
-  if (href === "/moc") return { moduleKey: "quality", areaKey: "moc" };
   if (href === "/ncr-capa") return { moduleKey: "quality", areaKey: "ncr" };
   if (href === "/audits") return { moduleKey: "quality", areaKey: "audits" };
   if (href === "/quality/actions") return { moduleKey: "quality", areaKey: "actions" };
@@ -569,6 +573,7 @@ function isAreaAllowed(area: AccessArea, role: SystemRole, moduleAccess: ModuleA
   if (area === "home") return true;
   if (area === "people") return !isExplicitNone(moduleAccess.people) && (hasExplicitAccess(moduleAccess.people) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Quality Engineer" || role === "Document Controller" || role === "Asset Manager" || role === "Viewer");
   if (area === "quality") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
+  if (area === "moc") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
   if (area === "lessons") return !isExplicitNone(moduleAccess.quality) && (hasExplicitAccess(moduleAccess.quality) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Viewer");
   if (area === "documents") return !isExplicitNone(moduleAccess.documents) && (hasExplicitAccess(moduleAccess.documents) || role === "Admin" || role === "Manager" || role === "Quality Engineer" || role === "Document Controller" || role === "Viewer");
   if (area === "hse") return !isExplicitNone(moduleAccess.hse) && (hasExplicitAccess(moduleAccess.hse) || role === "Admin" || role === "Manager" || role === "HSE Officer" || role === "Viewer");
@@ -770,6 +775,7 @@ export default function AppShell({ children }: AppShellProps) {
   const isActionModule = pathname === "/actions";
   const isProjectModule = pathname.startsWith("/projects") || pathname.startsWith("/inspections");
   const isLessonsModule = pathname.startsWith("/lessons-learned");
+  const isMocModule = pathname === "/moc" || pathname.startsWith("/moc/");
   const isAinmFieldMode = pathname === "/hse/ainm/field";
   const isAssetInspectionFieldMode = pathname === "/assets/inspection/field";
   const isAssetMaintenanceFieldMode = pathname === "/assets/maintenance/field";
@@ -792,6 +798,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? "Action Management"
     : isLessonsModule
     ? "Lessons Learnt"
+    : isMocModule
+    ? "Management of Change"
     : isProjectModule
     ? "Project Management"
     : isDocumentModule
@@ -817,6 +825,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? "Central action register and follow-up control"
     : isLessonsModule
     ? "Central project knowledge, repeat-failure prevention, and operational learning"
+    : isMocModule
+    ? "Controlled change records, numbering, sign-off, and close-out"
     : isProjectModule
     ? "Project registers, controls, documents, and reporting"
     : isDocumentModule
@@ -854,6 +864,8 @@ export default function AppShell({ children }: AppShellProps) {
     ? projectNavItems
     : isLessonsModule
     ? lessonsNavItems
+    : isMocModule
+    ? mocNavItems
     : qualityNavItems;
   const navItems = filterNavItemsForRole(baseNavItems, signedInRole, signedInModuleAccess, signedInTabPermissions);
   const showSideRail = !isLoginPage && !isPublicStandalonePage && !isHomePage && !isFieldToolsPage && !isFieldInspectionMode;

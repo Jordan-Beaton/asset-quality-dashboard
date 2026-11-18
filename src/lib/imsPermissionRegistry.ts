@@ -15,11 +15,15 @@ export const IMS_PERMISSION_REGISTRY: ImsPermissionModule[] = [
   { moduleKey: "quality", label: "Quality Management", legacyAccessField: "quality_access", areas: [
     { key: "dashboard", label: "Dashboard", routes: [{ path: "/quality" }] },
     { key: "calendar", label: "Calendar", routes: [{ path: "/quality/calendar" }] },
-    { key: "moc", label: "MOC", routes: [{ path: "/moc", match: "prefix" }] },
     { key: "ncr", label: "NCR", routes: [{ path: "/ncr-capa", match: "prefix" }] },
     { key: "audits", label: "Audits", routes: [{ path: "/audits", match: "prefix" }] },
     { key: "actions", label: "Actions", routes: [{ path: "/quality/actions", match: "prefix" }] },
     { key: "reports", label: "Reports", routes: [{ path: "/reports", match: "prefix" }] },
+  ] },
+  // Management of Change is its own module. Until a person has MOC-specific rows it follows their Quality access
+  // (see getEffectiveModuleAccess in AppShell); scripts/sql/moc_module_permissions.sql copies existing Part Access rows across.
+  { moduleKey: "moc", label: "Management of Change", areas: [
+    { key: "register", label: "MOC Register", routes: [{ path: "/moc", match: "prefix" }] },
   ] },
   { moduleKey: "lessons", label: "Lessons Learnt", areas: [
     { key: "workspace", label: "Lessons Learnt Workspace", routes: [{ path: "/lessons-learned", match: "prefix" }] },

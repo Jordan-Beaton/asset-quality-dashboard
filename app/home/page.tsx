@@ -32,9 +32,20 @@ const moduleCards = [
     title: "Quality Management",
     short: "Quality",
     icon: "quality",
-    description: "NCR, audits, MOC, reporting, and HSEQ workflow control.",
+    description: "NCR, audits, reporting, and HSEQ workflow control.",
     href: "/quality",
     moduleKey: "quality",
+    status: "Live",
+    group: "Core IMS",
+    cta: "Enter",
+  },
+  {
+    title: "Management of Change",
+    short: "MOC",
+    icon: "moc",
+    description: "Numbered change records by project, impact and risk review, sign-off, linked actions, and close-out.",
+    href: "/moc",
+    moduleKey: "moc",
     status: "Live",
     group: "Core IMS",
     cta: "Enter",
@@ -233,6 +244,16 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
       <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
         <path {...common} d="M8 4h8l1 3h2v13H5V7h2z" />
         <path {...common} d="m8.5 13 2.2 2.2 4.8-5" />
+      </svg>
+    );
+  }
+
+  if (icon === "moc") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
+        <path {...common} d="M12 21H6V3h8l4 4v3" />
+        <path {...common} d="M14 3v4h4M9 9h3M9 13h2" />
+        <path {...common} d="M21 15.5a4 4 0 1 0-1.2 3M21 12.5v3h-3" />
       </svg>
     );
   }
