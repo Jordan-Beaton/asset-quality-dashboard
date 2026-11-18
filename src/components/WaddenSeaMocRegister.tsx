@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { Packer } from "docx";
 import { QualityKpiCard } from "./QualityKpiCard";
 import { imsColours } from "./imsTheme";
 import { useUrlFlag, useUrlState } from "../lib/useUrlState";
+import { supabase } from "../lib/supabase";
 import {
   MOC_PROJECTS,
   buildAnnex,
@@ -21,8 +22,56 @@ import {
 } from "../lib/mocRegister";
 import { buildMocPdf, buildMocWord, mocFileName } from "../lib/mocRegisterDocs";
 
-// MOC Register annex. The register itself lives in a SharePoint workbook that the MOC coordinators keep up to date.
-// Nothing is stored here: the workbook is read in the browser and turned into the Word / PDF annex for one project.
+// MOC Register annex. The register is the Wadden Sea MOC section of the IMS (Quality, MOC), read live.
+// A workbook can still be uploaded instead, for example the old SharePoint register; nothing is stored from it.
+
+const DB_STATUS_LABEL: Record<string, string> = { Draft: "Draft", "In Review": "In review", Approved: "Approved", Closed: "Closed" };
+
+async function loadFromIms(): Promise<MocWorkbook> {
+  const mocResult = await supabase
+    .from("moc_reports")
+    .select("id,moc_report_no,series_number,moc_report_title,applies_to,change_type,moc_coordinator_name,responsible_manager_name,implementation_from,implementation_to,status,status_to_confirm,next_step,next_step_owner,next_step_due")
+    .eq("project_key", "wadden-sea")
+    .order("series_number", { ascending: true });
+  if (mocResult.error) throw new Error(mocResult.error.message);
+  const rows = mocResult.data || [];
+  const ids = rows.map((row) => String(row.id));
+  const actionResult = ids.length
+    ? await supabase.from("moc_action_plan_items").select("moc_report_id,sort_order,action_no,description,responsible_person,target_date,status").in("moc_report_id", ids).order("sort_order", { ascending: true })
+    : { data: [], error: null };
+  if (actionResult.error) throw new Error(actionResult.error.message);
+  const numberById = new Map(rows.map((row) => [String(row.id), String(row.moc_report_no)]));
+  const text = (value: unknown) => String(value ?? "").trim();
+  return {
+    warnings: [],
+    mocs: rows.map((row) => {
+      const parts = Array.isArray(row.applies_to) ? (row.applies_to as string[]) : [];
+      return {
+        mocNo: text(row.moc_report_no),
+        title: text(row.moc_report_title),
+        appliesTo: parts.join(" & ") || "All",
+        type: text(row.change_type),
+        coordinator: text(row.moc_coordinator_name),
+        manager: text(row.responsible_manager_name),
+        implFrom: text(row.implementation_from),
+        implTo: text(row.implementation_to),
+        status: row.status_to_confirm ? "To confirm" : DB_STATUS_LABEL[text(row.status)] || text(row.status),
+        nextStep: text(row.next_step),
+        nextOwner: text(row.next_step_owner),
+        nextDue: text(row.next_step_due),
+        notes: "",
+      };
+    }),
+    actions: (actionResult.data || []).map((item) => ({
+      mocNo: numberById.get(String(item.moc_report_id)) || "",
+      no: text(item.action_no),
+      description: text(item.description),
+      responsible: text(item.responsible_person),
+      target: text(item.target_date),
+      status: text(item.status),
+    })),
+  };
+}
 
 function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
@@ -40,7 +89,11 @@ function todayIso() {
 
 export function WaddenSeaMocRegister() {
   const fileInput = useRef<HTMLInputElement>(null);
-  const [workbook, setWorkbook] = useState<MocWorkbook | null>(null);
+  const [source, setSource] = useUrlState<"ims" | "workbook">("moc_source", "ims", ["ims", "workbook"]);
+  const [imsBook, setImsBook] = useState<MocWorkbook | null>(null);
+  const [imsLoading, setImsLoading] = useState(false);
+  const [fileBook, setFileBook] = useState<MocWorkbook | null>(null);
+  const workbook = source === "ims" ? imsBook : fileBook;
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,6 +101,23 @@ export function WaddenSeaMocRegister() {
   const [reportDate, setReportDate] = useState(todayIso());
   const [hideClosed, setHideClosed] = useUrlFlag("moc_hide_closed");
   const [hideActions, setHideActions] = useUrlFlag("moc_hide_actions");
+
+  const refreshIms = useCallback(async () => {
+    setImsLoading(true);
+    setError("");
+    try {
+      setImsBook(await loadFromIms());
+    } catch (problem) {
+      setImsBook(null);
+      setError(problem instanceof Error ? problem.message : "The MOC register could not be loaded.");
+    } finally {
+      setImsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (source === "ims" && !imsBook) void refreshIms();
+  }, [source, imsBook, refreshIms]);
 
   const annex = useMemo(() => (workbook ? buildAnnex(workbook, project, { includeFinished: !hideClosed, reportDate }) : null), [workbook, project, hideClosed, reportDate]);
   const shownAnnex = annex && hideActions ? { ...annex, openActions: [], counts: { ...annex.counts, openActions: 0 } } : annex;
@@ -60,10 +130,10 @@ export function WaddenSeaMocRegister() {
     try {
       const parsed = parseMocWorkbook(await file.arrayBuffer());
       if (!parsed.mocs.length) throw new Error("No MOCs were found on the Register sheet.");
-      setWorkbook(parsed);
+      setFileBook(parsed);
       setFileName(file.name);
     } catch (problem) {
-      setWorkbook(null);
+      setFileBook(null);
       setFileName("");
       setError(problem instanceof Error ? problem.message : "The workbook could not be read.");
     }
@@ -92,14 +162,28 @@ export function WaddenSeaMocRegister() {
       <div style={panel}>
         <h2 style={heading}>MOC Register annex</h2>
         <p style={help}>
-          Upload the MOC register workbook from SharePoint, choose the project and the report date, then check the preview and generate the annex. The workbook is read in your browser and is not stored here.
-          Cost and the internal notes column are never included.
+          Choose the project and the report date, check the preview, then generate the annex. By default it reads the live Wadden Sea MOC register in the IMS (Quality, MOC), so update a MOC there and refresh this page.
+          Cost and internal notes are never included.
         </p>
         <div style={controls}>
           <label style={field}>
-            <span>Register workbook (.xlsx)</span>
-            <input ref={fileInput} id="moc-workbook" type="file" accept=".xlsx,.xlsm" onChange={(event) => void onFile(event)} style={input} />
+            <span>Read the register from</span>
+            <select id="moc-source" style={input} value={source} onChange={(event) => { setError(""); setSource(event.target.value as "ims" | "workbook"); }}>
+              <option value="ims">The IMS MOC register (live)</option>
+              <option value="workbook">An uploaded workbook (.xlsx)</option>
+            </select>
           </label>
+          {source === "workbook" ? (
+            <label style={field}>
+              <span>Register workbook (.xlsx)</span>
+              <input ref={fileInput} id="moc-workbook" type="file" accept=".xlsx,.xlsm" onChange={(event) => void onFile(event)} style={input} />
+            </label>
+          ) : (
+            <div style={field}>
+              <span>Register</span>
+              <button type="button" style={secondary} disabled={imsLoading} onClick={() => void refreshIms()}>{imsLoading ? "Loading..." : "Refresh from the IMS"}</button>
+            </div>
+          )}
           <label style={field}>
             <span>Project</span>
             <select id="moc-project" style={input} value={project} onChange={(event) => setProject(event.target.value as MocProject)}>
@@ -115,13 +199,18 @@ export function WaddenSeaMocRegister() {
           <label style={check}><input id="moc-hide-closed" type="checkbox" checked={hideClosed} onChange={(event) => setHideClosed(event.target.checked)} /> Hide closed and not implemented MOCs</label>
           <label style={check}><input id="moc-hide-actions" type="checkbox" checked={hideActions} onChange={(event) => setHideActions(event.target.checked)} /> Leave out the open actions table</label>
         </div>
-        {fileName ? <p style={loaded}>Loaded {fileName}: {workbook?.mocs.length} MOCs and {workbook?.actions.length} actions.</p> : null}
+        {source === "workbook" && fileName ? <p style={loaded}>Loaded {fileName}: {workbook?.mocs.length} MOCs and {workbook?.actions.length} actions.</p> : null}
+        {source === "ims" && imsBook ? <p style={loaded}>Read from the IMS: {imsBook.mocs.length} Wadden Sea MOCs and {imsBook.actions.length} actions.</p> : null}
         {error ? <p role="alert" style={errorText}>{error}</p> : null}
         {workbook?.warnings.map((warning) => <p key={warning} style={warn}>{warning}</p>)}
       </div>
 
       {!shownAnnex ? (
-        <div style={empty}>No workbook loaded yet. Upload the register to see the {project} annex.</div>
+        <div style={empty}>
+          {source === "ims"
+            ? imsLoading ? "Loading the MOC register..." : "No MOC register loaded."
+            : `No workbook loaded yet. Upload the register to see the ${project} annex.`}
+        </div>
       ) : (
         <>
           <div style={kpis}>

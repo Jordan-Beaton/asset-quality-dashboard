@@ -92,7 +92,29 @@ type MocReport = {
   status: MocStatus;
   created_at: string;
   updated_at: string;
+  // Numbering series and project details. series_key is empty on records created before project numbering.
+  series_key: string;
+  series_number: number | null;
+  project_key: string;
+  applies_to: string[];
+  client_reference: string;
+  implementation_from: string;
+  implementation_to: string;
+  next_step: string;
+  next_step_owner: string;
+  next_step_due: string;
+  report_notes: string;
+  status_to_confirm: boolean;
 };
+
+type MocSeries = { series_key: string; label: string; prefix: string; project_key: string | null; last_number: number };
+
+// The parts of each project a MOC can apply to. A project only needs an entry here if its MOCs are tagged by part.
+const PROJECT_PARTS: Record<string, string[]> = { "wadden-sea": ["BA3", "LW2", "LW4"] };
+
+function formatSeriesNumber(series: MocSeries | undefined, number: number) {
+  return `${series?.prefix || "MOC"}-MOC-${String(number).padStart(3, "0")}`;
+}
 
 type MocActionPlanItem = {
   id: string;
@@ -180,6 +202,8 @@ type MocActionAttachment = {
 };
 
 type MocStarterForm = {
+  series_key: string;
+  applies_to: string[];
   moc_report_title: string;
   project_worksite_address: string;
   moc_coordinator_name: string;
@@ -363,18 +387,6 @@ function buildMocLinkedActionHref(report: MocReport) {
 }
 
 
-function buildNextMocNumber(values: string[]) {
-  const used = values
-    .map((value) => {
-      const match = value.match(/(\d+)$/);
-      return match ? Number(match[1]) : null;
-    })
-    .filter((value): value is number => value !== null);
-
-  const next = used.length ? Math.max(...used) + 1 : 1;
-  return `MOC-${String(next).padStart(3, "0")}`;
-}
-
 function createEmptyReport(): MocReport {
   return {
     id: "",
@@ -425,11 +437,25 @@ function createEmptyReport(): MocReport {
     status: "Draft",
     created_at: "",
     updated_at: "",
+    series_key: "",
+    series_number: null,
+    project_key: "",
+    applies_to: [],
+    client_reference: "",
+    implementation_from: "",
+    implementation_to: "",
+    next_step: "",
+    next_step_owner: "",
+    next_step_due: "",
+    report_notes: "",
+    status_to_confirm: false,
   };
 }
 
 function createStarterForm(): MocStarterForm {
   return {
+    series_key: "ens",
+    applies_to: [],
     moc_report_title: "",
     project_worksite_address: "",
     moc_coordinator_name: "",
@@ -647,6 +673,15 @@ function buildParentPayload(report: MocReport, mocNo?: string) {
     variation_order_reference_no: report.variation_order_reference_no,
     variation_order_na: report.variation_order_na,
     status: report.status,
+    applies_to: report.applies_to,
+    client_reference: report.client_reference || null,
+    implementation_from: report.implementation_from || null,
+    implementation_to: report.implementation_to || null,
+    next_step: report.next_step || null,
+    next_step_owner: report.next_step_owner || null,
+    next_step_due: report.next_step_due || null,
+    report_notes: report.report_notes || null,
+    status_to_confirm: report.status_to_confirm,
     updated_at: new Date().toISOString(),
   };
 }
@@ -702,6 +737,18 @@ function normaliseReport(row: Record<string, unknown>): MocReport {
     status: normaliseStatus(String(row.status || "")),
     created_at: String(row.created_at || ""),
     updated_at: String(row.updated_at || ""),
+    series_key: String(row.series_key || ""),
+    series_number: typeof row.series_number === "number" ? row.series_number : null,
+    project_key: String(row.project_key || ""),
+    applies_to: Array.isArray(row.applies_to) ? (row.applies_to as unknown[]).map(String) : [],
+    client_reference: String(row.client_reference || ""),
+    implementation_from: String(row.implementation_from || ""),
+    implementation_to: String(row.implementation_to || ""),
+    next_step: String(row.next_step || ""),
+    next_step_owner: String(row.next_step_owner || ""),
+    next_step_due: String(row.next_step_due || ""),
+    report_notes: String(row.report_notes || ""),
+    status_to_confirm: Boolean(row.status_to_confirm),
   };
 }
 
@@ -877,6 +924,7 @@ function MOCPageContent() {
   const linkedAttention = searchParams.get("attention")?.trim() || "";
 
   const [reports, setReports] = useState<MocReport[]>([]);
+  const [mocSeries, setMocSeries] = useState<MocSeries[]>([]);
   const [actionPlanItems, setActionPlanItems] = useState<MocActionPlanItem[]>([]);
   const [affectedDocuments, setAffectedDocuments] = useState<MocDocumentRow[]>([]);
   const [riskDocuments, setRiskDocuments] = useState<MocDocumentRow[]>([]);
@@ -897,6 +945,8 @@ function MOCPageContent() {
   const [search, setSearch] = useUrlState("search", "");
   const [statusFilter, setStatusFilter] = useUrlState<"All" | "Active" | MocStatus>("status", "All", MOC_STATUS_FILTER_VALUES);
   const [changeTypeFilter, setChangeTypeFilter] = useUrlState<"All" | ChangeType>("change_type", "All", MOC_CHANGE_TYPE_FILTER_VALUES);
+  // "All", "company" (no project) or a project key such as wadden-sea.
+  const [projectFilter, setProjectFilter] = useUrlState("project", "All");
   // ?attention= and ?recent=1 are deep links that pick the starting view filter; after that the choice lives in ?view=.
   const [initialViewFilter] = useState<MocViewFilter>(
     linkedAttention === "expired-temporary"
@@ -964,10 +1014,16 @@ function MOCPageContent() {
     return false;
   }
 
-  const nextMocNumber = useMemo(
-    () => buildNextMocNumber(reports.map((item) => item.moc_report_no).filter(Boolean)),
-    [reports]
+  const starterSeries = useMemo(
+    () => mocSeries.find((item) => item.series_key === starterForm.series_key),
+    [mocSeries, starterForm.series_key]
   );
+  // Preview only: the database allocates the real number when the MOC is saved.
+  const nextMocNumber = starterSeries
+    ? formatSeriesNumber(starterSeries, starterSeries.last_number + 1)
+    : "Numbering not set up";
+  const projectSeries = useMemo(() => mocSeries.filter((item) => item.project_key), [mocSeries]);
+  const starterParts = starterSeries?.project_key ? PROJECT_PARTS[starterSeries.project_key] || [] : [];
 
   const selectedReport = useMemo(
     () => reports.find((report) => report.id === selectedReportId) || null,
@@ -1004,16 +1060,18 @@ function MOCPageContent() {
         statusFilter === "All" ||
         (statusFilter === "Active" ? report.status !== "Closed" : report.status === statusFilter);
       const matchesChangeType = changeTypeFilter === "All" || report.change_type === changeTypeFilter;
+      const matchesProject =
+        projectFilter === "All" || (projectFilter === "company" ? !report.project_key : report.project_key === projectFilter);
       const matchesView =
         viewFilter === "All" ||
         (viewFilter === "Recent" && isRecentMoc(report)) ||
         (viewFilter === "Expired Temporary" && isExpiredTemporary(report)) ||
         (viewFilter === "Expiry Soon" && isNearingTemporaryExpiry(report)) ||
         (viewFilter === "Draft Ageing" && isDraftAged(report));
-      return matchesSearch && matchesStatus && matchesChangeType && matchesView;
+      return matchesSearch && matchesStatus && matchesChangeType && matchesProject && matchesView;
     })
       .sort((a, b) => getCreatedOrUpdatedTime(b) - getCreatedOrUpdatedTime(a));
-  }, [reports, search, statusFilter, changeTypeFilter, viewFilter]);
+  }, [reports, search, statusFilter, changeTypeFilter, projectFilter, viewFilter]);
 
   const peopleNameOptions = useMemo(
     () =>
@@ -1240,6 +1298,10 @@ function MOCPageContent() {
             active: Boolean(row.active),
           }))
           .filter((person) => person.name);
+
+    // Numbering series are read separately so the register still opens if the project numbering script has not been applied yet.
+    const seriesRes = await supabase.from("moc_series").select("series_key,label,prefix,project_key,last_number").order("label", { ascending: true });
+    setMocSeries(seriesRes.error ? [] : ((seriesRes.data || []) as MocSeries[]));
 
     setReports(nextReports);
     setActionPlanItems(nextActionItems);
@@ -1719,22 +1781,36 @@ function MOCPageContent() {
 
     setSaving(true);
     try {
-      const nextNumber = nextMocNumber;
+      if (!starterSeries) {
+        throw new Error("MOC numbering is not set up yet. Apply scripts/sql/moc_project_series.sql in Supabase.");
+      }
+      if (starterSeries.project_key && starterParts.length && !starterForm.applies_to.length) {
+        throw new Error(`Choose which parts of ${starterSeries.label} this MOC applies to (${starterParts.join(", ")} or All).`);
+      }
       const newReport: MocReport = {
         ...createEmptyReport(),
-        moc_report_no: nextNumber,
+        moc_report_no: "",
         moc_report_title: starterForm.moc_report_title,
-        project_worksite_address: starterForm.project_worksite_address,
+        project_worksite_address: starterForm.project_worksite_address || (starterSeries.project_key ? starterSeries.label : ""),
         moc_coordinator_name: starterForm.moc_coordinator_name,
         responsible_manager_name: starterForm.responsible_manager_name,
         change_type: starterForm.change_type,
         status: "Draft",
+        applies_to: starterForm.applies_to,
+        series_key: starterSeries.series_key,
+        project_key: starterSeries.project_key || "",
       };
 
+      // The number in moc_report_no is a placeholder: the database trigger replaces it with the next number in the series.
       const insertRes = await supabase
         .from("moc_reports")
-        .insert({ ...buildParentPayload(newReport, nextNumber), created_at: new Date().toISOString() })
-        .select("id")
+        .insert({
+          ...buildParentPayload(newReport, `pending-${crypto.randomUUID()}`),
+          series_key: starterSeries.series_key,
+          project_key: starterSeries.project_key,
+          created_at: new Date().toISOString(),
+        })
+        .select("id,moc_report_no")
         .single();
 
       if (insertRes.error || !insertRes.data?.id) {
@@ -1742,6 +1818,8 @@ function MOCPageContent() {
       }
 
       const reportId = String(insertRes.data.id);
+      const nextNumber = String(insertRes.data.moc_report_no || nextMocNumber);
+      newReport.moc_report_no = nextNumber;
       const initialBundle: PersistableMocBundle = {
         report: newReport,
         actionItems: [createActionItem(0)],
@@ -3906,7 +3984,101 @@ function MOCPageContent() {
       <section style={topGridStyle}>
           <SectionCard title="Create MOC" subtitle="Start a new Management of Change record and complete the full form below after creation.">
             <div style={starterFormGridStyle}>
-              <Field label="MOC Report No.">
+              <div style={{ gridColumn: "1 / -1" }}>
+                <Field label="1. Does this change belong to a project?">
+                  <div style={segmentedWrapWideStyle}>
+                    {([
+                      { key: "company", label: "No, company-wide" },
+                      { key: "project", label: "Yes, a project" },
+                    ] as const).map((option) => {
+                      const active = option.key === "project" ? Boolean(starterSeries?.project_key) : !starterSeries?.project_key;
+                      const disabled = option.key === "project" && !projectSeries.length;
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          disabled={disabled}
+                          style={{
+                            ...segmentedButtonStyle,
+                            ...segmentedButtonFillStyle,
+                            background: active ? "#005670" : "transparent",
+                            color: active ? "#ffffff" : "#000000",
+                            opacity: disabled ? 0.5 : 1,
+                          }}
+                          onClick={() =>
+                            setStarterForm((prev) => ({
+                              ...prev,
+                              series_key: option.key === "project" ? projectSeries[0]?.series_key || prev.series_key : "ens",
+                              applies_to: [],
+                            }))
+                          }
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+              </div>
+
+              {starterSeries?.project_key ? (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="2. Which project?">
+                    <div style={segmentedWrapWideStyle}>
+                      {projectSeries.map((option) => (
+                        <button
+                          key={option.series_key}
+                          type="button"
+                          style={{
+                            ...segmentedButtonStyle,
+                            ...segmentedButtonFillStyle,
+                            background: starterForm.series_key === option.series_key ? "#005670" : "transparent",
+                            color: starterForm.series_key === option.series_key ? "#ffffff" : "#000000",
+                          }}
+                          onClick={() => setStarterForm((prev) => ({ ...prev, series_key: option.series_key, applies_to: [] }))}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                </div>
+              ) : null}
+
+              {starterParts.length ? (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="3. Which parts does it affect?">
+                    <div style={segmentedWrapWideStyle}>
+                      {[...starterParts, "All"].map((part) => {
+                        const active = starterForm.applies_to.includes(part);
+                        return (
+                          <button
+                            key={part}
+                            type="button"
+                            style={{
+                              ...segmentedButtonStyle,
+                              ...segmentedButtonFillStyle,
+                              background: active ? "#005670" : "transparent",
+                              color: active ? "#ffffff" : "#000000",
+                            }}
+                            onClick={() =>
+                              setStarterForm((prev) => {
+                                if (part === "All") return { ...prev, applies_to: ["All"] };
+                                const without = prev.applies_to.filter((item) => item !== "All" && item !== part);
+                                return { ...prev, applies_to: prev.applies_to.includes(part) ? without : [...without, part] };
+                              })
+                            }
+                          >
+                            {part}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </Field>
+                </div>
+              ) : null}
+
+              <Field label="MOC Report No. (allocated when you create it)">
                 <input value={nextMocNumber} readOnly style={readOnlyInputStyle} />
               </Field>
 
@@ -4034,6 +4206,15 @@ function MOCPageContent() {
                 <option value="Permanent">Permanent</option>
                 <option value="Temporary">Temporary</option>
               </select>
+              <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} style={toolbarSelectStyle}>
+                <option value="All">All projects</option>
+                <option value="company">Company-wide</option>
+                {projectSeries.map((option) => (
+                  <option key={option.series_key} value={option.project_key || ""}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
               <select
                 value={viewFilter}
                 onChange={(e) => setViewFilter(e.target.value as MocViewFilter)}
@@ -4106,7 +4287,10 @@ function MOCPageContent() {
                           {report.proposed_change_description || "No change description entered yet."}
                         </div>
                       </div>
-                      <div style={registerSimpleTextStyle}>{report.project_worksite_address || "-"}</div>
+                      <div style={registerSimpleTextStyle}>
+                        {report.project_worksite_address || "-"}
+                        {report.applies_to.length ? <div style={registerDescriptionStyle}>Applies to: {report.applies_to.join(", ")}</div> : null}
+                      </div>
                       <div style={registerSimpleTextStyle}>{report.moc_coordinator_name || "-"}</div>
                       <div style={registerSimpleTextStyle}>{report.responsible_manager_name || "-"}</div>
                       <div>
@@ -4185,6 +4369,110 @@ function MOCPageContent() {
             </div>
 
             <div style={subSectionStackStyle}>
+              {detailReport.project_key ? (
+                <DetailSubsection title="PROJECT REPORTING">
+                  <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditMoc || detailReport.status === "Closed"}>
+                    <div style={detailFormGridStyle}>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <Field label="Applies to">
+                          <div style={segmentedWrapWideStyle}>
+                            {[...(PROJECT_PARTS[detailReport.project_key] || []), "All"].map((part) => {
+                              const active = detailReport.applies_to.includes(part);
+                              return (
+                                <button
+                                  key={part}
+                                  type="button"
+                                  style={{
+                                    ...segmentedButtonStyle,
+                                    ...segmentedButtonFillStyle,
+                                    background: active ? "#005670" : "transparent",
+                                    color: active ? "#ffffff" : "#000000",
+                                  }}
+                                  onClick={() => {
+                                    if (part === "All") return updateDetailField("applies_to", ["All"]);
+                                    const without = detailReport.applies_to.filter((item) => item !== "All" && item !== part);
+                                    updateDetailField("applies_to", active ? without : [...without, part]);
+                                  }}
+                                >
+                                  {part}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </Field>
+                      </div>
+                      <Field label="Client reference (as the client wrote it)">
+                        <input
+                          value={detailReport.client_reference}
+                          onChange={(e) => updateDetailField("client_reference", e.target.value)}
+                          style={inputStyle}
+                        />
+                      </Field>
+                      <Field label="Implementation from">
+                        <input
+                          type="date"
+                          value={detailReport.implementation_from}
+                          onChange={(e) => updateDetailField("implementation_from", e.target.value)}
+                          style={inputStyle}
+                        />
+                      </Field>
+                      <Field label="Implementation to">
+                        <input
+                          type="date"
+                          value={detailReport.implementation_to}
+                          onChange={(e) => updateDetailField("implementation_to", e.target.value)}
+                          style={inputStyle}
+                        />
+                      </Field>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <Field label="Next step (shown in the monthly report)">
+                          <input
+                            value={detailReport.next_step}
+                            onChange={(e) => updateDetailField("next_step", e.target.value)}
+                            style={inputStyle}
+                          />
+                        </Field>
+                      </div>
+                      <Field label="Next step owner">
+                        <PeopleNameInput
+                          value={detailReport.next_step_owner}
+                          onChange={(e) => updateDetailField("next_step_owner", e.target.value)}
+                          listId="moc-people-options"
+                          placeholder="Select or type a name"
+                        />
+                      </Field>
+                      <Field label="Next step due">
+                        <input
+                          type="date"
+                          value={detailReport.next_step_due}
+                          onChange={(e) => updateDetailField("next_step_due", e.target.value)}
+                          style={inputStyle}
+                        />
+                      </Field>
+                      <Field label="Status">
+                        <label style={{ display: "inline-flex", gap: 8, alignItems: "center", minHeight: 40, fontWeight: 700 }}>
+                          <input
+                            type="checkbox"
+                            checked={detailReport.status_to_confirm}
+                            onChange={(e) => updateDetailField("status_to_confirm", e.target.checked)}
+                          />
+                          Status still to be confirmed
+                        </label>
+                      </Field>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <Field label="Internal notes (never included in the client report)">
+                          <textarea
+                            value={detailReport.report_notes}
+                            onChange={(e) => updateDetailField("report_notes", e.target.value)}
+                            style={inputStyle}
+                            rows={2}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  </fieldset>
+                </DetailSubsection>
+              ) : null}
               <DetailSubsection title="A. MOC REPORT DETAILS">
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <div style={detailFormGridStyle}>
@@ -5040,14 +5328,17 @@ function MOCPageContent() {
               >
                 Generate Linked Action
               </Link>
-              <button
-                type="button"
-                style={dangerButtonStyle}
-                onClick={() => void deleteSelectedMoc()}
-                disabled={saving || !canEditMoc}
-              >
-                Delete
-              </button>
+              {detailReport.project_key ? null : (
+                // Numbered project MOCs are never deleted: the client holds the number, so a withdrawn MOC is closed instead.
+                <button
+                  type="button"
+                  style={dangerButtonStyle}
+                  onClick={() => void deleteSelectedMoc()}
+                  disabled={saving || !canEditMoc}
+                >
+                  Delete
+                </button>
+              )}
             </div>
           </SectionCard>
         ) : null}

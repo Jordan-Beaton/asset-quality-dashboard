@@ -117,6 +117,16 @@ At phone widths the workspace inherits the whole-IMS bottom navigation, one-colu
 - Header names on the Register and Actions sheets are matched by label, so columns can be reordered but not renamed. Applies to accepts All, BA3, LW2, LW4 or combinations such as BA3 & LW2.
 - MOC-007 must not be shown as closed until Daniel Fraser updates it himself. Statuses for MOC-001 to MOC-005 were inferred and are marked To confirm in the workbook.
 
+
+#### MOC numbering and the IMS MOC section
+
+- Apply `scripts/sql/moc_project_series.sql` once, BEFORE deploying the matching code. It adds `moc_series` (one counter per numbering series), series/project/applies-to/implementation/next-step fields on `moc_reports`, and triggers that allocate the next number on insert, refuse to change an issued number, and hand back the newest number if it is deleted straight away (the Create MOC rollback).
+- Series: `ens` (company-wide, ENS-MOC-001...) and `wadden-sea` (Nexans, NEX-MOC-001...). The one existing company MOC, MOC-001, is renamed ENS-MOC-001. To add a project, insert a `moc_series` row (and an entry in `PROJECT_PARTS` in `app/moc/page.tsx` if its MOCs are tagged by part).
+- Create MOC (`app/moc/page.tsx`) asks: project or company-wide, which project, which parts (BA3, LW2, LW4 or All). The number shown is a preview; the database assigns the real one. Numbered project MOCs have no Delete button: a withdrawn MOC is closed so the client never sees a gap.
+- Project MOCs get a PROJECT REPORTING block (applies to, client reference, implementation dates, next step/owner/due, status still to be confirmed, internal notes). It stays editable after approval. Internal notes are never output.
+- `scripts/import-wadden-sea-mocs.mjs <workbook> [--extras json] [--apply]` loads the seven Wadden Sea MOCs and 51 actions (numbers kept, titles as written, every action owner blank, original owners and non-date targets kept in the internal notes). Dry run by default; safe to re-run, it skips MOCs that already exist.
+- The MOC Register annex reads the live IMS MOCs by default (`loadFromIms` in `src/components/WaddenSeaMocRegister.tsx`); uploading a workbook remains as an alternative.
+- Central Actions are created from a MOC action plan the first time that MOC is saved in the IMS (existing behaviour in `syncMocActionsToCentralActions`), so the imported actions appear unassigned in Actions at that point.
 - The compliance and acceptance map is in `docs/codex/WADDEN_SEA_OPEN_POINTS_COMPLIANCE.md`.
 - The Employer source identifies the activity as `CA_Act_1699`; do not relabel it `CA_ACT_1669` without a revised controlled source.
 - CDE upload and Employer decisions remain human-controlled steps. The IMS tracks due dates, references and evidence but does not integrate directly with the Employer CDE.
