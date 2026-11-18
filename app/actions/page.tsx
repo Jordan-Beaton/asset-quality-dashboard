@@ -3487,6 +3487,24 @@ function ActionsPageContent() {
     setSelectedEvidenceAction(null);
   }
 
+  function changeActionView(view: ActionView) {
+    if (view === "register" && activeView !== "register") {
+      setQuickFilter("");
+      setShowOverdueOnly(false);
+      setShowOpenOnly(false);
+      setShowClosedOnly(false);
+      setShowEvidenceOnly(false);
+      setShowLinkedIssuesOnly(false);
+      setDueStartFilter(0);
+      setDueWindowFilter(0);
+      setShowNoDueDateOnly(false);
+      setCreatedMonthFilter("");
+      setClosedMonthFilter("");
+      setSelectedEvidenceAction(null);
+    }
+    setActiveView(view);
+  }
+
   function openRegisterDrilldown(options: RegisterDrilldownOptions = {}) {
     setActiveView("register");
     setSelectedEvidenceAction(null);
@@ -3577,7 +3595,7 @@ function ActionsPageContent() {
         </div>
       </div>
 
-      <ActionViewTabs activeView={activeView} onChange={setActiveView} />
+      <ActionViewTabs activeView={activeView} onChange={changeActionView} />
 
       {activeView === "dashboard" ? (
         <>
@@ -3610,7 +3628,7 @@ function ActionsPageContent() {
               title="My Open Actions"
               value={myOpenActions}
               accent="#005670"
-              onClick={() => openRegisterDrilldown({ openOnly: true, quickFilter: "my" })}
+              onClick={() => setActiveView("my")}
             />
             <QualityKpiCard
               title="Linked Record Issues"
@@ -4640,18 +4658,29 @@ function ActionsPageContent() {
         </div>
 
         <div style={{ overflowX: "auto" }}>
-          <table style={tableStyle}>
+          <table style={registerTableStyle}>
+            <colgroup>
+              <col style={{ width: 95 }} />
+              <col />
+              <col style={{ width: 120 }} />
+              <col style={{ width: 90 }} />
+              <col style={{ width: 180 }} />
+              <col style={{ width: 120 }} />
+              <col style={{ width: 105 }} />
+              <col style={{ width: 110 }} />
+              <col style={{ width: 150 }} />
+            </colgroup>
             <thead>
               <tr>
-                <th style={tableHeadStyle}>Action No.</th>
-                <th style={tableHeadStyle}>Title</th>
-                <th style={tableHeadStyle}>Department</th>
-                <th style={tableHeadStyle}>Source</th>
-                <th style={tableHeadStyle}>Linked Record</th>
-                <th style={tableHeadStyle}>Owner</th>
-                <th style={tableHeadStyle}>Due Date</th>
-                <th style={tableHeadStyle}>Status</th>
-                <th style={tableHeadStyle}>Actions</th>
+                <th style={registerHeadStyle}>Action No.</th>
+                <th style={registerHeadStyle}>Title</th>
+                <th style={registerHeadStyle}>Department</th>
+                <th style={registerHeadStyle}>Source</th>
+                <th style={registerHeadStyle}>Linked Record</th>
+                <th style={registerHeadStyle}>Owner</th>
+                <th style={registerHeadStyle}>Due Date</th>
+                <th style={registerHeadStyle}>Status</th>
+                <th style={registerHeadStyle}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -4687,26 +4716,26 @@ function ActionsPageContent() {
                           : "white",
                       }}
                     >
-                      <td style={tableCellStyle}>
+                      <td style={registerCellStyle}>
                         <div style={actionNumberCellStyle}>{action.action_number || "-"}</div>
                       </td>
-                      <td style={tableCellStyle}>
-                        <div style={primaryCellTextStyle}>{action.title || "-"}</div>
-                        <div style={secondaryCellTextStyle}>
+                      <td style={registerCellStyle}>
+                        <div style={registerTitleStyle} title={action.title || undefined}>{action.title || "-"}</div>
+                        <div style={{ ...secondaryCellTextStyle, ...oneLineStyle }}>
                           {[buildActionSourceLabel(action), raisedByLabel(action, people)].filter(Boolean).join(" · ") || " "}
                         </div>
                       </td>
-                      <td style={tableCellStyle}>
-                        <span style={badgeStyle}>{action.department || "-"}</span>
+                      <td style={registerCellStyle}>
+                        <span style={{ ...badgeStyle, whiteSpace: "normal", overflowWrap: "anywhere" }}>{action.department || "-"}</span>
                       </td>
-                      <td style={tableCellStyle}>
+                      <td style={registerCellStyle}>
                         <SourceChip action={action} />
                       </td>
-                      <td style={tableCellStyle}>
+                      <td style={registerCellStyle}>
                         <LinkedRecordChips action={action} />
                       </td>
-                      <td style={tableCellStyle}>{action.owner || "-"}</td>
-                      <td style={tableCellStyle}>
+                      <td style={registerCellStyle}>{action.owner || "-"}</td>
+                      <td style={registerCellStyle}>
                         <div style={primaryCellTextStyle}>{formatDate(action.due_date)}</div>
                         <div
                           style={{
@@ -4718,10 +4747,10 @@ function ActionsPageContent() {
                           {getDueLabel(action.due_date)}
                         </div>
                       </td>
-                      <td style={tableCellStyle}>
+                      <td style={registerCellStyle}>
                         <StatusBadge value={action.status || "Unknown"} />
                       </td>
-                      <td style={tableCellStyle}>
+                      <td style={registerCellStyle}>
                         <div style={actionButtonsWrapStyle}>
                           <button
                             type="button"
@@ -6296,11 +6325,13 @@ const linkedChipStyle: CSSProperties = {
   alignItems: "center",
   width: "fit-content",
   padding: "5px 9px",
-  borderRadius: "999px",
+  borderRadius: "14px",
   fontSize: "12px",
   fontWeight: 800,
   border: "1px solid transparent",
-  whiteSpace: "nowrap",
+  maxWidth: "100%",
+  whiteSpace: "normal",
+  overflowWrap: "anywhere",
 };
 
 const linkedChipToneStyles: Record<LinkedRecordChip["tone"], CSSProperties> = {
@@ -6329,6 +6360,14 @@ const tableStyle: CSSProperties = {
   minWidth: 960,
   fontSize: "13px",
 };
+
+// The Action Register table: fixed layout so all nine columns fit the screen at desktop widths. Below 1200px it scrolls.
+const registerTableStyle: CSSProperties = { ...tableStyle, tableLayout: "fixed", minWidth: 1200 };
+// Two lines at most; the full text is on hover and in the detail panel.
+const registerTitleStyle: CSSProperties = { fontWeight: 600, color: "#000000", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" };
+const oneLineStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+const registerHeadStyle: CSSProperties = { textAlign: "left", padding: "13px 10px", background: "#ECECE7", color: "#53565A", fontSize: "12px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: "1px solid #D0D0CE", whiteSpace: "nowrap" };
+const registerCellStyle: CSSProperties = { padding: "13px 10px", borderBottom: "1px solid #ECECE7", color: "#000000", verticalAlign: "middle", fontSize: "13px", lineHeight: 1.45, overflowWrap: "anywhere" };
 
 const tableHeadStyle: CSSProperties = {
   textAlign: "left",
