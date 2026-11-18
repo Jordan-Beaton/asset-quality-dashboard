@@ -7,6 +7,48 @@ import type { CSSProperties } from "react";
 
 export type MocStage = "describe" | "assess" | "plan" | "signoff";
 
+export type MocViewMode = "form" | "split" | "report";
+
+const VIEW_OPTIONS: Array<{ key: MocViewMode; label: string; hint: string }> = [
+  { key: "form", label: "Form", hint: "Full-width form, report hidden" },
+  { key: "split", label: "Split", hint: "Form beside the report as it builds" },
+  { key: "report", label: "Report", hint: "Full-width report" },
+];
+
+// Chooses how much of the screen the form and the live report get.
+export function MocViewToggle({ view, onChange }: { view: MocViewMode; onChange: (view: MocViewMode) => void }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 12, color: "#53565A", fontWeight: 700 }}>View</span>
+      <div role="group" aria-label="Form and report layout" style={{ display: "inline-flex", border: "1px solid #D0D0CE", borderRadius: 10, overflow: "hidden", background: "#ffffff" }}>
+        {VIEW_OPTIONS.map((option) => {
+          const active = view === option.key;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              title={option.hint}
+              aria-pressed={active}
+              onClick={() => onChange(option.key)}
+              style={{
+                border: 0,
+                padding: "7px 16px",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                background: active ? "#005670" : "#ffffff",
+                color: active ? "#ffffff" : "#000000",
+              }}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export const MOC_STAGES: Array<{ key: MocStage; label: string; sections: string }> = [
   { key: "describe", label: "1  Describe", sections: "Sections A, B" },
   { key: "assess", label: "2  Assess", sections: "Sections D, F, G, H, I" },
@@ -149,7 +191,7 @@ function Value({ value }: { value: string }) {
   return value.trim() ? <>{value}</> : <span style={emptyStyle}>not yet entered</span>;
 }
 
-export function MocLivePreview({ data, onJump }: { data: MocPreviewData; onJump: (stage: MocStage) => void }) {
+export function MocLivePreview({ data, onJump, wide = false }: { data: MocPreviewData; onJump: (stage: MocStage) => void; wide?: boolean }) {
   const r = data.report;
   const checks = computeMocChecks(data);
   const gaps = checks.filter((check) => !check.ok);
@@ -160,7 +202,10 @@ export function MocLivePreview({ data, onJump }: { data: MocPreviewData; onJump:
   const reviewers = data.reviews.filter((row) => row.approve_flag || row.inform_flag);
 
   return (
-    <aside style={{ display: "grid", gap: 10, alignContent: "start", position: "sticky", top: 12 }} aria-label="Live MOC document preview">
+    <aside
+      style={wide ? { display: "grid", gap: 10, alignContent: "start", maxWidth: 980, width: "100%", margin: "0 auto" } : { display: "grid", gap: 10, alignContent: "start", position: "sticky", top: 12 }}
+      aria-label="Live MOC document preview"
+    >
       <div style={{ border: `1px solid ${gaps.length ? "#FFAD00" : "#005670"}`, background: gaps.length ? "#ECECE7" : "#EEF7F8", borderRadius: 8, padding: "10px 12px", fontSize: 12.5 }}>
         <strong>{gaps.length ? `${gaps.length} item${gaps.length === 1 ? "" : "s"} the PDF and Word document will print blank` : "Everything the PDF and Word document print is filled in"}</strong>
         {gaps.length ? (

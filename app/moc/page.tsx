@@ -30,8 +30,9 @@ import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
-import { MocLivePreview, MocStageBar, computeMocChecks } from "../../src/components/MocWorkbench";
-import type { MocStage } from "../../src/components/MocWorkbench";
+import { PersonPicker } from "../../src/components/PersonPicker";
+import { MocLivePreview, MocStageBar, MocViewToggle, computeMocChecks } from "../../src/components/MocWorkbench";
+import type { MocStage, MocViewMode } from "../../src/components/MocWorkbench";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlState } from "../../src/lib/useUrlState";
 
@@ -979,6 +980,28 @@ function MOCPageContent() {
   useEffect(() => {
     setDetailStage("describe");
   }, [selectedReportId]);
+  // Form only, split, or report only. Remembered per browser; falls back to split.
+  const [detailView, setDetailView] = useState<MocViewMode>("split");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("ims-moc-detail-view");
+      if (saved === "form" || saved === "split" || saved === "report") setDetailView(saved);
+    } catch {
+      /* storage unavailable: keep the default */
+    }
+  }, []);
+  function chooseDetailView(view: MocViewMode) {
+    setDetailView(view);
+    try {
+      window.localStorage.setItem("ims-moc-detail-view", view);
+    } catch {
+      /* ignore */
+    }
+  }
+  function openDetailStage(stage: MocStage) {
+    setDetailStage(stage);
+    if (detailView === "report") chooseDetailView("split");
+  }
   // The open record is remembered in ?selected=; the record's details are loaded back into the panel once the register has loaded.
   const [urlReportId, setUrlReportId] = useUrlState("selected", "");
   const [starterForm, setStarterForm] = useState<MocStarterForm>(createStarterForm());
@@ -1080,13 +1103,6 @@ function MOCPageContent() {
       .sort((a, b) => getCreatedOrUpdatedTime(b) - getCreatedOrUpdatedTime(a));
   }, [reports, search, statusFilter, changeTypeFilter, projectFilter, viewFilter]);
 
-  const peopleNameOptions = useMemo(
-    () =>
-      Array.from(new Set(peopleOptions.map((person) => person.name.trim()).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b)
-      ),
-    [peopleOptions]
-  );
 
   const resolvePersonEmail = useCallback(
     (name: string) => {
@@ -3977,11 +3993,6 @@ function MOCPageContent() {
           </button>
         ))}
       </nav>
-      <datalist id="moc-people-options">
-        {peopleNameOptions.map((personName) => (
-          <option key={personName} value={personName} />
-        ))}
-      </datalist>
 
       {activeView === "dashboard" ? (
         <>
@@ -4082,8 +4093,9 @@ function MOCPageContent() {
                           style={{
                             ...segmentedButtonStyle,
                             ...segmentedButtonFillStyle,
-                            background: active ? "#005670" : "transparent",
-                            color: active ? "#ffffff" : "#000000",
+                            background: active ? "#EEF7F8" : "#ffffff",
+ borderColor: active ? "#005670" : "#D0D0CE",
+                            color: active ? "#005670" : "#000000",
                             opacity: disabled ? 0.5 : 1,
                           }}
                           onClick={() =>
@@ -4113,8 +4125,9 @@ function MOCPageContent() {
                           style={{
                             ...segmentedButtonStyle,
                             ...segmentedButtonFillStyle,
-                            background: starterForm.series_key === option.series_key ? "#005670" : "transparent",
-                            color: starterForm.series_key === option.series_key ? "#ffffff" : "#000000",
+                            background: starterForm.series_key === option.series_key ? "#EEF7F8" : "#ffffff",
+ borderColor: starterForm.series_key === option.series_key ? "#005670" : "#D0D0CE",
+                            color: starterForm.series_key === option.series_key ? "#005670" : "#000000",
                           }}
                           onClick={() => setStarterForm((prev) => ({ ...prev, series_key: option.series_key, applies_to: [] }))}
                         >
@@ -4139,8 +4152,9 @@ function MOCPageContent() {
                             style={{
                               ...segmentedButtonStyle,
                               ...segmentedButtonFillStyle,
-                              background: active ? "#005670" : "transparent",
-                              color: active ? "#ffffff" : "#000000",
+                              background: active ? "#EEF7F8" : "#ffffff",
+ borderColor: active ? "#005670" : "#D0D0CE",
+                              color: active ? "#005670" : "#000000",
                             }}
                             onClick={() =>
                               setStarterForm((prev) => {
@@ -4190,21 +4204,21 @@ function MOCPageContent() {
               </div>
 
               <div style={starterAlignedRowStyle}>
-                <Field label="MOC Co-Ordinator Name">
-                  <PeopleNameInput
+                <Field group label="MOC Co-Ordinator Name">
+                  <PersonPicker
                     value={starterForm.moc_coordinator_name}
-                    onChange={(e) => setStarterForm((prev) => ({ ...prev, moc_coordinator_name: e.target.value }))}
-                    listId="moc-people-options"
-                    placeholder="Select or type a name"
+                    onChange={(name) => setStarterForm((prev) => ({ ...prev, moc_coordinator_name: name }))}
+                    people={peopleOptions}
+                    placeholder="Search people"
                   />
                 </Field>
 
-                <Field label="Responsible ENS Manager / Supervisor">
-                  <PeopleNameInput
+                <Field group label="Responsible ENS Manager / Supervisor">
+                  <PersonPicker
                     value={starterForm.responsible_manager_name}
-                    onChange={(e) => setStarterForm((prev) => ({ ...prev, responsible_manager_name: e.target.value }))}
-                    listId="moc-people-options"
-                    placeholder="Select or type a name"
+                    onChange={(name) => setStarterForm((prev) => ({ ...prev, responsible_manager_name: name }))}
+                    people={peopleOptions}
+                    placeholder="Search people"
                   />
                 </Field>
 
@@ -4217,8 +4231,9 @@ function MOCPageContent() {
                         style={{
                           ...segmentedButtonStyle,
                           ...segmentedButtonFillStyle,
-                          background: starterForm.change_type === option ? "#005670" : "transparent",
-                          color: starterForm.change_type === option ? "#ffffff" : "#000000",
+                          background: starterForm.change_type === option ? "#EEF7F8" : "#ffffff",
+ borderColor: starterForm.change_type === option ? "#005670" : "#D0D0CE",
+                          color: starterForm.change_type === option ? "#005670" : "#000000",
                         }}
                         onClick={() => setStarterForm((prev) => ({ ...prev, change_type: option }))}
                       >
@@ -4449,9 +4464,10 @@ function MOCPageContent() {
               </div>
             </div>
 
-            <MocStageBar stage={detailStage} onChange={setDetailStage} checks={workbenchChecks} />
-            <div style={workbenchGridStyle}>
-            <div style={subSectionStackStyle}>
+            <MocViewToggle view={detailView} onChange={chooseDetailView} />
+            <MocStageBar stage={detailStage} onChange={openDetailStage} checks={workbenchChecks} />
+            <div style={detailView === "split" ? workbenchGridStyle : { ...workbenchGridStyle, gridTemplateColumns: "1fr" }}>
+            <div style={detailView === "report" ? { ...subSectionStackStyle, display: "none" } : subSectionStackStyle}>
               {detailReport.project_key ? (
                 <DetailSubsection title="PROJECT REPORTING" visible={detailStage === "describe"}>
                   <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditMoc || detailReport.status === "Closed"}>
@@ -4468,8 +4484,9 @@ function MOCPageContent() {
                                   style={{
                                     ...segmentedButtonStyle,
                                     ...segmentedButtonFillStyle,
-                                    background: active ? "#005670" : "transparent",
-                                    color: active ? "#ffffff" : "#000000",
+                                    background: active ? "#EEF7F8" : "#ffffff",
+ borderColor: active ? "#005670" : "#D0D0CE",
+                                    color: active ? "#005670" : "#000000",
                                   }}
                                   onClick={() => {
                                     if (part === "All") return updateDetailField("applies_to", ["All"]);
@@ -4516,12 +4533,13 @@ function MOCPageContent() {
                           />
                         </Field>
                       </div>
-                      <Field label="Next step owner">
-                        <PeopleNameInput
+                      <Field group label="Next step owner">
+                        <PersonPicker
                           value={detailReport.next_step_owner}
-                          onChange={(e) => updateDetailField("next_step_owner", e.target.value)}
-                          listId="moc-people-options"
-                          placeholder="Select or type a name"
+                          onChange={(name) => updateDetailField("next_step_owner", name)}
+                          people={peopleOptions}
+                          placeholder="Search people"
+                          disabled={!canEditMoc || detailReport.status === "Closed"}
                         />
                       </Field>
                       <Field label="Next step due">
@@ -4566,7 +4584,7 @@ function MOCPageContent() {
                     <input value={detailReport.status} readOnly style={readOnlyInputStyle} />
                   </Field>
                   <div style={{ gridColumn: "1 / -1" }}>
-                    <Field label="MOC Report Title">
+                    <Field gap={!detailReport.moc_report_title.trim()} label="MOC Report Title">
                       <input
                         value={detailReport.moc_report_title}
                         onChange={(e) => updateDetailField("moc_report_title", e.target.value)}
@@ -4583,12 +4601,13 @@ function MOCPageContent() {
                       />
                     </Field>
                   </div>
-                  <Field label="MOC Co-Ordinator Name">
-                    <PeopleNameInput
+                  <Field group gap={!detailReport.moc_coordinator_name.trim()} label="MOC Co-Ordinator Name">
+                    <PersonPicker
                       value={detailReport.moc_coordinator_name}
-                      onChange={(e) => updateDetailField("moc_coordinator_name", e.target.value)}
-                      listId="moc-people-options"
-                      placeholder="Select or type a name"
+                      onChange={(name) => updateDetailField("moc_coordinator_name", name)}
+                      people={peopleOptions}
+                      placeholder="Search people"
+                      disabled={!canEditCoreFields}
                     />
                   </Field>
                   <Field label="MOC Co-Ordinator Position">
@@ -4598,12 +4617,13 @@ function MOCPageContent() {
                       style={inputStyle}
                     />
                   </Field>
-                  <Field label="Responsible ENS Manager / Supervisor Name">
-                    <PeopleNameInput
+                  <Field group gap={!detailReport.responsible_manager_name.trim()} label="Responsible ENS Manager / Supervisor Name">
+                    <PersonPicker
                       value={detailReport.responsible_manager_name}
-                      onChange={(e) => updateDetailField("responsible_manager_name", e.target.value)}
-                      listId="moc-people-options"
-                      placeholder="Select or type a name"
+                      onChange={(name) => updateDetailField("responsible_manager_name", name)}
+                      people={peopleOptions}
+                      placeholder="Search people"
+                      disabled={!canEditCoreFields}
                     />
                   </Field>
                   <Field label="Responsible ENS Manager / Supervisor Position">
@@ -4621,7 +4641,7 @@ function MOCPageContent() {
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditCoreFields}>
                 <div style={detailFormGridStyle}>
                   <div style={{ gridColumn: "1 / -1" }}>
-                    <Field label="Description of the change (proposed change)">
+                    <Field gap={!detailReport.proposed_change_description.trim()} label="Description of the change (proposed change)">
                       <textarea
                         value={detailReport.proposed_change_description}
                         onChange={(e) => updateDetailField("proposed_change_description", e.target.value)}
@@ -4630,7 +4650,7 @@ function MOCPageContent() {
                     </Field>
                   </div>
                   <div style={{ gridColumn: "1 / -1" }}>
-                    <Field label="Reason for the change">
+                    <Field gap={!detailReport.reason_for_change.trim()} label="Reason for the change">
                       <textarea
                         value={detailReport.reason_for_change}
                         onChange={(e) => updateDetailField("reason_for_change", e.target.value)}
@@ -4648,8 +4668,9 @@ function MOCPageContent() {
                             style={{
                               ...segmentedButtonStyle,
                               ...segmentedButtonFillStyle,
-                              background: detailReport.change_type === option ? "#005670" : "transparent",
-                              color: detailReport.change_type === option ? "#ffffff" : "#000000",
+                              background: detailReport.change_type === option ? "#EEF7F8" : "#ffffff",
+ borderColor: detailReport.change_type === option ? "#005670" : "#D0D0CE",
+                              color: detailReport.change_type === option ? "#005670" : "#000000",
                               opacity: canEditStructural ? 1 : 0.65,
                             }}
                             disabled={!canEditStructural}
@@ -4754,13 +4775,14 @@ function MOCPageContent() {
                               />
                             </td>
                             <td style={{ ...gridCellStyle, minWidth: 150 }}>
-                              <input
-                                list="moc-people-options"
+                              <PersonPicker
+                                compact
                                 value={row.responsible_person}
-                                onChange={(e) => updateActionRow(index, "responsible_person", e.target.value)}
+                                onChange={(name) => updateActionRow(index, "responsible_person", name)}
+                                people={peopleOptions}
                                 placeholder="Owner"
-                                style={gridInputStyle}
-                                aria-label={`Action ${index + 1} owner`}
+                                disabled={!canEditImplementationFields}
+                                ariaLabel={`Action ${index + 1} owner`}
                               />
                             </td>
                             <td style={{ ...gridCellStyle, minWidth: 130 }}>
@@ -5038,7 +5060,7 @@ function MOCPageContent() {
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
                 <div style={detailFormGridStyle}>
                   <div>
-                    <Field label="Describe potential Hazards & Risks">
+                    <Field gap={!detailReport.hazard_risks_description.trim()} label="Describe potential Hazards & Risks">
                       <textarea
                         value={detailReport.hazard_risks_description}
                         onChange={(e) => updateDetailField("hazard_risks_description", e.target.value)}
@@ -5047,7 +5069,7 @@ function MOCPageContent() {
                     </Field>
                   </div>
                   <div>
-                    <Field label="Proposed Risk Mitigations">
+                    <Field gap={!detailReport.proposed_risk_mitigations.trim()} label="Proposed Risk Mitigations">
                       <textarea
                         value={detailReport.proposed_risk_mitigations}
                         onChange={(e) => updateDetailField("proposed_risk_mitigations", e.target.value)}
@@ -5061,7 +5083,7 @@ function MOCPageContent() {
 
               <DetailSubsection title="H. COST REVIEW" visible={detailStage === "assess"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
-                <Field label="Description of cost impact (incl. future savings)">
+                <Field gap={!detailReport.cost_review_description.trim()} label="Description of cost impact (incl. future savings)">
                   <textarea
                     value={detailReport.cost_review_description}
                     onChange={(e) => updateDetailField("cost_review_description", e.target.value)}
@@ -5073,7 +5095,7 @@ function MOCPageContent() {
 
               <DetailSubsection title="I. SCHEDULE REVIEW" visible={detailStage === "assess"}>
                 <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditImplementationFields}>
-                <Field label="Description of the schedule impact (incl. future savings)">
+                <Field gap={!detailReport.schedule_review_description.trim()} label="Description of the schedule impact (incl. future savings)">
                   <textarea
                     value={detailReport.schedule_review_description}
                     onChange={(e) => updateDetailField("schedule_review_description", e.target.value)}
@@ -5216,7 +5238,7 @@ function MOCPageContent() {
                     </thead>
                     <tbody>
                       {detailReviewRows.map((row, index) => (
-                        <tr key={`${row.id || "new"}-${index}`} style={{ background: row.approve_flag || row.inform_flag ? "#F4F8F8" : "transparent" }}>
+                        <tr key={`${row.id || "new"}-${index}`}>
                           <td style={{ ...gridCellStyle, minWidth: 130 }}>
                             <input
                               value={row.involved_party}
@@ -5226,11 +5248,14 @@ function MOCPageContent() {
                             />
                           </td>
                           <td style={{ ...gridCellStyle, minWidth: 190, padding: "4px 6px" }}>
-                            <PeopleEmailSelect
+                            <PersonPicker
+                              compact
                               value={row.name}
-                              onChange={(value) => updateReviewRow(index, "name", value)}
+                              onChange={(name) => updateReviewRow(index, "name", name)}
                               people={peopleOptions}
+                              placeholder="Choose a person"
                               disabled={!canEditReviewSections}
+                              ariaLabel={`Review row ${index + 1} person`}
                             />
                           </td>
                           <td style={{ ...gridCellStyle, minWidth: 130 }}>
@@ -5341,7 +5366,7 @@ function MOCPageContent() {
                 </fieldset>
               </DetailSubsection>
             </div>
-            <MocLivePreview data={workbenchData} onJump={setDetailStage} />
+            {detailView !== "form" ? <MocLivePreview data={workbenchData} onJump={openDetailStage} wide={detailView === "report"} /> : null}
             </div>
 
             <div style={detailButtonRowStyle}>
@@ -5443,22 +5468,35 @@ function SectionCard({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label style={{ display: "block" }}>
+function Field({ label, children, group = false, gap = false }: { label: string; children: ReactNode; group?: boolean; gap?: boolean }) {
+  const content = (
+    <>
       <span style={labelStyle}>{label}</span>
       {children}
-    </label>
+      {gap ? (
+        <span style={gapHintStyle}>
+          <span style={gapDotStyle} aria-hidden="true" />
+          The PDF and Word document print this blank
+        </span>
+      ) : null}
+    </>
   );
+  return group ? <div style={{ display: "block" }}>{content}</div> : <label style={{ display: "block" }}>{content}</label>;
+}
+
+// "A. MOC REPORT DETAILS" -> "A. MOC report details"
+function sentenceTitle(title: string) {
+  const lower = title.toLowerCase().replace(/\bmoc\b/g, "MOC").replace(/\bens\b/g, "ENS");
+  return lower.replace(/^((?:[a-z]\.\s+)?)(\S)/, (_m, prefix: string, first: string) => prefix.toUpperCase() + first.toUpperCase());
 }
 
 function DetailSubsection({ title, children, visible = true }: { title: string; children: ReactNode; visible?: boolean }) {
   if (!visible) return null;
   return (
-    <>
-      <div style={detailSectionTitleStyle}>{title}</div>
+    <section style={detailCardStyle}>
+      <div style={detailSectionTitleStyle}>{sentenceTitle(title)}</div>
       {children}
-    </>
+    </section>
   );
 }
 
@@ -5511,57 +5549,6 @@ function ImpactToggle({ label, checked, onToggle }: { label: string; checked: bo
       </span>
       <span>{label}</span>
     </button>
-  );
-}
-
-function PeopleNameInput({
-  value,
-  onChange,
-  listId,
-  placeholder,
-  disabled,
-}: {
-  value: string;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  listId: string;
-  placeholder?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <input
-      value={value}
-      onChange={onChange}
-      list={listId}
-      style={inputStyle}
-      placeholder={placeholder}
-      disabled={disabled}
-    />
-  );
-}
-
-function PeopleEmailSelect({
-  value,
-  onChange,
-  people,
-  disabled,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  people: PeopleOption[];
-  disabled?: boolean;
-}) {
-  const hasCurrentValue = !value || people.some((person) => person.name === value);
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} style={inputStyle} disabled={disabled}>
-      <option value="">Select a person</option>
-      {!hasCurrentValue ? <option value={value}>{value} (no email on file)</option> : null}
-      {people.map((person) => (
-        <option key={person.id} value={person.name}>
-          {person.name}
-          {person.email ? "" : " (no email)"}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -5731,11 +5718,12 @@ function SimpleSignoffTable({
             <Field label="Role">
               <input value={row.role_label} onChange={(e) => onChange(index, "role_label", e.target.value)} style={inputStyle} />
             </Field>
-            <Field label="Name">
-              <PeopleEmailSelect
+            <Field group label="Name">
+              <PersonPicker
                 value={row.name}
-                onChange={(value) => onChange(index, "name", value)}
+                onChange={(name) => onChange(index, "name", name)}
                 people={peopleOptions}
+                placeholder="Choose a person"
                 disabled={disabled}
               />
             </Field>
@@ -5913,8 +5901,9 @@ const sectionSubtitleStyle: CSSProperties = {
 
 const detailFormGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
   gap: "12px",
+  alignItems: "start",
 };
 
 const detailChangeTypeRowStyle: CSSProperties = {
@@ -5948,11 +5937,11 @@ const detailTemporaryDatesStyle: CSSProperties = {
 
 const inputStyle: CSSProperties = {
   width: "100%",
+  minHeight: 42,
   padding: "10px 12px",
   borderRadius: 10,
   border: "1px solid #D0D0CE",
   background: "#ffffff",
-  outline: "none",
   fontSize: 14,
   color: "#000000",
   boxSizing: "border-box",
@@ -5960,13 +5949,14 @@ const inputStyle: CSSProperties = {
 
 const readOnlyInputStyle: CSSProperties = {
   ...inputStyle,
-  background: "#ECECE7",
+  background: "#F4F8F8",
+  border: "1px dashed #D0D0CE",
   color: "#53565A",
 };
 
 const textareaStyle: CSSProperties = {
   ...inputStyle,
-  minHeight: 90,
+  minHeight: 96,
   resize: "vertical",
   fontFamily: "inherit",
 };
@@ -5977,21 +5967,29 @@ const tallTextareaStyle: CSSProperties = {
 };
 
 const labelStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
+  fontSize: 13,
+  fontWeight: 800,
   color: "#53565A",
   marginBottom: 6,
   display: "block",
-  letterSpacing: 0.2,
-  textTransform: "uppercase",
 };
+
+const gapHintStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  marginTop: 6,
+  fontSize: 12,
+  fontWeight: 700,
+  color: "#53565A",
+};
+
+const gapDotStyle: CSSProperties = { width: 8, height: 8, borderRadius: "50%", background: "#FFAD00", display: "inline-block", flex: "none" };
 
 const segmentedWrapStyle: CSSProperties = {
   display: "inline-flex",
-  background: "#D0D0CE",
-  borderRadius: 14,
-  padding: 4,
-  border: "1px solid #D0D0CE",
+  gap: 6,
+  flexWrap: "wrap",
 };
 
 const segmentedWrapWideStyle: CSSProperties = {
@@ -6002,11 +6000,12 @@ const segmentedWrapWideStyle: CSSProperties = {
 };
 
 const segmentedButtonStyle: CSSProperties = {
-  padding: "10px 14px",
+  minHeight: 42,
+  padding: "0 16px",
   borderRadius: 10,
-  border: "none",
+  border: "1px solid #D0D0CE",
   cursor: "pointer",
-  fontWeight: 800,
+  fontWeight: 700,
 };
 
 const segmentedButtonFillStyle: CSSProperties = {
@@ -6181,12 +6180,18 @@ const fieldsetResetStyle: CSSProperties = {
 
 const subSectionStackStyle: CSSProperties = {
   display: "grid",
-  gap: "22px",
+  gap: "14px",
+  minWidth: 0,
+  alignContent: "start",
+};
+
+const detailCardStyle: CSSProperties = {
+  display: "grid",
+  gap: "12px",
+  background: "#ffffff",
   border: "1px solid #D0D0CE",
-  borderRadius: "18px",
-  padding: "20px",
-  background: "#ECECE7",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
+  borderRadius: "12px",
+  padding: "14px",
   minWidth: 0,
 };
 
@@ -6197,18 +6202,15 @@ const workbenchGridStyle: CSSProperties = {
   alignItems: "start",
 };
 
-const gridTableStyle: CSSProperties = { width: "100%", borderCollapse: "collapse", background: "#ffffff", border: "1px solid #D0D0CE" };
-const gridHeadCellStyle: CSSProperties = { textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: "#53565A", padding: "7px 8px", borderBottom: "1px solid #D0D0CE", whiteSpace: "nowrap" };
-const gridCellStyle: CSSProperties = { padding: 0, borderBottom: "1px solid #ECECE7", verticalAlign: "top" };
-const gridInputStyle: CSSProperties = { width: "100%", border: 0, background: "transparent", padding: "9px 8px", font: "inherit", fontSize: 13, color: "#000000", minWidth: 0 };
+const gridTableStyle: CSSProperties = { width: "100%", borderCollapse: "separate", borderSpacing: "0 6px" };
+const gridHeadCellStyle: CSSProperties = { textAlign: "left", fontSize: 12, fontWeight: 800, color: "#53565A", padding: "0 4px 2px 0", whiteSpace: "nowrap" };
+const gridCellStyle: CSSProperties = { padding: "0 4px 0 0", verticalAlign: "top" };
+const gridInputStyle: CSSProperties = { width: "100%", minHeight: 38, border: "1px solid #D0D0CE", borderRadius: 10, background: "#F4F8F8", padding: "8px 10px", boxSizing: "border-box", font: "inherit", fontSize: 14, color: "#000000", minWidth: 0 };
 
 const detailSectionTitleStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 800,
   color: "#005670",
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  marginBottom: "-6px",
 };
 
 const detailTemporaryHintStyle: CSSProperties = {
