@@ -1605,7 +1605,8 @@ function MOCPageContent() {
     rowLabel: string,
     recipientName: string,
     mode: "decision" | "inform" = "decision",
-    skipSave = false
+    skipSave = false,
+    fullPdfBase64: string | null = null
   ) {
     if (!requireEditPermission("Sending MOC sign-off")) return;
     if (!selectedReportId) return;
@@ -1624,6 +1625,8 @@ function MOCPageContent() {
     setSendingSignoffKey(key);
     try {
       if (!skipSave) await saveSelectedMoc();
+      // The reviewer gets the full MOC report (risk, hazards, cost, schedule, documents), not only the short summary.
+      const attachPdf = fullPdfBase64 ?? (await generatePdfFor(selectedReportId, true, "base64").catch(() => null));
       const response = await fetch("/api/moc-signoff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1635,11 +1638,17 @@ function MOCPageContent() {
           recipientName: trimmedName,
           recipientEmail,
           mode,
+          // Very large reports fall back to the short summary rather than exceed the request limit.
+          fullPdfBase64: attachPdf && attachPdf.length < 3_500_000 ? attachPdf : null,
         }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error || "Unable to send the sign-off request.");
       await loadSignoffRequests(selectedReportId);
+      if (!skipSave) {
+        const refreshed = await loadData();
+        openBundle(selectedReportId, refreshed);
+      }
       showMessage(
         mode === "inform" ? `Informed ${trimmedName} by email.` : `Sign-off requested from ${trimmedName}.`,
         "success"
@@ -1665,6 +1674,7 @@ function MOCPageContent() {
     if (!window.confirm(`Send ${targets.length} email${targets.length === 1 ? "" : "s"} now?\n\n${summary}`)) return;
     try {
       await saveSelectedMoc();
+      const sharedPdf = selectedReportId ? await generatePdfFor(selectedReportId, true, "base64").catch(() => null) : null;
       for (const { row, index } of targets) {
         await sendSignoffRequest(
           "moc_review_endorsement_rows",
@@ -1672,9 +1682,12 @@ function MOCPageContent() {
           row.involved_party || `Review row ${index + 1}`,
           row.name,
           row.approve_flag ? "decision" : "inform",
-          true
+          true,
+          sharedPdf
         );
       }
+      const refreshedAfterBulk = await loadData();
+      openBundle(selectedReportId, refreshedAfterBulk);
     } catch (error) {
       showMessage(getErrorMessage(error), "error");
     }
@@ -2078,9 +2091,11 @@ function MOCPageContent() {
     setSaving(true);
     const previousBundle = getBundleFromData(selectedReportId);
     try {
+      const latestStatusRes = await supabase.from("moc_reports").select("status").eq("id", selectedReportId).maybeSingle();
+      const latestStatus = (latestStatusRes.data?.status as MocStatus | undefined) || detailReport.status;
       const updateRes = await supabase
         .from("moc_reports")
-        .update(buildParentPayload(detailReport))
+        .update({ ...buildParentPayload(detailReport), status: latestStatus })
         .eq("id", selectedReportId);
 
       if (updateRes.error) {
@@ -2146,6 +2161,13 @@ function MOCPageContent() {
     if (allowedNext !== nextStatus) {
       showMessage(`Status cannot move directly from ${detailReport.status} to ${nextStatus}.`, "warning");
       return;
+    }
+    if (nextStatus === "Approved") {
+      const rejectedBy = detailReviewRows.filter((row) => row.approve_flag && row.approved_value === "No").map((row) => row.involved_party || row.name);
+      if (rejectedBy.length) {
+        showMessage(`${detailReport.moc_report_no} cannot be approved while ${rejectedBy.join(", ")} has rejected it. Resolve the rejection first.`, "warning");
+        return;
+      }
     }
 
     setSaving(true);
@@ -3863,13 +3885,14 @@ function MOCPageContent() {
     }
   }
 
-  async function generatePdfFor(reportId: string, preferCurrentDetail = false) {
+  // mode "save" downloads the PDF. mode "base64" returns it (without the data-URI prefix) so it can be emailed.
+  async function generatePdfFor(reportId: string, preferCurrentDetail = false, mode: "save" | "base64" = "save"): Promise<string | null> {
     const bundle =
       preferCurrentDetail && detailReport.id === reportId
         ? buildCurrentDetailBundle()
         : getBundleFromData(reportId);
 
-    if (!bundle) return;
+    if (!bundle) return null;
 
     setGeneratingPdf(true);
 
@@ -3945,10 +3968,15 @@ function MOCPageContent() {
         doc.setTextColor(0, 0, 0);
       }
 
+      if (mode === "base64") {
+        return doc.output("datauristring").split(",")[1] || null;
+      }
       doc.save(`${bundle.report.moc_report_no || "MOC"}-${bundle.report.moc_report_title || "Form"}.pdf`);
       showMessage(`Generated PDF for ${bundle.report.moc_report_no}.`, "success");
+      return null;
     } catch (error) {
       showMessage(getErrorMessage(error), "error");
+      return null;
     } finally {
       pdfPageDecorator = null;
       setGeneratingPdf(false);

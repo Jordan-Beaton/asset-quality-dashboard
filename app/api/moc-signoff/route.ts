@@ -63,6 +63,7 @@ export async function POST(request: Request) {
       recipientName?: string;
       recipientEmail?: string;
       mode?: string;
+      fullPdfBase64?: string | null;
     };
     const mocReportId = clean(body.mocReportId);
     const targetTable = clean(body.targetTable) as TargetTable;
@@ -71,6 +72,12 @@ export async function POST(request: Request) {
     const recipientName = clean(body.recipientName);
     const recipientEmail = clean(body.recipientEmail).toLowerCase();
     const mode: SendMode = body.mode === "inform" ? "inform" : "decision";
+    // The full MOC report built in the browser. Only accept something that really is a PDF, and of a sensible size.
+    let fullPdf: Buffer | null = null;
+    if (typeof body.fullPdfBase64 === "string" && body.fullPdfBase64.length > 0 && body.fullPdfBase64.length < 6_000_000) {
+      const candidate = Buffer.from(body.fullPdfBase64, "base64");
+      if (candidate.subarray(0, 5).toString("latin1") === "%PDF-") fullPdf = candidate;
+    }
 
     if (!mocReportId || !TARGET_TABLES.includes(targetTable) || !Number.isFinite(sortOrder)) {
       return NextResponse.json({ error: "Missing or invalid sign-off target." }, { status: 400 });
@@ -177,7 +184,7 @@ export async function POST(request: Request) {
         <p>Hi ${escapeHtml(recipientName)},</p>
         <p><strong>${escapeHtml(report.moc_report_no)}</strong> - ${escapeHtml(report.moc_report_title)}</p>
         <p>You're asked to review this as: <strong>${escapeHtml(rowLabel)}</strong>.</p>
-        <p>A summary of the MOC is attached for your review. Please Approve, Reject, or leave Comments.</p>
+        <p>${fullPdf ? "The full MOC report is attached for your review, including the risk assessment, hazards, cost and schedule." : "A summary of the MOC is attached for your review."} Please Approve, Reject, or leave Comments.</p>
         <p><a href="${escapeHtml(actionUrl)}" style="display:inline-block;background:#005670;color:#fff;text-decoration:none;border-radius:10px;padding:12px 18px;font-weight:700">Review and decide</a></p>
         <p style="font-size:12px;color:#53565A">Rejecting or leaving Comments requires a short note. Comments do not approve or reject the change, but the MOC Coordinator will be notified to follow up.</p>
       </div>`
@@ -186,7 +193,7 @@ export async function POST(request: Request) {
         <p>Hi ${escapeHtml(recipientName)},</p>
         <p><strong>${escapeHtml(report.moc_report_no)}</strong> - ${escapeHtml(report.moc_report_title)}</p>
         <p>You're being kept informed of this change as: <strong>${escapeHtml(rowLabel)}</strong>. No action or decision is required from you - this is for your awareness only.</p>
-        <p>A summary of the MOC is attached for your records.</p>
+        <p>${fullPdf ? "The full MOC report is attached for your records." : "A summary of the MOC is attached for your records."}</p>
       </div>`;
 
     const result = await resend.emails.send({
@@ -197,9 +204,16 @@ export async function POST(request: Request) {
           ? `MOC sign-off requested: ${report.moc_report_no} - ${report.moc_report_title}`
           : `MOC for your information: ${report.moc_report_no} - ${report.moc_report_title}`,
       html,
-      attachments: [{ filename: `${report.moc_report_no}-MOC-Summary.pdf`, content: Buffer.from(pdfBytes) }],
+      attachments: fullPdf
+        ? [{ filename: `${report.moc_report_no}-Management-of-Change.pdf`, content: fullPdf }]
+        : [{ filename: `${report.moc_report_no}-MOC-Summary.pdf`, content: Buffer.from(pdfBytes) }],
     });
     if (result.error) throw new Error(result.error.message);
+
+    // Sending the first sign-off request puts a Draft MOC into review (the same move as the "Mark In Review" button).
+    if (mode === "decision" && targetTable === "moc_review_endorsement_rows" && report.status === "Draft") {
+      await supabase.from("moc_reports").update({ status: "In Review", updated_at: nowIso }).eq("id", mocReportId).eq("status", "Draft");
+    }
 
     await writeNotification({
       recipientEmail,

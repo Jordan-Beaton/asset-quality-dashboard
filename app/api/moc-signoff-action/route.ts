@@ -138,9 +138,27 @@ export async function POST(request: Request) {
 
     const { data: report } = await supabase
       .from("moc_reports")
-      .select("moc_report_no,moc_report_title,moc_coordinator_name")
+      .select("moc_report_no,moc_report_title,moc_coordinator_name,status")
       .eq("id", mocReportId)
       .maybeSingle();
+
+    // The MOC status follows the reviewers: once every row marked Approve has approved, an In Review MOC becomes Approved.
+    let autoApproved = false;
+    if (targetTable === "moc_review_endorsement_rows" && report?.status === "In Review") {
+      const { data: reviewRows } = await supabase
+        .from("moc_review_endorsement_rows")
+        .select("approve_flag,approved_value")
+        .eq("moc_report_id", mocReportId);
+      const approvers = (reviewRows || []).filter((row) => row.approve_flag);
+      if (approvers.length > 0 && approvers.every((row) => row.approved_value === "Yes")) {
+        const { error: statusError } = await supabase
+          .from("moc_reports")
+          .update({ status: "Approved", updated_at: decidedAt })
+          .eq("id", mocReportId)
+          .eq("status", "In Review");
+        autoApproved = !statusError;
+      }
+    }
     const mocRef = report ? `${report.moc_report_no} - ${report.moc_report_title}` : "the MOC";
 
     const { resend, from } = emailClient();
@@ -170,9 +188,9 @@ export async function POST(request: Request) {
       });
     }
 
-    // "Comments" doesn't approve or reject anything, so make sure it doesn't
-    // just sit quietly on the row — notify the MOC Coordinator to follow up.
-    if (decision === "comments" && report?.moc_coordinator_name) {
+    // Comments don't approve or reject anything, and a rejection stops the change, so neither should sit quietly
+    // on the row: notify the MOC Coordinator to follow up.
+    if (decision !== "approve" && report?.moc_coordinator_name) {
       const { data: coordinator } = await supabase
         .from("people")
         .select("name,email")
@@ -183,26 +201,56 @@ export async function POST(request: Request) {
         await resend.emails.send({
           from,
           to: [coordinatorEmail],
-          subject: `MOC comments returned - needs your attention: ${mocRef}`,
+          subject: decision === "reject" ? `MOC rejected by a reviewer - needs your attention: ${mocRef}` : `MOC comments returned - needs your attention: ${mocRef}`,
           html: `<div style="font-family:'Segoe UI',Arial,sans-serif;color:#000;line-height:1.5">
-            <h2>Comments returned on an MOC you coordinate</h2>
+            <h2>${decision === "reject" ? "A reviewer rejected an MOC you coordinate" : "Comments returned on an MOC you coordinate"}</h2>
             <p><strong>${escapeHtml(mocRef)}</strong> - ${escapeHtml(rowLabel)}</p>
             <p><strong>From:</strong> ${escapeHtml(name)} (${escapeHtml(recipientEmail)})</p>
-            <p><strong>Comments:</strong> ${escapeHtml(note)}</p>
-            <p>This did not approve or reject the change - please review and follow up.</p>
+            <p><strong>${decision === "reject" ? "Reason" : "Comments"}:</strong> ${escapeHtml(note)}</p>
+            <p>${decision === "reject" ? "The MOC stays In Review and cannot be marked Approved until this is resolved - please follow up." : "This did not approve or reject the change - please review and follow up."}</p>
           </div>`,
         });
         await writeNotification({
           recipientEmail: coordinatorEmail,
           sourceModule: "Management of Change",
-          title: `Comments need attention: ${mocRef}`,
+          title: decision === "reject" ? `Rejected, needs attention: ${mocRef}` : `Comments need attention: ${mocRef}`,
           body: `${rowLabel} - ${name}: ${note}`,
           link: report ? `/moc?search=${encodeURIComponent(report.moc_report_no)}` : undefined,
         });
       }
     }
 
-    return NextResponse.json({ ok: true, status });
+    if (autoApproved) {
+      const { data: coordinator } = await supabase
+        .from("people")
+        .select("name,email")
+        .ilike("name", clean(report?.moc_coordinator_name))
+        .maybeSingle();
+      const approvedRecipients = Array.from(new Set([clean(coordinator?.email), senderEmail].filter((email) => email.includes("@"))));
+      if (approvedRecipients.length) {
+        await resend.emails.send({
+          from,
+          to: approvedRecipients,
+          subject: `MOC fully approved: ${mocRef}`,
+          html: `<div style="font-family:'Segoe UI',Arial,sans-serif;color:#000;line-height:1.5">
+            <h2>MOC fully approved</h2>
+            <p><strong>${escapeHtml(mocRef)}</strong></p>
+            <p>Every reviewer marked Approve has now approved, so the MOC status has moved from In Review to Approved.</p>
+          </div>`,
+        });
+        for (const recipient of approvedRecipients) {
+          await writeNotification({
+            recipientEmail: recipient,
+            sourceModule: "Management of Change",
+            title: `MOC fully approved: ${mocRef}`,
+            body: "All reviewers have approved. Status moved to Approved.",
+            link: report ? `/moc?search=${encodeURIComponent(report.moc_report_no)}` : undefined,
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({ ok: true, status, mocStatusMovedToApproved: autoApproved });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to record the decision." }, { status: 500 });
   }
