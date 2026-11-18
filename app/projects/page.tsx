@@ -4,8 +4,22 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { AddProjectPanel } from "../../src/components/AddProjectPanel";
+import { useImsPermissions } from "../../src/components/ImsPermissions";
+import { getProject } from "../../src/lib/projectRegistry";
+import { useProjectRegistry } from "../../src/lib/useProjectRegistry";
+
+// Descriptions for the projects that have their own tailored dashboards. Any other project gets the standard one.
+const KNOWN_BLURBS: Record<string, string> = {
+  "wadden-sea": "ITP control, monthly report annexes, audit reporting, and the 8-week inspection lookahead.",
+  "baltic-power": "ITP control, NOI planning, and evidence-based phase sign-off with external approval.",
+};
+const STANDARD_BLURB = "ITP control, NOI planning, the MOC register, and evidence-based phase sign-off.";
 
 export default function ProjectsPage() {
+  const { projects } = useProjectRegistry();
+  const permissions = useImsPermissions();
+
   return (
     <main style={page}>
       <QualityPageHero
@@ -20,24 +34,17 @@ export default function ProjectsPage() {
           <h2 style={heading}>Project workspaces</h2>
         </div>
         <div style={grid}>
-          <Link href="/projects/wadden-sea" style={card}>
-            <div style={cardTop}>
-              <span style={badge}>Active</span>
-              <span style={code}>WSP</span>
-            </div>
-            <h3 style={cardTitle}>Wadden Sea Project</h3>
-            <p style={copy}>ITP control, monthly report annexes, audit reporting, and the 8-week inspection lookahead.</p>
-            <span style={cta}>Open project workspace →</span>
-          </Link>
-          <Link href="/projects/baltic-power" style={card}>
-            <div style={cardTop}>
-              <span style={badge}>Active</span>
-              <span style={code}>BLP</span>
-            </div>
-            <h3 style={cardTitle}>Baltic Power</h3>
-            <p style={copy}>ITP control, NOI planning, and evidence-based phase sign-off with external approval.</p>
-            <span style={cta}>Open project workspace →</span>
-          </Link>
+          {projects.map((project) => (
+            <Link key={project.key} href={`/projects/${project.key}`} style={card}>
+              <div style={cardTop}>
+                <span style={badge}>Active</span>
+                <span style={code}>{getProject(project.key).abbreviation}</span>
+              </div>
+              <h3 style={cardTitle}>{project.key === "wadden-sea" ? "Wadden Sea Project" : project.name}</h3>
+              <p style={copy}>{KNOWN_BLURBS[project.key] || STANDARD_BLURB}</p>
+              <span style={cta}>Open project workspace →</span>
+            </Link>
+          ))}
           <Link href="/inspections" style={card}>
             <div style={cardTop}>
               <span style={badge}>All projects</span>
@@ -49,6 +56,7 @@ export default function ProjectsPage() {
           </Link>
         </div>
       </section>
+      {permissions.isAdmin ? <AddProjectPanel /> : null}
     </main>
   );
 }

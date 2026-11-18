@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import nextDynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { CSSProperties, ChangeEvent, ClipboardEvent as ReactClipboardEvent, ReactNode } from "react";
+import type { CSSProperties, ChangeEvent, ClipboardEvent as ReactClipboardEvent, ReactNode, RefObject } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -37,6 +38,9 @@ import { supabase } from "../../src/lib/supabase";
 import { useUrlState } from "../../src/lib/useUrlState";
 
 export const dynamic = "force-dynamic";
+
+// The client MOC register report (Word and PDF) is loaded only when the Reports view is opened.
+const MocRegisterAnnex = nextDynamic(() => import("../../src/components/MocRegisterAnnex").then((module) => module.MocRegisterAnnex), { ssr: false });
 
 type MocStatus = "Draft" | "In Review" | "Approved" | "Closed";
 type ChangeType = "Permanent" | "Temporary";
@@ -110,10 +114,12 @@ type MocReport = {
   status_to_confirm: boolean;
 };
 
-type MocSeries = { series_key: string; label: string; prefix: string; project_key: string | null; last_number: number };
+type MocSeries = { series_key: string; label: string; prefix: string; project_key: string | null; last_number: number; parts: string[] };
 
-// The parts of each project a MOC can apply to. A project only needs an entry here if its MOCs are tagged by part.
-const PROJECT_PARTS: Record<string, string[]> = { "wadden-sea": ["BA3", "LW2", "LW4"] };
+// Each project's parts (the "which part does it apply to" choices) are stored with its numbering series, so adding a project
+// needs no code. Only if the database column is not there yet (before scripts/sql/project_registry.sql is run) does
+// Wadden Sea fall back to its original parts.
+const LEGACY_WADDEN_SEA_PARTS = ["BA3", "LW2", "LW4"];
 
 function formatSeriesNumber(series: MocSeries | undefined, number: number) {
   return `${series?.prefix || "MOC"}-MOC-${String(number).padStart(3, "0")}`;
@@ -975,6 +981,13 @@ function MOCPageContent() {
     Boolean(linkedStatus !== "All" || linkedChangeType !== "All" || linkedRecent || linkedAttention)
   );
   const [selectedReportId, setSelectedReportId] = useState("");
+  // Clicking a register row opens the record and scrolls it into view (UI standard: selecting a row scrolls to the detail panel).
+  const detailPanelRef = useRef<HTMLElement>(null);
+  function scrollToDetailPanel() {
+    window.setTimeout(() => {
+      detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
   // Which of the four workbench stages is open. Reset to the first stage when a different MOC is opened.
   const [detailStage, setDetailStage] = useState<MocStage>("describe");
   useEffect(() => {
@@ -1053,7 +1066,14 @@ function MOCPageContent() {
     ? formatSeriesNumber(starterSeries, starterSeries.last_number + 1)
     : "Numbering not set up";
   const projectSeries = useMemo(() => mocSeries.filter((item) => item.project_key), [mocSeries]);
-  const starterParts = starterSeries?.project_key ? PROJECT_PARTS[starterSeries.project_key] || [] : [];
+  const [reportProjectChoice, setReportProjectChoice] = useState("");
+  const reportProjectKey = projectSeries.some((item) => item.project_key === reportProjectChoice) ? reportProjectChoice : projectSeries[0]?.project_key || "";
+  const setReportProjectKey = setReportProjectChoice;
+  const starterParts = starterSeries?.project_key ? starterSeries.parts || [] : [];
+  const detailParts = useMemo(
+    () => mocSeries.find((item) => item.project_key && item.project_key === detailReport.project_key)?.parts || [],
+    [mocSeries, detailReport.project_key]
+  );
 
   const selectedReport = useMemo(
     () => reports.find((report) => report.id === selectedReportId) || null,
@@ -1333,8 +1353,18 @@ function MOCPageContent() {
           .filter((person) => person.name);
 
     // Numbering series are read separately so the register still opens if the project numbering script has not been applied yet.
-    const seriesRes = await supabase.from("moc_series").select("series_key,label,prefix,project_key,last_number").order("label", { ascending: true });
-    setMocSeries(seriesRes.error ? [] : ((seriesRes.data || []) as MocSeries[]));
+    const seriesWithParts = await supabase.from("moc_series").select("series_key,label,prefix,project_key,last_number,parts").order("label", { ascending: true });
+    const seriesRes = seriesWithParts.error
+      ? await supabase.from("moc_series").select("series_key,label,prefix,project_key,last_number").order("label", { ascending: true })
+      : seriesWithParts;
+    setMocSeries(
+      seriesRes.error
+        ? []
+        : ((seriesRes.data || []) as unknown as Array<Omit<MocSeries, "parts"> & { parts?: string[] | null }>).map((row) => ({
+            ...row,
+            parts: Array.isArray(row.parts) ? row.parts : row.project_key === "wadden-sea" ? LEGACY_WADDEN_SEA_PARTS : [],
+          }))
+    );
 
     setReports(nextReports);
     setActionPlanItems(nextActionItems);
@@ -4402,7 +4432,10 @@ function MOCPageContent() {
                         ...mocRegisterRowStyle,
                         background: active ? "#eef7f8" : "#ffffff",
                       }}
-                      onClick={() => openBundle(report.id)}
+                      onClick={() => {
+                        openBundle(report.id);
+                        scrollToDetailPanel();
+                      }}
                     >
                       <div style={registerSimpleTextStyle}>{report.moc_report_no}</div>
                       <div>
@@ -4455,7 +4488,7 @@ function MOCPageContent() {
         </SectionCard>
 
         {selectedReport ? (
-          <SectionCard title="Detail Panel" subtitle="Full MOC form editor. The saved record stays table-led, and this panel appears only when needed.">
+          <SectionCard sectionRef={detailPanelRef} title="Detail Panel" subtitle="Full MOC form editor. The saved record stays table-led, and this panel appears only when needed.">
             <div style={detailHeaderStyle}>
               <div>
                 <div style={detailRecordNumberStyle}>{detailReport.moc_report_no}</div>
@@ -4500,10 +4533,11 @@ function MOCPageContent() {
                 <DetailSubsection title="PROJECT REPORTING" visible={detailStage === "describe"}>
                   <fieldset style={fieldsetResetStyle} data-ims-unstyled="true" disabled={!canEditMoc || detailReport.status === "Closed"}>
                     <div style={detailFormGridStyle}>
+                      {detailParts.length ? (
                       <div style={{ gridColumn: "1 / -1" }}>
-                        <Field label="Applies to">
+                        <Field group label="Applies to">
                           <div style={segmentedWrapWideStyle}>
-                            {[...(PROJECT_PARTS[detailReport.project_key] || []), "All"].map((part) => {
+                            {[...detailParts, "All"].map((part) => {
                               const active = detailReport.applies_to.includes(part);
                               return (
                                 <button
@@ -4529,6 +4563,7 @@ function MOCPageContent() {
                           </div>
                         </Field>
                       </div>
+                      ) : null}
                       <Field label="Client reference (as the client wrote it)">
                         <input
                           value={detailReport.client_reference}
@@ -5471,6 +5506,24 @@ function MOCPageContent() {
               )}
             </div>
           </SectionCard>
+          {projectSeries.length ? (
+            <SectionCard title="Client MOC register report" subtitle="The monthly Word and PDF register of a project's MOCs and open actions, read live from this module.">
+              <div style={{ display: "grid", gap: 14 }}>
+                <div style={{ maxWidth: 320 }}>
+                  <Field label="Project">
+                    <select value={reportProjectKey} onChange={(event) => setReportProjectKey(event.target.value)} style={inputStyle}>
+                      {projectSeries.map((item) => (
+                        <option key={item.series_key} value={item.project_key || ""}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+                {reportProjectKey ? <MocRegisterAnnex key={reportProjectKey} projectKey={reportProjectKey} /> : null}
+              </div>
+            </SectionCard>
+          ) : null}
         </section>
       ) : null}
     </main>
@@ -5481,13 +5534,15 @@ function SectionCard({
   title,
   subtitle,
   children,
+  sectionRef,
 }: {
   title: string;
   subtitle?: string;
   children?: ReactNode;
+  sectionRef?: RefObject<HTMLElement | null>;
 }) {
   return (
-    <section style={panelStyle}>
+    <section ref={sectionRef} style={{ ...panelStyle, scrollMarginTop: 12 }}>
       <div style={sectionHeaderStyle}>
         <h2 style={sectionTitleStyle}>{title}</h2>
         {subtitle ? <p style={sectionSubtitleStyle}>{subtitle}</p> : null}

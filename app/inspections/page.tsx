@@ -15,6 +15,7 @@ import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import { projects as projectRegistry, getProject } from "../../src/lib/projectRegistry";
+import { useProjectRegistry } from "../../src/lib/useProjectRegistry";
 import { exportPdfTableTheme, exportRgb, exportTypography } from "../../src/lib/exportTheme";
 
 type Attendee = { name: string; company: string; contact: string; email: string };
@@ -293,12 +294,14 @@ export default function OverallInspectionsPage() {
     );
   }
 
+  const { projects: sharedProjects } = useProjectRegistry();
   const knownProjects = useMemo(() => {
     const map = new Map<string, string>();
     Object.entries(projectRegistry).forEach(([key, config]) => map.set(key, config.label));
+    sharedProjects.forEach((project) => map.set(project.key, project.name));
     events.forEach((event) => { if (!map.has(event.projectKey)) map.set(event.projectKey, event.projectLabel); });
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [events]);
+  }, [events, sharedProjects]);
 
   const itpOptionsForForm = useMemo(() => {
     const matchingProject = allItps.filter((itp) => itp.project_key === form.projectKey);

@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
-import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
-import { QualityPageHero } from "../../../src/components/QualityPageHero";
-import { ProjectWorkspaceNav } from "../../../src/components/ProjectWorkspaceNav";
-import { supabase } from "../../../src/lib/supabase";
-import { useUrlState } from "../../../src/lib/useUrlState";
+import { ImsTabs, ImsTopMetaRow } from "./ImsPrimitives";
+import { QualityKpiCard } from "./QualityKpiCard";
+import { QualityPageHero } from "./QualityPageHero";
+import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
+import { supabase } from "../lib/supabase";
+import { useUrlState } from "../lib/useUrlState";
+import { getProject } from "../lib/projectRegistry";
+import { useProjectRegistry } from "../lib/useProjectRegistry";
 
 type ItpRow = {
   id: string;
@@ -43,11 +45,18 @@ function formatDate(value: string | null) {
     : "Date TBC";
 }
 
-export default function WaddenSeaPage() {
+// The standard project dashboard. Every project in the shared project list uses it (Wadden Sea keeps its own page).
+export function ProjectDashboardPage({ projectKey }: { projectKey: string }) {
+  const { projects, loaded } = useProjectRegistry();
+  const registryProject = projects.find((project) => project.key === projectKey);
+  const config = getProject(projectKey);
+  const label = registryProject?.name || config.label;
+  const hasReports = config.tabs.includes("reports");
+  const [openMocs, setOpenMocs] = useState<number | null>(null);
   const [itps, setItps] = useState<ItpRow[]>([]);
   const [noiPoints, setNoiPoints] = useState<NoiRow[]>([]);
   const [dashboardView, setDashboardView] = useUrlState<"overview" | "planning" | "controls">("view", "overview", ["overview", "planning", "controls"]);
-  const [message, setMessage] = useState("Loading Baltic Power project controls...");
+  const [message, setMessage] = useState("Loading project controls...");
 
   useEffect(() => {
     void (async () => {
@@ -55,23 +64,25 @@ export default function WaddenSeaPage() {
         supabase
           .from("project_itps")
           .select("id,document_number,title,supplier,overall_stage,overall_status,next_action,due_date")
-          .eq("project_key", "baltic-power")
+          .eq("project_key", projectKey)
           .order("updated_at", { ascending: false }),
         supabase
           .from("project_noi_points")
           .select("id,itp_id,section_number,activity_description,intervention_type,planned_date,noi_number,status")
-          .eq("project_key", "baltic-power")
+          .eq("project_key", projectKey)
           .order("planned_date", { ascending: true }),
       ]);
+      const mocResult = await supabase.from("moc_reports").select("id", { count: "exact", head: true }).eq("project_key", projectKey).neq("status", "Closed");
+      setOpenMocs(mocResult.error ? null : mocResult.count ?? 0);
       if (itpResult.error || noiResult.error) {
         setMessage(`Project dashboard failed to load: ${itpResult.error?.message || noiResult.error?.message}`);
         return;
       }
       setItps((itpResult.data || []) as ItpRow[]);
       setNoiPoints((noiResult.data || []) as NoiRow[]);
-      setMessage("Baltic Power dashboard ready.");
+      setMessage(`${label} dashboard ready.`);
     })();
-  }, []);
+  }, [projectKey]);
 
   const today = useMemo(() => {
     const value = new Date();
@@ -95,6 +106,15 @@ export default function WaddenSeaPage() {
   const noiOutstanding = upcoming.filter((point) => !point.noi_number).length;
   const currentItps = itps.filter((itp) => itp.overall_stage !== "Closed").length;
 
+  if (loaded && !registryProject) {
+    return (
+      <main style={page}>
+        <ImsTopMetaRow backHref="/projects" backLabel="Back to Project Management" status={<><strong>Status:</strong> Project not found.</>} />
+        <div style={empty}>This project is not in the project list. An admin can add it from Project Management.</div>
+      </main>
+    );
+  }
+
   return (
     <main style={page}>
       <style>{`
@@ -104,26 +124,27 @@ export default function WaddenSeaPage() {
         @keyframes projectViewEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 720px) { .project-dashboard-grid, .project-dashboard-kpis, .project-dashboard-quick { grid-template-columns: 1fr !important; } }
       `}</style>
-      <QualityPageHero label="Project workspace · BLP" title="Baltic Power" description="Live project controls, upcoming inspections, document reviews, and monthly reporting in one workspace." />
+      <QualityPageHero label={`Project workspace · ${config.abbreviation}`} title={label} description="Live project controls, upcoming inspections, document reviews, and monthly reporting in one workspace." />
 
       <ImsTopMetaRow backHref="/projects" backLabel="Back to Project Management" status={<><strong>Status:</strong> {message}</>} />
 
-      <ProjectWorkspaceNav projectKey="baltic-power" active="dashboard" />
+      <ProjectWorkspaceNav projectKey={projectKey} active="dashboard" />
 
       <div className="project-dashboard-command">
-        <ImsTabs tabs={[{ value: "overview", label: "Overview" }, { value: "planning", label: "Inspection Planning" }, { value: "controls", label: "Project Controls" }]} active={dashboardView} onChange={setDashboardView} ariaLabel="Baltic Power dashboard views" />
+        <ImsTabs tabs={[{ value: "overview", label: "Overview" }, { value: "planning", label: "Inspection Planning" }, { value: "controls", label: "Project Controls" }]} active={dashboardView} onChange={setDashboardView} ariaLabel={`${label} dashboard views`} />
       </div>
 
       {dashboardView === "overview" ? <div className="project-dashboard-panel" role="tabpanel">
       <section className="quality-kpi-grid project-dashboard-kpis" style={metrics}>
-        <QualityKpiCard title="Current ITPs" value={currentItps} accent="#63B1BC" href="/projects/baltic-power/itp" />
-        <QualityKpiCard title="ITPs Requiring Attention" value={itpAttention.length} accent="#53565A" href="/projects/baltic-power/itp" />
-        <QualityKpiCard title="Upcoming Inspections" value={upcoming.length} accent="#005670" href="/projects/baltic-power/noi" />
-        <QualityKpiCard title="NOI Outstanding" value={noiOutstanding} accent="#FFAD00" href="/projects/baltic-power/noi" />
-        <QualityKpiCard title="Overdue Inspections" value={overdue.length} accent="#F93822" href="/projects/baltic-power/noi" />
-        <QualityKpiCard title="NOI Requirements" value={noiPoints.length} accent="#005670" href="/projects/baltic-power/noi" />
-        <QualityKpiCard title="NOI Creator" value="Create" accent="#005670" href="/projects/baltic-power/noi/create" />
-        <QualityKpiCard title="ITP Sign-Off" value="Issue" accent="#005670" href="/projects/baltic-power/itp-sign-off" />
+        <QualityKpiCard title="Current ITPs" value={currentItps} accent="#63B1BC" href={`/projects/${projectKey}/itp`} />
+        <QualityKpiCard title="ITPs Requiring Attention" value={itpAttention.length} accent="#53565A" href={`/projects/${projectKey}/itp`} />
+        <QualityKpiCard title="Upcoming Inspections" value={upcoming.length} accent="#005670" href={`/projects/${projectKey}/noi`} />
+        <QualityKpiCard title="NOI Outstanding" value={noiOutstanding} accent="#FFAD00" href={`/projects/${projectKey}/noi`} />
+        <QualityKpiCard title="Overdue Inspections" value={overdue.length} accent="#F93822" href={`/projects/${projectKey}/noi`} />
+        <QualityKpiCard title="NOI Requirements" value={noiPoints.length} accent="#005670" href={`/projects/${projectKey}/noi`} />
+        <QualityKpiCard title="Open MOCs" value={openMocs === null ? "-" : openMocs} accent="#005670" href={`/moc?project=${projectKey}`} />
+        <QualityKpiCard title="NOI Creator" value="Create" accent="#005670" href={`/projects/${projectKey}/noi/create`} />
+        <QualityKpiCard title="ITP Sign-Off" value="Issue" accent="#005670" href={`/projects/${projectKey}/itp-sign-off`} />
       </section>
       </div> : null}
 
@@ -132,7 +153,7 @@ export default function WaddenSeaPage() {
         <div style={panel}>
           <div style={panelHeader}>
             <div><span style={kicker}>Next 8 weeks</span><h2 style={heading}>Upcoming inspections</h2></div>
-            <Link href="/projects/baltic-power/reports" style={actionLink}>Open lookahead →</Link>
+            {hasReports ? <Link href={`/projects/${projectKey}/reports`} style={actionLink}>Open lookahead →</Link> : <Link href="/inspections" style={actionLink}>Open Overall Inspections →</Link>}
           </div>
           <div style={list}>
             {upcoming.length ? upcoming.slice(0, 10).map((point) => {
@@ -151,7 +172,7 @@ export default function WaddenSeaPage() {
         <div style={panel}>
           <div style={panelHeader}>
             <div><span style={kicker}>Action required</span><h2 style={heading}>ITP review priorities</h2></div>
-            <Link href="/projects/baltic-power/itp" style={actionLink}>Open ITP tracker →</Link>
+            <Link href={`/projects/${projectKey}/itp`} style={actionLink}>Open ITP tracker →</Link>
           </div>
           <div style={list}>
             {itpAttention.length ? itpAttention.slice(0, 10).map((itp) => (
@@ -170,9 +191,9 @@ export default function WaddenSeaPage() {
       <section style={quickPanel}>
         <div><span style={kicker}>Quick access</span><h2 style={heading}>Project controls</h2></div>
         <div className="project-dashboard-quick" style={quickGrid}>
-          <Link href="/projects/baltic-power/itp" style={quickLink}><strong>Upload or review an ITP</strong><span>Manage metadata, revisions and Enshore decisions.</span></Link>
-          <Link href="/projects/baltic-power/noi" style={quickLink}><strong>Maintain NOI requirements</strong><span>Update inspection dates, numbers and status.</span></Link>
-          <Link href="/projects/baltic-power/reports" style={quickLink}><strong>Prepare monthly annexes</strong><span>Generate audit and eight-week lookahead outputs.</span></Link>
+          <Link href={`/projects/${projectKey}/itp`} style={quickLink}><strong>Upload or review an ITP</strong><span>Manage metadata, revisions and Enshore decisions.</span></Link>
+          <Link href={`/projects/${projectKey}/noi`} style={quickLink}><strong>Maintain NOI requirements</strong><span>Update inspection dates, numbers and status.</span></Link>
+          {hasReports ? <Link href={`/projects/${projectKey}/reports`} style={quickLink}><strong>Prepare monthly annexes</strong><span>Generate audit and eight-week lookahead outputs.</span></Link> : <Link href={`/moc?project=${projectKey}`} style={quickLink}><strong>Open the MOC register</strong><span>Raise, review and sign off changes for this project.</span></Link>}
         </div>
       </section>
       </div> : null}

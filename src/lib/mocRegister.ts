@@ -1,10 +1,10 @@
 import * as XLSX from "xlsx";
 
-// Reads the Wadden Sea MOC register workbook (kept in SharePoint) and prepares the annex for one project.
-// Nothing is stored: the workbook is read in the browser each time it is uploaded.
+// Prepares the client MOC register annex for one project, or for one part of a project (for example BA3).
+// Records come from the live MOC register, or from an uploaded register workbook (read in the browser; nothing is stored).
 
-export const MOC_PROJECTS = ["BA3", "LW2", "LW4"] as const;
-export type MocProject = (typeof MOC_PROJECTS)[number];
+// A part of a project, such as "BA3". An empty string means the whole project (projects without parts).
+export type MocProject = string;
 
 export const MOC_STATUSES = ["Draft", "Under review", "Approved - implementing", "Implemented - close-out pending", "Closed", "Not implemented", "To confirm"];
 
@@ -32,6 +32,7 @@ export type AnnexRow = MocRecord & { actionsTotal: number; actionsClosed: number
 export type AnnexAction = MocAction & { title: string };
 export type Annex = {
   project: MocProject;
+  projectLabel: string;
   reportDate: string;
   rows: AnnexRow[];
   openActions: AnnexAction[];
@@ -88,8 +89,10 @@ export function isToConfirm(status: string) {
   return /^to confirm/i.test(clean(status)) || !clean(status);
 }
 
-// "All" applies to every project. Otherwise the cell lists one or more of BA3, LW2, LW4 ("BA3 & LW2", "BA3, LW4").
+// "All" applies to every part. Otherwise the cell lists one or more parts ("BA3 & LW2", "BA3, LW4"). With no part chosen
+// (a project without parts) every MOC applies.
 export function appliesToProject(appliesTo: string, project: MocProject) {
+  if (!project) return true;
   const tokens = clean(appliesTo).toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
   if (!tokens.length) return true;
   return tokens.includes("ALL") || tokens.includes(project);
@@ -186,7 +189,7 @@ export function parseMocWorkbook(data: ArrayBuffer): MocWorkbook {
   return { mocs, actions, warnings };
 }
 
-export function buildAnnex(source: MocWorkbook, project: MocProject, options: { includeFinished: boolean; reportDate: string }): Annex {
+export function buildAnnex(source: MocWorkbook, project: MocProject, options: { includeFinished: boolean; reportDate: string; projectLabel?: string }): Annex {
   const today = options.reportDate;
   const rows: AnnexRow[] = source.mocs
     .filter((moc) => appliesToProject(moc.appliesTo, project) && (options.includeFinished || !isFinished(moc.status)))
@@ -200,6 +203,7 @@ export function buildAnnex(source: MocWorkbook, project: MocProject, options: { 
     .map((action) => ({ ...action, title: rows.find((row) => row.mocNo.toLowerCase() === action.mocNo.toLowerCase())?.title || "" }));
   return {
     project,
+    projectLabel: options.projectLabel || "Project",
     reportDate: today,
     rows,
     openActions,

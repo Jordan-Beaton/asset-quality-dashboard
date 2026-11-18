@@ -27,7 +27,7 @@ import { ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { WaddenSeaOpenPoints } from "../../../src/components/WaddenSeaOpenPoints";
-import { WaddenSeaMocRegister } from "../../../src/components/WaddenSeaMocRegister";
+import { MocRegisterAnnex } from "../../../src/components/MocRegisterAnnex";
 import { ProjectWorkspaceNav } from "../../../src/components/ProjectWorkspaceNav";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
@@ -1245,7 +1245,7 @@ export default function ProjectReportsPage() {
 
       {activeAnnex === "open-points" ? <WaddenSeaOpenPoints /> : null}
 
-      {activeAnnex === "moc" ? <WaddenSeaMocRegister /> : null}
+      {activeAnnex === "moc" ? <MocRegisterAnnex projectKey="wadden-sea" /> : null}
 
       {activeAnnex === "audit-ncr" || activeAnnex === "audit-programme" ? (
         <section style={panelStyle}>

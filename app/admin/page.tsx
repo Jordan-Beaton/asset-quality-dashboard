@@ -7,6 +7,7 @@ import { ImsButton, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/component
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import SpeakUpAdminPanel from "../../src/components/speakup/SpeakUpAdminPanel";
+import { AddProjectPanel } from "../../src/components/AddProjectPanel";
 import { IMS_PERMISSION_REGISTRY } from "../../src/lib/imsPermissionRegistry";
 import { useUrlState } from "../../src/lib/useUrlState";
 import {
@@ -392,7 +393,7 @@ export default function AdminDashboardPage() {
   });
   const [companyForm, setCompanyForm] = useState<CompanySettings>(initialCompany);
   const [newDepartment, setNewDepartment] = useState({ name: "", code: "" });
-  const [newProject, setNewProject] = useState({ code: "", name: "", type: "Project" });
+  const [newProject, setNewProject] = useState({ code: "", name: "", type: "Vessel" });
   const [personDrafts, setPersonDrafts] = useState<Record<string, Partial<PersonRow>>>({});
   const [userSearch, setUserSearch] = useUrlState("search", "");
   const [showInvitePanel, setShowInvitePanel] = useState(false);
@@ -987,7 +988,7 @@ export default function AdminDashboardPage() {
   async function addProject() {
     if (!requireCreatePermission("add Admin reference projects")) return;
     const ok = await postAdminAction("addProject", newProject, `${newProject.name} added successfully.`);
-    if (ok) setNewProject({ code: "", name: "", type: "Project" });
+    if (ok) setNewProject({ code: "", name: "", type: "Vessel" });
   }
 
   return (
@@ -1540,12 +1541,13 @@ export default function AdminDashboardPage() {
             <ReferenceList items={departments.map((department) => ({ id: department.id, label: department.name, meta: department.code || "", active: department.active }))} />
           </ImsPanel>
 
-          <ImsPanel title="Projects / Vessels / Sites" subtitle="Foundation list for project and site dropdowns.">
+          <AddProjectPanel />
+
+          <ImsPanel title="Projects / Vessels / Sites" subtitle="Foundation list for project and site dropdowns. Add projects with the panel above so they get their MOC numbering; use this form for vessels, sites and clients.">
             <div style={{ ...formGridStyle, gridTemplateColumns: "150px 1fr 160px auto", marginBottom: 16 }}>
               <input value={newProject.code} onChange={(event) => setNewProject({ ...newProject, code: event.target.value.toUpperCase() })} style={imsInputStyle} placeholder="Project code" />
               <input value={newProject.name} onChange={(event) => setNewProject({ ...newProject, name: event.target.value })} style={imsInputStyle} placeholder="Project / vessel / site name" />
               <SelectField value={newProject.type} onChange={(value) => setNewProject({ ...newProject, type: value })}>
-                <option value="Project">Project</option>
                 <option value="Vessel">Vessel</option>
                 <option value="Site">Site</option>
                 <option value="Client">Client</option>

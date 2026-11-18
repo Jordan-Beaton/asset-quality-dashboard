@@ -11,6 +11,7 @@ import { MobileCompatibilityGuard } from "./MobileCompatibilityGuard";
 import { NavTracker } from "./NavTracker";
 import NotificationBell from "./NotificationBell";
 import { supabase } from "../lib/supabase";
+import { useProjectRegistry } from "../lib/useProjectRegistry";
 import { getPermissionTargetFromPath } from "../lib/imsPermissionRegistry";
 
 type AppShellProps = {
@@ -106,14 +107,15 @@ type NavIconKey =
   | "observations"
   | "lessons";
 
-const projectNavItems: NavItem[] = [
-  { href: "/home", label: "Home", icon: "home" },
-  { href: "/projects", label: "Projects", icon: "dashboard" },
-  { href: "/projects/wadden-sea", label: "Wadden Sea", icon: "assets" },
-  { href: "/projects/baltic-power", label: "Baltic Power", icon: "assets" },
-  { href: "/inspections", label: "Overall Inspections", icon: "inspection" },
-  { href: "/guides?guide=review-points", label: "Process Guides", icon: "lessons" },
-];
+function buildProjectNavItems(projects: Array<{ key: string; name: string }>): NavItem[] {
+  return [
+    { href: "/home", label: "Home", icon: "home" },
+    { href: "/projects", label: "Projects", icon: "dashboard" },
+    ...projects.map((project) => ({ href: `/projects/${project.key}`, label: project.name, icon: "assets" as const })),
+    { href: "/inspections", label: "Overall Inspections", icon: "inspection" },
+    { href: "/guides?guide=review-points", label: "Process Guides", icon: "lessons" },
+  ];
+}
 
 const qualityNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
@@ -776,6 +778,7 @@ export default function AppShell({ children }: AppShellProps) {
   const isProjectModule = pathname.startsWith("/projects") || pathname.startsWith("/inspections");
   const isLessonsModule = pathname.startsWith("/lessons-learned");
   const isMocModule = pathname === "/moc" || pathname.startsWith("/moc/");
+  const { projects: registryProjects } = useProjectRegistry(isProjectModule);
   const isAinmFieldMode = pathname === "/hse/ainm/field";
   const isAssetInspectionFieldMode = pathname === "/assets/inspection/field";
   const isAssetMaintenanceFieldMode = pathname === "/assets/maintenance/field";
@@ -861,7 +864,7 @@ export default function AppShell({ children }: AppShellProps) {
     : isActionModule
     ? actionNavItems
     : isProjectModule
-    ? projectNavItems
+    ? buildProjectNavItems(registryProjects)
     : isLessonsModule
     ? lessonsNavItems
     : isMocModule

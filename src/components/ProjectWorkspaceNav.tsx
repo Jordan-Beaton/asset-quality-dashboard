@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { imsActiveTabButtonStyle, imsTabButtonStyle, imsTabListStyle } from "./imsTheme";
 import { getProject } from "../lib/projectRegistry";
 
-export type ProjectTab = "dashboard" | "itp" | "noi" | "noi-creator" | "review-points" | "inspection-records" | "reports" | "itp-sign-off";
+export type ProjectTab = "dashboard" | "itp" | "noi" | "noi-creator" | "review-points" | "inspection-records" | "reports" | "itp-sign-off" | "moc";
 
 const TAB_LABELS: Record<ProjectTab, string> = {
   dashboard: "Dashboard",
@@ -16,10 +16,12 @@ const TAB_LABELS: Record<ProjectTab, string> = {
   "inspection-records": "Inspection Records",
   reports: "Project Reports",
   "itp-sign-off": "ITP Sign-Off",
+  moc: "MOC",
 };
 
 function tabHref(projectKey: string, tab: ProjectTab): string {
   if (tab === "dashboard") return `/projects/${projectKey}`;
+  if (tab === "moc") return `/moc?project=${projectKey}`;
   if (tab === "noi-creator") return `/projects/${projectKey}/noi/create`;
   return `/projects/${projectKey}/${tab}`;
 }

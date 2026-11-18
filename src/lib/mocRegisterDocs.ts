@@ -17,7 +17,7 @@ import {
 } from "docx";
 import { actionsText, formatDate, implementationPeriod, nextStepText, type Annex } from "./mocRegister";
 
-// The Word and PDF annexes follow the house style of the other Wadden Sea Project Reports annexes:
+// The Word and PDF annexes follow the house style of the Project Reports annexes:
 // landscape A4, Calibri, teal header row with white bold text, grey banded rows, project title block, page footer.
 // Cost is never included, and neither are the internal notes in the workbook.
 
@@ -49,7 +49,8 @@ function actionBody(annex: Annex) {
 }
 
 export function mocFileName(annex: Annex, extension: "docx" | "pdf") {
-  return `Wadden-Sea-MOC-Register-${annex.project}-${annex.reportDate}.${extension}`;
+  const label = annex.projectLabel.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "Project";
+  return `${label}-MOC-Register${annex.project ? `-${annex.project}` : ""}-${annex.reportDate}.${extension}`;
 }
 
 export function buildMocWord(annex: Annex): WordDocument {
@@ -75,16 +76,16 @@ export function buildMocWord(annex: Annex): WordDocument {
         ...rows.map((row, rowIndex) => new TableRow({ cantSplit: true, children: row.map((value, index) => cell(value, widths[index], { fill: rowIndex % 2 === 0 ? GREY : undefined })) })),
       ],
     });
-  const title = `MOC Register - ${annex.project}`;
+  const title = `MOC Register - ${annex.project || annex.projectLabel}`;
   const note = (text: string) => new Paragraph({ spacing: { before: 80, after: 80 }, children: [new TextRun({ text, font: "Calibri", size: 15, color: MUTED })] });
   const actionRows = actionBody(annex);
   return new WordDocument({
     styles: { default: { document: { run: { font: "Calibri", size: 17, color: "000000" } } } },
     sections: [{
       properties: { page: { size: { orientation: PageOrientation.LANDSCAPE }, margin: { top: 540, right: 540, bottom: 720, left: 540, footer: 300 } } },
-      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Wadden Sea | ${title} | Page `, font: "Calibri", size: 15, color: MUTED }), new SimpleField("PAGE"), new TextRun({ text: " of ", font: "Calibri", size: 15, color: MUTED }), new SimpleField("NUMPAGES")] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${annex.projectLabel} | ${title} | Page `, font: "Calibri", size: 15, color: MUTED }), new SimpleField("PAGE"), new TextRun({ text: " of ", font: "Calibri", size: 15, color: MUTED }), new SimpleField("NUMPAGES")] })] }) },
       children: [
-        new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: "WADDEN SEA PROJECT", font: "Calibri", bold: true, size: 32, color: TEAL })] }),
+        new Paragraph({ spacing: { after: 50 }, children: [new TextRun({ text: `${annex.projectLabel.toUpperCase()} PROJECT`, font: "Calibri", bold: true, size: 32, color: TEAL })] }),
         new Paragraph({ spacing: { after: 70 }, children: [new TextRun({ text: title, font: "Calibri", bold: true, size: 26 })] }),
         new Paragraph({ spacing: { after: 170 }, children: [new TextRun({ text: summaryLine(annex), font: "Calibri", size: 16, color: MUTED })] }),
         annex.rows.length ? table(REGISTER_HEAD, REGISTER_WIDTHS, registerBody(annex)) : note("No MOCs apply to this project at the reporting date."),
@@ -99,13 +100,13 @@ export function buildMocPdf(annex: Annex): jsPDF {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
-  const title = `MOC Register - ${annex.project}`;
+  const title = `MOC Register - ${annex.project || annex.projectLabel}`;
   doc.setFillColor(0, 86, 112);
   doc.rect(0, 0, width, 24, "F");
   doc.setFont("helvetica", "bold");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(17);
-  doc.text("WADDEN SEA PROJECT", 10, 11);
+  doc.text(`${annex.projectLabel.toUpperCase()} PROJECT`, 10, 11);
   doc.setFontSize(10);
   doc.text(title, 10, 18);
   doc.setTextColor(83, 86, 90);
@@ -137,7 +138,7 @@ export function buildMocPdf(annex: Annex): jsPDF {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(83, 86, 90);
-    doc.text(`Wadden Sea | ${title}`, 10, height - 6);
+    doc.text(`${annex.projectLabel} | ${title}`, 10, height - 6);
     doc.text(`Page ${page} of ${pages}`, width - 10, height - 6, { align: "right" });
   }
   return doc;

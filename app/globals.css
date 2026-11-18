@@ -1528,3 +1528,20 @@ textarea {
   height: auto !important;
   min-height: 64px !important;
 }
+
+/* A text box that sits inside a box that already draws the border (tag inputs, pickers). */
+.ims-page-container input.ims-bare-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+.ims-page-container input.ims-bare-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):focus {
+  width: auto !important;
+  flex: 1 1 0%;
+  min-width: 0;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  font-size: var(--ims-text-base) !important;
+}
