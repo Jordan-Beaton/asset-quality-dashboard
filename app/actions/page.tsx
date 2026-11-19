@@ -4660,15 +4660,15 @@ function ActionsPageContent() {
         <div style={{ overflowX: "auto" }}>
           <table style={registerTableStyle}>
             <colgroup>
-              <col style={{ width: 95 }} />
-              <col />
-              <col style={{ width: 120 }} />
               <col style={{ width: 90 }} />
-              <col style={{ width: 180 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 105 }} />
-              <col style={{ width: 110 }} />
+              <col />
+              <col style={{ width: 115 }} />
+              <col style={{ width: 90 }} />
               <col style={{ width: 150 }} />
+              <col style={{ width: 110 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 105 }} />
+              <col style={{ width: 145 }} />
             </colgroup>
             <thead>
               <tr>
@@ -4720,7 +4720,7 @@ function ActionsPageContent() {
                         <div style={actionNumberCellStyle}>{action.action_number || "-"}</div>
                       </td>
                       <td style={registerCellStyle}>
-                        <div style={registerTitleStyle} title={action.title || undefined}>{action.title || "-"}</div>
+                        <span style={registerTitleStyle} title={action.title || undefined}>{action.title || "-"}</span>
                         <div style={{ ...secondaryCellTextStyle, ...oneLineStyle }}>
                           {[buildActionSourceLabel(action), raisedByLabel(action, people)].filter(Boolean).join(" · ") || " "}
                         </div>
@@ -4758,7 +4758,7 @@ function ActionsPageContent() {
                               event.stopPropagation();
                               setSelectedEvidenceAction(action);
                             }}
-                            style={miniButtonStyle}
+                            style={{ ...miniButtonStyle, ...registerButtonStyle }}
                           >
                             Open
                           </button>
@@ -4768,7 +4768,7 @@ function ActionsPageContent() {
                               event.stopPropagation();
                               deleteAction(action.id);
                             }}
-                            style={miniButtonDeleteStyle}
+                            style={{ ...miniButtonDeleteStyle, ...registerButtonStyle }}
                             disabled={!canEditAction}
                           >
                             Delete
@@ -6361,8 +6361,11 @@ const tableStyle: CSSProperties = {
   fontSize: "13px",
 };
 
-// The Action Register table: fixed layout so all nine columns fit the screen at desktop widths. Below 1200px it scrolls.
-const registerTableStyle: CSSProperties = { ...tableStyle, tableLayout: "fixed", minWidth: 1200 };
+// The Action Register table: fixed layout so all nine columns fit the screen from about 1070px wide. Narrower scrolls.
+// The IMS-wide table rules clip the first element in a cell to one line, so the title is a span (clamped to two lines
+// here) and the row buttons are compact enough to sit inside their column.
+const registerTableStyle: CSSProperties = { ...tableStyle, tableLayout: "fixed", minWidth: 1065 };
+const registerButtonStyle: CSSProperties = { padding: "6px 10px", fontSize: "13px" };
 // Two lines at most; the full text is on hover and in the detail panel.
 const registerTitleStyle: CSSProperties = { fontWeight: 600, color: "#000000", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" };
 const oneLineStyle: CSSProperties = { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
@@ -6462,7 +6465,7 @@ const emptyTableCellStyle: CSSProperties = {
 
 const actionButtonsWrapStyle: CSSProperties = {
   display: "flex",
-  gap: "8px",
+  gap: "6px",
   flexWrap: "wrap",
 };
 
