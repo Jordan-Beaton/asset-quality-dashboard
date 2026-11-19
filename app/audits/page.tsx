@@ -4479,14 +4479,14 @@ function AuditsPageContent() {
                         >
                           <div style={openFindingsPrimaryCellStyle}>{finding.reference}</div>
                           <div style={openFindingsCellMutedStyle}>{finding.audit_number}</div>
-                          <div style={openFindingsTitleCellStyle}>{finding.audit_title}</div>
+                          <div style={openFindingsTitleCellStyle}><span style={openFindingsClampStyle} title={finding.audit_title || undefined}>{finding.audit_title}</span></div>
                           <div>
                             <span style={{ ...badgeStyle, background: tone.bg, color: tone.color }}>
                               {finding.category}
                             </span>
                           </div>
-                          <div style={openFindingsBodyTextStyle}>{finding.description || "-"}</div>
-                          <div style={openFindingsBodyTextStyle}>{finding.owner || "-"}</div>
+                          <div style={openFindingsBodyTextStyle}><span style={openFindingsClampStyle} title={finding.description || undefined}>{finding.description || "-"}</span></div>
+                          <div style={openFindingsBodyTextStyle}><span style={openFindingsClampStyle} title={finding.owner || undefined}>{finding.owner || "-"}</span></div>
                           <div style={openFindingsCellMutedStyle}>{formatDate(finding.due_date)}</div>
                           {isClosedFindingsView ? (
                             <div style={openFindingsCellMutedStyle}>{formatDate(finding.closure_date)}</div>
@@ -4503,7 +4503,7 @@ function AuditsPageContent() {
                               </span>
                             </div>
                           )}
-                          <div style={openFindingsBodyTextStyle}>{finding.root_cause || "-"}</div>
+                          <div style={openFindingsBodyTextStyle}><span style={openFindingsClampStyle} title={finding.root_cause || undefined}>{finding.root_cause || "-"}</span></div>
                           <div style={openFindingsActionCellStyle}>
                             <span style={openFindingsActionPillStyle}>Edit finding</span>
                           </div>
@@ -6594,6 +6594,20 @@ const openFindingsSummaryStyle: CSSProperties = {
   fontSize: "14px",
 };
 
+const FINDINGS_GRID_COLUMNS = "145px 100px minmax(100px, 1.4fr) 84px minmax(110px, 2.2fr) 120px 100px 108px minmax(100px, 1.5fr) 118px";
+const FINDINGS_GRID_MIN_WIDTH = 1085;
+
+// The IMS register rules cut every cell to one line with "...". Long text sits in an inner span that wraps to two lines.
+const openFindingsClampStyle: CSSProperties = {
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 2,
+  overflow: "hidden",
+  whiteSpace: "normal",
+  overflowWrap: "anywhere",
+  lineHeight: 1.35,
+};
+
 const openFindingsTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
@@ -6604,7 +6618,8 @@ const openFindingsTableWrapStyle: CSSProperties = {
 
 const openFindingsHeadStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 1.15fr 1.8fr 0.85fr 2.2fr 1fr 0.9fr 0.95fr 1.4fr 0.95fr",
+  gridTemplateColumns: FINDINGS_GRID_COLUMNS,
+  minWidth: FINDINGS_GRID_MIN_WIDTH,
   gap: "8px",
   padding: "9px 10px",
   background: "#005670",
@@ -6619,13 +6634,15 @@ const openFindingsHeadStyle: CSSProperties = {
 
 const openFindingsBodyStyle: CSSProperties = {
   display: "grid",
+  minWidth: FINDINGS_GRID_MIN_WIDTH,
 };
 
 const openFindingsRowStyle: CSSProperties = {
   width: "100%",
   textAlign: "left",
   display: "grid",
-  gridTemplateColumns: "1fr 1.15fr 1.8fr 0.85fr 2.2fr 1fr 0.9fr 0.95fr 1.4fr 0.95fr",
+  gridTemplateColumns: FINDINGS_GRID_COLUMNS,
+  minWidth: FINDINGS_GRID_MIN_WIDTH,
   gap: "8px",
   padding: "10px",
   borderTop: "none",
