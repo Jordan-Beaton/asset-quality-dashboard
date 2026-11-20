@@ -11,8 +11,12 @@ import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
 import { QualityPageHero } from "./QualityPageHero";
 import { supabase } from "../lib/supabase";
 import { getProject } from "../lib/projectRegistry";
+import { downloadCommentsExcel, downloadCommentsWord } from "../lib/itpCommentExport";
 import {
+  COMMENT_ROUND_DAYS,
   STATE_LABEL,
+  addWorkingDays,
+  commentProgress,
   daysLate,
   daysWaiting,
   formatDateTime,
@@ -20,12 +24,15 @@ import {
   formatShortDate,
   gateSteps,
   holderOf,
+  initialsOf,
   notifyListOf,
   sameEmail,
+  supplierCommentsText,
   todayLondon,
   type GateStep,
   type ItpActivity,
   type ItpComment,
+  type ItpCommentRequest,
   type ItpPerson,
   type WorkflowRevision,
 } from "../lib/itpWorkflow";
@@ -56,8 +63,24 @@ type Itp = {
   project_itp_revisions?: Revision[];
 };
 
-type Draft = { choice: string | null; note: string; comments: Array<{ ref: string; text: string }>; approverEmail: string; error: string };
-const emptyDraft: Draft = { choice: null, note: "", comments: [{ ref: "", text: "" }], approverEmail: "", error: "" };
+type Draft = {
+  choice: string | null;
+  note: string;
+  comments: Array<{ ref: string; text: string }>;
+  approverEmail: string;
+  error: string;
+  // sharing for team comments
+  shareList: ItpPerson[];
+  shareDue: string;
+  shareNote: string;
+  // issuing comments to the supplier: comments on the page the reviewer has unticked stay internal
+  unticked: string[];
+  showNames: boolean;
+  emailUploader: boolean;
+  copied: boolean;
+};
+const SHARE_NOTE_DEFAULT = "Please read this revision and add your comments by the due date. I will send everything to the supplier together.";
+const emptyDraft: Draft = { choice: null, note: "", comments: [{ ref: "", text: "" }], approverEmail: "", error: "", shareList: [], shareDue: "", shareNote: "", unticked: [], showNames: false, emailUploader: false, copied: false };
 
 type Toast = { tone: "ok" | "warn"; text: string } | null;
 
@@ -82,6 +105,7 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
   const [itp, setItp] = useState<Itp | null>(null);
   const [activity, setActivity] = useState<ItpActivity[]>([]);
   const [comments, setComments] = useState<ItpComment[]>([]);
+  const [requests, setRequests] = useState<ItpCommentRequest[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [counts, setCounts] = useState<{ noi: number; review: number } | null>(null);
   const [myEmail, setMyEmail] = useState("");
@@ -99,10 +123,11 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
   const [newComment, setNewComment] = useState({ ref: "", body: "" });
 
   const load = useCallback(async () => {
-    const [itpResult, activityResult, commentResult, peopleResult, auth] = await Promise.all([
+    const [itpResult, activityResult, commentResult, requestResult, peopleResult, auth] = await Promise.all([
       supabase.from("project_itps").select("*, project_itp_revisions(*)").eq("id", itpId).eq("project_key", projectKey).maybeSingle(),
       supabase.from("project_itp_activity").select("*").eq("itp_id", itpId).order("created_at", { ascending: false }),
       supabase.from("project_itp_comments").select("*").eq("itp_id", itpId).order("created_at", { ascending: false }),
+      supabase.from("project_itp_comment_requests").select("*").eq("itp_id", itpId).order("created_at", { ascending: true }),
       supabase.from("people").select("id,name,role,department,email").eq("active", true).not("email", "is", null).order("name", { ascending: true }),
       supabase.auth.getUser(),
     ]);
@@ -115,6 +140,8 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
     setProblem(activityResult.error || commentResult.error ? SETUP_NOTICE : "");
     setActivity(activityResult.error ? [] : (activityResult.data || []) as ItpActivity[]);
     setComments(commentResult.error ? [] : (commentResult.data || []) as ItpComment[]);
+    // Until the one-off team-comments SQL has been run this table does not exist, which simply means nobody was asked.
+    setRequests(requestResult.error ? [] : (requestResult.data || []) as ItpCommentRequest[]);
     if (!peopleResult.error) setPeople((peopleResult.data || []) as PersonOption[]);
     setMyEmail((auth.data.user?.email || "").toLowerCase());
     if (revision) {
@@ -140,7 +167,10 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
   const canEdit = permissions.loaded && (isAdmin || permissions.canEdit);
   const canAssign = Boolean(revision) && state !== "Approved" && (isAdmin || isUploader || isReviewer);
   const canManageComments = isAdmin || isUploader || isReviewer || isApprover;
-  const canComment = canManageComments || Boolean(revision && notifyListOf(revision).some((person) => sameEmail(person.email, myEmail)));
+  const revisionRequests = useMemo(() => requests.filter((request) => request.revision_id === revision?.id && request.status !== "Closed"), [requests, revision?.id]);
+  const myRequest = revisionRequests.find((request) => sameEmail(request.person_email, myEmail));
+  const progress = commentProgress(revisionRequests);
+  const canComment = canManageComments || Boolean(revision && notifyListOf(revision).some((person) => sameEmail(person.email, myEmail))) || Boolean(myRequest);
   const holder = revision ? holderOf(revision) : null;
   const late = revision ? daysLate(revision) : 0;
   const waiting = revision ? daysWaiting(revision) : 0;
@@ -148,6 +178,9 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
   const revisionComments = useMemo(() => comments.filter((comment) => comment.revision_id === revision?.id), [comments, revision?.id]);
   const earlierOpen = useMemo(() => comments.filter((comment) => comment.revision_id !== revision?.id && comment.status === "Open"), [comments, revision?.id]);
   const reviewNote = useMemo(() => revisionComments.find((comment) => comment.kind === "Review note"), [revisionComments]);
+  // Comments on this revision that have not been issued to the supplier, oldest first (the page shows newest first).
+  const pageComments = useMemo(() => revisionComments.filter((comment) => comment.kind === "General").sort((a, b) => a.created_at.localeCompare(b.created_at)), [revisionComments]);
+  const commentsBy = (email: string) => pageComments.filter((comment) => sameEmail(comment.author_email, email)).length;
   const visibleActivity = useMemo(() => activity.filter((event) => showEarlier || !event.revision_id || event.revision_id === revision?.id), [activity, revision?.id, showEarlier]);
   const hasEarlierActivity = activity.some((event) => event.revision_id && event.revision_id !== revision?.id);
 
@@ -169,16 +202,98 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
     }
   }
 
+  function chooseDecision(value: string) {
+    if (value === "share" && !draft.shareDue) {
+      // Start the list with the approver and anyone copied in, but not people who are already asked.
+      const already = new Set(revisionRequests.map((request) => request.person_email.toLowerCase()));
+      const start = [
+        revision?.approver_email ? { name: revision.approver_name || revision.approver_email, email: revision.approver_email } : null,
+        ...(revision ? notifyListOf(revision) : []),
+      ].filter((person): person is ItpPerson => Boolean(person) && !sameEmail(person?.email, myEmail) && !already.has((person?.email || "").toLowerCase()));
+      setDraft({ ...draft, choice: value, error: "", shareList: start, shareDue: addWorkingDays(todayLondon(), COMMENT_ROUND_DAYS), shareNote: SHARE_NOTE_DEFAULT });
+      return;
+    }
+    setDraft({ ...draft, choice: value, error: "" });
+  }
+
+  // The comments that would go to the supplier: ticked ones already on the page, plus any typed on the spot.
+  function issuedLines() {
+    const typed = draft.comments.map((item) => ({ ref: item.ref.trim(), text: item.text.trim() })).filter((item) => item.text);
+    const picked = pageComments.filter((comment) => !draft.unticked.includes(comment.id));
+    return {
+      typed,
+      picked,
+      lines: [
+        ...picked.map((comment) => ({ ref: comment.ref, text: comment.body, author: comment.author_name, date: comment.created_at })),
+        ...typed.map((item) => ({ ref: item.ref || null, text: item.text, author: revision?.reviewer_name || null, date: new Date().toISOString() })),
+      ],
+    };
+  }
+
+  async function submitShare() {
+    if (!revision) return;
+    if (!draft.shareList.length) { setDraft({ ...draft, error: "Choose at least one person to comment." }); return; }
+    if (draft.shareDue && draft.shareDue < todayLondon()) { setDraft({ ...draft, error: "The due date cannot be in the past." }); return; }
+    const count = draft.shareList.length;
+    await run(() => callWorkflow({ action: "share", revisionId: revision.id, emails: draft.shareList.map((person) => person.email), dueDate: draft.shareDue || undefined, note: draft.shareNote }),
+      `Shared for comments. ${count === 1 ? draft.shareList[0].name : `${count} people`} ${count === 1 ? "has" : "have"} been emailed.`);
+  }
+
+  async function finishCommenting(noComments: boolean) {
+    if (!revision) return;
+    await run(() => callWorkflow({ action: "finishComments", revisionId: revision.id, noComments }), `Thank you. ${revision.reviewer_name || "The reviewer"} has been told you have finished.`);
+  }
+
+  async function remindCommenters(email?: string) {
+    if (!revision) return;
+    await run(() => callWorkflow({ action: "remindCommenters", revisionId: revision.id, email }), email ? "Reminder sent." : "Reminder sent to everyone who has not finished.");
+  }
+
   async function submitReview() {
     if (!revision || !draft.choice) return;
-    const filled = draft.comments.map((item) => ({ ref: item.ref.trim(), text: item.text.trim() })).filter((item) => item.text);
-    if (draft.choice === "comments" && !filled.length) { setDraft({ ...draft, error: "Add at least one comment for the supplier." }); return; }
+    const { typed: filled, picked } = issuedLines();
+    if (draft.choice === "comments" && !filled.length && !picked.length) { setDraft({ ...draft, error: "Tick or add at least one comment to issue to the supplier." }); return; }
     if (draft.choice === "reject" && !draft.note.trim()) { setDraft({ ...draft, error: "Give a reason for the rejection." }); return; }
     if (draft.choice === "recommend" && !(draft.approverEmail || revision.approver_email)) { setDraft({ ...draft, error: "Choose who will approve this ITP." }); return; }
     const message = draft.choice === "recommend" ? `Review submitted. ${people.find((p) => p.email === (draft.approverEmail || revision.approver_email))?.name || "The approver"} has been emailed and Gate 2 is open.`
-      : draft.choice === "comments" ? "Comments issued. They are logged on the ITP and emailed to the uploader for the supplier."
+      : draft.choice === "comments" ? `Comments recorded as issued (${picked.length + filled.length}). The ITP is now with the supplier.${draft.emailUploader ? ` ${revision.uploader_name || "The uploader"} has been emailed.` : ""}`
       : "ITP rejected. The reason is logged and emailed to the uploader for the supplier.";
-    await run(() => callWorkflow({ action: "review", revisionId: revision.id, decision: draft.choice, note: draft.note, comments: filled, approverEmail: draft.approverEmail || undefined }), message);
+    await run(() => callWorkflow({
+      action: "review",
+      revisionId: revision.id,
+      decision: draft.choice,
+      note: draft.note,
+      comments: filled,
+      commentIds: picked.map((comment) => comment.id),
+      emailUploader: draft.emailUploader,
+      approverEmail: draft.approverEmail || undefined,
+    }), message);
+  }
+
+  function exportHead() {
+    return { documentNumber: itp?.document_number || "ITP", title: itp?.title || "", revision: revision?.revision || "", supplier: itp?.supplier || null, showNames: draft.showNames };
+  }
+
+  async function copyForEmail(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setDraft((current) => ({ ...current, copied: true }));
+    } catch {
+      const box = document.getElementById("itp-issue-text") as HTMLTextAreaElement | null;
+      box?.focus();
+      box?.select();
+      setToast({ tone: "warn", text: "Your browser would not copy it automatically. The text is selected, so press Ctrl+C." });
+      setDraft((current) => ({ ...current, copied: true }));
+    }
+  }
+
+  async function downloadFile(kind: "word" | "excel", lines: Array<{ ref: string | null; text: string; author: string | null; date: string }>) {
+    try {
+      if (kind === "word") await downloadCommentsWord(exportHead(), lines);
+      else await downloadCommentsExcel(exportHead(), lines);
+    } catch (error) {
+      setToast({ tone: "warn", text: error instanceof Error ? error.message : "The file could not be made." });
+    }
   }
 
   async function submitApproval() {
@@ -277,7 +392,7 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
     const approvalWho = legacy ? "Not recorded" : revision.approved_by_name || revision.approver_name || "Chosen after review";
     const reviewSub = legacy ? "Before the stage gate"
       : steps.review === "done" ? formatShortDate(revision.reviewed_at)
-      : steps.review === "active" ? (revision.gate_due_date ? `Due ${formatShortDate(revision.gate_due_date)}` : "Needs a reviewer")
+      : steps.review === "active" ? (progress.total ? `Team comments ${progress.finished} of ${progress.total}` : revision.gate_due_date ? `Due ${formatShortDate(revision.gate_due_date)}` : "Needs a reviewer")
       : revision.approval_outcome === "Rejected" ? "Rejected at approval" : `${revision.review_outcome || "Comments issued"} ${formatShortDate(revision.reviewed_at)}`.trim();
     const approvalSub = legacy ? "Before the stage gate"
       : steps.approval === "done" ? formatShortDate(revision.approved_at)
@@ -333,7 +448,7 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
         <section className="itp-card">
           <div className="itp-card-h"><h3>With supplier</h3><span className="itp-pill bad">{revision.review_outcome === "Rejected" || revision.approval_outcome === "Rejected" ? "Rejected" : "Comments issued"}</span></div>
           <p className="itp-muted" style={flat}>{revision.review_outcome === "Rejected" || revision.approval_outcome === "Rejected" ? "This revision was rejected." : "Comments were issued on this revision."} The reasons are in Comments. The next step is a new revision from {itp.supplier || "the supplier"}, which restarts the review at Gate 1 and emails the reviewer.</p>
-          <div className="itp-submit"><span className="itp-sends">The comments email went to {revision.uploader_name || "the uploader"}.</span>
+          <div className="itp-submit"><span className="itp-sends">{revision.review_outcome === "Rejected" || revision.approval_outcome === "Rejected" ? `The rejection went to ${revision.uploader_name || "the uploader"}.` : `${revision.reviewed_by_name || "The reviewer"} sent the comments to the supplier by email, outside the IMS.`}</span>
             <Link style={{ ...primaryButton, textDecoration: "none" }} href={`/projects/${projectKey}/itp?upload=1`}>Upload new revision</Link></div>
         </section>
       );
@@ -355,43 +470,137 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
     if (state === "Awaiting Review" && isReviewer) {
       const choice = draft.choice;
       const needsApprover = choice === "recommend" && !revision.approver_email;
+      const issue = issuedLines();
+      const mailText = supplierCommentsText({ documentNumber: itp.document_number, title: itp.title, revision: revision.revision, showNames: draft.showNames, items: issue.lines });
+      const uploaderName = revision.uploader_name || "the uploader";
       return (
         <section className="itp-card" aria-label="Your review">
           <div className="itp-card-h"><h3>Your review</h3><span className={`itp-pill ${late ? "bad" : "wait"}`}>{late ? `${late} ${late === 1 ? "day" : "days"} overdue` : `Due ${formatShortDate(revision.gate_due_date)}`}</span></div>
           <p className="itp-muted" style={flat}>Open Rev {revision.revision}, check it against the supplier PO and Enshore requirements, then record your decision. {revision.approver_name ? `${revision.approver_name} approves next.` : "You will choose who approves it next."}</p>
           <div><button type="button" style={ghostButton} onClick={() => void openFile(revision)}>Open document ↗</button></div>
           {openCommentsNotice()}
+          {revisionRequests.length ? (
+            <div className="itp-team" aria-label="Team comments">
+              <div className="itp-card-h"><h3>Team comments</h3><span className={`itp-pill ${progress.waiting ? "wait" : "ok"}`}>{progress.finished} of {progress.total} finished</span></div>
+              {revisionRequests.map((request) => {
+                const added = commentsBy(request.person_email);
+                const overdue = request.status === "Waiting" && request.due_date ? Math.max(0, Math.round((new Date(`${todayLondon()}T00:00:00`).getTime() - new Date(`${request.due_date}T00:00:00`).getTime()) / 86_400_000)) : 0;
+                return (
+                  <div key={request.id} className="itp-teamrow">
+                    <span className="itp-av" aria-hidden="true">{initialsOf(request.person_name)}</span>
+                    <span className="itp-who">{request.person_name}<span className="itp-sub">{request.status === "Finished" ? `${request.no_comments ? "Has no comments" : `${added} comment${added === 1 ? "" : "s"}`} · finished ${formatShortDate(request.finished_at)}` : `${added ? `${added} comment${added === 1 ? "" : "s"} so far · ` : ""}due ${formatShortDate(request.due_date)}${overdue ? ` · ${overdue} ${overdue === 1 ? "day" : "days"} late` : ""}`}</span></span>
+                    {request.status === "Finished" ? <span className="itp-pill ok">Finished</span> : (
+                      <span style={buttonRow}><span className={`itp-pill ${overdue ? "bad" : "wait"}`}>Waiting</span><button type="button" style={ghostButton} disabled={busy || request.last_reminded_on === todayLondon()} onClick={() => void remindCommenters(request.person_email)}>{request.last_reminded_on === todayLondon() ? "Reminded today" : "Remind"}</button></span>
+                    )}
+                  </div>
+                );
+              })}
+              <p className="itp-sub" style={flat}>You can decide at any point. Anyone who has not finished is told the review has moved on, and their comments stay on the page.</p>
+            </div>
+          ) : null}
           <fieldset className="itp-opts"><legend className="itp-kicker" style={{ marginBottom: 8 }}>Decision</legend>
-            <Option name="decision" value="recommend" title="Recommend for approval" text={revision.approver_name ? `Sends it to ${revision.approver_name} for the second gate.` : "Sends it to an approver you choose for the second gate."} checked={choice === "recommend"} onChange={(value) => setDraft({ ...draft, choice: value, error: "" })} />
-            <Option name="decision" value="comments" title="Issue comments to the supplier" text="Stops here until a new revision arrives. Each comment is logged with an Open marker." checked={choice === "comments"} onChange={(value) => setDraft({ ...draft, choice: value, error: "" })} />
-            <Option name="decision" value="reject" title="Reject" text="Not acceptable as issued. A written reason is required." checked={choice === "reject"} onChange={(value) => setDraft({ ...draft, choice: value, error: "" })} />
+            <Option name="decision" value="share" title={revisionRequests.length ? "Share with more people" : "Share for team comments"} text="Colleagues you choose are emailed and add their comments. Nothing goes to the supplier yet." checked={choice === "share"} onChange={chooseDecision} />
+            <Option name="decision" value="recommend" title="Recommend for approval" text={revision.approver_name ? `Sends it to ${revision.approver_name} for the second gate.` : "Sends it to an approver you choose for the second gate."} checked={choice === "recommend"} onChange={chooseDecision} />
+            <Option name="decision" value="comments" title="Record comments as issued" text="Use after you have sent your own email to the supplier. Stops here until a new revision arrives." checked={choice === "comments"} onChange={chooseDecision} />
+            <Option name="decision" value="reject" title="Reject" text="Not acceptable as issued. A written reason is required." checked={choice === "reject"} onChange={chooseDecision} />
           </fieldset>
+          {choice === "share" ? (
+            <div className="itp-sharebox">
+              <div className="itp-field"><span>Who should comment? <span className="itp-hint">(People Management only)</span></span>
+                <NotifyPicker id="share-people" value={draft.shareList} people={people} exclude={[myEmail, ...revisionRequests.map((request) => request.person_email)]} onChange={(shareList) => setDraft({ ...draft, shareList, error: "" })} /></div>
+              <div className="itp-assign">
+                <label className="itp-field"><span>Comments due by</span><input style={inputStyle} type="date" min={todayLondon()} value={draft.shareDue} onChange={(event) => setDraft({ ...draft, shareDue: event.target.value, error: "" })} /></label>
+                <label className="itp-field"><span>Note to them <span className="itp-hint">(optional)</span></span><textarea style={{ ...inputStyle, minHeight: 84, resize: "vertical" }} value={draft.shareNote} onChange={(event) => setDraft({ ...draft, shareNote: event.target.value })} /></label>
+              </div>
+            </div>
+          ) : null}
           {choice === "recommend" ? (
             <label className="itp-field"><span>Approver · Gate 2 {needsApprover ? <span className="itp-hint">(required: choose someone with the right expertise)</span> : <span className="itp-hint">(change if needed)</span>}</span>
               <PersonSelect id="review-approver" value={draft.approverEmail || revision.approver_email || ""} people={people} exclude={[myEmail]} onChange={(value) => setDraft({ ...draft, approverEmail: value, error: "" })} /></label>
           ) : null}
           {choice === "comments" ? (
-            <div className="itp-field"><span>Comments for the supplier</span>
-              <div className="itp-draftlist">
-                {draft.comments.map((item, index) => (
-                  <div key={index} className="itp-draftrow">
-                    <input style={inputStyle} aria-label={`Reference for comment ${index + 1}`} placeholder="Section / ref" value={item.ref} onChange={(event) => setDraft({ ...draft, comments: draft.comments.map((c, i) => i === index ? { ...c, ref: event.target.value } : c) })} />
-                    <textarea style={{ ...inputStyle, minHeight: 64, resize: "vertical" }} aria-label={`Comment ${index + 1}`} placeholder="What needs to change?" value={item.text} onChange={(event) => setDraft({ ...draft, comments: draft.comments.map((c, i) => i === index ? { ...c, text: event.target.value } : c), error: "" })} />
-                    {draft.comments.length > 1 ? <button type="button" style={ghostButton} aria-label={`Remove comment ${index + 1}`} onClick={() => setDraft({ ...draft, comments: draft.comments.filter((_, i) => i !== index) })}>Remove</button> : <span />}
+            <div className="itp-sharebox">
+              <div className="itp-field"><span>Comments to issue to the supplier <span className="itp-hint">(untick anything internal. It stays on the ITP, with no Open marker)</span></span>
+                {pageComments.length ? (
+                  <div className="itp-draftlist">
+                    {pageComments.map((comment) => {
+                      const on = !draft.unticked.includes(comment.id);
+                      return (
+                        <label key={comment.id} className={`itp-comment itp-pickrow${on ? "" : " is-off"}`}>
+                          <input type="checkbox" checked={on} onChange={() => setDraft({ ...draft, unticked: on ? [...draft.unticked, comment.id] : draft.unticked.filter((id) => id !== comment.id), copied: false, error: "" })} />
+                          <span className="head">{comment.ref || "General"} · {comment.author_name || "Unknown"} · {formatDateTime(comment.created_at)}</span>
+                          <span />
+                          <span className="body">{comment.body}</span>
+                        </label>
+                      );
+                    })}
                   </div>
-                ))}
-                <div><button type="button" style={ghostButton} onClick={() => setDraft({ ...draft, comments: [...draft.comments, { ref: "", text: "" }] })}>+ Add another comment</button></div>
+                ) : <p className="itp-sub" style={flat}>No comments on the page yet. Add them below or in the Comments panel.</p>}
               </div>
+              <div className="itp-field"><span>Add another comment <span className="itp-hint">(optional)</span></span>
+                <div className="itp-draftlist">
+                  {draft.comments.map((item, index) => (
+                    <div key={index} className="itp-draftrow">
+                      <input style={inputStyle} aria-label={`Reference for comment ${index + 1}`} placeholder="Section / ref" value={item.ref} onChange={(event) => setDraft({ ...draft, copied: false, comments: draft.comments.map((c, i) => i === index ? { ...c, ref: event.target.value } : c) })} />
+                      <textarea style={{ ...inputStyle, minHeight: 64, resize: "vertical" }} aria-label={`Comment ${index + 1}`} placeholder="What needs to change?" value={item.text} onChange={(event) => setDraft({ ...draft, copied: false, comments: draft.comments.map((c, i) => i === index ? { ...c, text: event.target.value } : c), error: "" })} />
+                      {draft.comments.length > 1 ? <button type="button" style={ghostButton} aria-label={`Remove comment ${index + 1}`} onClick={() => setDraft({ ...draft, comments: draft.comments.filter((_, i) => i !== index) })}>Remove</button> : <span />}
+                    </div>
+                  ))}
+                  <div><button type="button" style={ghostButton} onClick={() => setDraft({ ...draft, comments: [...draft.comments, { ref: "", text: "" }] })}>+ Add another comment</button></div>
+                </div>
+              </div>
+              <div className="itp-field"><span>Text for your email to the supplier</span>
+                <textarea id="itp-issue-text" readOnly style={{ ...inputStyle, minHeight: 190, resize: "vertical", lineHeight: 1.5 }} value={issue.lines.length ? mailText : "Tick at least one comment to build the email text."} onFocus={(event) => event.currentTarget.select()} />
+                <label className="itp-check"><input type="checkbox" checked={draft.showNames} onChange={(event) => setDraft({ ...draft, showNames: event.target.checked })} /> Show who raised each comment</label>
+                <div style={buttonRow}>
+                  <button type="button" style={primaryButton} disabled={!issue.lines.length} onClick={() => void copyForEmail(mailText)}>Copy for email</button>
+                  <button type="button" style={ghostButton} disabled={!issue.lines.length} onClick={() => void downloadFile("word", issue.lines)}>Download Word</button>
+                  <button type="button" style={ghostButton} disabled={!issue.lines.length} onClick={() => void downloadFile("excel", issue.lines)}>Download Excel</button>
+                </div>
+                <span className="itp-sub">Copying does not email anyone. Paste it into your own email, so your signature and recipients are used.</span>
+              </div>
+              {draft.copied ? (
+                <div className="itp-callout info" role="status">
+                  <div><strong>Copied.</strong> Once your email to the supplier has gone, record it here so the ITP moves to With supplier and each comment gets an Open marker.</div>
+                  <div style={{ marginTop: 8 }}><button type="button" style={primaryButton} disabled={busy} onClick={() => void submitReview()}>{busy ? "Saving..." : "I have sent it. Record as issued"}</button></div>
+                </div>
+              ) : null}
+              <label className="itp-check"><input type="checkbox" checked={draft.emailUploader} onChange={(event) => setDraft({ ...draft, emailUploader: event.target.checked })} /> Also email {uploaderName} to say comments were issued <span className="itp-hint">(not needed if you are emailing the supplier yourself)</span></label>
             </div>
           ) : null}
-          {choice ? (
-            <label className="itp-field"><span>{choice === "reject" ? "Reason for rejection" : "Review note"} <span className="itp-hint">{choice === "reject" ? "(required, goes to the uploader for the supplier)" : choice === "comments" ? "(optional covering note)" : "(optional, visible to the approver)"}</span></span>
+          {choice && choice !== "share" ? (
+            <label className="itp-field"><span>{choice === "reject" ? "Reason for rejection" : "Review note"} <span className="itp-hint">{choice === "reject" ? "(required, goes to the uploader for the supplier)" : choice === "comments" ? "(optional, kept on the ITP. Not sent to the supplier)" : "(optional, visible to the approver)"}</span></span>
               <textarea style={{ ...inputStyle, minHeight: 84, resize: "vertical" }} value={draft.note} onChange={(event) => setDraft({ ...draft, note: event.target.value, error: "" })} placeholder="What did you check, and what should the next person know?" /></label>
           ) : null}
           {draft.error ? <div className="itp-err" role="alert">{draft.error}</div> : null}
           <div className="itp-submit">
-            <span className="itp-sends">{choice === "recommend" ? `${people.find((p) => p.email === (draft.approverEmail || revision.approver_email))?.name || "The approver"} is emailed straight away.` : choice ? `${revision.uploader_name || "The uploader"} is emailed to pass this to the supplier.` : "Nobody is emailed until you decide."}</span>
-            <button type="button" style={primaryButton} disabled={busy || !choice} onClick={() => void submitReview()}>{busy ? "Saving..." : choice === "recommend" ? "Submit and email approver" : choice === "comments" ? "Issue comments" : choice === "reject" ? "Reject ITP" : "Choose a decision"}</button>
+            <span className="itp-sends">{choice === "share" ? (draft.shareList.length ? `${draft.shareList.length === 1 ? draft.shareList[0].name : `${draft.shareList.length} people`} emailed straight away. The gate stays with you.` : "Choose who to ask.")
+              : choice === "recommend" ? `${people.find((p) => p.email === (draft.approverEmail || revision.approver_email))?.name || "The approver"} is emailed straight away.`
+              : choice === "comments" ? (draft.emailUploader ? `${uploaderName} is emailed.` : "Nothing is emailed by the IMS. Send your own email to the supplier first.")
+              : choice === "reject" ? `${uploaderName} is emailed to pass this to the supplier.`
+              : "Nobody is emailed until you decide."}</span>
+            <button type="button" style={primaryButton} disabled={busy || !choice || (choice === "share" && !draft.shareList.length)} onClick={() => void (choice === "share" ? submitShare() : submitReview())}>{busy ? "Saving..." : choice === "share" ? "Share for comments" : choice === "recommend" ? "Submit and email approver" : choice === "comments" ? "Record comments as issued" : choice === "reject" ? "Reject ITP" : "Choose a decision"}</button>
+          </div>
+        </section>
+      );
+    }
+
+    if (state === "Awaiting Review" && myRequest && myRequest.status === "Waiting") {
+      const mine = commentsBy(myEmail);
+      const overdue = myRequest.due_date ? Math.max(0, Math.round((new Date(`${todayLondon()}T00:00:00`).getTime() - new Date(`${myRequest.due_date}T00:00:00`).getTime()) / 86_400_000)) : 0;
+      return (
+        <section className="itp-card" aria-label="Your comments are wanted">
+          <div className="itp-card-h"><h3>Your comments are wanted</h3><span className={`itp-pill ${overdue ? "bad" : "wait"}`}>{overdue ? `${overdue} ${overdue === 1 ? "day" : "days"} overdue` : `Due ${formatShortDate(myRequest.due_date)}`}</span></div>
+          {myRequest.note ? <div className="itp-quote"><small>{myRequest.requested_by_name || revision.reviewer_name || "The reviewer"} · note</small>{myRequest.note}</div> : null}
+          <p className="itp-muted" style={flat}>{revision.reviewer_name || "The reviewer"} is reviewing Rev {revision.revision} and would like your comments before deciding what goes to the supplier. Read the document, add your comments in the Comments panel, then tell them you have finished. The supplier decision stays with {revision.reviewer_name || "the reviewer"}.</p>
+          <div style={buttonRow}>
+            <button type="button" style={ghostButton} onClick={() => void openFile(revision)}>Open document ↗</button>
+            <button type="button" style={ghostButton} onClick={() => document.getElementById("itp-comments")?.scrollIntoView({ block: "start", behavior: "smooth" })}>Go to comments</button>
+          </div>
+          {openCommentsNotice()}
+          <div className="itp-submit">
+            <span className="itp-sends">{mine ? `You have added ${mine} comment${mine === 1 ? "" : "s"}.` : "You have not added any comments yet."} {revision.reviewer_name || "The reviewer"} is emailed when you finish.</span>
+            <button type="button" style={primaryButton} disabled={busy} onClick={() => void finishCommenting(mine === 0)}>{busy ? "Saving..." : mine ? "I have finished commenting" : "I have no comments"}</button>
           </div>
         </section>
       );
@@ -428,7 +637,7 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
     return (
       <section className="itp-card">
         <div className="itp-card-h"><h3>Waiting on {who}</h3><span className={`itp-pill ${late ? "bad" : "wait"}`}>{late ? `${late} ${late === 1 ? "day" : "days"} overdue` : `Due ${formatShortDate(revision.gate_due_date)}`}</span></div>
-        <p className="itp-muted" style={flat}>{gateName} has been with {who} {waiting === 0 ? "since today" : `for ${waiting} ${waiting === 1 ? "day" : "days"}`}. You can see everything here, but only {who} can record this decision.</p>
+        <p className="itp-muted" style={flat}>{gateName} has been with {who} {waiting === 0 ? "since today" : `for ${waiting} ${waiting === 1 ? "day" : "days"}`}. You can see everything here, but only {who} can record this decision.{state === "Awaiting Review" && progress.total ? ` ${progress.finished} of ${progress.total} colleagues have finished commenting.` : ""}{myRequest && myRequest.status === "Finished" ? " You have finished commenting. Thank you." : ""}</p>
         <div className="itp-submit"><span className="itp-sends">Reminders also go out automatically: the day before it is due, then daily once overdue.</span>
           <span style={buttonRow}>
             {(isAdmin || isUploader || isReviewer) ? <button type="button" style={ghostButton} disabled={busy || revision.last_reminder_on === todayLondon()} onClick={() => void remind()}>Send a reminder now</button> : null}
@@ -467,7 +676,7 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
     const revisionLabel = (id: string) => `Rev ${(itp?.project_itp_revisions || []).find((item) => item.id === id)?.revision || "?"}`;
     const order = [...byRevision.keys()].sort((a, b) => (a === revision.id ? -1 : b === revision.id ? 1 : 0));
     return (
-      <section className="itp-card">
+      <section className="itp-card" id="itp-comments">
         <div className="itp-card-h"><h3>Comments</h3><span className={`itp-pill ${open.length ? "wait" : "idle"}`}>{open.length ? `${open.length} open` : "None open"}</span></div>
         {order.length === 0 ? <p className="itp-muted" style={flat}>No comments yet. Comments issued to the supplier, review notes and anything you add here are kept with the ITP.</p> : null}
         {order.map((id) => (

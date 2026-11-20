@@ -4,7 +4,9 @@ import { createClient as createServerSupabaseClient } from "./supabase/server";
 import { writeNotifications } from "./notifications";
 import { getProject } from "./projectRegistry";
 import {
+  COMMENT_ROUND_DAYS,
   GATE_DAYS,
+  addWorkingDays,
   daysBetween,
   dueDateFrom,
   holderOf,
@@ -15,6 +17,7 @@ import {
   notifyListOf,
   sameEmail,
   todayLondon,
+  type ItpCommentRequest,
   type ItpPerson,
   type WorkflowRevision,
   type WorkflowState,
@@ -46,7 +49,7 @@ export type RevisionRecord = WorkflowRevision & {
   project_itps: ItpMasterRow;
 };
 
-const SETUP_MESSAGE = "The ITP stage gate needs its one-off database setup (scripts/sql/project_itp_stage_gate.sql) to be run first.";
+const SETUP_MESSAGE = "The ITP stage gate needs its one-off database setup (scripts/sql/project_itp_stage_gate.sql, then scripts/sql/project_itp_team_comments.sql) to be run first.";
 
 export function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -56,7 +59,7 @@ export function serviceClient() {
 }
 
 function fail(error: { message: string }): never {
-  if (/(workflow_state|project_itp_activity|project_itp_comments|reviewer_email|notify_list)/.test(error.message) && /(does not exist|schema cache|could not find)/i.test(error.message)) {
+  if (/(workflow_state|project_itp_activity|project_itp_comments|project_itp_comment_requests|reviewer_email|notify_list)/.test(error.message) && /(does not exist|schema cache|could not find)/i.test(error.message)) {
     throw new ItpWorkflowError(SETUP_MESSAGE, 503);
   }
   throw new ItpWorkflowError(error.message, 500);
@@ -601,8 +604,25 @@ export type ReviewInput = {
   decision: unknown;
   note?: unknown;
   comments?: unknown;
+  commentIds?: unknown;
+  emailUploader?: unknown;
   approverEmail?: unknown;
 };
+
+// The comments already on the page that the reviewer ticked to issue to the supplier (this revision, not yet issued).
+async function readPickedComments(ctx: Ctx, revision: RevisionRecord, value: unknown) {
+  const ids = (Array.isArray(value) ? value : []).map((item) => String(item)).filter((item) => /^[0-9a-f-]{36}$/i.test(item)).slice(0, 200);
+  if (!ids.length) return [] as Array<{ id: string; ref: string | null; body: string }>;
+  const { data, error } = await ctx.service
+    .from("project_itp_comments")
+    .select("id,ref,body,kind,revision_id,created_at")
+    .in("id", ids)
+    .eq("revision_id", revision.id)
+    .eq("kind", "General")
+    .order("created_at", { ascending: true });
+  if (error) fail(error);
+  return ((data || []) as Array<{ id: string; ref: string | null; body: string }>).map((row) => ({ id: row.id, ref: row.ref, body: row.body }));
+}
 
 function readComments(value: unknown) {
   const raw = Array.isArray(value) ? value : [];
@@ -636,6 +656,7 @@ export async function decideReview(ctx: Ctx, input: ReviewInput) {
       enshore_decision: "Pending Review",
     });
     await syncMaster(ctx, updated, "Awaiting Approval", updated.gate_due_date);
+    await closeRequests(ctx, updated.id);
     if (note) await addComment(ctx, updated, { kind: "Review note", body: note });
     await logActivity(ctx, updated, "reviewed", "Review complete: recommended for approval", note || null);
     const warning = await emailApprovalRequest(ctx, updated, note);
@@ -644,9 +665,11 @@ export async function decideReview(ctx: Ctx, input: ReviewInput) {
 
   if (decision === "comments" || decision === "reject") {
     const rejected = decision === "reject";
-    const items = rejected ? [] : readComments(input.comments);
+    const typed = rejected ? [] : readComments(input.comments);
+    const picked = rejected ? [] : await readPickedComments(ctx, revision, input.commentIds);
+    const items = [...picked.map((comment) => ({ ref: comment.ref, text: comment.body })), ...typed];
     if (rejected && !note) throw new ItpWorkflowError("Give a reason for the rejection.");
-    if (!rejected && !items.length) throw new ItpWorkflowError("Add at least one comment for the supplier.");
+    if (!rejected && !items.length) throw new ItpWorkflowError("Tick or add at least one comment to issue to the supplier.");
     const updated = await updateRevision(ctx, revision, {
       workflow_state: "With Supplier",
       gate_due_date: null,
@@ -658,17 +681,188 @@ export async function decideReview(ctx: Ctx, input: ReviewInput) {
       enshore_reviewed_at: todayLondon(),
     });
     await syncMaster(ctx, updated, "With Supplier", null, rejected ? { overall_status: "Rejected" } : {});
+    await closeRequests(ctx, updated.id);
+    let internalCount = 0;
     if (rejected) await addComment(ctx, updated, { kind: "Supplier comment", ref: "Rejection", body: note, open: true });
     else {
-      for (const item of items) await addComment(ctx, updated, { kind: "Supplier comment", ref: item.ref, body: item.text, open: true });
+      // Ticked comments already on the page become comments for the supplier. Anything left unticked stays internal.
+      if (picked.length) {
+        const { error: pickError } = await ctx.service.from("project_itp_comments").update({ kind: "Supplier comment", status: "Open" }).in("id", picked.map((comment) => comment.id));
+        if (pickError) fail(pickError);
+      }
+      for (const item of typed) await addComment(ctx, updated, { kind: "Supplier comment", ref: item.ref, body: item.text, open: true });
       if (note) await addComment(ctx, updated, { kind: "Review note", body: note });
+      const { count } = await ctx.service.from("project_itp_comments").select("id", { count: "exact", head: true }).eq("revision_id", updated.id).eq("kind", "General");
+      internalCount = count || 0;
     }
-    await logActivity(ctx, updated, rejected ? "rejected" : "comments", rejected ? "Rejected" : `Comments issued to the supplier (${items.length})`, rejected ? note : note || null);
-    const warning = await emailSupplierComments(ctx, updated, { rejected, note: rejected ? note : note, items: items.map((item) => ({ ref: item.ref, text: item.text })) });
+    // The reviewer sends the comments to the supplier in their own email. The IMS only emails the uploader if asked to.
+    const emailUploader = rejected || input.emailUploader === true;
+    const issuedDetail = [
+      note,
+      !rejected && !emailUploader ? "Sent to the supplier by the reviewer in their own email. Nothing was emailed by the IMS." : "",
+      internalCount ? `${internalCount} other comment${internalCount === 1 ? "" : "s"} kept internal.` : "",
+    ].filter(Boolean).join("\n");
+    await logActivity(ctx, updated, rejected ? "rejected" : "comments", rejected ? "Rejected" : `Comments recorded as issued to the supplier (${items.length})`, rejected ? note : issuedDetail || null);
+    const warning = emailUploader ? await emailSupplierComments(ctx, updated, { rejected, note, items: items.map((item) => ({ ref: item.ref, text: item.text })) }) : "";
     return { ok: true, state: updated.workflow_state, warning };
   }
 
   throw new ItpWorkflowError("Choose a decision.");
+}
+
+// ---------- team comments ----------
+
+async function loadRequests(ctx: Ctx, revisionId: string): Promise<ItpCommentRequest[]> {
+  const { data, error } = await ctx.service.from("project_itp_comment_requests").select("*").eq("revision_id", revisionId).order("created_at", { ascending: true });
+  if (error) {
+    // Before the one-off SQL has been run there are no requests, so nothing changes for anyone.
+    if (/(does not exist|schema cache|could not find)/i.test(error.message)) return [];
+    fail(error);
+  }
+  return (data || []) as ItpCommentRequest[];
+}
+
+async function closeRequests(ctx: Ctx, revisionId: string) {
+  const { error } = await ctx.service.from("project_itp_comment_requests").update({ status: "Closed" }).eq("revision_id", revisionId).eq("status", "Waiting");
+  if (error && !/(does not exist|schema cache|could not find)/i.test(error.message)) fail(error);
+}
+
+function readIsoDate(value: unknown) {
+  const text = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) && !Number.isNaN(Date.parse(`${text}T00:00:00Z`)) ? text : "";
+}
+
+async function emailCommentRequest(ctx: Ctx, revision: RevisionRecord, person: ItpPerson, args: { due: string; note: string; reminder?: boolean; late?: number }) {
+  const reviewerName = revision.reviewer_name || ctx.actor.name;
+  const subject = args.reminder
+    ? args.late ? `Overdue: your comments on ${itpLabel(revision)} (${args.late} ${args.late === 1 ? "day" : "days"})` : `Reminder: your comments on ${itpLabel(revision)}`
+    : `ITP comments wanted: ${itpLabel(revision)} (${projectLabel(revision)})`;
+  return deliver(ctx, revision, {
+    label: args.reminder ? "Comments reminder" : "Comments request",
+    to: [person],
+    subject,
+    notificationTitle: subject,
+    actorForLog: args.reminder && !args.late ? ctx.actor : { name: "IMS", email: "" },
+    spec: {
+      heading: args.reminder ? "Your comments are still wanted" : "Your comments are wanted on an ITP",
+      intro: args.reminder
+        ? `${reviewerName} is waiting for your comments on this ITP before deciding what goes to the supplier.`
+        : `${reviewerName} is reviewing this ITP and would like your comments before anything goes to the supplier.`,
+      quote: args.note ? { by: `${reviewerName} · note`, text: args.note } : undefined,
+      rows: [...baseRows(revision), ["Comments due", longDate(args.due)]],
+      button: "Open the ITP and comment",
+      url: recordUrl(ctx.origin, revision),
+      footer: "Add your comments on the ITP page, then press 'I have finished commenting' so the reviewer knows. You do not make the supplier decision. That stays with the reviewer.",
+    },
+  });
+}
+
+export type ShareInput = { revisionId: unknown; emails: unknown; dueDate?: unknown; note?: unknown };
+
+// Gate 1: the reviewer shares the revision with colleagues for comments. The gate itself does not move.
+export async function shareForComments(ctx: Ctx, input: ShareInput) {
+  const revision = await loadRevision(ctx.service, input.revisionId);
+  if (revision.workflow_state !== "Awaiting Review") throw new ItpWorkflowError("This ITP is not waiting for a review any more. Refresh the page to see where it is now.", 409);
+  if (!sameEmail(revision.reviewer_email, ctx.actor.email)) throw new ItpWorkflowError(`Only ${revision.reviewer_name || "the assigned reviewer"} can ask colleagues for comments. You are signed in as ${ctx.actor.email}.`, 403);
+  const people = dedupe(await findPeople(ctx.service, input.emails), [ctx.actor.email]);
+  if (!people.length) throw new ItpWorkflowError("Choose at least one person from the list.");
+  const today = todayLondon();
+  const due = readIsoDate(input.dueDate) || addWorkingDays(today, COMMENT_ROUND_DAYS);
+  if (due < today) throw new ItpWorkflowError("The due date cannot be in the past.");
+  const note = cleanBody(input.note, 1500);
+
+  const existing = await loadRequests(ctx, revision.id);
+  for (const person of people) {
+    const key = normalisedEmail(person.email);
+    const row = existing.find((request) => normalisedEmail(request.person_email) === key);
+    const fields = {
+      person_name: person.name,
+      person_email: key,
+      requested_by_name: ctx.actor.name,
+      requested_by_email: ctx.actor.email,
+      due_date: due,
+      note: note || null,
+      status: "Waiting",
+      finished_at: null,
+      no_comments: false,
+      reminder_count: 0,
+      last_reminded_on: null,
+    };
+    const result = row
+      ? await ctx.service.from("project_itp_comment_requests").update(fields).eq("id", row.id)
+      : await ctx.service.from("project_itp_comment_requests").insert({ ...fields, itp_id: revision.itp_id, revision_id: revision.id, project_key: revision.project_itps.project_key });
+    if (result.error) fail(result.error);
+  }
+  await logActivity(ctx, revision, "comments-requested", `Shared for team comments with ${peopleNames(people)}`, `Comments due ${longDate(due)}.${note ? `\n${note}` : ""}`);
+  const warnings: string[] = [];
+  for (const person of people) {
+    const warning = await emailCommentRequest(ctx, revision, person, { due, note });
+    if (warning) warnings.push(`${person.name}: ${warning}`);
+  }
+  return { ok: true, warning: warnings.join(" ") };
+}
+
+export type FinishInput = { revisionId: unknown; noComments?: unknown };
+
+// A colleague tells the reviewer they have finished commenting (or that they have nothing to add).
+export async function finishComments(ctx: Ctx, input: FinishInput) {
+  const revision = await loadRevision(ctx.service, input.revisionId);
+  const requests = await loadRequests(ctx, revision.id);
+  const mine = requests.find((request) => sameEmail(request.person_email, ctx.actor.email));
+  if (!mine) throw new ItpWorkflowError("You have not been asked to comment on this ITP.", 403);
+  if (revision.workflow_state !== "Awaiting Review" || mine.status === "Closed") throw new ItpWorkflowError("The reviewer has already moved this ITP on, so comments are closed.", 409);
+  if (mine.status === "Finished") return { ok: true, warning: "" };
+
+  const { count } = await ctx.service
+    .from("project_itp_comments")
+    .select("id", { count: "exact", head: true })
+    .eq("revision_id", revision.id)
+    .eq("kind", "General")
+    .ilike("author_email", ctx.actor.email.replace(/[\\%_]/g, "\\$&"));
+  const added = count || 0;
+  const noComments = input.noComments === true && added === 0;
+  const { error } = await ctx.service.from("project_itp_comment_requests").update({ status: "Finished", finished_at: new Date().toISOString(), no_comments: noComments }).eq("id", mine.id);
+  if (error) fail(error);
+  await logActivity(ctx, revision, "comments-finished", noComments ? "Has no comments" : `Finished commenting (${added} comment${added === 1 ? "" : "s"})`);
+
+  const remaining = requests.filter((request) => request.id !== mine.id && request.status === "Waiting").length;
+  const reviewer = reviewerOf(revision);
+  if (!reviewer) return { ok: true, warning: "" };
+  const warning = await deliver(ctx, revision, {
+    label: "Comments finished notice",
+    to: [reviewer],
+    subject: remaining ? `${ctx.actor.name} has finished commenting on ${itpLabel(revision)}` : `Everyone has finished commenting on ${itpLabel(revision)}`,
+    spec: {
+      heading: remaining ? "A colleague has finished commenting" : "Everyone has finished commenting",
+      intro: `${ctx.actor.name} ${noComments ? "has no comments on this ITP" : `has added ${added} comment${added === 1 ? "" : "s"}`}. ${remaining ? `${remaining} ${remaining === 1 ? "person is" : "people are"} still to finish.` : "You can now collate the comments and decide."}`,
+      rows: baseRows(revision),
+      button: "Collate and decide",
+      url: recordUrl(ctx.origin, revision),
+      footer: "Open the ITP, tick the comments that should go to the supplier, and copy them into your own email.",
+    },
+  });
+  return { ok: true, warning };
+}
+
+// The reviewer nudges everyone still to finish (or one person). Once a day each.
+export async function remindCommenters(ctx: Ctx, input: { revisionId: unknown; email?: unknown }) {
+  const revision = await loadRevision(ctx.service, input.revisionId);
+  if (!sameEmail(revision.reviewer_email, ctx.actor.email) && !canManage(ctx.actor, revision)) throw new ItpWorkflowError("Only the reviewer, the uploader, the Quality Lead or an administrator can send reminders.", 403);
+  if (revision.workflow_state !== "Awaiting Review") throw new ItpWorkflowError("Nothing is waiting on comments for this ITP.");
+  const wanted = input.email ? normalisedEmail(String(input.email)) : "";
+  const today = todayLondon();
+  const waiting = (await loadRequests(ctx, revision.id)).filter((request) => request.status === "Waiting" && (!wanted || normalisedEmail(request.person_email) === wanted));
+  if (!waiting.length) throw new ItpWorkflowError("Nobody is waiting to comment.");
+  const toRemind = waiting.filter((request) => request.last_reminded_on !== today);
+  if (!toRemind.length) throw new ItpWorkflowError("A reminder has already gone out today.");
+  const warnings: string[] = [];
+  for (const request of toRemind) {
+    const { error } = await ctx.service.from("project_itp_comment_requests").update({ last_reminded_on: today }).eq("id", request.id);
+    if (error) fail(error);
+    const warning = await emailCommentRequest(ctx, revision, { name: request.person_name, email: request.person_email }, { due: request.due_date || today, note: request.note || "", reminder: true });
+    if (warning) warnings.push(`${request.person_name}: ${warning}`);
+  }
+  return { ok: true, warning: warnings.join(" ") };
 }
 
 export type ApprovalInput = { revisionId: unknown; decision: unknown; note?: unknown };
@@ -735,11 +929,13 @@ export async function decideApproval(ctx: Ctx, input: ApprovalInput) {
 
 export async function postComment(ctx: Ctx, input: { revisionId: unknown; body: unknown; ref?: unknown }) {
   const revision = await loadRevision(ctx.service, input.revisionId);
+  const asked = await loadRequests(ctx, revision.id);
   const involved = canManage(ctx.actor, revision)
     || sameEmail(revision.reviewer_email, ctx.actor.email)
     || sameEmail(revision.approver_email, ctx.actor.email)
-    || notifyListOf(revision).some((person) => sameEmail(person.email, ctx.actor.email));
-  if (!involved) throw new ItpWorkflowError("Only the people on this ITP (reviewer, approver, uploader, anyone copied in) or an administrator can add comments.", 403);
+    || notifyListOf(revision).some((person) => sameEmail(person.email, ctx.actor.email))
+    || asked.some((request) => request.status !== "Closed" && sameEmail(request.person_email, ctx.actor.email));
+  if (!involved) throw new ItpWorkflowError("Only the people on this ITP (reviewer, approver, uploader, anyone copied in or asked to comment) or an administrator can add comments.", 403);
   const body = cleanBody(input.body, 4000);
   if (!body) throw new ItpWorkflowError("Write a comment first.");
   const open = false;
@@ -885,6 +1081,29 @@ export async function runReminders(service: SupabaseClient, origin: string, dryR
     const warning = await sendReminder(ctx, revision, plan.to, { kind: plan.kind, daysLate: plan.daysLate, copy: plan.copy });
     if (warning) result.warnings.push(`${itpLabel(revision)}: ${warning}`);
     const { error: patchError } = await service.from("project_itp_revisions").update(plan.patch).eq("id", revision.id);
+    if (patchError) result.warnings.push(`${itpLabel(revision)}: ${patchError.message}`);
+  }
+
+  // People asked to comment who are past their due date: a reminder a day for three days, then weekly.
+  const { data: waitingRows, error: waitingError } = await service.from("project_itp_comment_requests").select("*").eq("status", "Waiting").lt("due_date", today);
+  if (waitingError) {
+    if (!/(does not exist|schema cache|could not find)/i.test(waitingError.message)) result.warnings.push(`Team comments: ${waitingError.message}`);
+    return result;
+  }
+  for (const request of (waitingRows || []) as ItpCommentRequest[]) {
+    if (request.last_reminded_on === today || !request.due_date) continue;
+    const weeklyDue = !request.last_reminded_on || daysBetween(request.last_reminded_on, today) >= 7;
+    if ((request.reminder_count || 0) >= 3 && !weeklyDue) continue;
+    const ctx: Ctx = { service, origin, actor: { userId: "", email: "", name: "IMS", isAdmin: false, isManager: false } };
+    let revision: RevisionRecord;
+    try { revision = await loadRevision(service, request.revision_id); } catch { continue; }
+    if (!revision.is_current || revision.workflow_state !== "Awaiting Review") continue;
+    result.sent.push({ itp: itpLabel(revision), kind: "comments", to: request.person_name });
+    if (dryRun) continue;
+    const late = daysBetween(request.due_date, today);
+    const warning = await emailCommentRequest(ctx, revision, { name: request.person_name, email: request.person_email }, { due: request.due_date, note: request.note || "", reminder: true, late });
+    if (warning) result.warnings.push(`${itpLabel(revision)}: ${warning}`);
+    const { error: patchError } = await service.from("project_itp_comment_requests").update({ reminder_count: (request.reminder_count || 0) + 1, last_reminded_on: today }).eq("id", request.id);
     if (patchError) result.warnings.push(`${itpLabel(revision)}: ${patchError.message}`);
   }
   return result;

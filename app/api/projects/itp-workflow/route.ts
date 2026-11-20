@@ -5,11 +5,14 @@ import {
   assignPeople,
   decideApproval,
   decideReview,
+  finishComments,
   postComment,
+  remindCommenters,
   remindHolder,
   resolveActor,
   serviceClient,
   setCommentStatus,
+  shareForComments,
   startWorkflow,
   type Ctx,
 } from "../../../../src/lib/itpWorkflowServer";
@@ -44,6 +47,12 @@ export async function POST(request: Request) {
         return NextResponse.json(await setCommentStatus(ctx, body as never));
       case "remind":
         return NextResponse.json(await remindHolder(ctx, body as never));
+      case "share":
+        return NextResponse.json(await shareForComments(ctx, body as never));
+      case "finishComments":
+        return NextResponse.json(await finishComments(ctx, body as never));
+      case "remindCommenters":
+        return NextResponse.json(await remindCommenters(ctx, body as never));
       default:
         throw new ItpWorkflowError("Unknown action.");
     }

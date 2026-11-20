@@ -203,3 +203,50 @@ export function initialsOf(name: string | null | undefined) {
 export function notifyListOf(revision: Pick<WorkflowRevision, "notify_list">): ItpPerson[] {
   return Array.isArray(revision.notify_list) ? revision.notify_list.filter((item) => item && item.email) : [];
 }
+
+// ---------- team comments (Gate 1 reviewer shares the ITP with colleagues before deciding) ----------
+
+export type CommentRequestStatus = "Waiting" | "Finished" | "Closed";
+
+export type ItpCommentRequest = {
+  id: string;
+  itp_id: string;
+  revision_id: string;
+  person_name: string;
+  person_email: string;
+  requested_by_name: string | null;
+  requested_by_email: string | null;
+  due_date: string | null;
+  note: string | null;
+  status: CommentRequestStatus;
+  finished_at: string | null;
+  no_comments: boolean;
+  reminder_count: number;
+  last_reminded_on: string | null;
+  created_at: string;
+};
+
+export const COMMENT_ROUND_DAYS = 3;
+
+export type SupplierCommentLine = { ref: string | null; text: string; author: string | null };
+
+// The text the reviewer pastes into their own email to the supplier. No greeting or sign-off: the reviewer's email
+// program adds their signature, and the recipients are theirs to choose.
+export function supplierCommentsText(args: { documentNumber: string; title: string; revision: string; items: SupplierCommentLine[]; showNames: boolean }) {
+  const lines = [
+    `Thank you for issuing ${args.documentNumber} ${args.title}, Rev ${args.revision}. We have reviewed it and our comments are below. Please address each one and reissue the ITP.`,
+    "",
+  ];
+  args.items.forEach((item, index) => {
+    const who = args.showNames && item.author ? ` (${item.author})` : "";
+    lines.push(`${index + 1}. ${item.ref ? `${item.ref}${who}: ` : who ? `${who.trim()} ` : ""}${item.text}`);
+  });
+  return lines.join("\n");
+}
+
+// Waiting and Finished people for one revision, for the "2 of 3 finished" line.
+export function commentProgress(requests: Array<Pick<ItpCommentRequest, "status">>) {
+  const live = requests.filter((request) => request.status !== "Closed");
+  const finished = live.filter((request) => request.status === "Finished").length;
+  return { total: live.length, finished, waiting: live.length - finished };
+}
