@@ -2430,6 +2430,16 @@ function NcrCapaPageContent() {
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
+  // A report is built from what is on screen. If the NCR is open for editing, the typed text is used, so a
+  // section filled in but not yet saved does not come out blank.
+  function ncrReportRow(saved: CombinedRow): CombinedRow {
+    return editRow && editRow.id === saved.id && editRow.type === "NCR" ? editRow : saved;
+  }
+
+  function hasSupplierResponse(row: CombinedRow) {
+    return Boolean((row.supplier_response || "").trim() || (row.supplier_acknowledgement || "").trim());
+  }
+
   async function generateNcrPdf() {
     if (!requireEditPermission("Generating saved NCR PDFs")) return;
 
@@ -2440,6 +2450,7 @@ function NcrCapaPageContent() {
 
     try {
       setGeneratingPdf(true);
+      const reportRow = ncrReportRow(selectedRow);
 
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -2488,10 +2499,10 @@ function NcrCapaPageContent() {
         margin: { left: margin, right: margin },
         head: [["Field", "Value", "Field", "Value"]],
         body: [
-          ["NCR Number", selectedRow.number, "Status", selectedRow.status || ""],
-          ["Title", selectedRow.title || "", "Severity", getSeverityDisplay(selectedRow.severity)],
-          ["Source Type", selectedRow.source_type || "", "Project", selectedRow.project || ""],
-          ["Owner", selectedRow.owner || "", "Due Date", formatDate(selectedRow.due_date)],
+          ["NCR Number", reportRow.number, "Status", reportRow.status || ""],
+          ["Title", reportRow.title || "", "Severity", getSeverityDisplay(reportRow.severity)],
+          ["Source Type", reportRow.source_type || "", "Project", reportRow.project || ""],
+          ["Owner", reportRow.owner || "", "Due Date", formatDate(reportRow.due_date)],
         ],
         styles: {
           font: "helvetica",
@@ -2615,23 +2626,28 @@ function NcrCapaPageContent() {
         y = ((doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y) + 8;
       };
 
-      drawHeading("NCR DETAILS");
-      drawParagraphBox("Issue / Description", selectedRow.description, 28);
-      drawParagraphBox("Containment Action", selectedRow.containment_action, 20);
-      drawParagraphBox("Corrective Action", selectedRow.corrective_action, 20);
-      drawParagraphBox("Root Cause Category", selectedRow.root_cause_category, 12);
-      drawParagraphBox("Root Cause Description", selectedRow.root_cause_description, 22);
+      // Sections follow the lettering on the NCR form (A to F) so the report reads the same as the screen.
+      drawHeading("A. NCR DETAILS");
+      drawParagraphBox("Issue / Description", reportRow.description, 28);
+      drawHeading("B. CONTAINMENT ACTION");
+      drawParagraphBox("Containment Action", reportRow.containment_action, 20);
+      drawHeading("C. ROOT CAUSE");
+      drawParagraphBox("Root Cause Category", reportRow.root_cause_category, 12);
+      drawParagraphBox("Root Cause Description", reportRow.root_cause_description, 22);
+      drawHeading("D. CORRECTIVE ACTION");
+      drawParagraphBox("Corrective Action", reportRow.corrective_action, 20);
 
         const evidenceUrlMap = new Map<string, string>();
 
-        if (externalFacingPdf) {
-          drawHeading("SUPPLIER / CLIENT RESPONSE");
-          drawParagraphBox("Response / Proposed Action", selectedRow.supplier_response, 28);
-          drawParagraphBox("Acknowledgement / Responsible Contact", selectedRow.supplier_acknowledgement, 18);
+        // The supplier / client section prints for the external form, and whenever a response has been recorded.
+        if (externalFacingPdf || hasSupplierResponse(reportRow)) {
+          drawHeading("E. SUPPLIER / CLIENT RESPONSE");
+          drawParagraphBox("Response / Proposed Action", reportRow.supplier_response, 28);
+          drawParagraphBox("Acknowledgement / Responsible Contact", reportRow.supplier_acknowledgement, 18);
       }
 
         if (includeEvidenceListInPdf) {
-          drawHeading("EVIDENCE LIST");
+          drawHeading("F. EVIDENCE LIST");
 
           if (selectedNcrPdfEvidence.length === 0) {
             drawParagraphBox("Attached Evidence", "No evidence files listed for this export.", 14);
@@ -2839,6 +2855,7 @@ function NcrCapaPageContent() {
 
     try {
       setGeneratingWord(true);
+      const reportRow = ncrReportRow(selectedRow);
 
       const title = externalFacingPdf
         ? "Supplier / Client NCR Response Form"
@@ -2912,31 +2929,34 @@ function NcrCapaPageContent() {
           children: [new TextRun({ text: "", size: 1 })],
         }),
         wordKeyValueTable([
-          ["NCR Number", selectedRow.number, "Status", selectedRow.status || ""],
-          ["Title", selectedRow.title || "", "Severity", getSeverityDisplay(selectedRow.severity)],
-          ["Source Type", selectedRow.source_type || "", "Project", selectedRow.project || ""],
-          ["Owner", selectedRow.owner || "", "Due Date", formatDate(selectedRow.due_date)],
+          ["NCR Number", reportRow.number, "Status", reportRow.status || ""],
+          ["Title", reportRow.title || "", "Severity", getSeverityDisplay(reportRow.severity)],
+          ["Source Type", reportRow.source_type || "", "Project", reportRow.project || ""],
+          ["Owner", reportRow.owner || "", "Due Date", formatDate(reportRow.due_date)],
         ]),
-        wordHeading("NCR DETAILS"),
-        ...wordParagraphBox("Issue / Description", selectedRow.description),
-        ...wordParagraphBox("Containment Action", selectedRow.containment_action),
-        ...wordParagraphBox("Corrective Action", selectedRow.corrective_action),
-        ...wordParagraphBox("Root Cause Category", selectedRow.root_cause_category),
-        ...wordParagraphBox("Root Cause Description", selectedRow.root_cause_description)
+        wordHeading("A. NCR DETAILS"),
+        ...wordParagraphBox("Issue / Description", reportRow.description),
+        wordHeading("B. CONTAINMENT ACTION"),
+        ...wordParagraphBox("Containment Action", reportRow.containment_action),
+        wordHeading("C. ROOT CAUSE"),
+        ...wordParagraphBox("Root Cause Category", reportRow.root_cause_category),
+        ...wordParagraphBox("Root Cause Description", reportRow.root_cause_description),
+        wordHeading("D. CORRECTIVE ACTION"),
+        ...wordParagraphBox("Corrective Action", reportRow.corrective_action)
       );
 
       const evidenceUrlMap = new Map<string, string>();
 
-      if (externalFacingPdf) {
+      if (externalFacingPdf || hasSupplierResponse(reportRow)) {
         children.push(
-          wordHeading("SUPPLIER / CLIENT RESPONSE"),
-          ...wordParagraphBox("Response / Proposed Action", selectedRow.supplier_response),
-          ...wordParagraphBox("Acknowledgement / Responsible Contact", selectedRow.supplier_acknowledgement)
+          wordHeading("E. SUPPLIER / CLIENT RESPONSE"),
+          ...wordParagraphBox("Response / Proposed Action", reportRow.supplier_response),
+          ...wordParagraphBox("Acknowledgement / Responsible Contact", reportRow.supplier_acknowledgement)
         );
       }
 
       if (includeEvidenceListInPdf) {
-        children.push(wordHeading("EVIDENCE LIST"));
+        children.push(wordHeading("F. EVIDENCE LIST"));
 
         if (selectedNcrPdfEvidence.length === 0) {
           children.push(...wordParagraphBox("Attached Evidence", "No evidence files listed for this export."));
