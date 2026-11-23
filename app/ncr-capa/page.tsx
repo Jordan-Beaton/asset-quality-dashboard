@@ -1370,7 +1370,6 @@ function NcrCapaPageContent() {
       // Closed NCRs only show when asked for: the tick box, or a request that is explicitly about closed
       // records (Closed status/KPI, a closed month, a direct link to an NCR, or a search).
       const includeClosedNcrs =
-        activeLogTab !== "NCR" ||
         showClosedNcrs ||
         statusFilter === "Closed" ||
         ncrQuickFilter === "Closed" ||
@@ -4427,12 +4426,17 @@ function NcrCapaPageContent() {
           <div style={tableInfoRowStyle}>
             Showing <strong>{filteredRows.length}</strong> of{" "}
             <strong>{kpis.totalNcrs}</strong> NCR records for {yearFilter}
-            {activeLogTab === "NCR" ? (
-              <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginLeft: "14px", cursor: "pointer", color: "#000000" }}>
-                <input type="checkbox" checked={showClosedNcrs} onChange={(event) => setShowClosedNcrs(event.target.checked)} />
-                Show closed NCRs{!showClosedNcrs && kpis.closed ? ` (${kpis.closed} hidden)` : ""}
-              </label>
-            ) : null}
+            {(() => {
+              const hiddenClosed =
+                activeLogTab === "NCR" ? kpis.closed : combinedRows.filter((row) => row.type === "CAPA" && row.status === "Closed").length;
+              return (
+                <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginLeft: "14px", cursor: "pointer", color: "#000000" }}>
+                  <input type="checkbox" checked={showClosedNcrs} onChange={(event) => setShowClosedNcrs(event.target.checked)} />
+                  Show closed {activeLogTab === "NCR" ? "NCRs" : "CAPAs"}
+                  {!showClosedNcrs && hiddenClosed ? ` (${hiddenClosed} hidden)` : ""}
+                </label>
+              );
+            })()}
           </div>
 
           {loading ? (

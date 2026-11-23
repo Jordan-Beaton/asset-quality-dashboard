@@ -61,6 +61,7 @@ type ActionItem = {
   linked_capa_number: string | null;
   linked_moc_id: string | null;
   linked_moc_number: string | null;
+  linked_moc_action_key?: string | null;
   linked_ainm_id: string | null;
   linked_ainm_number: string | null;
   linked_hse_inspection_id: string | null;
@@ -128,6 +129,7 @@ type MocDueItem = {
   responsible_person: string;
   target_date: string;
   status: string;
+  link_key: string;
 };
 
 type AinmOption = {
@@ -1215,7 +1217,7 @@ function ActionsPageContent() {
   async function loadMocDueItems() {
     const { data, error } = await supabase
       .from("moc_action_plan_items")
-      .select("id,moc_report_id,action_no,description,responsible_person,target_date,status")
+      .select("id,moc_report_id,action_no,description,responsible_person,target_date,status,link_key")
       .order("target_date", { ascending: true });
 
     if (error) return;
@@ -1229,6 +1231,7 @@ function ActionsPageContent() {
         responsible_person: String(row.responsible_person || ""),
         target_date: String(row.target_date || ""),
         status: String(row.status || ""),
+        link_key: String(row.link_key || ""),
       }))
       .filter((row) => row.id && row.moc_report_id);
 
@@ -1897,8 +1900,14 @@ function ActionsPageContent() {
 
   const myMocItems = useMemo<MyWorkItem[]>(() => {
     if (!currentPersonName) return [];
+    // Every MOC action is also copied into the central Action Register. When that copy is already in the list as one of
+    // my own actions it stands for the MOC action (it names the MOC it belongs to), so the MOC row is left out.
+    const coveredMocKeys = new Set(
+      myOwnActionItems.map((item) => item.action?.linked_moc_action_key).filter((key): key is string => Boolean(key))
+    );
     return mocDueItems
       .filter((item) => matchesPersonName(item.responsible_person, currentPersonName))
+      .filter((item) => !item.link_key || !coveredMocKeys.has(item.link_key))
       .map((item) => {
         const report = mocOptionById.get(item.moc_report_id);
         return {
@@ -1913,7 +1922,7 @@ function ActionsPageContent() {
           href: report?.number ? `/moc?search=${encodeURIComponent(report.number)}` : null,
         };
       });
-  }, [mocDueItems, mocOptionById, currentPersonName]);
+  }, [mocDueItems, mocOptionById, currentPersonName, myOwnActionItems]);
 
   const myActionList = useMemo(() => {
     return [...myOwnActionItems, ...myNcrItems, ...myFindingItems, ...myAinmItems, ...myObservationItems, ...myMocItems].sort((a, b) => {
