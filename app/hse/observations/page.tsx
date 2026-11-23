@@ -36,6 +36,7 @@ import {
   type ObservationReportGroup,
   type ObservationReportSort,
 } from "../../../src/lib/observationReportPdf";
+import { downloadRegisterExcel, excelDateStamp } from "../../../src/lib/registerExcel";
 
 export const dynamic = "force-dynamic";
 
@@ -340,6 +341,58 @@ export default function HseObservationsPage() {
     }
   }
 
+  // The workbook holds exactly the rows the register is showing, with every field in its own column for sorting and filtering.
+  async function exportExcel() {
+    if (!filteredRecords.length) {
+      setMessage("There are no observations to export for the current filters.");
+      return;
+    }
+    try {
+      const filters = [
+        `Year: ${yearFilter || "All"}`,
+        ...(projectFilter ? [`Project: ${projectFilter}`] : []),
+        ...(statusFilter ? [`Status: ${statusFilter}`] : []),
+        ...(typeFilter ? [`Type: ${typeFilter}`] : []),
+        ...(riskFilter ? [`Risk: ${riskFilter}`] : []),
+        ...(reporterTypeFilter ? [`Submitted as: ${reporterTypeFilter}`] : []),
+        ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+      ];
+      await downloadRegisterExcel<ObservationRecord>({
+        fileName: `observation-register${projectFilter ? `-${projectFilter.replace(/[^A-Za-z0-9._-]+/g, "-")}` : ""}-${excelDateStamp()}.xlsx`,
+        sheetName: "Observation Register",
+        title: "Observation Register — Enshore IMS",
+        filters,
+        rows: filteredRecords,
+        columns: [
+          { header: "Observation No.", width: 16, value: (record) => record.observation_number || "" },
+          { header: "Date", width: 13, value: (record) => (record.observation_date ? formatDate(record.observation_date) : "") },
+          { header: "Time", width: 8, value: (record) => record.observation_time || "" },
+          { header: "Project", width: 22, value: (record) => record.project || "" },
+          { header: "Vessel / Worksite", width: 22, value: (record) => record.vessel_worksite || "" },
+          { header: "Site / Location", width: 22, value: (record) => record.site_location || "" },
+          { header: "Type", width: 20, value: (record) => record.observation_type || "" },
+          { header: "Category", width: 18, value: (record) => record.category || "" },
+          { header: "Risk Level", width: 16, value: (record) => record.risk_level || "" },
+          { header: "Status", width: 14, value: (record) => record.status || "" },
+          { header: "Title", width: 36, value: (record) => record.title || "" },
+          { header: "Description", width: 70, value: (record) => record.description || "" },
+          { header: "Immediate Action", width: 44, value: (record) => record.immediate_action || "" },
+          { header: "Suggested Action", width: 44, value: (record) => record.suggested_action || "" },
+          { header: "Assigned To", width: 22, value: (record) => record.assigned_to || "" },
+          { header: "Submitted As", width: 16, value: (record) => record.reporter_type || "" },
+          { header: "Reporter", width: 22, value: (record) => record.reporter_name || "" },
+          { header: "Reporter Company", width: 22, value: (record) => record.reporter_company || "" },
+          { header: "Close-out Notes", width: 44, value: (record) => record.closeout_notes || "" },
+          { header: "Closed By", width: 20, value: (record) => record.closed_by || "" },
+          { header: "Closed On", width: 13, value: (record) => (record.closed_at ? formatDate(record.closed_at) : "") },
+        ],
+      });
+      setMessage(`Observation Excel report created with ${filteredRecords.length} observation${filteredRecords.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? `The Excel report could not be created: ${error.message}` : "The Excel report could not be created.");
+    }
+  }
+
   const selectedRecord = useMemo(() => records.find((record) => record.id === selectedId) || null, [records, selectedId]);
   const selectedEvidence = useMemo(() => evidence.filter((item) => item.observation_id === selectedRecord?.id), [evidence, selectedRecord?.id]);
   const selectedLinkedActions = useMemo(() => {
@@ -601,6 +654,7 @@ export default function HseObservationsPage() {
               actions={<>
                 <ImsButton variant="secondary" onClick={() => { setSearch(""); setStatusFilter(""); setTypeFilter(""); setRiskFilter(""); setReporterTypeFilter(""); setProjectFilter(""); }}>Clear Filters</ImsButton>
                 <ImsButton variant={showExport ? "secondary" : "primary"} onClick={() => setShowExport((value) => !value)} disabled={!filteredRecords.length} title="Create a PDF of the observations currently shown">{showExport ? "Hide PDF options" : "Export PDF"}</ImsButton>
+                <ImsButton variant="secondary" onClick={() => void exportExcel()} disabled={!filteredRecords.length} title="Download an Excel workbook of the observations currently shown">Export Excel</ImsButton>
               </>}
             >
               <Field label="Project">

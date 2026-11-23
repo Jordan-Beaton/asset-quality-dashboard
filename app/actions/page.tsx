@@ -28,6 +28,7 @@ import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
+import { downloadRegisterExcel, excelDateStamp } from "../../src/lib/registerExcel";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import { supabase } from "../../src/lib/supabase";
 
@@ -3465,6 +3466,56 @@ function ActionsPageContent() {
     }
   }
 
+  // The workbook holds exactly the rows the register is showing, with a line saying which filters produced them.
+  async function generateFilteredActionRegisterExcel() {
+    if (filteredActions.length === 0) {
+      setMessage("No filtered actions available for Excel export.");
+      return;
+    }
+
+    try {
+      const filters = [
+        ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+        ...(statusFilter ? [`Status: ${statusFilter}`] : []),
+        ...(priorityFilter ? [`Priority: ${priorityFilter}`] : []),
+        ...(ownerFilter ? [`Owner: ${ownerFilter}`] : []),
+        ...(projectFilter ? [`Project: ${projectFilter}`] : []),
+        ...(sourceFilter ? [`Source: ${sourceFilter}`] : []),
+        ...(departmentFilter ? [`Department: ${departmentFilter}`] : []),
+        ...(showOverdueOnly ? ["Overdue only"] : []),
+        ...(showOpenOnly ? ["Open / non-closed only"] : []),
+        ...(showClosedOnly ? ["Closed / complete only"] : []),
+        ...(quickFilter ? [`Quick filter: ${quickFilter}`] : []),
+      ];
+      await downloadRegisterExcel<ActionItem>({
+        fileName: `action-register-${excelDateStamp()}.xlsx`,
+        sheetName: "Action Register",
+        title: "Action Register — Enshore IMS Central Action Management",
+        filters,
+        rows: filteredActions,
+        columns: [
+          { header: "Action No.", width: 14, value: (action) => action.action_number || "" },
+          { header: "Title", width: 44, value: (action) => action.title || "" },
+          { header: "Description", width: 60, value: (action) => action.description || "" },
+          { header: "Department", width: 18, value: (action) => action.department || "" },
+          { header: "Project", width: 22, value: (action) => action.project || "" },
+          { header: "Source", width: 20, value: (action) => getActionSourceLabel(action) },
+          { header: "Linked Record", width: 30, value: (action) => buildLinkedRecordDisplay(action) },
+          { header: "Owner", width: 22, value: (action) => action.owner || "" },
+          { header: "Priority", width: 11, value: (action) => action.priority || "" },
+          { header: "Due Date", width: 13, value: (action) => (action.due_date ? formatDate(action.due_date) : "") },
+          { header: "Status", width: 14, value: (action) => action.status || "" },
+          { header: "Overdue", width: 9, value: (action) => (isOverdue(action) ? "Yes" : "No") },
+          { header: "Close-out Comments", width: 50, value: (action) => action.close_out_comments || "" },
+        ],
+      });
+      setMessage(`Action Register Excel report created with ${filteredActions.length} action${filteredActions.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      console.error(error);
+      setMessage("Action Register Excel report could not be created.");
+    }
+  }
+
   function clearFilters() {
     setSearch("");
     setStatusFilter("");
@@ -4593,6 +4644,13 @@ function ActionsPageContent() {
             style={primaryButtonStyle}
           >
             Generate PDF Report
+          </button>
+          <button
+            type="button"
+            onClick={() => void generateFilteredActionRegisterExcel()}
+            style={primaryButtonStyle}
+          >
+            Generate Excel Report
           </button>
         </div>
           ) : null}
