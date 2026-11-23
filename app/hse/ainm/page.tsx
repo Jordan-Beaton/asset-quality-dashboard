@@ -41,6 +41,8 @@ import {
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 import { exportColours, exportRgb, exportTypography } from "../../../src/lib/exportTheme";
+import { ainmReportFileName, createAinmReportPdf } from "../../../src/lib/ainmReportPdf";
+import { downloadRegisterExcel, excelDateStamp } from "../../../src/lib/registerExcel";
 
 export const dynamic = "force-dynamic";
 
@@ -713,6 +715,8 @@ function HseAinmPageContent() {
   const [stageFilter, setStageFilter] = useUrlState("stage", "");
   const [typeFilter, setTypeFilter] = useUrlState<"" | AINMType>("type", "", ["", "Incident", "Accident"]);
   const [classificationFilter, setClassificationFilter] = useUrlState("classification", "");
+  const [projectFilter, setProjectFilter] = useUrlState("regproject", "");
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
   const [importWorkbook, setImportWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [importSheets, setImportSheets] = useState<string[]>([]);
@@ -857,9 +861,15 @@ function HseAinmPageContent() {
         record.notification_status === stageFilter ||
         record.part1_status === stageFilter ||
         record.part2_status === stageFilter;
-      return matchesSearch && matchesStatus && matchesStage && matchesType && matchesClassification;
+      const matchesProject = !projectFilter || clean(record.project) === projectFilter;
+      return matchesSearch && matchesStatus && matchesStage && matchesType && matchesClassification && matchesProject;
     });
-  }, [classificationFilter, records, search, stageFilter, statusFilter, typeFilter]);
+  }, [classificationFilter, projectFilter, records, search, stageFilter, statusFilter, typeFilter]);
+
+  const projectOptions = useMemo(
+    () => [...new Set(records.map((record) => clean(record.project)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base", numeric: true })),
+    [records],
+  );
 
   const filteredExternalRecords = useMemo(() => {
     const query = externalSearch.trim().toLowerCase();
@@ -990,7 +1000,8 @@ function HseAinmPageContent() {
         value: dashboardRecords.filter((record) => clean(record.project) === project).length,
         color: "#005670",
         onClick: () => {
-          setSearch((current) => current.trim() ? `${current.trim()} ${project}` : project);
+          setProjectFilter(project);
+          setShowRegisterFilters(true);
           setActiveView("register");
         },
       }))
@@ -1024,6 +1035,119 @@ function HseAinmPageContent() {
     setStageFilter("");
     setTypeFilter("");
     setClassificationFilter("");
+    setProjectFilter("");
+  }
+
+  function registerFilterDescriptions() {
+    return [
+      `Project: ${projectFilter || "All"}`,
+      `Status: ${statusFilter || "All"}`,
+      ...(stageFilter ? [`Stage status: ${stageFilter}`] : []),
+      `Report type: ${typeFilter || "All"}`,
+      ...(classificationFilter ? [`Classification: ${classificationFilter}`] : []),
+      ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+    ];
+  }
+
+  async function loadImageDataUrl(path: string) {
+    try {
+      const response = await fetch(path);
+      if (!response.ok) return undefined;
+      const blob = await response.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return undefined;
+    }
+  }
+
+  // The PDF holds exactly the AINMs the register is showing, grouped by project, with the filters that produced them.
+  async function exportRegisterPdf() {
+    if (!filteredRecords.length) {
+      setMessage("There are no AINMs to export for the current filters.");
+      return;
+    }
+    setExportingPdf(true);
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const metadata = authData.user?.user_metadata as { full_name?: string; name?: string } | undefined;
+      const generatedBy = metadata?.full_name || metadata?.name || authData.user?.email || "";
+      const [enshoreLogo, threeRsLogo] = await Promise.all([
+        loadImageDataUrl("/enshore-primary-logo-colour.png"),
+        loadImageDataUrl("/enshore-3rs-primary-rgb.jpg"),
+      ]);
+      const pdf = createAinmReportPdf(
+        filteredRecords.map((record) => ({
+          ainm_number: clean(record.ainm_number),
+          title: clean(record.title),
+          project: record.project,
+          location_site: record.location_site,
+          event_date: record.event_date,
+          event_classification: record.event_classification,
+          brief_event_details: record.brief_event_details,
+          notification_status: record.notification_status,
+          part1_status: record.part1_status,
+          part2_status: record.part2_status,
+          overall_status: record.overall_status,
+          owner: record.owner,
+        })),
+        { filters: registerFilterDescriptions(), generatedBy, includeDetails: true, logos: { enshore: enshoreLogo, threeRs: threeRsLogo } },
+      );
+      pdf.save(ainmReportFileName(projectFilter));
+      setMessage(`AINM report created with ${filteredRecords.length} AINM${filteredRecords.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? `The report could not be created: ${error.message}` : "The report could not be created.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  // The workbook holds exactly the AINMs the register is showing, one field per column for sorting and filtering.
+  async function exportRegisterExcel() {
+    if (!filteredRecords.length) {
+      setMessage("There are no AINMs to export for the current filters.");
+      return;
+    }
+    try {
+      await downloadRegisterExcel<AINMRecord>({
+        fileName: `ainm-register${projectFilter ? `-${projectFilter.replace(/[^A-Za-z0-9._-]+/g, "-")}` : ""}-${excelDateStamp()}.xlsx`,
+        sheetName: "AINM Register",
+        title: "AINM Register — Enshore IMS",
+        filters: registerFilterDescriptions(),
+        rows: filteredRecords,
+        columns: [
+          { header: "AINM No.", width: 14, value: (record) => record.ainm_number || "" },
+          { header: "Type", width: 11, value: (record) => ainmTypeLabel(record) },
+          { header: "Title", width: 40, value: (record) => record.title || "" },
+          { header: "Project", width: 22, value: (record) => record.project || "" },
+          { header: "Location / Site", width: 22, value: (record) => record.location_site || "" },
+          { header: "Event Date", width: 13, value: (record) => displayDate(record.event_date) },
+          { header: "Event Time", width: 10, value: (record) => record.event_time || "" },
+          { header: "Classification", width: 24, value: (record) => record.event_classification || "" },
+          { header: "Company in Control", width: 22, value: (record) => record.company_in_control || "" },
+          { header: "Owner", width: 20, value: (record) => record.owner || "" },
+          { header: "Notification Status", width: 18, value: (record) => record.notification_status || "" },
+          { header: "Notification Sent", width: 16, value: (record) => displayDate(record.notification_sent_at) },
+          { header: "Part 1 Status", width: 14, value: (record) => record.part1_status || "" },
+          { header: "Part 1 Completed", width: 16, value: (record) => displayDate(record.part1_completed_at) },
+          { header: "Part 2 Status", width: 14, value: (record) => record.part2_status || "" },
+          { header: "Part 2 Completed", width: 16, value: (record) => displayDate(record.part2_completed_at) },
+          { header: "Overall Status", width: 14, value: (record) => record.overall_status || "" },
+          { header: "Brief Event Details", width: 70, value: (record) => record.brief_event_details || "" },
+          { header: "Injury / Release / Damage", width: 44, value: (record) => record.injury_release_damage_details || "" },
+          { header: "Initial Cause", width: 40, value: (record) => record.initial_cause || "" },
+          { header: "Immediate Corrective Actions", width: 44, value: (record) => record.immediate_corrective_actions || "" },
+          { header: "Comments", width: 40, value: (record) => record.comments || "" },
+        ],
+      });
+      setMessage(`AINM Excel report created with ${filteredRecords.length} AINM${filteredRecords.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? `The Excel report could not be created: ${error.message}` : "The Excel report could not be created.");
+    }
   }
 
   function exportDashboardSummaryPdf() {
@@ -3514,8 +3638,18 @@ function HseAinmPageContent() {
               searchPlaceholder="Search AINM no., title, project, owner..."
               showFilters={showRegisterFilters}
               onToggleFilters={() => setShowRegisterFilters((current) => !current)}
-              actions={<ImsButton variant="secondary" onClick={clearRegisterFilters}>Clear Filters</ImsButton>}
+              actions={<>
+                <ImsButton variant="secondary" onClick={clearRegisterFilters}>Clear Filters</ImsButton>
+                <ImsButton variant="primary" onClick={() => void exportRegisterPdf()} disabled={!filteredRecords.length || exportingPdf} title="Create a PDF of the AINMs currently shown, grouped by project">{exportingPdf ? "Creating PDF..." : "Export PDF"}</ImsButton>
+                <ImsButton variant="secondary" onClick={() => void exportRegisterExcel()} disabled={!filteredRecords.length} title="Download an Excel workbook of the AINMs currently shown">Export Excel</ImsButton>
+              </>}
             >
+              <Field label="Project">
+                <select style={filterStyle} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+                  <option value="">All projects</option>
+                  {projectOptions.map((project) => <option key={project} value={project}>{project}</option>)}
+                </select>
+              </Field>
               <Field label="Status">
                 <select style={filterStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                   <option value="">All statuses</option>
