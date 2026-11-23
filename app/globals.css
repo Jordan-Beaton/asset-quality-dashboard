@@ -293,6 +293,41 @@ label.audit-upload-label,
   box-shadow: 0 1px 3px rgba(0, 86, 112, 0.06) !important;
 }
 
+/* The filter bar is the same grey as the secondary button, so on it a secondary button
+ * disappears into the panel. Give it a white face and an outline there, and let every
+ * button answer a hover and a press so it is clear it is clickable. */
+.ims-filter-panel .ims-btn--secondary,
+.ims-register-toolbar .ims-btn--secondary {
+  background: var(--enshore-surface) !important;
+  border: 1px solid var(--enshore-border) !important;
+  color: var(--enshore-ink) !important;
+}
+
+.ims-btn:not(:disabled):hover {
+  filter: brightness(0.94);
+}
+
+.ims-btn:not(:disabled):active {
+  filter: brightness(0.84);
+  transform: translateY(1px);
+}
+
+.ims-filter-panel .ims-btn--secondary:not(:disabled):hover {
+  border-color: var(--enshore-brand) !important;
+  filter: none;
+}
+
+.ims-filter-panel .ims-btn--secondary:not(:disabled):active {
+  background: var(--enshore-border) !important;
+  border-color: var(--enshore-brand) !important;
+  filter: none;
+}
+
+.ims-btn:focus-visible {
+  outline: 2px solid var(--enshore-brand);
+  outline-offset: 2px;
+}
+
 .ims-page-container input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
 .ims-page-container select {
   width: 100%;

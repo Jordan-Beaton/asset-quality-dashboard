@@ -1006,10 +1006,10 @@ function ActionsPageContent() {
   const [sourceFilter, setSourceFilter] = useUrlState("source", "");
   const [departmentFilter, setDepartmentFilter] = useUrlState("department", "");
   const [showOverdueOnly, setShowOverdueOnly] = useUrlFlag("overdue", false);
-  const [showOpenOnly, setShowOpenOnly] = useUrlFlag("open", false);
+  const [showOpenOnly, setShowOpenOnly] = useUrlFlag("open", true);
   const [showClosedOnly, setShowClosedOnly] = useUrlFlag("closed", false);
   const [quickFilter, setQuickFilter] = useUrlState<QuickFilter>("quick", "", quickFilterValues);
-  const [myActionFilter, setMyActionFilter] = useUrlState<MyActionFilter>("myfilter", "all", myActionFilterValues);
+  const [myActionFilter, setMyActionFilter] = useUrlState<MyActionFilter>("myfilter", "open", myActionFilterValues);
   const [showMyItemFilters, setShowMyItemFilters] = useUrlFlag("myfilters", false);
   const [myItemStatusFilter, setMyItemStatusFilter] = useUrlState("mystatus", "");
   const [myItemTypeFilter, setMyItemTypeFilter] = useUrlState("mytype", "");
@@ -1647,6 +1647,10 @@ function ActionsPageContent() {
       .map((item) => ({ name: item.name, closed: item.value }));
   }, [actions]);
 
+  // The register opens showing open items only. Choosing a status, "closed only" or a closed month is an explicit
+  // request to see closed items, so the open-only default steps aside for those.
+  const openOnlyActive = showOpenOnly && !statusFilter && !showClosedOnly && !closedMonthFilter;
+
   const filteredActions = useMemo(() => {
     return actions.filter((action) => {
       const matchesSearch = matchesSearchTerm(action, search);
@@ -1665,7 +1669,7 @@ function ActionsPageContent() {
       const matchesSource = !sourceFilter || getActionSourceValue(action) === sourceFilter;
       const matchesDepartment = !departmentFilter || (action.department || "") === departmentFilter;
       const matchesOverdue = !showOverdueOnly || isOverdue(action);
-      const matchesOpenOnly = !showOpenOnly || !isClosedLikeStatus(action.status);
+      const matchesOpenOnly = !openOnlyActive || !isClosedLikeStatus(action.status);
       const matchesClosedOnly = !showClosedOnly || isClosedLikeStatus(action.status);
       const matchesEvidenceOnly = !showEvidenceOnly || (evidenceCountMap.get(action.id) || 0) > 0;
       const matchesLinkedIssuesOnly =
@@ -1733,7 +1737,7 @@ function ActionsPageContent() {
     sourceFilter,
     departmentFilter,
     showOverdueOnly,
-    showOpenOnly,
+    openOnlyActive,
     showClosedOnly,
     showEvidenceOnly,
     showLinkedIssuesOnly,
@@ -1958,12 +1962,13 @@ function ActionsPageContent() {
     [myTodayOpenItems]
   );
   const myQuickFilteredActions = useMemo(() => {
-    if (myActionFilter === "open") return myOpenWorkItems;
+    // Open items is the default view; choosing Closed in the status filter is a request to see closed items, so it steps aside.
+    if (myActionFilter === "open") return myItemStatusFilter === "Closed" ? myActionList : myOpenWorkItems;
     if (myActionFilter === "closed") return myClosedActions;
     if (myActionFilter === "overdue") return myOverdueActions;
     if (myActionFilter === "dueWeek") return myDueThisWeekActions;
     return myActionList;
-  }, [myActionFilter, myActionList, myClosedActions, myDueThisWeekActions, myOpenWorkItems, myOverdueActions]);
+  }, [myActionFilter, myActionList, myClosedActions, myDueThisWeekActions, myItemStatusFilter, myOpenWorkItems, myOverdueActions]);
 
   const myFilteredActions = useMemo(() => {
     return myQuickFilteredActions.filter((item) => {
@@ -1974,10 +1979,158 @@ function ActionsPageContent() {
     });
   }, [myQuickFilteredActions, myItemStatusFilter, myItemTypeFilter]);
 
-  function clearMyItemFilters() {
-    setMyActionFilter("all");
+  // Clearing returns to the default view, which hides closed items. "Show All Mine" includes them.
+  function clearMyItemFilters(includeClosed = false) {
+    setMyActionFilter(includeClosed ? "all" : "open");
     setMyItemStatusFilter("");
     setMyItemTypeFilter("");
+  }
+
+  function myReportFilters() {
+    return [
+      `Person: ${currentPersonName}`,
+      `Showing: ${myItemStatusFilter === "Closed" && myActionFilter === "open" ? "All Items" : myActionFilterLabel}`,
+      ...(myItemStatusFilter ? [`Status: ${myItemStatusFilter}`] : []),
+      ...(myItemTypeFilter ? [`Type: ${myItemTypeFilter}`] : []),
+    ];
+  }
+
+  function myReportSourceLabel(item: MyWorkItem) {
+    return item.source === "Action" && item.action ? getActionSourceLabel(item.action) : item.source;
+  }
+
+  async function generateMyActionsExcel() {
+    if (myFilteredActions.length === 0) {
+      setMessage("No items available for Excel export.");
+      return;
+    }
+    try {
+      await downloadRegisterExcel<MyWorkItem>({
+        fileName: `my-actions-${excelDateStamp()}.xlsx`,
+        sheetName: "My Actions",
+        title: `My Actions — ${currentPersonName}`,
+        filters: myReportFilters(),
+        rows: myFilteredActions,
+        columns: [
+          { header: "Type", width: 14, value: (item) => item.source },
+          { header: "Reference", width: 22, value: (item) => item.number },
+          { header: "Title", width: 60, value: (item) => item.title },
+          { header: "Project", width: 24, value: (item) => item.project },
+          { header: "Source", width: 20, value: (item) => myReportSourceLabel(item) },
+          { header: "Priority", width: 11, value: (item) => (item.action ? item.action.priority || "" : "") },
+          { header: "Due Date", width: 13, value: (item) => (item.due_date ? formatDate(item.due_date) : "") },
+          { header: "Status", width: 14, value: (item) => item.status || "" },
+          { header: "Overdue", width: 9, value: (item) => (isOverdue(item) ? "Yes" : "No") },
+        ],
+      });
+      setMessage(`My Actions Excel report created with ${myFilteredActions.length} item${myFilteredActions.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      console.error(error);
+      setMessage("My Actions Excel report could not be created.");
+    }
+  }
+
+  async function generateMyActionsPdf() {
+    if (myFilteredActions.length === 0) {
+      setMessage("No items available for PDF export.");
+      return;
+    }
+    try {
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+
+      try {
+        const logoResponse = await fetch("/enshore-primary-logo-colour.png");
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const logoDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(new Error("Could not convert logo to data URL."));
+            reader.readAsDataURL(logoBlob);
+          });
+          doc.addImage(logoDataUrl, "PNG", margin, 8, 44, 22);
+        }
+      } catch {
+        // Keep report generation resilient if the logo cannot be loaded.
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(17);
+      doc.setTextColor(0, 0, 0);
+      doc.text("My Actions", pageWidth / 2, 17, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(83, 86, 90);
+      doc.text(`${currentPersonName} — ${myReportFilters()[1].replace("Showing: ", "")}`, pageWidth / 2, 23, { align: "center" });
+      doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`, pageWidth - margin, 17, { align: "right" });
+      doc.text(`Items: ${myFilteredActions.length}`, pageWidth - margin, 23, { align: "right" });
+      doc.setDrawColor(0, 86, 112);
+      doc.setLineWidth(0.7);
+      doc.line(margin, 31, pageWidth - margin, 31);
+
+      const rows = myFilteredActions.map((item) => ({
+        type: item.source,
+        reference: item.number,
+        title: item.title,
+        project: item.project,
+        source: myReportSourceLabel(item),
+        due_date: formatDate(item.due_date),
+        status: item.status || "-",
+        is_overdue: isOverdue(item),
+      }));
+
+      autoTable(doc, {
+        startY: 35,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 14 },
+        columns: [
+          { header: "Type", dataKey: "type" },
+          { header: "Reference", dataKey: "reference" },
+          { header: "Title", dataKey: "title" },
+          { header: "Project", dataKey: "project" },
+          { header: "Source", dataKey: "source" },
+          { header: "Due Date", dataKey: "due_date" },
+          { header: "Status", dataKey: "status" },
+        ],
+        body: rows,
+        styles: { font: "helvetica", fontSize: 7.4, cellPadding: 1.8, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0], overflow: "linebreak", valign: "top" },
+        headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255], fontStyle: "bold" },
+        columnStyles: {
+          type: { cellWidth: 24 },
+          reference: { cellWidth: 36 },
+          title: { cellWidth: 82 },
+          project: { cellWidth: 40 },
+          source: { cellWidth: 28 },
+          due_date: { cellWidth: 24 },
+          status: { cellWidth: 24 },
+        },
+        didParseCell: (data) => {
+          if (data.section !== "body") return;
+          const row = data.row.raw as (typeof rows)[number];
+          if (row.is_overdue && (data.column.dataKey === "due_date" || data.column.dataKey === "status")) {
+            data.cell.styles.fillColor = [254, 226, 226];
+            data.cell.styles.textColor = [153, 27, 27];
+            data.cell.styles.fontStyle = "bold";
+          }
+        },
+        didDrawPage: () => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8.5);
+          doc.setTextColor(83, 86, 90);
+          doc.text("Enshore Action Management", margin, pageHeight - 6);
+          doc.text(`Page ${doc.getCurrentPageInfo().pageNumber} of ${doc.getNumberOfPages()}`, pageWidth - margin, pageHeight - 6, { align: "right" });
+        },
+      });
+
+      doc.save(`my-actions-${excelDateStamp()}.pdf`);
+      setMessage("My Actions PDF generated successfully.");
+    } catch (error) {
+      console.error(error);
+      setMessage("My Actions PDF generation failed.");
+    }
   }
 
   const myActionFilterLabel =
@@ -3483,7 +3636,7 @@ function ActionsPageContent() {
         ...(sourceFilter ? [`Source: ${sourceFilter}`] : []),
         ...(departmentFilter ? [`Department: ${departmentFilter}`] : []),
         ...(showOverdueOnly ? ["Overdue only"] : []),
-        ...(showOpenOnly ? ["Open / non-closed only"] : []),
+        ...(openOnlyActive ? ["Open / non-closed only"] : []),
         ...(showClosedOnly ? ["Closed / complete only"] : []),
         ...(quickFilter ? [`Quick filter: ${quickFilter}`] : []),
       ];
@@ -3525,7 +3678,7 @@ function ActionsPageContent() {
     setSourceFilter("");
     setDepartmentFilter("");
     setShowOverdueOnly(false);
-    setShowOpenOnly(false);
+    setShowOpenOnly(true);
     setShowClosedOnly(false);
     setQuickFilter("");
     setShowEvidenceOnly(false);
@@ -3542,7 +3695,7 @@ function ActionsPageContent() {
     if (view === "register" && activeView !== "register") {
       setQuickFilter("");
       setShowOverdueOnly(false);
-      setShowOpenOnly(false);
+      setShowOpenOnly(true);
       setShowClosedOnly(false);
       setShowEvidenceOnly(false);
       setShowLinkedIssuesOnly(false);
@@ -3567,7 +3720,8 @@ function ActionsPageContent() {
     if (options.source !== undefined) setSourceFilter(options.source);
     if (options.department !== undefined) setDepartmentFilter(options.department);
     if (options.overdue !== undefined) setShowOverdueOnly(options.overdue);
-    if (options.openOnly !== undefined) setShowOpenOnly(options.openOnly);
+    // A drill-down from the dashboard shows every action behind the number clicked, so it only keeps open-only on when asked.
+    setShowOpenOnly(options.openOnly ?? false);
     if (options.closedOnly !== undefined) setShowClosedOnly(options.closedOnly);
     if (options.quickFilter !== undefined) setQuickFilter(options.quickFilter);
     if (options.evidenceOnly !== undefined) setShowEvidenceOnly(options.evidenceOnly);
@@ -4274,15 +4428,21 @@ function ActionsPageContent() {
                     Showing {myFilteredActions.length} {myActionFilterLabel.toLowerCase()} for {currentPersonName}.
                   </p>
                 </div>
-                <button type="button" style={secondaryButtonStyle} onClick={clearMyItemFilters}>
+                <button type="button" style={secondaryButtonStyle} onClick={() => clearMyItemFilters(true)}>
                   Show All Mine
                 </button>
               </div>
 
               <div className="ims-filter-panel" style={simpleFilterShellStyle}>
                 <div style={simpleFilterButtonRowStyle}>
-                  <button type="button" onClick={clearMyItemFilters} style={secondaryButtonStyle}>
+                  <button type="button" onClick={() => clearMyItemFilters()} style={secondaryButtonStyle}>
                     Clear Filters
+                  </button>
+                  <button type="button" onClick={() => void generateMyActionsPdf()} style={primaryButtonStyle}>
+                    Generate PDF Report
+                  </button>
+                  <button type="button" onClick={() => void generateMyActionsExcel()} style={primaryButtonStyle}>
+                    Generate Excel Report
                   </button>
                   <button
                     type="button"
@@ -4626,6 +4786,28 @@ function ActionsPageContent() {
 
           <button
             type="button"
+            onClick={() => {
+              if (openOnlyActive) {
+                setShowOpenOnly(false);
+                return;
+              }
+              // Turning open-only on also drops a status or closed filter that was holding it aside.
+              setShowOpenOnly(true);
+              setShowClosedOnly(false);
+              setStatusFilter("");
+              setClosedMonthFilter("");
+            }}
+            title={openOnlyActive ? "Closed actions are hidden. Press to include them." : "Closed actions are included. Press to show open actions only."}
+            style={{
+              ...secondaryButtonStyle,
+              background: openOnlyActive ? "#000000" : "#D0D0CE",
+              color: openOnlyActive ? "#ffffff" : "#000000",
+            }}
+          >
+            {openOnlyActive ? "Open Actions Only" : "Including Closed Actions"}
+          </button>
+          <button
+            type="button"
             onClick={() => setShowOverdueOnly((current) => !current)}
             style={{
               ...secondaryButtonStyle,
@@ -4665,7 +4847,7 @@ function ActionsPageContent() {
                 with quick filter <strong>{quickFilter === "dueWeek" ? "Due This Week" : quickFilter === "highPriority" ? "High Priority" : quickFilter === "my" ? "My Actions" : "Overdue"}</strong>
               </>
             ) : null}
-            {showOpenOnly ? (
+            {openOnlyActive ? (
               <>
                 {" "}
                 showing <strong>open/non-closed</strong>

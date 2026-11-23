@@ -173,6 +173,8 @@ export default function HseObservationsPage() {
   const [riskFilter, setRiskFilter] = useUrlState("risk", "");
   const [reporterTypeFilter, setReporterTypeFilter] = useUrlState("reporter", "");
   const [projectFilter, setProjectFilter] = useUrlState("project", "");
+  // Closed observations are hidden until asked for. Picking a status is also a request to see that status.
+  const [showClosed, setShowClosed] = useUrlFlag("closed", false);
   const [showExport, setShowExport] = useState(false);
   const [exportGroup, setExportGroup] = useState<ObservationReportGroup>("project");
   const [exportSort, setExportSort] = useState<ObservationReportSort>("newest");
@@ -213,6 +215,7 @@ export default function HseObservationsPage() {
     const matched = records.find((record) => record.id === target || record.observation_number === target);
     if (!matched) return;
     setSelectedId(matched.id);
+    if (isClosed(matched.status)) setShowClosed(true);
     setActiveView("register");
   }, [records]);
 
@@ -254,9 +257,12 @@ export default function HseObservationsPage() {
     return !Number.isNaN(date.getTime()) && String(date.getFullYear()) === yearFilter;
   }), [records, yearFilter]);
 
+  const hideClosed = !showClosed && !statusFilter;
+
   const filteredRecords = useMemo(() => {
     const lower = search.trim().toLowerCase();
     return yearRecords.filter((record) => {
+      if (hideClosed && isClosed(record.status)) return false;
       const matchesSearch = !lower || [
         record.observation_number,
         record.title,
@@ -274,7 +280,7 @@ export default function HseObservationsPage() {
       const matchesProject = !projectFilter || (record.project || "") === projectFilter;
       return matchesSearch && matchesStatus && matchesType && matchesRisk && matchesReporterType && matchesProject;
     });
-  }, [projectFilter, reporterTypeFilter, riskFilter, search, statusFilter, typeFilter, yearRecords]);
+  }, [hideClosed, projectFilter, reporterTypeFilter, riskFilter, search, statusFilter, typeFilter, yearRecords]);
 
   const projectOptions = useMemo(
     () => [...new Set(yearRecords.map((record) => record.project).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b)),
@@ -311,7 +317,7 @@ export default function HseObservationsPage() {
       const filters = [
         `Year: ${yearFilter || "All"}`,
         `Project: ${projectFilter || "All"}`,
-        `Status: ${statusFilter || "All"}`,
+        `Status: ${statusFilter || (hideClosed ? "Open (closed hidden)" : "All")}`,
         `Type: ${typeFilter || "All"}`,
         `Risk: ${riskFilter || "All"}`,
         `Submitted as: ${reporterTypeFilter || "All"}`,
@@ -351,7 +357,7 @@ export default function HseObservationsPage() {
       const filters = [
         `Year: ${yearFilter || "All"}`,
         ...(projectFilter ? [`Project: ${projectFilter}`] : []),
-        ...(statusFilter ? [`Status: ${statusFilter}`] : []),
+        ...(statusFilter ? [`Status: ${statusFilter}`] : hideClosed ? ["Open (closed hidden)"] : []),
         ...(typeFilter ? [`Type: ${typeFilter}`] : []),
         ...(riskFilter ? [`Risk: ${riskFilter}`] : []),
         ...(reporterTypeFilter ? [`Submitted as: ${reporterTypeFilter}`] : []),
@@ -405,6 +411,8 @@ export default function HseObservationsPage() {
 
   function selectObservationAndScroll(id: string) {
     setSelectedId(id);
+    // A closed record chosen from the dashboard must still appear in the register list beside its detail.
+    if (isClosed(records.find((record) => record.id === id)?.status)) setShowClosed(true);
     window.setTimeout(() => {
       selectedDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
@@ -652,7 +660,16 @@ export default function HseObservationsPage() {
               showFilters={showFilters}
               onToggleFilters={() => setShowFilters((value) => !value)}
               actions={<>
-                <ImsButton variant="secondary" onClick={() => { setSearch(""); setStatusFilter(""); setTypeFilter(""); setRiskFilter(""); setReporterTypeFilter(""); setProjectFilter(""); }}>Clear Filters</ImsButton>
+                <ImsButton
+                  variant={hideClosed ? "primary" : "secondary"}
+                  onClick={() => {
+                    if (hideClosed) { setShowClosed(true); return; }
+                    setShowClosed(false);
+                    setStatusFilter("");
+                  }}
+                  title={hideClosed ? "Closed observations are hidden. Press to show them." : "Closed observations are showing. Press to hide them."}
+                >{hideClosed ? "Show Closed" : "Hide Closed"}</ImsButton>
+                <ImsButton variant="secondary" onClick={() => { setSearch(""); setStatusFilter(""); setTypeFilter(""); setRiskFilter(""); setReporterTypeFilter(""); setProjectFilter(""); setShowClosed(false); }}>Clear Filters</ImsButton>
                 <ImsButton variant={showExport ? "secondary" : "primary"} onClick={() => setShowExport((value) => !value)} disabled={!filteredRecords.length} title="Create a PDF of the observations currently shown">{showExport ? "Hide PDF options" : "Export PDF"}</ImsButton>
                 <ImsButton variant="secondary" onClick={() => void exportExcel()} disabled={!filteredRecords.length} title="Download an Excel workbook of the observations currently shown">Export Excel</ImsButton>
               </>}
@@ -714,7 +731,7 @@ export default function HseObservationsPage() {
                 </div>
               </div>
             ) : null}
-            <div style={imsTableInfoRowStyle}>Showing <strong>{filteredRecords.length}</strong> of <strong>{yearRecords.length}</strong> observations</div>
+            <div style={imsTableInfoRowStyle}>Showing <strong>{filteredRecords.length}</strong> of <strong>{yearRecords.length}</strong> observations{hideClosed ? " · closed observations are hidden" : ""}</div>
             <div className="observation-table-wrap" style={{ overflowX: "auto", border: "1px solid #D0D0CE", borderRadius: "14px" }}>
               <table className="observation-table" style={{ ...imsTableStyle, minWidth: 980 }}>
                 <thead>

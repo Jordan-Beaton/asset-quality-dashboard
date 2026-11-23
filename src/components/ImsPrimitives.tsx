@@ -56,6 +56,7 @@ export function ImsButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
+      className={`ims-btn ims-btn--${variant}`}
       style={{
         ...getButtonStyle(variant),
         opacity: disabled ? 0.65 : 1,
