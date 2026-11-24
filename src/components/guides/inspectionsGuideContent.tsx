@@ -111,7 +111,7 @@ function SectionHseStart() {
         <tbody>
           <tr><td style={nowrapCell}><strong>Open Inspections</strong></td><td style={imsTableCellStyle}>Every inspection that is not Complete or Closed (so Draft and Open ones). Click it to open the register filtered to <strong>Open</strong>.</td></tr>
           <tr><td style={nowrapCell}><strong>Completed / Closed</strong></td><td style={imsTableCellStyle}>Inspections that are Complete or Closed. Click it to open the register filtered to <strong>Complete</strong>.</td></tr>
-          <tr><td style={nowrapCell}><strong>Open Findings</strong></td><td style={imsTableCellStyle}>The total number of checklist items answered <strong>No</strong> across all inspections.</td></tr>
+          <tr><td style={nowrapCell}><strong>Open Findings</strong></td><td style={imsTableCellStyle}>The total number of findings across all inspections. On most questions a <strong>No</strong> is a finding. On the few questions that ask whether something bad is there, a <strong>Yes</strong> is the finding (see Checklist answers).</td></tr>
           <tr><td style={nowrapCell}><strong>Evidence Files</strong></td><td style={imsTableCellStyle}>The total number of evidence files uploaded.</td></tr>
         </tbody>
       </table>
@@ -178,7 +178,7 @@ function SectionHseFill() {
       </div>
       <div style={stepList}>
         <Step n={1}>Fill in <code style={codeStyle}>Title</code> (required), <code style={codeStyle}>Department</code>, <code style={codeStyle}>Inspection Date</code>, <code style={codeStyle}>Project / Work Scope</code>, <code style={codeStyle}>Vessel / Spread</code> and <code style={codeStyle}>Area / Zone</code>. Pick the <code style={codeStyle}>Inspector</code> from the list; their position is filled in for you and you can change it.</Step>
-        <Step n={2}>Work through each checklist section. For every item choose <strong>N/A</strong>, <strong>Yes</strong> or <strong>No</strong>, and type anything useful in <strong>Comments / action notes</strong>. Items with a &quot;No&quot; are counted as <strong>Open Findings</strong> on the Dashboard.</Step>
+        <Step n={2}>Work through each checklist section. For every item choose <strong>N/A</strong>, <strong>Yes</strong> or <strong>No</strong>, and type anything useful in <strong>Comments / action notes</strong>. Answers that count as a finding are added to <strong>Open Findings</strong> on the Dashboard. On most questions that is a <strong>No</strong>, but not on every question, so read the wording.</Step>
         <Step n={3}>Use <strong>Upload</strong> on an item row to attach a photo or file to that exact item (see <strong>Register, Evidence &amp; PDF</strong>).</Step>
         <Step n={4}>Add overall remarks under <strong>Additional Comments</strong> (the last numbered section on every form).</Step>
         <Step n={5}>In <strong>Sign-Off</strong>, choose the <code style={codeStyle}>Name</code> from the list, check <code style={codeStyle}>Position</code>, <code style={codeStyle}>Company</code> (defaults to Enshore Subsea) and set the <code style={codeStyle}>Date</code>.</Step>
@@ -224,7 +224,7 @@ function SectionRecordScreen() {
       <h3 style={h3Style}>The four steps</h3>
       <div style={stepList}>
         <Step n={1}><strong>Report details</strong> (site, date, inspector): Inspection No., Status, Title, Department, date, project, vessel, area and inspector. Percentage.</Step>
-        <Step n={2}><strong>Checklist</strong>: every checklist section, plus the Evidence panel. It reads how many items are answered, for example <em>18 of 30 answered</em>, and how many notes are needed for items marked No. Percentage is the share answered.</Step>
+        <Step n={2}><strong>Checklist</strong>: every checklist section, plus the Evidence panel. It reads how many items are answered, for example <em>18 of 30 answered</em>. Percentage is the share answered.</Step>
         <Step n={3}><strong>Comments</strong> (overall remarks): Additional Comments and, on a saved inspection, the Linked Actions panel. It reads <em>Optional</em> until you add a comment.</Step>
         <Step n={4}><strong>Sign-off</strong> (name and date): the sign-off name, position, company and date. Percentage.</Step>
       </div>
@@ -235,7 +235,7 @@ function SectionRecordScreen() {
         <div>The chips warn, they never block. If you click <strong>Complete Inspection</strong> with items missing you are asked &ldquo;N items are still missing: ... Complete anyway?&rdquo; and can carry on. A title is still needed to save.</div>
       </div>
       <h3 style={h3Style}>Form, Split and PDF</h3>
-      <p style={pStyle}><strong>Form</strong> shows only the fields, <strong>Split</strong> shows them beside the live <strong>Inspection report (PDF)</strong> summary, and <strong>PDF</strong> shows that summary on its own. The summary shows the report details, how many items are answered, the open findings (every item marked No, with its comment if you wrote one) and the sign-off. Gaps in the report details and sign-off show as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
+      <p style={pStyle}><strong>Form</strong> shows only the fields, <strong>Split</strong> shows them beside the live <strong>Inspection report (PDF)</strong> summary, and <strong>PDF</strong> shows that summary on its own. The summary shows the report details, how many items are answered, the open findings (every answer that counts as a finding, with its comment if you wrote one) and the sign-off. Gaps in the report details and sign-off show as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
       <h3 style={h3Style}>All sections</h3>
       <p style={pStyle}>The <strong>All sections</strong> button shows the whole inspection on one long page, as it used to be. Click it again to return to one step at a time. At the bottom of a saved inspection, <strong>Export PDF</strong>, <strong>Save Inspection</strong> and <strong>Delete Inspection</strong> stay in place whichever step you are on; a new inspection shows only <strong>Save Inspection</strong>.</p>
     </>
@@ -563,7 +563,8 @@ function SectionStatuses() {
         <span style={pill(imsColours.brand, "#ffffff")}>Yes</span>
         <span style={pill(imsColours.danger, "#ffffff")}>No</span>
       </div>
-      <p style={pStyle}><strong>No</strong> answers are counted as <strong>Open Findings</strong> on the Dashboard.</p>
+      <p style={pStyle}>A <strong>finding</strong> is the bad answer to a question. On most questions that is <strong>No</strong>, for example &ldquo;Lighting satisfactory?&rdquo;.</p>
+      <p style={pStyle}>Some questions ask whether something bad is there, for example &ldquo;Trip hazards present?&rdquo; or &ldquo;Is there evidence of waste cross-contamination?&rdquo;. On those a <strong>Yes</strong> is the finding and a No is the good answer. Every <strong>&ldquo;Other &hellip; observations&rdquo;</strong> line works this way too: choose <strong>Yes</strong> if you have something else to report and write it in the comment. There are 30 such questions across the six forms. Findings show in Open Findings on the Dashboard, the Open findings column of the register, and the report summary beside the form.</p>
       <h3 style={h3Style}>Overall Inspections status (manual entries)</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         {["Planned", "Confirmed", "Completed", "Cancelled"].map(s => <span key={s} style={badge(s)}>{s}</span>)}

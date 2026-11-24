@@ -782,6 +782,28 @@ const droppedObjectsChecklist: ChecklistSection[] = [
   },
 ];
 
+// Which answer is a finding. On most questions a NO is the finding ("Lighting satisfactory?"). On the questions below the
+// wording asks whether something bad is there ("Trip hazards present?"), so a YES is the finding and a No is the good answer.
+// This includes every "Other ... observations" line. Reviewed and approved by the IMS admin on 24 Nov 2026 (30 questions).
+// Counts are worked out from the saved answers each time, so changing this list changes finding counts on past inspections.
+const YES_IS_FINDING: Record<string, string[]> = {
+  "workplace-office": ["1.4", "2.15", "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "4.8", "5.6"],
+  "vessel-pre-sail": ["6.1", "6.2", "14.3"],
+  "workplace-offshore": ["1.12", "2.2", "2.9", "3.24", "4.11", "5.20", "6.7", "7.8"],
+  "workplace-mobilisation": ["1.30", "1.33", "1.34", "2.7", "2.8"],
+  [defaultTemplateId]: ["1.6", "2.40", "3.13", "4.11"],
+};
+
+function isFindingAnswer(templateId: string | null | undefined, itemId: string, answer: string | null | undefined) {
+  const formId = templateId && YES_IS_FINDING[templateId] ? templateId : defaultTemplateId;
+  const yesIsFinding = YES_IS_FINDING[formId].includes(itemId);
+  return answer === (yesIsFinding ? "Yes" : "No");
+}
+
+function countFindings(record: Pick<HseInspectionRecord, "form_id" | "checklist_responses">) {
+  return Object.entries(record.checklist_responses || {}).filter(([itemId, response]) => isFindingAnswer(record.form_id, itemId, response?.answer)).length;
+}
+
 function getChecklistForTemplateId(templateId: string | null | undefined) {
   if (templateId === "vessel-pre-sail") return vesselPreSailChecklist;
   if (templateId === "workplace-office") return officeChecklist;
@@ -1019,9 +1041,7 @@ export default function HseInspectionsPage() {
   const kpis = useMemo(() => {
     const open = records.filter((record) => record.status !== "Closed" && record.status !== "Complete").length;
     const complete = records.filter((record) => record.status === "Complete" || record.status === "Closed").length;
-    const findings = records.reduce((count, record) => {
-      return count + Object.values(record.checklist_responses || {}).filter((response) => response.answer === "No").length;
-    }, 0);
+    const findings = records.reduce((count, record) => count + countFindings(record), 0);
     const evidenceCount = evidence.length;
     return { open, complete, findings, evidenceCount };
   }, [evidence.length, records]);
@@ -1850,7 +1870,7 @@ export default function HseInspectionsPage() {
   }
 
   function findingsCount(record: HseInspectionRecord) {
-    return Object.values(record.checklist_responses || {}).filter((response) => response.answer === "No").length;
+    return countFindings(record);
   }
 
   async function exportRegisterExcel() {
@@ -2712,7 +2732,7 @@ function inspectionChecklistStats(draft: HseInspectionRecord) {
   const items = getChecklistForTemplateId(draft.form_id).flatMap((section) => section.items);
   const answeredFlags = items.map((item) => Boolean(draft.checklist_responses[item.id]?.answer));
   const findings = items
-    .filter((item) => draft.checklist_responses[item.id]?.answer === "No")
+    .filter((item) => isFindingAnswer(draft.form_id, item.id, draft.checklist_responses[item.id]?.answer))
     .map((item) => ({ number: item.number, text: item.text, note: clean(draft.checklist_responses[item.id]?.comments) }));
   return {
     total: items.length,
@@ -2830,7 +2850,7 @@ function InspectionWorkbench({
             ...shownFindings.map((finding) => ({ label: `Item ${finding.number}`, value: finding.note ? `${finding.text} - ${finding.note}` : finding.text, step: "checklist" })),
             ...(stats.findings.length > shownFindings.length ? [{ label: "More findings", value: `${stats.findings.length - shownFindings.length} more in the checklist` }] : []),
           ]
-        : [{ label: "Findings", value: "None marked No" }],
+        : [{ label: "Findings", value: "None raised" }],
     },
     {
       heading: "SIGN-OFF",
