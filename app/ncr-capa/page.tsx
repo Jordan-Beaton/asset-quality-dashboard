@@ -1268,13 +1268,6 @@ function NcrCapaPageContent() {
     );
   }, [evidenceFiles, selectedRow]);
 
-  const selectedLinkedCapas = useMemo(() => {
-    if (!selectedRow || selectedRow.type !== "NCR") return [];
-    return capas.filter((capa) =>
-      parseLinkedReferences(capa.linked_to).includes(selectedRow.number)
-    );
-  }, [capas, selectedRow]);
-
   const selectedLinkedActions = useMemo(() => {
     if (!selectedRow || selectedRow.type !== "NCR") return [];
     return linkedActions.filter(
@@ -3652,10 +3645,6 @@ function NcrCapaPageContent() {
       (getRootCauseCategorySelectValue(editRow.root_cause_category) !== "Other" || filled(editRootCauseOther));
     const linkedActionsClosed =
       linkedActionList.length > 0 && linkedActionList.every((action) => isClosedActionStatus(action.status));
-    const linkedCapaList = selectedLinkedCapas;
-    const capasEffective =
-      linkedCapaList.length > 0 &&
-      linkedCapaList.every((capa) => normaliseEffectivenessStatus(capa.effectiveness_status) === "Effective");
 
     type NcrCheck = { label: string; ok: boolean };
     const describeChecks: NcrCheck[] = [
@@ -3675,18 +3664,19 @@ function NcrCapaPageContent() {
         ? [{ label: "Supplier / client response", ok: filled(editRow.supplier_response) || filled(editRow.supplier_acknowledgement) }]
         : []),
     ];
-    // Linked CAPAs carry the effectiveness review. With none linked there is nothing to check.
-    const effectivenessChecks: NcrCheck[] =
-      linkedCapaList.length > 0 ? [{ label: "Linked CAPA effectiveness: Effective", ok: capasEffective }] : [];
-    // The closure date is stamped by the save when the status becomes Closed, so it is not a "before closing" item.
+    // Step 4 is closing readiness: the status is Closed and the save has stamped the closure date. These are the
+    // result of closing, not "before closing" items, so they do not appear in the missing list.
     const closureRecorded = isClosed && filled(closedAt);
-    const verifyChecks: NcrCheck[] = [...effectivenessChecks, { label: "Closure date", ok: closureRecorded }];
+    const verifyChecks: NcrCheck[] = [
+      { label: "Status is Closed", ok: isClosed },
+      { label: "Closure date", ok: closureRecorded },
+    ];
 
     const steps: WorkbenchStepDef[] = [
       { key: "describe", label: "Describe", sub: "Section A and evidence", pct: percentDone(describeChecks.map((c) => c.ok)) },
       { key: "contain", label: "Contain", sub: "Section B", pct: percentDone(containChecks.map((c) => c.ok)) },
       { key: "cause", label: "Cause & actions", sub: "Sections C, D, E, linked actions", pct: percentDone(causeChecks.map((c) => c.ok)) },
-      { key: "verify", label: "Verify & close", sub: "Effectiveness, closure, reports", pct: percentDone(verifyChecks.map((c) => c.ok)) },
+      { key: "verify", label: "Verify & close", sub: "Status, closure, reports", pct: percentDone(verifyChecks.map((c) => c.ok)) },
     ];
     const initialStep = steps.find((step) => (step.pct ?? 100) < 100)?.key || "describe";
 
@@ -3694,7 +3684,6 @@ function NcrCapaPageContent() {
       ...describeChecks.filter((c) => !c.ok).map((c) => ({ label: c.label, step: "describe" })),
       ...containChecks.filter((c) => !c.ok).map((c) => ({ label: c.label, step: "contain" })),
       ...causeChecks.filter((c) => !c.ok).map((c) => ({ label: c.label, step: "cause" })),
-      ...effectivenessChecks.filter((c) => !c.ok).map((c) => ({ label: c.label, step: "verify" })),
     ];
     const missingLabels = missing.map((item) => item.label);
 
@@ -3785,7 +3774,7 @@ function NcrCapaPageContent() {
                 }
                 note={
                   <>
-                    Closing is always a manual decision.{" "}
+                    Close the NCR here or in step 4. Closing is always a manual decision.{" "}
                     {missing.length === 0
                       ? "Nothing is missing."
                       : `${missing.length} item${missing.length === 1 ? " is" : "s are"} still missing.`}
@@ -4061,7 +4050,21 @@ function NcrCapaPageContent() {
             <WorkbenchStep stepKey="verify">
               <div style={detailSectionStyle}>
                 <div style={ncrStepGridStyle}>
-                  <div style={formSectionTitleStyle}>Verification and closure</div>
+                  <div style={formSectionTitleStyle}>Close this NCR</div>
+
+                  <div>
+                    <label style={labelStyle}>Status</label>
+                    <select
+                      style={inputStyle}
+                      value={editRow.status}
+                      onChange={(e) => setEditRow({ ...editRow, status: e.target.value })}
+                      disabled={!canEditNcr}
+                    >
+                      {statusOptions.map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
 
                   <div>
                     <label style={labelStyle}>Closure date</label>
@@ -4070,45 +4073,34 @@ function NcrCapaPageContent() {
                     </div>
                   </div>
 
-                  <div>
-                    <label style={labelStyle}>Status</label>
-                    <div style={ncrReadOnlyValueStyle}>
-                      <StatusPill label={editRow.status} tone={toneForStatus(editRow.status)} />
-                    </div>
-                  </div>
-
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <label style={labelStyle}>Linked CAPA effectiveness</label>
-                    {linkedCapaList.length === 0 ? (
-                      <div style={emptyTextStyle}>
-                        No CAPA records are linked to this NCR, so there is no effectiveness review to wait for.
-                      </div>
-                    ) : (
-                      <div style={linkedActionListStyle}>
-                        {linkedCapaList.map((capa) => {
-                          const effectiveness = normaliseEffectivenessStatus(capa.effectiveness_status);
-                          return (
-                            <div key={capa.id} style={linkedActionItemStyle}>
-                              <div style={{ minWidth: 0 }}>
-                                <div style={linkedActionTitleStyle}>
-                                  {capa.capa_number || "CAPA"} - {capa.title || "Untitled CAPA"}
-                                </div>
-                                <div style={linkedActionMetaStyle}>
-                                  Status: <strong>{capa.status || "-"}</strong> | Reviewed:{" "}
-                                  <strong>{capa.effectiveness_review_date ? formatDate(capa.effectiveness_review_date) : "-"}</strong>
-                                </div>
-                              </div>
-                              <StatusPill label={effectiveness} tone={toneForStatus(effectiveness)} />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
                   <div style={{ gridColumn: "1 / -1", ...ncrHintStyle }}>
-                    The closure date is stamped when the status is set to Closed and saved. Use Close NCR above, or set the
-                    status in step 1.
+                    {isClosed
+                      ? "This NCR is closed. Set the status back to Open or In Progress and save to reopen it."
+                      : missing.length === 0
+                      ? "Nothing is missing. Press Close NCR to set the status to Closed and save. The closure date is stamped when you save."
+                      : `Still missing: ${missingLabels.join(", ")}. You can still close the NCR, and you will be asked to confirm first.`}
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1", ...buttonRowStyle }}>
+                    {isClosed ? null : (
+                      <button
+                        type="button"
+                        style={primaryButton}
+                        onClick={() => closeNcrRecord(editRow, missingLabels)}
+                        disabled={saving || !canEditNcr}
+                        title={canEditNcr ? "Set the status to Closed and save" : "Closing needs Edit permission for this IMS area"}
+                      >
+                        Close NCR
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      style={isClosed ? primaryButton : secondaryButton}
+                      onClick={() => void saveEdit()}
+                      disabled={saving || !canEditNcr}
+                    >
+                      {saving ? "Saving..." : "Save Changes"}
+                    </button>
                   </div>
                 </div>
               </div>

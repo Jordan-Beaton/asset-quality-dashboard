@@ -1581,32 +1581,19 @@ function AuditsPageContent() {
     }));
   }, [riskAreaReview]);
 
-  // A returned Word response is saved by "Upload completed Word" under findings/<ref>/returned and named "<ref> completed response - ...".
-  function hasReturnedWord(finding: FindingRecord) {
-    const returnedFolder = `/findings/${sanitizeFileName(finding.reference || "finding")}/returned/`;
-    const returnedPrefix = `${finding.reference || "Finding"} completed response -`;
-    return auditFiles.some(
-      (file) =>
-        file.audit_id === finding.audit_id &&
-        Boolean(file.file_path?.includes(returnedFolder) || file.file_name?.startsWith(returnedPrefix))
-    );
-  }
-
   // Everything the audit record screen needs, worked out from the saved audit, its findings and its files.
   // The audit has no checklist-sent, frequency-outcome or closure-date column of its own: the frequency outcome is worked out
-  // from the findings, the Word loop is tracked per finding, and closure dates live on the findings.
+  // from the findings, and closure dates live on the findings. The Word loop is optional, so nothing here depends on it.
   const auditWorkbench = (() => {
     const audit = selectedAudit;
     const scoped = selectedFindings;
     const openRows = scoped.filter((finding) => finding.status !== "Closed");
     const closedRows = scoped.filter((finding) => finding.status === "Closed");
     const closedWithoutDate = closedRows.filter((finding) => !finding.closure_date);
-    const openWithoutWord = openRows.filter((finding) => !hasReturnedWord(finding));
-    const returnedWordCount = scoped.filter((finding) => hasReturnedWord(finding)).length;
     // Documents uploaded against the audit itself, not evidence or returned Word files that belong to a finding.
     const reportDocs = selectedAuditFiles.filter((file) => !(file.file_path || "").includes("/findings/"));
     const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
-    const base = { openRows, closedRows, closedWithoutDate, openWithoutWord, returnedWordCount, reportDocs };
+    const base = { openRows, closedRows, closedWithoutDate, reportDocs };
 
     if (!audit) {
       return {
@@ -1625,12 +1612,6 @@ function AuditsPageContent() {
     if (!audit.lead_auditor.trim()) missing.push({ label: "Lead auditor", step: "plan" });
     if (!audit.audit_date) missing.push({ label: "Audit date", step: "plan" });
     if (audit.standards.length === 0) missing.push({ label: "Standards", step: "plan" });
-    if (openWithoutWord.length > 0) {
-      missing.push({
-        label: `Completed Word not returned for ${openWithoutWord.length} open ${plural(openWithoutWord.length, "finding", "findings")}`,
-        step: "conduct",
-      });
-    }
     if (openRows.length > 0) {
       missing.push({
         label: `${openRows.length} ${plural(openRows.length, "finding", "findings")} still open`,
@@ -1645,8 +1626,9 @@ function AuditsPageContent() {
     }
     if (reportDocs.length === 0) missing.push({ label: "Audit report not uploaded", step: "closeout" });
 
-    const conductChecks = [audit.status === "In Progress" || audit.status === "Completed"];
-    if (scoped.length > 0) conductChecks.push(openWithoutWord.length === 0);
+    // Conduct is judged on real conduct facts only: the audit has a date and has been started or finished.
+    // The Word loop is optional and never counts here.
+    const conductChecks = [Boolean(audit.audit_date), audit.status === "In Progress" || audit.status === "Completed"];
 
     const steps: WorkbenchStepDef[] = [
       {
@@ -1664,7 +1646,7 @@ function AuditsPageContent() {
       {
         key: "conduct",
         label: "Conduct",
-        sub: scoped.length > 0 ? `Word returned ${returnedWordCount} of ${scoped.length}` : "Word loop, evidence",
+        sub: "Audit date, findings list, optional Word loop",
         pct: percentDone(conductChecks),
       },
       scoped.length === 0
@@ -5512,49 +5494,58 @@ function AuditsPageContent() {
 
               <WorkbenchStep stepKey="conduct">
                 <div style={detailSectionStyle}>
-                  <ModuleSectionHeader title="Word loop" />
+                  <ModuleSectionHeader title="Findings raised" />
                   <p style={emptyTextStyle}>
-                    Send each finding to its owner as a Word document, then upload the completed copy when it comes back. You review what changed before anything is applied.
+                    Each finding becomes an audit NCR with its own number, owner and due date. The Word loop is optional: if an owner prefers to answer in Word, generate the report and upload the completed copy. You review what changed before anything is applied.
                   </p>
                   {selectedFindings.length === 0 ? (
-                    <p style={{ ...emptyTextStyle, marginTop: "10px" }}>No findings raised yet, so there is nothing to send. Raise findings in the Findings step.</p>
+                    <p style={{ ...emptyTextStyle, marginTop: "10px" }}>No findings raised yet. Raise findings in the Findings step.</p>
                   ) : (
-                    <div style={{ ...findingListStyle, marginTop: "12px" }}>
+                    <div style={conductListStyle}>
                       {selectedFindings.map((finding) => {
-                        const returned = hasReturnedWord(finding);
+                        const description = (finding.description || "").trim();
+                        const shortDescription = description.length > 90 ? `${description.slice(0, 89)}...` : description;
+                        const uploadDisabled = Boolean(importingFindingWordId) || !canEditAudit;
                         return (
-                          <div key={finding.id} style={findingCardStyle}>
-                            <div style={findingHeadStyle}>
-                              <div>
-                                <div style={findingRefStyle}>{finding.reference}</div>
-                                <div style={findingClauseStyle}>{finding.clause}</div>
-                              </div>
-                              <div style={findingBadgeWrapStyle}>
+                          <div key={finding.id}>
+                            <div style={conductRowStyle}>
+                              <div style={conductRowMainStyle}>
+                                <span style={conductRowRefStyle}>{finding.reference}</span>
                                 <StatusPill label={finding.category} tone={findingCategoryTone(finding.category)} />
-                                <StatusPill label={returned ? "Word returned" : "Word not returned"} tone={returned ? "ok" : "warn"} />
-                              </div>
-                            </div>
-                            <div style={findingCardActionsStyle}>
-                              <button
-                                type="button"
-                                style={secondaryButtonStyle}
-                                onClick={() => void generateFindingWord(finding)}
-                                disabled={Boolean(generatingFindingWordId)}
-                              >
-                                {generatingFindingWordId === finding.id ? "Generating Word..." : "Generate Word report"}
-                              </button>
-                              <label style={uploadButtonStyle}>
-                                <span style={{ color: "#ffffff", fontWeight: 700, pointerEvents: "none" }}>
-                                  {importingFindingWordId === finding.id ? "Reading completed Word..." : "Upload completed Word"}
+                                <StatusPill label={finding.status} tone={toneForStatus(finding.status)} />
+                                <span style={conductRowMetaStyle}>
+                                  {finding.owner || "No owner"}
+                                  {" · "}
+                                  {finding.due_date ? `Due ${formatDate(finding.due_date)}` : "No due date"}
                                 </span>
-                                <input
-                                  type="file"
-                                  accept=".docx"
-                                  style={{ display: "none" }}
-                                  disabled={Boolean(importingFindingWordId) || !canEditAudit}
-                                  onChange={(event) => void handleCompletedFindingUpload(finding, event)}
-                                />
-                              </label>
+                              </div>
+                              <div style={conductRowSideStyle}>
+                                <span style={conductRowDescStyle} title={description || undefined}>
+                                  {shortDescription || "No description yet"}
+                                </span>
+                                <button
+                                  type="button"
+                                  style={conductRowButtonStyle}
+                                  title="Generate the Word report for this finding (optional)"
+                                  onClick={() => void generateFindingWord(finding)}
+                                  disabled={Boolean(generatingFindingWordId)}
+                                >
+                                  {generatingFindingWordId === finding.id ? "Generating..." : "Word report"}
+                                </button>
+                                <label
+                                  title="Upload the completed Word report for this finding (optional)"
+                                  style={{ ...conductRowButtonStyle, opacity: uploadDisabled ? 0.55 : 1, cursor: uploadDisabled ? "not-allowed" : "pointer" }}
+                                >
+                                  {importingFindingWordId === finding.id ? "Reading..." : "Upload Word"}
+                                  <input
+                                    type="file"
+                                    accept=".docx"
+                                    style={{ display: "none" }}
+                                    disabled={uploadDisabled}
+                                    onChange={(event) => void handleCompletedFindingUpload(finding, event)}
+                                  />
+                                </label>
+                              </div>
                             </div>
                             {renderFindingImportPreview(finding)}
                           </div>
@@ -7913,6 +7904,71 @@ const detailTagLinkStyle: CSSProperties = {
 const findingListStyle: CSSProperties = {
   display: "grid",
   gap: "12px",
+};
+
+// Compact finding list in the Conduct step: one slim row per finding, wrapping to two lines on a phone.
+const conductListStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: "6px", marginTop: "12px" };
+const conductRowStyle: CSSProperties = {
+  display: "grid",
+  gap: "4px",
+  padding: "6px 10px",
+  border: "1px solid #D0D0CE",
+  borderRadius: "10px",
+  background: "#ECECE7",
+  boxSizing: "border-box",
+  minWidth: 0,
+};
+const conductRowMainStyle: CSSProperties = {
+  minWidth: 0,
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "4px 8px",
+};
+const conductRowRefStyle: CSSProperties = { fontWeight: 800, color: "#000000", fontSize: "13px", whiteSpace: "nowrap" };
+const conductRowDescStyle: CSSProperties = {
+  flex: "1 1 150px",
+  minWidth: 0,
+  color: "#53565A",
+  fontSize: "12.5px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+const conductRowSideStyle: CSSProperties = {
+  minWidth: 0,
+  display: "flex",
+  flexWrap: "wrap",
+  alignItems: "center",
+  gap: "6px",
+};
+const conductRowMetaStyle: CSSProperties = {
+  color: "#53565A",
+  fontSize: "12px",
+  fontWeight: 700,
+  marginLeft: "auto",
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+const conductRowButtonStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flex: "0 0 auto",
+  width: "auto",
+  maxWidth: "100%",
+  background: "#D0D0CE",
+  color: "#000000",
+  border: "none",
+  borderRadius: "8px",
+  padding: "4px 10px",
+  minHeight: "28px",
+  fontSize: "12px",
+  fontWeight: 700,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const findingCardStyle: CSSProperties = {

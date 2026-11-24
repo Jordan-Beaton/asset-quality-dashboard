@@ -68,7 +68,7 @@ function SectionOverview() {
         <tbody>
           {[
             ["Dashboard", "Totals for audits and findings, a chart of findings by audit type, and the Top 5 Problem Audits / Areas."],
-            ["Audit Programme", "The register of all audits. Open one to see its record screen: plan it, send findings out as Word, raise findings, then close it out with its report and linked items."],
+            ["Audit Programme", "The register of all audits. Open one to see its record screen: plan it, review the findings list (with an optional Word loop), raise findings, then close it out with its report and linked items."],
             ["Create Audit", "Add a new audit to the programme."],
             ["Findings", "Every Open Finding (or Closed Finding) across all audits in one list, with a search box, filters, Export PDF, Export Excel and an edit panel."],
             ["Reports", "Generate Open, Closed, Custom and Programme Snapshot reports as PDF or Word."],
@@ -260,13 +260,13 @@ function SectionRecordScreen() {
       <h3 style={h3Style}>The four steps</h3>
       <div style={stepList}>
         <Step n={1}><strong>Plan</strong> (type, lead, dates, status): the Audit Record fields, <strong>Save Audit Changes</strong> and <strong>Delete Audit</strong>.</Step>
-        <Step n={2}><strong>Conduct</strong> (Word loop): each finding with its Word returned tag and the <strong>Generate Word report</strong> and <strong>Upload completed Word</strong> buttons.</Step>
+        <Step n={2}><strong>Conduct</strong> (audit date, findings list, optional Word loop): a compact list with one slim row per finding, showing its reference, class (Major, Minor, OFI or OBS), status, a one-line summary, owner and due date. Each row has two small buttons, <strong>Generate Word report</strong> and <strong>Upload completed Word</strong>. They are optional, and nothing in the audit waits for a Word to come back.</Step>
         <Step n={3}><strong>Findings</strong> (classes, owners, status): the Major, Minor, OFI and OBS counts, <strong>Raise Finding</strong>, <strong>Open Findings tab (all audits)</strong> and the Findings Register.</Step>
         <Step n={4}><strong>Close-out</strong> (report, links, frequency): risk score, frequency outcome, closure dates, <strong>Save Audit Changes</strong>, <strong>Generate PDF Report</strong>, Audit Documents and Linked Items.</Step>
       </div>
-      <p style={pStyle}>Each step shows a percentage. Plan counts the title, auditee, lead auditor, audit date and standards. Conduct counts whether the audit is In Progress or Completed and, once findings exist, whether each has a returned Word. Findings counts how many findings are Closed with a closure date, and reads <em>None raised</em> until you raise one. Close-out counts Completed status, no open findings, an uploaded audit document, and a closure date on every closed finding. The screen opens on the first step below 100%.</p>
+      <p style={pStyle}>Each step shows a percentage. Plan counts the title, auditee, lead auditor, audit date and standards. Conduct counts whether the audit date is set and whether the audit is In Progress or Completed. It does not depend on the Word loop. Findings counts how many findings are Closed with a closure date, and reads <em>None raised</em> until you raise one. Close-out counts Completed status, no open findings, an uploaded audit document, and a closure date on every closed finding. The screen opens on the first step below 100%.</p>
       <h3 style={h3Style}>Still missing</h3>
-      <p style={pStyle}>A box lists what is still missing before the audit is completed, as chips such as Lead auditor, <em>1 finding still open</em>, <em>Completed Word not returned for 2 open findings</em>, <em>Closure date required on 1 closed finding</em> or <em>Audit report not uploaded</em>. Click a chip to jump to the step that holds it.</p>
+      <p style={pStyle}>A box lists what is still missing before the audit is completed, as chips such as Lead auditor, <em>1 finding still open</em>, <em>Closure date required on 1 closed finding</em> or <em>Audit report not uploaded</em>. Click a chip to jump to the step that holds it.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>The chips warn, they never block. If you click <strong>Mark Completed</strong> with items missing you are asked &ldquo;N items are still missing: ... Mark completed anyway?&rdquo; and can carry on. Mark Completed saves the audit with the status Completed, the same save as Save Audit Changes.</div>
@@ -435,7 +435,7 @@ function SectionWordLoop() {
     <>
       <div style={eyebrow}>Findings</div>
       <h2 style={h2Style}>Finding Reports & Word Upload</h2>
-      <p style={pStyle}>For owners who prefer to respond in Word, you can send them a finding report, then upload their completed copy and let the IMS read the answers back in. You check every change before it is applied.</p>
+      <p style={pStyle}>For owners who prefer to respond in Word, you can send them a finding report, then upload their completed copy and let the IMS read the answers back in. You check every change before it is applied. This is optional: you never have to generate or return a Word, and Conduct is not blocked or held back if you do not.</p>
       <div style={flowWrap}>
         <div style={flowStep()}>Generate Word report</div><div style={arrow}>→</div>
         <div style={flowStep()}>Owner completes it</div><div style={arrow}>→</div>
@@ -444,7 +444,7 @@ function SectionWordLoop() {
         <div style={flowStep(true)}>Approve Updates</div>
       </div>
       <div style={stepList}>
-        <Step n={1}>Open the finding (in the audit or in the Findings tab), open <strong>More options ···</strong> and choose <strong>Generate Word report</strong>. A <code style={codeStyle}>.docx</code> file is saved. This also works on a phone. In the audit, step 2 <strong>Conduct</strong> lists every finding with <strong>Generate Word report</strong> and <strong>Upload completed Word</strong> buttons and a <em>Word returned</em> or <em>Word not returned</em> tag, so you can run the whole Word loop from there.</Step>
+        <Step n={1}>Open the finding (in the audit or in the Findings tab), open <strong>More options ···</strong> and choose <strong>Generate Word report</strong>. A <code style={codeStyle}>.docx</code> file is saved. This also works on a phone. In the audit, step 2 <strong>Conduct</strong> shows a compact list with one slim row per finding (reference, class, status, a one-line summary, owner and due date) and two small buttons on each row, <strong>Generate Word report</strong> and <strong>Upload completed Word</strong>, so you can run the whole Word loop from there if you want to.</Step>
         <Step n={2}>Send it to the owner. They fill in <strong>Owner</strong>, <strong>Status</strong>, <strong>Due Date</strong>, <strong>Closure Date</strong>, <strong>Root Cause</strong>, <strong>Containment Action</strong> and <strong>Corrective Action</strong> in the Word file and send it back. They should not change the labels or the Finding Ref.</Step>
         <Step n={3}>Open the same finding, open <strong>More options ···</strong> and choose <strong>Upload completed Word</strong> (or use the button in step 2 <strong>Conduct</strong>). Pick the returned file.</Step>
         <Step n={4}>A <strong>Returned finding review</strong> box appears. For each field that differs it shows <strong>Current IMS</strong> beside <strong>Returned Word</strong>.</Step>

@@ -390,7 +390,7 @@ export default function HseDashboardPage() {
         label: "Critical pressure",
         value: hsePulse.criticalItems,
         detail: "Open AINMs, overdue HSE actions, and overdue calendar items",
-        href: "/hse/actions?view=overdue",
+        href: "/hse/actions?view=register&pressure=overdue",
         accent: chartColours.red,
       },
       {

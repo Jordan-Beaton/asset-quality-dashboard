@@ -136,17 +136,17 @@ function SectionRecordScreen() {
         summaryRows={[["NCR Number", "NCR-032"], ["Severity", "High"], ["Containment Action", null]]}
       />
       <h3 style={h3Style}>The header</h3>
-      <p style={pStyle}>The top shows the NCR number, title and status, then the <strong>Close NCR</strong> button and <strong>Hide Panel</strong>. A line underneath reads &ldquo;Closing is always a manual decision&rdquo; and says how many items are still missing. <strong>Close NCR</strong> disappears once the NCR is Closed, and it needs Edit permission.</p>
+      <p style={pStyle}>The top shows the NCR number, title and status, then the <strong>Close NCR</strong> button and <strong>Hide Panel</strong>. A line underneath says you can close the NCR here or in step 4, reminds you that closing is always a manual decision, and says how many items are still missing. <strong>Close NCR</strong> disappears once the NCR is Closed, and it needs Edit permission. Step 4 has the same button.</p>
       <h3 style={h3Style}>The four steps</h3>
       <div style={stepList}>
         <Step n={1}><strong>Describe</strong> (Section A and evidence): title, description, owner, project, due date, status, and Evidence and attachments.</Step>
         <Step n={2}><strong>Contain</strong> (Section B): the containment action.</Step>
         <Step n={3}><strong>Cause &amp; actions</strong> (Sections C, D, E, linked actions): root cause, corrective action, supplier / client response, and the Linked Actions panel.</Step>
-        <Step n={4}><strong>Verify &amp; close</strong> (effectiveness, closure, reports): closure date, status, any linked CAPA effectiveness, and Report Export.</Step>
+        <Step n={4}><strong>Verify &amp; close</strong> (status, closure, reports): this is where you close the NCR. It has the Status box, the read-only Closure date, a plain list of what is still missing, the <strong>Close NCR</strong> and <strong>Save Changes</strong> buttons, and below them Report Export. You do not need to go back to step 1 to close.</Step>
       </div>
-      <p style={pStyle}>Each step shows a percentage: the share of its checks that are done. The screen opens on the first step that is below 100%. Click any step to go to it.</p>
+      <p style={pStyle}>Each step shows a percentage: the share of its checks that are done. For step 4 that means the status is Closed and the closure date has been stamped. The Status box in step 1 and the one in step 4 are the same field, so changing either updates both. The screen opens on the first step that is below 100%. Click any step to go to it.</p>
       <h3 style={h3Style}>Still missing</h3>
-      <p style={pStyle}>A box lists what is still missing before closing, as small chips such as Title, Containment action, or Root cause category. Click a chip to jump to the step that holds it. The checks are: Title, Description, Owner, Project and Due date; Containment action; Root cause category (and the other-category text if you chose Other), Root cause description, Corrective action written, and Corrective action linked and closed; a Supplier / client response when the Source Type is Supplier or External; and, only if a CAPA is linked, that its effectiveness is Effective.</p>
+      <p style={pStyle}>A box lists what is still missing before closing, as small chips such as Title, Containment action, or Root cause category. Click a chip to jump to the step that holds it. The checks are: Title, Description, Owner, Project and Due date; Containment action; Root cause category (and the other-category text if you chose Other), Root cause description, Corrective action written, and Corrective action linked and closed; a Supplier / client response when the Source Type is Supplier or External. Sections D and E are the boxes you fill in to record the corrective action and the supplier or client response; NCRs no longer link CAPA effectiveness records.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>The chips warn, they never block. If you click <strong>Close NCR</strong> with items missing, you are asked &ldquo;N items are still missing: ... Close anyway?&rdquo; and can choose to go ahead. Close NCR sets the status to Closed and saves, the same as choosing Closed and clicking Save Changes.</div>
@@ -154,7 +154,7 @@ function SectionRecordScreen() {
       <h3 style={h3Style}>Form, Split and Word report</h3>
       <p style={pStyle}>The buttons above the steps change the layout. <strong>Form</strong> shows only the fields, <strong>Split</strong> (the default) shows the fields with the live <strong>NCR report</strong> summary on the right, and <strong>Word report</strong> shows the summary on its own. The summary lists the report headings with your entries filled in. Anything not yet filled in shows as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
       <h3 style={h3Style}>All sections</h3>
-      <p style={pStyle}>The <strong>All sections</strong> button shows every section on one long page, as the NCR screen used to. Click it again to go back to one step at a time. <strong>Save Changes</strong> and <strong>Generate Linked Action</strong> stay below the steps whichever way you view it.</p>
+      <p style={pStyle}>The <strong>All sections</strong> button shows every section on one long page, as the NCR screen used to. Click it again to go back to one step at a time. <strong>Save Changes</strong> and <strong>Generate Linked Action</strong> stay below the steps whichever way you view it, and step 4 has its own <strong>Save Changes</strong> next to <strong>Close NCR</strong>.</p>
     </>
   );
 }
