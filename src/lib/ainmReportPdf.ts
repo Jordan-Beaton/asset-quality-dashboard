@@ -118,8 +118,10 @@ export function createAinmReportPdf(records: AinmReportRecord[], options: AinmRe
   const open = records.filter((record) => !isClosed(record)).length;
   const incidents = records.filter((record) => typeLabel(record) === "Incident").length;
   const accidents = records.filter((record) => typeLabel(record) === "Accident").length;
-  const part1Due = records.filter((record) => record.part1_status !== "Complete").length;
-  const part2Due = records.filter((record) => record.part2_status !== "Complete").length;
+  // Stage statuses arrive as display labels ("Completed") or stored values ("Complete").
+  const stageDone = (status: string) => /^complete/i.test(status.trim());
+  const part1Due = records.filter((record) => !stageDone(record.part1_status)).length;
+  const part2Due = records.filter((record) => !stageDone(record.part2_status)).length;
   const cells: Array<[string, number, boolean]> = [
     ["AINMs", records.length, false],
     ["Open", open, false],

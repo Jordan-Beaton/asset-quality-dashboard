@@ -33,9 +33,11 @@ function badge(status: string): CSSProperties {
     "in progress": "brand",
     closed: "ok",
     "not started": "neu",
-    draft: "neu",
+    draft: "brand",
+    ongoing: "brand",
     issued: "ok",
     complete: "ok",
+    completed: "ok",
   };
   return tintPill(map[status.toLowerCase()] || "warn");
 }
@@ -57,7 +59,7 @@ function SectionOverview() {
       <p style={pStyle}><strong>Internal AINM</strong> — a full event that Enshore is directly investigating, using the Notification / Part 1 / Part 2 structure below.<br /><strong>External AINM</strong> — an event reported by a third party (supplier, client, contractor) where Enshore is tracking status and any resulting actions without running the full internal investigation. See <strong>External AINM</strong> in this guide.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
-        <div>Every AINM has an <code style={codeStyle}>Overall Status</code> of Open, In Progress, or Closed, tracked separately from the individual Notification / Part 1 / Part 2 stage statuses. All four statuses are set by hand from drop-downs; nothing changes them automatically.</div>
+        <div>Every AINM has an <code style={codeStyle}>Overall Status</code> of Open, In Progress, or Closed, tracked alongside the Notification / Part 1 / Part 2 stage statuses. Nobody sets any of these four statuses by hand: each stage status is worked out from how much of that stage is filled in (Not Started, Ongoing or Completed), and the Overall Status follows from the stages. The only way to close an AINM is the <strong>Close AINM</strong> button.</div>
       </div>
       <div style={callout("info")}>
         <span>ℹ</span>
@@ -96,14 +98,14 @@ function SectionRegister() {
               <td style={imsTableCellStyle}>Incident</td>
               <td style={imsTableCellStyle}>Near Miss</td>
               <td style={imsTableCellStyle}>Example project</td>
-              <td style={imsTableCellStyle}><span style={badge("complete")}>Complete</span></td>
-              <td style={imsTableCellStyle}><span style={badge("draft")}>Draft</span></td>
+              <td style={imsTableCellStyle}><span style={badge("completed")}>Completed</span></td>
+              <td style={imsTableCellStyle}><span style={badge("ongoing")}>Ongoing</span></td>
               <td style={imsTableCellStyle}><span style={badge("in progress")}>In Progress</span></td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p style={pStyle}>The register also shows Event Date and Notification status columns. Search covers AINM number, title, project, location, classification and owner. Click <strong>Show Filters</strong> for the filter box: <strong>Project</strong> (every project that has an AINM), <strong>Status</strong>, <strong>Stage Status</strong>, <strong>Report Type</strong> (Incident or Accident) and <strong>Classification</strong>. <strong>Clear Filters</strong> resets them all. The line above the table says how many of the AINMs are showing. Click a row to scroll straight to its record screen.</p>
+      <p style={pStyle}>The register also shows Event Date and Notification status columns. Search covers AINM number, title, project, location, classification and owner. Click <strong>Show Filters</strong> for the filter box: <strong>Project</strong> (every project that has an AINM), <strong>Status</strong>, <strong>Stage Status</strong> (Not Started, Ongoing, Issued or Completed; it matches an AINM when any of its three stages has that status), <strong>Report Type</strong> (Incident or Accident) and <strong>Classification</strong>. <strong>Clear Filters</strong> resets them all. The line above the table says how many of the AINMs are showing. Click a row to scroll straight to its record screen.</p>
       <p style={pStyle}>The toolbar runs left to right: search, <strong>Clear Filters</strong>, <strong>Export PDF</strong>, <strong>Export Excel</strong> and <strong>Show Filters</strong>. Export PDF and Export Excel both export exactly the AINMs the register is showing under the current search and filters. See <strong>Reports & Exports</strong>.</p>
     </>
   );
@@ -130,13 +132,13 @@ function SectionRecordScreen() {
           { label: "Reports", state: "No PDF yet" },
         ]}
         active={1}
-        missing={["Part 1 status: Complete", "Root cause: process", "Part 2 status: Complete"]}
+        missing={["Part 1: complete and issue it", "Root cause: process", "Part 2: complete and issue it"]}
         gate="this AINM can be closed"
         summaryTitle="AINM report"
         summaryRows={[["AINM Ref", "IR041"], ["Classification", "Near Miss"], ["Event details", null]]}
       />
       <h3 style={h3Style}>The header</h3>
-      <p style={pStyle}>The top shows the AINM number, title and Overall Status, with <strong>Close AINM</strong> and <strong>Hide Panel</strong>. Under it sit the four status boxes: <strong>Notification Status</strong>, <strong>Part 1 Status</strong>, <strong>Part 2 Status</strong> and <strong>Overall Status</strong>. They are still set by hand. <strong>Save AINM</strong> and <strong>Delete AINM</strong> are at the bottom of the screen, whichever step you are on.</p>
+      <p style={pStyle}>The top shows the AINM number, title and Overall Status, with <strong>Close AINM</strong> (plus <strong>Reopen AINM</strong> when the AINM is closed) and <strong>Hide Panel</strong>. Under it sit four read-only status chips: <strong>Notification Status</strong>, <strong>Part 1 Status</strong>, <strong>Part 2 Status</strong> and <strong>Overall Status</strong>. You cannot change them by hand; they are worked out from progress (see Automatic statuses below). <strong>Save AINM</strong> and <strong>Delete AINM</strong> are at the bottom of the screen, whichever step you are on.</p>
       <h3 style={h3Style}>The six steps</h3>
       <div style={stepList}>
         <Step n={1}><strong>Notification</strong>: the event facts, initial response and Notification Evidence. It shows a percentage.</Step>
@@ -148,11 +150,47 @@ function SectionRecordScreen() {
       </div>
       <p style={pStyle}>A link ending <code style={codeStyle}>tab=part1</code> (or notification, part2, actions, evidence, reports) opens the AINM on that step.</p>
       <h3 style={h3Style}>Still missing</h3>
-      <p style={pStyle}>A box lists what is still missing before the AINM can be closed. It includes the stage statuses (<em>Notification status: Issued or Complete</em>, <em>Part 1 status: Complete</em>, <em>Part 2 status: Complete</em>), the key fields of each stage (for example Title, Location / site, Root cause: people, Investigation team member, Location sign-off and HSEQ sign-off), and <em>Linked action closed</em> while a linked central Action is still open. Click a chip to jump to its step.</p>
+      <p style={pStyle}>A box lists what is still missing before the AINM can be closed. For each stage that is not Completed it says what to do (<em>Notification: complete and issue it</em>, <em>Part 1: complete and issue it</em>, <em>Part 2: complete and issue it</em>). It also lists the key fields of each stage (for example Title, Location / site, Root cause: people, Investigation team member, Location sign-off and HSEQ sign-off), and <em>Linked action closed</em> while a linked central Action is still open. Click a chip to jump to its step.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
-        <div>The chips warn, they never block. If you click <strong>Close AINM</strong> with items missing you are asked &ldquo;N items are still missing: ... Close anyway?&rdquo; (the first eight are named), or &ldquo;Close IR041?&rdquo; when nothing is missing. Close AINM sets Overall Status to Closed and saves, the same as Save AINM. It is greyed out once the AINM is Closed or if you do not have Edit permission. Nothing else changes the Overall Status for you.</div>
+        <div>The chips warn, they never block. If you click <strong>Close AINM</strong> with items missing you are asked &ldquo;N items are still missing: ... Close anyway?&rdquo; (the first eight are named), or &ldquo;Close IR041?&rdquo; when nothing is missing. Close AINM sets Overall Status to Closed and saves, the same as Save AINM. It is greyed out once the AINM is Closed or if you do not have Edit permission. It is the only way to close an AINM.</div>
       </div>
+      <h3 style={h3Style}>Automatic statuses</h3>
+      <p style={pStyle}>Each stage status is worked out from the same fields that drive the percentage on its step. It is recalculated every time the screen draws and every time you save, so it can never disagree with the percentage.</p>
+      <table style={imsTableStyle}>
+        <thead>
+          <tr>
+            {["Status", "Meaning"].map(h => <th key={h} style={imsTableHeadStyle}>{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}><span style={badge("not started")}>Not Started</span></td>
+            <td style={imsTableCellStyle}>The stage is at 0% and has not been issued.</td>
+          </tr>
+          <tr>
+            <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}><span style={badge("ongoing")}>Ongoing</span></td>
+            <td style={imsTableCellStyle}>The stage is above 0% and has not been issued yet. A stage at 100% that is waiting for its Issue button is also Ongoing.</td>
+          </tr>
+          <tr>
+            <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}><span style={badge("completed")}>Completed</span></td>
+            <td style={imsTableCellStyle}>The stage is at 100% and has been issued.</td>
+          </tr>
+          <tr>
+            <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}><span style={badge("issued")}>Issued</span></td>
+            <td style={imsTableCellStyle}>Only seen on older Closed AINMs that were saved with the word Issued. On an open AINM a stage that is at 100% and issued shows as Completed.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style={pStyle}>If someone clears a required field on a Completed stage, it drops back to Ongoing, and the Issue button comes back once the stage is at 100% again.</p>
+      <h3 style={h3Style}>Issue buttons</h3>
+      <p style={pStyle}>When a stage reaches 100% an <strong>Issue Notification</strong>, <strong>Issue Part 1</strong> or <strong>Issue Part 2</strong> button appears at the top of that stage. Pressing it saves the AINM straight away, records the issue date for that stage (Notification sent, Part 1 completed or Part 2 completed) and the stage becomes <strong>Completed</strong>. Issuing needs Edit permission, and the button is greyed out without it.</p>
+      <h3 style={h3Style}>Locked stages</h3>
+      <p style={pStyle}><strong>Part 1</strong> is locked until the Notification is Completed, and <strong>Part 2</strong> is locked until Part 1 is Completed. A locked stage can still be opened and read, but every field and button in it is greyed out and a banner says what to do first, for example &ldquo;Complete and issue the Notification before Part 1 can be started.&rdquo; On the step bar its line reads <em>Locked: complete the Notification first</em> (or <em>Locked: complete Part 1 first</em>). Actions, Evidence and Reports are never locked.</p>
+      <h3 style={h3Style}>Overall Status, Close AINM and Reopen AINM</h3>
+      <p style={pStyle}>The Overall Status is <strong>Open</strong> while all three stages are Not Started and <strong>In Progress</strong> as soon as any stage has been started. It becomes <strong>Closed</strong> only when you press <strong>Close AINM</strong> (with the confirmation described above). A Closed AINM shows a <strong>Reopen AINM</strong> button (Edit permission needed). It sets the Overall Status to In Progress and saves, and the stage statuses are then worked out again so the record can be worked on.</p>
+      <h3 style={h3Style}>Closed and older AINMs</h3>
+      <p style={pStyle}>An AINM that is Closed keeps the stage statuses it was saved with, exactly as stored, and is never locked. They are shown with the new names: Draft shows as Ongoing and Complete shows as Completed. AINMs that are still open use the automatic statuses and the locks, so an open AINM that was saved earlier with Notification set to Complete, but whose Notification is only 64% filled in, now shows Ongoing until it is finished and issued. The register, Dashboard filters, exports and this guide all use the same names. External AINMs are not affected.</p>
       <h3 style={h3Style}>Form, Split and PDF report</h3>
       <p style={pStyle}><strong>Form</strong> shows only the fields, <strong>Split</strong> (the default) shows them beside the <strong>AINM report</strong> summary, and <strong>PDF report</strong> shows the summary on its own. The summary follows the report headings (AINM Summary, Initial Notification and so on), and anything not yet filled in shows as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
       <h3 style={h3Style}>All sections</h3>
@@ -171,9 +209,9 @@ function SectionNotification() {
         <Step n={1}>Go to the <strong>Create AINM</strong> tab and choose the <code style={codeStyle}>AINM Type</code>: <strong>Incident Report</strong> or <strong>Accident Report</strong> (it starts on a grey Select Type). The <code style={codeStyle}>AINM No.</code> is generated for you (IR001 style for incidents, AR001 style for accidents).</Step>
         <Step n={2}>Enter <code style={codeStyle}>Title</code>, <code style={codeStyle}>Project</code>, <code style={codeStyle}>Location / Site</code>, <code style={codeStyle}>Date of Event</code> and <code style={codeStyle}>Time of Event</code>.</Step>
         <Step n={3}>Select the <code style={codeStyle}>Event Classification</code> and enter <code style={codeStyle}>Brief Event Details</code>. A type, number and title are required.</Step>
-        <Step n={4}>Click <strong>Create AINM</strong>. The record opens in the register with Notification, Part 1 and Part 2 all <span style={badge("not started")}>Not Started</span> and Overall Status Open.</Step>
+        <Step n={4}>Click <strong>Create AINM</strong>. The record opens in the register. Notification shows <span style={badge("ongoing")}>Ongoing</span> because some of it is filled in, Part 1 and Part 2 are <span style={badge("not started")}>Not Started</span>, and the Overall Status is worked out for you.</Step>
         <Step n={5}>On the <strong>Notification</strong> step of the record screen complete <code style={codeStyle}>Brief details of the injury/release/damage</code> and the initial response: <code style={codeStyle}>Casualty Management</code>, <code style={codeStyle}>Site/Location Management</code>, <code style={codeStyle}>Cause Identification</code> and <code style={codeStyle}>Additional information</code>. Keep names out of the text — use job titles or &quot;IP&quot; (Injured Person).</Step>
-        <Step n={6}>Upload any photographs or documents under <strong>Notification Evidence</strong>, set <code style={codeStyle}>Notification Status</code> in the row of status boxes under the header (for example Issued once it has gone out), and click <strong>Save AINM</strong> at the bottom of the record screen.</Step>
+        <Step n={6}>Upload any photographs or documents under <strong>Notification Evidence</strong>, and click <strong>Save AINM</strong> at the bottom of the record screen. When the Notification reaches 100%, press <strong>Issue Notification</strong> at the top of the step; it records the date it was sent and the Notification becomes <span style={badge("completed")}>Completed</span>. That unlocks Part 1.</Step>
       </div>
       <p style={pStyle}><strong>Generate Initial Notification</strong> downloads the Notification as a Word document (ENS-HSEQ-FRM-027). Project, location, date, time and classification carry forward into the Part 1 and Part 2 tabs.</p>
     </>
@@ -190,7 +228,7 @@ function SectionMobile() {
       <div style={stepList}>
         <Step n={1}>Under <strong>Start New AINM</strong> choose <strong>Incident / Near Miss</strong> or <strong>Accident</strong>. To carry on with an existing record, search under <strong>Continue Existing</strong> by AINM number, title or project and tap it (the 20 best matches are listed).</Step>
         <Step n={2}>Complete the <strong>Initial Notification</strong> form: Title, Project / Work Title, Location / Site, Date and Time of Event, Classification, the brief details of the event and of injury / release / damage, Casualty Management, Site / Location Management, Cause Identification and Additional Information. The AINM No. is generated from the type.</Step>
-        <Step n={3}>Tap <strong>Save AINM Notification</strong> to save as a Draft, or <strong>Mark as Issued</strong>. You can also choose the Notification Status (Draft, Issued or Complete) yourself.</Step>
+        <Step n={3}>Tap <strong>Save AINM Notification</strong>. The Notification Status is a read-only chip: the save stores it as Not Started or Ongoing for you. <strong>Issue Notification</strong> (it used to be Mark as Issued) is greyed out until all 11 notification fields are filled in: Title, Project, Location / Site, Date and Time of Event, Classification, the brief details of the event, injury / release / damage details, Casualty Management, Site / Location Management and Cause Identification. A line under the buttons lists what is still missing, and the greyed button shows the same list as a tooltip. When it is pressed the notification is saved and becomes Completed.</Step>
         <Step n={4}>Once the AINM is saved, tap <strong>Upload Evidence</strong> under Notification Evidence. Tap a file in the list to open it.</Step>
       </div>
       <h3 style={h3Style}>Evidence uploads</h3>
@@ -211,14 +249,14 @@ function SectionPart1() {
       <h2 style={h2Style}>Part 1 — Immediate Response</h2>
       <p style={pStyle}>Part 1 captures what happened immediately after the event, the containment put in place, and the first root-cause thinking — completed as soon as practical after the Notification. The Part 1 step is designed for the desktop.</p>
       <div style={stepList}>
-        <Step n={1}>Open the AINM and go to the <strong>Part 1</strong> step. The event summary from the Notification is shown at the top.</Step>
+        <Step n={1}>Open the AINM and go to the <strong>Part 1</strong> step. It is locked (readable but greyed out) until the Notification is Completed. The event summary from the Notification is shown at the top.</Step>
         <Step n={2}>Enter <code style={codeStyle}>Company in Control</code> and check the <code style={codeStyle}>Event Details</code>, then build the <strong>Timeline of Events</strong> with <strong>Add Timeline Entry</strong> (a date/time and a description for each point).</Step>
         <Step n={3}>If there was an environmental release, record its <code style={codeStyle}>Type</code> and <code style={codeStyle}>Quantity</code>.</Step>
         <Step n={4}>Record every <strong>Immediate Containment Action</strong> taken. Each gets its own numbered row; use <strong>Add Row</strong> for more.</Step>
         <Step n={5}>Record the <strong>Event investigation and root cause analysis</strong> against each of <strong>People</strong>, <strong>Equipment</strong>, <strong>Environment/Conditions</strong>, and <strong>Process</strong>.</Step>
         <Step n={6}>Tick the relevant items in the attachments checklist (witness statements, toolbox talk, risk assessment, photographs, permit to work, and so on). Selecting <strong>Other</strong> reveals a free-text box to describe what else is attached.</Step>
         <Step n={7}>Add <code style={codeStyle}>Additional Comments</code>, choose the <code style={codeStyle}>Reviewed / Accepted By</code> person from People (or <strong>Add New Person...</strong>) and check their <code style={codeStyle}>Reviewer Position</code>.</Step>
-        <Step n={8}>Upload Part 1 evidence, set <code style={codeStyle}>Part 1 Status</code> (in the status boxes under the header) to Complete when finished, and click <strong>Save AINM</strong>. <strong>Generate Part 1 Report</strong> downloads the Word report (ENS-HSEQ-FRM-028).</Step>
+        <Step n={8}>Upload Part 1 evidence and click <strong>Save AINM</strong>. When Part 1 reaches 100%, press <strong>Issue Part 1</strong> at the top of the step and Part 1 becomes Completed, which unlocks Part 2. <strong>Generate Part 1 Report</strong> downloads the Word report (ENS-HSEQ-FRM-028).</Step>
       </div>
       <div style={callout("info")}>
         <span>ℹ</span>
@@ -235,12 +273,12 @@ function SectionPart2() {
       <h2 style={h2Style}>Part 2 — Investigation</h2>
       <p style={pStyle}>Part 2 is the full investigation, signed off by the reviewers listed in <strong>Sign-off</strong>. It is typically completed by the investigation team.</p>
       <div style={stepList}>
-        <Step n={1}>Open the AINM and go to the <strong>Part 2</strong> step.</Step>
+        <Step n={1}>Open the AINM and go to the <strong>Part 2</strong> step. It is locked (readable but greyed out) until Part 1 is Completed.</Step>
         <Step n={2}>List the <strong>Investigation Team Members</strong> — name, company, position and investigation role — with <strong>Add Team Member</strong>.</Step>
         <Step n={3}>Record <strong>Investigation Findings</strong> against each of <strong>People</strong>, <strong>Equipment</strong>, <strong>Environment/Conditions</strong>, and <strong>Process</strong> — this structure keeps root-cause analysis consistent across every AINM.</Step>
         <Step n={4}>List the <strong>Reference documentation</strong> used (document title and number) with <strong>Add Reference Document</strong>, and add <code style={codeStyle}>Further comments</code>.</Step>
         <Step n={5}>Add corrective action recommendations as linked central Actions in the <strong>Corrective Actions / Recommendations</strong> panel (see <strong>Linked Actions</strong>). Older tracker actions imported from the AINM Action Tracker appear on the Actions tab.</Step>
-        <Step n={6}>Complete the <strong>Investigation Review and Sign-Off</strong> section (see <strong>Sign-off</strong>), upload Part 2 evidence, set <code style={codeStyle}>Part 2 Status</code> to Complete, and click <strong>Save AINM</strong>.</Step>
+        <Step n={6}>Complete the <strong>Investigation Review and Sign-Off</strong> section (see <strong>Sign-off</strong>), upload Part 2 evidence and click <strong>Save AINM</strong>. When Part 2 reaches 100%, press <strong>Issue Part 2</strong> at the top of the step and Part 2 becomes Completed.</Step>
       </div>
       <p style={pStyle}><strong>Generate Part 2 Report</strong> downloads the Word report (ENS-HSEQ-FRM-029).</p>
     </>
@@ -270,7 +308,7 @@ function SectionSignoff() {
       <p style={pStyle}>You can also simply choose a person and enter a position and date without sending an email request.</p>
       <div style={callout("warning")}>
         <span>⚠</span>
-        <div>Sign-off blocks can be completed independently and in any order — the AINM&apos;s <code style={codeStyle}>Overall Status</code> is not automatically set to Closed, so confirm all sign-offs are in before changing it to Closed yourself.</div>
+        <div>Sign-off blocks can be completed independently and in any order — the AINM&apos;s <code style={codeStyle}>Overall Status</code> is not automatically set to Closed, so confirm all sign-offs are in before pressing <strong>Close AINM</strong>.</div>
       </div>
     </>
   );
@@ -342,16 +380,16 @@ function SectionReports() {
 function SectionStatuses() {
   const stageRows: [string, string][] = [
     ["not started", "Not Started"],
-    ["draft", "Draft"],
-    ["issued", "Issued"],
-    ["complete", "Complete"],
+    ["ongoing", "Ongoing"],
+    ["completed", "Completed"],
+    ["issued", "Issued (older Closed AINMs only)"],
   ];
   return (
     <>
       <div style={eyebrow}>Reference</div>
       <h2 style={h2Style}>Status Reference</h2>
       <h3 style={h3Style}>Stage status (Notification / Part 1 / Part 2)</h3>
-      <p style={pStyle}>Chosen from the Notification Status, Part 1 Status and Part 2 Status boxes under the header of the record screen (the phone page sets the Notification status).</p>
+      <p style={pStyle}>Shown as read-only chips under the header of the record screen, in the register and on the phone page. They are worked out from progress and are never chosen by hand: Not Started at 0%, Ongoing from above 0% until the stage is issued, and Completed at 100% once the Issue button has been pressed. Behind the scenes Ongoing is saved as Draft and Completed as Complete, so nothing in the database changes.</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {stageRows.map(([key, label]) => <span key={label} style={badge(key)}>{label}</span>)}
       </div>
@@ -365,15 +403,15 @@ function SectionStatuses() {
         <tbody>
           <tr>
             <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}><span style={badge("open")}>Open</span></td>
-            <td style={imsTableCellStyle}>Newly raised, investigation not yet underway. Every new AINM starts here.</td>
+            <td style={imsTableCellStyle}>All three stages are Not Started. Worked out automatically.</td>
           </tr>
           <tr>
             <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}><span style={badge("in progress")}>In Progress</span></td>
-            <td style={imsTableCellStyle}>Part 1 and/or Part 2 underway.</td>
+            <td style={imsTableCellStyle}>At least one stage has been started. Worked out automatically. It is also what Reopen AINM sets.</td>
           </tr>
           <tr>
             <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}><span style={badge("closed")}>Closed</span></td>
-            <td style={imsTableCellStyle}>Investigation and sign-off complete. The Dashboard counts every AINM that is not Closed as open.</td>
+            <td style={imsTableCellStyle}>Set only by the Close AINM button. A Closed AINM keeps its stage statuses as saved and is never locked. The Dashboard counts every AINM that is not Closed as open.</td>
           </tr>
         </tbody>
       </table>

@@ -5,6 +5,7 @@ import { ChangeEvent, CSSProperties, useEffect, useMemo, useState } from "react"
 import { supabase } from "../../../../src/lib/supabase";
 import { openFileUrl } from "../../../../src/lib/fileOpen";
 import { IMS_EVIDENCE_ACCEPT, uploadContentType } from "../../../../src/lib/fileTypes";
+import { computeNotificationState, computeOverallStatus, issueTooltip, stageLabel } from "../../../../src/lib/ainmStages";
 
 type StageStatus = "Not Started" | "Draft" | "Issued" | "Complete";
 type OverallStatus = "Open" | "In Progress" | "Closed";
@@ -70,7 +71,7 @@ const emptyRecord: AINMRecord = {
   site_management: "",
   initial_cause: "",
   additional_information: "",
-  notification_status: "Draft",
+  notification_status: "Not Started",
   notification_sent_at: "",
   part1_status: "Not Started",
   part2_status: "Not Started",
@@ -169,6 +170,8 @@ export default function HseAinmFieldPage() {
   const [search, setSearch] = useState("");
 
   const selectedEvidence = useMemo(() => evidence.filter((file) => file.ainm_id === draft.id), [draft.id, evidence]);
+  const notification = computeNotificationState(draft);
+  const recordClosed = draft.overall_status === "Closed";
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
     return records
@@ -229,16 +232,29 @@ export default function HseAinmFieldPage() {
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  async function saveNotification(nextStatus?: StageStatus) {
+  // The notification status is never chosen by hand. Save stores Not Started or Draft (shown as Ongoing) from the
+  // 11 notification checks. Issue Notification stores Complete and stamps notification_sent_at, and only works when
+  // all 11 checks pass. A Closed AINM keeps its saved statuses.
+  async function saveNotification(issue = false) {
     if (!clean(draft.ainm_number) || !clean(draft.title)) {
       setMessage("AINM No. and title are required.");
       return;
     }
 
+    const base: AINMRecord = { ...draft };
+    if (issue) {
+      if (!computeNotificationState(draft).canIssue) {
+        setMessage(issueTooltip(computeNotificationState(draft), "Notification"));
+        return;
+      }
+      base.notification_status = "Complete";
+      base.notification_sent_at = new Date().toISOString();
+    }
+    const notificationStatus = computeNotificationState(base).status;
     const recordForSave: AINMRecord = {
-      ...draft,
-      notification_status: nextStatus || draft.notification_status || "Draft",
-      overall_status: draft.overall_status || "Open",
+      ...base,
+      notification_status: notificationStatus,
+      overall_status: computeOverallStatus(notificationStatus, base.part1_status, base.part2_status, base.overall_status || "Open"),
     };
 
     setSaving(true);
@@ -364,7 +380,7 @@ export default function HseAinmFieldPage() {
                   <button key={record.id} type="button" style={recordCardStyle} onClick={() => continueRecord(record)}>
                     <strong>{record.ainm_number} - {record.title}</strong>
                     <span>{record.project || "No project"} • {record.event_date || "No date"}</span>
-                    <span style={pillStyle}>{record.notification_status}</span>
+                    <span style={pillStyle}>{stageLabel(computeNotificationState(record).status)}</span>
                   </button>
                 )) : <div style={emptyStyle}>No AINMs found.</div>}
               </div>
@@ -452,21 +468,28 @@ export default function HseAinmFieldPage() {
               <textarea value={draft.additional_information || ""} onChange={(event) => updateDraft("additional_information", event.target.value)} style={textareaStyle} />
             </Field>
             <Field label="Notification Status">
-              <select value={draft.notification_status} onChange={(event) => updateDraft("notification_status", event.target.value as StageStatus)} style={inputStyle}>
-                <option>Draft</option>
-                <option>Issued</option>
-                <option>Complete</option>
-              </select>
+              <div><span style={pillStyle}>{notification.label}</span></div>
             </Field>
 
             <div style={actionButtonsStyle}>
-              <button type="button" style={secondaryButtonStyle} onClick={() => void saveNotification("Draft")} disabled={saving}>
+              <button type="button" style={secondaryButtonStyle} onClick={() => void saveNotification()} disabled={saving}>
                 {saving ? "Saving..." : "Save AINM Notification"}
               </button>
-              <button type="button" style={primaryButtonStyle} onClick={() => void saveNotification("Issued")} disabled={saving}>
-                Mark as Issued
+              <button
+                type="button"
+                style={{ ...primaryButtonStyle, opacity: saving || !notification.canIssue ? 0.55 : 1 }}
+                onClick={() => void saveNotification(true)}
+                disabled={saving || !notification.canIssue}
+                title={recordClosed ? "This AINM is closed." : issueTooltip(notification, "Notification")}
+              >
+                Issue Notification
               </button>
             </div>
+            {recordClosed ? (
+              <p style={helperTextStyle}>This AINM is closed, so its saved status is shown as stored.</p>
+            ) : notification.status !== "Complete" && !notification.canIssue ? (
+              <p style={helperTextStyle}>To issue the notification, still missing: {notification.missing.join(", ")}.</p>
+            ) : null}
 
             <section style={evidenceBoxStyle}>
               <h3 style={smallTitleStyle}>Notification Evidence</h3>

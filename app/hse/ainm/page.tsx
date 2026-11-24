@@ -37,7 +37,6 @@ import {
   RecordWorkbench,
   StatusPill as WorkbenchStatusPill,
   WorkbenchStep,
-  percentDone,
   toneForStatus,
   type DocPreviewSection,
   type WorkbenchStepDef,
@@ -53,6 +52,18 @@ import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 import { exportColours, exportRgb, exportTypography } from "../../../src/lib/exportTheme";
 import { ainmReportFileName, createAinmReportPdf } from "../../../src/lib/ainmReportPdf";
+import {
+  LOCKED_NOTE,
+  LOCKED_SUBLINE,
+  computeAinmStages,
+  issueTooltip,
+  stageFilterOptions,
+  stageLabel,
+  withComputedStatuses,
+  type AinmStages,
+  type StageKey,
+  type StageState,
+} from "../../../src/lib/ainmStages";
 import { downloadRegisterExcel, excelDateStamp } from "../../../src/lib/registerExcel";
 import { openFileUrl, saveBlobAsFile } from "../../../src/lib/fileOpen";
 import { uploadContentType } from "../../../src/lib/fileTypes";
@@ -283,7 +294,6 @@ type ImportGroup = {
   actions: ImportedAction[];
 };
 
-const stageStatuses: StageStatus[] = ["Not Started", "Draft", "Issued", "Complete"];
 const overallStatuses: OverallStatus[] = ["Open", "In Progress", "Closed"];
 const externalAinmStatuses: ExternalAINMStatus[] = ["Logged", "Under Review", "Action Required", "Closed"];
 const externalPartyTypes = ["Third Party", "Supplier", "Contractor", "Client", "Other"];
@@ -784,9 +794,41 @@ function HseAinmPageContent() {
     );
   }, [centralActions, selected?.ainm_number, selectedId]);
 
+  // Linked corrective actions per AINM (central actions plus tracker actions). The Part 2 progress check reads this,
+  // so the register and dashboard can show the same automatic statuses as the record screen.
+  const linkedActionCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    const idByNumber = new Map<string, string>();
+    const ids = new Set<string>();
+    records.forEach((record) => {
+      ids.add(record.id);
+      if (record.ainm_number) idByNumber.set(record.ainm_number, record.id);
+    });
+    const bump = (id: string) => counts.set(id, (counts.get(id) || 0) + 1);
+    centralActions.forEach((action) => {
+      const targets = new Set<string>();
+      if (action.linked_ainm_id && ids.has(action.linked_ainm_id)) targets.add(action.linked_ainm_id);
+      const byNumber = action.linked_ainm_number ? idByNumber.get(action.linked_ainm_number) : undefined;
+      if (byNumber) targets.add(byNumber);
+      targets.forEach(bump);
+    });
+    actions.forEach((action) => {
+      if (ids.has(action.ainm_id)) bump(action.ainm_id);
+    });
+    return counts;
+  }, [actions, centralActions, records]);
+
+  // Every register row, KPI and export reads the automatic statuses (Closed AINMs keep what was saved).
+  // Opening a record always uses the stored row from `records`, so nothing computed is ever mistaken for saved data.
+  const effectiveRecords = useMemo(
+    () => records.map((record) => withComputedStatuses(record, linkedActionCounts.get(record.id) || 0)),
+    [linkedActionCounts, records],
+  );
+
   function selectAinmAndScroll(record: AINMRecord) {
-    setSelectedId(record.id);
-    setDraft(record);
+    const stored = records.find((item) => item.id === record.id) || record;
+    setSelectedId(stored.id);
+    setDraft(stored);
     window.setTimeout(() => {
       selectedDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
@@ -848,7 +890,7 @@ function HseAinmPageContent() {
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
     const searchTerms = query.split(/\s+/).filter(Boolean);
-    return records.filter((record) => {
+    return effectiveRecords.filter((record) => {
       const haystack = [
         record.ainm_number,
         record.title,
@@ -869,7 +911,7 @@ function HseAinmPageContent() {
       const matchesProject = !projectFilter || clean(record.project) === projectFilter;
       return matchesSearch && matchesStatus && matchesStage && matchesType && matchesClassification && matchesProject;
     });
-  }, [classificationFilter, projectFilter, records, search, stageFilter, statusFilter, typeFilter]);
+  }, [classificationFilter, effectiveRecords, projectFilter, search, stageFilter, statusFilter, typeFilter]);
 
   const projectOptions = useMemo(
     () => [...new Set(records.map((record) => clean(record.project)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base", numeric: true })),
@@ -904,7 +946,7 @@ function HseAinmPageContent() {
         ...externalRecords.map(externalRecordYear).filter(Boolean),
       ])
     ).sort((a, b) => Number(b) - Number(a));
-    const dashboardRecords = dashboardYear ? records.filter((record) => recordYear(record) === dashboardYear) : records;
+    const dashboardRecords = dashboardYear ? effectiveRecords.filter((record) => recordYear(record) === dashboardYear) : effectiveRecords;
     const dashboardExternalRecords = dashboardYear ? externalRecords.filter((record) => externalRecordYear(record) === dashboardYear) : externalRecords;
     const statisticalExternalRecords = dashboardExternalRecords.filter((record) => record.include_in_statistics);
     const scopedExternalRecords =
@@ -944,7 +986,7 @@ function HseAinmPageContent() {
       externalOpen,
       externalClosed,
     };
-  }, [compiledPdfReports, dashboardScope, dashboardYear, externalRecords, records]);
+  }, [compiledPdfReports, dashboardScope, dashboardYear, effectiveRecords, externalRecords, records]);
 
   const dashboardInsights = useMemo(() => {
     const dashboardRecords = kpis.dashboardRecords;
@@ -982,9 +1024,9 @@ function HseAinmPageContent() {
       },
     ];
     const workflowRows = [
-      { label: "Notification issued/complete", value: completedNotification, color: "#005670" },
-      { label: "Part 1 complete", value: completedPart1, color: "#63B1BC" },
-      { label: "Part 2 complete", value: completedPart2, color: "#53565A" },
+      { label: "Notification completed", value: completedNotification, color: "#005670" },
+      { label: "Part 1 completed", value: completedPart1, color: "#63B1BC" },
+      { label: "Part 2 completed", value: completedPart2, color: "#53565A" },
     ];
     const classificationRows = eventClassifications
       .map((classification) => ({
@@ -1047,7 +1089,7 @@ function HseAinmPageContent() {
     return [
       `Project: ${projectFilter || "All"}`,
       `Status: ${statusFilter || "All"}`,
-      ...(stageFilter ? [`Stage status: ${stageFilter}`] : []),
+      ...(stageFilter ? [`Stage status: ${stageLabel(stageFilter)}`] : []),
       `Report type: ${typeFilter || "All"}`,
       ...(classificationFilter ? [`Classification: ${classificationFilter}`] : []),
       ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
@@ -1094,9 +1136,9 @@ function HseAinmPageContent() {
           event_date: record.event_date,
           event_classification: record.event_classification,
           brief_event_details: record.brief_event_details,
-          notification_status: record.notification_status,
-          part1_status: record.part1_status,
-          part2_status: record.part2_status,
+          notification_status: stageLabel(record.notification_status),
+          part1_status: stageLabel(record.part1_status),
+          part2_status: stageLabel(record.part2_status),
           overall_status: record.overall_status,
           owner: record.owner,
         })),
@@ -1135,11 +1177,11 @@ function HseAinmPageContent() {
           { header: "Classification", width: 24, value: (record) => record.event_classification || "" },
           { header: "Company in Control", width: 22, value: (record) => record.company_in_control || "" },
           { header: "Owner", width: 20, value: (record) => record.owner || "" },
-          { header: "Notification Status", width: 18, value: (record) => record.notification_status || "" },
+          { header: "Notification Status", width: 18, value: (record) => stageLabel(record.notification_status) },
           { header: "Notification Sent", width: 16, value: (record) => displayDate(record.notification_sent_at) },
-          { header: "Part 1 Status", width: 14, value: (record) => record.part1_status || "" },
+          { header: "Part 1 Status", width: 14, value: (record) => stageLabel(record.part1_status) },
           { header: "Part 1 Completed", width: 16, value: (record) => displayDate(record.part1_completed_at) },
-          { header: "Part 2 Status", width: 14, value: (record) => record.part2_status || "" },
+          { header: "Part 2 Status", width: 14, value: (record) => stageLabel(record.part2_status) },
           { header: "Part 2 Completed", width: 16, value: (record) => displayDate(record.part2_completed_at) },
           { header: "Overall Status", width: 14, value: (record) => record.overall_status || "" },
           { header: "Brief Event Details", width: 70, value: (record) => record.brief_event_details || "" },
@@ -1175,8 +1217,8 @@ function HseAinmPageContent() {
         ["Closed AINMs", String(kpis.closed), "Internal AINM records closed"],
         ["Incidents", String(kpis.incidents), "Incident report profile for the selected dashboard scope"],
         ["Accidents", String(kpis.accidents), "Accident report profile for the selected dashboard scope"],
-        ["Part 1 Due", String(kpis.part1Due), "Part 1 not complete"],
-        ["Part 2 Due", String(kpis.part2Due), "Part 2 not complete"],
+        ["Part 1 Due", String(kpis.part1Due), "Part 1 not completed"],
+        ["Part 2 Due", String(kpis.part2Due), "Part 2 not completed"],
         ["Compiled Report Packs", String(kpis.compiledReports), "Final compiled PDF packs generated"],
       ],
       theme: "grid",
@@ -1668,7 +1710,7 @@ function HseAinmPageContent() {
     setSaving(true);
     const { data, error } = await supabase
       .from("hse_ainm_records")
-      .insert([{ ...buildPayload(newRecord), created_at: new Date().toISOString() }])
+      .insert([{ ...buildPayload(withComputedStatuses(newRecord, 0)), created_at: new Date().toISOString() }])
       .select("*")
       .single();
     setSaving(false);
@@ -1723,7 +1765,13 @@ function HseAinmPageContent() {
     if (!selectedId) return;
     if (!requireEditPermission("Saving AINMs")) return;
 
-    const draftForSave = { ...buildDraftForSave(), ...overrides };
+    // The three stage statuses and the Overall Status are never set by hand. Every save carries the computed values
+    // (Closed AINMs keep what was saved; Close AINM computes the stages first and then closes).
+    const draftForSave = withComputedStatuses(
+      { ...buildDraftForSave(), ...overrides },
+      selectedCentralActions.length + selectedActions.length,
+      { closeNow: overrides?.overall_status === "Closed" },
+    );
     setSaving(true);
     const { error } = await supabase.from("hse_ainm_records").update(buildPayload(draftForSave)).eq("id", selectedId);
     setSaving(false);
@@ -2949,7 +2997,7 @@ function HseAinmPageContent() {
         ["AINM Ref", record.ainm_number, "Title", record.title],
         ["Project", record.project || "", "Location/Site", record.location_site || ""],
         ["Date of Event", displayDate(record.event_date), "Time of Event", record.event_time || ""],
-        ["Classification", record.event_classification || "", "Overall Status", record.overall_status],
+        ["Classification", record.event_classification || "", "Overall Status", computeAinmStages(record, linkedActionCounts.get(record.id) || 0).overall],
       ], { 0: { cellWidth: 30 }, 2: { cellWidth: 30 } });
 
       y = pdfSection(doc, "Initial Notification", y);
@@ -3200,48 +3248,22 @@ function HseAinmPageContent() {
   };
   const countLabel = (count: number, noun: string, plural = `${noun}s`) => (count ? `${count} ${count === 1 ? noun : plural}` : "");
 
-  type StageCheck = { label: string; ok: boolean };
-  const notificationChecks: StageCheck[] = [
-    { label: "Title", ok: hasText(draft.title) },
-    { label: "Project", ok: hasText(draft.project) },
-    { label: "Location / site", ok: hasText(draft.location_site) },
-    { label: "Date of event", ok: hasText(draft.event_date) },
-    { label: "Time of event", ok: hasText(draft.event_time) },
-    { label: "Classification", ok: hasText(draft.event_classification) },
-    { label: "Brief details of the event", ok: hasText(draft.brief_event_details) },
-    { label: "Injury / release / damage details", ok: hasText(draft.injury_release_damage_details) },
-    { label: "Casualty management", ok: hasText(draft.casualty_management) },
-    { label: "Site / location management", ok: hasText(draft.site_management) },
-    { label: "Cause identification", ok: hasText(draft.initial_cause) },
-  ];
-  const part1Checks: StageCheck[] = [
-    { label: "Company in control", ok: hasText(draft.company_in_control) },
-    { label: "Timeline entry", ok: timelineEntryRows.some((row) => hasText(row.datetime) || hasText(row.description)) },
-    { label: "Immediate containment action", ok: correctiveActionRows.some((row) => hasText(row)) },
-    { label: "Root cause: people", ok: hasText(draft.root_cause_people) },
-    { label: "Root cause: equipment", ok: hasText(draft.root_cause_equipment) },
-    { label: "Root cause: environment", ok: hasText(draft.root_cause_environment) },
-    { label: "Root cause: process", ok: hasText(draft.root_cause_process) },
-    { label: "Part 1 reviewer", ok: hasText(draft.part1_reviewer_name) },
-  ];
+  // The stage statuses are never set by hand. They are worked out here from the same checks that drive the
+  // percentages (see src/lib/ainmStages.ts) and are written to the record on every save.
   const linkedActionCount = selectedCentralActions.length + selectedActions.length;
-  const part2Checks: StageCheck[] = [
-    { label: "Investigation team member", ok: investigationTeamRows.some((row) => hasText(row.name) || hasText(row.company) || hasText(row.position) || hasText(row.role)) },
-    { label: "Findings: people", ok: hasText(draft.investigation_findings_people) },
-    { label: "Findings: equipment", ok: hasText(draft.investigation_findings_equipment) },
-    { label: "Findings: environment", ok: hasText(draft.investigation_findings_environment) },
-    { label: "Findings: process", ok: hasText(draft.investigation_findings_process) },
-    { label: "Reference document", ok: referenceDocumentRows.some((row) => hasText(row)) },
-    { label: "Corrective action", ok: linkedActionCount > 0 },
-    { label: "Location sign-off", ok: hasText(draft.signoff_location_name) },
-    { label: "HSEQ sign-off", ok: hasText(draft.signoff_hseq_name) },
+  const stages = computeAinmStages(draft, linkedActionCount);
+  const ainmClosed = stages.closed;
+  const stageDefs: Array<{ key: StageKey; name: string; issueLabel: string; state: StageState }> = [
+    { key: "notification", name: "Notification", issueLabel: "Issue Notification", state: stages.notification },
+    { key: "part1", name: "Part 1", issueLabel: "Issue Part 1", state: stages.part1 },
+    { key: "part2", name: "Part 2", issueLabel: "Issue Part 2", state: stages.part2 },
   ];
 
   const compiledPdfCount = compiledPdfReports.filter((report) => report.ainm_id === selectedId).length;
   const workbenchSteps: WorkbenchStepDef[] = [
-    { key: "notification", label: "Notification", sub: `Status: ${draft.notification_status}`, pct: percentDone(notificationChecks.map((check) => check.ok)) },
-    { key: "part1", label: "Part 1", sub: `Status: ${draft.part1_status}`, pct: percentDone(part1Checks.map((check) => check.ok)) },
-    { key: "part2", label: "Part 2", sub: `Status: ${draft.part2_status}`, pct: percentDone(part2Checks.map((check) => check.ok)) },
+    { key: "notification", label: "Notification", sub: `Status: ${stages.notification.label}`, pct: stages.notification.pct },
+    { key: "part1", label: "Part 1", sub: stages.part1.locked ? LOCKED_SUBLINE.part1 : `Status: ${stages.part1.label}`, pct: stages.part1.pct },
+    { key: "part2", label: "Part 2", sub: stages.part2.locked ? LOCKED_SUBLINE.part2 : `Status: ${stages.part2.label}`, pct: stages.part2.pct },
     { key: "actions", label: "Actions", sub: "Linked and tracker", state: `${linkedActionCount} linked` },
     { key: "evidence", label: "Evidence", sub: "All stages", state: `${selectedEvidence.length} file${selectedEvidence.length === 1 ? "" : "s"}` },
     { key: "reports", label: "Reports", sub: "Word and PDF", state: compiledPdfCount ? `${compiledPdfCount} PDF${compiledPdfCount === 1 ? "" : "s"}` : "No PDF yet" },
@@ -3250,15 +3272,12 @@ function HseAinmPageContent() {
   // Only warns. Close AINM asks first and then goes ahead.
   const openLinkedActions = selectedCentralActions.filter((action) => clean(action.status).toLowerCase() !== "closed");
   const ainmMissing: Array<{ label: string; step: string }> = [
-    ...(draft.notification_status === "Issued" || draft.notification_status === "Complete" ? [] : [{ label: "Notification status: Issued or Complete", step: "notification" }]),
-    ...notificationChecks.filter((check) => !check.ok).map((check) => ({ label: check.label, step: "notification" })),
-    ...(draft.part1_status === "Complete" ? [] : [{ label: "Part 1 status: Complete", step: "part1" }]),
-    ...part1Checks.filter((check) => !check.ok).map((check) => ({ label: check.label, step: "part1" })),
-    ...(draft.part2_status === "Complete" ? [] : [{ label: "Part 2 status: Complete", step: "part2" }]),
-    ...part2Checks.filter((check) => !check.ok).map((check) => ({ label: check.label, step: "part2" })),
+    ...stageDefs.flatMap(({ key, name, state }) => [
+      ...(state.status === "Complete" ? [] : [{ label: `${name}: complete and issue it`, step: key }]),
+      ...state.checks.filter((check) => !check.ok).map((check) => ({ label: check.label, step: key })),
+    ]),
     ...(openLinkedActions.length ? [{ label: openLinkedActions.length === 1 ? "Linked action closed" : `${openLinkedActions.length} linked actions closed`, step: "actions" }] : []),
   ];
-  const ainmClosed = draft.overall_status === "Closed";
   const outstandingForClose = ainmClosed ? [] : ainmMissing;
 
   function closeAinm() {
@@ -3273,6 +3292,33 @@ function HseAinmPageContent() {
     void saveDraft({ overall_status: "Closed" });
   }
 
+  // Sets the Overall Status back to In Progress and saves, so a Closed AINM can be worked on again.
+  // The stage statuses are then worked out again on save.
+  function reopenAinm() {
+    if (!canEditAinm || saving || !ainmClosed) return;
+    void saveDraft({ overall_status: "In Progress" });
+  }
+
+  // The Issue button. It stores Complete for the stage, stamps the stage's existing date column and saves straight away
+  // with the same save as Save AINM. Notification: notification_status and notification_sent_at.
+  // Part 1: part1_status and part1_completed_at. Part 2: part2_status and part2_completed_at.
+  function issueStage(key: StageKey) {
+    if (!requireEditPermission("Issuing an AINM stage")) return;
+    const stage = stages[key];
+    if (saving || !stage.canIssue) {
+      setMessage(issueTooltip(stage, key === "notification" ? "Notification" : key === "part1" ? "Part 1" : "Part 2"));
+      return;
+    }
+    const stamp = new Date().toISOString();
+    void saveDraft(
+      key === "notification"
+        ? { notification_status: "Complete", notification_sent_at: stamp }
+        : key === "part1"
+        ? { part1_status: "Complete", part1_completed_at: stamp }
+        : { part2_status: "Complete", part2_completed_at: stamp },
+    );
+  }
+
   const reportSignoffName = (name: string | null) => shortText(name);
   const ainmReportSections: DocPreviewSection[] = [
     {
@@ -3284,7 +3330,7 @@ function HseAinmPageContent() {
         { label: "Location/Site", value: draft.location_site, step: "notification" },
         { label: "Date of Event", value: [displayDate(draft.event_date), draft.event_time].filter(Boolean).join(" "), step: "notification" },
         { label: "Classification", value: draft.event_classification, step: "notification" },
-        { label: "Overall Status", value: draft.overall_status },
+        { label: "Overall Status", value: stages.overall },
       ],
     },
     {
@@ -3801,7 +3847,7 @@ function HseAinmPageContent() {
               <Field label="Stage Status">
                 <select style={filterStyle} value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
                   <option value="">All stage statuses</option>
-                  {stageStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                  {stageFilterOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </Field>
               <Field label="Report Type">
@@ -3844,9 +3890,9 @@ function HseAinmPageContent() {
                       <td style={tdStyle}>{record.event_classification || ""}</td>
                       <td style={tdStyle}>{record.project}</td>
                       <td style={tdStyle}>{displayDate(record.event_date)}</td>
-                      <td style={tdStyle}><StatusPill status={record.notification_status} /></td>
-                      <td style={tdStyle}><StatusPill status={record.part1_status} /></td>
-                      <td style={tdStyle}><StatusPill status={record.part2_status} /></td>
+                      <td style={tdStyle}><StagePill status={record.notification_status} /></td>
+                      <td style={tdStyle}><StagePill status={record.part1_status} /></td>
+                      <td style={tdStyle}><StagePill status={record.part2_status} /></td>
                       <td style={tdStyle}><StatusPill status={record.overall_status} /></td>
                     </tr>
                   ))}
@@ -3871,8 +3917,10 @@ function HseAinmPageContent() {
                     <RecordHeader
                       id={draft.ainm_number}
                       title={draft.title}
-                      status={{ label: draft.overall_status, tone: toneForStatus(draft.overall_status) }}
-                      note="An AINM moves through three stages. Each stage keeps its own status, and the overall status is set by hand."
+                      status={{ label: stages.overall, tone: toneForStatus(stages.overall) }}
+                      note={ainmClosed
+                        ? "This AINM is closed. Its saved statuses are shown as stored. Reopen it to work on it again."
+                        : "An AINM moves through three stages. Each status is worked out from progress. Press Issue when a stage reaches 100%. Close AINM is the only way to close the record."}
                       actions={
                         <>
                           <ImsButton
@@ -3883,16 +3931,36 @@ function HseAinmPageContent() {
                           >
                             Close AINM
                           </ImsButton>
+                          {ainmClosed ? (
+                            <ImsButton
+                              variant="secondary"
+                              onClick={reopenAinm}
+                              disabled={!canEditAinm || saving}
+                              title="Sets Overall Status to In Progress and saves, so the AINM can be worked on again"
+                            >
+                              Reopen AINM
+                            </ImsButton>
+                          ) : null}
                           <ImsButton variant="secondary" onClick={() => setSelectedId("")} title="Close this panel">Hide Panel</ImsButton>
                         </>
                       }
                     />
-                    <StatusRow record={draft} onChange={updateDraft} />
+                    <StatusRow stages={stages} />
                   </>
                 }
               >
 
               <WorkbenchStep stepKey="notification">
+                <StageBar
+                  name="Notification"
+                  issueLabel="Issue Notification"
+                  state={stages.notification}
+                  lockedNote={""}
+                  canEdit={canEditAinm}
+                  saving={saving}
+                  onIssue={() => issueStage("notification")}
+                />
+                <fieldset disabled={stages.notification.locked} style={stages.notification.locked ? lockedFieldsetStyle : stageFieldsetStyle}>
                 <DetailSection>
                   <div style={formGridStyle}>
                     <Field label="AINM No."><input style={inputStyle} value={draft.ainm_number} onChange={(e) => updateDraft("ainm_number", e.target.value)} /></Field>
@@ -3955,9 +4023,20 @@ function HseAinmPageContent() {
                     </button>
                   </div>
                 </DetailSection>
+                </fieldset>
               </WorkbenchStep>
 
               <WorkbenchStep stepKey="part1">
+                <StageBar
+                  name="Part 1"
+                  issueLabel="Issue Part 1"
+                  state={stages.part1}
+                  lockedNote={LOCKED_NOTE.part1}
+                  canEdit={canEditAinm}
+                  saving={saving}
+                  onIssue={() => issueStage("part1")}
+                />
+                <fieldset disabled={stages.part1.locked} style={stages.part1.locked ? lockedFieldsetStyle : stageFieldsetStyle}>
                 <DetailSection>
                   <div style={carryForwardPanelStyle}>
                     <h3 style={carryForwardTitleStyle}>{draft.ainm_number} - {draft.title}</h3>
@@ -4131,9 +4210,20 @@ function HseAinmPageContent() {
                     </button>
                   </div>
                 </DetailSection>
+                </fieldset>
               </WorkbenchStep>
 
               <WorkbenchStep stepKey="part2">
+                <StageBar
+                  name="Part 2"
+                  issueLabel="Issue Part 2"
+                  state={stages.part2}
+                  lockedNote={LOCKED_NOTE.part2}
+                  canEdit={canEditAinm}
+                  saving={saving}
+                  onIssue={() => issueStage("part2")}
+                />
+                <fieldset disabled={stages.part2.locked} style={stages.part2.locked ? lockedFieldsetStyle : stageFieldsetStyle}>
                 <DetailSection>
                   <div style={carryForwardPanelStyle}>
                     <h3 style={carryForwardTitleStyle}>{draft.ainm_number} - {draft.title}</h3>
@@ -4293,6 +4383,7 @@ function HseAinmPageContent() {
                     </button>
                   </div>
                 </DetailSection>
+                </fieldset>
               </WorkbenchStep>
 
               <WorkbenchStep stepKey="actions">
@@ -4524,13 +4615,71 @@ export default function HseAinmPage() {
   );
 }
 
-function StatusRow({ record, onChange }: { record: AINMRecord; onChange: <K extends keyof AINMRecord>(key: K, value: AINMRecord[K]) => void }) {
+// Read-only status chips. The stage statuses and the Overall Status are worked out from progress, never chosen by hand.
+function StatusRow({ stages }: { stages: AinmStages }) {
+  const chip = (label: string, status: StageStatus | OverallStatus, text: string) => (
+    <div style={fieldStyle}>
+      <span style={labelStyle}>{label}</span>
+      <div><WorkbenchStatusPill label={text} tone={stageTone(status)} /></div>
+    </div>
+  );
   return (
     <div style={stageGridStyle}>
-      <Field label="Notification Status"><select style={inputStyle} value={record.notification_status} onChange={(e) => onChange("notification_status", e.target.value as StageStatus)}>{stageStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></Field>
-      <Field label="Part 1 Status"><select style={inputStyle} value={record.part1_status} onChange={(e) => onChange("part1_status", e.target.value as StageStatus)}>{stageStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></Field>
-      <Field label="Part 2 Status"><select style={inputStyle} value={record.part2_status} onChange={(e) => onChange("part2_status", e.target.value as StageStatus)}>{stageStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></Field>
-      <Field label="Overall Status"><select style={inputStyle} value={record.overall_status} onChange={(e) => onChange("overall_status", e.target.value as OverallStatus)}>{overallStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></Field>
+      {chip("Notification Status", stages.notification.status, stages.notification.label)}
+      {chip("Part 1 Status", stages.part1.status, stages.part1.label)}
+      {chip("Part 2 Status", stages.part2.status, stages.part2.label)}
+      {chip("Overall Status", stages.overall, stages.overall)}
+    </div>
+  );
+}
+
+function stageTone(status: string): "ok" | "warn" | "bad" | "neu" | "brand" {
+  if (status === "Complete" || status === "Issued" || status === "Closed") return "ok";
+  if (status === "Draft" || status === "In Progress") return "brand";
+  if (status === "Open") return "warn";
+  return "neu";
+}
+
+// A stage status shown with its display label (Draft shows as Ongoing, Complete as Completed).
+function StagePill({ status }: { status: string }) {
+  return <WorkbenchStatusPill label={stageLabel(status)} tone={stageTone(status)} />;
+}
+
+// Sits at the top of each stage: the status chip, the Issue button at 100%, and the lock banner.
+function StageBar({
+  name,
+  issueLabel,
+  state,
+  lockedNote,
+  canEdit,
+  saving,
+  onIssue,
+}: {
+  name: string;
+  issueLabel: string;
+  state: StageState;
+  lockedNote: string;
+  canEdit: boolean;
+  saving: boolean;
+  onIssue: () => void;
+}) {
+  return (
+    <div style={stageBarStyle}>
+      <div style={stageBarRowStyle}>
+        <span style={labelStyle}>{name} status</span>
+        <WorkbenchStatusPill label={state.label} tone={stageTone(state.status)} />
+        {state.canIssue ? (
+          <ImsButton
+            variant="primary"
+            onClick={onIssue}
+            disabled={!canEdit || saving}
+            title={canEdit ? issueTooltip(state, name) : "Issuing requires Edit permission for this IMS area."}
+          >
+            {saving ? "Saving..." : issueLabel}
+          </ImsButton>
+        ) : null}
+      </div>
+      {state.locked ? <div style={stageLockedBannerStyle} role="status">{lockedNote}</div> : null}
     </div>
   );
 }
@@ -4890,6 +5039,11 @@ const externalNoticeStyle: CSSProperties = {
   lineHeight: 1.45,
 };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 };
+const stageBarStyle: CSSProperties = { display: "grid", gap: 10, marginBottom: 12 };
+const stageBarRowStyle: CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 };
+const stageLockedBannerStyle: CSSProperties = { border: "1px solid #D0D0CE", borderLeft: "4px solid #FFAD00", borderRadius: 12, padding: "12px 14px", background: "white", color: "#000000", fontWeight: 800, fontSize: 14 };
+const stageFieldsetStyle: CSSProperties = { border: 0, padding: 0, margin: 0, minWidth: 0 };
+const lockedFieldsetStyle: CSSProperties = { ...stageFieldsetStyle, opacity: 0.7 };
 const stageGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12, marginBottom: 16 };
 const fieldStyle: CSSProperties = { display: "grid", gap: 6 };
 const labelStyle: CSSProperties = { color: "#53565A", fontSize: 12, fontWeight: 900 };
