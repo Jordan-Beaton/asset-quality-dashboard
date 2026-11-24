@@ -234,6 +234,12 @@ Do Not:
 - Use KPI cards for long explanatory text.
 - Make KPI grids inconsistent between equivalent modules.
 
+Phone density (720px and below, added November 2026):
+
+- People mostly log things on a phone rather than read dashboards, so figure tiles are compact: two across, `52px` minimum height, value (`22px`) beside its label (`11px`), `3px` accent top border, `8px` gap. The desktop card above is unchanged.
+- This is done once, in `app/globals.css` ("Phone density"), for every grid whose children are `QualityKpiCard`s. Do not size KPI cards per page.
+- The page hero, top meta row, tab strip, panels and panel section headers also use slim phone padding in the same block.
+
 ## Interactive Dashboard Standard
 
 The dashboard alignment completed on 11 August 2026 is the reference for operational dashboards and dashboard tabs.
@@ -646,6 +652,29 @@ Standards:
 - Public and dedicated field routes may remove normal AppShell padding through an explicit modifier such as `ims-page-container--public`; never compensate for phone padding with desktop negative margins.
 - Public form cards should use the full available width without horizontal page overflow. Controls must use `width: 100%`, `max-width: 100%`, `min-width: 0`, `box-sizing: border-box`, and a `16px` phone font size.
 - Preserve desktop inline layout values above `720px`. Responsive corrections should be scoped to the shared phone breakpoint or a narrower route-specific breakpoint.
+
+Phone rules added in November 2026 (all in `app/globals.css`):
+
+- Form controls are `16px` on a phone. iPhones zoom the page in when a smaller text box is tapped. The rule uses the same `:not([type=...])` chain as the page-container control rule so it out-ranks it; do not set smaller font sizes on controls inside `@media (max-width: 720px)`.
+- Links and buttons are at least `40px` tall on a phone (row `Expand` toggles included).
+- A header row built as `display:flex; justify-content:space-between` wraps on a phone, and its labels share the row width, so a title, filters and a button never crush each other.
+- Panel header actions (`ModuleSectionHeader`) wrap rather than running off the right edge.
+- Never use `capture="environment"` on a file input that should also accept documents: on Android it opens the camera only and people cannot choose a PDF, Word or Excel file. The phone file chooser already offers the camera when `accept` includes `image/*`.
+- IMS Home on a phone opens with a compact hero, a `Log something` strip (Observation, Incident, Site inspection, Asset check, plus `All field tools`; each permission-aware) and a plain 56px list of workspaces. The desktop launchpad is unchanged.
+
+## Files: Opening, Saving And Uploading
+
+Phone browsers block and break things desktop browsers allow. Use the shared helpers and constants; do not write page-local versions.
+
+- `src/lib/fileOpen.ts` `openFileUrl(url)` opens a stored file (signed storage link) in a new tab, or in the same tab if the phone blocks the new tab. Never call `window.open(signedUrl, "_blank", "noopener,noreferrer")` after an `await`: iPhones and many Android browsers silently block it, and `noopener` hides whether it worked.
+- `saveBlobAsFile(blob, fileName)` saves a generated Word, Excel or other file. It attaches the link to the page and releases the blob address after 60 seconds. Releasing it immediately breaks the download on Safari. `openOrSaveBlob` opens a generated PDF in a tab, or saves it if blocked.
+- `src/lib/fileTypes.ts` holds the accepted file types for every document and evidence upload: PDF, Word, Excel (including macro-enabled), PowerPoint, CSV, text and photos (including iPhone HEIC). Use `IMS_DOCUMENT_ACCEPT` or `IMS_EVIDENCE_ACCEPT` for the `accept` attribute. Import-only pickers (for example a single `.xlsx` register import) stay specific.
+- Pass `contentType: uploadContentType(file)` to every storage upload. Phones often report no file type; the helper falls back to the type for the file extension so Word, Excel and PowerPoint files open in the right app.
+- Register exports (`src/lib/registerExcel.ts`, `createObservationReportPdf`, `createAinmReportPdf`) export exactly the rows the register is showing and print the filters that produced them. New registers should follow that convention, with `Export PDF` and `Export Excel` side by side.
+
+## Closed Items
+
+In the operational registers where people mainly work open items (Actions, My Actions, Observations, NCR and CAPA), closed items are hidden by default with a visible `Show Closed` / `Hide Closed` control (or tick box showing the hidden count). Opening a closed record from a link or dashboard shows it. Registers that are controlled lists rather than work queues (ITPs, documents, audits, calibration, MOC and so on) keep showing everything.
 
 New module/tab definition of done:
 

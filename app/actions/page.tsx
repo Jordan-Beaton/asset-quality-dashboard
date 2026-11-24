@@ -31,6 +31,8 @@ import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { downloadRegisterExcel, excelDateStamp } from "../../src/lib/registerExcel";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import { supabase } from "../../src/lib/supabase";
+import { openFileUrl } from "../../src/lib/fileOpen";
+import { uploadContentType } from "../../src/lib/fileTypes";
 
 type ActionItem = {
   id: string;
@@ -3046,7 +3048,7 @@ function ActionsPageContent() {
 
       const { error: uploadError } = await supabase.storage
         .from("quality-evidence")
-        .upload(filePath, file, {
+        .upload(filePath, file, { contentType: uploadContentType(file),
           cacheControl: "3600",
           upsert: false,
         });
@@ -3463,7 +3465,7 @@ function ActionsPageContent() {
       return;
     }
 
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   async function deleteEvidence(file: EvidenceFile) {

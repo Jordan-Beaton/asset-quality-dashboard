@@ -34,6 +34,8 @@ import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { exportColours, exportRgb, exportTypography } from "../../src/lib/exportTheme";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
+import { openFileUrl, saveBlobAsFile } from "../../src/lib/fileOpen";
+import { uploadContentType } from "../../src/lib/fileTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -1709,7 +1711,7 @@ function NcrCapaPageContent() {
 
       const { error: uploadError } = await supabase.storage
         .from("quality-evidence")
-        .upload(filePath, file, {
+        .upload(filePath, file, { contentType: uploadContentType(file),
           cacheControl: "3600",
           upsert: false,
         });
@@ -2379,7 +2381,7 @@ function NcrCapaPageContent() {
   async function openEvidence(file: EvidenceFile) {
     try {
       const signedUrl = await createEvidenceSignedUrl(file.file_path, 300);
-      window.open(signedUrl, "_blank", "noopener,noreferrer");
+      openFileUrl(signedUrl);
     } catch (error) {
       setMessage(
         `Could not open file: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -2427,7 +2429,7 @@ function NcrCapaPageContent() {
       return;
     }
 
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   // A report is built from what is on screen. If the NCR is open for editing, the typed text is used, so a
@@ -3115,14 +3117,7 @@ function NcrCapaPageContent() {
       const blob = await Packer.toBlob(wordDoc);
       const fileName = `${selectedRow.number}-${externalFacingPdf ? "external" : "internal"}-ncr-report.docx`
         .replace(/[^a-zA-Z0-9._-]/g, "-");
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      saveBlobAsFile(blob, fileName);
 
       setMessage(`${selectedRow.number} Word report generated.`);
     } catch (error) {

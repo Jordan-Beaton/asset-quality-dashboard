@@ -47,11 +47,14 @@ const subtitleStyle: CSSProperties = {
 };
 
 const actionsStyle: CSSProperties = {
-  flex: "0 0 auto",
+  flex: "0 1 auto",
   display: "flex",
+  flexWrap: "wrap",
   alignItems: "center",
   justifyContent: "flex-end",
   gap: "8px",
+  minWidth: 0,
+  maxWidth: "100%",
 };
 
 export function ModuleSectionHeader({ title, subtitle, actions }: ModuleSectionHeaderProps) {

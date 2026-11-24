@@ -32,6 +32,8 @@ import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
+import { openFileUrl, saveBlobAsFile } from "../../src/lib/fileOpen";
+import { IMS_DOCUMENT_ACCEPT, uploadContentType } from "../../src/lib/fileTypes";
 
 type AuditType = "Internal" | "External" | "Supplier";
 type AuditStatus = "Planned" | "In Progress" | "Completed" | "Overdue" | "Cancelled";
@@ -2150,7 +2152,7 @@ function AuditsPageContent() {
     const folderPath = folder ? `${folder.replace(/^\/+|\/+$/g, "")}/` : "";
     const path = `audits/${auditId}/${folderPath}${Date.now()}-${safeName}`;
 
-    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: uploadContentType(file),
       upsert: true,
     });
 
@@ -2322,7 +2324,7 @@ function AuditsPageContent() {
       return;
     }
 
-    window.open(signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(signedUrl);
   }
 
   function getFindingEvidenceFiles(finding: FindingRecord) {
@@ -2784,12 +2786,7 @@ function AuditsPageContent() {
       });
 
       const blob = await Packer.toBlob(document);
-      const url = URL.createObjectURL(blob);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = `${sanitizeFileName(finding.reference || "audit-finding")}-finding-report.docx`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveBlobAsFile(blob, `${sanitizeFileName(finding.reference || "audit-finding")}-finding-report.docx`);
       setMessage(`Finding Word report generated for ${finding.reference}.`);
     } catch (error) {
       const err = error as Error;
@@ -3805,12 +3802,7 @@ function AuditsPageContent() {
       });
 
       const blob = await Packer.toBlob(document);
-      const url = URL.createObjectURL(blob);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = `custom-audit-ncr-report-${new Date().toISOString().slice(0, 10)}.docx`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveBlobAsFile(blob, `custom-audit-ncr-report-${new Date().toISOString().slice(0, 10)}.docx`);
       setMessage(`Custom Word report generated from ${selectedAudits.length} selected audits.`);
     } catch (error) {
       const err = error as Error;
@@ -3938,12 +3930,7 @@ function AuditsPageContent() {
       });
 
       const blob = await Packer.toBlob(document);
-      const url = URL.createObjectURL(blob);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = `audit-programme-snapshot-${new Date().toISOString().slice(0, 10)}.docx`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveBlobAsFile(blob, `audit-programme-snapshot-${new Date().toISOString().slice(0, 10)}.docx`);
       setMessage(`Audit Programme Word report generated with ${selectedAudits.length} selected audits.`);
     } catch (error) {
       const err = error as Error;
@@ -5056,7 +5043,7 @@ function AuditsPageContent() {
                     </span>
                     <input
                       type="file"
-                      accept=".pdf,.doc,.docx,.xlsx,.xls,.png,.jpg,.jpeg"
+                      accept={IMS_DOCUMENT_ACCEPT}
                       onChange={handleReportUpload}
                       style={{ display: "none" }}
                       disabled={isUploadingReport || !canEditAudit}

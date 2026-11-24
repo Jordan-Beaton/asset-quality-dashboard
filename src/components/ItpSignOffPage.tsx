@@ -6,6 +6,8 @@ import { ImsButton, ImsPanel, ImsTopMetaRow } from "./ImsPrimitives";
 import { QualityKpiCard } from "./QualityKpiCard";
 import { QualityPageHero } from "./QualityPageHero";
 import { supabase } from "../lib/supabase";
+import { openFileUrl } from "../lib/fileOpen";
+import { IMS_DOCUMENT_ACCEPT, uploadContentType } from "../lib/fileTypes";
 
 type PhaseItem = { taskNumber?: string; activityDescription?: string };
 type Phase = { phaseNumber: string; phaseTitle: string; items: PhaseItem[] };
@@ -181,7 +183,7 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("You must be signed in to issue a sign-off request.");
       path = `${projectKey}/itp-sign-offs/${crypto.randomUUID()}/${file.name.replace(/[^a-zA-Z0-9._-]+/g, "-")}`;
-      const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: file.type || undefined });
+      const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: uploadContentType(file) });
       if (uploadError) throw uploadError;
       const rows = selectedPhases.map((phase) => ({ project_key: projectKey, document_name: file.name, document_path: path, phase_number: phase.phaseNumber, phase_title: phase.phaseTitle, phase_items: phase.items, recipient_email: recipientEmail.trim().toLowerCase(), sender_name: auth.user.user_metadata?.full_name || auth.user.user_metadata?.name || null, sender_email: auth.user.email || null, created_by: auth.user.id }));
       const { data, error } = await supabase.from("project_itp_sign_off_requests").insert(rows).select("id");
@@ -206,14 +208,14 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
   async function openSource(path: string) {
     const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) { setMessage(error?.message || "Unable to open the source ITP."); return; }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   async function openCertificate(path: string | null) {
     if (!path) { setMessage("No sign-off certificate is available for this record."); return; }
     const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(path, 60 * 60 * 24 * 180);
     if (error || !data?.signedUrl) { setMessage(error?.message || "Unable to open the sign-off certificate."); return; }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   return <main style={page}>
@@ -242,7 +244,7 @@ export function ItpSignOffPage({ projectKey, projectLabel, nav }: ItpSignOffConf
             {!trackedItps.length ? <span style={muted}>No ITPs are tracked for this project yet — use &quot;Upload a document&quot; instead.</span> : null}
           </label>
         ) : (
-          <label style={field}><span>Internal ITP</span><input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={(event) => void handleFileChange(event)} disabled={extracting || sending} /></label>
+          <label style={field}><span>Internal ITP</span><input type="file" accept={IMS_DOCUMENT_ACCEPT} onChange={(event) => void handleFileChange(event)} disabled={extracting || sending} /></label>
         )}
         <label style={field}><span>Recipient email</span><input type="email" value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="recipient@example.com" /></label>
       </div>

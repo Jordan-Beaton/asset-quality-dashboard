@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, CSSProperties, FormEvent } from "react";
 import { imsColours, imsInputStyle } from "../../src/components/imsTheme";
 import { defaultObservationProjects } from "../../src/lib/observationProjects";
+import { IMS_EVIDENCE_ACCEPT } from "../../src/lib/fileTypes";
 
 const reporterTypes = ["Employee", "Contractor", "Client", "Visitor", "Quick Fill"];
 const observationTypes = ["Positive Observation", "Unsafe Act", "Unsafe Condition", "Environmental", "Quality / Process", "Other"];
@@ -379,7 +380,7 @@ export default function PublicObservationPage() {
           <section className="observe-card" style={cardStyle}>
             <h2 style={sectionTitleStyle}>Photos or supporting evidence</h2>
             <p style={helperTextStyle}>Optional. Add several photos or files, including one at a time from your phone camera.</p>
-            <input className="observe-control" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={fileInputStyle} onChange={addEvidenceFiles} />
+            <input className="observe-control" type="file" multiple accept={IMS_EVIDENCE_ACCEPT} style={fileInputStyle} onChange={addEvidenceFiles} />
             {evidenceFiles.length ? (
               <div style={selectedEvidenceListStyle} aria-live="polite">
                 <strong>{evidenceFiles.length} attachment{evidenceFiles.length === 1 ? "" : "s"} ready to upload</strong>

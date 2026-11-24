@@ -21,11 +21,14 @@ function getActionLabel(action: string) {
   if (action === "accept_review") return "Accept Review";
   if (action === "approve_document") return "Approve Document";
   if (action === "reject_review" || action === "reject_approval") return "Reject Document";
+  if (action === "reject_periodic_review") return "Raise a Concern";
+  if (action === "confirm_periodic_review") return "No Changes Required";
   return "Confirm Action";
 }
 
 function isRejectAction(action: string) {
-  return action === "reject_review" || action === "reject_approval";
+  // The periodic review "Raise a Concern" link also needs a written reason: the server refuses it without one.
+  return action === "reject_review" || action === "reject_approval" || action === "reject_periodic_review";
 }
 
 function WorkflowActionContent() {
@@ -152,12 +155,12 @@ function WorkflowActionContent() {
 
             {requiresReason ? (
               <label style={fieldStyle}>
-                <span style={labelStyle}>Rejection Reason</span>
+                <span style={labelStyle}>{details?.action === "reject_periodic_review" ? "Your Concern" : "Rejection Reason"}</span>
                 <textarea
                   value={rejectionReason}
                   onChange={(event) => setRejectionReason(event.target.value)}
                   style={textareaStyle}
-                  placeholder="Enter the reason so the originator knows what needs to change"
+                  placeholder={details?.action === "reject_periodic_review" ? "Describe your concern or what needs to be reviewed" : "Enter the reason so the originator knows what needs to change"}
                   disabled={isComplete}
                 />
               </label>

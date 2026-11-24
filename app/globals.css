@@ -85,6 +85,9 @@ body {
   color: var(--enshore-brand);
   font-size: var(--ims-text-xl) !important;
   line-height: 1.25 !important;
+  /* The size was already shared, but the weight was left at the reset value (400) on pages that set none,
+   * so those headings read thin beside the 800-weight section headers. A page's own inline weight still wins. */
+  font-weight: 700;
 }
 
 .ims-page-container h1:not(.ims-page-hero-title) {
@@ -1226,8 +1229,9 @@ textarea {
   }
 
   .ims-mobile-row-toggle {
-    min-height: 32px !important;
-    padding: 5px 9px;
+    min-height: 40px !important;
+    min-width: 72px;
+    padding: 8px 12px;
     border: 1px solid #D0D0CE;
     border-radius: 8px;
     background: #ECECE7;
@@ -1590,4 +1594,185 @@ textarea {
   box-shadow: none !important;
   outline: 0 !important;
   font-size: var(--ims-text-base) !important;
+}
+
+/* Phone usability contract.
+ * 1. iPhones zoom the whole page in when a text box smaller than 16px is tapped, and do not zoom back out,
+ *    so every form control is 16px on a phone.
+ * 2. Links and buttons are at least 40px tall so they can be pressed with a thumb. */
+@media (max-width: 760px) {
+  html body input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
+  html body select:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  html body textarea:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]) {
+    font-size: 16px !important;
+  }
+
+  .ims-page-container table button.ims-mobile-row-toggle {
+    min-height: 40px !important;
+  }
+
+  .ims-top-meta-row .ims-back-nav > a:first-child,
+  .ims-back-nav .ims-back-home {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+
+  .ims-page-container button:not(.ims-mobile-row-toggle):not([role="tab"]) {
+    min-height: 40px;
+  }
+}
+
+/* Phone density.
+ * People mostly log things on a phone, so the page furniture is kept small and the work starts near the top:
+ * figure tiles sit two across, and the title, back and status bars are slim. Desktop and tablet are untouched. */
+@media (max-width: 720px) {
+  .ims-page-container.ims-responsive-contract main:not(.ims-home-page) .quality-kpi-grid,
+  .ims-page-container.ims-responsive-contract main:not(.ims-home-page) [style*="grid-template-columns"]:has(> * > .quality-kpi-card) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin-top: 0 !important;
+    margin-bottom: 12px !important;
+  }
+
+  .quality-kpi-grid > *,
+  [style*="grid-template-columns"]:has(> * > .quality-kpi-card) > * {
+    min-height: 0 !important;
+    min-width: 0;
+  }
+
+  .quality-kpi-card {
+    min-height: 52px !important;
+    padding: 8px 10px !important;
+    border-radius: 12px !important;
+    border-top-width: 3px !important;
+    flex-direction: row-reverse !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .quality-kpi-card-value {
+    font-size: 22px !important;
+    line-height: 1 !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .quality-kpi-card-label {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    min-width: 0;
+  }
+
+  .ims-page-hero {
+    min-height: 0 !important;
+    padding: 12px 16px !important;
+    margin-bottom: 10px !important;
+    border-radius: 14px !important;
+  }
+
+  .ims-top-meta-row {
+    min-height: 0 !important;
+    padding: 6px 10px !important;
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .ims-top-meta-status,
+  .ims-top-meta-row > div:last-child {
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+  }
+
+  .ims-tabs {
+    margin-bottom: 10px !important;
+  }
+
+  .ims-panel {
+    padding: 10px !important;
+    margin-bottom: 10px;
+  }
+
+  .ims-section-header {
+    padding: 8px 10px !important;
+    margin-bottom: 10px !important;
+  }
+}
+
+/* Header rows that put a title, filters and a button side by side must wrap on a phone instead of crushing each other. */
+@media (max-width: 720px) {
+  .ims-page-container main:not(.ims-home-page) [style*="display:flex"][style*="justify-content:space-between"],
+  .ims-page-container main:not(.ims-home-page) [style*="display: flex"][style*="justify-content: space-between"] {
+    flex-wrap: wrap !important;
+    row-gap: 10px;
+  }
+
+  .ims-page-container main:not(.ims-home-page) [style*="display:flex"][style*="justify-content:space-between"] > label,
+  .ims-page-container main:not(.ims-home-page) [style*="display: flex"][style*="justify-content: space-between"] > label {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .ims-page-container main:not(.ims-home-page) [style*="display:flex"][style*="justify-content:space-between"] > button,
+  .ims-page-container main:not(.ims-home-page) [style*="display: flex"][style*="justify-content: space-between"] > button {
+    flex: 0 0 auto;
+    white-space: normal;
+  }
+}
+
+/* Process Guides: a drop-down for the guide and the section replaces two long button rows on a phone. */
+.guide-switch-select,
+.guide-section-select {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .guide-switch-bar,
+  .guide-section-bar {
+    display: none !important;
+  }
+
+  .guide-switch-select,
+  .guide-section-select {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--enshore-border);
+    border-radius: 12px;
+    background: var(--enshore-surface);
+    color: var(--enshore-ink);
+    font-weight: 700;
+  }
+
+  .guide-content {
+    padding: 16px 14px !important;
+    min-height: 0 !important;
+  }
+}
+
+/* Long registers on a phone: the first batch of cards shows, the rest sit behind a Show more button. */
+@media (max-width: 720px) {
+  .ims-page-container table.ims-mobile-card-table tbody > tr[data-mobile-hidden="true"] {
+    display: none !important;
+  }
+}
+
+.ims-mobile-more {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 10px 0 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--enshore-border);
+  border-radius: 12px;
+  background: var(--enshore-surface);
+  color: var(--enshore-brand);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ims-mobile-more:active {
+  filter: brightness(0.92);
 }

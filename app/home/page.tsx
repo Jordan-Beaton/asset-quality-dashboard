@@ -885,6 +885,32 @@ export default function HomePage() {
           .card-glow { transition: transform 260ms ease, opacity 260ms ease; }
           .home-module-card:hover .card-glow { transform: scale(1.7); opacity: .9; }
 
+          .home-log-strip { display: none; }
+          @media (max-width: 720px) {
+            /* Phone home: log something first, then a plain list of workspaces. */
+            .home-ims-hero { padding: 12px 16px !important; min-height: 0 !important; transform: none !important; border-radius: 14px !important; }
+            .home-ims-orbit { display: none !important; }
+            .home-ims-hero h1 { font-size: 19px !important; line-height: 1.2 !important; margin: 0 !important; }
+            .home-ims-hero h1 br { display: none; }
+            .home-ims-hero p { display: none !important; }
+            .home-ims-hero > div:first-of-type > div:first-child { font-size: 10px !important; margin-bottom: 4px !important; }
+            .home-log-strip { display: grid; gap: 8px; }
+            .home-log-title { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 900; color: #005670; }
+            .home-log-title a { font-size: 12px; font-weight: 800; color: #005670; text-decoration: none; padding: 8px 0 8px 12px; }
+            .home-log-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+            .home-log-btn { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 52px; padding: 8px 10px; border-radius: 12px; background: #005670; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 800; line-height: 1.2; }
+            .home-log-btn:active { filter: brightness(0.84); }
+            .home-log-btn span:first-child { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: rgba(255,255,255,.16); font-size: 18px; line-height: 1; }
+            .workspace-view-tools { display: none !important; }
+            .module-list-view { gap: 6px; }
+            .module-card-list { height: 56px !important; min-height: 56px !important; grid-template-columns: 36px minmax(0, 1fr) !important; gap: 12px !important; padding: 8px 12px !important; border-radius: 12px !important; animation: none !important; }
+            .module-card-list > div:last-child { display: none !important; }
+            .module-card-list .module-icon { width: 36px !important; height: 36px !important; border-radius: 10px !important; }
+            .module-card-list .module-icon svg { width: 20px !important; height: 20px !important; }
+            .module-card-list h3 { font-size: 15px !important; }
+            .module-card-list .module-access-label, .module-card-list .card-glow { display: none !important; }
+          }
+
         `}
       </style>
       <section
@@ -906,7 +932,7 @@ export default function HomePage() {
         <span className="hero-scan" aria-hidden="true" />
         <div style={heroCopyStyle}>
           <div style={eyebrowStyle}>Enshore Integrated Management System</div>
-          <h1 style={heroTitleStyle}>Everything connected.<br />One place to begin.</h1>
+          <h1 style={heroTitleStyle}>Everything connected.{" "}<br />One place to begin.</h1>
           <p style={heroSubtitleStyle}>
             Choose your workspace below.
           </p>
@@ -935,6 +961,16 @@ export default function HomePage() {
               <source src="/enshore-e-outline-loop.mp4" type="video/mp4" />
             </video>
           </div>
+        </div>
+      </section>
+
+      <section className="home-log-strip" aria-label="Log something">
+        <div className="home-log-title"><span>Log something</span><Link href="/field-tools">All field tools</Link></div>
+        <div className="home-log-grid">
+          <Link href="/observe" className="home-log-btn"><span aria-hidden="true">+</span><span>Observation</span></Link>
+          {!permissions.loaded || permissions.canAccessModule("hse") ? <Link href="/hse/ainm/field" className="home-log-btn"><span aria-hidden="true">!</span><span>Incident</span></Link> : null}
+          {!permissions.loaded || permissions.canAccessModule("hse") ? <Link href="/hse/inspections/field" className="home-log-btn"><span aria-hidden="true">✓</span><span>Site inspection</span></Link> : null}
+          {!permissions.loaded || permissions.canAccessModule("assets") ? <Link href="/assets/inspection/field" className="home-log-btn"><span aria-hidden="true">⚙</span><span>Asset check</span></Link> : null}
         </div>
       </section>
 

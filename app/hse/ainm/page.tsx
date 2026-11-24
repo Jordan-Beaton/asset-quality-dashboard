@@ -43,6 +43,8 @@ import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 import { exportColours, exportRgb, exportTypography } from "../../../src/lib/exportTheme";
 import { ainmReportFileName, createAinmReportPdf } from "../../../src/lib/ainmReportPdf";
 import { downloadRegisterExcel, excelDateStamp } from "../../../src/lib/registerExcel";
+import { openFileUrl, saveBlobAsFile } from "../../../src/lib/fileOpen";
+import { uploadContentType } from "../../../src/lib/fileTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -1950,7 +1952,7 @@ function HseAinmPageContent() {
 
     for (const file of files) {
       const path = `HSE/AINM/${selectedId}/${Date.now()}-${sanitizeFileName(file.name)}`;
-      const upload = await supabase.storage.from(evidenceBucket).upload(path, file, { upsert: false });
+      const upload = await supabase.storage.from(evidenceBucket).upload(path, file, { contentType: uploadContentType(file), upsert: false });
       if (upload.error) {
         setMessage(`Evidence upload failed: ${upload.error.message}`);
         continue;
@@ -1980,7 +1982,7 @@ function HseAinmPageContent() {
 
     for (const file of files) {
       const path = `HSE/AINM/External/${selectedExternalId}/${Date.now()}-${sanitizeFileName(file.name)}`;
-      const upload = await supabase.storage.from(evidenceBucket).upload(path, file, { upsert: false });
+      const upload = await supabase.storage.from(evidenceBucket).upload(path, file, { contentType: uploadContentType(file), upsert: false });
       if (upload.error) {
         setMessage(`External AINM upload failed: ${upload.error.message}`);
         continue;
@@ -2007,7 +2009,7 @@ function HseAinmPageContent() {
       setMessage(`Could not open ${file.file_name}.`);
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   async function openExternalEvidence(file: ExternalAINMEvidence) {
@@ -2016,7 +2018,7 @@ function HseAinmPageContent() {
       setMessage(`Could not open ${file.file_name}.`);
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   async function openGeneratedReport(report: AINMGeneratedDocument) {
@@ -2029,7 +2031,7 @@ function HseAinmPageContent() {
       setMessage(`Could not open ${report.file_name || "compiled PDF report"}.`);
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   async function deleteEvidence(file: AINMEvidence) {
@@ -2824,12 +2826,7 @@ function HseAinmPageContent() {
       });
 
       const blob = await Packer.toBlob(doc);
-      const url = URL.createObjectURL(blob);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = `${record.ainm_number}-${stage}.docx`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveBlobAsFile(blob, `${record.ainm_number}-${stage}.docx`);
       await supabase.from("hse_ainm_generated_documents").insert([
         { ainm_id: record.id, document_stage: stage, file_name: `${record.ainm_number}-${stage}.docx` },
       ]);

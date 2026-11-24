@@ -6,6 +6,7 @@ import { ImsButton, ImsPanel } from "./ImsPrimitives";
 import { imsColours, imsInputStyle } from "./imsTheme";
 import { supabase } from "../lib/supabase";
 import { downloadLessonsPreventionPdf } from "../lib/lessonsPreventionPdf";
+import { uploadContentType } from "../lib/fileTypes";
 
 type IndexStatus = { configured: boolean; migration_required: boolean; total: number; indexed: number };
 const MAX_REVIEW_FILE_BYTES = 50 * 1024 * 1024;
@@ -46,7 +47,7 @@ export function LessonsPreventionIntelligence({ canManage, onOpenLessons }: { ca
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
         const storagePath = `AI-REVIEW/${crypto.randomUUID()}-${safeName}`;
         temporaryStoragePath = storagePath;
-        const { error: uploadError } = await supabase.storage.from("lessons-learned-evidence").upload(storagePath, file, { contentType: file.type || "application/octet-stream", upsert: false });
+        const { error: uploadError } = await supabase.storage.from("lessons-learned-evidence").upload(storagePath, file, { contentType: uploadContentType(file), upsert: false });
         if (uploadError) throw new Error(`Document upload failed: ${uploadError.message}`);
         setMessage(`Extracting the complete contents of ${file.name}...`);
         const extractResponse = await fetch("/api/lessons-learned/procedure-extract", {

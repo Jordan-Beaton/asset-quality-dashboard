@@ -31,6 +31,7 @@ import { MocRegisterAnnex } from "../../../src/components/MocRegisterAnnex";
 import { ProjectWorkspaceNav } from "../../../src/components/ProjectWorkspaceNav";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
+import { saveBlobAsFile } from "../../../src/lib/fileOpen";
 
 type RawCell = string | number | boolean | Date | null | undefined;
 
@@ -372,12 +373,7 @@ function makeWordCell(text: string, width: number, options?: { header?: boolean;
 }
 
 function downloadBlob(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const link = window.document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  saveBlobAsFile(blob, fileName);
 }
 
 export default function ProjectReportsPage() {

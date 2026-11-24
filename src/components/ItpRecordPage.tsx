@@ -36,6 +36,7 @@ import {
   type ItpPerson,
   type WorkflowRevision,
 } from "../lib/itpWorkflow";
+import { openFileUrl } from "../lib/fileOpen";
 
 const STORAGE_BUCKET = "project-documents";
 const SETUP_NOTICE = "The ITP stage gate needs its one-off database setup. Run scripts/sql/project_itp_stage_gate.sql in Supabase.";
@@ -340,7 +341,7 @@ export function ItpRecordPage({ projectKey, itpId }: { projectKey: string; itpId
   async function openFile(target: Revision) {
     const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(target.file_path, 60 * 60 * 24 * 7);
     if (error) setToast({ tone: "warn", text: error.message });
-    else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    else openFileUrl(data.signedUrl);
   }
 
   function openEdit() {

@@ -11,6 +11,8 @@ import { ImsButton, ImsFilterPanel, ImsPanel } from "./ImsPrimitives";
 import { useImsPermissions } from "./ImsPermissions";
 import { useUrlFlag, useUrlState } from "../lib/useUrlState";
 import { supabase } from "../lib/supabase";
+import { openFileUrl, saveBlobAsFile } from "../lib/fileOpen";
+import { uploadContentType } from "../lib/fileTypes";
 
 type View = "dashboard" | "register" | "create" | "settings";
 type Severity = "Critical" | "Major" | "Minor";
@@ -48,7 +50,7 @@ function effectiveDue(point: OpenPoint) { if (point.employer_extension_agreed &&
 function isOverdue(point: OpenPoint) { const due = effectiveDue(point); return !isClosed(point) && Boolean(due) && due < new Date().toISOString().slice(0, 10); }
 function mirrorOverdue(point: OpenPoint) { if (isClosed(point)) return false; const baseline = point.cde_mirrored_at || point.created_at || point.identified_date; return Date.now() - new Date(baseline).getTime() > 7 * 86400000; }
 function fmt(value: string | null | undefined) { if (!value) return "-"; const date = new Date(value.length === 10 ? `${value}T00:00:00` : value); return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }
-function download(blob: Blob, name: string) { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url); }
+function download(blob: Blob, name: string) { saveBlobAsFile(blob, name); }
 
 export function WaddenSeaOpenPoints() {
   const permission = useImsPermissions();
@@ -124,10 +126,10 @@ export function WaddenSeaOpenPoints() {
   async function uploadEvidence(event: ChangeEvent<HTMLInputElement>) {
     if (!selected || !canEdit) { event.target.value = ""; return; } const files = Array.from(event.target.files || []); event.target.value = ""; if (!files.length) return;
     const { data: auth } = await supabase.auth.getUser();
-    for (const file of files) { const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "-"); const path = `wadden-sea/open-points/${selected.open_point_number}/${Date.now()}-${safe}`; const uploaded = await supabase.storage.from("project-documents").upload(path, file); if (uploaded.error) { setMessage(uploaded.error.message); return; } const row = await supabase.from("project_open_point_evidence").insert({ open_point_id: selected.id, evidence_type: evidenceType, file_name: file.name, file_path: path, file_size: file.size, content_type: file.type, notes: evidenceNote || null, uploaded_by: auth.user?.id }); if (row.error) { setMessage(row.error.message); return; } }
+    for (const file of files) { const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "-"); const path = `wadden-sea/open-points/${selected.open_point_number}/${Date.now()}-${safe}`; const uploaded = await supabase.storage.from("project-documents").upload(path, file, { contentType: uploadContentType(file) }); if (uploaded.error) { setMessage(uploaded.error.message); return; } const row = await supabase.from("project_open_point_evidence").insert({ open_point_id: selected.id, evidence_type: evidenceType, file_name: file.name, file_path: path, file_size: file.size, content_type: file.type, notes: evidenceNote || null, uploaded_by: auth.user?.id }); if (row.error) { setMessage(row.error.message); return; } }
     setEvidenceNote(""); await load(); setMessage(`${files.length} evidence file(s) uploaded.`);
   }
-  async function openEvidence(item: Evidence) { const { data, error } = await supabase.storage.from("project-documents").createSignedUrl(item.file_path, 60 * 60 * 24 * 180); if (error || !data?.signedUrl) { setMessage(error?.message || "Evidence could not be opened."); return; } window.open(data.signedUrl, "_blank", "noopener,noreferrer"); }
+  async function openEvidence(item: Evidence) { const { data, error } = await supabase.storage.from("project-documents").createSignedUrl(item.file_path, 60 * 60 * 24 * 180); if (error || !data?.signedUrl) { setMessage(error?.message || "Evidence could not be opened."); return; } openFileUrl(data.signedUrl); }
   async function markMirrored(point: OpenPoint) { const reference = window.prompt("CDE submission / transmittal reference"); if (!reference) return; const uploader = window.prompt("Uploaded by", point.owner || "") || point.owner; const { error } = await supabase.from("project_open_points").update({ cde_mirrored_at: new Date().toISOString(), cde_registered_at: point.cde_registered_at || new Date().toISOString(), cde_submission_reference: reference, cde_uploaded_by: uploader }).eq("id", point.id); if (error) setMessage(error.message); else { await load(); setMessage(`${point.open_point_number} marked as mirrored to the Employer CDE.`); } }
 
   async function saveSettings() { if (!canEdit) return; const phases = settingsDraft.phases.split("\n").map((line) => line.split("|").map(clean)).filter((x) => x[0] && /^\d{4}-\d{2}-\d{2}$/.test(x[1])).map(([name, date]) => ({ name, date })); const next = { project_key: "wadden-sea", taking_over_date: settingsDraft.takingOver || null, phase_milestones: phases, sbs_options: settingsDraft.sbs.split(",").map(clean).filter(Boolean), wbs_options: settingsDraft.wbs.split(",").map(clean).filter(Boolean) }; const { error } = await supabase.from("project_open_point_settings").upsert(next); if (error) setMessage(error.message); else { await load(); setMessage("Open Points control settings saved."); } }

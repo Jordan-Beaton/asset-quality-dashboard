@@ -14,6 +14,7 @@ import {
   imsSecondaryButtonStyle, imsGhostButtonStyle,
   imsInputStyle, imsTextareaStyle, imsLabelStyle, imsFieldStyle,
 } from "./imsTheme";
+import { uploadContentType } from "../lib/fileTypes";
 
 const STORAGE_BUCKET = "project-documents";
 
@@ -363,7 +364,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
 
       for (const file of addFiles) {
         const path = `${projectKey}/inspection-records/${newRecord.id}/${Date.now()}-${file.name}`;
-        const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file);
+        const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: uploadContentType(file) });
         if (upErr) throw upErr;
         await supabase.from("inspection_record_files").insert({
           record_id: newRecord.id, file_name: file.name, file_path: path, file_size: file.size,
@@ -412,7 +413,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
     try {
       for (const file of Array.from(e.target.files)) {
         const path = `${projectKey}/inspection-records/${evidenceRecord.id}/${Date.now()}-${file.name}`;
-        const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file);
+        const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: uploadContentType(file) });
         if (upErr) throw upErr;
         await supabase.from("inspection_record_files").insert({ record_id: evidenceRecord.id, file_name: file.name, file_path: path, file_size: file.size });
       }

@@ -19,6 +19,8 @@ import {
   imsTableStyle,
 } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
+import { openFileUrl } from "../../src/lib/fileOpen";
+import { IMS_DOCUMENT_ACCEPT, uploadContentType } from "../../src/lib/fileTypes";
 
 export const dynamic = "force-dynamic";
 type AssetStatus = "Active" | "Inactive" | "Quarantine" | "Under Maintenance";
@@ -1342,7 +1344,7 @@ function AssetsPageContent() {
 
     const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
       upsert: true,
-      contentType: file.type || undefined,
+      contentType: uploadContentType(file),
     });
 
     if (error) {
@@ -1646,7 +1648,7 @@ function AssetsPageContent() {
       return;
     }
 
-    window.open(signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(signedUrl);
   }
 
   function printSelectedAssetQrCode() {
@@ -3160,7 +3162,7 @@ function AssetsPageContent() {
                                   Upload cert
                                   <input
                                     type="file"
-                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                    accept={IMS_DOCUMENT_ACCEPT}
                                     onChange={(e) => handleCalibrationFileUpload(record.id, e)}
                                     style={{ display: "none" }}
                                   />
@@ -3247,7 +3249,7 @@ function AssetsPageContent() {
                                   Upload record
                                   <input
                                     type="file"
-                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                    accept={IMS_DOCUMENT_ACCEPT}
                                     onChange={(e) => handleInspectionFileUpload(record.id, e)}
                                     style={{ display: "none" }}
                                   />

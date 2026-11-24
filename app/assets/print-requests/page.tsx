@@ -23,6 +23,8 @@ import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { exportPdfTableTheme, exportRgb, exportTypography } from "../../../src/lib/exportTheme";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
+import { openFileUrl } from "../../../src/lib/fileOpen";
+import { uploadContentType } from "../../../src/lib/fileTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -595,7 +597,7 @@ export default function PrintRequestsPage() {
     let warning = "";
     for (const file of filesToUpload) {
       const path = `PRINT/${requestId}/${objectId}/${Date.now()}-${sanitizeFileName(file.name)}`;
-      const upload = await supabase.storage.from(storageBucket).upload(path, file, { upsert: false });
+      const upload = await supabase.storage.from(storageBucket).upload(path, file, { contentType: uploadContentType(file), upsert: false });
       if (upload.error) {
         warning += ` Upload failed for ${file.name} on ${jobNumber}: ${upload.error.message}`;
         continue;
@@ -898,7 +900,7 @@ export default function PrintRequestsPage() {
       setMessage(`File link failed: ${error?.message || "No link returned"}`);
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   async function addTeamMember() {

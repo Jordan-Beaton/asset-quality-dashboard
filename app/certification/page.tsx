@@ -22,6 +22,8 @@ import {
 import { supabase } from "../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import type { CSSProperties } from "react";
+import { openFileUrl } from "../../src/lib/fileOpen";
+import { IMS_DOCUMENT_ACCEPT, uploadContentType } from "../../src/lib/fileTypes";
 
 type CertificationView = "dashboard" | "register" | "upload";
 
@@ -227,7 +229,7 @@ function CertificationPageContent() {
       if (form.file) {
         const fileName = sanitizeFileName(form.file.name);
         const path = `certification/${Date.now()}-${fileName}`;
-        const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(path, form.file, {
+        const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(path, form.file, { contentType: uploadContentType(form.file),
           cacheControl: "3600",
           upsert: false,
         });
@@ -286,7 +288,7 @@ function CertificationPageContent() {
       return;
     }
 
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   async function deleteCertificate(row: CertificationRow) {
@@ -408,7 +410,7 @@ function CertificationPageContent() {
                 </select>
               </Field>
               <Field label="Certificate File">
-                <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={(event) => setForm({ ...form, file: event.target.files?.[0] || null })} style={fileInputStyle} />
+                <input type="file" accept={IMS_DOCUMENT_ACCEPT} onChange={(event) => setForm({ ...form, file: event.target.files?.[0] || null })} style={fileInputStyle} />
               </Field>
               <div style={{ gridColumn: "1 / -1" }}>
                 <Field label="Scope">

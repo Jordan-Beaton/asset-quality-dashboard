@@ -10,6 +10,7 @@ import { QualityPageHero } from "./QualityPageHero";
 import { ProjectWorkspaceNav } from "./ProjectWorkspaceNav";
 import { supabase } from "../lib/supabase";
 import { getProject } from "../lib/projectRegistry";
+import { saveBlobAsFile } from "../lib/fileOpen";
 
 type Itp = { id: string; document_number: string; title: string; supplier: string | null; scope: string | null };
 type NoiPoint = { id: string; itp_id: string; section_number: string; activity_description: string; intervention_type: string; planned_date: string | null; noi_number: string | null; status: string };
@@ -34,12 +35,7 @@ const STORAGE_BUCKET = "project-documents";
 const blankAttendee = (): Attendee => ({ name: "", company: "", contact: "", email: "" });
 
 function download(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  saveBlobAsFile(blob, name);
 }
 
 function displayDate(value: string) {

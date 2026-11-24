@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { uploadContentType } from "../../../src/lib/fileTypes";
 
 const evidenceBucket = "quality-evidence";
 
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
       const filePath = `hse-observations/${observationId}/${Date.now()}-${fileIndex}-${fileName}`;
       const upload = await supabase.storage.from(evidenceBucket).upload(filePath, file, {
         upsert: false,
-        contentType: file.type || undefined,
+        contentType: uploadContentType(file),
       });
 
       if (upload.error) {

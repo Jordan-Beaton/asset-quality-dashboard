@@ -36,6 +36,7 @@ import {
   wrapCaseKeyForHandler,
   type ProtectedPrivateKey,
 } from "../../lib/speakUpCrypto";
+import { saveBlobAsFile } from "../../lib/fileOpen";
 
 type Me = {
   id: string;
@@ -167,14 +168,7 @@ const mimeFor = (name: string) => MIME_TYPES[extensionOf(name)] || "application/
 const isImageName = (name: string) => ["png", "jpg", "jpeg"].includes(extensionOf(name));
 
 function saveBytes(name: string, bytes: Uint8Array, type: string) {
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+  saveBlobAsFile(new Blob([bytes as BlobPart], { type }), name);
 }
 
 function Chip({ text, tone = "plain" }: { text: string; tone?: "bad" | "warn" | "plain" }) {

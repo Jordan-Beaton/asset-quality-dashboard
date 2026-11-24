@@ -12,6 +12,8 @@ import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
+import { openFileUrl, openOrSaveBlob } from "../../../src/lib/fileOpen";
+import { IMS_EVIDENCE_ACCEPT, uploadContentType } from "../../../src/lib/fileTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -1332,7 +1334,7 @@ export default function HseInspectionsPage() {
     for (const item of files) {
       const file = item.file;
       const path = `HSE/Inspections/${inspectionId}/${Date.now()}-${sanitizeFileName(file.name)}`;
-      const upload = await supabase.storage.from(evidenceBucket).upload(path, file, { upsert: false, contentType: file.type || undefined });
+      const upload = await supabase.storage.from(evidenceBucket).upload(path, file, { upsert: false, contentType: uploadContentType(file) });
       if (upload.error) {
         setMessage(`Evidence upload failed: ${upload.error.message}`);
         continue;
@@ -1390,7 +1392,7 @@ export default function HseInspectionsPage() {
 
   async function openEvidenceFile(file: InspectionEvidence) {
     const url = await createSignedEvidenceUrl(file.file_path);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    if (url) openFileUrl(url);
   }
 
   async function deleteEvidenceFile(file: InspectionEvidence) {
@@ -1675,9 +1677,7 @@ export default function HseInspectionsPage() {
     applyPdfChrome(doc, record, logoData, `${record.form_number}${record.form_revision ? ` Rev ${record.form_revision}` : ""}`);
 
       const fileName = `${record.inspection_number}-${sanitizeFileName(record.form_title)}.pdf`;
-      const url = doc.output("bloburl");
-      const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) doc.save(fileName);
+      openOrSaveBlob(doc.output("blob"), fileName);
       setMessage(`Generated PDF for ${record.inspection_number}.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown PDF generation error";
@@ -1831,7 +1831,7 @@ export default function HseInspectionsPage() {
     applyPdfChrome(doc, blankRecord, logoData, `${template.documentNumber}${template.revision ? ` Rev ${template.revision}` : ""}`);
 
     const url = doc.output("bloburl");
-    window.open(url, "_blank", "noopener,noreferrer");
+    openFileUrl(String(url));
     setMessage(`Opened blank PDF for ${template.documentNumber}.`);
   }
 
@@ -2471,8 +2471,8 @@ function InspectionForm({
                       <input
                         type="file"
                         multiple
-                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                        capture="environment"
+                        accept={IMS_EVIDENCE_ACCEPT}
+                       
                         style={{ display: "none" }}
                         disabled={!canUploadEvidence || uploading}
                         onChange={(event) => onUploadEvidenceForItem(item.id, event)}
@@ -2515,8 +2515,8 @@ function InspectionForm({
                       <input
                         type="file"
                         multiple
-                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                        capture="environment"
+                        accept={IMS_EVIDENCE_ACCEPT}
+                       
                         style={{ display: "none" }}
                         disabled={!canUploadEvidence || uploading}
                         onChange={(event) => onUploadEvidenceForItem(item.id, event)}
@@ -2629,7 +2629,7 @@ function PendingEvidencePanel({
       <EvidenceItemPicker value={uploadItemNumber} formId={formId} onChange={onUploadItemNumberChange} />
       <label style={{ ...uploadButtonStyle, opacity: canCreate ? 1 : 0.55 }}>
         Upload Photos / Files
-        <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" capture="environment" style={{ display: "none" }} onChange={onUpload} disabled={!canCreate} />
+        <input type="file" multiple accept={IMS_EVIDENCE_ACCEPT} style={{ display: "none" }} onChange={onUpload} disabled={!canCreate} />
       </label>
       <div style={evidenceListStyle}>
         {pendingEvidence.map((file) => (
@@ -2675,7 +2675,7 @@ function EvidencePanel({
       <EvidenceItemPicker value={uploadItemNumber} formId={formId} onChange={onUploadItemNumberChange} />
       <label style={{ ...uploadButtonStyle, opacity: canEdit ? 1 : 0.55 }}>
         {uploading ? "Uploading..." : "Upload Evidence"}
-        <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" capture="environment" style={{ display: "none" }} onChange={onUpload} disabled={uploading || !canEdit} />
+        <input type="file" multiple accept={IMS_EVIDENCE_ACCEPT} style={{ display: "none" }} onChange={onUpload} disabled={uploading || !canEdit} />
       </label>
       <div style={evidenceListStyle}>
         {sortedEvidence.map((file) => (

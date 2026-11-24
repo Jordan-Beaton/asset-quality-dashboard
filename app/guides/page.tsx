@@ -10,11 +10,46 @@ import { mocGuide } from "../../src/components/guides/mocGuideContent";
 import { ainmGuide } from "../../src/components/guides/ainmGuideContent";
 import { reviewPointsGuide } from "../../src/components/guides/reviewPointsGuideContent";
 import { speakUpGuide } from "../../src/components/guides/speakUpGuideContent";
+import { actionsGuide } from "../../src/components/guides/actionsGuideContent";
+import { observationsGuide } from "../../src/components/guides/observationsGuideContent";
+import { inspectionsGuide } from "../../src/components/guides/inspectionsGuideContent";
+import { ptwGuide } from "../../src/components/guides/ptwGuideContent";
+import { auditsGuide } from "../../src/components/guides/auditsGuideContent";
+import { assetsGuide } from "../../src/components/guides/assetsGuideContent";
+import { riskGuide } from "../../src/components/guides/riskGuideContent";
+import { lessonsGuide } from "../../src/components/guides/lessonsGuideContent";
+import { certificationGuide } from "../../src/components/guides/certificationGuideContent";
+import { managementReviewGuide } from "../../src/components/guides/managementReviewGuideContent";
+import { projectsGuide } from "../../src/components/guides/projectsGuideContent";
+import { adminGuide } from "../../src/components/guides/adminGuideContent";
+import { phoneGuide } from "../../src/components/guides/phoneGuideContent";
+import { reportsGuide } from "../../src/components/guides/reportsGuideContent";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { page, guideSwitchBar, guideSwitchBtn, navBar, navGroup, navBtn, content } from "../../src/components/guides/guideKit";
 import type { GuideDefinition } from "../../src/components/guides/guideKit";
 
-const allGuides: GuideDefinition[] = [documentControlGuide, ncrGuide, mocGuide, ainmGuide, reviewPointsGuide, speakUpGuide];
+const allGuides: GuideDefinition[] = [
+  phoneGuide,
+  documentControlGuide,
+  actionsGuide,
+  ncrGuide,
+  mocGuide,
+  auditsGuide,
+  ainmGuide,
+  observationsGuide,
+  inspectionsGuide,
+  ptwGuide,
+  assetsGuide,
+  riskGuide,
+  lessonsGuide,
+  certificationGuide,
+  managementReviewGuide,
+  projectsGuide,
+  reviewPointsGuide,
+  reportsGuide,
+  adminGuide,
+  speakUpGuide,
+];
 
 function GuidesPageContent() {
   const searchParams = useSearchParams();
@@ -27,7 +62,7 @@ function GuidesPageContent() {
       .then((json) => setSpeakUpHandler(Boolean(json?.handler)))
       .catch(() => undefined);
   }, []);
-  const guides = useMemo(() => allGuides.filter((guide) => guide.id !== speakUpGuide.id || permissions.isAdmin || speakUpHandler), [permissions.isAdmin, speakUpHandler]);
+  const guides = useMemo(() => allGuides.filter((guide) => (guide.id !== speakUpGuide.id || permissions.isAdmin || speakUpHandler) && (guide.id !== adminGuide.id || permissions.isAdmin)), [permissions.isAdmin, speakUpHandler]);
   const linkedGuide = searchParams.get("guide")?.trim() || "";
 
   const initialGuide = guides.find((g) => g.id === linkedGuide) || documentControlGuide;
@@ -63,7 +98,18 @@ function GuidesPageContent() {
       />
 
       {/* Guide switcher */}
-      <div style={guideSwitchBar}>
+      <select
+        className="guide-switch-select"
+        aria-label="Choose a process guide"
+        value={activeGuideId}
+        onChange={(event) => {
+          const next = guides.find((guide) => guide.id === event.target.value);
+          if (next) selectGuide(next);
+        }}
+      >
+        {guides.map((guide) => <option key={guide.id} value={guide.id}>{guide.navLabel}</option>)}
+      </select>
+      <div className="guide-switch-bar" style={guideSwitchBar}>
         {guides.map((guide) => (
           <button
             key={guide.id}
@@ -76,7 +122,19 @@ function GuidesPageContent() {
       </div>
 
       {/* Section nav */}
-      <div style={navBar}>
+      <select
+        className="guide-section-select"
+        aria-label="Choose a section of this guide"
+        value={active}
+        onChange={(event) => setActive(event.target.value)}
+      >
+        {groups.map((group) => (
+          <optgroup key={group} label={group}>
+            {activeGuide.sections.filter((s) => s.group === group).map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </optgroup>
+        ))}
+      </select>
+      <div className="guide-section-bar" style={navBar}>
         {groups.map(group => (
           <div key={group} style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
             <span style={navGroup}>{group}</span>
@@ -94,7 +152,7 @@ function GuidesPageContent() {
       </div>
 
       {/* Content */}
-      <div style={content}>
+      <div className="guide-content" style={content}>
         {ActiveSection ? <ActiveSection /> : null}
       </div>
     </main>

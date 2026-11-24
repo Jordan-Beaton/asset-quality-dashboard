@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { ChangeEvent, CSSProperties, useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../../src/lib/supabase";
+import { openFileUrl } from "../../../../src/lib/fileOpen";
+import { IMS_EVIDENCE_ACCEPT, uploadContentType } from "../../../../src/lib/fileTypes";
 
 type StageStatus = "Not Started" | "Draft" | "Issued" | "Complete";
 type OverallStatus = "Open" | "In Progress" | "Closed";
@@ -288,7 +290,7 @@ export default function HseAinmFieldPage() {
     setUploading(true);
     for (const file of files) {
       const path = `HSE/AINM/${recordId}/${Date.now()}-${sanitizeFileName(file.name)}`;
-      const upload = await supabase.storage.from(evidenceBucket).upload(path, file, { upsert: false });
+      const upload = await supabase.storage.from(evidenceBucket).upload(path, file, { contentType: uploadContentType(file), upsert: false });
       if (upload.error) {
         setUploading(false);
         setMessage(`Evidence upload failed: ${upload.error.message}`);
@@ -323,7 +325,7 @@ export default function HseAinmFieldPage() {
       setMessage(`Open evidence failed: ${error?.message || "Unable to create link"}`);
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   return (
@@ -470,7 +472,7 @@ export default function HseAinmFieldPage() {
               <h3 style={smallTitleStyle}>Notification Evidence</h3>
               <label style={uploadButtonStyle}>
                 {uploading ? "Uploading..." : "Upload Evidence"}
-                <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={uploadEvidence} style={{ display: "none" }} />
+                <input type="file" multiple accept={IMS_EVIDENCE_ACCEPT} onChange={uploadEvidence} style={{ display: "none" }} />
               </label>
               <div style={recordListStyle}>
                 {selectedEvidence.length ? selectedEvidence.map((file) => (

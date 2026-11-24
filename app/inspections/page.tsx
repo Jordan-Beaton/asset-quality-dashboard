@@ -17,6 +17,8 @@ import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import { projects as projectRegistry, getProject } from "../../src/lib/projectRegistry";
 import { useProjectRegistry } from "../../src/lib/useProjectRegistry";
 import { exportPdfTableTheme, exportRgb, exportTypography } from "../../src/lib/exportTheme";
+import { openFileUrl } from "../../src/lib/fileOpen";
+import { uploadContentType } from "../../src/lib/fileTypes";
 
 type Attendee = { name: string; company: string; contact: string; email: string };
 
@@ -412,7 +414,7 @@ export default function OverallInspectionsPage() {
   async function uploadFileAsAttachment(file: File, inspectionId: string, projectKey: string) {
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
     const path = `${projectKey}/inspection-attachments/${inspectionId}/${Date.now()}-${safeName}`;
-    const uploaded = await supabase.storage.from("project-documents").upload(path, file);
+    const uploaded = await supabase.storage.from("project-documents").upload(path, file, { contentType: uploadContentType(file) });
     if (uploaded.error) throw uploaded.error;
     const { error } = await supabase.from("project_inspection_attachments").insert({
       inspection_id: inspectionId,
@@ -458,7 +460,7 @@ export default function OverallInspectionsPage() {
       setMessage(error?.message || "The attachment could not be opened.");
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   function updateDetailAttendee(index: number, changes: Partial<Attendee>) {

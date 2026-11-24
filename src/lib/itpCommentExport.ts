@@ -1,3 +1,4 @@
+import { saveBlobAsFile } from "./fileOpen";
 // Takes the comments the reviewer ticked and turns them into a file or clipboard text, for their own email to the supplier.
 // Browser only: the libraries load when a button is pressed, so the ITP page itself stays light.
 
@@ -10,14 +11,7 @@ function fileStem(head: Head) {
 }
 
 function saveBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveBlobAsFile(blob, name);
 }
 
 export async function downloadCommentsExcel(head: Head, items: ExportComment[]) {

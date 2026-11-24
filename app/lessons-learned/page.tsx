@@ -12,6 +12,8 @@ import { LessonsPreventionIntelligence } from "../../src/components/LessonsPreve
 import { imsColours, imsInputStyle } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
+import { openFileUrl } from "../../src/lib/fileOpen";
+import { IMS_EVIDENCE_ACCEPT, uploadContentType } from "../../src/lib/fileTypes";
 
 type View = "dashboard" | "register" | "create" | "import" | "trends" | "intelligence";
 type AnalysisFilter = "all" | "open-actions" | "high-critical" | "repeat-lessons" | "unowned-actions" | "cross-project-repeats" | "with-evidence" | "missing-root-cause" | "ai-results";
@@ -374,7 +376,7 @@ function LessonsLearnedPageContent() {
     if (!files.length) return null;
     for (const file of files) {
       const path = `LESSON/${recordId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeFileName(file.name)}`;
-      const { error } = await supabase.storage.from("lessons-learned-evidence").upload(path, file, { upsert: false }); if (error) return error.message;
+      const { error } = await supabase.storage.from("lessons-learned-evidence").upload(path, file, { contentType: uploadContentType(file), upsert: false }); if (error) return error.message;
       const { error: metaError } = await supabase.from("evidence_files").insert({ record_type: "LESSON", record_id: recordId, file_name: file.name, file_path: path, file_size: file.size, content_type: file.type || "application/octet-stream", notes: evidenceNotes || null });
       if (metaError) return metaError.message;
     } return null;
@@ -397,7 +399,7 @@ function LessonsLearnedPageContent() {
     setSaving(false); setFiles([]); setEvidenceNotes(""); setForm(isFieldMode ? { ...emptyForm, report_date: todayValue() } : emptyForm); setSelected(null); setSelectedLessonId(""); await loadData(); setView(isFieldMode ? "create" : "register");
   }
   async function deleteLesson() { if (!selected || !requireEdit("delete lessons") || !window.confirm(`Delete ${selected.lesson_number}?`)) return; const { error } = await supabase.from("lessons_learned").delete().eq("id", selected.id); setMessage(error ? `Delete failed: ${error.message}` : `${selected.lesson_number} deleted.`); if (!error) { setSelected(null); setSelectedLessonId(""); setForm(emptyForm); await loadData(); } }
-  async function openEvidence(item: Evidence) { const { data, error } = await supabase.storage.from("lessons-learned-evidence").createSignedUrl(item.file_path, 60 * 60 * 24 * 180); if (error) setMessage(`Evidence open failed: ${error.message}`); else window.open(data.signedUrl, "_blank", "noopener,noreferrer"); }
+  async function openEvidence(item: Evidence) { const { data, error } = await supabase.storage.from("lessons-learned-evidence").createSignedUrl(item.file_path, 60 * 60 * 24 * 180); if (error) setMessage(`Evidence open failed: ${error.message}`); else openFileUrl(data.signedUrl); }
 
   function previewImport(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; if (!file || !requireCreate("import lessons")) return; setImportName(file.name); setMessage(`Reading ${file.name}...`);
@@ -539,7 +541,7 @@ function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNo
       <Field label="What Happened?"><Textarea value={form.issue_description} onChange={(x) => update("issue_description", x)} placeholder="Describe the event or successful practice without blame." /></Field>
       <Field label="Lesson Learnt"><Textarea value={form.lesson_learned} onChange={(x) => update("lesson_learned", x)} placeholder="What should another team know or repeat?" /></Field>
       <Field label="Recommended Action"><Textarea value={form.recommended_action} onChange={(x) => update("recommended_action", x)} placeholder="What should happen next, if anything?" /></Field>
-      <Field label="Photo / File Evidence"><input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xlsx" onChange={(e) => setFiles(Array.from(e.target.files || []))} style={imsInputStyle} /></Field>
+      <Field label="Photo / File Evidence"><input type="file" multiple accept={IMS_EVIDENCE_ACCEPT} onChange={(e) => setFiles(Array.from(e.target.files || []))} style={imsInputStyle} /></Field>
       <Field label="Evidence Note"><Input value={evidenceNotes} onChange={setEvidenceNotes} placeholder={files.length ? `${files.length} file(s) selected` : "Optional description"} /></Field>
     </div>
     <details style={fieldOptionalStyle}>
@@ -584,7 +586,7 @@ function LessonForm({ title, subtitle, form, update, files, setFiles, evidenceNo
     <Field label="Action Owner"><ControlledSelect value={form.action_owner} onChange={(x) => update("action_owner", x)} placeholder="Select from People Management" options={peopleSelectOptions} /></Field><Field label="Target Date"><Input type="date" value={form.target_date} onChange={(x) => update("target_date", x)} /></Field>
     <Field label="Completion Date"><Input type="date" value={form.completion_date} onChange={(x) => update("completion_date", x)} /></Field><Field label="Repeat Group"><Input value={form.repeat_group} onChange={(x) => update("repeat_group", x)} placeholder="e.g. Document control at mobilisation" /></Field>
     <Field label="Keywords" wide><Input value={form.keywords} onChange={(x) => update("keywords", x)} placeholder="Comma-separated: mobilisation, cable handling, document control" /></Field>
-    <Field label="Source File"><Input value={form.source_file} onChange={(x) => update("source_file", x)} /></Field><Field label="Photo / File Evidence"><input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xlsx" onChange={(e) => setFiles(Array.from(e.target.files || []))} style={imsInputStyle} /></Field>
+    <Field label="Source File"><Input value={form.source_file} onChange={(x) => update("source_file", x)} /></Field><Field label="Photo / File Evidence"><input type="file" multiple accept={IMS_EVIDENCE_ACCEPT} onChange={(e) => setFiles(Array.from(e.target.files || []))} style={imsInputStyle} /></Field>
     <Field label="Evidence Note" wide><Input value={evidenceNotes} onChange={setEvidenceNotes} placeholder={files.length ? `${files.length} file(s) selected` : "Describe the evidence"} /></Field>
   </div>
   {evidence.length > 0 && <div style={evidenceGrid}>{evidence.map((item) => <button key={item.id} style={evidenceCard} onClick={() => void onOpenEvidence(item)}><strong>{item.file_name}</strong><span>{item.notes || "Open evidence"}</span></button>)}</div>}

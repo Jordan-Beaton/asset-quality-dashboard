@@ -128,7 +128,8 @@ function SectionOverview() {
       <h3 style={h3Style}>Where to find it</h3>
       <p style={pStyle}>
         <strong>One project:</strong> open the project (for example Wadden Sea) and click the <strong>Review Points</strong> tab, next to NOI Creator.<br />
-        <strong>All projects:</strong> open <strong>Overall Inspections</strong> and click the <strong>Review Points</strong> tab.
+        <strong>All projects:</strong> open <strong>Overall Inspections</strong> and click the <strong>Review Points</strong> tab.<br />
+        <strong>From an ITP:</strong> open the ITP record (ITP Tracker, then the ITP). Once its revision is approved, the <strong>Linked records</strong> card shows how many review points (R/A) were found and has a <strong>Review Points</strong> button that jumps to the tracker.
       </p>
       <div style={mockPanel}>
         <div style={mockLabel}>Project workspace tabs</div>
@@ -141,6 +142,8 @@ function SectionOverview() {
       <h3 style={h3Style}>What it is not</h3>
       <p style={pStyle}>Review points have <strong>no attachments</strong> and no approval workflow beyond the decision itself. Witness and hold points still live in the NOI Tracker, and inspection evidence still goes in Inspection Records.</p>
       <Note>Every decision carries a digital sign-off: the signer&apos;s name, the date and the time, set by the server when they sign. It cannot be typed in or backdated, and every change is kept in a history.</Note>
+      <h3 style={h3Style}>Not the same as ITP team comments</h3>
+      <p style={pStyle}>Review Points are the R and A marks <em>inside</em> an ITP. They are separate from the <strong>Gate 1 team comments</strong> on the ITP record, where the Gate 1 reviewer shares a newly uploaded ITP revision with colleagues for comment before deciding what goes to the supplier. Those live on the ITP record page (ITP Tracker, then the ITP, under <strong>Gate 1 · Review</strong> and the <strong>Comments</strong> panel), not on the Review Points tab. Reviewing an ITP at Gate 1 does not sign off its review points, and signing review points does not decide the ITP.</p>
     </>
   );
 }
@@ -261,6 +264,7 @@ function SectionRevisions() {
       <h3 style={h3Style}>A new ITP revision starts fresh</h3>
       <p style={pStyle}>Points belong to the revision they were scanned from. When a new revision is uploaded and scanned, its review points arrive as <span style={pendingChip}>Pending</span>. Decisions are <strong>not</strong> carried across, because an approval applies to the revision that was reviewed.</p>
       <Note tone="warning">Points from an earlier revision stay in the list alongside the new revision&apos;s points. Use the status cards and filters to focus on what is still Pending.</Note>
+      <Note>A new ITP revision also restarts the ITP&apos;s own review at Gate 1 (including any team comments requested from colleagues). That is tracked on the ITP record and is independent of review point decisions.</Note>
     </>
   );
 }
@@ -285,7 +289,7 @@ function SectionPage() {
       <h3 style={h3Style}>Status cards</h3>
       <p style={pStyle}>The cards are filters: click <strong>Pending</strong>, <strong>Accepted</strong> or <strong>Failed</strong> to narrow the list, and <strong>All review points</strong> to clear it. <strong>Past target date</strong> counts points that are not accepted and whose target date has passed (it is a count only).</p>
       <h3 style={h3Style}>Filters</h3>
-      <p style={pStyle}>Search by section, description, ITP number, supplier or reviewer. Filter by ITP and by reviewer; choose <strong>Unassigned</strong> to find points with no reviewer. <strong>Clear filters</strong> resets everything.</p>
+      <p style={pStyle}>Search by section, description, ITP number, supplier or reviewer. Filter by ITP and by reviewer; choose <strong>Unassigned</strong> to find points with no reviewer. <strong>Clear filters</strong> resets everything. The secondary buttons (Clear filters, Scan ITPs for review points, Select all pending) are white with a visible outline, and on a phone the filter bar and header buttons wrap onto extra lines. The register table scrolls sideways on a small screen, or use the <strong>By ITP</strong> view.</p>
       <h3 style={h3Style}>Two views</h3>
       <p style={pStyle}><strong>Register</strong> is one table of every point. <strong>By ITP</strong> groups the points into a card per ITP with a progress bar (accepted, failed, pending), which is the easier way to work through one ITP at a time and has a <strong>Select all N pending</strong> button.</p>
     </>
@@ -311,7 +315,7 @@ function SectionAssign() {
         </div>
         <div style={{ display: "flex", gap: 8 }}><span style={btn("primary")}>Save</span><span style={btn("ghost")}>Cancel</span></div>
       </div>
-      <p style={pStyle}>A point past its target date shows in red with how many days overdue (for example <span style={{ color: imsColours.danger, fontWeight: 800 }}>4 days overdue</span>), and counts in the <strong>Past target date</strong> card. A point due within a week shows <strong>Due in N days</strong>. Once a point is accepted, its date is no longer flagged.</p>
+      <p style={pStyle}>A point past its target date shows in red with how many days overdue (for example <span style={{ color: imsColours.danger, fontWeight: 800 }}>4 days overdue</span>), and counts in the <strong>Past target date</strong> card. A point due today shows <strong>Due today</strong>, and one due within a week shows <strong>Due in N days</strong>. Once a point is accepted, its date is no longer flagged.</p>
     </>
   );
 }
@@ -485,6 +489,8 @@ function SectionTroubleshooting() {
             ["\"Give a reason for failing\"", "Failing needs a reason.", "Type what must be corrected or resubmitted, then sign."],
             ["A point I tried to sign was skipped", "It was no longer Pending (someone else decided it first).", "Refresh the page and check its history."],
             ["A reviewer is missing from the list", "Reviewers come from active people in People Management.", "Add or reactivate them there."],
+            ["The ITP record shows 0 review points, or no Review Points button", "The Linked records card only shows once the ITP revision is approved, and counts only that revision's points.", "Wait for approval, or open the Review Points tab directly and scan the ITP."],
+            ["Looking for the Gate 1 team comments", "They belong to the ITP record, not Review Points.", "Open the ITP from the ITP Tracker and use the Gate 1 · Review card and the Comments panel."],
           ].map(([see, means, doIt]) => (
             <tr key={see}><td style={{ ...cell, fontWeight: 800 }}>{see}</td><td style={cell}>{means}</td><td style={cell}>{doIt}</td></tr>
           ))}

@@ -20,6 +20,7 @@ import {
   type MocWorkbook,
 } from "../lib/mocRegister";
 import { buildMocPdf, buildMocWord, mocFileName } from "../lib/mocRegisterDocs";
+import { saveBlobAsFile } from "../lib/fileOpen";
 
 // Client MOC register annex for any project. The register is that project's MOC list in the IMS (MOC module), read live.
 // A workbook can still be uploaded instead, for example an old SharePoint register; nothing is stored from it.
@@ -73,12 +74,7 @@ async function loadFromIms(projectKey: string): Promise<MocWorkbook> {
 }
 
 function download(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  link.click();
-  URL.revokeObjectURL(url);
+  saveBlobAsFile(blob, name);
 }
 
 function todayIso() {

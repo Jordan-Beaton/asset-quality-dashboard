@@ -4,6 +4,11 @@ import { useEffect } from "react";
 
 const priorityHeadingPattern = /(^|\s)(no\.?|number|title|name|status|owner|assigned|priority|due|date|project|location|type)(\s|$)/i;
 
+// A long register turns into a very long column of cards on a phone (one register ran to about 36 screens),
+// so the first batch is shown with a "Show more" button. Search and filters still work on every record.
+const MOBILE_ROW_BATCH = 25;
+const visibleRowCounts = new WeakMap<HTMLTableElement, number>();
+
 export function MobileTableEnhancer({ routeKey }: { routeKey: string }) {
   useEffect(() => {
     const media = window.matchMedia("(max-width: 720px)");
@@ -18,6 +23,47 @@ export function MobileTableEnhancer({ routeKey }: { routeKey: string }) {
       });
       table.querySelectorAll<HTMLTableRowElement>("tr[data-mobile-expanded]").forEach((row) => row.removeAttribute("data-mobile-expanded"));
       table.querySelectorAll<HTMLButtonElement>(".ims-mobile-row-toggle").forEach((button) => button.remove());
+      table.querySelectorAll<HTMLTableRowElement>("tr[data-mobile-hidden]").forEach((row) => row.removeAttribute("data-mobile-hidden"));
+      removeMoreButton(table);
+    };
+
+    const removeMoreButton = (table: HTMLTableElement) => {
+      const next = table.nextElementSibling;
+      if (next && next.classList.contains("ims-mobile-more")) next.remove();
+    };
+
+    // Show the first batch of rows, plus any selected row, and a button for the rest.
+    const limitRows = (table: HTMLTableElement) => {
+      const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>(":scope > tbody > tr"));
+      const shown = visibleRowCounts.get(table) || MOBILE_ROW_BATCH;
+      if (rows.length <= MOBILE_ROW_BATCH) {
+        rows.forEach((row) => row.removeAttribute("data-mobile-hidden"));
+        removeMoreButton(table);
+        return;
+      }
+      rows.forEach((row, index) => {
+        const keep = index < shown || row.getAttribute("aria-selected") === "true" || row.dataset.selected === "true";
+        if (keep) row.removeAttribute("data-mobile-hidden");
+        else row.setAttribute("data-mobile-hidden", "true");
+      });
+      const hidden = rows.filter((row) => row.getAttribute("data-mobile-hidden") === "true").length;
+      let button = table.nextElementSibling as HTMLButtonElement | null;
+      if (!button || !button.classList.contains("ims-mobile-more")) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.className = "ims-mobile-more";
+        button.addEventListener("click", () => {
+          visibleRowCounts.set(table, (visibleRowCounts.get(table) || MOBILE_ROW_BATCH) + MOBILE_ROW_BATCH);
+          scheduleScan();
+        });
+        table.insertAdjacentElement("afterend", button);
+      }
+      if (!hidden) {
+        button.remove();
+        return;
+      }
+      const label = `Show ${Math.min(MOBILE_ROW_BATCH, hidden)} more (${hidden} not shown)`;
+      if (button.textContent !== label) button.textContent = label;
     };
 
     const enhanceTable = (table: HTMLTableElement) => {
@@ -57,6 +103,7 @@ export function MobileTableEnhancer({ routeKey }: { routeKey: string }) {
         });
         cells[0].appendChild(toggle);
       });
+      limitRows(table);
     };
 
     const scan = () => {

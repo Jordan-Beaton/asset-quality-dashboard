@@ -36,6 +36,8 @@ import { MocLivePreview, MocStageBar, MocViewToggle, computeMocChecks } from "..
 import type { MocStage, MocViewMode } from "../../src/components/MocWorkbench";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlState } from "../../src/lib/useUrlState";
+import { openFileUrl, saveBlobAsFile } from "../../src/lib/fileOpen";
+import { uploadContentType } from "../../src/lib/fileTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -266,11 +268,16 @@ const allowedMocAttachmentExtensions = [
   ".docx",
   ".xls",
   ".xlsx",
+  ".xlsm",
+  ".ppt",
+  ".pptx",
   ".csv",
   ".png",
   ".jpg",
   ".jpeg",
   ".webp",
+  ".heic",
+  ".heif",
   ".txt",
 ] as const;
 
@@ -1535,7 +1542,7 @@ function MOCPageContent() {
 
         const { error: uploadError } = await supabase.storage
           .from(MOC_ATTACHMENT_BUCKET)
-          .upload(filePath, file, { cacheControl: "3600", upsert: false });
+          .upload(filePath, file, { contentType: uploadContentType(file), cacheControl: "3600", upsert: false });
         if (uploadError) throw new Error(uploadError.message);
 
         uploadedPaths.push(filePath);
@@ -1573,7 +1580,7 @@ function MOCPageContent() {
         .from(MOC_ATTACHMENT_BUCKET)
         .createSignedUrl(file.file_path, 60 * 60 * 24 * 180);
       if (error || !data?.signedUrl) throw new Error(error?.message || "Could not create file link.");
-      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      openFileUrl(data.signedUrl);
     } catch (error) {
       showMessage(`Could not open attachment: ${getErrorMessage(error)}`, "error");
     } finally {
@@ -2538,7 +2545,7 @@ function MOCPageContent() {
 
         const { error: uploadError } = await supabase.storage
           .from(MOC_ATTACHMENT_BUCKET)
-          .upload(filePath, file, {
+          .upload(filePath, file, { contentType: uploadContentType(file),
             cacheControl: "3600",
             upsert: false,
           });
@@ -2590,7 +2597,7 @@ function MOCPageContent() {
         throw new Error(error?.message || "Could not create file link.");
       }
 
-      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      openFileUrl(data.signedUrl);
     } catch (error) {
       showMessage(`Could not open attachment: ${getErrorMessage(error)}`, "error");
     } finally {
@@ -3901,12 +3908,7 @@ function MOCPageContent() {
       });
 
       const blob = await Packer.toBlob(document);
-      const url = URL.createObjectURL(blob);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = `${report.moc_report_no || "MOC"}-${sanitizeFileName(report.moc_report_title || "Management-of-Change")}.docx`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveBlobAsFile(blob, `${report.moc_report_no || "MOC"}-${sanitizeFileName(report.moc_report_title || "Management-of-Change")}.docx`);
       showMessage(`Generated Word circulation copy for ${report.moc_report_no}.`, "success");
     } catch (error) {
       showMessage(`Word export failed: ${getErrorMessage(error)}`, "error");

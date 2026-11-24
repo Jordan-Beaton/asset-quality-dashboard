@@ -9,6 +9,7 @@ import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
+import { openOrSaveBlob, saveBlobAsFile } from "../../../src/lib/fileOpen";
 
 export const dynamic = "force-dynamic";
 
@@ -675,9 +676,8 @@ export default function HseReportsPage() {
 
       const filename = `HSE-Monthly-Management-Report-${monthLabel.replace(/\s+/g, "-")}.pdf`;
       const pdfBlob = doc.output("blob");
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      window.open(pdfUrl, "_blank", "noopener,noreferrer");
-      doc.save(filename);
+      const pdfFileName = filename;
+      if (openOrSaveBlob(pdfBlob, pdfFileName)) saveBlobAsFile(pdfBlob, pdfFileName);
       setMessage(`Generated PDF for ${monthLabel}.`);
     } catch (error) {
       setMessage(error instanceof Error ? `PDF generation failed: ${error.message}` : "PDF generation failed.");

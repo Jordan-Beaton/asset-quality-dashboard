@@ -9,6 +9,7 @@ import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
+import { openOrSaveBlob, saveBlobAsFile } from "../../src/lib/fileOpen";
 
 type Ncr = {
   id: string;
@@ -1062,9 +1063,8 @@ export default function ReportsPage() {
       }
 
       const pdfBlob = doc.output("blob");
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      window.open(pdfUrl, "_blank", "noopener,noreferrer");
-      doc.save(`${reportTitle.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-")}.pdf`);
+      const pdfFileName = `${reportTitle.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-")}.pdf`;
+      if (openOrSaveBlob(pdfBlob, pdfFileName)) saveBlobAsFile(pdfBlob, pdfFileName);
       setMessage("Monthly management report PDF generated successfully.");
     } catch (error) {
       console.error(error);

@@ -10,6 +10,7 @@ import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
+import { openOrSaveBlob, saveBlobAsFile } from "../../../src/lib/fileOpen";
 
 type Asset = {
   id: string;
@@ -1024,9 +1025,8 @@ export default function AssetReportsPage() {
       }
 
       const pdfBlob = doc.output("blob");
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      window.open(pdfUrl, "_blank", "noopener,noreferrer");
-      doc.save(`${reportTitle.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-")}.pdf`);
+      const pdfFileName = `${reportTitle.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-")}.pdf`;
+      if (openOrSaveBlob(pdfBlob, pdfFileName)) saveBlobAsFile(pdfBlob, pdfFileName);
       setMessage("Asset Monthly Report PDF generated successfully.");
     } catch (error) {
       console.error(error);

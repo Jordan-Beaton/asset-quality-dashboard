@@ -11,6 +11,8 @@ import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
+import { openFileUrl } from "../../src/lib/fileOpen";
+import { IMS_DOCUMENT_ACCEPT, uploadContentType } from "../../src/lib/fileTypes";
 
 type DocumentStatus =
   | "Draft"
@@ -1597,7 +1599,7 @@ function DocumentsPageContent() {
       return;
     }
 
-    window.open(signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(signedUrl);
   }
 
   async function addDocument(e: React.FormEvent) {
@@ -2357,7 +2359,7 @@ function DocumentsPageContent() {
         }
       }
 
-      const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+      const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: uploadContentType(file),
         upsert: true,
       });
 
@@ -3189,7 +3191,7 @@ function DocumentsPageContent() {
           </section>
 
           {/* People coverage strip */}
-          <section style={{ background: "#FFFFFF", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "16px 20px", display: "flex", gap: "0", alignItems: "flex-start", marginBottom: "20px" }}>
+          <section style={{ background: "#FFFFFF", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "16px 20px", display: "flex", flexWrap: "wrap", gap: "14px 0", alignItems: "flex-start", marginBottom: "20px" }}>
             {[
               { label: "Originator set", count: originatorSetCount, color: "#005670" },
               { label: "Reviewer set", count: reviewerSetCount, color: "#005670" },
@@ -3199,7 +3201,8 @@ function DocumentsPageContent() {
               <div
                 key={label}
                 style={{
-                  flex: 1,
+                  flex: "1 1 150px",
+                  minWidth: 0,
                   paddingLeft: i === 0 ? 0 : "20px",
                   paddingRight: i === arr.length - 1 ? 0 : "20px",
                   borderLeft: accent ? "1px solid #D0D0CE" : "none",
@@ -4193,7 +4196,7 @@ function DocumentsPageContent() {
                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                         <label className="audit-upload-label" style={uploadButtonStyle}>
                           {isUploadingFile ? "Uploading..." : "Upload new version"}
-                          <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" onChange={handleControlledFileUpload} style={{ display: "none" }} disabled={isUploadingFile || !canEditDocument} />
+                          <input type="file" accept={IMS_DOCUMENT_ACCEPT} onChange={handleControlledFileUpload} style={{ display: "none" }} disabled={isUploadingFile || !canEditDocument} />
                         </label>
                         <button type="button" style={secondaryButtonStyle} onClick={issueNextRevision} disabled={!canEditDocument}>
                           Up-rev to {getNextRevision(selectedDocument.current_revision || "A")}

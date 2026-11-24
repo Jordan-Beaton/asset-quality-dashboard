@@ -19,6 +19,7 @@ import {
   wrapCaseKeyForHandler,
   wrapCaseKeyForReporter,
 } from "../../src/lib/speakUpCrypto";
+import { saveBlobAsFile } from "../../src/lib/fileOpen";
 
 type Stage = "landing" | "mode" | "form" | "sending" | "done" | "lookup" | "case";
 
@@ -131,14 +132,7 @@ function formatReference(input: string) {
 }
 
 function saveBytes(name: string, bytes: Uint8Array) {
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/octet-stream" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+  saveBlobAsFile(new Blob([bytes as BlobPart], { type: "application/octet-stream" }), name);
 }
 
 function formatDate(value: string | null) {

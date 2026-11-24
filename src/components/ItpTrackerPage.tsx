@@ -24,6 +24,8 @@ import {
   type WorkflowRevision,
   type WorkflowState,
 } from "../lib/itpWorkflow";
+import { openFileUrl } from "../lib/fileOpen";
+import { uploadContentType } from "../lib/fileTypes";
 
 const STORAGE_BUCKET = "project-documents";
 
@@ -412,7 +414,7 @@ export function ItpTrackerPage({ projectKey }: { projectKey: string }) {
       const sourceFile = file;
       const safeName = sourceFile.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
       uploadedPath = `${projectKey}/${itpId}/${Date.now()}-${safeName}`;
-      const upload = await supabase.storage.from(STORAGE_BUCKET).upload(uploadedPath, sourceFile, { contentType: sourceFile.type || undefined, upsert: false });
+      const upload = await supabase.storage.from(STORAGE_BUCKET).upload(uploadedPath, sourceFile, { contentType: uploadContentType(sourceFile), upsert: false });
       if (upload.error) throw upload.error;
       const { data: insertedRevision, error: revisionError } = await supabase.from("project_itp_revisions").insert({
         itp_id: itpId,
@@ -485,7 +487,7 @@ export function ItpTrackerPage({ projectKey }: { projectKey: string }) {
   async function openFile(revision: Revision) {
     const { data, error } = await supabase.storage.from(STORAGE_BUCKET).createSignedUrl(revision.file_path, 60 * 60 * 24 * 180);
     if (error) setMessage(error.message);
-    else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    else openFileUrl(data.signedUrl);
   }
 
   const stageColour: Record<WorkflowState, string> = { "With Supplier": "#F93822", "Awaiting Review": "#FFAD00", "Awaiting Approval": "#FFAD00", Approved: "#005670" };

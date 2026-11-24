@@ -19,6 +19,8 @@ import {
 } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
+import { openFileUrl } from "../../../src/lib/fileOpen";
+import { IMS_DOCUMENT_ACCEPT, uploadContentType } from "../../../src/lib/fileTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -182,7 +184,7 @@ async function uploadMaintenanceFile(assetId: string, file: File) {
   const path = `Maintenance/${assetId}/${Date.now()}-${safeName}`;
   const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
     upsert: false,
-    contentType: file.type || undefined,
+    contentType: uploadContentType(file),
   });
   if (error) throw new Error(error.message);
   return path;
@@ -479,7 +481,7 @@ function MaintenancePageContent() {
         setMessage("Unable to open maintenance file.");
         return;
       }
-      window.open(url, "_blank", "noopener,noreferrer");
+      openFileUrl(url);
       setMessage("Maintenance file opened.");
     } finally {
       setOpeningId("");
@@ -797,7 +799,7 @@ function MaintenancePageContent() {
                 <div style={uploadControlWrapStyle}>
                   <input
                     type="file"
-                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                    accept={IMS_DOCUMENT_ACCEPT}
                     onChange={(e) =>
                       setNewMaintenance((prev) => ({
                         ...prev,

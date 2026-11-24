@@ -29,6 +29,8 @@ import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
+import { saveBlobAsFile } from "../../../src/lib/fileOpen";
+import { IMS_EVIDENCE_ACCEPT, uploadContentType } from "../../../src/lib/fileTypes";
 
 type PtwView = "dashboard" | "register" | "create" | "template";
 type YesNo = "" | "Yes" | "No";
@@ -296,12 +298,7 @@ function sanitizeFileName(value: string) {
 }
 
 function downloadBlob(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  saveBlobAsFile(blob, fileName);
 }
 
 function formatDateForReport(value: string) {
@@ -667,7 +664,7 @@ export default function HsePermitToWorkPage() {
     for (const item of files) {
       const safeName = `${Date.now()}-${sanitizeFileName(item.file.name)}`;
       const path = `hse-ptw/${ptwId}/${safeName}`;
-      const upload = await supabase.storage.from(evidenceBucket).upload(path, item.file, { upsert: false, contentType: item.file.type || undefined });
+      const upload = await supabase.storage.from(evidenceBucket).upload(path, item.file, { upsert: false, contentType: uploadContentType(item.file) });
       if (upload.error) {
         setStatusMessage(`PTW attachment upload failed: ${upload.error.message}`);
         return false;
@@ -1953,7 +1950,7 @@ export default function HsePermitToWorkPage() {
                           <input
                             type="file"
                             multiple
-                            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                            accept={IMS_EVIDENCE_ACCEPT}
                             style={{ display: "none" }}
                             disabled={uploadingAttachment === attachmentType}
                             onChange={(event) => void handleAttachmentUpload(attachmentType, event)}

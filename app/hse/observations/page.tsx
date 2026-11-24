@@ -37,6 +37,7 @@ import {
   type ObservationReportSort,
 } from "../../../src/lib/observationReportPdf";
 import { downloadRegisterExcel, excelDateStamp } from "../../../src/lib/registerExcel";
+import { openFileUrl } from "../../../src/lib/fileOpen";
 
 export const dynamic = "force-dynamic";
 
@@ -551,7 +552,7 @@ export default function HseObservationsPage() {
       setMessage(`Evidence link failed: ${error?.message || "No link returned"}`);
       return;
     }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    openFileUrl(data.signedUrl);
   }
 
   const createActionHref = selectedRecord
