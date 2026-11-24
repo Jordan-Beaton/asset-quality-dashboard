@@ -5,11 +5,11 @@ import {
   eyebrow, h2Style, h3Style, pStyle, codeStyle,
   stepList, Step, callout,
   mockPanel, mockHero, mockHeroEyebrow, mockLabel, flowWrap, flowStep, arrow,
-  mockInput, mockFieldLabel, mockRow, mockField, btn, pill,
+  mockInput, mockFieldLabel, mockRow, mockField, btn, pill, tintPill, RecordScreenMock,
 } from "./guideKit";
 
 type SectionKey =
-  | "overview" | "dashboard" | "create" | "programme" | "documents"
+  | "overview" | "dashboard" | "create" | "programme" | "recordscreen" | "documents"
   | "raise" | "manage" | "wordloop" | "reports" | "statuses" | "faq";
 
 const sections: GuideSectionDef[] = [
@@ -17,6 +17,7 @@ const sections: GuideSectionDef[] = [
   { key: "dashboard",  label: "Dashboard",                    group: "Getting Started" },
   { key: "create",     label: "Creating an Audit",            group: "Audit Programme" },
   { key: "programme",  label: "The Audit Programme",          group: "Audit Programme" },
+  { key: "recordscreen", label: "The record screen",          group: "Audit Programme" },
   { key: "documents",  label: "Documents & Linked Items",     group: "Audit Programme" },
   { key: "raise",      label: "Raising a Finding",            group: "Findings" },
   { key: "manage",     label: "Managing & Closing Findings",  group: "Findings" },
@@ -27,24 +28,23 @@ const sections: GuideSectionDef[] = [
 ];
 
 function badge(status: string): CSSProperties {
-  const map: Record<string, { bg: string; color: string }> = {
-    planned:       { bg: imsColours.page,        color: imsColours.brand },
-    "in progress": { bg: imsColours.warning,     color: "#ffffff" },
-    completed:     { bg: imsColours.brand,       color: "#ffffff" },
-    overdue:       { bg: imsColours.danger,      color: "#ffffff" },
-    cancelled:     { bg: imsColours.page,        color: imsColours.muted },
-    open:          { bg: imsColours.warning,     color: "#ffffff" },
-    closed:        { bg: imsColours.brand,       color: "#ffffff" },
-    major:         { bg: imsColours.danger,      color: "#ffffff" },
-    minor:         { bg: imsColours.warning,     color: "#ffffff" },
-    ofi:           { bg: imsColours.brandAccent, color: "#ffffff" },
-    obs:           { bg: imsColours.page,        color: imsColours.muted },
-    increase:      { bg: imsColours.danger,      color: "#ffffff" },
-    maintain:      { bg: imsColours.page,        color: imsColours.ink },
-    reduce:        { bg: imsColours.brand,       color: "#ffffff" },
+  const map: Record<string, "ok" | "warn" | "bad" | "neu" | "brand"> = {
+    planned: "neu",
+    "in progress": "brand",
+    completed: "ok",
+    overdue: "bad",
+    cancelled: "neu",
+    open: "warn",
+    closed: "ok",
+    major: "bad",
+    minor: "warn",
+    ofi: "brand",
+    obs: "neu",
+    increase: "bad",
+    maintain: "neu",
+    reduce: "ok",
   };
-  const t = map[status.toLowerCase()] || map.planned;
-  return pill(t.bg, t.color);
+  return tintPill(map[status.toLowerCase()] || "neu");
 }
 
 function SectionOverview() {
@@ -68,9 +68,9 @@ function SectionOverview() {
         <tbody>
           {[
             ["Dashboard", "Totals for audits and findings, a chart of findings by audit type, and the Top 5 Problem Audits / Areas."],
-            ["Audit Programme", "The register of all audits. Open one to edit it, upload documents, link NCRs and Actions, and raise or edit findings."],
+            ["Audit Programme", "The register of all audits. Open one to see its record screen: plan it, send findings out as Word, raise findings, then close it out with its report and linked items."],
             ["Create Audit", "Add a new audit to the programme."],
-            ["Findings", "Every Open Finding (or Closed Finding) across all audits in one list, with filters and an edit panel."],
+            ["Findings", "Every Open Finding (or Closed Finding) across all audits in one list, with a search box, filters, Export PDF, Export Excel and an edit panel."],
             ["Reports", "Generate Open, Closed, Custom and Programme Snapshot reports as PDF or Word."],
           ].map(([a, b]) => (
             <tr key={a}>
@@ -201,15 +201,15 @@ function SectionProgramme() {
       </div>
       <h3 style={h3Style}>Finding the audit you want</h3>
       <div style={stepList}>
-        <Step n={1}>Type in the search box. It searches audit number, title, lead auditor, location, standards, procedure reference, certification body and any linked NCR or Action number.</Step>
+        <Step n={1}>Type in the search box. It searches audit number, title, lead auditor, location, standards, procedure reference, certification body and any linked NCR or Action number. The buttons beside it, left to right, are <strong>Clear Filters</strong>, <strong>Export PDF</strong>, <strong>Export Excel</strong> and <strong>Show Filters</strong>.</Step>
         <Step n={2}>Click <strong>Show Filters</strong> to filter by <code style={codeStyle}>All Status</code>, <code style={codeStyle}>All Types</code> and <code style={codeStyle}>All Months</code>. Click <strong>Hide Filters</strong> to tuck them away again.</Step>
         <Step n={3}>Use the sort chips (<strong>Scheduled</strong>, <strong>Audit No.</strong>, <strong>Title</strong>, <strong>Type</strong>, <strong>Lead</strong>, <strong>Findings</strong>). Click a chip again to reverse the order.</Step>
-        <Step n={4}>Click a row. The <strong>Audit Detail</strong> panel opens underneath. <strong>Hide Panel</strong> closes it.</Step>
+        <Step n={4}>Click a row. The <strong>Audit Detail</strong> panel opens underneath with the record screen (see The record screen). <strong>Hide Panel</strong> closes it.</Step>
       </div>
-      <p style={pStyle}>The line above the list shows how many audits match, for example <em>Showing 8 of 40 audits</em>. <strong>Download PDF</strong> beside it saves the programme list as a PDF.</p>
+      <p style={pStyle}>The line above the list shows how many audits match, for example <em>Showing 8 of 40 audits</em>. <strong>Export PDF</strong> saves the audits currently shown as a PDF, and <strong>Export Excel</strong> downloads them as a workbook. Both follow your search and filters.</p>
       <h3 style={h3Style}>Editing an audit</h3>
-      <p style={pStyle}>In the Audit Detail panel, the <strong>Audit Record</strong> section holds the same fields as Create Audit (the Audit Number is fixed). Change what you need and click <strong>Save Audit Changes</strong>. Changing the Audit Date also updates the Audit Month for you.</p>
-      <p style={pStyle}>The buttons under the Audit Record are <strong>Save Audit Changes</strong>, <strong>Generate PDF Report</strong> (a one-audit report with the audit details and findings summary), <strong>Raise Finding</strong> and <strong>Delete Audit</strong>. Deleting asks you to confirm and also removes the audit&apos;s uploaded files.</p>
+      <p style={pStyle}>In the Audit Detail panel, step 1 <strong>Plan</strong> holds the <strong>Audit Record</strong> section with the same fields as Create Audit (the Audit Number is fixed). Change what you need and click <strong>Save Audit Changes</strong>. Changing the Audit Date also updates the Audit Month for you.</p>
+      <p style={pStyle}>Under the Audit Record are <strong>Save Audit Changes</strong> and <strong>Delete Audit</strong>. Deleting asks you to confirm and also removes the audit&apos;s uploaded files. <strong>Raise Finding</strong> is in step 3 <strong>Findings</strong>, and <strong>Generate PDF Report</strong> (a one-audit report with the audit details and findings summary) is in step 4 <strong>Close-out</strong>.</p>
       <h3 style={h3Style}>Risk Score and Frequency Outcome</h3>
       <p style={pStyle}>These help decide how often an area needs auditing. The score starts at 1 and adds <strong>5</strong> for each Major finding, <strong>3</strong> for each Minor, <strong>1</strong> for each OFI or OBS, and <strong>2</strong> for each repeat finding (a finding whose description matches another finding anywhere in the audit records).</p>
       <table style={imsTableStyle}>
@@ -230,15 +230,64 @@ function SectionProgramme() {
   );
 }
 
+function SectionRecordScreen() {
+  return (
+    <>
+      <div style={eyebrow}>Audit Programme</div>
+      <h2 style={h2Style}>The record screen</h2>
+      <p style={pStyle}>Click an audit in the Audit Programme and the <strong>Audit Detail</strong> panel opens on the <strong>record screen</strong>. It holds everything that used to be in one long panel, split into four steps.</p>
+      <RecordScreenMock
+        id="INT-26-004"
+        title="Document control"
+        status="In Progress"
+        tone="brand"
+        nextButton="Mark Completed"
+        track={["Planned", "In Progress", "Completed"]}
+        steps={[
+          { label: "Plan", pct: 100 },
+          { label: "Conduct", pct: 50 },
+          { label: "Findings", pct: 33 },
+          { label: "Close-out", pct: 25 },
+        ]}
+        active={1}
+        missing={["1 finding still open", "Audit report not uploaded"]}
+        gate="this audit is completed"
+        summaryTitle="Audit report"
+        summaryRows={[["Number", "INT-26-004"], ["Lead auditor", "A. Person"], ["Report upload", null]]}
+      />
+      <h3 style={h3Style}>The header</h3>
+      <p style={pStyle}>The top shows the audit number, title and status, a track reading Planned, In Progress, Completed, and the <strong>Mark Completed</strong> button next to <strong>Hide Panel</strong>. The track marks the status saved on the audit; an audit saved as Overdue or Cancelled has no step marked. Mark Completed is hidden once the audit is Completed or Cancelled, and needs Edit permission. If you can view the audit but not change it, the header says so.</p>
+      <h3 style={h3Style}>The four steps</h3>
+      <div style={stepList}>
+        <Step n={1}><strong>Plan</strong> (type, lead, dates, status): the Audit Record fields, <strong>Save Audit Changes</strong> and <strong>Delete Audit</strong>.</Step>
+        <Step n={2}><strong>Conduct</strong> (Word loop): each finding with its Word returned tag and the <strong>Generate Word report</strong> and <strong>Upload completed Word</strong> buttons.</Step>
+        <Step n={3}><strong>Findings</strong> (classes, owners, status): the Major, Minor, OFI and OBS counts, <strong>Raise Finding</strong>, <strong>Open Findings tab (all audits)</strong> and the Findings Register.</Step>
+        <Step n={4}><strong>Close-out</strong> (report, links, frequency): risk score, frequency outcome, closure dates, <strong>Save Audit Changes</strong>, <strong>Generate PDF Report</strong>, Audit Documents and Linked Items.</Step>
+      </div>
+      <p style={pStyle}>Each step shows a percentage. Plan counts the title, auditee, lead auditor, audit date and standards. Conduct counts whether the audit is In Progress or Completed and, once findings exist, whether each has a returned Word. Findings counts how many findings are Closed with a closure date, and reads <em>None raised</em> until you raise one. Close-out counts Completed status, no open findings, an uploaded audit document, and a closure date on every closed finding. The screen opens on the first step below 100%.</p>
+      <h3 style={h3Style}>Still missing</h3>
+      <p style={pStyle}>A box lists what is still missing before the audit is completed, as chips such as Lead auditor, <em>1 finding still open</em>, <em>Completed Word not returned for 2 open findings</em>, <em>Closure date required on 1 closed finding</em> or <em>Audit report not uploaded</em>. Click a chip to jump to the step that holds it.</p>
+      <div style={callout("info")}>
+        <span>ℹ</span>
+        <div>The chips warn, they never block. If you click <strong>Mark Completed</strong> with items missing you are asked &ldquo;N items are still missing: ... Mark completed anyway?&rdquo; and can carry on. Mark Completed saves the audit with the status Completed, the same save as Save Audit Changes.</div>
+      </div>
+      <h3 style={h3Style}>Form, Split and Audit report</h3>
+      <p style={pStyle}><strong>Form</strong> shows only the fields, <strong>Split</strong> (the default) shows them beside the live <strong>Audit report</strong> summary, and <strong>Audit report</strong> shows the summary on its own. The summary lists the audit details, a findings summary and the outcome. Blanks show as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
+      <h3 style={h3Style}>All sections</h3>
+      <p style={pStyle}>The <strong>All sections</strong> button shows every section on one long page, as the Audit Detail panel used to. Click it again to return to one step at a time.</p>
+    </>
+  );
+}
+
 function SectionDocuments() {
   return (
     <>
       <div style={eyebrow}>Audit Programme</div>
       <h2 style={h2Style}>Documents & Linked Items</h2>
       <h3 style={h3Style}>Audit Documents</h3>
-      <p style={pStyle}>At the top of the Audit Detail panel you can attach the signed or issued audit report and anything else that belongs to the audit.</p>
+      <p style={pStyle}>In step 4 <strong>Close-out</strong> of the Audit Detail panel you can attach the signed or issued audit report and anything else that belongs to the audit.</p>
       <div style={stepList}>
-        <Step n={1}>Open the audit from the Audit Programme.</Step>
+        <Step n={1}>Open the audit from the Audit Programme and go to step 4 <strong>Close-out</strong>.</Step>
         <Step n={2}>Click <strong>Upload document</strong> and choose the file. PDF, Word, Excel, PowerPoint and photos are all accepted (plus CSV and plain text). On a phone you can pick a photo from your gallery.</Step>
         <Step n={3}>The file appears in the list with its size and upload time. Use <strong>Open / View</strong> to view it or <strong>Remove</strong> to delete it.</Step>
       </div>
@@ -246,7 +295,7 @@ function SectionDocuments() {
       <h3 style={h3Style}>Linked NCRs and Actions</h3>
       <p style={pStyle}>Link an audit to the NCRs and Actions that came out of it so anyone can trace between them.</p>
       <div style={stepList}>
-        <Step n={1}>In <strong>Linked Items</strong>, choose a record in <code style={codeStyle}>Add Linked NCR</code> (<em>Select NCR</em>) or <code style={codeStyle}>Add Linked Action</code> (<em>Select Action</em>).</Step>
+        <Step n={1}>In <strong>Linked Items</strong> (also in step 4 <strong>Close-out</strong>), choose a record in <code style={codeStyle}>Add Linked NCR</code> (<em>Select NCR</em>) or <code style={codeStyle}>Add Linked Action</code> (<em>Select Action</em>).</Step>
         <Step n={2}>Click <strong>+ Add</strong>. It is saved straight away and appears under <strong>Linked NCRs</strong> or <strong>Linked Actions</strong>.</Step>
         <Step n={3}>Click a linked number to open it in the NCR / CAPA or Actions page. Click the <strong>×</strong> beside it to unlink it.</Step>
       </div>
@@ -263,7 +312,7 @@ function SectionRaise() {
     <>
       <div style={eyebrow}>Findings</div>
       <h2 style={h2Style}>Raising a Finding</h2>
-      <p style={pStyle}>A finding is raised against a single audit, from that audit&apos;s Audit Detail panel.</p>
+      <p style={pStyle}>A finding is raised against a single audit, from step 3 <strong>Findings</strong> of that audit&apos;s Audit Detail panel.</p>
       <div style={mockPanel}>
         <div style={mockLabel}>Raise Finding</div>
         <div style={mockRow}>
@@ -282,7 +331,7 @@ function SectionRaise() {
         <span style={btn("primary")}>Save Finding</span> <span style={btn("ghost")}>Cancel</span>
       </div>
       <div style={stepList}>
-        <Step n={1}>In the Audit Programme, open the audit and click <strong>Raise Finding</strong>.</Step>
+        <Step n={1}>In the Audit Programme, open the audit, go to step 3 <strong>Findings</strong> and click <strong>Raise Finding</strong>.</Step>
         <Step n={2}>Choose the <code style={codeStyle}>Category</code> (see below) and enter the <code style={codeStyle}>Clause / Reference</code>, for example the ISO clause the finding relates to. The <code style={codeStyle}>Reference</code> (F-001, F-002 and so on) is given automatically.</Step>
         <Step n={3}>Write the <code style={codeStyle}>Description</code> as the finding statement plus the objective evidence.</Step>
         <Step n={4}>Choose the <code style={codeStyle}>Owner</code> from the list. If you leave it empty, the Auditee is used. Set the <code style={codeStyle}>Due Date</code>.</Step>
@@ -316,13 +365,16 @@ function SectionManage() {
       <h2 style={h2Style}>Managing & Closing Findings</h2>
       <p style={pStyle}>There are two places to work on findings. Both change the same records.</p>
       <h3 style={h3Style}>1. The Findings Register inside an audit</h3>
-      <p style={pStyle}>In the Audit Detail panel, the <strong>Findings Register</strong> shows a card for each finding. Change any field and it <strong>saves automatically</strong> a moment later, and the Status banner says <em>Finding changes saved.</em> There is no Save button on these cards.</p>
+      <p style={pStyle}>In the Audit Detail panel, step 3 <strong>Findings</strong> has a <strong>Findings Register</strong> that shows a card for each finding. Change any field and it <strong>saves automatically</strong> a moment later, and the Status banner says <em>Finding changes saved.</em> There is no Save button on these cards.</p>
       <h3 style={h3Style}>2. The Findings tab</h3>
       <div style={mockPanel}>
         <div style={mockLabel}>Findings — Open Findings</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+          <span style={{ ...mockInput, width: 220 }}>Search finding ref, audit, owner...</span>
+          <span style={btn("ghost")}>Clear Filters</span>
+          <span style={btn("primary")}>Export PDF</span>
+          <span style={btn("ghost")}>Export Excel</span>
           <span style={btn("primary")}>Show Filters</span>
-          <span style={btn("primary")}>Generate Open Audit NCR Report</span>
           <span style={btn("ghost")}>Back to Audit Register</span>
         </div>
         <table style={imsTableStyle}>
@@ -349,7 +401,7 @@ function SectionManage() {
           </tbody>
         </table>
       </div>
-      <p style={pStyle}>This tab lists every open finding across all audits (or every closed finding, if you came from <strong>Closed Findings</strong>). Click <strong>Show Filters</strong> to narrow the list by <code style={codeStyle}>All Audit Types</code>, <code style={codeStyle}>All Categories</code> and <code style={codeStyle}>All Audit Titles</code>; <strong>Clear Filters</strong> resets them. Click a row to open the edit panel underneath.</p>
+      <p style={pStyle}>This tab lists every open finding across all audits (or every closed finding, if you came from <strong>Closed Findings</strong>). Use the search box to find a finding by reference, audit, description, owner or root cause. Click <strong>Show Filters</strong> to narrow the list by <code style={codeStyle}>All Audit Types</code>, <code style={codeStyle}>All Categories</code> and <code style={codeStyle}>All Audit Titles</code>; <strong>Clear Filters</strong> resets them. <strong>Export PDF</strong> saves the findings currently shown as a PDF (the Open or Closed Audit NCR Report, depending on the view) and <strong>Export Excel</strong> downloads them as a workbook. Click a row to open the edit panel underneath.</p>
       <div style={stepList}>
         <Step n={1}>Click the finding. Update <code style={codeStyle}>Category</code>, <code style={codeStyle}>Status</code>, <code style={codeStyle}>Clause / Reference</code>, <code style={codeStyle}>Owner</code>, <code style={codeStyle}>Due Date</code>, <code style={codeStyle}>Closure Date</code>, <code style={codeStyle}>Description</code>, <code style={codeStyle}>Root Cause</code>, <code style={codeStyle}>Containment Action</code> and <code style={codeStyle}>Corrective Action</code>.</Step>
         <Step n={2}>Click <strong>Save Finding</strong> (this panel does need the button).</Step>
@@ -392,9 +444,9 @@ function SectionWordLoop() {
         <div style={flowStep(true)}>Approve Updates</div>
       </div>
       <div style={stepList}>
-        <Step n={1}>Open the finding (in the audit or in the Findings tab), open <strong>More options ···</strong> and choose <strong>Generate Word report</strong>. A <code style={codeStyle}>.docx</code> file is saved. This also works on a phone.</Step>
+        <Step n={1}>Open the finding (in the audit or in the Findings tab), open <strong>More options ···</strong> and choose <strong>Generate Word report</strong>. A <code style={codeStyle}>.docx</code> file is saved. This also works on a phone. In the audit, step 2 <strong>Conduct</strong> lists every finding with <strong>Generate Word report</strong> and <strong>Upload completed Word</strong> buttons and a <em>Word returned</em> or <em>Word not returned</em> tag, so you can run the whole Word loop from there.</Step>
         <Step n={2}>Send it to the owner. They fill in <strong>Owner</strong>, <strong>Status</strong>, <strong>Due Date</strong>, <strong>Closure Date</strong>, <strong>Root Cause</strong>, <strong>Containment Action</strong> and <strong>Corrective Action</strong> in the Word file and send it back. They should not change the labels or the Finding Ref.</Step>
-        <Step n={3}>Open the same finding, open <strong>More options ···</strong> and choose <strong>Upload completed Word</strong>. Pick the returned file.</Step>
+        <Step n={3}>Open the same finding, open <strong>More options ···</strong> and choose <strong>Upload completed Word</strong> (or use the button in step 2 <strong>Conduct</strong>). Pick the returned file.</Step>
         <Step n={4}>A <strong>Returned finding review</strong> box appears. For each field that differs it shows <strong>Current IMS</strong> beside <strong>Returned Word</strong>.</Step>
         <Step n={5}>Click <strong>Approve Updates</strong> to apply the changes, or <strong>Discard</strong> to throw the upload away.</Step>
       </div>
@@ -463,7 +515,7 @@ function SectionReports() {
         <Step n={4}>Or click <strong>Generate Word</strong> / <strong>Generate PDF</strong> to save the selection as a file.</Step>
       </div>
       <h3 style={h3Style}>Other exports</h3>
-      <p style={pStyle}><strong>Download PDF</strong> in the Audit Programme saves the register. <strong>Generate PDF Report</strong> in an audit&apos;s detail saves that one audit with its findings summary. <strong>Generate PDF report</strong> and <strong>Generate Word report</strong> in a finding&apos;s More options menu save that one finding.</p>
+      <p style={pStyle}><strong>Export PDF</strong> and <strong>Export Excel</strong> in the Audit Programme and in the Findings tab save the rows currently shown. <strong>Generate PDF Report</strong> in step 4 <strong>Close-out</strong> of an audit saves that one audit with its findings summary. <strong>Generate PDF report</strong> and <strong>Generate Word report</strong> in a finding&apos;s More options menu save that one finding.</p>
     </>
   );
 }
@@ -542,6 +594,7 @@ const sectionComponents: Record<SectionKey, () => ReactElement> = {
   dashboard: SectionDashboard,
   create:    SectionCreate,
   programme: SectionProgramme,
+  recordscreen: SectionRecordScreen,
   documents: SectionDocuments,
   raise:     SectionRaise,
   manage:    SectionManage,

@@ -8,11 +8,15 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { ImsPermissionNotice, useImsPermissions } from "../../../src/components/ImsPermissions";
+import { ImsButton, ImsFilterPanel } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
+import { DocPreview, RecordHeader, RecordWorkbench, StatusPill as WorkbenchStatusPill, WorkbenchStep, percentDone, toneForStatus } from "../../../src/components/RecordWorkbench";
+import type { DocPreviewSection, WorkbenchStepDef } from "../../../src/components/RecordWorkbench";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 import { openFileUrl, openOrSaveBlob } from "../../../src/lib/fileOpen";
+import { downloadRegisterExcel, excelDateStamp } from "../../../src/lib/registerExcel";
 import { IMS_EVIDENCE_ACCEPT, uploadContentType } from "../../../src/lib/fileTypes";
 
 export const dynamic = "force-dynamic";
@@ -1271,7 +1275,8 @@ export default function HseInspectionsPage() {
     };
   }
 
-  async function saveInspection() {
+  // overrides lets the "Complete Inspection" button save with the status set to Complete: the same as choosing Complete in the Status box and pressing Save Inspection.
+  async function saveInspection(overrides: Partial<HseInspectionRecord> = {}) {
     if (selectedId) {
       if (!requireEditPermission("edit HSE inspections")) return;
     } else if (!requireCreatePermission("create HSE inspections")) {
@@ -1286,7 +1291,7 @@ export default function HseInspectionsPage() {
       return;
     }
     setSaving(true);
-    const payload = buildPayload({ ...draft, inspection_number: draft.inspection_number || nextInspectionNumber(records) });
+    const payload = buildPayload({ ...draft, ...overrides, inspection_number: draft.inspection_number || nextInspectionNumber(records) });
     if (selectedId) {
       const { error } = await supabase.from("hse_inspection_records").update(payload).eq("id", selectedId);
       setSaving(false);
@@ -1294,6 +1299,7 @@ export default function HseInspectionsPage() {
         setMessage(`Save failed: ${error.message}`);
         return;
       }
+      if (Object.keys(overrides).length) setDraft((current) => ({ ...current, ...overrides }));
       setMessage(`${draft.inspection_number} saved.`);
       await loadData();
       return;
@@ -1835,6 +1841,110 @@ export default function HseInspectionsPage() {
     setMessage(`Opened blank PDF for ${template.documentNumber}.`);
   }
 
+  // The register exports hold exactly the rows on screen, with the filters that produced them.
+  function registerFilterSummary() {
+    return [
+      ...(statusFilter ? [`Status: ${statusFilter}`] : []),
+      ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+    ];
+  }
+
+  function findingsCount(record: HseInspectionRecord) {
+    return Object.values(record.checklist_responses || {}).filter((response) => response.answer === "No").length;
+  }
+
+  async function exportRegisterExcel() {
+    if (!filteredRecords.length) {
+      setMessage("There are no inspections to export for the current filters.");
+      return;
+    }
+    try {
+      await downloadRegisterExcel<HseInspectionRecord>({
+        fileName: `inspection-register-${excelDateStamp()}.xlsx`,
+        sheetName: "Inspection Register",
+        title: "HSE Inspection Register - Enshore IMS",
+        filters: registerFilterSummary(),
+        rows: filteredRecords,
+        columns: [
+          { header: "Inspection No.", width: 16, value: (record) => record.inspection_number || "" },
+          { header: "Form No.", width: 18, value: (record) => record.form_number || "" },
+          { header: "Type", width: 34, value: (record) => record.form_title || "" },
+          { header: "Title", width: 36, value: (record) => record.title || "" },
+          { header: "Date", width: 13, value: (record) => displayDate(record.inspection_date) },
+          { header: "Status", width: 12, value: (record) => record.status || "" },
+          { header: "Department", width: 20, value: (record) => record.department || "" },
+          { header: "Project / Work Scope", width: 26, value: (record) => record.project_work_scope || "" },
+          { header: "Vessel / Spread", width: 22, value: (record) => record.vessel_spread || "" },
+          { header: "Area / Zone", width: 22, value: (record) => record.area_zone || "" },
+          { header: "Inspector", width: 22, value: (record) => record.inspector_name || "" },
+          { header: "Open Findings", width: 14, value: (record) => findingsCount(record) },
+          { header: "Evidence Files", width: 14, value: (record) => evidence.filter((file) => file.inspection_id === record.id).length },
+          { header: "Signed Off By", width: 22, value: (record) => record.signoff_name || "" },
+          { header: "Sign-off Date", width: 13, value: (record) => displayDate(record.signoff_date) },
+        ],
+      });
+      setMessage(`Inspection Excel register created with ${filteredRecords.length} inspection${filteredRecords.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? `The Excel register could not be created: ${error.message}` : "The Excel register could not be created.");
+    }
+  }
+
+  async function exportRegisterPdf() {
+    if (!filteredRecords.length) {
+      setMessage("There are no inspections to export for the current filters.");
+      return;
+    }
+    try {
+      const logoData = await getLogoDataUrl();
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      if (logoData) {
+        try {
+          doc.addImage(logoData, "PNG", 14, 8, 32, 16);
+        } catch {
+          // Keep the export working if the logo cannot be embedded.
+        }
+      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(0, 0, 0);
+      doc.text("HSE Inspection Register", 283, 16, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`Generated ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} - ${filteredRecords.length} inspection${filteredRecords.length === 1 ? "" : "s"}`, 283, 22, { align: "right" });
+      const filters = registerFilterSummary();
+      doc.text(filters.length ? `Filters: ${filters.join(" - ")}` : "Filters: none", 14, 31);
+      autoTable(doc, {
+        startY: 35,
+        theme: "grid",
+        margin: { left: 14, right: 14, bottom: 14 },
+        styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0], valign: "middle" },
+        headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
+        columnStyles: { 0: { fontStyle: "bold" } },
+        head: [["Inspection No.", "Type", "Area / Zone", "Inspector", "Date", "Status", "Open findings"]],
+        body: filteredRecords.map((record) => [
+          record.inspection_number || "",
+          record.form_title || "",
+          record.area_zone || record.vessel_spread || "",
+          record.inspector_name || "",
+          displayDate(record.inspection_date),
+          record.status || "",
+          String(findingsCount(record)),
+        ]),
+      });
+      const pages = doc.getNumberOfPages();
+      for (let page = 1; page <= pages; page += 1) {
+        doc.setPage(page);
+        doc.setFontSize(8);
+        doc.setTextColor(83, 86, 90);
+        doc.text(`Page ${page} of ${pages}`, 283, 203, { align: "right" });
+      }
+      openOrSaveBlob(doc.output("blob"), `inspection-register-${excelDateStamp()}.pdf`);
+      setMessage(`Inspection register PDF created with ${filteredRecords.length} inspection${filteredRecords.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? `The PDF could not be created: ${error.message}` : "The PDF could not be created.");
+    }
+  }
+
   return (
     <main style={isMobile ? mobileMainStyle : undefined}>
       {!isFieldCreateMode ? <ImsPermissionNotice /> : null}
@@ -1894,6 +2004,10 @@ export default function HseInspectionsPage() {
           onPersonSelect={selectPerson}
           onChecklistChange={updateChecklist}
           onSave={() => void saveInspection()}
+          onComplete={() => void saveInspection({ status: "Complete" })}
+          onClose={() => setSelectedId("")}
+          onExportPdf={() => void exportRegisterPdf()}
+          onExportExcel={() => void exportRegisterExcel()}
           onDelete={() => selected ? void deleteInspection(selected) : undefined}
           onUpload={(event) => void uploadEvidence(event, uploadItemNumber)}
           onUploadForItem={(itemNumber, event) => void uploadEvidence(event, itemNumber)}
@@ -1928,6 +2042,7 @@ export default function HseInspectionsPage() {
           onUploadItemNumberChange={setUploadItemNumber}
           onRemovePendingEvidence={removePendingEvidence}
           onSave={() => void saveInspection()}
+          onComplete={() => void saveInspection({ status: "Complete" })}
           canCreateInspection={canCreateInspection}
           isMobile={isMobile}
           isFieldCreateMode={isFieldCreateMode}
@@ -2064,6 +2179,10 @@ function RegisterView({
   onPersonSelect,
   onChecklistChange,
   onSave,
+  onComplete,
+  onClose,
+  onExportPdf,
+  onExportExcel,
   onDelete,
   onUpload,
   onUploadForItem,
@@ -2098,6 +2217,10 @@ function RegisterView({
   onPersonSelect: (value: string, target: "inspector" | "signoff") => void;
   onChecklistChange: (itemId: string, field: keyof ChecklistResponse, value: string) => void;
   onSave: () => void;
+  onComplete: () => void;
+  onClose: () => void;
+  onExportPdf: () => void;
+  onExportExcel: () => void;
   onDelete: () => void;
   onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onUploadForItem: (itemNumber: string, event: ChangeEvent<HTMLInputElement>) => void;
@@ -2118,22 +2241,26 @@ function RegisterView({
     <section style={splitGridStyle}>
       <div style={isMobile ? mobilePanelStyle : panelStyle}>
         <PanelHeader title="Inspection Register" description="Logged HSE inspections with status, findings, evidence, and report output." />
-        <div className="ims-filter-panel" style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
-          <input style={inputStyle} placeholder="Search inspections" value={search} onChange={(event) => onSearch(event.target.value)} />
-          <button type="button" onClick={() => setShowFilters((current) => !current)} style={showFilters ? secondaryButtonStyle : primaryButtonStyle}>
-            {showFilters ? "Hide Filters" : "Show Filters"}
-          </button>
-          <button type="button" onClick={onCreate} style={primaryButtonStyle} disabled={!canCreateInspection}>Create Inspection</button>
-        </div>
-        {showFilters ? (
-        <div className="ims-filter-panel" style={isMobile ? mobileRegisterToolbarStyle : registerToolbarStyle}>
-          <select style={selectStyle} value={statusFilter} onChange={(event) => onStatusFilter(event.target.value)}>
-            <option value="">All Statuses</option>
-            {["Draft", "Open", "Complete", "Closed"].map((status) => <option key={status} value={status}>{status}</option>)}
-          </select>
-          <button type="button" onClick={() => { onSearch(""); onStatusFilter(""); }} style={secondaryButtonStyle}>Clear Filters</button>
-        </div>
-        ) : null}
+        <ImsFilterPanel
+          search={search}
+          onSearchChange={onSearch}
+          searchPlaceholder="Search inspections"
+          showFilters={showFilters}
+          onToggleFilters={() => setShowFilters((current) => !current)}
+          actions={<>
+            <ImsButton variant="secondary" onClick={() => { onSearch(""); onStatusFilter(""); }}>Clear Filters</ImsButton>
+            <ImsButton variant="primary" onClick={onExportPdf} disabled={!records.length} title="Create a PDF of the inspections currently shown">Export PDF</ImsButton>
+            <ImsButton variant="secondary" onClick={onExportExcel} disabled={!records.length} title="Download an Excel workbook of the inspections currently shown">Export Excel</ImsButton>
+            <ImsButton variant="primary" onClick={onCreate} disabled={!canCreateInspection}>Create Inspection</ImsButton>
+          </>}
+        >
+          <Field label="Status">
+            <select style={selectStyle} value={statusFilter} onChange={(event) => onStatusFilter(event.target.value)}>
+              <option value="">All Statuses</option>
+              {["Draft", "Open", "Complete", "Closed"].map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+          </Field>
+        </ImsFilterPanel>
         <div style={tableInfoStyle}>Showing {records.length} of {totalRecords} inspections</div>
         {isMobile ? (
           <div style={mobileRegisterListStyle}>
@@ -2228,8 +2355,8 @@ function RegisterView({
           <div style={emptyBoxStyle}>Select an inspection to open the detail/edit panel.</div>
         ) : (
           <>
-            <PanelHeader title={`${draft.inspection_number} - ${draft.title}`} description={`${draft.form_number} ${recordRevisionLabel(draft)}`} />
-            <InspectionForm
+            <InspectionWorkbench
+              key={selected.id}
               draft={draft}
               people={people}
               compact
@@ -2240,24 +2367,34 @@ function RegisterView({
               uploading={uploading}
               onUploadEvidenceForItem={onUploadForItem}
               isMobile={isMobile}
-            />
-            <LinkedActionsPanel inspection={draft} linkedActions={linkedActions} canCreateAction={canCreateInspection} />
-            <EvidencePanel
-              evidence={evidence}
-              uploading={uploading}
-              uploadItemNumber={uploadItemNumber}
-              formId={draft.form_id}
+              evidenceCount={evidence.length}
               canEdit={canEditInspection}
-              onUploadItemNumberChange={onUploadItemNumberChange}
-              onUpload={onUpload}
-              onOpen={onOpenEvidence}
-              onDelete={onDeleteEvidence}
+              saving={saving}
+              onSave={onSave}
+              onComplete={onComplete}
+              onClose={onClose}
+              checklistExtras={
+                <EvidencePanel
+                  evidence={evidence}
+                  uploading={uploading}
+                  uploadItemNumber={uploadItemNumber}
+                  formId={draft.form_id}
+                  canEdit={canEditInspection}
+                  onUploadItemNumberChange={onUploadItemNumberChange}
+                  onUpload={onUpload}
+                  onOpen={onOpenEvidence}
+                  onDelete={onDeleteEvidence}
+                />
+              }
+              commentsExtras={<LinkedActionsPanel inspection={draft} linkedActions={linkedActions} canCreateAction={canCreateInspection} />}
+              footer={
+                <div style={formActionsStyle}>
+                  <button type="button" style={secondaryButtonStyle} onClick={onGeneratePdf}>Export PDF</button>
+                  <button type="button" style={primaryButtonStyle} onClick={onSave} disabled={saving || !canEditInspection}>{saving ? "Saving..." : "Save Inspection"}</button>
+                  <button type="button" style={dangerButtonStyle} onClick={onDelete} disabled={!canEditInspection}>Delete Inspection</button>
+                </div>
+              }
             />
-            <div style={formActionsStyle}>
-              <button type="button" style={secondaryButtonStyle} onClick={onGeneratePdf}>Generate PDF Report</button>
-              <button type="button" style={primaryButtonStyle} onClick={onSave} disabled={saving || !canEditInspection}>{saving ? "Saving..." : "Save Inspection"}</button>
-              <button type="button" style={dangerButtonStyle} onClick={onDelete} disabled={!canEditInspection}>Delete Inspection</button>
-            </div>
           </>
         )}
       </div>
@@ -2282,6 +2419,7 @@ function CreateInspectionView({
   onUploadItemNumberChange,
   onRemovePendingEvidence,
   onSave,
+  onComplete,
   canCreateInspection,
   isMobile,
   isFieldCreateMode,
@@ -2302,6 +2440,7 @@ function CreateInspectionView({
   onUploadItemNumberChange: (value: string) => void;
   onRemovePendingEvidence: (id: string) => void;
   onSave: () => void;
+  onComplete: () => void;
   canCreateInspection: boolean;
   isMobile: boolean;
   isFieldCreateMode: boolean;
@@ -2347,31 +2486,39 @@ function CreateInspectionView({
       </div> : null}
 
       {selectedTemplate.enabled ? (
-        <>
-          <InspectionForm
-            draft={draft}
-            people={people}
-            onDraftChange={onDraftChange}
-            onPersonSelect={onPersonSelect}
-            onChecklistChange={onChecklistChange}
-            canUploadEvidence={canCreateInspection}
-            uploading={false}
-            onUploadEvidenceForItem={onPendingUploadForItem}
-            isMobile={isMobile}
-          />
-          <PendingEvidencePanel
-            pendingEvidence={pendingEvidence}
-            uploadItemNumber={uploadItemNumber}
-            formId={draft.form_id}
-            onUploadItemNumberChange={onUploadItemNumberChange}
-            onUpload={onPendingUpload}
-            onRemove={onRemovePendingEvidence}
-            canCreate={canCreateInspection}
-          />
-          <div style={formActionsStyle}>
-            <button type="button" style={primaryButtonStyle} onClick={onSave} disabled={saving || !canCreateInspection}>{saving ? "Saving..." : "Save Inspection"}</button>
-          </div>
-        </>
+        <InspectionWorkbench
+          key={`create-${draft.form_id}`}
+          draft={draft}
+          people={people}
+          onDraftChange={onDraftChange}
+          onPersonSelect={onPersonSelect}
+          onChecklistChange={onChecklistChange}
+          canUploadEvidence={canCreateInspection}
+          uploading={false}
+          onUploadEvidenceForItem={onPendingUploadForItem}
+          isMobile={isMobile}
+          evidenceCount={pendingEvidence.length}
+          canEdit={canCreateInspection}
+          saving={saving}
+          onSave={onSave}
+          onComplete={onComplete}
+          checklistExtras={
+            <PendingEvidencePanel
+              pendingEvidence={pendingEvidence}
+              uploadItemNumber={uploadItemNumber}
+              formId={draft.form_id}
+              onUploadItemNumberChange={onUploadItemNumberChange}
+              onUpload={onPendingUpload}
+              onRemove={onRemovePendingEvidence}
+              canCreate={canCreateInspection}
+            />
+          }
+          footer={
+            <div style={formActionsStyle}>
+              <button type="button" style={primaryButtonStyle} onClick={onSave} disabled={saving || !canCreateInspection}>{saving ? "Saving..." : "Save Inspection"}</button>
+            </div>
+          }
+        />
       ) : (
         <div style={emptyBoxStyle}>
           {selectedTemplate.documentNumber} will use this same inspection engine once it is wired: structured form, evidence upload, mobile completion, and PDF output.
@@ -2392,10 +2539,13 @@ function InspectionForm({
   uploading,
   onUploadEvidenceForItem,
   isMobile = false,
+  workbench = false,
 }: {
   draft: HseInspectionRecord;
   people: PeopleOption[];
   compact?: boolean;
+  /** True inside the record workbench, which scrolls the page instead of the form. */
+  workbench?: boolean;
   onDraftChange: <K extends keyof HseInspectionRecord>(key: K, value: HseInspectionRecord[K]) => void;
   onPersonSelect: (value: string, target: "inspector" | "signoff") => void;
   onChecklistChange: (itemId: string, field: keyof ChecklistResponse, value: string) => void;
@@ -2405,7 +2555,8 @@ function InspectionForm({
   isMobile?: boolean;
 }) {
   return (
-    <div style={compact ? (isMobile ? mobileCompactFormStyle : compactFormStyle) : undefined}>
+    <div style={compact && !workbench ? (isMobile ? mobileCompactFormStyle : compactFormStyle) : undefined}>
+      <WorkbenchStep stepKey="details">
       <InspectionSection title="Report Details">
         <div style={isMobile ? mobileFormGridStyle : formGridStyle}>
           <Field label="Inspection No."><input style={{ ...inputStyle, background: "#ECECE7" }} value={draft.inspection_number} readOnly /></Field>
@@ -2426,9 +2577,11 @@ function InspectionForm({
           <Field label="Inspector Position"><input style={inputStyle} value={draft.inspector_position || ""} onChange={(event) => onDraftChange("inspector_position", event.target.value)} /></Field>
         </div>
       </InspectionSection>
+      </WorkbenchStep>
 
       {getChecklistForTemplateId(draft.form_id).map((section) => (
-        <InspectionSection key={section.id} title={section.title}>
+        <WorkbenchStep key={section.id} stepKey="checklist">
+        <InspectionSection title={section.title}>
           {isMobile ? (
             <div style={mobileChecklistListStyle}>
               {section.items.map((item) => {
@@ -2528,12 +2681,16 @@ function InspectionForm({
             </div>
           )}
         </InspectionSection>
+        </WorkbenchStep>
       ))}
 
+      <WorkbenchStep stepKey="comments">
       <InspectionSection title={additionalCommentsTitle(draft.form_id)}>
         <textarea style={largeTextareaStyle} value={draft.additional_comments || ""} onChange={(event) => onDraftChange("additional_comments", event.target.value)} />
       </InspectionSection>
+      </WorkbenchStep>
 
+      <WorkbenchStep stepKey="signoff">
       <InspectionSection title="Sign-Off">
         <div style={isMobile ? mobileFormGridStyle : formGridStyle}>
           <Field label="Name">
@@ -2544,7 +2701,188 @@ function InspectionForm({
           <Field label="Date"><input type="date" style={inputStyle} value={draft.signoff_date || ""} onChange={(event) => onDraftChange("signoff_date", event.target.value)} /></Field>
         </div>
       </InspectionSection>
+      </WorkbenchStep>
     </div>
+  );
+}
+
+// ---- Inspection record workbench: progress follows the checklist, so a supervisor on a phone sees what is left at a glance. ----
+
+function inspectionChecklistStats(draft: HseInspectionRecord) {
+  const items = getChecklistForTemplateId(draft.form_id).flatMap((section) => section.items);
+  const answeredFlags = items.map((item) => Boolean(draft.checklist_responses[item.id]?.answer));
+  const findings = items
+    .filter((item) => draft.checklist_responses[item.id]?.answer === "No")
+    .map((item) => ({ number: item.number, text: item.text, note: clean(draft.checklist_responses[item.id]?.comments) }));
+  return {
+    total: items.length,
+    answered: answeredFlags.filter(Boolean).length,
+    answeredFlags,
+    findings,
+    findingsWithoutNote: findings.filter((finding) => !finding.note).length,
+  };
+}
+
+function InspectionWorkbench({
+  draft,
+  people,
+  compact,
+  onDraftChange,
+  onPersonSelect,
+  onChecklistChange,
+  canUploadEvidence,
+  uploading,
+  onUploadEvidenceForItem,
+  isMobile,
+  evidenceCount,
+  canEdit,
+  saving,
+  onSave,
+  onComplete,
+  onClose,
+  checklistExtras,
+  commentsExtras,
+  footer,
+}: {
+  draft: HseInspectionRecord;
+  people: PeopleOption[];
+  compact?: boolean;
+  onDraftChange: <K extends keyof HseInspectionRecord>(key: K, value: HseInspectionRecord[K]) => void;
+  onPersonSelect: (value: string, target: "inspector" | "signoff") => void;
+  onChecklistChange: (itemId: string, field: keyof ChecklistResponse, value: string) => void;
+  canUploadEvidence: boolean;
+  uploading: boolean;
+  onUploadEvidenceForItem: (itemNumber: string, event: ChangeEvent<HTMLInputElement>) => void;
+  isMobile: boolean;
+  evidenceCount: number;
+  canEdit: boolean;
+  saving: boolean;
+  onSave: () => void;
+  onComplete: () => void;
+  onClose?: () => void;
+  checklistExtras?: ReactNode;
+  commentsExtras?: ReactNode;
+  footer?: ReactNode;
+}) {
+  const stats = inspectionChecklistStats(draft);
+  const detailChecks = [
+    Boolean(clean(draft.title)),
+    Boolean(draft.inspection_date),
+    Boolean(clean(draft.project_work_scope) || clean(draft.vessel_spread) || clean(draft.area_zone)),
+    Boolean(clean(draft.inspector_name)),
+    Boolean(clean(draft.inspector_position)),
+  ];
+  const signoffChecks = [Boolean(clean(draft.signoff_name)), Boolean(clean(draft.signoff_position)), Boolean(draft.signoff_date)];
+  const hasComments = Boolean(clean(draft.additional_comments));
+  const unanswered = stats.total - stats.answered;
+
+  const steps: WorkbenchStepDef[] = [
+    { key: "details", label: "Report details", sub: "Site, date, inspector", pct: percentDone(detailChecks) },
+    {
+      key: "checklist",
+      label: "Checklist",
+      sub: `${stats.answered} of ${stats.total} answered${stats.findingsWithoutNote ? ` - ${stats.findingsWithoutNote} note${stats.findingsWithoutNote === 1 ? "" : "s"} needed` : ""}`,
+      pct: percentDone(stats.answeredFlags),
+    },
+    { key: "comments", label: "Comments", sub: "Overall remarks", ...(hasComments ? { pct: 100 } : { state: "Optional" }) },
+    { key: "signoff", label: "Sign-off", sub: "Name and date", pct: percentDone(signoffChecks) },
+  ];
+
+  // Shown as "still missing before this inspection can be completed". They warn only; Complete Inspection stays usable.
+  const missing: Array<{ label: string; step: string }> = [
+    ...(clean(draft.title) ? [] : [{ label: "Title", step: "details" }]),
+    ...(draft.inspection_date ? [] : [{ label: "Inspection date", step: "details" }]),
+    ...(clean(draft.inspector_name) ? [] : [{ label: "Inspector", step: "details" }]),
+    ...(unanswered > 0 ? [{ label: `${unanswered} checklist item${unanswered === 1 ? "" : "s"} unanswered`, step: "checklist" }] : []),
+    ...(stats.findingsWithoutNote > 0 ? [{ label: `${stats.findingsWithoutNote} finding${stats.findingsWithoutNote === 1 ? "" : "s"} marked No without a comment`, step: "checklist" }] : []),
+    ...(clean(draft.signoff_name) ? [] : [{ label: "Sign-off name", step: "signoff" }]),
+    ...(draft.signoff_date ? [] : [{ label: "Sign-off date", step: "signoff" }]),
+  ];
+
+  function handleComplete() {
+    if (missing.length) {
+      const proceed = window.confirm(`${missing.length} item${missing.length === 1 ? " is" : "s are"} still missing: ${missing.map((item) => item.label).join(", ")}. Complete anyway?`);
+      if (!proceed) return;
+    }
+    onComplete();
+  }
+
+  const shownFindings = stats.findings.slice(0, 10);
+  const previewSections: DocPreviewSection[] = [
+    {
+      heading: "REPORT DETAILS",
+      rows: [
+        { label: "Form", value: `${draft.form_number} ${draft.form_revision ? `Rev ${draft.form_revision}` : ""}`.trim() },
+        { label: "Date", value: displayDate(draft.inspection_date), step: "details" },
+        { label: "Area / zone", value: draft.area_zone || draft.vessel_spread || draft.project_work_scope, step: "details" },
+        { label: "Inspector", value: draft.inspector_name, step: "details" },
+      ],
+    },
+    {
+      heading: "CHECKLIST",
+      rows: [
+        { label: "Answered", value: `${stats.answered} of ${stats.total}` },
+        { label: "Evidence files", value: String(evidenceCount) },
+      ],
+    },
+    {
+      heading: "OPEN FINDINGS",
+      rows: stats.findings.length
+        ? [
+            ...shownFindings.map((finding) => ({ label: `Item ${finding.number}`, value: finding.note ? `${finding.text} - ${finding.note}` : "", step: "checklist" })),
+            ...(stats.findings.length > shownFindings.length ? [{ label: "More findings", value: `${stats.findings.length - shownFindings.length} more in the checklist` }] : []),
+          ]
+        : [{ label: "Findings", value: "None marked No" }],
+    },
+    {
+      heading: "SIGN-OFF",
+      rows: [
+        { label: "Signed by", value: draft.signoff_name, step: "signoff" },
+        { label: "Date", value: displayDate(draft.signoff_date), step: "signoff" },
+      ],
+    },
+  ];
+
+  const canComplete = draft.status === "Draft" || draft.status === "Open";
+
+  return (
+    <RecordWorkbench
+      gate="this inspection can be completed"
+      steps={steps}
+      missing={missing}
+      reportLabel="PDF"
+      header={
+        <RecordHeader
+          id={draft.inspection_number || "New inspection"}
+          title={draft.title || draft.form_title}
+          status={{ label: draft.status || "Draft", tone: toneForStatus(draft.status) }}
+          note={`${draft.form_number} ${recordRevisionLabel(draft)}`}
+          actions={<>
+            {canComplete ? <ImsButton onClick={handleComplete} disabled={!canEdit || saving} title="Sets the status to Complete and saves the inspection">Complete Inspection</ImsButton> : null}
+            <ImsButton variant="secondary" onClick={onSave} disabled={!canEdit || saving}>{saving ? "Saving..." : "Save Inspection"}</ImsButton>
+            {onClose ? <ImsButton variant="secondary" onClick={onClose} title="Close this inspection">Hide Panel</ImsButton> : null}
+          </>}
+        />
+      }
+      side={<DocPreview title="Inspection report (PDF)" sections={previewSections} />}
+    >
+      <InspectionForm
+        draft={draft}
+        people={people}
+        compact={compact}
+        workbench
+        onDraftChange={onDraftChange}
+        onPersonSelect={onPersonSelect}
+        onChecklistChange={onChecklistChange}
+        canUploadEvidence={canUploadEvidence}
+        uploading={uploading}
+        onUploadEvidenceForItem={onUploadEvidenceForItem}
+        isMobile={isMobile}
+      />
+      {checklistExtras ? <WorkbenchStep stepKey="checklist">{checklistExtras}</WorkbenchStep> : null}
+      {commentsExtras ? <WorkbenchStep stepKey="comments">{commentsExtras}</WorkbenchStep> : null}
+      {footer}
+    </RecordWorkbench>
   );
 }
 
@@ -2729,8 +3067,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function StatusPill({ status }: { status: string }) {
-  const color = status === "Closed" || status === "Complete" ? "#005670" : status === "Open" ? "#63B1BC" : "#FFAD00";
-  return <span style={{ ...statusPillInlineStyle, background: `${color}22`, color }}>{status}</span>;
+  return <WorkbenchStatusPill label={status} tone={toneForStatus(status)} />;
 }
 
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
@@ -2812,18 +3149,6 @@ const detailPanelStyle: CSSProperties = {
   boxSizing: "border-box",
   minWidth: 0,
 };
-const registerToolbarStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
-  alignItems: "end",
-  marginBottom: "14px",
-  padding: "12px",
-  border: "1px solid #D0D0CE",
-  borderRadius: "16px",
-  background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
-};
 const inputStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "9px", padding: "9px 12px", fontSize: "14px", background: "white", boxSizing: "border-box" };
 const selectStyle: CSSProperties = { ...inputStyle };
 const tableInfoStyle: CSSProperties = {
@@ -2896,7 +3221,6 @@ const selectedEyebrowStyle: CSSProperties = { fontSize: "12px", color: "#005670"
 const selectedTitleStyle: CSSProperties = { margin: "4px 0", fontSize: "22px", color: "#000000" };
 const selectedDescriptionStyle: CSSProperties = { margin: 0, color: "#53565A", lineHeight: 1.45 };
 const statusPillStyle: CSSProperties = { background: "#ECECE7", color: "#005670", borderRadius: "999px", padding: "7px 10px", fontWeight: 800, fontSize: "12px", whiteSpace: "nowrap" };
-const statusPillInlineStyle: CSSProperties = { borderRadius: "999px", padding: "6px 9px", fontWeight: 900, fontSize: "12px", whiteSpace: "nowrap" };
 const compactFormStyle: CSSProperties = { maxHeight: "62vh", overflow: "auto", paddingRight: "6px" };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px" };
 const fieldStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: "6px", fontWeight: 800, color: "#53565A", fontSize: "12px" };
@@ -3004,13 +3328,6 @@ const mobilePanelStyle: CSSProperties = {
   ...panelStyle,
   padding: "12px",
   borderRadius: "14px",
-};
-
-const mobileRegisterToolbarStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr",
-  gap: "8px",
-  marginBottom: "12px",
 };
 
 const mobileRegisterListStyle: CSSProperties = {

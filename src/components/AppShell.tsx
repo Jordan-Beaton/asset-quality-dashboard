@@ -24,6 +24,26 @@ type NavItem = {
   icon: NavIconKey;
 };
 
+// One short word under each icon on the phone bottom bar, so people do not have to guess what an icon is.
+const PHONE_NAV_LABELS: Record<string, string> = {
+  "Overall Inspections": "Inspect",
+  "Process Guides": "Guides",
+  "Document Control": "Documents",
+  "MOC Register": "MOC",
+  "Lessons Learnt": "Lessons",
+  "Certification": "Certs",
+  "Admin Console": "Admin",
+  "Print Requests": "3D Print",
+  "Maintenance": "Maintain",
+  "Calibration": "Calibrate",
+  "Dashboard": "Dash",
+  "Observations": "Observe",
+};
+
+function phoneNavLabel(label: string) {
+  return PHONE_NAV_LABELS[label] || label;
+}
+
 type SystemRole =
   | "Admin"
   | "Manager"
@@ -161,11 +181,8 @@ const riskNavItems: NavItem[] = [
   { href: "/home", label: "Home", icon: "home" },
   { href: "/risk", label: "Dashboard", icon: "dashboard" },
   { href: "/risk/register", label: "Register", icon: "risk" },
-  { href: "/risk/reviews", label: "Reviews", icon: "reviews" },
-  { href: "/risk/controls", label: "Controls", icon: "controls" },
-  { href: "/risk/opportunities", label: "Opportunities", icon: "opportunities" },
-  { href: "/risk/actions", label: "Actions", icon: "actions" },
-  { href: "/risk/reports", label: "Reports", icon: "reports" },
+  // Reviews, Controls, Opportunities, Actions and Reports are empty shells today. They are left out of the menu so nobody
+  // lands on a blank page. Add each one back here when it is built. The pages and their permission keys still exist.
 ];
 
 const hseNavItems: NavItem[] = [
@@ -1515,6 +1532,9 @@ export default function AppShell({ children }: AppShellProps) {
                     }}
                   >
                     {item.label}
+                  </span>
+                  <span className="ims-rail-phone-label" aria-hidden="true">
+                    {phoneNavLabel(item.label)}
                   </span>
                 </Link>
               );

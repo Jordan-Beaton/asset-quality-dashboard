@@ -6,7 +6,7 @@ import { ImsBackNav } from "../../src/components/ImsBackNav";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -25,6 +25,15 @@ import {
 } from "recharts";
 import type { CSSProperties, ReactNode } from "react";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
+import { ImsButton, ImsLinkButton } from "../../src/components/ImsPrimitives";
+import {
+  RecordHeader,
+  RecordWorkbench,
+  StatusPill,
+  WorkbenchStep,
+  toneForStatus,
+} from "../../src/components/RecordWorkbench";
+import type { WorkbenchStepDef } from "../../src/components/RecordWorkbench";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
@@ -270,6 +279,8 @@ type RegisterDrilldownOptions = {
 
 type LinkedRecordChip = {
   label: string;
+  /** When set, the chip opens that record. */
+  href?: string;
   tone: "teal" | "blue" | "purple" | "amber" | "red" | "slate";
 };
 
@@ -359,6 +370,7 @@ const emptyForm: ActionForm = {
 
 const actionSourceOptions = [
   "Manual",
+  "Audit",
   "Audit Finding",
   "Asset Inspection",
   "Asset Maintenance",
@@ -680,7 +692,8 @@ function getActionSourceValue(action: ActionItem) {
   const source = (action.source || "").trim();
   if (!source) return "Manual";
   if (source === "Audit") {
-    return action.linked_finding_id || action.linked_finding_reference ? "Audit Finding" : "Other";
+    // A stored "Audit" with no finding stays "Audit" (it used to show as "Other"). The stored value is not changed.
+    return action.linked_finding_id || action.linked_finding_reference ? "Audit Finding" : "Audit";
   }
   return source;
 }
@@ -692,7 +705,7 @@ function getActionSourceLabel(action: ActionItem) {
 }
 
 function getSourceChipTone(source: string): LinkedRecordChip["tone"] {
-  if (source === "Audit Finding") return "blue";
+  if (isAuditLinkedSource(source)) return "blue";
   if (isAssetLinkedSource(source)) return "teal";
   if (source === "NCR/CAPA") return "red";
   if (source === "MOC") return "purple";
@@ -705,7 +718,7 @@ function getSourceChipTone(source: string): LinkedRecordChip["tone"] {
 }
 
 function isAuditLinkedSource(source: string | null | undefined) {
-  return source === "Audit Finding";
+  return source === "Audit Finding" || source === "Audit";
 }
 
 function isAssetLinkedSource(source: string | null | undefined) {
@@ -715,6 +728,7 @@ function isAssetLinkedSource(source: string | null | undefined) {
 function sourceImpliesLinkedRecord(source: string | null | undefined) {
   return (
     source === "Audit Finding" ||
+    source === "Audit" ||
     source === "Asset Inspection" ||
     source === "Asset Maintenance" ||
     source === "Asset Calibration" ||
@@ -728,11 +742,62 @@ function sourceImpliesLinkedRecord(source: string | null | undefined) {
   );
 }
 
-function buildLinkedRecordChips(action: ActionItem): LinkedRecordChip[] {
+type AuditLookup = { auditOptions: AuditOption[]; findingOptions: FindingOption[] };
+
+// Lets the linked-record chips find an action's audit from the loaded audits and findings.
+const AuditLookupContext = createContext<AuditLookup>({ auditOptions: [], findingOptions: [] });
+
+type AuditRefFields = {
+  linked_audit_id?: string | null;
+  linked_audit_number?: string | null;
+  linked_finding_id?: string | null;
+  linked_finding_reference?: string | null;
+};
+
+// The audit an action belongs to. Uses the stored audit id or number first; when only a finding is stored, the audit
+// is taken from that finding (by id, or by reference when exactly one finding has it). Returns null when the action
+// carries no audit reference at all.
+function resolveActionAudit(action: AuditRefFields, lookup?: AuditLookup): { id: string; number: string } | null {
+  let id = (action.linked_audit_id || "").trim();
+  let number = (action.linked_audit_number || "").trim();
+  if (lookup) {
+    if (!id && number) id = lookup.auditOptions.find((option) => option.audit_number === number)?.id || "";
+    if (!id && !number) {
+      const findingId = (action.linked_finding_id || "").trim();
+      const findingRef = (action.linked_finding_reference || "").trim();
+      const matches = findingId
+        ? lookup.findingOptions.filter((finding) => finding.id === findingId)
+        : findingRef
+        ? lookup.findingOptions.filter((finding) => finding.reference === findingRef)
+        : [];
+      if (matches.length === 1) id = matches[0].audit_id;
+    }
+    if (id && !number) number = lookup.auditOptions.find((option) => option.id === id)?.audit_number || "";
+  }
+  return id || number ? { id, number } : null;
+}
+
+// Opens the Audits programme tab on that audit (the audit page keeps the open audit in ?selected=).
+function auditRecordHref(ref: { id: string; number: string } | null) {
+  if (!ref) return null;
+  if (ref.id) return `/audits?tab=programme&selected=${encodeURIComponent(ref.id)}`;
+  return `/audits?search=${encodeURIComponent(ref.number)}`;
+}
+
+function buildLinkedRecordChips(action: ActionItem, lookup?: AuditLookup): LinkedRecordChip[] {
   const chips: LinkedRecordChip[] = [];
   const source = getActionSourceValue(action);
 
-  if (action.linked_audit_number) chips.push({ label: `Audit ${action.linked_audit_number}`, tone: "blue" });
+  if (isAuditLinkedSource(source)) {
+    const audit = resolveActionAudit(action, lookup);
+    if (audit?.number) {
+      chips.push({ label: `Audit ${audit.number}`, tone: "blue", href: auditRecordHref(audit) || undefined });
+    } else if (audit?.id) {
+      chips.push({ label: "Audit linked", tone: "blue", href: auditRecordHref(audit) || undefined });
+    }
+  } else if (action.linked_audit_number) {
+    chips.push({ label: `Audit ${action.linked_audit_number}`, tone: "blue" });
+  }
   if (action.linked_finding_reference) chips.push({ label: `Finding ${action.linked_finding_reference}`, tone: "blue" });
   if (action.linked_asset_code) chips.push({ label: `Asset ${action.linked_asset_code}`, tone: "teal" });
   if (action.linked_inspection_number) chips.push({ label: `Inspection ${action.linked_inspection_number}`, tone: "teal" });
@@ -785,7 +850,7 @@ function buildActionSourceLabel(action: ActionItem) {
   if (!source || source === "Manual" || source === "Other") return "";
 
   const parts = [`Source: ${source}`];
-  if (source === "Audit Finding" && action.linked_audit_number) parts.push(`Audit ${action.linked_audit_number}`);
+  if (isAuditLinkedSource(source) && action.linked_audit_number) parts.push(`Audit ${action.linked_audit_number}`);
   if (source === "Audit Finding" && action.linked_finding_reference) parts.push(`Finding ${action.linked_finding_reference}`);
   if (isAssetLinkedSource(source) && action.linked_asset_code) parts.push(`Asset ${action.linked_asset_code}`);
   if (source === "Asset Inspection" && action.linked_inspection_number) {
@@ -863,6 +928,118 @@ function buildActionFormFromItem(action: ActionItem): ActionForm {
     linked_observation_number: action.linked_observation_number || "",
     close_out_comments: action.close_out_comments || "",
   };
+}
+
+type LinkedRecordTarget = { kind: string; number: string; href: string | null };
+
+// The record an action comes from, with the same destinations the "Linked Record Intelligence" links already use
+// (MOC uses the same address as the My Actions MOC rows).
+function getLinkedRecordTarget(f: ActionForm, lookup?: AuditLookup): LinkedRecordTarget | null {
+  const asset = encodeURIComponent(f.linked_asset_code || f.linked_asset_id);
+  if (isAuditLinkedSource(f.source)) {
+    const audit = resolveActionAudit(f, lookup);
+    if (!audit) return null;
+    return { kind: "audit", number: audit.number || "linked audit", href: auditRecordHref(audit) };
+  }
+  if (f.source === "Asset Inspection" && f.linked_inspection_number) {
+    return { kind: "inspection", number: f.linked_inspection_number, href: `/assets/inspection?asset=${asset}` };
+  }
+  if (f.source === "Asset Maintenance" && f.linked_maintenance_number) {
+    return { kind: "maintenance", number: f.linked_maintenance_number, href: `/assets/maintenance?asset=${asset}` };
+  }
+  if (f.source === "Asset Calibration" && f.linked_asset_code) {
+    return { kind: "calibration", number: f.linked_asset_code, href: `/assets/calibration?asset=${asset}` };
+  }
+  if (f.source === "NCR/CAPA") {
+    if (f.linked_ncr_id || f.linked_ncr_number) {
+      return {
+        kind: "NCR",
+        number: f.linked_ncr_number || "linked NCR",
+        href: f.linked_ncr_id
+          ? `/ncr-capa?ncrId=${encodeURIComponent(f.linked_ncr_id)}`
+          : `/ncr-capa?ncr=${encodeURIComponent(f.linked_ncr_number)}`,
+      };
+    }
+    if (f.linked_capa_number) return { kind: "CAPA", number: f.linked_capa_number, href: null };
+    return null;
+  }
+  if (f.source === "MOC" && f.linked_moc_number) {
+    return { kind: "MOC", number: f.linked_moc_number, href: `/moc?search=${encodeURIComponent(f.linked_moc_number)}` };
+  }
+  if (f.source === "AINM" && (f.linked_ainm_id || f.linked_ainm_number)) {
+    return {
+      kind: "AINM",
+      number: f.linked_ainm_number || "linked AINM",
+      href: f.linked_ainm_id
+        ? `/hse/ainm?ainmId=${encodeURIComponent(f.linked_ainm_id)}`
+        : `/hse/ainm?ainm=${encodeURIComponent(f.linked_ainm_number)}`,
+    };
+  }
+  if (f.source === "HSE Inspection" && (f.linked_hse_inspection_id || f.linked_hse_inspection_number)) {
+    return {
+      kind: "HSE inspection",
+      number: f.linked_hse_inspection_number || "linked inspection",
+      href: f.linked_hse_inspection_id
+        ? `/hse/inspections?inspectionId=${encodeURIComponent(f.linked_hse_inspection_id)}`
+        : `/hse/inspections?inspection=${encodeURIComponent(f.linked_hse_inspection_number)}`,
+    };
+  }
+  if (f.source === "Observation" && (f.linked_observation_id || f.linked_observation_number)) {
+    return {
+      kind: "observation",
+      number: f.linked_observation_number || "linked observation",
+      href: f.linked_observation_id
+        ? `/hse/observations?observationId=${encodeURIComponent(f.linked_observation_id)}`
+        : `/hse/observations?observation=${encodeURIComponent(f.linked_observation_number)}`,
+    };
+  }
+  return null;
+}
+
+// Short due-date wording for the record side card, for example "Due in 3 days" or "Overdue 4 days".
+function getDueSummary(action: { due_date: string | null; status: string | null }) {
+  const days = getDaysFromToday(action.due_date);
+  if (days === null) return "No due date set";
+  if (isClosedLikeStatus(action.status)) return `Was due ${formatDate(action.due_date)}`;
+  if (days < 0) return `Overdue ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"}`;
+  if (days === 0) return "Due today";
+  if (days === 1) return "Due tomorrow";
+  return `Due in ${days} days`;
+}
+
+// The next step in Open > In Progress > Closed, or null when the action is already closed.
+function nextStatusStep(status: string | null | undefined): "In Progress" | "Closed" | null {
+  if (isClosedLikeStatus(status)) return null;
+  return normaliseStatus(status) === "in progress" ? "Closed" : "In Progress";
+}
+
+// What is still missing before an action is closed. These are suggestions only: closing is never blocked.
+function closingGaps(evidenceCount: number, closeOutComments: string | null | undefined) {
+  const gaps: Array<{ label: string; step: string }> = [];
+  if (evidenceCount === 0) gaps.push({ label: "Evidence attached", step: "evidence" });
+  if (!(closeOutComments || "").trim()) gaps.push({ label: "Closing note", step: "details" });
+  return gaps;
+}
+
+// The one place that decides what happens when an action is closed with items missing. It only asks.
+// To make these items block closing instead, return false here when gaps.length > 0.
+function confirmCloseWithGaps(gaps: Array<{ label: string }>) {
+  if (gaps.length === 0) return true;
+  return window.confirm(
+    `${gaps.length} item${gaps.length === 1 ? " is" : "s are"} still missing: ${gaps.map((gap) => gap.label.toLowerCase()).join(", ")}. Close anyway?`
+  );
+}
+
+// Every source can be picked in the register filter, plus any source found in the data that is not in the list.
+function buildSourceFilterOptions(actions: ActionItem[], selected: string) {
+  const known: string[] = [...actionSourceOptions];
+  const extra = new Set<string>();
+  actions.forEach((action) => {
+    const value = getActionSourceValue(action);
+    if (value && !known.includes(value)) extra.add(value);
+  });
+  if (selected && !known.includes(selected)) extra.add(selected);
+  return [...known, ...[...extra].sort((a, b) => a.localeCompare(b))];
 }
 
 function ActionsPageContent() {
@@ -1052,6 +1229,12 @@ function ActionsPageContent() {
   const [currentPersonNotice, setCurrentPersonNotice] = useState("");
 
   const [editForm, setEditForm] = useState<ActionForm>(emptyForm);
+  // Which action the edit form currently holds, and a status change waiting to be saved with the normal save.
+  const [editFormActionId, setEditFormActionId] = useState("");
+  const pendingStatusSave = useRef<{ id: string; status: string; restore: { action: ActionItem | null } | null } | null>(null);
+  // The step the action record opens on. "Add evidence" on a My Actions card opens it on Evidence.
+  const [recordStart, setRecordStart] = useState<{ id: string; step: string } | null>(null);
+  const [myCardLimit, setMyCardLimit] = useState(25);
 
   const actionDetailRef = useRef<HTMLDivElement | null>(null);
   const [selectedEvidenceAction, setSelectedEvidenceAction] = useState<ActionItem | null>(null);
@@ -1475,7 +1658,7 @@ function ActionsPageContent() {
         prefillDepartment ||
         (nextSource === "HSE Inspection" || nextSource === "HSE" ? "HSE" : "") ||
         (nextSource === "Observation" ? "HSE" : "") ||
-        (nextSource === "Audit Finding" || nextSource === "NCR/CAPA" || nextSource === "MOC" ? "Quality" : "") ||
+        (isAuditLinkedSource(nextSource) || nextSource === "NCR/CAPA" || nextSource === "MOC" ? "Quality" : "") ||
         (isAssetLinkedSource(nextSource) ? "Assets" : current.department);
 
       return {
@@ -2144,6 +2327,13 @@ function ActionsPageContent() {
     }
   }
 
+  // On a phone, overdue items come first (a stable sort keeps the due-date order within each group).
+  const myCardItems = [...myFilteredActions].sort((a, b) => Number(isOverdue(b)) - Number(isOverdue(a)));
+
+  // True when closed items are part of the My Actions list (anything other than the default open-only view).
+  const myShowingClosed =
+    myActionFilter === "all" || myActionFilter === "closed" || (myActionFilter === "open" && myItemStatusFilter === "Closed");
+
   const myActionFilterLabel =
     myActionFilter === "open"
       ? "Open Items"
@@ -2228,8 +2418,25 @@ function ActionsPageContent() {
 
   useEffect(() => {
     if (!selectedEvidenceAction) return;
-    setEditForm(buildActionFormFromItem(selectedEvidenceAction));
+    const pending = pendingStatusSave.current;
+    setEditForm({
+      ...buildActionFormFromItem(selectedEvidenceAction),
+      ...(pending && pending.id === selectedEvidenceAction.id ? { status: pending.status } : {}),
+    });
+    setEditFormActionId(selectedEvidenceAction.id);
   }, [selectedEvidenceAction]);
+
+  // Once a quick status change (header button or My Actions card) is in the edit form, save it with the normal save.
+  useEffect(() => {
+    const pending = pendingStatusSave.current;
+    if (!pending) return;
+    if (editFormActionId !== pending.id || editForm.status !== pending.status) return;
+    pendingStatusSave.current = null;
+    void saveEdit(pending.id).finally(() => {
+      if (pending.restore) setSelectedEvidenceAction(pending.restore.action);
+    });
+    // saveEdit is recreated every render and reads the current edit form; it only needs to run when the form updates.
+  }, [editForm, editFormActionId]);
 
   useEffect(() => {
     if (!isAuditLinkedSource(editForm.source)) return;
@@ -2377,6 +2584,46 @@ function ActionsPageContent() {
     if (!currentOwner || peopleOptions.includes(currentOwner)) return peopleOptions;
     return [currentOwner, ...peopleOptions];
   }, [editForm.owner, peopleOptions]);
+
+  const sourceFilterOptions = useMemo(() => buildSourceFilterOptions(actions, sourceFilter), [actions, sourceFilter]);
+
+  const auditLookup = useMemo<AuditLookup>(() => ({ auditOptions, findingOptions }), [auditOptions, findingOptions]);
+
+  // Action record (workbench) values.
+  const selectedLinkedTarget = selectedEvidenceAction ? getLinkedRecordTarget(editForm, auditLookup) : null;
+  const selectedNextStep = selectedEvidenceAction ? nextStatusStep(selectedEvidenceAction.status) : null;
+  const selectedGaps = selectedEvidenceAction ? closingGaps(selectedActionEvidence.length, editForm.close_out_comments) : [];
+  const detailsToFill = [editForm.title.trim(), editForm.owner.trim(), editForm.due_date].filter((value) => !value).length;
+  const detailSteps: WorkbenchStepDef[] = [
+    {
+      key: "details",
+      label: "Details",
+      sub: "What, who, when",
+      state: detailsToFill === 0 ? "Complete" : `${detailsToFill} to fill`,
+    },
+    {
+      key: "evidence",
+      label: "Evidence",
+      sub: "Files for closure",
+      state: `${selectedActionEvidence.length} file${selectedActionEvidence.length === 1 ? "" : "s"}`,
+    },
+    {
+      key: "linked",
+      label: "Linked record",
+      sub: "Where it came from",
+      state: selectedLinkedTarget ? selectedLinkedTarget.number : "None",
+    },
+  ];
+  const detailNote = selectedEvidenceAction
+    ? [
+        `${getDueSummary({ due_date: editForm.due_date || null, status: selectedEvidenceAction.status })}${
+          editForm.due_date ? ` (${formatDate(editForm.due_date)})` : ""
+        }.`,
+        selectedLinkedTarget ? `Raised from ${selectedLinkedTarget.kind} ${selectedLinkedTarget.number}.` : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "";
 
   const uniqueProjects = useMemo(() => {
     return [...new Set(actions.map((a) => a.project).filter(Boolean))].sort();
@@ -3421,6 +3668,30 @@ function ActionsPageContent() {
     await loadActions(false);
   }
 
+  // Start / Close buttons: put the new status in the edit form and use the normal Save (same checks, same emails).
+  function quickSetStatus(action: ActionItem, target: "In Progress" | "Closed") {
+    if (!requireEditPermission("update action status")) return;
+    if (isClosedLikeStatus(action.status)) return;
+    if (target === "Closed") {
+      const alreadyOpen = selectedEvidenceAction?.id === action.id;
+      const note = alreadyOpen ? editForm.close_out_comments : action.close_out_comments;
+      if (!confirmCloseWithGaps(closingGaps(evidenceCountMap.get(action.id) || 0, note))) return;
+    }
+    const alreadySelected = selectedEvidenceAction?.id === action.id;
+    // When the action was not open in the record, put back whatever was open before once it has saved.
+    pendingStatusSave.current = {
+      id: action.id,
+      status: target,
+      restore: alreadySelected ? null : { action: selectedEvidenceAction },
+    };
+    if (alreadySelected) {
+      setEditForm((current) => ({ ...current, status: target }));
+      return;
+    }
+    setEditFormActionId("");
+    setSelectedEvidenceAction(action);
+  }
+
   async function uploadEvidenceToSelectedAction() {
     if (!requireEditPermission("upload action evidence")) return;
 
@@ -3538,6 +3809,12 @@ function ActionsPageContent() {
       doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 17, { align: "right" });
       doc.text(`Actions: ${filteredActions.length}`, pageWidth - margin, 23, { align: "right" });
 
+      const filterLines = registerFilterDescriptions();
+      if (filterLines.length > 0) {
+        doc.setFontSize(8);
+        doc.text(doc.splitTextToSize(`Filters: ${filterLines.join(" | ")}`, pageWidth - margin * 2).slice(0, 1), pageWidth / 2, 28, { align: "center" });
+      }
+
       doc.setDrawColor(0, 86, 112);
       doc.setLineWidth(0.7);
       doc.line(margin, 31, pageWidth - margin, 31);
@@ -3630,6 +3907,29 @@ function ActionsPageContent() {
     }
   }
 
+  // One description of the register filters, printed on both the PDF and the Excel sheet.
+  function registerFilterDescriptions() {
+    return [
+      ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+      ...(statusFilter ? [`Status: ${statusFilter}`] : []),
+      ...(priorityFilter ? [`Priority: ${priorityFilter}`] : []),
+      ...(ownerFilter ? [`Owner: ${ownerFilter}`] : []),
+      ...(projectFilter ? [`Project: ${projectFilter}`] : []),
+      ...(sourceFilter ? [`Source: ${sourceFilter}`] : []),
+      ...(departmentFilter ? [`Department: ${departmentFilter}`] : []),
+      ...(showOverdueOnly ? ["Overdue only"] : []),
+      ...(openOnlyActive ? ["Open / non-closed only"] : []),
+      ...(showClosedOnly ? ["Closed / complete only"] : []),
+      ...(quickFilter ? [`Quick filter: ${quickFilter}`] : []),
+      ...(showEvidenceOnly ? ["With attached evidence"] : []),
+      ...(showLinkedIssuesOnly ? ["With linked record issues"] : []),
+      ...(dueWindowFilter > 0 ? [`Due in ${dueStartFilter}-${dueWindowFilter} days`] : []),
+      ...(showNoDueDateOnly ? ["No due date"] : []),
+      ...(createdMonthFilter ? [`Created in ${createdMonthFilter}`] : []),
+      ...(closedMonthFilter ? [`Closed in ${closedMonthFilter}`] : []),
+    ];
+  }
+
   // The workbook holds exactly the rows the register is showing, with a line saying which filters produced them.
   async function generateFilteredActionRegisterExcel() {
     if (filteredActions.length === 0) {
@@ -3638,19 +3938,7 @@ function ActionsPageContent() {
     }
 
     try {
-      const filters = [
-        ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
-        ...(statusFilter ? [`Status: ${statusFilter}`] : []),
-        ...(priorityFilter ? [`Priority: ${priorityFilter}`] : []),
-        ...(ownerFilter ? [`Owner: ${ownerFilter}`] : []),
-        ...(projectFilter ? [`Project: ${projectFilter}`] : []),
-        ...(sourceFilter ? [`Source: ${sourceFilter}`] : []),
-        ...(departmentFilter ? [`Department: ${departmentFilter}`] : []),
-        ...(showOverdueOnly ? ["Overdue only"] : []),
-        ...(openOnlyActive ? ["Open / non-closed only"] : []),
-        ...(showClosedOnly ? ["Closed / complete only"] : []),
-        ...(quickFilter ? [`Quick filter: ${quickFilter}`] : []),
-      ];
+      const filters = registerFilterDescriptions();
       await downloadRegisterExcel<ActionItem>({
         fileName: `action-register-${excelDateStamp()}.xlsx`,
         sheetName: "Action Register",
@@ -3786,6 +4074,7 @@ function ActionsPageContent() {
   }
 
   return (
+    <AuditLookupContext.Provider value={auditLookup}>
     <main>
       <QualityPageHero
         label="ACTION MANAGEMENT"
@@ -3815,39 +4104,39 @@ function ActionsPageContent() {
 
       {activeView === "dashboard" ? (
         <>
-          <section className="quality-kpi-grid" style={statsGridStyle}>
+          <section className="quality-kpi-grid" style={kpiRowSixStyle}>
             <QualityKpiCard
-              title="Open Actions"
+              title="Open"
               value={openActions}
               accent="#63B1BC"
               onClick={() => openRegisterDrilldown({ openOnly: true })}
             />
             <QualityKpiCard
-              title="Closed / Complete"
+              title="Closed"
               value={closedActions}
               accent="#005670"
               onClick={() => openRegisterDrilldown({ closedOnly: true })}
             />
             <QualityKpiCard
-              title="Overdue Actions"
+              title="Overdue"
               value={overdueActions}
               accent="#F93822"
               onClick={() => openRegisterDrilldown({ overdue: true, quickFilter: "overdue" })}
             />
             <QualityKpiCard
-              title="Evidence Files"
+              title="Evidence"
               value={linkedEvidenceFiles.length}
               accent="#53565A"
               onClick={() => openRegisterDrilldown({ evidenceOnly: true })}
             />
             <QualityKpiCard
-              title="My Open Actions"
+              title="Mine"
               value={myOpenActions}
               accent="#005670"
               onClick={() => setActiveView("my")}
             />
             <QualityKpiCard
-              title="Linked Record Issues"
+              title="Link issues"
               value={linkedRecordIssues}
               accent="#FFAD00"
               onClick={() => openRegisterDrilldown({ linkedIssuesOnly: true })}
@@ -4387,7 +4676,7 @@ function ActionsPageContent() {
             <strong>My Actions:</strong> {currentPersonNotice}
           </div>
 
-          <section style={statsGridStyle}>
+          <section className="quality-kpi-grid" style={kpiRowFiveStyle}>
             <QualityKpiCard title="My Total Items" value={myActionList.length} accent="#005670" onClick={() => setMyActionFilter("all")} />
             <QualityKpiCard title="My Open Items" value={myOpenWorkItems.length} accent="#63B1BC" onClick={() => setMyActionFilter("open")} />
             <QualityKpiCard title="My Closed Items" value={myClosedActions.length} accent="#005670" onClick={() => setMyActionFilter("closed")} />
@@ -4439,21 +4728,43 @@ function ActionsPageContent() {
                     Showing {myFilteredActions.length} {myActionFilterLabel.toLowerCase()} for {currentPersonName}.
                   </p>
                 </div>
-                <button type="button" style={secondaryButtonStyle} onClick={() => clearMyItemFilters(true)}>
-                  Show All Mine
-                </button>
               </div>
 
               <div className="ims-filter-panel" style={simpleFilterShellStyle}>
                 <div style={simpleFilterButtonRowStyle}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (myShowingClosed) {
+                        setMyActionFilter("open");
+                        if (myItemStatusFilter === "Closed") setMyItemStatusFilter("");
+                        return;
+                      }
+                      clearMyItemFilters(true);
+                    }}
+                    title={myShowingClosed ? "Closed items are showing. Press to hide them." : "Closed items are hidden. Press to show every item, open and closed."}
+                    style={myShowingClosed ? secondaryButtonStyle : primaryButtonStyle}
+                  >
+                    {myShowingClosed ? "Hide Closed" : "Show Closed"}
+                  </button>
                   <button type="button" onClick={() => clearMyItemFilters()} style={secondaryButtonStyle}>
                     Clear Filters
                   </button>
-                  <button type="button" onClick={() => void generateMyActionsPdf()} style={primaryButtonStyle}>
-                    Generate PDF Report
+                  <button
+                    type="button"
+                    onClick={() => void generateMyActionsPdf()}
+                    disabled={myFilteredActions.length === 0}
+                    style={primaryButtonStyle}
+                  >
+                    Export PDF
                   </button>
-                  <button type="button" onClick={() => void generateMyActionsExcel()} style={primaryButtonStyle}>
-                    Generate Excel Report
+                  <button
+                    type="button"
+                    onClick={() => void generateMyActionsExcel()}
+                    disabled={myFilteredActions.length === 0}
+                    style={secondaryButtonStyle}
+                  >
+                    Export Excel
                   </button>
                   <button
                     type="button"
@@ -4485,7 +4796,70 @@ function ActionsPageContent() {
                 ) : null}
               </div>
 
-              <div style={{ overflowX: "auto" }}>
+              {/* Phones get a card per item with Start / Close buttons; the table below is for wider screens. */}
+              <style>{`@media (max-width: 720px) { .ims-my-table-wrap { display: none !important; } } @media (min-width: 721px) { .ims-my-cards { display: none !important; } }`}</style>
+              <div className="ims-my-cards" style={myCardListStyle}>
+                {myCardItems.length === 0 ? (
+                  <div style={emptyEvidencePanelStyle}>No items match this My Actions filter.</div>
+                ) : (
+                  myCardItems.slice(0, myCardLimit).map((item) => {
+                    const overdue = isOverdue(item);
+                    const action = item.source === "Action" ? item.action : null;
+                    const closed = isClosedLikeStatus(item.status);
+                    const canStart = Boolean(action) && nextStatusStep(item.status) === "In Progress";
+                    return (
+                      <div key={item.id} style={{ ...myCardStyle, borderColor: overdue ? "#F93822" : "#D0D0CE" }}>
+                        <div style={myCardTopStyle}>
+                          <MyWorkItemTypeChip source={item.source} />
+                          <span style={actionNumberCellStyle}>{item.number}</span>
+                          <span style={{ marginLeft: "auto" }}>
+                            <StatusBadge value={item.status || "Unknown"} />
+                          </span>
+                        </div>
+                        <div style={myCardTitleStyle}>{item.title}</div>
+                        <div style={secondaryCellTextStyle}>{item.project}</div>
+                        <div style={{ ...secondaryCellTextStyle, color: overdue ? "#F93822" : "#53565A", fontWeight: overdue ? 700 : 500 }}>
+                          {formatDate(item.due_date)} · {getDueLabel(item.due_date)}
+                        </div>
+                        <div style={myCardButtonsStyle}>
+                          {action && canStart ? (
+                            <ImsButton onClick={() => quickSetStatus(action, "In Progress")} disabled={!canEditAction || isSaving} style={myCardButtonStyle}>
+                              Start
+                            </ImsButton>
+                          ) : null}
+                          {action && !closed ? (
+                            <ImsButton onClick={() => quickSetStatus(action, "Closed")} disabled={!canEditAction || isSaving} style={myCardButtonStyle}>
+                              Close
+                            </ImsButton>
+                          ) : null}
+                          {action ? (
+                            <ImsButton
+                              variant="secondary"
+                              onClick={() => {
+                                setRecordStart({ id: action.id, step: "evidence" });
+                                openActionInRegister(action);
+                              }}
+                              style={myCardButtonStyle}
+                            >
+                              Add evidence
+                            </ImsButton>
+                          ) : null}
+                          <ImsButton variant="secondary" onClick={() => openMyWorkItem(item)} style={myCardButtonStyle}>
+                            Open
+                          </ImsButton>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                {myCardItems.length > myCardLimit ? (
+                  <button type="button" className="ims-mobile-more" onClick={() => setMyCardLimit((current) => current + 25)}>
+                    Show {Math.min(25, myCardItems.length - myCardLimit)} more ({myCardItems.length - myCardLimit} not shown)
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="ims-my-table-wrap" style={{ overflowX: "auto" }}>
                 <table style={myActionsTableStyle}>
                   <thead>
                     <tr>
@@ -4706,15 +5080,51 @@ function ActionsPageContent() {
             subtitle="Search the central register or show filters to narrow the action list."
           >
         <div className="ims-filter-panel" style={simpleFilterShellStyle}>
-          <div style={simpleFilterTopRowStyle}>
+          <div style={registerToolbarStyle}>
             <input
               placeholder="Search action no. / title / project / owner"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={inputStyle}
+              style={{ ...inputStyle, ...registerToolbarSearchStyle }}
             />
+            <button
+              type="button"
+              onClick={() => {
+                if (openOnlyActive) {
+                  setShowOpenOnly(false);
+                  return;
+                }
+                // Turning open-only on also drops a status or closed filter that was holding it aside.
+                setShowOpenOnly(true);
+                setShowClosedOnly(false);
+                setStatusFilter("");
+                setClosedMonthFilter("");
+              }}
+              title={openOnlyActive ? "Closed actions are hidden. Press to include them." : "Closed actions are included. Press to show open actions only."}
+              style={openOnlyActive ? primaryButtonStyle : secondaryButtonStyle}
+            >
+              {openOnlyActive ? "Show Closed" : "Hide Closed"}
+            </button>
             <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
               Clear Filters
+            </button>
+            <button
+              type="button"
+              onClick={() => void generateFilteredActionRegisterPdf()}
+              disabled={filteredActions.length === 0}
+              title="Create a PDF of the actions currently shown"
+              style={primaryButtonStyle}
+            >
+              Export PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => void generateFilteredActionRegisterExcel()}
+              disabled={filteredActions.length === 0}
+              title="Download an Excel workbook of the actions currently shown"
+              style={secondaryButtonStyle}
+            >
+              Export Excel
             </button>
             <button
               type="button"
@@ -4770,16 +5180,11 @@ function ActionsPageContent() {
 
           <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} style={inputStyle}>
             <option value="">All Sources</option>
-            <option value="Manual">Manual</option>
-            <option value="Audit Finding">Audit Finding</option>
-            <option value="Asset Inspection">Asset Inspection</option>
-            <option value="Asset Maintenance">Asset Maintenance</option>
-            <option value="Asset Calibration">Asset Calibration</option>
-            <option value="NCR/CAPA">NCR/CAPA</option>
-            <option value="MOC">MOC</option>
-            <option value="Risk">Risk</option>
-            <option value="HSE">HSE</option>
-            <option value="Other">Other</option>
+            {sourceFilterOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
 
           <select
@@ -4797,28 +5202,6 @@ function ActionsPageContent() {
 
           <button
             type="button"
-            onClick={() => {
-              if (openOnlyActive) {
-                setShowOpenOnly(false);
-                return;
-              }
-              // Turning open-only on also drops a status or closed filter that was holding it aside.
-              setShowOpenOnly(true);
-              setShowClosedOnly(false);
-              setStatusFilter("");
-              setClosedMonthFilter("");
-            }}
-            title={openOnlyActive ? "Closed actions are hidden. Press to include them." : "Closed actions are included. Press to show open actions only."}
-            style={{
-              ...secondaryButtonStyle,
-              background: openOnlyActive ? "#000000" : "#D0D0CE",
-              color: openOnlyActive ? "#ffffff" : "#000000",
-            }}
-          >
-            {openOnlyActive ? "Open Actions Only" : "Including Closed Actions"}
-          </button>
-          <button
-            type="button"
             onClick={() => setShowOverdueOnly((current) => !current)}
             style={{
               ...secondaryButtonStyle,
@@ -4827,23 +5210,6 @@ function ActionsPageContent() {
             }}
           >
             {showOverdueOnly ? "Showing Overdue Only" : "Include All Due Status"}
-          </button>
-          <button type="button" onClick={clearFilters} style={secondaryButtonStyle}>
-            Clear Filters
-          </button>
-          <button
-            type="button"
-            onClick={() => void generateFilteredActionRegisterPdf()}
-            style={primaryButtonStyle}
-          >
-            Generate PDF Report
-          </button>
-          <button
-            type="button"
-            onClick={() => void generateFilteredActionRegisterExcel()}
-            style={primaryButtonStyle}
-          >
-            Generate Excel Report
           </button>
         </div>
           ) : null}
@@ -5047,78 +5413,108 @@ function ActionsPageContent() {
             ? "Edit the full action record, manage linked source information, and upload supporting evidence."
             : "Click an action row to open the full detail and edit panel."
         }
-        action={
-          selectedEvidenceAction ? (
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              {editForm.source === "AINM" && (editForm.linked_ainm_id || editForm.linked_ainm_number) ? (
-                <Link
-                  href={
-                    editForm.linked_ainm_id
-                      ? `/hse/ainm?ainmId=${encodeURIComponent(editForm.linked_ainm_id)}`
-                      : `/hse/ainm?ainm=${encodeURIComponent(editForm.linked_ainm_number)}`
-                  }
-                  style={secondaryButtonStyle}
-                >
-                  ← Back to AINM
-                </Link>
-              ) : null}
-              {editForm.source === "AINM" ? (
-                <button
-                  type="button"
-                  onClick={() => void sendAinmActionNotification()}
-                  style={secondaryButtonStyle}
-                >
-                  Send Notification
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedEvidenceAction(null);
-                  setSelectedEvidenceFiles([]);
-                  setSelectedEvidenceNotes("");
-                }}
-                style={secondaryButtonStyle}
-              >
-                Hide Panel
-              </button>
-            </div>
-          ) : null
-        }
       >
         {!selectedEvidenceAction ? (
           <div style={emptyEvidencePanelStyle}>No action selected. Click a row in the register to open the action detail panel.</div>
         ) : (
-          <div style={detailPanelGridStyle}>
-            <div style={detailSectionCardStyle}>
-              <div style={detailPanelHeaderStyle}>
-                <div>
-                  <div style={detailActionNumberStyle}>{selectedEvidenceAction.action_number || "-"}</div>
-                  <div style={detailActionTitleStyle}>{selectedEvidenceAction.title || "Untitled Action"}</div>
+          <RecordWorkbench
+            key={selectedEvidenceAction.id}
+            gate="closing"
+            reportLabel="Summary"
+            initialStep={recordStart && recordStart.id === selectedEvidenceAction.id ? recordStart.step : "details"}
+            steps={detailSteps}
+            missing={selectedNextStep ? selectedGaps : undefined}
+            header={
+              <RecordHeader
+                id={selectedEvidenceAction.action_number || "-"}
+                title={editForm.title || selectedEvidenceAction.title || "Untitled Action"}
+                status={{ label: selectedEvidenceAction.status || "Unknown", tone: toneForStatus(selectedEvidenceAction.status) }}
+                track={{ steps: ["Open", "In Progress", "Closed"], current: isClosedLikeStatus(selectedEvidenceAction.status) ? "Closed" : selectedEvidenceAction.status || "" }}
+                note={detailNote}
+                actions={
+                  <>
+                    <PriorityBadge value={selectedEvidenceAction.priority || "Unknown"} />
+                    {editForm.source === "AINM" && (editForm.linked_ainm_id || editForm.linked_ainm_number) ? (
+                      <Link
+                        href={
+                          editForm.linked_ainm_id
+                            ? `/hse/ainm?ainmId=${encodeURIComponent(editForm.linked_ainm_id)}`
+                            : `/hse/ainm?ainm=${encodeURIComponent(editForm.linked_ainm_number)}`
+                        }
+                        style={secondaryButtonStyle}
+                      >
+                        ← Back to AINM
+                      </Link>
+                    ) : null}
+                    {editForm.source === "AINM" ? (
+                      <ImsButton variant="secondary" onClick={() => void sendAinmActionNotification()}>
+                        Send Notification
+                      </ImsButton>
+                    ) : null}
+                    {selectedNextStep ? (
+                      <ImsButton
+                        onClick={() => quickSetStatus(selectedEvidenceAction, selectedNextStep)}
+                        disabled={!canEditAction || isSaving}
+                        title={canEditAction ? "Saves the action with its next status" : "You do not have permission to edit actions"}
+                      >
+                        {selectedNextStep === "In Progress" ? "Mark In Progress" : "Close"}
+                      </ImsButton>
+                    ) : null}
+                    <ImsButton
+                      variant="secondary"
+                      onClick={() => {
+                        setSelectedEvidenceAction(null);
+                        setSelectedEvidenceFiles([]);
+                        setSelectedEvidenceNotes("");
+                      }}
+                    >
+                      Hide Panel
+                    </ImsButton>
+                  </>
+                }
+              />
+            }
+            side={
+              <aside className="ims-doc" aria-label="Linked record">
+                <div className="ims-doc__title">Linked record</div>
+                <div className="ims-doc__row">
+                  <span className="ims-doc__label">Source</span>
+                  <span>{editForm.source || "Manual"}</span>
                 </div>
-                <div style={detailBadgeWrapStyle}>
-                  <PriorityBadge value={selectedEvidenceAction.priority || "Unknown"} />
-                  <StatusBadge value={selectedEvidenceAction.status || "Unknown"} />
+                <div className="ims-doc__row">
+                  <span className="ims-doc__label">Record</span>
+                  <span>{selectedLinkedTarget ? selectedLinkedTarget.number : "None stored"}</span>
                 </div>
-              </div>
-
+                <div className="ims-doc__row">
+                  <span className="ims-doc__label">Due</span>
+                  <span>{getDueSummary({ due_date: editForm.due_date || null, status: selectedEvidenceAction.status })}</span>
+                </div>
+                <div className="ims-doc__row">
+                  <span className="ims-doc__label">Owner</span>
+                  <span>{editForm.owner || "Unassigned"}</span>
+                </div>
+                <div className="ims-doc__row">
+                  <span className="ims-doc__label">Created</span>
+                  <span>{formatDateTime(selectedEvidenceAction.created_at)}</span>
+                </div>
+                <div className="ims-doc__row">
+                  <span className="ims-doc__label">Updated</span>
+                  <span>{formatDateTime(selectedEvidenceAction.updated_at)}</span>
+                </div>
+                {selectedLinkedTarget?.href ? (
+                  <ImsLinkButton href={selectedLinkedTarget.href} variant="secondary">
+                    Open {selectedLinkedTarget.kind} {selectedLinkedTarget.number}
+                  </ImsLinkButton>
+                ) : sourceImpliesLinkedRecord(editForm.source) ? (
+                  <div style={linkedWarningStyle}>No linked record is stored on this action.</div>
+                ) : null}
+              </aside>
+            }
+          >
+            <WorkbenchStep stepKey="details">
               <div style={detailFormGridStyle}>
                 <Field label="Action Number">
                   <input value={selectedEvidenceAction.action_number || ""} readOnly style={readOnlyInputStyle} />
-                </Field>
-
-                <Field label="Source">
-                  <select
-                    value={editForm.source}
-                    onChange={(e) => setEditForm((current) => applySourceChange(current, e.target.value))}
-                    style={inputStyle}
-                  >
-                    {actionSourceOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
                 </Field>
 
                 <Field label="Department">
@@ -5215,6 +5611,106 @@ function ActionsPageContent() {
                     onChange={(e) => setEditForm((current) => ({ ...current, due_date: e.target.value }))}
                     style={inputStyle}
                   />
+                </Field>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="Description">
+                    <textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm((current) => ({ ...current, description: e.target.value }))}
+                      style={textAreaStyle}
+                    />
+                  </Field>
+                </div>
+              </div>
+            </WorkbenchStep>
+
+            <WorkbenchStep stepKey="evidence">
+              <div style={{ display: "grid", gap: "14px" }}>
+              <div style={evidencePanelHeadingStyle}>Evidence</div>
+              <div style={evidenceMetaTextStyle}>
+                Upload follow-up files against <strong>{selectedEvidenceAction.action_number || "this action"}</strong>.
+              </div>
+
+              <div style={evidenceFieldWrapStyle}>
+                <label style={fieldLabelStyle}>Select files</label>
+                <input type="file" multiple onChange={handleSelectedEvidenceFileChange} style={inputStyle} disabled={!canEditAction} />
+              </div>
+
+              <div style={evidenceFieldWrapStyle}>
+                <label style={fieldLabelStyle}>Evidence Notes (optional)</label>
+                <textarea
+                  placeholder="Add a note for the uploaded evidence"
+                  value={selectedEvidenceNotes}
+                  onChange={(e) => setSelectedEvidenceNotes(e.target.value)}
+                  style={textAreaStyle}
+                />
+              </div>
+
+              <SelectedFilesList files={selectedEvidenceFiles} />
+
+              <div style={formFooterStyle}>
+                <button
+                  type="button"
+                  onClick={uploadEvidenceToSelectedAction}
+                  style={primaryButtonStyle}
+                  disabled={isUploadingEvidence || !canEditAction}
+                >
+                  {isUploadingEvidence ? "Uploading..." : "Upload Evidence"}
+                </button>
+              </div>
+
+              <div style={evidencePanelHeadingStyle}>Attached Files</div>
+
+              {selectedActionEvidence.length === 0 ? (
+                <p style={emptyTextStyle}>No evidence attached to this action yet.</p>
+              ) : (
+                <div style={evidenceListWrapStyle}>
+                  {selectedActionEvidence.map((file) => (
+                    <div key={file.id} style={evidenceItemStyle}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={evidenceFileNameStyle}>{file.file_name}</div>
+                        <div style={evidenceMetaTextStyle}>
+                          {formatFileSize(file.file_size)} · {file.content_type || "Unknown type"} · Uploaded{" "}
+                          {formatDateTime(file.uploaded_at)}
+                        </div>
+                        {file.notes ? <div style={evidenceNoteStyle}>Note: {file.notes}</div> : null}
+                      </div>
+
+                      <div style={actionButtonsWrapStyle}>
+                        <button type="button" onClick={() => openEvidence(file)} style={miniButtonStyle}>
+                          Open
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteEvidence(file)}
+                          style={miniButtonDeleteStyle}
+                          disabled={!canEditAction}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              </div>
+            </WorkbenchStep>
+
+            <WorkbenchStep stepKey="linked">
+              <div style={detailFormGridStyle}>
+                <Field label="Source">
+                  <select
+                    value={editForm.source}
+                    onChange={(e) => setEditForm((current) => applySourceChange(current, e.target.value))}
+                    style={inputStyle}
+                  >
+                    {actionSourceOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
 
                 {isAuditLinkedSource(editForm.source) ? (
@@ -5422,16 +5918,6 @@ function ActionsPageContent() {
                     ) : null}
                   </>
                 ) : null}
-
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <Field label="Description">
-                    <textarea
-                      value={editForm.description}
-                      onChange={(e) => setEditForm((current) => ({ ...current, description: e.target.value }))}
-                      style={textAreaStyle}
-                    />
-                  </Field>
-                </div>
               </div>
 
               {sourceImpliesLinkedRecord(editForm.source) ? (
@@ -5457,11 +5943,8 @@ function ActionsPageContent() {
                       Finding Reference: <strong>{editForm.linked_finding_reference}</strong>
                     </div>
                   ) : null}
-                  {editForm.linked_audit_number ? (
-                    <Link
-                      href={`/audits?search=${encodeURIComponent(editForm.linked_audit_number)}`}
-                      style={backLinkStyle}
-                    >
+                  {isAuditLinkedSource(editForm.source) && auditRecordHref(resolveActionAudit(editForm, auditLookup)) ? (
+                    <Link href={auditRecordHref(resolveActionAudit(editForm, auditLookup)) || "/audits"} style={backLinkStyle}>
                       Open Linked Audit
                     </Link>
                   ) : null}
@@ -5584,6 +6067,7 @@ function ActionsPageContent() {
                   ) : null}
                 </div>
               ) : null}
+            </WorkbenchStep>
 
               <div style={formFooterStyle}>
                 <button
@@ -5598,84 +6082,15 @@ function ActionsPageContent() {
                   Title stays short for the register; description holds the fuller action detail.
                 </span>
               </div>
-            </div>
-
-            <div style={detailSectionCardStyle}>
-              <div style={evidencePanelHeadingStyle}>Evidence</div>
-              <div style={evidenceMetaTextStyle}>
-                Upload follow-up files against <strong>{selectedEvidenceAction.action_number || "this action"}</strong>.
-              </div>
-
-              <div style={evidenceFieldWrapStyle}>
-                <label style={fieldLabelStyle}>Select files</label>
-                <input type="file" multiple onChange={handleSelectedEvidenceFileChange} style={inputStyle} disabled={!canEditAction} />
-              </div>
-
-              <div style={evidenceFieldWrapStyle}>
-                <label style={fieldLabelStyle}>Evidence Notes (optional)</label>
-                <textarea
-                  placeholder="Add a note for the uploaded evidence"
-                  value={selectedEvidenceNotes}
-                  onChange={(e) => setSelectedEvidenceNotes(e.target.value)}
-                  style={textAreaStyle}
-                />
-              </div>
-
-              <SelectedFilesList files={selectedEvidenceFiles} />
-
-              <div style={formFooterStyle}>
-                <button
-                  type="button"
-                  onClick={uploadEvidenceToSelectedAction}
-                  style={primaryButtonStyle}
-                  disabled={isUploadingEvidence || !canEditAction}
-                >
-                  {isUploadingEvidence ? "Uploading..." : "Upload Evidence"}
-                </button>
-              </div>
-
-              <div style={evidencePanelHeadingStyle}>Attached Files</div>
-
-              {selectedActionEvidence.length === 0 ? (
-                <p style={emptyTextStyle}>No evidence attached to this action yet.</p>
-              ) : (
-                <div style={evidenceListWrapStyle}>
-                  {selectedActionEvidence.map((file) => (
-                    <div key={file.id} style={evidenceItemStyle}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={evidenceFileNameStyle}>{file.file_name}</div>
-                        <div style={evidenceMetaTextStyle}>
-                          {formatFileSize(file.file_size)} · {file.content_type || "Unknown type"} · Uploaded{" "}
-                          {formatDateTime(file.uploaded_at)}
-                        </div>
-                        {file.notes ? <div style={evidenceNoteStyle}>Note: {file.notes}</div> : null}
-                      </div>
-
-                      <div style={actionButtonsWrapStyle}>
-                        <button type="button" onClick={() => openEvidence(file)} style={miniButtonStyle}>
-                          Open
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteEvidence(file)}
-                          style={miniButtonDeleteStyle}
-                          disabled={!canEditAction}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          </RecordWorkbench>
         )}
       </SectionCard>
       </div>
+
         </>
       ) : null}
     </main>
+    </AuditLookupContext.Provider>
   );
 }
 
@@ -5933,7 +6348,8 @@ function SourceChip({ action }: { action: ActionItem }) {
 }
 
 function LinkedRecordChips({ action }: { action: ActionItem }) {
-  const chips = buildLinkedRecordChips(action);
+  const lookup = useContext(AuditLookupContext);
+  const chips = buildLinkedRecordChips(action, lookup);
 
   if (chips.length === 0) {
     return <span style={secondaryCellTextStyle}>-</span>;
@@ -5941,11 +6357,23 @@ function LinkedRecordChips({ action }: { action: ActionItem }) {
 
   return (
     <div style={linkedChipRowStyle}>
-      {chips.map((chip) => (
-        <span key={chip.label} style={{ ...linkedChipStyle, ...linkedChipToneStyles[chip.tone] }}>
-          {chip.label}
-        </span>
-      ))}
+      {chips.map((chip) =>
+        chip.href ? (
+          <Link
+            key={chip.label}
+            href={chip.href}
+            title="Open this record"
+            onClick={(event) => event.stopPropagation()}
+            style={{ ...linkedChipStyle, ...linkedChipToneStyles[chip.tone], textDecoration: "underline" }}
+          >
+            {chip.label}
+          </Link>
+        ) : (
+          <span key={chip.label} style={{ ...linkedChipStyle, ...linkedChipToneStyles[chip.tone] }}>
+            {chip.label}
+          </span>
+        )
+      )}
     </div>
   );
 }
@@ -5968,18 +6396,7 @@ function SelectedFilesList({ files }: { files: File[] }) {
 }
 
 function StatusBadge({ value }: { value: string }) {
-  const lower = normaliseStatus(value);
-
-  const styles =
-    lower === "closed" || lower === "complete" || lower === "completed"
-      ? { background: "#ECECE7", color: "#005670" }
-      : lower === "open"
-      ? { background: "#ECECE7", color: "#005670" }
-      : lower === "in progress"
-      ? { background: "#ECECE7", color: "#000000" }
-      : { background: "#D0D0CE", color: "#53565A" };
-
-  return <span style={{ ...badgeStyle, ...styles }}>{value}</span>;
+  return <StatusPill label={value} tone={toneForStatus(value)} />;
 }
 
 function PriorityBadge({ value }: { value: string }) {
@@ -6155,6 +6572,45 @@ const statsGridStyle: CSSProperties = {
   marginBottom: "20px",
 };
 
+// One row of tiles, like every other page. The global phone rules put these two across on a phone.
+const kpiRowSixStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+  gap: "12px",
+  marginBottom: "20px",
+};
+
+const kpiRowFiveStyle: CSSProperties = { ...kpiRowSixStyle, gridTemplateColumns: "repeat(5, minmax(0, 1fr))" };
+
+const myCardListStyle: CSSProperties = { display: "grid", gap: "10px" };
+
+const myCardStyle: CSSProperties = {
+  display: "grid",
+  gap: "6px",
+  padding: "12px",
+  border: "1px solid #D0D0CE",
+  borderRadius: "16px",
+  background: "#ffffff",
+  minWidth: 0,
+};
+
+const myCardTopStyle: CSSProperties = { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" };
+
+const myCardTitleStyle: CSSProperties = { fontWeight: 800, color: "#000000", overflowWrap: "anywhere" };
+
+const myCardButtonsStyle: CSSProperties = { display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" };
+
+const myCardButtonStyle: CSSProperties = { flex: "1 1 40%", minWidth: 0 };
+
+const registerToolbarStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "10px",
+  alignItems: "center",
+};
+
+const registerToolbarSearchStyle: CSSProperties = { flex: "1 1 260px", minWidth: 0 };
+
 const twoColumnGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1.15fr 0.85fr",
@@ -6274,13 +6730,6 @@ const simpleFilterShellStyle: CSSProperties = {
   borderRadius: "16px",
   background: "rgba(248,250,252,0.92)",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
-};
-
-const simpleFilterTopRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(220px, 1fr) auto 132px",
-  gap: "10px",
-  alignItems: "center",
 };
 
 const simpleFilterButtonRowStyle: CSSProperties = {
@@ -6863,54 +7312,6 @@ const linkedSourceTitleStyle: CSSProperties = {
 const linkedSourceMetaStyle: CSSProperties = {
   fontSize: "13px",
   color: "#53565A",
-};
-
-const detailPanelGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, 0.8fr)",
-  gap: "16px",
-};
-
-const detailSectionCardStyle: CSSProperties = {
-  border: "1px solid #D0D0CE",
-  borderRadius: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
-  padding: "18px",
-  display: "grid",
-  gap: "14px",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)",
-  minWidth: 0,
-};
-
-const detailPanelHeaderStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "14px",
-  alignItems: "center",
-  flexWrap: "wrap",
-  paddingBottom: "14px",
-  marginBottom: "4px",
-  borderBottom: "1px solid #D0D0CE",
-};
-
-const detailActionNumberStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 800,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-  color: "#005670",
-};
-
-const detailActionTitleStyle: CSSProperties = {
-  fontSize: "22px",
-  fontWeight: 800,
-  color: "#000000",
-};
-
-const detailBadgeWrapStyle: CSSProperties = {
-  display: "flex",
-  gap: "8px",
-  flexWrap: "wrap",
 };
 
 const detailFormGridStyle: CSSProperties = {

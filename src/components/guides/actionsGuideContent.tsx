@@ -5,16 +5,17 @@ import {
   eyebrow, h2Style, h3Style, pStyle, codeStyle,
   stepList, Step, callout,
   mockPanel, mockHero, mockHeroEyebrow, mockLabel, flowWrap, flowStep, arrow,
-  mockInput, mockFieldLabel, mockRow, mockField, btn, pill,
+  mockInput, mockFieldLabel, mockRow, mockField, btn, pill, tintPill, RecordScreenMock,
 } from "./guideKit";
 
 type SectionKey =
-  | "overview" | "register" | "create" | "update" | "myactions"
+  | "overview" | "register" | "recordscreen" | "create" | "update" | "myactions"
   | "linked" | "bulk" | "reports" | "statuses" | "faq";
 
 const sections: GuideSectionDef[] = [
   { key: "overview",  label: "Overview",                  group: "Getting Started" },
   { key: "register",  label: "The Action Register",       group: "Getting Started" },
+  { key: "recordscreen", label: "The record screen",      group: "Core Workflows" },
   { key: "create",    label: "Creating an Action",        group: "Core Workflows" },
   { key: "update",    label: "Updating & Closing Out",    group: "Core Workflows" },
   { key: "myactions", label: "My Actions & Today",        group: "Core Workflows" },
@@ -26,16 +27,15 @@ const sections: GuideSectionDef[] = [
 ];
 
 function badge(status: string): CSSProperties {
-  const map: Record<string, { bg: string; color: string }> = {
-    open:          { bg: imsColours.danger,      color: "#ffffff" },
-    "in progress": { bg: imsColours.warning,     color: "#ffffff" },
-    closed:        { bg: imsColours.brand,       color: "#ffffff" },
-    overdue:       { bg: imsColours.danger,      color: "#ffffff" },
-    neutral:       { bg: imsColours.page,        color: imsColours.muted },
-    link:          { bg: imsColours.brandAccent, color: "#ffffff" },
+  const map: Record<string, "ok" | "warn" | "bad" | "neu" | "brand"> = {
+    open: "warn",
+    "in progress": "brand",
+    closed: "ok",
+    overdue: "bad",
+    neutral: "neu",
+    link: "brand",
   };
-  const t = map[status.toLowerCase()] || map.neutral;
-  return pill(t.bg, t.color);
+  return tintPill(map[status.toLowerCase()] || "neu");
 }
 
 const tabRow: CSSProperties = { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 };
@@ -80,7 +80,7 @@ function SectionOverview() {
         <tbody>
           {([
             ["Dashboard", "See the big picture: counts and charts. Click any number or bar to jump to the matching actions in the register."],
-            ["Action Register", "Search, filter, open, edit and delete any action. Also where you generate PDF and Excel reports."],
+            ["Action Register", "Search, filter, open, edit and delete any action. Also where you use Export PDF and Export Excel."],
             ["Create Action", "Add a single new action, with optional evidence files."],
             ["My Actions", "Your personal list of everything assigned to you."],
             ["Today", "Your items sorted by urgency: Overdue, Due Today, Due This Week, Later."],
@@ -95,14 +95,14 @@ function SectionOverview() {
         </tbody>
       </table>
       <h3 style={h3Style}>The Dashboard</h3>
-      <p style={pStyle}>The Dashboard has six number cards: <strong>Open Actions</strong>, <strong>Closed / Complete</strong>, <strong>Overdue Actions</strong>, <strong>Evidence Files</strong>, <strong>My Open Actions</strong> and <strong>Linked Record Issues</strong>. Below them, the Action Intelligence Dashboard shows charts for <strong>Actions by Status</strong>, <strong>Actions by Source / Module</strong>, <strong>Open Actions by Owner</strong>, <strong>Due Date Pressure</strong>, <strong>Priority Mix</strong> and <strong>Closure Trend</strong>. Every card and chart is clickable and takes you to the register already filtered.</p>
+      <p style={pStyle}>The Dashboard has one row of six number cards: <strong>Open</strong>, <strong>Closed</strong>, <strong>Overdue</strong>, <strong>Evidence</strong>, <strong>Mine</strong> (your open actions) and <strong>Link issues</strong> (actions missing the record they should link to). Below them, the Action Intelligence Dashboard shows charts for <strong>Actions by Status</strong>, <strong>Actions by Source / Module</strong>, <strong>Open Actions by Owner</strong>, <strong>Due Date Pressure</strong>, <strong>Priority Mix</strong> and <strong>Closure Trend</strong>. Every card and chart is clickable and takes you to the register already filtered.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>Closed actions are hidden from the register by default so you only see work still to do. See <strong>The Action Register</strong> for how to include them.</div>
       </div>
       <div style={callout("info")}>
         <span>ℹ</span>
-        <div><strong>Using it on a phone:</strong> the tabs wrap onto several lines and the tables scroll sideways. Use <strong>Today</strong> or <strong>My Actions</strong> to see your own work without wide tables.</div>
+        <div><strong>Using it on a phone:</strong> the tabs wrap onto several lines and the tables scroll sideways. <strong>My Actions</strong> shows a card for each item instead of a wide table, with <strong>Start</strong>, <strong>Close</strong> and <strong>Add evidence</strong> buttons, so use it to work through your own items.</div>
       </div>
     </>
   );
@@ -113,12 +113,15 @@ function SectionRegister() {
     <>
       <div style={eyebrow}>Getting Started</div>
       <h2 style={h2Style}>The Action Register</h2>
-      <p style={pStyle}>The <strong>Action Register</strong> tab lists every central action. Click a row (or its <strong>Open</strong> button) to open the full record in the <strong>Action Detail</strong> panel underneath.</p>
+      <p style={pStyle}>The <strong>Action Register</strong> tab lists every central action. Click a row (or its <strong>Open</strong> button) to open the action on the <strong>record screen</strong> in the <strong>Action Detail</strong> panel underneath (see The record screen).</p>
       <div style={mockPanel}>
         <div style={mockLabel}>Action Register</div>
-        <div style={mockRow}>
+        <div style={{ ...mockRow, alignItems: "center" }}>
           <div style={mockField(3)}><input style={mockInput} readOnly placeholder="Search action no. / title / project / owner" /></div>
+          <span style={btn("primary")}>Show Closed</span>
           <span style={btn("ghost")}>Clear Filters</span>
+          <span style={btn("primary")}>Export PDF</span>
+          <span style={btn("ghost")}>Export Excel</span>
           <span style={btn("primary")}>Show Filters</span>
         </div>
         <div style={{ fontSize: 11, color: imsColours.muted, marginBottom: 8 }}>Showing <strong>14</strong> of <strong>63</strong> actions showing <strong>open/non-closed</strong></div>
@@ -148,10 +151,11 @@ function SectionRegister() {
       <h3 style={h3Style}>Closed actions are hidden by default</h3>
       <p style={pStyle}>When you open the register it shows <strong>open and in-progress actions only</strong>. To see closed ones as well:</p>
       <div style={stepList}>
-        <Step n={1}>Click <strong>Show Filters</strong>.</Step>
-        <Step n={2}>Click the toggle button that reads <strong>Open Actions Only</strong>. It changes to <strong>Including Closed Actions</strong> and closed actions appear in the list. Click it again to hide them.</Step>
+        <Step n={1}>Click <strong>Show Closed</strong> in the toolbar. The button changes to <strong>Hide Closed</strong> and closed actions appear in the list.</Step>
+        <Step n={2}>Click <strong>Hide Closed</strong> to hide them again.</Step>
       </div>
-      <p style={pStyle}>Choosing a value in the <code style={codeStyle}>All Status</code> filter (for example Closed) also shows those actions, whatever the toggle says. <strong>Clear Filters</strong> puts everything back to the default: open actions only.</p>
+      <p style={pStyle}>Choosing a value in the <code style={codeStyle}>All Status</code> filter (for example Closed) also shows those actions. <strong>Clear Filters</strong> puts everything back to the default: open actions only.</p>
+      <p style={pStyle}>The toolbar runs left to right: the search box, <strong>Show Closed</strong>, <strong>Clear Filters</strong>, <strong>Export PDF</strong>, <strong>Export Excel</strong> and <strong>Show Filters</strong>.</p>
       <h3 style={h3Style}>Searching and filtering</h3>
       <p style={pStyle}>Type in the search box to find an action by number, title, project, owner or linked record number. Click <strong>Show Filters</strong> to reveal:</p>
       <table style={imsTableStyle}>
@@ -163,9 +167,8 @@ function SectionRegister() {
             ["All Status", "Open, In Progress, Closed"],
             ["All Priorities", "Low, Medium, High"],
             ["All Owners / All Projects", "Everyone and every project that appears on an action"],
-            ["All Sources", "Where the action came from, for example Manual, Audit Finding, NCR/CAPA, MOC"],
+            ["All Sources", "Where the action came from. Every source is listed: Manual, Audit, Audit Finding, Asset Inspection, Asset Maintenance, Asset Calibration, NCR/CAPA, MOC, AINM, HSE Inspection, Observation, Risk, HSE and Other"],
             ["All Departments", "Assets, Base, Commercial, Crewing, Engineering, Finance, Human Resources, Logistics, Marketing, Operations, Procurement, Project, Quality, Survey, HSE, HSEQ"],
-            ["Open Actions Only / Including Closed Actions", "Toggle button: hide or include closed actions"],
             ["Include All Due Status / Showing Overdue Only", "Toggle button: switch to overdue actions only"],
           ] as [string, string][]).map(([a, b]) => (
             <tr key={a}>
@@ -180,6 +183,59 @@ function SectionRegister() {
         <span>ℹ</span>
         <div>Overdue actions show the number of days overdue in red under the due date. The date shown as &ldquo;Due today&rdquo;, &ldquo;Due tomorrow&rdquo; or &ldquo;Due in N days&rdquo; updates automatically.</div>
       </div>
+    </>
+  );
+}
+
+function SectionRecordScreen() {
+  return (
+    <>
+      <div style={eyebrow}>Core Workflows</div>
+      <h2 style={h2Style}>The record screen</h2>
+      <p style={pStyle}>When you open an action from the Action Register, My Actions or a link from another module, it appears on the <strong>record screen</strong>. It has the same fields and buttons as the old Action Detail panel, arranged in three steps with the status, the next-step button and a linked-record card in view.</p>
+      <RecordScreenMock
+        id="ACT-041"
+        title="Replace worn lifting strops"
+        status="In Progress"
+        tone="brand"
+        nextButton="Close"
+        track={["Open", "In Progress", "Closed"]}
+        steps={[
+          { label: "Details", state: "Complete" },
+          { label: "Evidence", state: "0 files" },
+          { label: "Linked record", state: "INS-0112" },
+        ]}
+        active={1}
+        missing={["Evidence attached", "Closing note"]}
+        gate="closing"
+        summaryTitle="Linked record"
+        summaryRows={[["Source", "Asset Inspection"], ["Record", "INS-0112"], ["Due", "Overdue 3 days"]]}
+      />
+      <h3 style={h3Style}>The header</h3>
+      <p style={pStyle}>The top shows the action number, title, status and priority, with a track reading Open, In Progress, Closed. A line underneath gives the due date wording (for example &ldquo;Due in 3 days&rdquo; or &ldquo;Overdue 4 days&rdquo;) and where the action was raised from. One next-step button moves the action on:</p>
+      <div style={stepList}>
+        <Step n={1}><strong>Mark In Progress</strong> while the action is Open.</Step>
+        <Step n={2}><strong>Close</strong> while it is In Progress.</Step>
+        <Step n={3}>No button once it is Closed.</Step>
+      </div>
+      <p style={pStyle}>The button saves the action with its new status using the normal checks and emails. It needs Edit permission. <strong>Hide Panel</strong> closes the record. AINM actions also have <strong>Send Notification</strong> and <strong>← Back to AINM</strong> in the header.</p>
+      <h3 style={h3Style}>The three steps</h3>
+      <div style={stepList}>
+        <Step n={1}><strong>Details</strong> (what, who, when): the fields, Close-out Comments and the Description. The step reads <em>Complete</em>, or how many of Title, Owner and Due Date are still to fill.</Step>
+        <Step n={2}><strong>Evidence</strong> (files for closure): upload, open and delete files. The step reads how many files are attached.</Step>
+        <Step n={3}><strong>Linked record</strong> (where it came from): the Linked Record Intelligence box. The step reads the linked record number, or <em>None</em>.</Step>
+      </div>
+      <p style={pStyle}>Actions use state words rather than percentages. The record opens on Details, except when you press <strong>Add evidence</strong> on a My Actions card, which opens it on Evidence. <strong>Save Action</strong> stays below the steps.</p>
+      <h3 style={h3Style}>Still missing</h3>
+      <p style={pStyle}>While an action is not yet closed, a box lists <em>Evidence attached</em> and <em>Closing note</em> when they are missing. Click a chip to jump to that step.</p>
+      <div style={callout("info")}>
+        <span>ℹ</span>
+        <div>The chips warn, they never block. Closing with items missing asks &ldquo;N items are still missing: ... Close anyway?&rdquo; and you can go ahead.</div>
+      </div>
+      <h3 style={h3Style}>Form, Split and Summary</h3>
+      <p style={pStyle}><strong>Form</strong> shows only the steps, <strong>Split</strong> shows them beside a <strong>Linked record</strong> card, and <strong>Summary</strong> shows that card on its own. The card lists the Source, Record, Due, Owner, Created and Updated, and has a button to open the linked record (for example <strong>Open NCR NCR-0023</strong>), or warns &ldquo;No linked record is stored on this action.&rdquo;</p>
+      <h3 style={h3Style}>All sections</h3>
+      <p style={pStyle}>The <strong>All sections</strong> button shows every step on one long page, as the Action Detail panel used to. Click it again to go back to one step at a time.</p>
     </>
   );
 }
@@ -233,20 +289,21 @@ function SectionUpdate() {
       <h2 style={h2Style}>Updating &amp; Closing Out</h2>
       <h3 style={h3Style}>Opening and editing an action</h3>
       <div style={stepList}>
-        <Step n={1}>In the <strong>Action Register</strong>, click the action row or its <strong>Open</strong> button. The <strong>Action Detail</strong> panel opens below the table.</Step>
+        <Step n={1}>In the <strong>Action Register</strong>, click the action row or its <strong>Open</strong> button. The <strong>Action Detail</strong> panel opens below the table on the record screen (see The record screen).</Step>
         <Step n={2}>Change any of <code style={codeStyle}>Source</code>, <code style={codeStyle}>Department</code>, <code style={codeStyle}>Title</code>, <code style={codeStyle}>Owner</code>, <code style={codeStyle}>Project</code>, <code style={codeStyle}>Priority</code>, <code style={codeStyle}>Status</code>, <code style={codeStyle}>Due Date</code> or <code style={codeStyle}>Description</code>. <code style={codeStyle}>Raised By</code> and <code style={codeStyle}>Action Number</code> are shown for information and cannot be edited.</Step>
-        <Step n={3}>Click <strong>Save Action</strong>. The message &ldquo;Action updated successfully.&rdquo; confirms it.</Step>
+        <Step n={3}>Click <strong>Save Action</strong>, below the steps. The message &ldquo;Action updated successfully.&rdquo; confirms it.</Step>
         <Step n={4}>Click <strong>Hide Panel</strong> when you have finished.</Step>
       </div>
       <h3 style={h3Style}>Closing an action</h3>
       <div style={stepList}>
-        <Step n={1}>Open the action and set <code style={codeStyle}>Status</code> to <span style={badge("closed")}>Closed</span>.</Step>
-        <Step n={2}>Write what was done in <code style={codeStyle}>Close-out Comments</code>.</Step>
-        <Step n={3}>Upload any proof (see below), then click <strong>Save Action</strong>.</Step>
+        <Step n={1}>Open the action. Write what was done in <code style={codeStyle}>Close-out Comments</code> (step 1 <strong>Details</strong>).</Step>
+        <Step n={2}>Upload any proof in step 2 <strong>Evidence</strong> (see below).</Step>
+        <Step n={3}>Click <strong>Close</strong> in the header. If the action is still Open, the button reads <strong>Mark In Progress</strong> first; click it, then click <strong>Close</strong>. You can also set <code style={codeStyle}>Status</code> to <span style={badge("closed")}>Closed</span> by hand and click <strong>Save Action</strong>.</Step>
       </div>
+      <p style={pStyle}>If anything is missing (no evidence attached, or no closing note), you are asked &ldquo;N items are still missing: ... Close anyway?&rdquo; and can choose to go ahead. Closing is never blocked.</p>
       <p style={pStyle}>Once saved as Closed, the action drops out of the default register view and out of My Actions and Today. It is not lost: include closed actions whenever you need it.</p>
       <h3 style={h3Style}>Evidence</h3>
-      <p style={pStyle}>The right-hand side of the Action Detail panel holds the <strong>Evidence</strong> for that action.</p>
+      <p style={pStyle}>Step 2 <strong>Evidence</strong> of the record screen holds the files for that action.</p>
       <div style={stepList}>
         <Step n={1}>Under <code style={codeStyle}>Select files</code>, choose one or more files. You can add an optional <code style={codeStyle}>Evidence Notes (optional)</code>.</Step>
         <Step n={2}>Click <strong>Upload Evidence</strong>.</Step>
@@ -302,9 +359,10 @@ function SectionMyActions() {
           ))}
         </div>
         <div style={{ ...mockRow, alignItems: "center" }}>
+          <span style={btn("primary")}>Show Closed</span>
           <span style={btn("ghost")}>Clear Filters</span>
-          <span style={btn("primary")}>Generate PDF Report</span>
-          <span style={btn("primary")}>Generate Excel Report</span>
+          <span style={btn("primary")}>Export PDF</span>
+          <span style={btn("ghost")}>Export Excel</span>
           <span style={btn("primary")}>Show Filters</span>
         </div>
         <table style={imsTableStyle}>
@@ -332,11 +390,13 @@ function SectionMyActions() {
       </div>
       <div style={stepList}>
         <Step n={1}>Click the <strong>My Actions</strong> tab. The five cards at the top (<strong>My Total Items</strong>, <strong>My Open Items</strong>, <strong>My Closed Items</strong>, <strong>My Overdue</strong>, <strong>My Due This Week</strong>) count your items. Click a card to filter the list below it.</Step>
-        <Step n={2}>The list opens showing <strong>open items only</strong>. To see closed items too, click <strong>Show All Mine</strong> or the <strong>My Total Items</strong> card. <strong>My Closed Items</strong> shows only the closed ones.</Step>
+        <Step n={2}>The list opens showing <strong>open items only</strong>. To see closed items too, click <strong>Show Closed</strong> (it then reads <strong>Hide Closed</strong>) or the <strong>My Total Items</strong> card. <strong>My Closed Items</strong> shows only the closed ones.</Step>
         <Step n={3}>Click <strong>Show Filters</strong> for a status filter (<code style={codeStyle}>All Status</code>, Open, Closed) and a type filter (<code style={codeStyle}>All Types</code>: Action, NCR, AINM, Observation, Audit Finding, MOC). <strong>Clear Filters</strong> returns to the default open-only view.</Step>
         <Step n={4}>Click a row (or <strong>Open</strong>). A central Action opens in the Action Register; an NCR, Audit Finding, AINM, Observation or MOC item takes you to that module&apos;s own page.</Step>
-        <Step n={5}>Use <strong>Generate PDF Report</strong> or <strong>Generate Excel Report</strong> to download the list you are looking at. See <strong>PDF &amp; Excel Reports</strong>.</Step>
+        <Step n={5}>Use <strong>Export PDF</strong> or <strong>Export Excel</strong> to download the list you are looking at. See <strong>PDF &amp; Excel Reports</strong>.</Step>
       </div>
+      <h3 style={h3Style}>My Actions on a phone</h3>
+      <p style={pStyle}>On a phone, My Actions shows one card per item instead of the table, with overdue items first. Each card shows the type, number, status, title, project and due date, and these buttons: <strong>Start</strong> (moves an Open action to In Progress), <strong>Close</strong>, <strong>Add evidence</strong> (opens the action on its Evidence step) and <strong>Open</strong>. Start, Close and Add evidence appear for central Actions only; an NCR, Audit Finding, AINM, Observation or MOC item has just <strong>Open</strong>. <strong>Close</strong> asks &ldquo;Close anyway?&rdquo; if evidence or a closing note is missing. Long lists show 25 cards, then a <strong>Show more</strong> button.</p>
       <h3 style={h3Style}>Today</h3>
       <p style={pStyle}>The <strong>Today</strong> tab shows your open items in four buckets, most urgent first: <strong>Overdue</strong>, <strong>Due Today</strong>, <strong>Due This Week</strong> and <strong>Later</strong> (the card for this reads <strong>Later / No Date</strong>). Closed items are not shown here. Items with no due date, such as AINMs and Observations, appear under Later.</p>
       <h3 style={h3Style}>Overdue / Priority</h3>
@@ -403,6 +463,7 @@ function SectionLinked() {
         <tbody>
           {([
             ["Audit Finding", "Audit Number, then Finding Reference (choose the audit first)"],
+            ["Audit", "The same Audit Number and Finding Reference fields as Audit Finding. With no finding, the source shows as Audit"],
             ["Asset Inspection", "Linked Asset, then Inspection Record"],
             ["Asset Maintenance", "Linked Asset, then Maintenance Record"],
             ["Asset Calibration", "Linked Asset, then Calibration Record"],
@@ -421,8 +482,9 @@ function SectionLinked() {
         </tbody>
       </table>
       <h3 style={h3Style}>What you see on the register</h3>
-      <p style={pStyle}>The <strong>Source</strong> and <strong>Linked Record</strong> columns show coloured tags such as <code style={codeStyle}>NCR NCR-0023</code> or <code style={codeStyle}>MOC 014</code>. If an action&apos;s source normally has a linked record but none is stored, the tag reads <code style={codeStyle}>Missing linked record</code> (amber). The Dashboard card <strong>Linked Record Issues</strong> counts these, and clicking it lists them so you can fix them.</p>
-      <p style={pStyle}>In the Action Detail panel, a <strong>Linked Record Intelligence</strong> box repeats the links and gives shortcuts back to the record: <strong>Open Linked Audit</strong>, <strong>Open Linked Inspection Log</strong>, <strong>Open Linked Maintenance Log</strong>, <strong>Open Linked Calibration Log</strong>, <strong>Open Linked NCR</strong>, <strong>Open Linked AINM</strong>, <strong>Open Linked HSE Inspection</strong> and <strong>Open Linked Observation</strong>. For AINM actions there is also a <strong>← Back to AINM</strong> button.</p>
+      <p style={pStyle}>The <strong>Source</strong> and <strong>Linked Record</strong> columns show coloured tags such as <code style={codeStyle}>NCR NCR-0023</code> or <code style={codeStyle}>MOC 014</code>. If an action&apos;s source normally has a linked record but none is stored, the tag reads <code style={codeStyle}>Missing linked record</code> (amber). The Dashboard card <strong>Link issues</strong> counts these, and clicking it lists them so you can fix them.</p>
+      <p style={pStyle}>An action with the source <strong>Audit</strong> that has no linked finding shows as <strong>Audit</strong> in the Source column (it used to show as Other), and its linked-record tag shows the audit number and opens that audit when the audit is known. The stored source value is not changed.</p>
+      <p style={pStyle}>In step 3 <strong>Linked record</strong> of the record screen, a <strong>Linked Record Intelligence</strong> box repeats the links and gives shortcuts back to the record: <strong>Open Linked Audit</strong>, <strong>Open Linked Inspection Log</strong>, <strong>Open Linked Maintenance Log</strong>, <strong>Open Linked Calibration Log</strong>, <strong>Open Linked NCR</strong>, <strong>Open Linked AINM</strong>, <strong>Open Linked HSE Inspection</strong> and <strong>Open Linked Observation</strong>. For AINM actions there is also a <strong>← Back to AINM</strong> button.</p>
       <h3 style={h3Style}>Module action views</h3>
       <p style={pStyle}>Some modules have their own Actions page that shows the central register filtered to their department:</p>
       <div style={stepList}>
@@ -431,9 +493,10 @@ function SectionLinked() {
         <Step n={3}><strong>Asset Actions</strong> shows actions with department Assets.</Step>
       </div>
       <p style={pStyle}>Each has Dashboard, Register and Create views, and actions made there are saved into the same central register with that department already set. Use <strong>Open Central Actions</strong> to jump to the full register, or <strong>Open Central</strong> on a row to open that one action in it.</p>
+      <p style={pStyle}>On HSE Actions and Quality Actions, clicking a row shows the same record screen, but read-only: you can look at the details, evidence and linked record, but changes are made in Central Actions. The next-step button opens the action there. On Quality Actions it reads <strong>Mark In Progress</strong> or <strong>Close</strong>; on HSE Actions it reads <strong>Start in Central Actions</strong> or <strong>Close in Central Actions</strong>, with <strong>Open / Edit in Central Actions</strong> beside it.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
-        <div>The Risk Actions page is currently only a signpost to the central register (<strong>Open Central Actions</strong>). It does not hold its own actions or counts yet.</div>
+        <div><strong>Risk</strong> is still a valid Source on an action, so actions already logged against it stay in the central register and can be found with the All Sources filter.</div>
       </div>
     </>
   );
@@ -446,13 +509,13 @@ function SectionReports() {
       <h2 style={h2Style}>PDF &amp; Excel Reports</h2>
       <h3 style={h3Style}>From the Action Register</h3>
       <div style={stepList}>
-        <Step n={1}>Set up the register to show exactly the actions you want: search, filters, and the <strong>Open Actions Only</strong> / <strong>Including Closed Actions</strong> toggle.</Step>
-        <Step n={2}>Make sure the filter panel is open (<strong>Show Filters</strong>). The report buttons sit at the end of the filter bar.</Step>
-        <Step n={3}>Click <strong>Generate PDF Report</strong> or <strong>Generate Excel Report</strong>. The file downloads straight away.</Step>
+        <Step n={1}>Set up the register to show exactly the actions you want: search, filters, and the <strong>Show Closed</strong> / <strong>Hide Closed</strong> button.</Step>
+        <Step n={2}>Find <strong>Export PDF</strong> and <strong>Export Excel</strong> in the toolbar above the register. They do not need the filters panel to be open.</Step>
+        <Step n={3}>Click <strong>Export PDF</strong> or <strong>Export Excel</strong>. The file downloads straight away. Both are greyed out when no actions are showing.</Step>
       </div>
       <p style={pStyle}>The report contains <strong>only the actions currently listed</strong>, so a closed action will be in your report only if you chose to include closed actions. The PDF is a landscape A4 table (Action No., Title, Department, Source, Linked Record, Owner, Priority, Due Date, Status) with overdue dates highlighted. The Excel workbook has the same rows with a line saying which filters were applied, and adds Description, Project, an Overdue column and <strong>Close-out Comments</strong>.</p>
       <h3 style={h3Style}>From My Actions</h3>
-      <p style={pStyle}>On the <strong>My Actions</strong> tab, <strong>Generate PDF Report</strong> and <strong>Generate Excel Report</strong> sit next to <strong>Clear Filters</strong>. They report the items currently shown for you, whether that is open items only or everything you chose to show, and the report header records what was showing and for whom.</p>
+      <p style={pStyle}>On the <strong>My Actions</strong> tab, <strong>Export PDF</strong> and <strong>Export Excel</strong> sit in the toolbar next to <strong>Clear Filters</strong>. They report the items currently shown for you, whether that is open items only or everything you chose to show, and the report header records what was showing and for whom.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>If nothing matches your filters, no file is produced and the status message says there are no items available for export. Widen your filters and try again.</div>
@@ -485,7 +548,7 @@ function SectionStatuses() {
           <tr>
             <td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}><span style={badge("closed")}>Closed</span></td>
             <td style={imsTableCellStyle}>Done. Add Close-out Comments and evidence.</td>
-            <td style={imsTableCellStyle}>No. Use <strong>Including Closed Actions</strong> (register) or <strong>Show All Mine</strong> (My Actions).</td>
+            <td style={imsTableCellStyle}>No. Press <strong>Show Closed</strong> (register and My Actions).</td>
           </tr>
         </tbody>
       </table>
@@ -508,14 +571,16 @@ function SectionStatuses() {
           {([
             ["Show Filters / Hide Filters", "Opens or closes the filter bar"],
             ["Clear Filters", "Removes every filter and returns to open actions only"],
-            ["Open Actions Only / Including Closed Actions", "Hides or includes closed actions in the register"],
-            ["Show All Mine", "My Actions: include closed items"],
-            ["Generate PDF Report / Generate Excel Report", "Downloads the list you are looking at"],
+            ["Show Closed / Hide Closed", "Includes or hides closed actions (register) or closed items (My Actions)"],
+            ["Export PDF / Export Excel", "Downloads the list you are looking at"],
+            ["Mark In Progress / Close", "Header of the record screen: moves the action to its next status"],
+            ["Start / Close / Add evidence", "My Actions cards on a phone"],
             ["Add Action", "Saves a new action (Create Action tab)"],
             ["Save Action", "Saves changes to the open action"],
             ["Upload Evidence", "Attaches the chosen files to the open action"],
             ["Send Notification", "AINM actions only: emails the owner and raiser"],
             ["Hide Panel", "Closes the Action Detail panel"],
+            ["All sections", "Record screen: shows every step on one long page"],
           ] as [string, string][]).map(([a, b]) => (
             <tr key={a}>
               <td style={{ ...imsTableCellStyle, fontWeight: 800 }}>{a}</td>
@@ -530,8 +595,8 @@ function SectionStatuses() {
 
 function SectionFaq() {
   const qa: [string, string][] = [
-    ["I cannot see an action I know exists.", "It is probably closed. Closed actions are hidden by default. Click Show Filters, then change Open Actions Only to Including Closed Actions, or search by the action number. Also check that no other filter is on, or press Clear Filters."],
-    ["My Actions is empty or shows a message instead of a list.", "Your sign-in email has to match an active record in People Management. Ask an administrator to check your People record. Also remember closed items are hidden until you click Show All Mine."],
+    ["I cannot see an action I know exists.", "It is probably closed. Closed actions are hidden by default. Press Show Closed, or search by the action number. Also check that no other filter is on, or press Clear Filters."],
+    ["My Actions is empty or shows a message instead of a list.", "Your sign-in email has to match an active record in People Management. Ask an administrator to check your People record. Also remember closed items are hidden until you press Show Closed."],
     ["Why does a MOC action show only once?", "Every MOC action is also copied into the central register. If that central Action is already in your list, the MOC row is left out so you do not see it twice."],
     ["Can I change an action's number?", "No. Action Number is read-only and is allocated automatically, using the next free number."],
     ["Who can create, edit or delete actions?", "Only people with create or edit rights. Everyone else sees a \"Read-only access\" message and the buttons are disabled."],
@@ -556,6 +621,7 @@ function SectionFaq() {
 const sectionComponents: Record<SectionKey, () => ReactElement> = {
   overview:  SectionOverview,
   register:  SectionRegister,
+  recordscreen: SectionRecordScreen,
   create:    SectionCreate,
   update:    SectionUpdate,
   myactions: SectionMyActions,

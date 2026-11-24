@@ -116,28 +116,8 @@ const moduleCards = [
     group: "Control",
     cta: "Open",
   },
-  {
-    title: "Risk Management",
-    short: "Risk",
-    icon: "risk",
-    description: "Risk register foundation, reviews, controls, opportunities, and reporting shell.",
-    href: "/risk",
-    moduleKey: "risk",
-    status: "Ready",
-    group: "Governance",
-    cta: "Open",
-  },
-  {
-    title: "Management Review",
-    short: "Review",
-    icon: "review",
-    description: "Read-only management pack view across system health, actions, risk, documents, and assets.",
-    href: "/management-review",
-    moduleKey: "management-review",
-    status: "Ready",
-    group: "Governance",
-    cta: "Review",
-  },
+  // Risk Management and Management Review are hidden for now (23-24 Nov 2026 decision). Their pages and data are untouched.
+  // To bring one back, add its tile here again, add it to the navigation in AppShell.tsx and to allGuides in app/guides/page.tsx.
   {
     title: "People Management",
     short: "People",
@@ -318,24 +298,6 @@ function ModuleIconGlyph({ icon }: { icon: ModuleIcon }) {
       <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
         <path {...common} d="M4 6h12M4 12h9M4 18h7" />
         <path {...common} d="m16 15 2 2 3-4" />
-      </svg>
-    );
-  }
-
-  if (icon === "risk") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
-        <path {...common} d="M12 3 21 20H3z" />
-        <path {...common} d="M12 9v5M12 17h.01" />
-      </svg>
-    );
-  }
-
-  if (icon === "review") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" style={iconSvgStyle}>
-        <path {...common} d="M4 19V5M4 19h16" />
-        <path {...common} d="M8 15v-4M12 15V8M16 15v-6" />
       </svg>
     );
   }

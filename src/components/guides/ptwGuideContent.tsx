@@ -5,16 +5,17 @@ import {
   eyebrow, h2Style, h3Style, pStyle, codeStyle,
   stepList, Step, callout,
   mockPanel, mockHero, mockHeroEyebrow, mockLabel, flowWrap, flowStep, arrow,
-  mockInput, mockFieldLabel, mockRow, mockField, btn, pill,
+  mockInput, mockFieldLabel, mockRow, mockField, btn, pill, tintPill, RecordScreenMock,
 } from "./guideKit";
 
 type SectionKey =
-  | "overview" | "dashboard" | "create" | "issue" | "extensions"
+  | "overview" | "dashboard" | "recordscreen" | "create" | "issue" | "extensions"
   | "closure" | "attachments" | "outputs" | "reference" | "faq";
 
 const sections: GuideSectionDef[] = [
   { key: "overview",    label: "Overview",                     group: "Getting Started" },
   { key: "dashboard",   label: "Dashboard & Register",         group: "Getting Started" },
+  { key: "recordscreen", label: "The record screen",           group: "Core Workflows" },
   { key: "create",      label: "Creating a Permit",            group: "Core Workflows" },
   { key: "issue",       label: "Issue & Acceptance",           group: "Core Workflows" },
   { key: "extensions",  label: "Extensions",                   group: "Core Workflows" },
@@ -26,15 +27,14 @@ const sections: GuideSectionDef[] = [
 ];
 
 function badge(status: string): CSSProperties {
-  const map: Record<string, { bg: string; color: string }> = {
-    draft:            { bg: imsColours.page,        color: imsColours.muted },
-    "awaiting issue": { bg: imsColours.warning,     color: "#ffffff" },
-    issued:           { bg: imsColours.brandAccent, color: "#ffffff" },
-    extended:         { bg: imsColours.brandAccent, color: "#ffffff" },
-    closed:           { bg: imsColours.brand,       color: "#ffffff" },
+  const map: Record<string, "ok" | "warn" | "bad" | "neu" | "brand"> = {
+    draft: "neu",
+    "awaiting issue": "warn",
+    issued: "ok",
+    extended: "brand",
+    closed: "ok",
   };
-  const t = map[status.toLowerCase()] || map.draft;
-  return pill(t.bg, t.color);
+  return tintPill(map[status.toLowerCase()] || "neu");
 }
 
 const workTypes = [
@@ -84,9 +84,9 @@ function SectionOverview() {
           <tr>{["Tab", "What it is for"].map(h => <th key={h} style={imsTableHeadStyle}>{h}</th>)}</tr>
         </thead>
         <tbody>
-          <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Dashboard</td><td style={imsTableCellStyle}>Counts of permits by status. Clicking a count takes you to the register.</td></tr>
+          <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Dashboard</td><td style={imsTableCellStyle}>Counts of permits by status, the six sections of the form, and a How a permit moves panel. Clicking a count takes you to the register.</td></tr>
           <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>PTW Register</td><td style={imsTableCellStyle}>The list of every saved permit, with search and filters. Click a row to open it.</td></tr>
-          <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Create PTW</td><td style={imsTableCellStyle}>The permit form itself, used both for new permits and for editing saved ones.</td></tr>
+          <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Create PTW</td><td style={imsTableCellStyle}>The permit itself, on the record screen, used both for new permits and for editing saved ones.</td></tr>
           <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Template Layout</td><td style={imsTableCellStyle}>A reference list of the sections on the ENS-HSEQ-FRM-010 form.</td></tr>
         </tbody>
       </table>
@@ -113,6 +113,7 @@ function SectionDashboard() {
             ["Active Work", "Issued or Extended"],
             ["Extensions", "Has an extension date or time filled in"],
             ["Closed PTWs", "Status is Closed"],
+            ["Draft PTWs", "Status is Draft"],
           ].map(([t, d]) => (
             <div key={t} style={{ flex: "1 1 130px", background: "#fff", border: `1px solid ${imsColours.border}`, borderRadius: 8, padding: "9px 11px" }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: imsColours.brand }}>{t}</div>
@@ -121,6 +122,7 @@ function SectionDashboard() {
           ))}
         </div>
       </div>
+      <p style={pStyle}>Beneath the counts, <strong>PTW Workflow</strong> lists the six sections of form ENS-HSEQ-FRM-010 (Work type, Description, Precautions, Issue / acceptance, Extensions, Closure), and <strong>How a permit moves</strong> shows the statuses a permit passes through, in order, with a line on what each means: Draft (the applicant is still filling in the permit), Awaiting Issue (complete and waiting for the issuing authority), Issued (signed and work can start), Extended (extended with the conditions unchanged) and Closed (work finished and the area checked as safe and tidy).</p>
       <h3 style={h3Style}>The PTW Register</h3>
       <div style={mockPanel}>
         <div style={{ ...mockHero, marginTop: 0 }}>
@@ -129,7 +131,7 @@ function SectionDashboard() {
         </div>
         <div style={mockRow}>
           <div style={mockField(3)}><div style={{ ...mockInput, color: imsColours.muted }}>Search PTW no., location, work type, issuer...</div></div>
-          <div><span style={btn("primary")}>Show Filters</span></div>
+          <div style={{ display: "flex", gap: 6 }}><span style={btn("ghost")}>Clear Filters</span><span style={btn("primary")}>Export PDF</span><span style={btn("ghost")}>Export Excel</span><span style={btn("primary")}>Show Filters</span></div>
         </div>
         <div style={{ fontSize: 11, fontWeight: 700, margin: "4px 0 8px" }}>Showing 1 of 1 PTWs</div>
         <table style={imsTableStyle}>
@@ -153,9 +155,63 @@ function SectionDashboard() {
         <Step n={1}>Type in the search box. It looks at the PTW number, status, description of work, location, the issued-by and accepted-by names, and the work types.</Step>
         <Step n={2}>Click <strong>Show Filters</strong> to narrow by <code style={codeStyle}>All Statuses</code> or <code style={codeStyle}>All Work Types</code>. The work type list only offers types that appear on saved permits.</Step>
         <Step n={3}>Click <strong>Clear Filters</strong> to reset the search and both filters.</Step>
-        <Step n={4}>Click any row to open that permit on the <strong>Create PTW</strong> tab for viewing or editing.</Step>
+        <Step n={4}>Click <strong>Export PDF</strong> for a PDF of the permits currently shown, or <strong>Export Excel</strong> for a workbook of them. Both follow your search and filters and are greyed out when no permits are showing.</Step>
+        <Step n={5}>Click any row to open that permit on the <strong>Create PTW</strong> tab, on its record screen, for viewing or editing.</Step>
       </div>
       <p style={pStyle}>The search and filters are kept in the page address, so you can bookmark or share a filtered view.</p>
+    </>
+  );
+}
+
+function SectionRecordScreen() {
+  return (
+    <>
+      <div style={eyebrow}>Core Workflows</div>
+      <h2 style={h2Style}>The record screen</h2>
+      <p style={pStyle}>A permit opens on the <strong>record screen</strong> on the Create PTW tab: the same form as before, split into the six sections of ENS-HSEQ-FRM-010 as steps, with a live copy of the form beside it.</p>
+      <RecordScreenMock
+        id="PTW-001"
+        title="Hot Work: Workshop bay 2"
+        status="Awaiting Issue"
+        tone="warn"
+        nextButton="Issue Permit"
+        track={["Draft", "Awaiting Issue", "Issued", "Extended", "Closed"]}
+        steps={[
+          { label: "Work type", pct: 100 },
+          { label: "Description", pct: 100 },
+          { label: "Precautions", pct: 78 },
+          { label: "Issue / acceptance", pct: 50 },
+          { label: "Extensions", state: "0 of 4 used" },
+          { label: "Closure", pct: 0 },
+        ]}
+        active={3}
+        missing={["Isolation required answer", "Issued by (name and signature)", "Accepted by (name and signature)"]}
+        gate="the permit can be issued"
+        summaryTitle="Form ENS-HSEQ-FRM-010"
+        summaryRows={[["Work type", "Hot Work"], ["Location / system", "Workshop bay 2"], ["Issued by", null]]}
+      />
+      <h3 style={h3Style}>The header</h3>
+      <p style={pStyle}>The top shows the PTW number, a title built from the work types and location, the status, and a track reading Draft, Awaiting Issue, Issued, Extended, Closed. A line reminds you to set the status to Awaiting Issue when the permit is complete, so the issuing authority can issue it. <strong>Issue Permit</strong> appears only while the status is Awaiting Issue. <strong>Hide Panel</strong> takes you back to the register. The PTW No. and Status boxes sit just above the steps.</p>
+      <h3 style={h3Style}>The six steps</h3>
+      <div style={stepList}>
+        <Step n={1}><strong>Work type</strong> (Section 1). Percentage.</Step>
+        <Step n={2}><strong>Description</strong> (Section 2). Percentage.</Step>
+        <Step n={3}><strong>Precautions</strong> (Section 3 and attachments). Percentage.</Step>
+        <Step n={4}><strong>Issue / acceptance</strong> (Section 4). Percentage.</Step>
+        <Step n={5}><strong>Extensions</strong> (Section 5A-D). No percentage: it reads how many of the four blocks are used, for example <em>1 of 4 used</em>.</Step>
+        <Step n={6}><strong>Closure</strong> (Section 5E). Percentage.</Step>
+      </div>
+      <p style={pStyle}>The percentages count real fields: for example Issue / acceptance counts the start and end dates and times and the name and signature of the issuer and the acceptor, and Precautions also counts the Lift Plan when Lifting Operations is ticked.</p>
+      <h3 style={h3Style}>Still missing</h3>
+      <p style={pStyle}>A box lists what is still missing before the permit can be issued: Work type, Description of work, Exact location, Risk assessment, Isolation required answer, Start date and time, End date and time, and the name and signature of the Issued by and Accepted by blocks. Click a chip to jump to its step.</p>
+      <div style={callout("info")}>
+        <span>ℹ</span>
+        <div>The chips warn, they never block. If you click <strong>Issue Permit</strong> with items missing you are asked &ldquo;N items are still missing: ... Issue anyway?&rdquo; and can go ahead. As before, the IMS does not check or lock anything: Issue Permit just sets the status to Issued and saves, the same as choosing Issued and clicking Save PTW.</div>
+      </div>
+      <h3 style={h3Style}>Form, Split and Permit form</h3>
+      <p style={pStyle}>The view buttons above the steps are <strong>Form</strong>, <strong>Split</strong> and <strong>Permit form</strong>. Form shows only the fields, Split shows the fields beside the live <strong>Form ENS-HSEQ-FRM-010</strong> summary, and Permit form shows that summary on its own. Anything not yet filled in shows as an amber &ldquo;to be completed&rdquo; that you can click to jump to the step.</p>
+      <h3 style={h3Style}>All sections</h3>
+      <p style={pStyle}>The <strong>All sections</strong> button shows all six sections on one long page, as the permit form used to. Click it again to return to one step at a time. <strong>Save PTW</strong>, <strong>New PTW</strong>, <strong>Reset Form</strong>, <strong>Delete PTW</strong>, <strong>Generate Word</strong> and <strong>Export PDF</strong> stay at the bottom whichever step you are on.</p>
     </>
   );
 }
@@ -165,13 +221,13 @@ function SectionCreate() {
     <>
       <div style={eyebrow}>Core Workflows</div>
       <h2 style={h2Style}>Creating a Permit</h2>
-      <p style={pStyle}>Sections 1 to 3 describe the job and the precautions. You can save at any time, including part-completed, with the status left on <span style={badge("draft")}>Draft</span>.</p>
+      <p style={pStyle}>Sections 1 to 3 describe the job and the precautions. You can save at any time, including part-completed, with the status left on <span style={badge("draft")}>Draft</span>. On the record screen, Section 1 is the <strong>Work type</strong> step, Section 2 is <strong>Description</strong> and Section 3 is <strong>Precautions</strong>.</p>
       <div style={stepList}>
-        <Step n={1}>Click <strong>New PTW</strong> (top right of the page, or on the Dashboard). A blank form opens with the next free number already filled in, for example <code style={codeStyle}>PTW-001</code>, <code style={codeStyle}>PTW-002</code>. You can overtype the number.</Step>
+        <Step n={1}>Click <strong>New PTW</strong> (top right of the page). A blank form opens with the next free number already filled in, for example <code style={codeStyle}>PTW-001</code>, <code style={codeStyle}>PTW-002</code>. You can overtype the number.</Step>
         <Step n={2}><strong>Section 1 – Work Type.</strong> Tick every type of work that applies. Ticking <strong>Other</strong> reveals an <code style={codeStyle}>Other Work Type</code> box.</Step>
         <Step n={3}><strong>Section 2 – Description of Work.</strong> Complete <code style={codeStyle}>Description of Work</code>, <code style={codeStyle}>Equipment / Tools to be Used</code> and <code style={codeStyle}>Exact Location of Work / System to be Worked On</code>.</Step>
         <Step n={4}><strong>Section 3 – Preparation and Precautions.</strong> Complete the boxes and Yes/No buttons shown below, then tick the precautions that apply.</Step>
-        <Step n={5}>Click <strong>Save PTW</strong>.</Step>
+        <Step n={5}>Click <strong>Save PTW</strong> (it stays at the bottom of the screen on every step).</Step>
       </div>
       <div style={mockPanel}>
         <div style={mockLabel}>Section 1 – Work Type (tick as applicable)</div>
@@ -208,7 +264,7 @@ function SectionCreate() {
       <p style={pStyle}>The Yes/No buttons can be clicked again to clear them. Ticking <strong>Other</strong> in the precautions reveals an <code style={codeStyle}>Other Precaution</code> box. <code style={codeStyle}>Hrs. by Issuing Authority</code> accepts a number only.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
-        <div>After the first save the permit stays open on the Create PTW tab and the heading shows its number and status. No field is compulsory to save, so check the form is complete before relying on it.</div>
+        <div>After the first save the permit stays open on the Create PTW tab and the header shows its number and status. No field is compulsory to save, so check the form is complete before relying on it.</div>
       </div>
     </>
   );
@@ -221,11 +277,11 @@ function SectionIssue() {
       <h2 style={h2Style}>Issue &amp; Acceptance (Section 4)</h2>
       <p style={pStyle}>Section 4 records when the permit runs and who issued and accepted it. The form shows the printed note <em>Maximum 12 hours or to shift change</em>; the IMS does not check the times you enter against it.</p>
       <div style={stepList}>
-        <Step n={1}>Enter <code style={codeStyle}>Start Time</code>, <code style={codeStyle}>Start Date</code>, <code style={codeStyle}>End Time</code> and <code style={codeStyle}>End Date</code>.</Step>
+        <Step n={1}>Go to the <strong>Issue / acceptance</strong> step and enter <code style={codeStyle}>Start Time</code>, <code style={codeStyle}>Start Date</code>, <code style={codeStyle}>End Time</code> and <code style={codeStyle}>End Date</code>.</Step>
         <Step n={2}>Under <strong>Permit Issued by Authorised Person</strong>, pick the person from the <code style={codeStyle}>Name</code> list (<em>Select person</em>).</Step>
         <Step n={3}>Check <code style={codeStyle}>Position</code>, fill in <code style={codeStyle}>Company</code> and <code style={codeStyle}>Date</code>, and type the confirmation in <code style={codeStyle}>Signature / Confirmation</code>.</Step>
         <Step n={4}>Repeat for <strong>Permit Accepted By</strong>.</Step>
-        <Step n={5}>Change <code style={codeStyle}>Status</code> at the top of the form to <span style={badge("awaiting issue")}>Awaiting Issue</span> or <span style={badge("issued")}>Issued</span> as appropriate, and click <strong>Save PTW</strong>.</Step>
+        <Step n={5}>Change <code style={codeStyle}>Status</code> (above the steps) to <span style={badge("awaiting issue")}>Awaiting Issue</span> when the permit is complete, and click <strong>Save PTW</strong>. The <strong>Issue Permit</strong> button then appears in the header: click it to set the status to <span style={badge("issued")}>Issued</span> and save. You can still choose Issued in the Status box and click Save PTW instead.</Step>
       </div>
       <div style={mockPanel}>
         <div style={mockLabel}>Permit Issued by Authorised Person</div>
@@ -256,7 +312,7 @@ function SectionExtensions() {
       <h2 style={h2Style}>Extensions (Sections 5A–5D)</h2>
       <p style={pStyle}>The form has four extension blocks, <strong>5A</strong>, <strong>5B</strong>, <strong>5C</strong> and <strong>5D</strong>. The form notes that extensions are <em>only if conditions of PTW have not changed</em>; that is a reminder printed on the form, not something the IMS checks.</p>
       <div style={stepList}>
-        <Step n={1}>Open the saved permit from the <strong>PTW Register</strong>.</Step>
+        <Step n={1}>Open the saved permit from the <strong>PTW Register</strong> and go to the <strong>Extensions</strong> step. It reads, for example, <em>1 of 4 used</em>.</Step>
         <Step n={2}>In the first unused block (5A first), enter <code style={codeStyle}>PTW Extended To (Time)</code> and <code style={codeStyle}>Date</code>.</Step>
         <Step n={3}>Complete <strong>Permit Extension by Authorised Person</strong> and <strong>Permit Accepted By</strong> (name, position, company, date, signature / confirmation), in the same way as Section 4.</Step>
         <Step n={4}>Set <code style={codeStyle}>Status</code> to <span style={badge("extended")}>Extended</span> and click <strong>Save PTW</strong>.</Step>
@@ -285,7 +341,7 @@ function SectionClosure() {
       <h2 style={h2Style}>Closing a Permit (Section 5E)</h2>
       <p style={pStyle}>Section 5E is headed <em>Permit Closure by Site Manager / Designate</em>, with the note <em>All work completed / suspended. Tags and key returned and area checked as safe and tidy.</em> That wording is printed on the form for the people closing the permit.</p>
       <div style={stepList}>
-        <Step n={1}>Open the permit from the <strong>PTW Register</strong>.</Step>
+        <Step n={1}>Open the permit from the <strong>PTW Register</strong> and go to the <strong>Closure</strong> step.</Step>
         <Step n={2}>Under <strong>Person Performing the Work</strong>, pick the name and complete position, company, date and signature / confirmation.</Step>
         <Step n={3}>Under <strong>PTW Issuing Authority</strong>, do the same.</Step>
         <Step n={4}>Set <code style={codeStyle}>Status</code> to <span style={badge("closed")}>Closed</span> and click <strong>Save PTW</strong>.</Step>
@@ -306,7 +362,7 @@ function SectionAttachments() {
     <>
       <div style={eyebrow}>Supporting Files</div>
       <h2 style={h2Style}>Attachments</h2>
-      <p style={pStyle}>The <strong>Attachments and Distribution</strong> section lets you list the supporting documents for the permit and upload a file against each one.</p>
+      <p style={pStyle}>The <strong>Attachments and Distribution</strong> section, at the end of the <strong>Precautions</strong> step, lets you list the supporting documents for the permit and upload a file against each one.</p>
       <div style={mockPanel}>
         <div style={mockLabel}>Attachments and Distribution</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
@@ -345,7 +401,7 @@ function SectionOutputs() {
     <>
       <div style={eyebrow}>Supporting Files</div>
       <h2 style={h2Style}>Word &amp; PDF Output</h2>
-      <p style={pStyle}>At the bottom of the Create PTW tab, <strong>Generate Word</strong> and <strong>Generate PDF</strong> produce the permit as a document on the ENS-HSEQ-FRM-010 layout.</p>
+      <p style={pStyle}>At the bottom of the Create PTW tab, <strong>Generate Word</strong> and <strong>Export PDF</strong> produce the permit as a document on the ENS-HSEQ-FRM-010 layout.</p>
       <div style={mockPanel}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <span style={btn("primary")}>Save PTW</span>
@@ -353,12 +409,12 @@ function SectionOutputs() {
           <span style={btn("ghost")}>Reset Form</span>
           <span style={btn("danger")}>Delete PTW</span>
           <span style={btn("ghost")}>Generate Word</span>
-          <span style={btn("ghost")}>Generate PDF</span>
+          <span style={btn("ghost")}>Export PDF</span>
         </div>
       </div>
       <div style={stepList}>
         <Step n={1}>Open the permit and make sure it is complete.</Step>
-        <Step n={2}>Click <strong>Generate Word</strong> or <strong>Generate PDF</strong>. The file downloads, named after the permit, for example <code style={codeStyle}>PTW-001-permit-to-work.pdf</code> or <code style={codeStyle}>PTW-001-permit-to-work.docx</code>.</Step>
+        <Step n={2}>Click <strong>Generate Word</strong> or <strong>Export PDF</strong>. The file downloads, named after the permit, for example <code style={codeStyle}>PTW-001-permit-to-work.pdf</code> or <code style={codeStyle}>PTW-001-permit-to-work.docx</code>.</Step>
         <Step n={3}>On a phone or tablet, the download is saved to the device in the same way; open it from your downloads or the Files app.</Step>
       </div>
       <h3 style={h3Style}>What is in the document</h3>
@@ -388,7 +444,7 @@ function SectionReference() {
       <div style={eyebrow}>Reference</div>
       <h2 style={h2Style}>Status &amp; Field Reference</h2>
       <h3 style={h3Style}>Permit status</h3>
-      <p style={pStyle}>Set from the <code style={codeStyle}>Status</code> drop-down at the top of the permit. The IMS never moves it for you.</p>
+      <p style={pStyle}>Set from the <code style={codeStyle}>Status</code> drop-down above the steps, or with <strong>Issue Permit</strong>, which moves Awaiting Issue to Issued. The IMS never moves it on its own.</p>
       <table style={imsTableStyle}>
         <thead>
           <tr>{["Status", "Meaning"].map(h => <th key={h} style={imsTableHeadStyle}>{h}</th>)}</tr>
@@ -428,11 +484,12 @@ function SectionReference() {
           <tr>{["Button", "What it does"].map(h => <th key={h} style={imsTableHeadStyle}>{h}</th>)}</tr>
         </thead>
         <tbody>
+          <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Issue Permit</td><td style={imsTableCellStyle}>In the header, only while the status is Awaiting Issue. Sets the status to Issued and saves. Missing items are listed first and you can carry on.</td></tr>
           <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Save PTW</td><td style={imsTableCellStyle}>Saves a new permit, or updates the open one, and uploads any queued attachments.</td></tr>
           <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>New PTW</td><td style={imsTableCellStyle}>Opens a blank form with the next number. Unsaved changes on the current form are lost.</td></tr>
           <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Reset Form</td><td style={imsTableCellStyle}>Puts the form back to how it was last saved (or blank, for a new permit).</td></tr>
           <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Delete PTW</td><td style={imsTableCellStyle}>Deletes the saved permit after confirmation.</td></tr>
-          <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Generate Word / Generate PDF</td><td style={imsTableCellStyle}>Downloads the permit as a document.</td></tr>
+          <tr><td style={{ ...imsTableCellStyle, fontWeight: 800 }}>Generate Word / Export PDF</td><td style={imsTableCellStyle}>Downloads the permit as a document.</td></tr>
         </tbody>
       </table>
     </>
@@ -491,6 +548,7 @@ function SectionFaq() {
 const sectionComponents: Record<SectionKey, () => ReactElement> = {
   overview:    SectionOverview,
   dashboard:   SectionDashboard,
+  recordscreen: SectionRecordScreen,
   create:      SectionCreate,
   issue:       SectionIssue,
   extensions:  SectionExtensions,

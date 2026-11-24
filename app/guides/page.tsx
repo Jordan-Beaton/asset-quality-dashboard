@@ -16,10 +16,8 @@ import { inspectionsGuide } from "../../src/components/guides/inspectionsGuideCo
 import { ptwGuide } from "../../src/components/guides/ptwGuideContent";
 import { auditsGuide } from "../../src/components/guides/auditsGuideContent";
 import { assetsGuide } from "../../src/components/guides/assetsGuideContent";
-import { riskGuide } from "../../src/components/guides/riskGuideContent";
 import { lessonsGuide } from "../../src/components/guides/lessonsGuideContent";
 import { certificationGuide } from "../../src/components/guides/certificationGuideContent";
-import { managementReviewGuide } from "../../src/components/guides/managementReviewGuideContent";
 import { projectsGuide } from "../../src/components/guides/projectsGuideContent";
 import { adminGuide } from "../../src/components/guides/adminGuideContent";
 import { phoneGuide } from "../../src/components/guides/phoneGuideContent";
@@ -40,10 +38,9 @@ const allGuides: GuideDefinition[] = [
   inspectionsGuide,
   ptwGuide,
   assetsGuide,
-  riskGuide,
+  // riskGuide and managementReviewGuide are hidden while those modules are hidden (see app/home/page.tsx). The guide files are kept: src/components/guides/riskGuideContent.tsx and managementReviewGuideContent.tsx.
   lessonsGuide,
   certificationGuide,
-  managementReviewGuide,
   projectsGuide,
   reviewPointsGuide,
   reportsGuide,

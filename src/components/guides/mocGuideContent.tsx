@@ -92,6 +92,7 @@ function SectionRegister() {
         </table>
       </div>
       <p style={pStyle}>The register also shows the project / worksite (with the parts it applies to), the MOC Co-Ordinator, the Responsible ENS Manager / Supervisor, and a <strong>PDF</strong> button on each row. Use the search box and <strong>Show Filters</strong> to narrow by status (including <strong>Active</strong>, meaning not Closed), change type, project (or Company-wide), and a view: <strong>Recently Created</strong>, <strong>Expired Temporary</strong>, <strong>Expiry Soon</strong>, or <strong>Draft Ageing</strong>. Click a row to open the detail panel below the register.</p>
+      <p style={pStyle}>The toolbar above the register runs left to right: the search box, <strong>Clear Filters</strong>, <strong>Export PDF</strong>, <strong>Export Excel</strong> and <strong>Show Filters</strong>. <strong>Export PDF</strong> makes a PDF register of the MOCs currently shown, and <strong>Export Excel</strong> downloads a workbook of them. Both follow your search and filters and are greyed out when nothing is showing. They are separate from the <strong>PDF</strong> button on each row, which makes the full report for that one MOC.</p>
     </>
   );
 }

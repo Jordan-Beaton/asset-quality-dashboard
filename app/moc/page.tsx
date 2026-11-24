@@ -29,7 +29,7 @@ import {
 } from "docx";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
-import { ImsTopMetaRow } from "../../src/components/ImsPrimitives";
+import { ImsButton, ImsFilterPanel, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { PersonPicker } from "../../src/components/PersonPicker";
 import { MocLivePreview, MocStageBar, MocViewToggle, computeMocChecks } from "../../src/components/MocWorkbench";
@@ -37,6 +37,8 @@ import type { MocStage, MocViewMode } from "../../src/components/MocWorkbench";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlState } from "../../src/lib/useUrlState";
 import { openFileUrl, saveBlobAsFile } from "../../src/lib/fileOpen";
+import { downloadRegisterExcel, excelDateStamp } from "../../src/lib/registerExcel";
+import { exportPdfTableTheme, exportRgb } from "../../src/lib/exportTheme";
 import { uploadContentType } from "../../src/lib/fileTypes";
 
 export const dynamic = "force-dynamic";
@@ -4015,6 +4017,105 @@ function MOCPageContent() {
     }
   }
 
+  function clearRegisterFilters() {
+    setSearch("");
+    setStatusFilter("All");
+    setChangeTypeFilter("All");
+    setProjectFilter("All");
+    setViewFilter("All");
+  }
+
+  // The register exports hold exactly the MOCs on screen, with the filters that produced them.
+  function registerFilterDescriptions() {
+    const projectLabel =
+      projectFilter === "All"
+        ? "All"
+        : projectFilter === "company"
+        ? "Company-wide"
+        : projectSeries.find((item) => item.project_key === projectFilter)?.label || projectFilter;
+    return [
+      `Status: ${statusFilter}`,
+      `Change type: ${changeTypeFilter}`,
+      `Project: ${projectLabel}`,
+      `View: ${viewFilter === "Recent" ? "Recently Created" : viewFilter}`,
+      ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+    ];
+  }
+
+  function exportRegisterPdf() {
+    if (!filteredReports.length) {
+      showMessage("There are no MOC records to export for the current filters.", "error");
+      return;
+    }
+    try {
+      const doc = new jsPDF("l", "mm", "a4");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(...exportRgb.brand);
+      doc.text("MOC Register", 12, 16);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...exportRgb.muted);
+      doc.text(`Generated ${new Date().toLocaleString("en-GB")} - ${filteredReports.length} record${filteredReports.length === 1 ? "" : "s"}`, 12, 22);
+      doc.text(`Filters: ${registerFilterDescriptions().join(" | ")}`, 12, 27, { maxWidth: 273 });
+      autoTable(doc, {
+        startY: 32,
+        margin: { left: 12, right: 12 },
+        head: [["MOC No.", "Title", "Project / worksite", "Coordinator", "Manager", "Change type", "Status", "Updated"]],
+        body: filteredReports.map((report) => [
+          report.moc_report_no || "",
+          report.moc_report_title || "Untitled MOC",
+          report.project_worksite_address || "-",
+          report.moc_coordinator_name || "-",
+          report.responsible_manager_name || "-",
+          report.change_type === "Temporary" ? `Temporary (${getTemporaryValidityLabel(report)})` : report.change_type,
+          report.status,
+          formatDateTime(buildRegisterUpdatedAt(report)),
+        ]),
+        theme: "grid",
+        styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [...exportPdfTableTheme.bodyStyles.lineColor], lineWidth: 0.1 },
+        headStyles: { fillColor: [...exportPdfTableTheme.headStyles.fillColor], textColor: [...exportPdfTableTheme.headStyles.textColor], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [...exportPdfTableTheme.alternateRowStyles.fillColor] },
+      });
+      saveBlobAsFile(doc.output("blob"), `moc-register-${excelDateStamp()}.pdf`);
+      showMessage(`MOC register PDF created with ${filteredReports.length} record${filteredReports.length === 1 ? "" : "s"}.`, "success");
+    } catch (error) {
+      showMessage(getErrorMessage(error), "error");
+    }
+  }
+
+  async function exportRegisterExcel() {
+    if (!filteredReports.length) {
+      showMessage("There are no MOC records to export for the current filters.", "error");
+      return;
+    }
+    try {
+      await downloadRegisterExcel<MocReport>({
+        fileName: `moc-register-${excelDateStamp()}.xlsx`,
+        sheetName: "MOC Register",
+        title: "MOC Register — Enshore IMS",
+        filters: registerFilterDescriptions(),
+        rows: filteredReports,
+        columns: [
+          { header: "MOC Report No.", width: 16, value: (report) => report.moc_report_no || "" },
+          { header: "MOC Report Title", width: 40, value: (report) => report.moc_report_title || "" },
+          { header: "Project / Worksite Address", width: 30, value: (report) => report.project_worksite_address || "" },
+          { header: "Applies To", width: 28, value: (report) => report.applies_to.join(", ") },
+          { header: "MOC Coordinator", width: 24, value: (report) => report.moc_coordinator_name || "" },
+          { header: "Responsible ENS Manager / Supervisor", width: 30, value: (report) => report.responsible_manager_name || "" },
+          { header: "Change Type", width: 12, value: (report) => report.change_type },
+          { header: "Temporary Validity", width: 28, value: (report) => (report.change_type === "Temporary" ? getTemporaryValidityLabel(report) : "") },
+          { header: "Status", width: 16, value: (report) => report.status },
+          { header: "Created / Updated", width: 20, value: (report) => formatDateTime(buildRegisterUpdatedAt(report)) },
+          { header: "Proposed Change", width: 60, value: (report) => report.proposed_change_description || "" },
+        ],
+      });
+      showMessage(`MOC register Excel created with ${filteredReports.length} record${filteredReports.length === 1 ? "" : "s"}.`, "success");
+    } catch (error) {
+      showMessage(getErrorMessage(error), "error");
+    }
+  }
+
   return (
     <main>
       <QualityPageHero
@@ -4325,26 +4426,20 @@ function MOCPageContent() {
       {activeView === "register" ? (
       <section style={workspaceGridStyle}>
         <SectionCard title="MOC Register" subtitle="Main operational register for saved MOC reports. Click a row to open the full detail and edit panel.">
-          <div className="ims-filter-panel" style={toolbarStyle}>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={toolbarSearchStyle}
-              placeholder="Search MOC number, title, project, coordinator or manager..."
-            />
-
-            <button
-              type="button"
-              onClick={() => setShowRegisterFilters((current) => !current)}
-              style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle}
-            >
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-          </div>
-
-          {showRegisterFilters ? (
-            <div className="ims-filter-panel" style={toolbarFiltersStyle}>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "All" | "Active" | MocStatus)}>
+          <ImsFilterPanel
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search MOC number, title, project, coordinator or manager..."
+            showFilters={showRegisterFilters}
+            onToggleFilters={() => setShowRegisterFilters((current) => !current)}
+            actions={<>
+              <ImsButton variant="secondary" onClick={clearRegisterFilters}>Clear Filters</ImsButton>
+              <ImsButton variant="primary" onClick={exportRegisterPdf} disabled={!filteredReports.length} title="Create a PDF of the MOC records currently shown">Export PDF</ImsButton>
+              <ImsButton variant="secondary" onClick={() => void exportRegisterExcel()} disabled={!filteredReports.length} title="Download an Excel workbook of the MOC records currently shown">Export Excel</ImsButton>
+            </>}
+          >
+            <>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "All" | "Active" | MocStatus)} style={toolbarSelectStyle}>
                 <option value="All">All statuses</option>
                 <option value="Active">Active</option>
                 {mocStatusOptions.map((option) => (
@@ -4382,8 +4477,8 @@ function MOCPageContent() {
                   </option>
                 ))}
               </select>
-            </div>
-          ) : null}
+            </>
+          </ImsFilterPanel>
 
           <div style={tableInfoRowStyle}>
             Showing <strong>{filteredReports.length}</strong> of <strong>{reports.length}</strong> MOC records
@@ -6102,31 +6197,6 @@ const segmentedButtonFillStyle: CSSProperties = {
   display: "inline-flex",
   minWidth: 0,
   whiteSpace: "nowrap",
-};
-
-const toolbarStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
-  alignItems: "end",
-  marginBottom: "14px",
-  padding: "12px",
-  border: "1px solid #D0D0CE",
-  borderRadius: "14px",
-  background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
-};
-
-const toolbarSearchStyle: CSSProperties = {
-  ...inputStyle,
-  maxWidth: "480px",
-  flex: "1 1 320px",
-};
-
-const toolbarFiltersStyle: CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
 };
 
 const toolbarSelectStyle: CSSProperties = {

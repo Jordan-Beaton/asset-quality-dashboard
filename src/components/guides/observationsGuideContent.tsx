@@ -5,12 +5,12 @@ import {
   eyebrow, h2Style, h3Style, pStyle, codeStyle,
   stepList, Step, callout,
   mockPanel, mockHero, mockHeroEyebrow, mockLabel, flowWrap, flowStep, arrow,
-  mockInput, mockFieldLabel, mockRow, mockField, btn, pill,
+  mockInput, mockFieldLabel, mockRow, mockField, btn, pill, tintPill, RecordScreenMock,
 } from "./guideKit";
 
 type SectionKey =
   | "overview" | "card" | "phone" | "dashboard" | "register"
-  | "review" | "exports" | "statuses" | "faq";
+  | "review" | "recordscreen" | "exports" | "statuses" | "faq";
 
 const sections: GuideSectionDef[] = [
   { key: "overview",  label: "Overview",                   group: "Getting Started" },
@@ -19,20 +19,20 @@ const sections: GuideSectionDef[] = [
   { key: "dashboard", label: "The Dashboard",              group: "HSE Review" },
   { key: "register",  label: "The Observation Register",   group: "HSE Review" },
   { key: "review",    label: "Reviewing & Closing Out",    group: "HSE Review" },
+  { key: "recordscreen", label: "The record screen",       group: "HSE Review" },
   { key: "exports",   label: "Exporting PDF & Excel",      group: "Reports" },
   { key: "statuses",  label: "Status & Field Reference",   group: "Reference" },
   { key: "faq",       label: "Common Questions",           group: "Reference" },
 ];
 
 function statusBadge(status: string): CSSProperties {
-  const map: Record<string, { bg: string; color: string }> = {
-    new:               { bg: imsColours.brandAccent, color: "#ffffff" },
-    "in review":       { bg: imsColours.warning,     color: "#ffffff" },
-    "action required": { bg: imsColours.danger,      color: "#ffffff" },
-    closed:            { bg: imsColours.brand,       color: "#ffffff" },
+  const map: Record<string, "ok" | "warn" | "bad" | "neu" | "brand"> = {
+    new: "warn",
+    "in review": "brand",
+    "action required": "bad",
+    closed: "ok",
   };
-  const t = map[status.toLowerCase()] || map.new;
-  return pill(t.bg, t.color);
+  return tintPill(map[status.toLowerCase()] || "warn");
 }
 
 function SectionOverview() {
@@ -208,10 +208,12 @@ function SectionRegister() {
           <div style={{ fontSize: 14, fontWeight: 700 }}>Observation Register</div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+          <span style={{ ...mockInput, width: 220 }}>Search observation no., details...</span>
           <span style={btn("primary")}>Show Closed</span>
           <span style={btn("ghost")}>Clear Filters</span>
           <span style={btn("primary")}>Export PDF</span>
           <span style={btn("ghost")}>Export Excel</span>
+          <span style={btn("primary")}>Show Filters</span>
         </div>
         <table style={imsTableStyle}>
           <thead>
@@ -234,7 +236,8 @@ function SectionRegister() {
           </tbody>
         </table>
       </div>
-      <p style={pStyle}>The register also shows <strong>Vessel / Worksite</strong>, <strong>Location</strong> and <strong>Submitted By</strong> columns. A line above the table reads, for example, <em>Showing 12 of 40 observations · closed observations are hidden</em>. Click any row to open its detail underneath.</p>
+      <p style={pStyle}>The register also shows <strong>Vessel / Worksite</strong>, <strong>Location</strong> and <strong>Submitted By</strong> columns. A line above the table reads, for example, <em>Showing 12 of 40 observations · closed observations are hidden</em>. Click any row to open its record screen underneath (see The record screen).</p>
+      <p style={pStyle}>The toolbar runs left to right: search, <strong>Show Closed</strong>, <strong>Clear Filters</strong>, <strong>Export PDF</strong>, <strong>Export Excel</strong> and <strong>Show Filters</strong>.</p>
       <h3 style={h3Style}>Closed observations are hidden by default</h3>
       <p style={pStyle}>To keep the list focused on live items, closed observations do not appear until you ask for them.</p>
       <div style={stepList}>
@@ -266,9 +269,9 @@ function SectionReview() {
     <>
       <div style={eyebrow}>HSE Review</div>
       <h2 style={h2Style}>Reviewing &amp; Closing Out</h2>
-      <p style={pStyle}>Click a row in the register and the <strong>Observation Detail</strong> panel opens below the list. The top shows what the submitter entered (who and where, type, risk, date and time, title, observation, immediate action and suggested action). Below that is the review area.</p>
+      <p style={pStyle}>Click a row in the register and the observation opens on the <strong>record screen</strong> below the list (see The record screen). Step 1 <strong>Card</strong> shows what the submitter entered (who and where, type, risk, date and time, title, observation, immediate action and suggested action). Step 2 <strong>Review</strong> is where you assign and assess it.</p>
       <div style={mockPanel}>
-        <div style={mockLabel}>Observation Detail - OBS-014</div>
+        <div style={mockLabel}>Step 2 Review - OBS-014</div>
         <div style={mockRow}>
           <div style={mockField()}><div style={mockFieldLabel}>Status</div><div style={mockInput}>In Review</div></div>
           <div style={mockField()}><div style={mockFieldLabel}>Assigned To</div><div style={mockInput}>Unassigned</div></div>
@@ -277,20 +280,19 @@ function SectionReview() {
         <div style={{ ...mockInput, minHeight: 40 }}> </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
           <span style={btn("primary")}>Save Review</span>
-          <span style={btn("ghost")}>Generate Central Action</span>
           <span style={btn("danger")}>Delete Observation</span>
         </div>
       </div>
       <div style={stepList}>
-        <Step n={1}>Read the card and open any evidence with <strong>Open Evidence</strong> (each file shows its size and upload time).</Step>
-        <Step n={2}>Set <code style={codeStyle}>Assigned To</code> from the list of active people — the list comes from People Management.</Step>
+        <Step n={1}>Read the card in step 1 <strong>Card</strong>. Evidence is under step 4 <strong>Close-out</strong>: open any file with <strong>Open Evidence</strong> (each file shows its size and upload time).</Step>
+        <Step n={2}>In step 2 <strong>Review</strong>, set <code style={codeStyle}>Assigned To</code> from the list of active people — the list comes from People Management.</Step>
         <Step n={3}>Move the <code style={codeStyle}>Status</code> on: <span style={statusBadge("in review")}>In Review</span> while HSE considers it, <span style={statusBadge("action required")}>Action Required</span> when something must be done.</Step>
         <Step n={4}>Add what was done or decided in <code style={codeStyle}>Close-out / Review Notes</code>.</Step>
         <Step n={5}>Press <strong>Save Review</strong>. The status line at the top confirms with &quot;OBS-014 updated.&quot;</Step>
-        <Step n={6}>When the matter is dealt with, set the Status to <span style={statusBadge("closed")}>Closed</span> and press <strong>Save Review</strong> again. It then drops out of the default register view.</Step>
+        <Step n={6}>When the matter is dealt with, press <strong>Close Out</strong> at the top of the record screen. It sets the Status to <span style={statusBadge("closed")}>Closed</span> and saves the review, and the observation then drops out of the default register view. You can also set the Status to Closed by hand and press <strong>Save Review</strong>.</Step>
       </div>
       <h3 style={h3Style}>Follow-up actions</h3>
-      <p style={pStyle}>Press <strong>Generate Central Action</strong> to open the Actions create screen with the source set to Observation, the department to HSE, and the project and observation number carried across. Once the action is saved it appears under <strong>Linked Actions</strong> on the observation, with its owner, due date and status, and an <strong>Open Linked Action</strong> button.</p>
+      <p style={pStyle}>Press <strong>Create HSE Action</strong> (at the top of the record screen, or in step 3 <strong>Actions</strong>) to open the Actions create screen with the source set to Observation, the department to HSE, and the project and observation number carried across. Once the action is saved it appears under <strong>Linked Actions</strong> in step 3 <strong>Actions</strong>, with its owner, due date and status, and an <strong>Open Linked Action</strong> button.</p>
       <h3 style={h3Style}>Automatic emails</h3>
       <p style={pStyle}>The IMS sends an email, but only when the person&apos;s name matches an active person in People Management that has an email address:</p>
       <div style={stepList}>
@@ -299,8 +301,57 @@ function SectionReview() {
       </div>
       <div style={callout("warning")}>
         <span>⚠</span>
-        <div><strong>Delete Observation</strong> asks for confirmation, then removes the observation and its uploaded evidence files. It cannot be undone — close the observation instead unless it was raised in error. <strong>Save Review</strong> and <strong>Delete Observation</strong> need Edit permission; <strong>Generate Central Action</strong> needs Create permission. Without it the buttons are greyed out.</div>
+        <div><strong>Delete Observation</strong> asks for confirmation, then removes the observation and its uploaded evidence files. It cannot be undone — close the observation instead unless it was raised in error. <strong>Save Review</strong> and <strong>Delete Observation</strong> need Edit permission; <strong>Create HSE Action</strong> needs Create permission. <strong>Close Out</strong> needs Edit permission. Without the right permission the buttons are greyed out.</div>
       </div>
+    </>
+  );
+}
+
+function SectionRecordScreen() {
+  return (
+    <>
+      <div style={eyebrow}>HSE Review</div>
+      <h2 style={h2Style}>The record screen</h2>
+      <p style={pStyle}>When you open an observation from the register, it appears on the <strong>record screen</strong> underneath the list. The same details and buttons as before are there, grouped into four steps.</p>
+      <RecordScreenMock
+        id="OBS-014"
+        title="Trip hazard at gangway"
+        status="In Review"
+        tone="brand"
+        nextButton="Close Out"
+        track={["New", "In Review", "Action Required", "Closed"]}
+        steps={[
+          { label: "Card", state: "Received" },
+          { label: "Review", state: "Assigned" },
+          { label: "Actions", state: "1 linked" },
+          { label: "Close-out", state: "Not started" },
+        ]}
+        active={1}
+        missing={["Review / close-out note", "Linked action closed"]}
+        gate="this card can be closed"
+        summaryTitle="History"
+        summaryRows={[["Submitted", "12 Mar 2026 09:14"], ["Last updated", "13 Mar 2026 11:02"]]}
+      />
+      <h3 style={h3Style}>The header</h3>
+      <p style={pStyle}>The top shows the observation number, title and status, with a track reading New, In Review, Action Required, Closed that marks where the card is now. The buttons are <strong>Create HSE Action</strong>, <strong>Close Out</strong> and <strong>Hide Panel</strong>. A line under the track reminds you that status is set by hand in the Review step.</p>
+      <h3 style={h3Style}>The four steps</h3>
+      <div style={stepList}>
+        <Step n={1}><strong>Card</strong> (as submitted): the details the submitter entered. The step reads <em>Received</em>.</Step>
+        <Step n={2}><strong>Review</strong> (assign and assess): Status, Assigned To, Close-out / Review Notes, <strong>Save Review</strong> and <strong>Delete Observation</strong>. The step reads <em>Assigned</em> or <em>Unassigned</em>.</Step>
+        <Step n={3}><strong>Actions</strong> (linked HSE actions): the Linked Actions list with an <strong>Open Linked Action</strong> button on each, and <strong>Create HSE Action</strong>. The step reads, for example, <em>1 linked</em>.</Step>
+        <Step n={4}><strong>Close-out</strong> (notes, evidence): the notes, who closed it and when, <strong>Save Review</strong> and the Evidence list. The step reads <em>Not started</em>, <em>Notes added</em> or <em>Closed</em>.</Step>
+      </div>
+      <p style={pStyle}>Observations have no percentages: each step shows a short state word instead. The screen opens on step 1.</p>
+      <h3 style={h3Style}>Still missing</h3>
+      <p style={pStyle}>A box lists what is still missing before the card can be closed: <em>Review / close-out note</em> (the review notes and the close-out notes are the same box), and <em>Linked action closed</em> when a linked action is still open. Click a chip to jump to that step.</p>
+      <div style={callout("info")}>
+        <span>ℹ</span>
+        <div>The chips warn, they never block. If you press <strong>Close Out</strong> with items missing you are asked &ldquo;N items are still missing: ... Close anyway?&rdquo;, or simply &ldquo;Close OBS-014?&rdquo; when nothing is missing. Close Out sets the status to Closed and saves, the same save as Save Review. It is greyed out once the card is Closed.</div>
+      </div>
+      <h3 style={h3Style}>Form, Split and History</h3>
+      <p style={pStyle}>The buttons above the steps change the layout: <strong>Form</strong> shows only the fields, <strong>Split</strong> shows them beside a <strong>History</strong> panel (submitted, last updated, and closed by and when), and <strong>History</strong> shows that panel on its own. The History panel only appears once the card has dates to show.</p>
+      <h3 style={h3Style}>All sections</h3>
+      <p style={pStyle}>The <strong>All sections</strong> button shows all four steps on one long page, as the detail panel used to. Click it again to return to one step at a time.</p>
     </>
   );
 }
@@ -317,7 +368,7 @@ function SectionExports() {
         <Step n={2}>Under <strong>Group by</strong>, choose <strong>Project (recommended)</strong>, <strong>Observation type</strong>, <strong>Risk level</strong> or <strong>No grouping</strong>.</Step>
         <Step n={3}>Under <strong>Order within each group</strong>, choose <strong>Newest first</strong>, <strong>Oldest first</strong> or <strong>Highest risk first</strong>.</Step>
         <Step n={4}>Under <strong>Add under each description</strong>, tick any of <strong>Immediate action</strong>, <strong>Suggested action</strong>, <strong>Assigned to</strong> and <strong>Close-out notes</strong>.</Step>
-        <Step n={5}>Press <strong>Download PDF</strong>. Use <strong>Hide PDF options</strong> to close the panel.</Step>
+        <Step n={5}>Press <strong>Download PDF</strong>. Press <strong>Export PDF</strong> again to close the panel.</Step>
       </div>
       <div style={mockPanel}>
         <div style={mockLabel}>PDF options</div>
@@ -365,7 +416,7 @@ function SectionStatuses() {
           <tr><td style={{ ...imsTableCellStyle, whiteSpace: "nowrap" }}><span style={statusBadge("closed")}>Closed</span></td><td style={imsTableCellStyle}>Dealt with. Hidden in the register until you press <strong>Show Closed</strong>.</td></tr>
         </tbody>
       </table>
-      <p style={pStyle}>Statuses are changed by hand in the Observation Detail panel; the system does not move them on by itself.</p>
+      <p style={pStyle}>Statuses are changed by hand on the record screen (the Status box in step 2 <strong>Review</strong>, or the <strong>Close Out</strong> button); the system does not move them on by itself.</p>
       <h3 style={h3Style}>Reference number</h3>
       <p style={pStyle}>Each card is given the next number in the sequence <code style={codeStyle}>OBS-001</code>, <code style={codeStyle}>OBS-002</code> and so on. The number is shown to the submitter when the card is logged.</p>
       <h3 style={h3Style}>Risk / attention levels</h3>
@@ -422,6 +473,7 @@ const sectionComponents: Record<SectionKey, () => ReactElement> = {
   dashboard: SectionDashboard,
   register:  SectionRegister,
   review:    SectionReview,
+  recordscreen: SectionRecordScreen,
   exports:   SectionExports,
   statuses:  SectionStatuses,
   faq:       SectionFaq,

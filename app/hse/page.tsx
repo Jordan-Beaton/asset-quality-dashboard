@@ -544,16 +544,11 @@ export default function HseDashboardPage() {
               Weighted from AINM closure, inspection completion, HSE action pressure, and calendar discipline.
             </p>
           </div>
-          <button
-            type="button"
-            className="hse-score-orb"
-            style={scoreOrbStyle}
-            onClick={() => router.push("/management-review")}
-            title="Open Management Review Snapshot"
-          >
+          {/* Management Review is hidden for now, so the score no longer links to it. */}
+          <div className="hse-score-orb" style={scoreOrbStyle}>
             <span style={scoreValueStyle}>{hsePulse.score}%</span>
             <span style={scoreSubLabelStyle}>CONTROL HEALTH</span>
-          </button>
+          </div>
         </div>
 
         <div className="hse-signal-grid" style={signalGridStyle}>

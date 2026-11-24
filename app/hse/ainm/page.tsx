@@ -31,6 +31,17 @@ import * as XLSX from "xlsx";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { ImsButton, ImsFilterPanel, ImsPanel } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
+import {
+  DocPreview,
+  RecordHeader,
+  RecordWorkbench,
+  StatusPill as WorkbenchStatusPill,
+  WorkbenchStep,
+  percentDone,
+  toneForStatus,
+  type DocPreviewSection,
+  type WorkbenchStepDef,
+} from "../../../src/components/RecordWorkbench";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import {
   imsTableCellStyle,
@@ -609,14 +620,6 @@ function getNextExternalAinmNumber(records: ExternalAINMRecord[]) {
     return Number.isFinite(value) ? Math.max(max, value) : max;
   }, 0);
   return `EXT-AINM-${String(maxNumber + 1).padStart(3, "0")}`;
-}
-
-function getStageTone(status: string) {
-  if (status === "Complete" || status === "Issued") return { bg: "#ECECE7", color: "#005670" };
-  if (status === "Draft" || status === "In Progress") return { bg: "#ECECE7", color: "#000000" };
-  if (status === "Closed") return { bg: "#ECECE7", color: "#005670" };
-  if (status === "Open") return { bg: "#ECECE7", color: "#005670" };
-  return { bg: "#D0D0CE", color: "#53565A" };
 }
 
 function buildActionHref(record: AINMRecord) {
@@ -1716,11 +1719,11 @@ function HseAinmPageContent() {
     await loadData();
   }
 
-  async function saveDraft() {
+  async function saveDraft(overrides?: Partial<AINMRecord>) {
     if (!selectedId) return;
     if (!requireEditPermission("Saving AINMs")) return;
 
-    const draftForSave = buildDraftForSave();
+    const draftForSave = { ...buildDraftForSave(), ...overrides };
     setSaving(true);
     const { error } = await supabase.from("hse_ainm_records").update(buildPayload(draftForSave)).eq("id", selectedId);
     setSaving(false);
@@ -3188,6 +3191,148 @@ function HseAinmPageContent() {
     );
   }
 
+  // Workbench model for the open AINM: stage progress, what is still missing, and the live PDF report summary.
+  // Everything here is read from the record and the rows on screen. Nothing is saved from here.
+  const hasText = (value: unknown) => clean(value).length > 0;
+  const shortText = (value: unknown, limit = 150) => {
+    const text = clean(value).replace(/\s+/g, " ");
+    return text.length > limit ? `${text.slice(0, limit)}...` : text;
+  };
+  const countLabel = (count: number, noun: string, plural = `${noun}s`) => (count ? `${count} ${count === 1 ? noun : plural}` : "");
+
+  type StageCheck = { label: string; ok: boolean };
+  const notificationChecks: StageCheck[] = [
+    { label: "Title", ok: hasText(draft.title) },
+    { label: "Project", ok: hasText(draft.project) },
+    { label: "Location / site", ok: hasText(draft.location_site) },
+    { label: "Date of event", ok: hasText(draft.event_date) },
+    { label: "Time of event", ok: hasText(draft.event_time) },
+    { label: "Classification", ok: hasText(draft.event_classification) },
+    { label: "Brief details of the event", ok: hasText(draft.brief_event_details) },
+    { label: "Injury / release / damage details", ok: hasText(draft.injury_release_damage_details) },
+    { label: "Casualty management", ok: hasText(draft.casualty_management) },
+    { label: "Site / location management", ok: hasText(draft.site_management) },
+    { label: "Cause identification", ok: hasText(draft.initial_cause) },
+  ];
+  const part1Checks: StageCheck[] = [
+    { label: "Company in control", ok: hasText(draft.company_in_control) },
+    { label: "Timeline entry", ok: timelineEntryRows.some((row) => hasText(row.datetime) || hasText(row.description)) },
+    { label: "Immediate containment action", ok: correctiveActionRows.some((row) => hasText(row)) },
+    { label: "Root cause: people", ok: hasText(draft.root_cause_people) },
+    { label: "Root cause: equipment", ok: hasText(draft.root_cause_equipment) },
+    { label: "Root cause: environment", ok: hasText(draft.root_cause_environment) },
+    { label: "Root cause: process", ok: hasText(draft.root_cause_process) },
+    { label: "Part 1 reviewer", ok: hasText(draft.part1_reviewer_name) },
+  ];
+  const linkedActionCount = selectedCentralActions.length + selectedActions.length;
+  const part2Checks: StageCheck[] = [
+    { label: "Investigation team member", ok: investigationTeamRows.some((row) => hasText(row.name) || hasText(row.company) || hasText(row.position) || hasText(row.role)) },
+    { label: "Findings: people", ok: hasText(draft.investigation_findings_people) },
+    { label: "Findings: equipment", ok: hasText(draft.investigation_findings_equipment) },
+    { label: "Findings: environment", ok: hasText(draft.investigation_findings_environment) },
+    { label: "Findings: process", ok: hasText(draft.investigation_findings_process) },
+    { label: "Reference document", ok: referenceDocumentRows.some((row) => hasText(row)) },
+    { label: "Corrective action", ok: linkedActionCount > 0 },
+    { label: "Location sign-off", ok: hasText(draft.signoff_location_name) },
+    { label: "HSEQ sign-off", ok: hasText(draft.signoff_hseq_name) },
+  ];
+
+  const compiledPdfCount = compiledPdfReports.filter((report) => report.ainm_id === selectedId).length;
+  const workbenchSteps: WorkbenchStepDef[] = [
+    { key: "notification", label: "Notification", sub: `Status: ${draft.notification_status}`, pct: percentDone(notificationChecks.map((check) => check.ok)) },
+    { key: "part1", label: "Part 1", sub: `Status: ${draft.part1_status}`, pct: percentDone(part1Checks.map((check) => check.ok)) },
+    { key: "part2", label: "Part 2", sub: `Status: ${draft.part2_status}`, pct: percentDone(part2Checks.map((check) => check.ok)) },
+    { key: "actions", label: "Actions", sub: "Linked and tracker", state: `${linkedActionCount} linked` },
+    { key: "evidence", label: "Evidence", sub: "All stages", state: `${selectedEvidence.length} file${selectedEvidence.length === 1 ? "" : "s"}` },
+    { key: "reports", label: "Reports", sub: "Word and PDF", state: compiledPdfCount ? `${compiledPdfCount} PDF${compiledPdfCount === 1 ? "" : "s"}` : "No PDF yet" },
+  ];
+
+  // Only warns. Close AINM asks first and then goes ahead.
+  const openLinkedActions = selectedCentralActions.filter((action) => clean(action.status).toLowerCase() !== "closed");
+  const ainmMissing: Array<{ label: string; step: string }> = [
+    ...(draft.notification_status === "Issued" || draft.notification_status === "Complete" ? [] : [{ label: "Notification status: Issued or Complete", step: "notification" }]),
+    ...notificationChecks.filter((check) => !check.ok).map((check) => ({ label: check.label, step: "notification" })),
+    ...(draft.part1_status === "Complete" ? [] : [{ label: "Part 1 status: Complete", step: "part1" }]),
+    ...part1Checks.filter((check) => !check.ok).map((check) => ({ label: check.label, step: "part1" })),
+    ...(draft.part2_status === "Complete" ? [] : [{ label: "Part 2 status: Complete", step: "part2" }]),
+    ...part2Checks.filter((check) => !check.ok).map((check) => ({ label: check.label, step: "part2" })),
+    ...(openLinkedActions.length ? [{ label: openLinkedActions.length === 1 ? "Linked action closed" : `${openLinkedActions.length} linked actions closed`, step: "actions" }] : []),
+  ];
+  const ainmClosed = draft.overall_status === "Closed";
+  const outstandingForClose = ainmClosed ? [] : ainmMissing;
+
+  function closeAinm() {
+    if (!canEditAinm || saving || ainmClosed) return;
+    const shown = outstandingForClose.slice(0, 8).map((item) => item.label).join(", ");
+    const more = outstandingForClose.length > 8 ? ` and ${outstandingForClose.length - 8} more` : "";
+    const prompt = outstandingForClose.length
+      ? `${outstandingForClose.length} item${outstandingForClose.length === 1 ? " is" : "s are"} still missing: ${shown}${more}. Close anyway?`
+      : `Close ${draft.ainm_number}?`;
+    if (!window.confirm(prompt)) return;
+    // The same save as Save AINM, with Overall Status set to Closed.
+    void saveDraft({ overall_status: "Closed" });
+  }
+
+  const reportSignoffName = (name: string | null) => shortText(name);
+  const ainmReportSections: DocPreviewSection[] = [
+    {
+      heading: "AINM Summary",
+      rows: [
+        { label: "AINM Ref", value: draft.ainm_number },
+        { label: "Title", value: draft.title, step: "notification" },
+        { label: "Project", value: draft.project, step: "notification" },
+        { label: "Location/Site", value: draft.location_site, step: "notification" },
+        { label: "Date of Event", value: [displayDate(draft.event_date), draft.event_time].filter(Boolean).join(" "), step: "notification" },
+        { label: "Classification", value: draft.event_classification, step: "notification" },
+        { label: "Overall Status", value: draft.overall_status },
+      ],
+    },
+    {
+      heading: "Initial Notification",
+      rows: [
+        { label: "Event details", value: shortText(draft.brief_event_details), step: "notification" },
+        { label: "Injury / release / damage", value: shortText(draft.injury_release_damage_details), step: "notification" },
+        { label: "Casualty management", value: shortText(draft.casualty_management), step: "notification" },
+        { label: "Site management", value: shortText(draft.site_management), step: "notification" },
+        { label: "Cause", value: shortText(draft.initial_cause), step: "notification" },
+        { label: "Additional info", value: shortText(draft.additional_information), step: "notification" },
+      ],
+    },
+    {
+      heading: "Part 1 Report",
+      rows: [
+        { label: "Company in control", value: draft.company_in_control, step: "part1" },
+        { label: "Timeline", value: countLabel(timelineEntryRows.filter((row) => hasText(row.datetime) || hasText(row.description)).length, "entry", "entries"), step: "part1" },
+        { label: "Containment", value: countLabel(correctiveActionRows.filter((row) => hasText(row)).length, "action"), step: "part1" },
+        { label: "Root cause: people", value: shortText(draft.root_cause_people), step: "part1" },
+        { label: "Root cause: equipment", value: shortText(draft.root_cause_equipment), step: "part1" },
+        { label: "Root cause: environment", value: shortText(draft.root_cause_environment), step: "part1" },
+        { label: "Root cause: process", value: shortText(draft.root_cause_process), step: "part1" },
+      ],
+    },
+    {
+      heading: "Part 2 Investigation",
+      rows: [
+        { label: "Team", value: countLabel(investigationTeamRows.filter((row) => hasText(row.name)).length, "member"), step: "part2" },
+        { label: "Findings: people", value: shortText(draft.investigation_findings_people), step: "part2" },
+        { label: "Findings: equipment", value: shortText(draft.investigation_findings_equipment), step: "part2" },
+        { label: "Findings: environment", value: shortText(draft.investigation_findings_environment), step: "part2" },
+        { label: "Findings: process", value: shortText(draft.investigation_findings_process), step: "part2" },
+        { label: "References", value: countLabel(referenceDocumentRows.filter((row) => hasText(row)).length, "document"), step: "part2" },
+        { label: "Corrective actions", value: countLabel(linkedActionCount, "action"), step: "actions" },
+        { label: "Location sign-off", value: reportSignoffName(draft.signoff_location_name), step: "part2" },
+        { label: "HSEQ sign-off", value: reportSignoffName(draft.signoff_hseq_name), step: "part2" },
+        { label: "Project manager", value: reportSignoffName(draft.signoff_project_manager_name), step: "part2" },
+        { label: "SMT representative", value: reportSignoffName(draft.signoff_smt_name), step: "part2" },
+        { label: "Further comments", value: shortText(draft.part2_further_comments), step: "part2" },
+      ],
+    },
+    {
+      heading: "Evidence Register",
+      rows: [{ label: "Files", value: countLabel(selectedEvidence.length, "file"), step: "evidence" }],
+    },
+  ];
+
   return (
     <main>
       <QualityPageHero
@@ -3712,23 +3857,43 @@ function HseAinmPageContent() {
 
           {selected ? (
             <div ref={selectedDetailRef}>
-            <SectionCard title={`${draft.ainm_number} - ${draft.title}`} subtitle="Open/hide style detail panel for notification, Part 1, Part 2, tracker actions, evidence, and reports.">
-              <nav className="ims-tabs" style={detailTabStyle} role="tablist" aria-label="AINM detail views">
-                {[
-                  ["notification", "Notification"],
-                  ["part1", "Part 1"],
-                  ["part2", "Part 2"],
-                  ["actions", "Actions"],
-                  ["evidence", "Evidence"],
-                  ["reports", "Reports"],
-                ].map(([tab, label]) => (
-                  <button key={tab} type="button" role="tab" aria-selected={detailTab === tab} data-active={detailTab === tab ? "true" : "false"} style={detailTab === tab ? activeViewButtonStyle : viewButtonStyle} onClick={() => setDetailTab(tab as DetailTab)}>{label}</button>
-                ))}
-              </nav>
+            <ImsPanel>
+              <RecordWorkbench
+                key={selectedId}
+                initialStep={detailTab}
+                gate="this AINM can be closed"
+                steps={workbenchSteps}
+                missing={outstandingForClose}
+                reportLabel="PDF report"
+                side={<DocPreview title="AINM report" sections={ainmReportSections} />}
+                header={
+                  <>
+                    <RecordHeader
+                      id={draft.ainm_number}
+                      title={draft.title}
+                      status={{ label: draft.overall_status, tone: toneForStatus(draft.overall_status) }}
+                      note="An AINM moves through three stages. Each stage keeps its own status, and the overall status is set by hand."
+                      actions={
+                        <>
+                          <ImsButton
+                            variant={outstandingForClose.length ? "secondary" : "primary"}
+                            onClick={closeAinm}
+                            disabled={!canEditAinm || saving || ainmClosed}
+                            title="Sets Overall Status to Closed and saves the AINM"
+                          >
+                            Close AINM
+                          </ImsButton>
+                          <ImsButton variant="secondary" onClick={() => setSelectedId("")} title="Close this panel">Hide Panel</ImsButton>
+                        </>
+                      }
+                    />
+                    <StatusRow record={draft} onChange={updateDraft} />
+                  </>
+                }
+              >
 
-              {detailTab === "notification" ? (
+              <WorkbenchStep stepKey="notification">
                 <DetailSection>
-                  <StatusRow record={draft} onChange={updateDraft} />
                   <div style={formGridStyle}>
                     <Field label="AINM No."><input style={inputStyle} value={draft.ainm_number} onChange={(e) => updateDraft("ainm_number", e.target.value)} /></Field>
                     <Field label="Title"><input style={inputStyle} value={draft.title} onChange={(e) => updateDraft("title", e.target.value)} /></Field>
@@ -3790,9 +3955,9 @@ function HseAinmPageContent() {
                     </button>
                   </div>
                 </DetailSection>
-              ) : null}
+              </WorkbenchStep>
 
-              {detailTab === "part1" ? (
+              <WorkbenchStep stepKey="part1">
                 <DetailSection>
                   <div style={carryForwardPanelStyle}>
                     <h3 style={carryForwardTitleStyle}>{draft.ainm_number} - {draft.title}</h3>
@@ -3966,9 +4131,9 @@ function HseAinmPageContent() {
                     </button>
                   </div>
                 </DetailSection>
-              ) : null}
+              </WorkbenchStep>
 
-              {detailTab === "part2" ? (
+              <WorkbenchStep stepKey="part2">
                 <DetailSection>
                   <div style={carryForwardPanelStyle}>
                     <h3 style={carryForwardTitleStyle}>{draft.ainm_number} - {draft.title}</h3>
@@ -4128,9 +4293,9 @@ function HseAinmPageContent() {
                     </button>
                   </div>
                 </DetailSection>
-              ) : null}
+              </WorkbenchStep>
 
-              {detailTab === "actions" ? (
+              <WorkbenchStep stepKey="actions">
                 <DetailSection>
                   <div style={compactActionsTabToolbarStyle}>
                     <Link href={buildActionHref(draft)} style={compactPrimaryLinkStyle}>Create Central Action</Link>
@@ -4174,9 +4339,9 @@ function HseAinmPageContent() {
                     {!selectedActions.length ? <div style={emptyBoxStyle}>No tracker actions linked yet.</div> : null}
                   </div>
                 </DetailSection>
-              ) : null}
+              </WorkbenchStep>
 
-              {detailTab === "evidence" ? (
+              <WorkbenchStep stepKey="evidence">
                 <DetailSection>
                   <div style={evidenceToolbarStyle}>
                     <select style={evidenceStageSelectStyle} value={evidenceStage} onChange={(e) => setEvidenceStage(e.target.value)}>
@@ -4206,9 +4371,9 @@ function HseAinmPageContent() {
                     {!selectedEvidence.length ? <div style={emptyBoxStyle}>No evidence uploaded yet.</div> : null}
                   </div>
                 </DetailSection>
-              ) : null}
+              </WorkbenchStep>
 
-              {detailTab === "reports" ? (
+              <WorkbenchStep stepKey="reports">
                 <DetailSection>
                   <div style={reportButtonGridStyle}>
                     <button type="button" style={reportButtonStyle} onClick={() => void generateWord("notification", draft)} disabled={Boolean(generatingStage)}>
@@ -4225,13 +4390,14 @@ function HseAinmPageContent() {
                     </button>
                   </div>
                 </DetailSection>
-              ) : null}
+              </WorkbenchStep>
 
               <div style={detailFooterStyle}>
                 <button type="button" style={primaryButtonStyle} onClick={() => void saveDraft()} disabled={saving || !canEditAinm}>{saving ? "Saving..." : "Save AINM"}</button>
                 <button type="button" style={dangerButtonStyle} onClick={() => void deleteRecord(draft)} disabled={!canEditAinm}>Delete AINM</button>
               </div>
-            </SectionCard>
+              </RecordWorkbench>
+            </ImsPanel>
             </div>
           ) : null}
         </section>
@@ -4370,8 +4536,7 @@ function StatusRow({ record, onChange }: { record: AINMRecord; onChange: <K exte
 }
 
 function StatusPill({ status }: { status: string }) {
-  const tone = getStageTone(status);
-  return <span style={{ ...pillStyle, background: tone.bg, color: tone.color }}>{status || "Not set"}</span>;
+  return <WorkbenchStatusPill label={status || "Not set"} tone={toneForStatus(status)} />;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -4776,7 +4941,7 @@ const toolbarStyle: CSSProperties = {
 const searchStyle: CSSProperties = { ...inputStyle, minHeight: 44 };
 const filterStyle: CSSProperties = { ...inputStyle, minHeight: 44 };
 const tableInfoRowStyle: CSSProperties = imsTableInfoRowStyle;
-const registerLayoutStyle: CSSProperties = { display: "grid", gap: 20 };
+const registerLayoutStyle: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 20 };
 const registerTableWrapStyle: CSSProperties = {
   overflowX: "auto",
   border: "1px solid #D0D0CE",
@@ -4799,7 +4964,6 @@ const reportHistoryPanelStyle: CSSProperties = {
 };
 const trStyle: CSSProperties = { cursor: "pointer" };
 const selectedRowStyle: CSSProperties = { cursor: "pointer", background: "#eef7f8" };
-const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 400, lineHeight: 1.35, whiteSpace: "nowrap" };
 const detailTabStyle: CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 };
 const detailSectionStyle: CSSProperties = {
   border: "1px solid #D0D0CE",

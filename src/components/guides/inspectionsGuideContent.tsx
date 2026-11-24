@@ -5,17 +5,18 @@ import {
   eyebrow, h2Style, h3Style, pStyle, codeStyle,
   stepList, Step, callout,
   mockPanel, mockHero, mockHeroEyebrow, mockLabel, flowWrap, flowStep, arrow,
-  mockInput, mockFieldLabel, mockRow, mockField, btn, pill,
+  mockInput, mockFieldLabel, mockRow, mockField, btn, pill, tintPill, RecordScreenMock,
 } from "./guideKit";
 
 type SectionKey =
-  | "overview" | "hsestart" | "hsefill" | "hseregister" | "phone"
+  | "overview" | "hsestart" | "hsefill" | "recordscreen" | "hseregister" | "phone"
   | "lookahead" | "manual" | "exports" | "statuses" | "faq";
 
 const sections: GuideSectionDef[] = [
   { key: "overview",    label: "Overview",                       group: "Getting Started" },
   { key: "hsestart",    label: "Dashboard & Starting a Form",    group: "HSE Inspections" },
   { key: "hsefill",     label: "Completing the Form",            group: "HSE Inspections" },
+  { key: "recordscreen", label: "The record screen",             group: "HSE Inspections" },
   { key: "hseregister", label: "Register, Evidence & PDF",       group: "HSE Inspections" },
   { key: "phone",       label: "Completing on a Phone",          group: "HSE Inspections" },
   { key: "lookahead",   label: "Lookahead & Register",           group: "Overall Inspections" },
@@ -26,18 +27,17 @@ const sections: GuideSectionDef[] = [
 ];
 
 function badge(status: string): CSSProperties {
-  const map: Record<string, { bg: string; color: string }> = {
-    draft:     { bg: imsColours.warning,     color: "#ffffff" },
-    open:      { bg: imsColours.brandAccent, color: "#ffffff" },
-    complete:  { bg: imsColours.brand,       color: "#ffffff" },
-    closed:    { bg: imsColours.brand,       color: "#ffffff" },
-    planned:   { bg: imsColours.page,        color: imsColours.muted },
-    confirmed: { bg: imsColours.brandAccent, color: "#ffffff" },
-    completed: { bg: imsColours.brand,       color: "#ffffff" },
-    cancelled: { bg: imsColours.danger,      color: "#ffffff" },
+  const map: Record<string, "ok" | "warn" | "bad" | "neu" | "brand"> = {
+    draft: "neu",
+    open: "warn",
+    complete: "ok",
+    closed: "ok",
+    planned: "neu",
+    confirmed: "brand",
+    completed: "ok",
+    cancelled: "bad",
   };
-  const t = map[status.toLowerCase()] || map.draft;
-  return pill(t.bg, t.color);
+  return tintPill(map[status.toLowerCase()] || "neu");
 }
 
 const cellStrong: CSSProperties = { ...imsTableCellStyle, fontWeight: 800, color: imsColours.brand, whiteSpace: "nowrap" };
@@ -149,7 +149,7 @@ function SectionHseFill() {
     <>
       <div style={eyebrow}>HSE Inspections</div>
       <h2 style={h2Style}>Completing the Form</h2>
-      <p style={pStyle}>Every form has the same layout: <strong>Report Details</strong>, then the checklist sections for that form, then <strong>Additional Comments</strong> and <strong>Sign-Off</strong>.</p>
+      <p style={pStyle}>Every form has the same layout: <strong>Report Details</strong>, then the checklist sections for that form, then <strong>Additional Comments</strong> and <strong>Sign-Off</strong>. On screen these are the four steps of the record screen (see The record screen): Report details, Checklist, Comments and Sign-off.</p>
       <div style={mockPanel}>
         <div style={mockLabel}>Report Details</div>
         <div style={mockRow}>
@@ -182,7 +182,7 @@ function SectionHseFill() {
         <Step n={3}>Use <strong>Upload</strong> on an item row to attach a photo or file to that exact item (see <strong>Register, Evidence &amp; PDF</strong>).</Step>
         <Step n={4}>Add overall remarks under <strong>Additional Comments</strong> (the last numbered section on every form).</Step>
         <Step n={5}>In <strong>Sign-Off</strong>, choose the <code style={codeStyle}>Name</code> from the list, check <code style={codeStyle}>Position</code>, <code style={codeStyle}>Company</code> (defaults to Enshore Subsea) and set the <code style={codeStyle}>Date</code>.</Step>
-        <Step n={6}>Set <code style={codeStyle}>Status</code> (see <strong>Status Reference</strong>) and click <strong>Save Inspection</strong>. A message in the status bar confirms it, for example &quot;HSE-INS-042 created.&quot;</Step>
+        <Step n={6}>Set <code style={codeStyle}>Status</code> (see <strong>Status Reference</strong>) and click <strong>Save Inspection</strong>. A message in the status bar confirms it, for example &quot;HSE-INS-042 created.&quot; When the form is finished you can instead click <strong>Complete Inspection</strong> in the header, which sets the status to Complete and saves.</Step>
       </div>
       <div style={callout("warning")}>
         <span>⚠</span>
@@ -195,6 +195,53 @@ function SectionHseFill() {
 
 // ── HSE: register, evidence & PDF ────────────────────────────────────────────
 
+function SectionRecordScreen() {
+  return (
+    <>
+      <div style={eyebrow}>HSE Inspections</div>
+      <h2 style={h2Style}>The record screen</h2>
+      <p style={pStyle}>A new or saved HSE inspection opens on the <strong>record screen</strong>: the same form as before, split into four steps with a live <strong>Inspection report (PDF)</strong> summary beside it.</p>
+      <RecordScreenMock
+        id="HSE-INS-042"
+        title="Workplace Inspection - Base and Site"
+        status="Open"
+        tone="warn"
+        nextButton="Complete Inspection"
+        steps={[
+          { label: "Report details", pct: 100 },
+          { label: "Checklist", pct: 60 },
+          { label: "Comments", state: "Optional" },
+          { label: "Sign-off", pct: 33 },
+        ]}
+        active={1}
+        missing={["12 checklist items unanswered", "1 finding marked No without a comment", "Sign-off date"]}
+        gate="this inspection can be completed"
+        summaryTitle="Inspection report (PDF)"
+        summaryRows={[["Answered", "18 of 30"], ["Evidence files", "3"], ["Signed by", null]]}
+      />
+      <h3 style={h3Style}>The header</h3>
+      <p style={pStyle}>The top shows the inspection number, title and status, with the form number and revision underneath. The buttons are <strong>Complete Inspection</strong> (only while the status is Draft or Open), <strong>Save Inspection</strong> and <strong>Hide Panel</strong>. <strong>Complete Inspection</strong> sets the status to Complete and saves, the same as choosing Complete in the Status box and clicking Save Inspection.</p>
+      <h3 style={h3Style}>The four steps</h3>
+      <div style={stepList}>
+        <Step n={1}><strong>Report details</strong> (site, date, inspector): Inspection No., Status, Title, Department, date, project, vessel, area and inspector. Percentage.</Step>
+        <Step n={2}><strong>Checklist</strong>: every checklist section, plus the Evidence panel. It reads how many items are answered, for example <em>18 of 30 answered</em>, and how many notes are needed for items marked No. Percentage is the share answered.</Step>
+        <Step n={3}><strong>Comments</strong> (overall remarks): Additional Comments and, on a saved inspection, the Linked Actions panel. It reads <em>Optional</em> until you add a comment.</Step>
+        <Step n={4}><strong>Sign-off</strong> (name and date): the sign-off name, position, company and date. Percentage.</Step>
+      </div>
+      <h3 style={h3Style}>Still missing</h3>
+      <p style={pStyle}>A box lists what is still missing before the inspection can be completed: Title, Inspection date, Inspector, <em>N checklist items unanswered</em>, <em>N findings marked No without a comment</em>, Sign-off name and Sign-off date. Click a chip to jump to its step.</p>
+      <div style={callout("info")}>
+        <span>ℹ</span>
+        <div>The chips warn, they never block. If you click <strong>Complete Inspection</strong> with items missing you are asked &ldquo;N items are still missing: ... Complete anyway?&rdquo; and can carry on. A title is still needed to save.</div>
+      </div>
+      <h3 style={h3Style}>Form, Split and PDF</h3>
+      <p style={pStyle}><strong>Form</strong> shows only the fields, <strong>Split</strong> shows them beside the live <strong>Inspection report (PDF)</strong> summary, and <strong>PDF</strong> shows that summary on its own. The summary shows the report details, how many items are answered, the open findings (items marked No, with their comments) and the sign-off. Gaps show as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
+      <h3 style={h3Style}>All sections</h3>
+      <p style={pStyle}>The <strong>All sections</strong> button shows the whole inspection on one long page, as it used to be. Click it again to return to one step at a time. At the bottom of a saved inspection, <strong>Export PDF</strong>, <strong>Save Inspection</strong> and <strong>Delete Inspection</strong> stay in place whichever step you are on; a new inspection shows only <strong>Save Inspection</strong>.</p>
+    </>
+  );
+}
+
 function SectionHseRegister() {
   return (
     <>
@@ -205,8 +252,11 @@ function SectionHseRegister() {
         <div style={mockLabel}>Inspection Register</div>
         <div style={{ ...mockRow, alignItems: "center" }}>
           <div style={mockField(2)}><div style={mockInput}>Search inspections</div></div>
-          <span style={btn("primary")}>Show Filters</span>
+          <span style={btn("ghost")}>Clear Filters</span>
+          <span style={btn("primary")}>Export PDF</span>
+          <span style={btn("ghost")}>Export Excel</span>
           <span style={btn("primary")}>Create Inspection</span>
+          <span style={btn("primary")}>Show Filters</span>
         </div>
         <div style={{ fontSize: 11, color: imsColours.muted, marginBottom: 6 }}>Showing 1 of 12 inspections</div>
         <table style={imsTableStyle}>
@@ -226,9 +276,10 @@ function SectionHseRegister() {
       </div>
       <div style={stepList}>
         <Step n={1}>Use <strong>Search inspections</strong> to find a record by number, title, form, project, vessel, area or inspector name.</Step>
-        <Step n={2}>Click <strong>Show Filters</strong> to reveal an <strong>All Statuses</strong> list (Draft, Open, Complete, Closed). <strong>Clear Filters</strong> resets both the search and the status.</Step>
-        <Step n={3}>Click a row. The record opens in a panel on the page, where you can change anything on the form.</Step>
-        <Step n={4}>Click <strong>Save Inspection</strong> to keep your changes, <strong>Generate PDF Report</strong> for a report, or <strong>Delete Inspection</strong> to remove it. Delete asks you to confirm and also removes the linked evidence records.</Step>
+        <Step n={2}>Click <strong>Show Filters</strong> to reveal an <strong>All Statuses</strong> list (Draft, Open, Complete, Closed). <strong>Clear Filters</strong> resets both the search and the status. The toolbar runs left to right: search, <strong>Clear Filters</strong>, <strong>Export PDF</strong>, <strong>Export Excel</strong>, <strong>Create Inspection</strong> and <strong>Show Filters</strong>.</Step>
+        <Step n={3}>Click <strong>Export PDF</strong> for a PDF register of the inspections currently shown (the HSE Inspection Register), or <strong>Export Excel</strong> for a workbook of them. Both follow your search and status filter and are greyed out when nothing is showing.</Step>
+        <Step n={4}>Click a row. The record opens on the record screen in a panel on the page, where you can change anything on the form.</Step>
+        <Step n={5}>Click <strong>Save Inspection</strong> to keep your changes, <strong>Complete Inspection</strong> when it is finished, <strong>Export PDF</strong> at the bottom of the record for that one inspection&apos;s report, or <strong>Delete Inspection</strong> to remove it. Delete asks you to confirm and also removes the linked evidence records.</Step>
       </div>
       <h3 style={h3Style}>Evidence (photos and files)</h3>
       <p style={pStyle}>You can attach <strong>photos, PDF, Word, Excel, PowerPoint, CSV and text files</strong>. You can choose several files at once.</p>
@@ -248,7 +299,7 @@ function SectionHseRegister() {
         </div>
       </div>
       <div style={stepList}>
-        <Step n={1}>Either use the <strong>Upload</strong> button on a checklist row (it links the file to that item), or use the <strong>Evidence Upload</strong> panel and first choose an item in <strong>Link evidence to item number</strong>. Leave it on <strong>General inspection evidence</strong> if the file is not about one item.</Step>
+        <Step n={1}>Evidence sits in step 2 <strong>Checklist</strong>. Either use the <strong>Upload</strong> button on a checklist row (it links the file to that item), or use the <strong>Evidence Upload</strong> panel and first choose an item in <strong>Link evidence to item number</strong>. Leave it on <strong>General inspection evidence</strong> if the file is not about one item.</Step>
         <Step n={2}>Click <strong>Upload Evidence</strong> (or <strong>Upload Photos / Files</strong> when creating) and pick the files.</Step>
         <Step n={3}>To look at a file, click <strong>Open / Preview</strong>. It opens in a new tab. If your browser blocks new tabs, it opens in the same tab, and the Back button brings you back to the IMS.</Step>
         <Step n={4}>To remove a file, click <strong>Delete</strong> and confirm.</Step>
@@ -258,9 +309,9 @@ function SectionHseRegister() {
         <div>When you are <strong>creating</strong> a new inspection, files are only <strong>staged</strong> (listed under &quot;Evidence Upload&quot; with a <strong>Remove</strong> button). They are uploaded when you click <strong>Save Inspection</strong>. On an inspection that is already saved, files upload straight away. If you try to upload before saving, you get &quot;Save the inspection before uploading evidence.&quot;</div>
       </div>
       <h3 style={h3Style}>Linked Actions</h3>
-      <p style={pStyle}>Findings that need follow-up are handled as central Actions. In a saved inspection, the <strong>Linked Actions</strong> panel has a <strong>Create Linked HSE Action</strong> button. It opens the central Action form with the source set to HSE Inspection, department HSEQ, and the project and inspection number filled in. Linked actions are listed in the panel (action number, title, owner, status, due date), each with an <strong>Open Action</strong> link.</p>
+      <p style={pStyle}>Findings that need follow-up are handled as central Actions. In a saved inspection, the <strong>Linked Actions</strong> panel (in step 3 <strong>Comments</strong>) has a <strong>Create Linked HSE Action</strong> button. It opens the central Action form with the source set to HSE Inspection, department HSEQ, and the project and inspection number filled in. Linked actions are listed in the panel (action number, title, owner, status, due date), each with an <strong>Open Action</strong> link.</p>
       <h3 style={h3Style}>The PDF report</h3>
-      <p style={pStyle}>Click <strong>PDF</strong> on a register row, or <strong>Generate PDF Report</strong> in the open record. The report contains the header details, every checklist section with N/A / Yes / No ticks and comments, <strong>Additional Comments</strong>, <strong>Actions</strong> (the linked central actions), <strong>Sign-Off</strong>, and an <strong>Evidence Register</strong> with an <strong>Open Evidence</strong> link for each file. PNG, JPG and WEBP photos are also placed in an <strong>Evidence Photos</strong> section.</p>
+      <p style={pStyle}>Click <strong>PDF</strong> on a register row, or <strong>Export PDF</strong> at the bottom of the open record. The report contains the header details, every checklist section with N/A / Yes / No ticks and comments, <strong>Additional Comments</strong>, <strong>Actions</strong> (the linked central actions), <strong>Sign-Off</strong>, and an <strong>Evidence Register</strong> with an <strong>Open Evidence</strong> link for each file. PNG, JPG and WEBP photos are also placed in an <strong>Evidence Photos</strong> section.</p>
       <p style={pStyle}>The PDF opens in a new tab. If your browser or phone does not allow that, the file is saved to your device instead, so it is never lost. The file name is the inspection number followed by the form title.</p>
     </>
   );
@@ -298,7 +349,7 @@ function SectionPhone() {
         <Step n={1}>Complete <strong>Report Details</strong> (title, date, area, inspector).</Step>
         <Step n={2}>For each item, tap <strong>N/A</strong>, <strong>Yes</strong> or <strong>No</strong> and add <strong>Comments / action notes</strong> if needed.</Step>
         <Step n={3}>Add <strong>Additional Comments</strong> and the <strong>Sign-Off</strong> details at the bottom.</Step>
-        <Step n={4}>Tap <strong>Save Inspection</strong>. The record then opens in the register, where it is shown as a card with its status and a <strong>PDF</strong> button.</Step>
+        <Step n={4}>Tap <strong>Save Inspection</strong>. The record then opens in the register, where it is shown as a card with its status and a <strong>PDF</strong> button. The steps (Report details, Checklist, Comments, Sign-off) and the live <strong>Inspection report (PDF)</strong> summary are on the phone too: the steps sit in two columns above the form, and the still-missing box and summary appear below it.</Step>
       </div>
       <h3 style={h3Style}>Taking or uploading photos and files</h3>
       <div style={stepList}>
@@ -313,7 +364,7 @@ function SectionPhone() {
         <div>Staged files are only held on the page until you save. If you close the browser or lose the page first, they are not kept. Save as soon as you have finished, then add any extras afterwards.</div>
       </div>
       <h3 style={h3Style}>Getting the PDF on your phone</h3>
-      <p style={pStyle}>In the register, tap <strong>PDF</strong> on the inspection card. The report opens in a new tab. If your phone blocks that, it is saved to the phone (look in your downloads or Files app). Evidence files opened with <strong>Open / Preview</strong> behave the same way.</p>
+      <p style={pStyle}>In the register, tap <strong>PDF</strong> on the inspection card (or <strong>Export PDF</strong> at the bottom of an open record). The report opens in a new tab. If your phone blocks that, it is saved to the phone (look in your downloads or Files app). Evidence files opened with <strong>Open / Preview</strong> behave the same way.</p>
       <p style={pStyle}>Buttons along the top of panels wrap onto a second line on a small screen, so scroll down if you cannot see one.</p>
     </>
   );
@@ -495,7 +546,7 @@ function SectionStatuses() {
       <div style={eyebrow}>Reference</div>
       <h2 style={h2Style}>Status Reference</h2>
       <h3 style={h3Style}>HSE inspection status</h3>
-      <p style={pStyle}>Set on the form under <strong>Report Details</strong>. New inspections start as <strong>Draft</strong>.</p>
+      <p style={pStyle}>Set on the form under <strong>Report Details</strong>, or with <strong>Complete Inspection</strong> in the header, which moves a Draft or Open inspection to Complete. New inspections start as <strong>Draft</strong>.</p>
       <table style={imsTableStyle}>
         <thead><tr>{["Status", "Use it when"].map(h => <th key={h} style={imsTableHeadStyle}>{h}</th>)}</tr></thead>
         <tbody>
@@ -543,12 +594,13 @@ function SectionFaq() {
   const qa: [string, string][] = [
     ["Why are Create Inspection, Save Inspection or the upload buttons greyed out?", "You have read-only access. You will see a message starting \"Read-only access: you do not have permission to...\". Ask your IMS administrator if you need create or edit rights."],
     ["I cannot find my inspection in the register.", "Check the search box and click Show Filters, then Clear Filters. The status filter may be hiding it."],
+    ["Where did Generate PDF Report go?", "It is now called Export PDF. It sits at the bottom of an open inspection for that one report, and on the register toolbar for a PDF of the inspections shown."],
     ["I added photos on a new inspection but nothing shows under Evidence.", "Files are staged until you click Save Inspection. Make sure you saved. After saving, they appear in the Evidence Upload panel of the saved record."],
     ["Can I use a photo I took earlier instead of taking a new one?", "Yes. On a phone, choose the photo library or files option when it asks where to get the file from."],
     ["Can I attach a Word, Excel or PowerPoint file as evidence?", "Yes. PDF, Word, Excel, PowerPoint, CSV, text and photos are accepted. In the PDF report these files appear as links in the Evidence Register. Only PNG, JPG and WEBP photos are also embedded as pictures."],
     ["The PDF did not open on my phone.", "If your phone blocks new tabs, the PDF is saved to the phone instead. Check your downloads or Files app."],
     ["Why does Open Inspections include Drafts?", "The card counts everything that is not Complete or Closed. Clicking it opens the register filtered to Open only."],
-    ["Where do I record actions from an inspection?", "In the saved inspection, use Create Linked HSE Action. Actions are managed in central Action Management and listed under Linked Actions and in the PDF."],
+    ["Where do I record actions from an inspection?", "In the saved inspection, go to step 3 Comments and use Create Linked HSE Action. Actions are managed in central Action Management and listed under Linked Actions and in the PDF."],
     ["An inspection I expect is missing from the 8-Week Lookahead.", "It may have no date yet, or fall outside the eight weeks from this Monday. Dateless entries appear only in the Full Register as Date TBC. Also check the Source, Supplier, Status, Witness / Hold and Client-visible only filters."],
     ["How do I stop an entry appearing in a client export?", "For a manual entry, untick Show to client in exports (open it, then Edit full details). Then tick Client-visible only before exporting."],
     ["Can I delete an inspection that came from an NOI?", "Not on this page. Delete is only for manual entries. Open in NOI Creator to work on the NOI itself."],
@@ -572,6 +624,7 @@ const sectionComponents: Record<SectionKey, () => ReactElement> = {
   overview:    SectionOverview,
   hsestart:    SectionHseStart,
   hsefill:     SectionHseFill,
+  recordscreen: SectionRecordScreen,
   hseregister: SectionHseRegister,
   phone:       SectionPhone,
   lookahead:   SectionLookahead,

@@ -7,7 +7,7 @@ import autoTable from "jspdf-autotable";
 import { ImsButton, ImsFilterPanel, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
-import { imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../../src/components/imsTheme";
+import { imsButtonBaseStyle, imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 import { openOrSaveBlob, saveBlobAsFile } from "../../../src/lib/fileOpen";
@@ -1326,6 +1326,9 @@ const inputStyle: CSSProperties = {
   minWidth: "180px",
   background: "white",
   color: "#000000",
+  minHeight: "42px",
+  boxSizing: "border-box",
+  fontSize: "14px",
 };
 
 const textareaStyle: CSSProperties = {
@@ -1336,33 +1339,21 @@ const textareaStyle: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#005670",
   color: "white",
-  border: "none",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: 700,
 };
 
 const secondaryButtonStyle: CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#D0D0CE",
   color: "#000000",
-  border: "none",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: 700,
 };
 
 const pdfButtonStyle: CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#005670",
   color: "white",
-  border: "none",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: 700,
 };
 
 const buttonRowStyle: CSSProperties = {
@@ -1455,7 +1446,8 @@ const miniButtonStyle: CSSProperties = {
   padding: "8px 12px",
   borderRadius: "8px",
   cursor: "pointer",
-  fontWeight: 700,
+  fontWeight: 800,
+  minHeight: "32px",
 };
 
 const miniButtonDeleteStyle: CSSProperties = {
@@ -1465,6 +1457,7 @@ const miniButtonDeleteStyle: CSSProperties = {
   padding: "8px 12px",
   borderRadius: "8px",
   cursor: "pointer",
-  fontWeight: 700,
+  fontWeight: 800,
+  minHeight: "32px",
 };
 

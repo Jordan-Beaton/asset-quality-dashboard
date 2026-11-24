@@ -493,11 +493,12 @@ function SectionMoving() {
               <div style={{ fontSize: 11, color: imsColours.muted }}>Page content appears here.</div>
               <div style={{ height: 70 }} />
               <div style={bottomBar}>
-                <div style={bottomIcon(true)}>Home</div>
-                <div style={bottomIcon()}>▦</div>
-                <div style={bottomIcon()}>▣</div>
-                <div style={bottomIcon()}>△</div>
-                <div style={bottomIcon()}>◔</div>
+                {[["Home", "Home", true], ["▦", "Dash", false], ["▣", "AINM", false], ["△", "Observe", false], ["◔", "PTW", false]].map(([icon, word, active]) => (
+                  <div key={String(word)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                    <div style={bottomIcon(Boolean(active))}>{icon}</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: imsColours.muted }}>{word}</div>
+                  </div>
+                ))}
               </div>
             </PhoneFrame>
             <div style={caption}>Swipe the bar sideways to see more.</div>
@@ -506,10 +507,10 @@ function SectionMoving() {
         <div>
           <h3 style={{ ...h3Style, marginTop: 0 }}>The bottom bar</h3>
           <p style={pStyle}>
-            The side menu you see on a computer becomes a bar of <strong>icons along the bottom</strong> of the screen. It shows the pages of the module you are in (for example HSE: Dashboard, Calendar, AINM, Observations and so on). <strong>Home</strong> is always first. If there are more icons than fit, swipe the bar sideways.
+            The side menu you see on a computer becomes a bar of <strong>icons along the bottom</strong> of the screen, with a one-word label under each icon (for example Dash, AINM, Observe, Guides, Documents). It shows the pages of the module you are in (for example HSE: Dashboard, Calendar, AINM, Observations and so on). <strong>Home</strong> is always first. If there are more icons than fit, swipe the bar sideways.
           </p>
           <p style={pStyle}>
-            The top header is shortened to the logo, the page name, the dark / light switch and <strong>Sign out</strong>. Field entry pages and the Observation Card have no bottom bar &mdash; use their Back links.
+            The top header is shortened to the logo, the page name (a long name wraps onto two lines instead of being cut off), the dark / light switch and <strong>Sign out</strong>. Field entry pages and the Observation Card have no bottom bar &mdash; use their Back links.
           </p>
         </div>
       </div>
@@ -517,6 +518,9 @@ function SectionMoving() {
       <h3 style={h3Style}>Tables become cards</h3>
       <p style={pStyle}>
         Registers are wide tables on a computer. On a phone each row becomes a <strong>card</strong> showing the label and value for each field. The most important fields stay visible (such as number, title, status, owner, due date, project and location). Everything else is hidden until you tap <strong>Expand</strong>.
+      </p>
+      <p style={pStyle}>
+        A long register shows the first <strong>25</strong> cards, then a <strong>Show more</strong> button that reads, for example, <em>Show 25 more (40 not shown)</em>. Search and filters still look through every record, not only the cards on screen.
       </p>
       <div style={mockPanel}>
         <div style={mockLabel}>A register row on a phone</div>
@@ -533,10 +537,15 @@ function SectionMoving() {
       <ul style={{ ...pStyle, paddingLeft: 20 }}>
         <li>A few wide, grid-style tables are left as scrolling tables because turning them into cards would lose their meaning &mdash; swipe sideways to read them.</li>
         <li>Large panels have a <strong>Collapse</strong> / <strong>Expand</strong> control so you can fold away sections you are not using.</li>
+        <li>The toolbar above a register (search, <strong>Show Closed</strong> where there is one, <strong>Clear Filters</strong>, <strong>Export PDF</strong>, <strong>Export Excel</strong>, <strong>Show Filters</strong>) wraps onto extra lines.</li>
         <li>Tabs along the top of a page scroll sideways when there are too many to fit.</li>
         <li>Forms become one column, with larger boxes and buttons that are easy to tap.</li>
       </ul>
 
+      <h3 style={h3Style}>Opening a record on a phone</h3>
+      <p style={pStyle}>
+        Tap a card in an NCR, audit, observation, AINM, permit, inspection or action register and the record opens on the <strong>record screen</strong>. On a phone it is one column: the header with the number, title, status and next-step button (for example <strong>Close NCR</strong>, <strong>Mark Completed</strong> or <strong>Issue Permit</strong>) comes first, then the steps in two columns, then the fields for the step you are on, then the <strong>still missing</strong> box and the live summary. Tap a step to move to it. <strong>All sections</strong> shows the whole record on one long page, and <strong>Form</strong>, <strong>Split</strong> and the report button choose what you see. The missing items only warn: you are always asked before you close with items missing.
+      </p>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>Everything you are allowed to do on a computer you can do on a phone, and nothing more &mdash; permissions are exactly the same. If a button is blocked, you will see a message saying your IMS permissions do not allow it.</div>

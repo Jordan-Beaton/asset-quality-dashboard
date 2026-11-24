@@ -3,11 +3,25 @@
 import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { ImsButton, ImsLinkButton } from "../../../src/components/ImsPrimitives";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
+import {
+  RecordHeader,
+  RecordWorkbench,
+  StatusPill,
+  WorkbenchStep,
+  percentDone,
+  toneForStatus,
+} from "../../../src/components/RecordWorkbench";
+import type { WorkbenchStepDef } from "../../../src/components/RecordWorkbench";
+import { downloadRegisterExcel, excelDateStamp } from "../../../src/lib/registerExcel";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
@@ -48,9 +62,14 @@ type ActionItem = {
   linked_ainm_number?: string | null;
   linked_hse_inspection_id?: string | null;
   linked_hse_inspection_number?: string | null;
+  linked_observation_id?: string | null;
+  linked_observation_number?: string | null;
+  close_out_comments?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
+
+type EvidenceRow = { id: string; record_id: string; file_name: string | null };
 
 type PersonOption = {
   id: string;
@@ -181,6 +200,190 @@ const sourceOptions = [
   "HSE",
   "Other",
 ];
+
+// Every source can be picked in the register filter (same list as the main Actions page), plus any source found in the data.
+const filterSourceOptions: string[] = [
+  "Manual",
+  "Audit",
+  "Audit Finding",
+  "Asset Inspection",
+  "Asset Maintenance",
+  "Asset Calibration",
+  "NCR/CAPA",
+  "MOC",
+  "AINM",
+  "HSE Inspection",
+  "Observation",
+  "Risk",
+  "HSE",
+  "Other",
+];
+
+function getActionSourceValue(action: ActionItem) {
+  const source = (action.source || "").trim();
+  if (!source) return "Manual";
+  if (source === "Audit") {
+    // A stored "Audit" with no finding stays "Audit". The stored value is not changed.
+    return action.linked_finding_id || action.linked_finding_reference ? "Audit Finding" : "Audit";
+  }
+  return source;
+}
+
+function getActionSourceLabel(action: ActionItem) {
+  const source = getActionSourceValue(action);
+  return source === "NCR/CAPA" ? "NCR / CAPA" : source;
+}
+
+function buildSourceFilterOptions(actions: ActionItem[], selected: string) {
+  const extra = new Set<string>();
+  actions.forEach((action) => {
+    const value = getActionSourceValue(action);
+    if (value && !filterSourceOptions.includes(value)) extra.add(value);
+  });
+  if (selected && !filterSourceOptions.includes(selected)) extra.add(selected);
+  return [...filterSourceOptions, ...[...extra].sort((a, b) => a.localeCompare(b))];
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// Short due-date wording for the record side card, for example "Due in 3 days" or "Overdue 4 days".
+function getDueSummary(action: { due_date: string | null; status: string | null }) {
+  const days = getDaysFromToday(action.due_date);
+  if (days === null) return "No due date set";
+  if (isClosedLikeStatus(action.status)) return `Was due ${formatDate(action.due_date)}`;
+  if (days < 0) return `Overdue ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"}`;
+  if (days === 0) return "Due today";
+  if (days === 1) return "Due tomorrow";
+  return `Due in ${days} days`;
+}
+
+// The next step in Open > In Progress > Closed, or null when the action is already closed.
+function nextStatusStep(status: string | null | undefined): "In Progress" | "Closed" | null {
+  if (isClosedLikeStatus(status)) return null;
+  return normaliseStatus(status) === "in progress" ? "Closed" : "In Progress";
+}
+
+// What is still missing before an action is closed. These are suggestions only: closing is never blocked.
+function closingGaps(evidenceCount: number, closeOutComments: string | null | undefined) {
+  const gaps: Array<{ label: string; step: string }> = [];
+  if (evidenceCount === 0) gaps.push({ label: "Evidence attached", step: "evidence" });
+  if (!(closeOutComments || "").trim()) gaps.push({ label: "Closing note", step: "details" });
+  return gaps;
+}
+
+// The one place that decides what happens when an action is closed with items missing. It only asks.
+// To make these items block closing instead, return false here when gaps.length > 0.
+function confirmCloseWithGaps(gaps: Array<{ label: string }>, question = "Close anyway?") {
+  if (gaps.length === 0) return true;
+  return window.confirm(
+    `${gaps.length} item${gaps.length === 1 ? " is" : "s are"} still missing: ${gaps.map((gap) => gap.label.toLowerCase()).join(", ")}. ${question}`
+  );
+}
+
+// Plain-text list of every linked record number, for the Excel and PDF exports.
+function buildLinkedRecordText(action: ActionItem) {
+  return [
+    action.linked_audit_number ? `Audit ${action.linked_audit_number}` : "",
+    action.linked_finding_reference ? `Finding ${action.linked_finding_reference}` : "",
+    action.linked_asset_code ? `Asset ${action.linked_asset_code}` : "",
+    action.linked_inspection_number ? `Inspection ${action.linked_inspection_number}` : "",
+    action.linked_maintenance_number ? `Maintenance ${action.linked_maintenance_number}` : "",
+    action.linked_ncr_number ? `NCR ${action.linked_ncr_number}` : "",
+    action.linked_capa_number ? `CAPA ${action.linked_capa_number}` : "",
+    action.linked_moc_number ? `MOC ${action.linked_moc_number}` : "",
+    action.linked_ainm_number ? `AINM ${action.linked_ainm_number}` : "",
+    action.linked_hse_inspection_number ? `HSE Inspection ${action.linked_hse_inspection_number}` : "",
+    action.linked_observation_number ? `Observation ${action.linked_observation_number}` : "",
+  ].filter(Boolean).join(", ");
+}
+
+type LinkedTarget = { kind: string; number: string; href: string | null };
+
+// The record an action comes from, with the same destinations the main Actions page uses.
+function getLinkedTarget(action: ActionItem, audits: AuditOption[], findings: FindingOption[]): LinkedTarget | null {
+  const source = getActionSourceValue(action);
+  const asset = encodeURIComponent(action.linked_asset_code || action.linked_asset_id || "");
+  if (source === "Audit" || source === "Audit Finding") {
+    let id = (action.linked_audit_id || "").trim();
+    let number = (action.linked_audit_number || "").trim();
+    if (!id && number) id = audits.find((option) => option.audit_number === number)?.id || "";
+    if (!id && !number) {
+      const findingId = (action.linked_finding_id || "").trim();
+      const findingRef = (action.linked_finding_reference || "").trim();
+      const matches = findingId
+        ? findings.filter((finding) => finding.id === findingId)
+        : findingRef
+        ? findings.filter((finding) => finding.reference === findingRef)
+        : [];
+      if (matches.length === 1) id = matches[0].audit_id;
+    }
+    if (id && !number) number = audits.find((option) => option.id === id)?.audit_number || "";
+    if (!id && !number) return null;
+    return {
+      kind: "audit",
+      number: number || "linked audit",
+      href: id ? `/audits?tab=programme&selected=${encodeURIComponent(id)}` : `/audits?search=${encodeURIComponent(number)}`,
+    };
+  }
+  if (source === "Asset Inspection" && action.linked_inspection_number) {
+    return { kind: "inspection", number: action.linked_inspection_number, href: `/assets/inspection?asset=${asset}` };
+  }
+  if (source === "Asset Maintenance" && action.linked_maintenance_number) {
+    return { kind: "maintenance", number: action.linked_maintenance_number, href: `/assets/maintenance?asset=${asset}` };
+  }
+  if (source === "Asset Calibration" && action.linked_asset_code) {
+    return { kind: "calibration", number: action.linked_asset_code, href: `/assets/calibration?asset=${asset}` };
+  }
+  if (source === "NCR/CAPA") {
+    if (action.linked_ncr_id || action.linked_ncr_number) {
+      return {
+        kind: "NCR",
+        number: action.linked_ncr_number || "linked NCR",
+        href: action.linked_ncr_id
+          ? `/ncr-capa?ncrId=${encodeURIComponent(action.linked_ncr_id)}`
+          : `/ncr-capa?ncr=${encodeURIComponent(action.linked_ncr_number || "")}`,
+      };
+    }
+    if (action.linked_capa_number) return { kind: "CAPA", number: action.linked_capa_number, href: null };
+    return null;
+  }
+  if (source === "MOC" && action.linked_moc_number) {
+    return { kind: "MOC", number: action.linked_moc_number, href: `/moc?search=${encodeURIComponent(action.linked_moc_number)}` };
+  }
+  if (source === "AINM" && (action.linked_ainm_id || action.linked_ainm_number)) {
+    return {
+      kind: "AINM",
+      number: action.linked_ainm_number || "linked AINM",
+      href: action.linked_ainm_id
+        ? `/hse/ainm?ainmId=${encodeURIComponent(action.linked_ainm_id)}`
+        : `/hse/ainm?ainm=${encodeURIComponent(action.linked_ainm_number || "")}`,
+    };
+  }
+  if (source === "HSE Inspection" && (action.linked_hse_inspection_id || action.linked_hse_inspection_number)) {
+    return {
+      kind: "HSE inspection",
+      number: action.linked_hse_inspection_number || "linked inspection",
+      href: action.linked_hse_inspection_id
+        ? `/hse/inspections?inspectionId=${encodeURIComponent(action.linked_hse_inspection_id)}`
+        : `/hse/inspections?inspection=${encodeURIComponent(action.linked_hse_inspection_number || "")}`,
+    };
+  }
+  if (source === "Observation" && (action.linked_observation_id || action.linked_observation_number)) {
+    return {
+      kind: "observation",
+      number: action.linked_observation_number || "linked observation",
+      href: action.linked_observation_id
+        ? `/hse/observations?observationId=${encodeURIComponent(action.linked_observation_id)}`
+        : `/hse/observations?observation=${encodeURIComponent(action.linked_observation_number || "")}`,
+    };
+  }
+  return null;
+}
 
 function normalizeImportHeader(value: string) {
   return value
@@ -348,7 +551,9 @@ function countByOwner(actions: ActionItem[]) {
 
 export default function HseActionsPage() {
   const imsPermissions = useImsPermissions();
+  const router = useRouter();
   const [actions, setActions] = useState<ActionItem[]>([]);
+  const [evidenceRows, setEvidenceRows] = useState<EvidenceRow[]>([]);
   const [currentUserEmail, setCurrentUserEmail] = useState("");
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [auditOptions, setAuditOptions] = useState<AuditOption[]>([]);
@@ -367,6 +572,8 @@ export default function HseActionsPage() {
   const [statusFilter, setStatusFilter] = useUrlState("status", "");
   const [ownerFilter, setOwnerFilter] = useUrlState("owner", "");
   const [priorityFilter, setPriorityFilter] = useUrlState("priority", "");
+  const [sourceFilter, setSourceFilter] = useUrlState("source", "");
+  const [showClosed, setShowClosed] = useUrlFlag("closed", false);
   const [showRegisterFilters, setShowRegisterFilters] = useUrlFlag("filters");
   const [pressureFilter, setPressureFilter] = useUrlState<"" | "overdue" | "dueWeek">("pressure", "", ["", "overdue", "dueWeek"]);
   const [form, setForm] = useState<ActionForm>(emptyForm);
@@ -382,6 +589,11 @@ export default function HseActionsPage() {
   const canCreateAction = useMemo(() => {
     return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canCreate);
   }, [imsPermissions.canCreate, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
+
+  // Only used to enable or disable the header button that opens the action in Central Actions, where editing happens.
+  const canEditAction = useMemo(() => {
+    return imsPermissions.loaded && (imsPermissions.isMasterAdmin || imsPermissions.fullAccess || imsPermissions.canEdit);
+  }, [imsPermissions.canEdit, imsPermissions.fullAccess, imsPermissions.isMasterAdmin, imsPermissions.loaded]);
 
   useEffect(() => {
     void loadData();
@@ -420,12 +632,14 @@ export default function HseActionsPage() {
     const matched = actions.find((action) => action.id === actionId || action.action_number === actionNumber);
     if (!matched) return;
     setSelectedId(matched.id);
+    // Opening a closed action from a link shows it.
+    if (isClosedLikeStatus(matched.status)) setShowClosed(true);
     setActiveView("register");
   }, [actions]);
 
   async function loadData() {
     setLoading(true);
-    const [actionsRes, peopleRes, auditRes, findingRes, ncrRes, capaRes, mocRes, ainmRes, hseInspectionRes, assetsRes, inspectionsRes, maintenanceRes, calibrationsRes] = await Promise.all([
+    const [actionsRes, peopleRes, auditRes, findingRes, ncrRes, capaRes, mocRes, ainmRes, hseInspectionRes, assetsRes, inspectionsRes, maintenanceRes, calibrationsRes, evidenceRes] = await Promise.all([
       supabase.from("actions").select("*").order("action_number", { ascending: true }),
       supabase.from("people").select("id,name,email,role,department,active").eq("active", true).order("name", { ascending: true }),
       supabase.from("audits").select("id,audit_number,title").order("audit_number", { ascending: true }),
@@ -439,6 +653,8 @@ export default function HseActionsPage() {
       supabase.from("asset_inspection_records").select("id,asset_id,inspection_number,inspection_date,result").order("inspection_number", { ascending: true }),
       supabase.from("asset_maintenance_records").select("id,asset_id,maintenance_number,maintenance_date,description").order("maintenance_number", { ascending: true }),
       supabase.from("asset_calibration_records").select("id,asset_id,reference,certificate_number,calibration_date,calibration_due_date").order("calibration_date", { ascending: false }),
+      // Read only: lets the action record show how many evidence files an action already has.
+      supabase.from("evidence_files").select("id,record_id,file_name").eq("record_type", "ACTION"),
     ]);
 
     if (actionsRes.error) {
@@ -455,6 +671,7 @@ export default function HseActionsPage() {
     });
     const hseActions = allActions.filter((action) => (action.department || "").trim().toUpperCase() === "HSE");
     setActions(hseActions);
+    if (evidenceRes.data && !evidenceRes.error) setEvidenceRows(((evidenceRes.data || []) as EvidenceRow[]).filter((row) => row.record_id));
     if (peopleRes.data && !peopleRes.error) setPeople((peopleRes.data || []) as PersonOption[]);
     if (auditRes.data && !auditRes.error) {
       setAuditOptions(((auditRes.data || []) as Array<Record<string, unknown>>).map((row) => ({
@@ -624,6 +841,17 @@ export default function HseActionsPage() {
     [assetCalibrationOptions, form.linked_asset_id]
   );
 
+  const sourceFilterOptions = useMemo(() => buildSourceFilterOptions(actions, sourceFilter), [actions, sourceFilter]);
+
+  // Closed actions are hidden by default. A status filter, or the Show Closed button, brings them back.
+  const closedHidden = !showClosed && !statusFilter;
+
+  const evidenceCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    evidenceRows.forEach((row) => map.set(row.record_id, (map.get(row.record_id) || 0) + 1));
+    return map;
+  }, [evidenceRows]);
+
   const filteredActions = useMemo(() => {
     const query = search.trim().toLowerCase();
     return actions.filter((action) => {
@@ -636,12 +864,15 @@ export default function HseActionsPage() {
         action.source,
         action.linked_ainm_number,
         action.linked_hse_inspection_number,
+        action.linked_observation_number,
       ].join(" ").toLowerCase();
       return (
         (!query || haystack.includes(query)) &&
+        (!closedHidden || !isClosedLikeStatus(action.status)) &&
         (!statusFilter || (action.status || "") === statusFilter) &&
         (!ownerFilter || (action.owner || "") === ownerFilter) &&
         (!priorityFilter || (action.priority || "") === priorityFilter) &&
+        (!sourceFilter || getActionSourceValue(action) === sourceFilter) &&
         (!pressureFilter ||
           (pressureFilter === "overdue"
             ? isOverdue(action)
@@ -652,7 +883,7 @@ export default function HseActionsPage() {
               })()))
       );
     });
-  }, [actions, ownerFilter, pressureFilter, priorityFilter, search, statusFilter]);
+  }, [actions, closedHidden, ownerFilter, pressureFilter, priorityFilter, search, sourceFilter, statusFilter]);
 
   async function handleImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     if (!canCreateAction) {
@@ -940,9 +1171,182 @@ export default function HseActionsPage() {
     return getNextActionNumber((data || []) as ActionItem[]);
   }
 
-  function openRegister(status = "") {
+  // A drill-down from the dashboard shows every action behind the number clicked, closed ones included when no status is given.
+  function openRegister(status = "", includeClosed = false) {
     setStatusFilter(status);
+    setShowClosed(includeClosed);
+    setSelectedId("");
     setActiveView("register");
+  }
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("");
+    setOwnerFilter("");
+    setPriorityFilter("");
+    setSourceFilter("");
+    setPressureFilter("");
+    setShowClosed(false);
+    setSelectedId("");
+  }
+
+  // One description of the register filters, printed on both the PDF and the Excel sheet.
+  function registerFilterDescriptions() {
+    return [
+      ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+      ...(statusFilter ? [`Status: ${statusFilter}`] : []),
+      ...(ownerFilter ? [`Owner: ${ownerFilter}`] : []),
+      ...(priorityFilter ? [`Priority: ${priorityFilter}`] : []),
+      ...(sourceFilter ? [`Source: ${sourceFilter}`] : []),
+      ...(pressureFilter === "overdue" ? ["Overdue only"] : pressureFilter === "dueWeek" ? ["Due this week"] : []),
+      ...(closedHidden ? ["Open / non-closed only"] : []),
+    ];
+  }
+
+  async function exportRegisterExcel() {
+    if (filteredActions.length === 0) {
+      setMessage("No filtered actions available for Excel export.");
+      return;
+    }
+    try {
+      await downloadRegisterExcel<ActionItem>({
+        fileName: `hse-action-register-${excelDateStamp()}.xlsx`,
+        sheetName: "HSE Action Register",
+        title: "HSE Action Register — Enshore IMS",
+        filters: registerFilterDescriptions(),
+        rows: filteredActions,
+        columns: [
+          { header: "Action No.", width: 14, value: (action) => action.action_number || "" },
+          { header: "Title", width: 44, value: (action) => action.title || "" },
+          { header: "Description", width: 60, value: (action) => action.description || "" },
+          { header: "Project", width: 22, value: (action) => action.project || "" },
+          { header: "Source", width: 20, value: (action) => getActionSourceLabel(action) },
+          { header: "Linked Record", width: 30, value: (action) => buildLinkedRecordText(action) },
+          { header: "Owner", width: 22, value: (action) => action.owner || "" },
+          { header: "Priority", width: 11, value: (action) => action.priority || "" },
+          { header: "Due Date", width: 13, value: (action) => (action.due_date ? formatDate(action.due_date) : "") },
+          { header: "Status", width: 14, value: (action) => action.status || "" },
+          { header: "Overdue", width: 9, value: (action) => (isOverdue(action) ? "Yes" : "No") },
+          { header: "Close-out Comments", width: 50, value: (action) => action.close_out_comments || "" },
+        ],
+      });
+      setMessage(`HSE Action Register Excel report created with ${filteredActions.length} action${filteredActions.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      console.error(error);
+      setMessage("HSE Action Register Excel report could not be created.");
+    }
+  }
+
+  async function exportRegisterPdf() {
+    if (filteredActions.length === 0) {
+      setMessage("No filtered actions available for PDF export.");
+      return;
+    }
+    try {
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 12;
+
+      try {
+        const logoResponse = await fetch("/enshore-primary-logo-colour.png");
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const logoDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result || ""));
+            reader.onerror = () => reject(new Error("Could not convert logo to data URL."));
+            reader.readAsDataURL(logoBlob);
+          });
+          doc.addImage(logoDataUrl, "PNG", margin, 8, 44, 22);
+        }
+      } catch {
+        // Keep report generation resilient if the logo cannot be loaded.
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(17);
+      doc.setTextColor(0, 0, 0);
+      doc.text("HSE Action Register", pageWidth / 2, 17, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(83, 86, 90);
+      doc.text("Enshore IMS — HSE Management", pageWidth / 2, 23, { align: "center" });
+      doc.text(`Generated: ${new Date().toLocaleString("en-GB")}`, pageWidth - margin, 17, { align: "right" });
+      doc.text(`Actions: ${filteredActions.length}`, pageWidth - margin, 23, { align: "right" });
+
+      const filterLines = registerFilterDescriptions();
+      if (filterLines.length > 0) {
+        doc.setFontSize(8);
+        doc.text(doc.splitTextToSize(`Filters: ${filterLines.join(" | ")}`, pageWidth - margin * 2).slice(0, 1), pageWidth / 2, 28, { align: "center" });
+      }
+      doc.setDrawColor(0, 86, 112);
+      doc.setLineWidth(0.7);
+      doc.line(margin, 31, pageWidth - margin, 31);
+
+      const reportRows = filteredActions.map((action) => ({
+        action_number: action.action_number || "-",
+        title: action.title || "-",
+        source: getActionSourceLabel(action),
+        linked_record: buildLinkedRecordText(action) || "-",
+        owner: action.owner || "-",
+        priority: action.priority || "-",
+        due_date: formatDate(action.due_date),
+        status: action.status || "-",
+        is_overdue: isOverdue(action),
+      }));
+
+      autoTable(doc, {
+        startY: 35,
+        theme: "grid",
+        margin: { left: margin, right: margin, bottom: 14 },
+        tableWidth: "auto",
+        columns: [
+          { header: "Action No.", dataKey: "action_number" },
+          { header: "Title", dataKey: "title" },
+          { header: "Source", dataKey: "source" },
+          { header: "Linked Record", dataKey: "linked_record" },
+          { header: "Owner", dataKey: "owner" },
+          { header: "Priority", dataKey: "priority" },
+          { header: "Due Date", dataKey: "due_date" },
+          { header: "Status", dataKey: "status" },
+        ],
+        body: reportRows,
+        styles: { font: "helvetica", fontSize: 7.4, cellPadding: 1.8, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0], overflow: "linebreak", valign: "top" },
+        headStyles: { fillColor: [0, 86, 112], textColor: [255, 255, 255], fontStyle: "bold" },
+        columnStyles: {
+          action_number: { cellWidth: 22 },
+          title: { cellWidth: 64 },
+          source: { cellWidth: 28 },
+          linked_record: { cellWidth: 50 },
+          owner: { cellWidth: 30 },
+          priority: { cellWidth: 20 },
+          due_date: { cellWidth: 24 },
+          status: { cellWidth: 24 },
+        },
+        didParseCell: (data) => {
+          if (data.section !== "body") return;
+          const row = data.row.raw as (typeof reportRows)[number];
+          if (row.is_overdue && (data.column.dataKey === "due_date" || data.column.dataKey === "status")) {
+            data.cell.styles.textColor = [249, 56, 34];
+            data.cell.styles.fontStyle = "bold";
+          }
+        },
+        didDrawPage: () => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8.5);
+          doc.setTextColor(83, 86, 90);
+          doc.text("Enshore HSE Action Management", margin, pageHeight - 6);
+          doc.text(`Page ${doc.getCurrentPageInfo().pageNumber} of ${doc.getNumberOfPages()}`, pageWidth - margin, pageHeight - 6, { align: "right" });
+        },
+      });
+
+      doc.save(`hse-action-register-${excelDateStamp()}.pdf`);
+      setMessage("HSE Action Register PDF generated successfully.");
+    } catch (error) {
+      console.error(error);
+      setMessage("HSE Action Register PDF generation failed.");
+    }
   }
 
   function updateSource(source: string) {
@@ -1099,6 +1503,42 @@ export default function HseActionsPage() {
 
   const latestAction = actions[actions.length - 1];
 
+  // Action record (workbench) values for the selected action. This page shows the record and opens Central Actions to edit it.
+  const selectedEvidence = selectedAction ? evidenceRows.filter((row) => row.record_id === selectedAction.id) : [];
+  const selectedLinkedTarget = selectedAction ? getLinkedTarget(selectedAction, auditOptions, findingOptions) : null;
+  const selectedNextStep = selectedAction ? nextStatusStep(selectedAction.status) : null;
+  const selectedGaps = selectedAction ? closingGaps(selectedEvidence.length, selectedAction.close_out_comments) : [];
+  const detailSteps: WorkbenchStepDef[] = selectedAction
+    ? [
+        {
+          key: "details",
+          label: "Details",
+          sub: "What, who, when",
+          pct: percentDone([
+            Boolean((selectedAction.title || "").trim()),
+            Boolean((selectedAction.owner || "").trim()),
+            Boolean(selectedAction.due_date),
+            Boolean((selectedAction.description || "").trim()),
+          ]),
+        },
+        { key: "evidence", label: "Evidence", sub: "Files for closure", state: `${selectedEvidence.length} file${selectedEvidence.length === 1 ? "" : "s"}` },
+        { key: "linked", label: "Linked record", sub: "Where it came from", state: selectedLinkedTarget ? selectedLinkedTarget.number : "None" },
+      ]
+    : [];
+  const detailNote = selectedAction
+    ? [
+        `${getDueSummary(selectedAction)}${selectedAction.due_date ? ` (${formatDate(selectedAction.due_date)})` : ""}.`,
+        selectedLinkedTarget ? `Raised from ${selectedLinkedTarget.kind} ${selectedLinkedTarget.number}.` : "",
+        "Edit this action in Central Actions.",
+      ].filter(Boolean).join(" ")
+    : "";
+
+  // The header button jumps to Central Actions, where the status is changed. Closing with items missing only asks first.
+  function openInCentralToProgress(action: ActionItem, target: "In Progress" | "Closed") {
+    if (target === "Closed" && !confirmCloseWithGaps(closingGaps(evidenceCountMap.get(action.id) || 0, action.close_out_comments), "Open Central Actions to close it anyway?")) return;
+    router.push(`/actions?actionId=${encodeURIComponent(action.id)}`);
+  }
+
   return (
     <main>
       <QualityPageHero
@@ -1128,8 +1568,8 @@ export default function HseActionsPage() {
 
       {activeView === "dashboard" ? (
         <>
-          <section style={statsGridStyle}>
-            <QualityKpiCard title="HSE Actions" value={kpis.total} accent="#005670" onClick={() => openRegister()} />
+          <section className="quality-kpi-grid" style={statsGridStyle}>
+            <QualityKpiCard title="HSE Actions" value={kpis.total} accent="#005670" onClick={() => openRegister("", true)} />
             <QualityKpiCard title="Open Actions" value={kpis.open} accent="#63B1BC" onClick={() => openRegister("Open")} />
             <QualityKpiCard title="Overdue Actions" value={kpis.overdue} accent="#F93822" onClick={() => { setPressureFilter("overdue"); setActiveView("register"); }} />
             <QualityKpiCard title="Due This Week" value={kpis.dueWeek} accent="#FFAD00" onClick={() => { setPressureFilter("dueWeek"); setActiveView("register"); }} />
@@ -1160,32 +1600,63 @@ export default function HseActionsPage() {
 
       {activeView === "register" ? (
         <SectionCard title="HSE Action Register" subtitle="Central Action Management records filtered to department HSE.">
-          <div className="ims-filter-panel" style={toolbarStyle}>
-            <input style={inputStyle} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search HSE Actions..." />
-            <button type="button" style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowRegisterFilters((current) => !current)}>
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
+          <div className="ims-filter-panel" style={filterShellStyle}>
+            <div style={registerToolbarStyle}>
+              <input style={{ ...inputStyle, flex: "1 1 260px", minWidth: 0 }} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search action no. / title / project / owner" />
+              <button
+                type="button"
+                onClick={() => {
+                  if (closedHidden) {
+                    setShowClosed(true);
+                    return;
+                  }
+                  // Hiding closed actions also drops a status filter that was holding them in view.
+                  setShowClosed(false);
+                  setStatusFilter("");
+                }}
+                title={closedHidden ? "Closed actions are hidden. Press to include them." : "Closed actions are included. Press to show open actions only."}
+                style={closedHidden ? primaryButtonStyle : secondaryButtonStyle}
+              >
+                {closedHidden ? "Show Closed" : "Hide Closed"}
+              </button>
+              <button type="button" style={secondaryButtonStyle} onClick={clearFilters}>Clear Filters</button>
+              <button type="button" style={primaryButtonStyle} disabled={filteredActions.length === 0} title="Create a PDF of the actions currently shown" onClick={() => void exportRegisterPdf()}>Export PDF</button>
+              <button type="button" style={secondaryButtonStyle} disabled={filteredActions.length === 0} title="Download an Excel workbook of the actions currently shown" onClick={() => void exportRegisterExcel()}>Export Excel</button>
+              <button type="button" style={showRegisterFilters ? secondaryButtonStyle : primaryButtonStyle} onClick={() => setShowRegisterFilters((current) => !current)}>
+                {showRegisterFilters ? "Hide Filters" : "Show Filters"}
+              </button>
+            </div>
+
+            {showRegisterFilters ? (
+              <div className="ims-filter-panel" style={toolbarStyle}>
+                <select style={inputStyle} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                  <option value="">All Status</option>
+                  {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+                </select>
+                <select style={inputStyle} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
+                  <option value="">All Priorities</option>
+                  {priorityOptions.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+                </select>
+                <select style={inputStyle} value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+                  <option value="">All Owners</option>
+                  {ownerOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+                </select>
+                <select style={inputStyle} value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+                  <option value="">All Sources</option>
+                  {sourceFilterOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </div>
+            ) : null}
           </div>
 
-          {showRegisterFilters ? (
-          <div className="ims-filter-panel" style={toolbarStyle}>
-            <select style={inputStyle} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">All Status</option>
-              {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
-            </select>
-            <select style={inputStyle} value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
-              <option value="">All Owners</option>
-              {ownerOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
-            </select>
-            <select style={inputStyle} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
-              <option value="">All Priority</option>
-              {priorityOptions.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
-            </select>
-            <button type="button" style={secondaryButtonStyle} onClick={() => { setSearch(""); setStatusFilter(""); setOwnerFilter(""); setPriorityFilter(""); setPressureFilter(""); }}>Clear</button>
+          <div style={tableInfoStyle}>
+            <span>
+              Showing <strong>{filteredActions.length}</strong> of <strong>{actions.length}</strong> HSE actions
+              {closedHidden ? <> showing <strong>open/non-closed</strong></> : null}
+              {pressureFilter === "overdue" ? <> with quick filter <strong>Overdue</strong></> : null}
+              {pressureFilter === "dueWeek" ? <> with quick filter <strong>Due This Week</strong></> : null}
+            </span>
           </div>
-          ) : null}
-
-          <div style={tableInfoStyle}>Showing {filteredActions.length} of {actions.length} HSE Actions</div>
           <div style={{ overflowX: "auto" }}>
             <table style={tableStyle}>
               <thead>
@@ -1202,7 +1673,7 @@ export default function HseActionsPage() {
               </thead>
               <tbody>
                 {filteredActions.length ? filteredActions.map((action) => {
-                  const projectSummary = `${action.project || "No project"}${action.linked_ainm_number ? ` | AINM ${action.linked_ainm_number}` : ""}${action.linked_hse_inspection_number ? ` | HSE Inspection ${action.linked_hse_inspection_number}` : ""}`;
+                  const projectSummary = `${action.project || "No project"}${action.linked_ainm_number ? ` | AINM ${action.linked_ainm_number}` : ""}${action.linked_hse_inspection_number ? ` | HSE Inspection ${action.linked_hse_inspection_number}` : ""}${action.linked_observation_number ? ` | Observation ${action.linked_observation_number}` : ""}`;
                   return (
                   <tr key={action.id} aria-selected={selectedId === action.id} data-selected={selectedId === action.id ? "true" : "false"} style={selectedId === action.id ? selectedRowStyle : trStyle} onClick={() => setSelectedId(action.id)}>
                     <td style={{ ...tdStrongStyle, ...colActionNoStyle }}>{action.action_number || "-"}</td>
@@ -1211,13 +1682,13 @@ export default function HseActionsPage() {
                       <div style={{ ...mutedTextStyle, ...truncatedTextStyle }} title={projectSummary}>{projectSummary}</div>
                     </td>
                     <td style={{ ...tdStyle, ...colOwnerStyle, ...truncatedTextStyle }} title={action.owner || "-"}>{action.owner || "-"}</td>
-                    <td style={{ ...tdStyle, ...colSourceStyle, ...truncatedTextStyle }} title={action.source || "-"}>{action.source || "-"}</td>
+                    <td style={{ ...tdStyle, ...colSourceStyle, ...truncatedTextStyle }} title={getActionSourceLabel(action)}>{getActionSourceLabel(action)}</td>
                     <td style={{ ...tdStyle, ...colDueDateStyle }}>
                       <strong>{formatDate(action.due_date)}</strong>
                       <div style={{ ...mutedTextStyle, color: isOverdue(action) ? "#F93822" : "#53565A" }}>{getDueLabel(action.due_date)}</div>
                     </td>
                     <td style={{ ...tdStyle, ...colPriorityStyle }}>{action.priority || "-"}</td>
-                    <td style={{ ...tdStyle, ...colStatusStyle }}><StatusPill status={action.status || "Open"} /></td>
+                    <td style={{ ...tdStyle, ...colStatusStyle }}><StatusPill label={action.status || "Open"} tone={toneForStatus(action.status || "Open")} /></td>
                     <td style={{ ...tdStyle, ...colActionStyle }}><Link href={`/actions?actionId=${encodeURIComponent(action.id)}`} style={smallLinkStyle}>Open Central</Link></td>
                   </tr>
                   );
@@ -1228,19 +1699,97 @@ export default function HseActionsPage() {
             </table>
           </div>
 
-          {selectedAction ? (
-            <div style={detailCardStyle}>
-              <h3 style={detailTitleStyle}>{selectedAction.action_number} - {selectedAction.title}</h3>
-              <p style={emptyTextStyle}>{selectedAction.description || "No description captured."}</p>
-              <div style={detailMetaGridStyle}>
-                <span><strong>Owner:</strong> {selectedAction.owner || "-"}</span>
-                <span><strong>Status:</strong> {selectedAction.status || "-"}</span>
-                <span><strong>Priority:</strong> {selectedAction.priority || "-"}</span>
-                <span><strong>Due:</strong> {formatDate(selectedAction.due_date)}</span>
+        </SectionCard>
+      ) : null}
+
+      {activeView === "register" && selectedAction ? (
+        <SectionCard title={`Action Detail — ${selectedAction.action_number || "Action"}`} subtitle="Review the action record. Editing and evidence upload happen in Central Actions.">
+          <RecordWorkbench
+            key={selectedAction.id}
+            gate="closing"
+            reportLabel="Summary"
+            initialStep="details"
+            steps={detailSteps}
+            missing={selectedNextStep ? selectedGaps : undefined}
+            header={
+              <RecordHeader
+                id={selectedAction.action_number || "-"}
+                title={selectedAction.title || "Untitled Action"}
+                status={{ label: selectedAction.status || "Unknown", tone: toneForStatus(selectedAction.status) }}
+                track={{ steps: ["Open", "In Progress", "Closed"], current: isClosedLikeStatus(selectedAction.status) ? "Closed" : selectedAction.status || "" }}
+                note={detailNote}
+                actions={
+                  <>
+                    <span style={priorityTextStyle}>{selectedAction.priority ? `${selectedAction.priority} priority` : "No priority"}</span>
+                    {selectedNextStep ? (
+                      <ImsButton
+                        onClick={() => openInCentralToProgress(selectedAction, selectedNextStep)}
+                        disabled={!canEditAction}
+                        title={canEditAction ? "Opens this action in Central Actions, where the status is changed" : "You do not have permission to edit actions"}
+                      >
+                        {selectedNextStep === "In Progress" ? "Start in Central Actions" : "Close in Central Actions"}
+                      </ImsButton>
+                    ) : null}
+                    <ImsLinkButton href={`/actions?actionId=${encodeURIComponent(selectedAction.id)}`} variant="secondary">Open / Edit in Central Actions</ImsLinkButton>
+                    <ImsButton variant="secondary" onClick={() => setSelectedId("")}>Hide Panel</ImsButton>
+                  </>
+                }
+              />
+            }
+            side={
+              <aside className="ims-doc" aria-label="Linked record">
+                <div className="ims-doc__title">Linked record</div>
+                <div className="ims-doc__row"><span className="ims-doc__label">Source</span><span>{getActionSourceLabel(selectedAction)}</span></div>
+                <div className="ims-doc__row"><span className="ims-doc__label">Record</span><span>{selectedLinkedTarget ? selectedLinkedTarget.number : "None stored"}</span></div>
+                <div className="ims-doc__row"><span className="ims-doc__label">Due</span><span>{getDueSummary(selectedAction)}</span></div>
+                <div className="ims-doc__row"><span className="ims-doc__label">Owner</span><span>{selectedAction.owner || "Unassigned"}</span></div>
+                <div className="ims-doc__row"><span className="ims-doc__label">Created</span><span>{formatDateTime(selectedAction.created_at)}</span></div>
+                <div className="ims-doc__row"><span className="ims-doc__label">Updated</span><span>{formatDateTime(selectedAction.updated_at)}</span></div>
+                {selectedLinkedTarget?.href ? (
+                  <ImsLinkButton href={selectedLinkedTarget.href} variant="secondary">Open {selectedLinkedTarget.kind} {selectedLinkedTarget.number}</ImsLinkButton>
+                ) : !selectedLinkedTarget && getActionSourceValue(selectedAction) !== "Manual" && getActionSourceValue(selectedAction) !== "Other" ? (
+                  <div style={linkedWarningStyle}>No linked record is stored on this action.</div>
+                ) : null}
+              </aside>
+            }
+          >
+            <WorkbenchStep stepKey="details">
+              <div style={formGridStyle}>
+                <Field label="Action Number"><input style={readOnlyInputStyle} value={selectedAction.action_number || ""} readOnly /></Field>
+                <Field label="Title"><input style={readOnlyInputStyle} value={selectedAction.title || ""} readOnly /></Field>
+                <Field label="Owner"><input style={readOnlyInputStyle} value={selectedAction.owner || ""} readOnly /></Field>
+                <Field label="Project"><input style={readOnlyInputStyle} value={selectedAction.project || ""} readOnly /></Field>
+                <Field label="Priority"><input style={readOnlyInputStyle} value={selectedAction.priority || ""} readOnly /></Field>
+                <Field label="Status"><input style={readOnlyInputStyle} value={selectedAction.status || ""} readOnly /></Field>
+                <Field label="Due Date"><input style={readOnlyInputStyle} value={selectedAction.due_date ? formatDate(selectedAction.due_date) : ""} readOnly /></Field>
+                <Field label="Close-out Comments"><textarea style={{ ...readOnlyInputStyle, minHeight: 80, resize: "vertical" }} value={selectedAction.close_out_comments || ""} readOnly /></Field>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="Description"><textarea style={{ ...readOnlyInputStyle, minHeight: 96, resize: "vertical" }} value={selectedAction.description || ""} readOnly /></Field>
+                </div>
               </div>
-              <Link href={`/actions?actionId=${encodeURIComponent(selectedAction.id)}`} style={primaryLinkStyle}>Open / Edit in Central Actions</Link>
-            </div>
-          ) : null}
+            </WorkbenchStep>
+
+            <WorkbenchStep stepKey="evidence">
+              <div style={{ display: "grid", gap: 10 }}>
+                <p style={emptyTextStyle}>
+                  {selectedEvidence.length
+                    ? `${selectedEvidence.length} evidence file${selectedEvidence.length === 1 ? "" : "s"} attached to ${selectedAction.action_number || "this action"}.`
+                    : `No evidence is attached to ${selectedAction.action_number || "this action"} yet.`}
+                </p>
+                {selectedEvidence.map((file) => <div key={file.id} style={evidenceRowStyle}>{file.file_name || "Evidence file"}</div>)}
+                <p style={emptyTextStyle}>Upload and open evidence files in Central Actions.</p>
+              </div>
+            </WorkbenchStep>
+
+            <WorkbenchStep stepKey="linked">
+              <div style={formGridStyle}>
+                <Field label="Source"><input style={readOnlyInputStyle} value={getActionSourceLabel(selectedAction)} readOnly /></Field>
+                <Field label="Linked Record"><input style={readOnlyInputStyle} value={selectedLinkedTarget ? `${selectedLinkedTarget.kind} ${selectedLinkedTarget.number}` : ""} placeholder="None stored" readOnly /></Field>
+                <Field label="Asset"><input style={readOnlyInputStyle} value={selectedAction.linked_asset_code || ""} readOnly /></Field>
+                <Field label="Department"><input style={readOnlyInputStyle} value={selectedAction.department || ""} readOnly /></Field>
+              </div>
+            </WorkbenchStep>
+          </RecordWorkbench>
         </SectionCard>
       ) : null}
 
@@ -1491,11 +2040,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label style={fieldStyle}><span style={labelStyle}>{label}</span>{children}</label>;
 }
 
-function StatusPill({ status }: { status: string }) {
-  const closed = isClosedLikeStatus(status);
-  return <span style={{ ...pillStyle, background: closed ? "#ECECE7" : "#ECECE7", color: closed ? "#005670" : "#005670" }}>{status || "Open"}</span>;
-}
-
 function BarList({ rows, total, accent, onClick }: { rows: { label: string; value: number }[]; total: number; accent: string; onClick?: (label: string) => void }) {
   if (!rows.length) return <div style={emptyBoxStyle}>No data available yet.</div>;
   return <div style={barListStyle}>{rows.map((row) => <button key={row.label} type="button" style={barRowStyle} onClick={() => onClick?.(row.label)}><span style={barLabelStyle}><strong>{row.label}</strong><span>{row.value}</span></span><span style={barTrackStyle}><span style={{ ...barFillStyle, background: accent, width: `${Math.max(4, Math.round((row.value / total) * 100))}%` }} /></span></button>)}</div>;
@@ -1525,7 +2069,8 @@ const primaryLinkStyle: CSSProperties = { background: "#005670", color: "white",
 const smallLinkStyle: CSSProperties = { ...primaryLinkStyle, padding: "8px 10px", fontSize: 12 };
 const viewButtonStyle: CSSProperties = { background: "#ECECE7", color: "#000000", border: "none", borderRadius: 10, padding: "10px 14px", fontWeight: 800, cursor: "pointer", minHeight: "44px", display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, boxSizing: "border-box" };
 const activeViewButtonStyle: CSSProperties = { ...viewButtonStyle, background: "#005670", color: "white" };
-const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "16px", marginBottom: "20px" };
+// One row of six tiles, like the main Actions page. The global phone rules put these two across on a phone.
+const statsGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: "12px", marginBottom: "20px" };
 const dashboardGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "20px" };
 const panelStyle: CSSProperties = { background: "white", borderRadius: "18px", padding: "20px", boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)", marginBottom: 20 };
 const sectionHeaderStyle: CSSProperties = { background: "#005670", borderRadius: 10, padding: "12px 14px", marginBottom: 16 };
@@ -1658,24 +2203,23 @@ const emptyCellStyle: CSSProperties = {
   background: "#ECECE7",
   borderBottom: "1px dashed #D0D0CE",
 };
-const detailCardStyle: CSSProperties = {
-  marginTop: 18,
-  border: "1px solid #D0D0CE",
-  borderRadius: "18px",
-  padding: "18px",
-  background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)",
+const filterShellStyle: CSSProperties = {
   display: "grid",
-  gap: 12,
-  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
-  minWidth: 0,
+  gap: "12px",
+  padding: "12px",
+  border: "1px solid #D0D0CE",
+  borderRadius: "16px",
+  background: "rgba(248,250,252,0.92)",
+  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
 };
-const detailTitleStyle: CSSProperties = { margin: 0, color: "#000000", fontSize: 18 };
-const detailMetaGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, color: "#53565A", fontSize: 13 };
+const registerToolbarStyle: CSSProperties = { display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center" };
+const priorityTextStyle: CSSProperties = { color: "#53565A", fontSize: 13, fontWeight: 800 };
+const linkedWarningStyle: CSSProperties = { border: "1px solid #FFAD00", borderRadius: 10, padding: "10px 12px", color: "#000000", fontSize: 13 };
+const evidenceRowStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: 10, padding: "10px 12px", background: "white", color: "#000000", fontSize: 13 };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 };
 const fieldStyle: CSSProperties = { display: "grid", gap: 6 };
 const labelStyle: CSSProperties = { color: "#53565A", fontSize: 12, fontWeight: 900 };
 const buttonRowStyle: CSSProperties = { display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 14 };
-const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "5px 9px", fontSize: 12, fontWeight: 900 };
 const barListStyle: CSSProperties = { display: "grid", gap: 12 };
 const barRowStyle: CSSProperties = { display: "grid", gap: 7, border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" };
 const barLabelStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, color: "#000000", fontSize: 13 };

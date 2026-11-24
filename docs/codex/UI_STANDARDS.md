@@ -709,6 +709,29 @@ Field Tools launchers:
 - Put essential capture fields first. Secondary ownership, classification and follow-up data should use a clearly labelled expandable section such as `Optional detail`.
 - After a successful repeatable field capture, clear the form and keep the field workflow ready unless the process specifically requires opening the saved record.
 
+## Record Screen (Workbench)
+
+Records that people write or work through (NCR, Audits, Observations, AINM, Permit to Work, HSE Inspections, Actions, MOC) share one record screen, built on `src/components/RecordWorkbench.tsx`. Management of Change is the reference.
+
+- **Header:** record number, title, status pill, one primary next-step button and the Hide Panel button, always in that place. One calm note line underneath says why the record is locked or what happens next.
+- **Steps:** a row of progress steps. Each shows its own percentage computed from real field values, or a state word where a percentage has no meaning (an action is a task, a card is reviewed not authored). The module keeps its own fields and wraps each group in `WorkbenchStep`. The `All sections` button shows the old long form, so nothing is ever hidden for good.
+- **Still missing:** chips say what is missing before the next step. They warn, they never block. A closing button stays usable and asks for confirmation (`window.confirm` listing the gaps). Whether a module should block instead is a per-module decision and lives in one place in that page.
+- **Live summary:** where a report or document is produced, `DocPreview` shows what it will contain, with unfinished fields as amber blanks that jump to the step. It is a summary of the fields, not a pixel copy of the Word or PDF file.
+- **Status track:** `StatusTrack` shows where a record sits (for example Open, In Progress, Closed). Status values and who may change them are unchanged.
+- A header button calls the page's existing handler and respects existing permissions. Never add a header button that does something the page cannot already do.
+
+## Status Colours
+
+Four soft tints carry status everywhere, in light and dark, defined once in `app/globals.css` (`--ims-ok-*`, `--ims-warn-*`, `--ims-bad-*`, `--ims-neu-*`) and used through `.ims-pill--ok|warn|bad|neu|brand` or `StatusPill`: success (Approved, Closed, Effective), needs attention (Open, Review due, Due in 7 days), overdue or urgent (Overdue, High, Action Required), neutral (Draft, Planned, Superseded). Teal stays the primary action colour. Amber and red only mean "needs attention". Do not invent new status colours; the UI check allows exactly these.
+
+## Standard Register Toolbar
+
+Every register uses one bar, in this order: search, Show Closed (only on work-queue registers), Clear Filters, Export PDF, Export Excel, Show Filters. Wording is exactly "Export PDF" and "Export Excel". A different deliverable such as a Word report keeps its own name after the pair. Excel exports use `downloadRegisterExcel`, contain exactly the rows on screen and print the filters on the sheet.
+
+## Pages That Are Not Built
+
+An empty shell page is not linked from any menu. Add it to the menu when it is built. Do not show developer notes, "coming soon" wording or placeholder tiles to staff.
+
 ## Typography
 
 Global font:

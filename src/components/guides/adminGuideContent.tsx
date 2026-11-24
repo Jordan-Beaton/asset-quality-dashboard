@@ -497,7 +497,7 @@ function SectionReference() {
       <div style={eyebrow}>Reference</div>
       <h2 style={h2Style}>Reference</h2>
       <h3 style={h3Style}>Modules and their internal tabs (permission list)</h3>
-      <p style={pStyle}>These are the modules and tabs you can grant in Part Access.</p>
+      <p style={pStyle}>These are the modules and tabs you can grant in Part Access. Risk Management and Management Review are hidden from Home, the menus and the Guides list for now, so people will not see them whatever access they have. They stay in this list so their access settings are kept.</p>
       <Table head={["Module", "Internal tabs"]} rows={registry} />
       <h3 style={h3Style}>Access status</h3>
       <p style={pStyle}>{statusPill("Active", "good")} {statusPill("Invited", "good")} {statusPill("Deactivated", "danger")}</p>

@@ -28,10 +28,22 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import * as XLSX from "xlsx";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
+import { ImsButton, ImsFilterPanel } from "../../src/components/ImsPrimitives";
 import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
+import {
+  DocPreview,
+  RecordHeader,
+  RecordWorkbench,
+  StatusPill,
+  WorkbenchStep,
+  percentDone,
+  toneForStatus,
+} from "../../src/components/RecordWorkbench";
+import type { DocPreviewSection, WorkbenchStepDef } from "../../src/components/RecordWorkbench";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { exportColours, exportRgb, exportTypography } from "../../src/lib/exportTheme";
+import { downloadRegisterExcel, excelDateStamp } from "../../src/lib/registerExcel";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
 import { openFileUrl, saveBlobAsFile } from "../../src/lib/fileOpen";
@@ -286,14 +298,9 @@ function rowDueState(row: { status: string; due_date: string | null | undefined 
   return (row.status || "") === "Closed" ? "none" : dueState(row.due_date);
 }
 
-function getStatusTone(status: string) {
-  const value = (status || "").toLowerCase();
-  if (value.includes("open")) return { bg: "#ECECE7", color: "#F93822" };
-  if (value.includes("progress")) return { bg: "#ECECE7", color: "#000000" };
-  if (value.includes("hold")) return { bg: "#ECECE7", color: "#53565A" };
-  if (value.includes("closed")) return { bg: "#ECECE7", color: "#005670" };
-  if (value.includes("complete")) return { bg: "#ECECE7", color: "#005670" };
-  return { bg: "#D0D0CE", color: "#53565A" };
+// A central action counts as finished when it is closed or completed (the same words the Actions page treats as closed).
+function isClosedActionStatus(status: string | null | undefined) {
+  return ["closed", "complete", "completed"].includes((status || "").trim().toLowerCase());
 }
 
 function getSeverityTone(severity: string) {
@@ -2174,39 +2181,41 @@ function NcrCapaPageContent() {
     await loadData();
   }
 
-  async function saveEdit() {
-    if (!editRow) return;
+  // A caller can pass the record to save (Close NCR passes it with the status already set to Closed).
+  async function saveEdit(override?: CombinedRow) {
+    const record = override ?? editRow;
+    if (!record) return;
     if (!requireEditPermission("Saving NCR/CAPA changes")) return;
 
     setSaving(true);
 
-    if (editRow.type === "NCR") {
+    if (record.type === "NCR") {
       const wasClosed = (selectedRow?.status || "").trim().toLowerCase() === "closed";
-      const isClosed = (editRow.status || "").trim().toLowerCase() === "closed";
+      const isClosed = (record.status || "").trim().toLowerCase() === "closed";
       const nextClosedAt = !wasClosed && isClosed ? new Date().toISOString() : wasClosed && !isClosed ? null : selectedRow?.closed_at || null;
 
       const { error } = await supabase
         .from("ncrs")
         .update({
-          title: editRow.title || null,
-          description: editRow.description || null,
-          containment_action: editRow.containment_action || null,
-          corrective_action: editRow.corrective_action || null,
-          severity: editRow.severity || null,
-          status: editRow.status || null,
-          owner: editRow.owner || null,
-          area: editRow.area || null,
-          due_date: editRow.due_date || null,
+          title: record.title || null,
+          description: record.description || null,
+          containment_action: record.containment_action || null,
+          corrective_action: record.corrective_action || null,
+          severity: record.severity || null,
+          status: record.status || null,
+          owner: record.owner || null,
+          area: record.area || null,
+          due_date: record.due_date || null,
           closed_at: nextClosedAt,
-          project: editRow.project || null,
-          source_type: editRow.source_type || "Internal",
+          project: record.project || null,
+          source_type: record.source_type || "Internal",
           root_cause_category:
-            resolveRootCauseCategory(editRow.root_cause_category, editRootCauseOther) || null,
-          root_cause_description: editRow.root_cause_description || null,
-          supplier_response: editRow.supplier_response || null,
-          supplier_acknowledgement: editRow.supplier_acknowledgement || null,
+            resolveRootCauseCategory(record.root_cause_category, editRootCauseOther) || null,
+          root_cause_description: record.root_cause_description || null,
+          supplier_response: record.supplier_response || null,
+          supplier_acknowledgement: record.supplier_acknowledgement || null,
         })
-        .eq("id", editRow.id);
+        .eq("id", record.id);
 
       if (error) {
         setSaving(false);
@@ -2215,15 +2224,15 @@ function NcrCapaPageContent() {
       }
     } else {
       if (
-        editRow.status === "Closed" &&
-        normaliseEffectivenessStatus(editRow.effectiveness_status) !== "Effective"
+        record.status === "Closed" &&
+        normaliseEffectivenessStatus(record.effectiveness_status) !== "Effective"
       ) {
         setSaving(false);
         setMessage("CAPA cannot be closed until effectiveness is reviewed and marked Effective.");
         return;
       }
 
-      const cleanedLinkedTo = editRow.linked_to
+      const cleanedLinkedTo = record.linked_to
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean)
@@ -2232,22 +2241,22 @@ function NcrCapaPageContent() {
       const { error } = await supabase
         .from("capas")
         .update({
-          title: editRow.title || null,
-          description: editRow.description || null,
-          status: editRow.status || null,
-          owner: editRow.owner || null,
-          due_date: editRow.due_date || null,
+          title: record.title || null,
+          description: record.description || null,
+          status: record.status || null,
+          owner: record.owner || null,
+          due_date: record.due_date || null,
           linked_to: cleanedLinkedTo || null,
-          project: editRow.project || null,
-          correction_description: editRow.correction_description || null,
-          corrective_action_description: editRow.corrective_action_description || null,
-          effectiveness_status: normaliseEffectivenessStatus(editRow.effectiveness_status),
-          effectiveness_review_date: editRow.effectiveness_review_date || null,
-          effectiveness_reviewer: editRow.effectiveness_reviewer || null,
-          effectiveness_comments: editRow.effectiveness_comments || null,
-          effectiveness_due_date: editRow.effectiveness_due_date || null,
+          project: record.project || null,
+          correction_description: record.correction_description || null,
+          corrective_action_description: record.corrective_action_description || null,
+          effectiveness_status: normaliseEffectivenessStatus(record.effectiveness_status),
+          effectiveness_review_date: record.effectiveness_review_date || null,
+          effectiveness_reviewer: record.effectiveness_reviewer || null,
+          effectiveness_comments: record.effectiveness_comments || null,
+          effectiveness_due_date: record.effectiveness_due_date || null,
         })
-        .eq("id", editRow.id);
+        .eq("id", record.id);
 
       if (error) {
         setSaving(false);
@@ -2257,16 +2266,16 @@ function NcrCapaPageContent() {
     }
 
     setSaving(false);
-    setMessage(`${editRow.number} updated successfully.`);
+    setMessage(`${record.number} updated successfully.`);
 
     // Only notify the owner about what actually changed: a genuine (re)assignment,
     // or a status change on a record they already own. Editing unrelated fields
     // (e.g. root cause, description) with the owner and status unchanged should
     // not tell them they've "been assigned" — that isn't what happened.
     const prevOwner = (selectedRow?.owner ?? "").trim().toLowerCase();
-    const newOwner = (editRow.owner ?? "").trim();
+    const newOwner = (record.owner ?? "").trim();
     const prevStatus = selectedRow?.status ?? "";
-    const newStatus = editRow.status ?? "";
+    const newStatus = record.status ?? "";
     const notifyKind: "assigned" | "status-changed" | null =
       newOwner && newOwner.toLowerCase() !== prevOwner
         ? "assigned"
@@ -2284,12 +2293,12 @@ function NcrCapaPageContent() {
             kind: notifyKind,
             recipientEmail: ownerRecord.email,
             recipientName: ownerRecord.name,
-            itemType: editRow.type === "NCR" ? "NCR" : "CAPA",
-            itemRef: editRow.number,
-            itemTitle: editRow.title,
-            status: editRow.status,
-            dueDate: editRow.due_date || undefined,
-            itemUrl: `${window.location.origin}/ncr-capa?ncr=${encodeURIComponent(editRow.number)}`,
+            itemType: record.type === "NCR" ? "NCR" : "CAPA",
+            itemRef: record.number,
+            itemTitle: record.title,
+            status: record.status,
+            dueDate: record.due_date || undefined,
+            itemUrl: `${window.location.origin}/ncr-capa?ncr=${encodeURIComponent(record.number)}`,
           }),
         });
       }
@@ -3516,6 +3525,839 @@ function NcrCapaPageContent() {
     await loadNcrOptions();
   }
 
+  // ---- NCR record workbench -------------------------------------------------------------------------------------
+  // The NCR detail panel is a four-step workbench. The fields, handlers and saving are the same as before; this only
+  // groups them into steps and shows what is still missing. Closing stays a manual decision (warn, never block).
+  const ncrWorkbenchRef = useRef<HTMLDivElement | null>(null);
+  const ncrStepKeys = ["describe", "contain", "cause", "verify"];
+
+  // The live summary and the missing chips jump to a step by pressing that step's tab.
+  function jumpToNcrStep(stepKey: string) {
+    const index = ncrStepKeys.indexOf(stepKey);
+    const tabs = ncrWorkbenchRef.current?.querySelectorAll<HTMLButtonElement>(".ims-steps .ims-step");
+    if (index >= 0) tabs?.[index]?.click();
+  }
+
+  // Closing an NCR sets the status to Closed and runs the same save as the Save Changes button.
+  function closeNcrRecord(record: CombinedRow, missingLabels: string[]) {
+    if (record.type !== "NCR" || (record.status || "").trim().toLowerCase() === "closed") return;
+    if (!requireEditPermission("Closing an NCR")) return;
+    if (missingLabels.length > 0) {
+      const count = missingLabels.length;
+      const proceed = window.confirm(
+        `${count} item${count === 1 ? " is" : "s are"} still missing: ${missingLabels.join(", ")}. Close anyway?`
+      );
+      if (!proceed) return;
+    }
+    const closing: CombinedRow = { ...record, status: "Closed" };
+    setEditRow(closing);
+    void saveEdit(closing);
+  }
+
+  function renderEvidenceBody() {
+    return (
+      <>
+                <div style={detailFormGridStyle}>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Select Files</label>
+                    <input
+                      type="file"
+                      multiple
+                      style={inputStyle}
+                      onChange={handleSelectedEvidenceFileChange}
+                      disabled={!canEditNcr}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Evidence Notes (optional)</label>
+                    <textarea
+                      style={textareaStyle}
+                      value={selectedEvidenceNotes}
+                      onChange={(e) => setSelectedEvidenceNotes(e.target.value)}
+                      placeholder="Add a note for the uploaded evidence"
+                    />
+                  </div>
+                </div>
+
+                <SelectedFilesList files={selectedEvidenceFiles} />
+
+                <div style={buttonRowStyle}>
+                  <button
+                    type="button"
+                    style={{ ...primaryButton, background: "#53565A" }}
+                    onClick={() => void uploadEvidenceToSelected()}
+                    disabled={uploadingEvidence || !canEditNcr}
+                  >
+                    {uploadingEvidence ? "Uploading..." : "Upload Evidence"}
+                  </button>
+                </div>
+
+                <div style={evidenceListStyle}>
+                  {selectedRowEvidence.length === 0 ? (
+                    <div style={emptyBoardStyle}>No evidence attached yet.</div>
+                  ) : (
+                    selectedRowEvidence.map((file) => (
+                      <div key={file.id} style={evidenceItemStyle}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={evidenceFileNameStyle}>{file.file_name}</div>
+                          <div style={evidenceMetaTextStyle}>
+                            {formatFileSize(file.file_size)} | {file.content_type || "Unknown type"} | Uploaded{" "}
+                            {formatDateTime(file.uploaded_at)}
+                          </div>
+                          {file.notes ? <div style={evidenceNoteStyle}>Note: {file.notes}</div> : null}
+                        </div>
+
+                        <div style={actionButtonsWrapStyle}>
+                          <button type="button" style={secondaryButtonSmall} onClick={() => void openEvidence(file)}>
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            style={{
+                              ...secondaryButtonSmall,
+                              border: "1px solid #ECECE7",
+                              color: "#F93822",
+                              background: "#ECECE7",
+                            }}
+                            onClick={() => void deleteEvidence(file)}
+                            disabled={!canEditNcr}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+      </>
+    );
+  }
+
+  function renderNcrWorkbench(editRow: CombinedRow) {
+    const live = ncrs.find((item) => item.id === editRow.id);
+    const filled = (value: string | null | undefined) => Boolean((value || "").trim());
+    const clip = (value: string, limit = 240) => {
+      const text = (value || "").trim();
+      return text.length > limit ? `${text.slice(0, limit).trim()}...` : text;
+    };
+    const isClosed = (editRow.status || "").trim().toLowerCase() === "closed";
+    const closedAt = live?.closed_at || "";
+    const externalSource = editRow.source_type === "Supplier" || editRow.source_type === "External";
+
+    // What each step needs, taken from the values on screen (typed but unsaved text counts).
+    const linkedActionList = selectedLinkedActions;
+    const rootCategoryRecorded =
+      filled(editRow.root_cause_category) &&
+      (getRootCauseCategorySelectValue(editRow.root_cause_category) !== "Other" || filled(editRootCauseOther));
+    const linkedActionsClosed =
+      linkedActionList.length > 0 && linkedActionList.every((action) => isClosedActionStatus(action.status));
+    const linkedCapaList = selectedLinkedCapas;
+    const capasEffective =
+      linkedCapaList.length > 0 &&
+      linkedCapaList.every((capa) => normaliseEffectivenessStatus(capa.effectiveness_status) === "Effective");
+
+    type NcrCheck = { label: string; ok: boolean };
+    const describeChecks: NcrCheck[] = [
+      { label: "Title", ok: filled(editRow.title) },
+      { label: "Description", ok: filled(editRow.description) },
+      { label: "Owner", ok: filled(editRow.owner) },
+      { label: "Project", ok: filled(editRow.project) },
+      { label: "Due date", ok: filled(editRow.due_date) },
+    ];
+    const containChecks: NcrCheck[] = [{ label: "Containment action", ok: filled(editRow.containment_action) }];
+    const causeChecks: NcrCheck[] = [
+      { label: "Root cause category", ok: rootCategoryRecorded },
+      { label: "Root cause description", ok: filled(editRow.root_cause_description) },
+      { label: "Corrective action written", ok: filled(editRow.corrective_action) },
+      { label: "Corrective action linked and closed", ok: linkedActionsClosed },
+      ...(externalSource
+        ? [{ label: "Supplier / client response", ok: filled(editRow.supplier_response) || filled(editRow.supplier_acknowledgement) }]
+        : []),
+    ];
+    // Linked CAPAs carry the effectiveness review. With none linked there is nothing to check.
+    const effectivenessChecks: NcrCheck[] =
+      linkedCapaList.length > 0 ? [{ label: "Linked CAPA effectiveness: Effective", ok: capasEffective }] : [];
+    // The closure date is stamped by the save when the status becomes Closed, so it is not a "before closing" item.
+    const closureRecorded = isClosed && filled(closedAt);
+    const verifyChecks: NcrCheck[] = [...effectivenessChecks, { label: "Closure date", ok: closureRecorded }];
+
+    const steps: WorkbenchStepDef[] = [
+      { key: "describe", label: "Describe", sub: "Section A and evidence", pct: percentDone(describeChecks.map((c) => c.ok)) },
+      { key: "contain", label: "Contain", sub: "Section B", pct: percentDone(containChecks.map((c) => c.ok)) },
+      { key: "cause", label: "Cause & actions", sub: "Sections C, D, E, linked actions", pct: percentDone(causeChecks.map((c) => c.ok)) },
+      { key: "verify", label: "Verify & close", sub: "Effectiveness, closure, reports", pct: percentDone(verifyChecks.map((c) => c.ok)) },
+    ];
+    const initialStep = steps.find((step) => (step.pct ?? 100) < 100)?.key || "describe";
+
+    const missing: Array<{ label: string; step: string }> = [
+      ...describeChecks.filter((c) => !c.ok).map((c) => ({ label: c.label, step: "describe" })),
+      ...containChecks.filter((c) => !c.ok).map((c) => ({ label: c.label, step: "contain" })),
+      ...causeChecks.filter((c) => !c.ok).map((c) => ({ label: c.label, step: "cause" })),
+      ...effectivenessChecks.filter((c) => !c.ok).map((c) => ({ label: c.label, step: "verify" })),
+    ];
+    const missingLabels = missing.map((item) => item.label);
+
+    const reportSections: DocPreviewSection[] = [
+      {
+        heading: "Report header",
+        rows: [
+          { label: "NCR Number", value: editRow.number },
+          { label: "Status", value: editRow.status },
+          { label: "Title", value: editRow.title, step: "describe" },
+          { label: "Severity", value: getSeverityDisplay(editRow.severity) },
+          { label: "Source Type", value: editRow.source_type, step: "describe" },
+          { label: "Project", value: editRow.project, step: "describe" },
+          { label: "Owner", value: editRow.owner, step: "describe" },
+          { label: "Due Date", value: editRow.due_date ? formatDate(editRow.due_date) : "", step: "describe" },
+        ],
+      },
+      { heading: "A. NCR details", rows: [{ label: "Issue / Description", value: clip(editRow.description), step: "describe" }] },
+      { heading: "B. Containment action", rows: [{ label: "Containment Action", value: clip(editRow.containment_action), step: "contain" }] },
+      {
+        heading: "C. Root cause",
+        rows: [
+          { label: "Root Cause Category", value: editRow.root_cause_category, step: "cause" },
+          { label: "Root Cause Description", value: clip(editRow.root_cause_description), step: "cause" },
+        ],
+      },
+      { heading: "D. Corrective action", rows: [{ label: "Corrective Action", value: clip(editRow.corrective_action), step: "cause" }] },
+      ...(externalFacingPdf || hasSupplierResponse(editRow)
+        ? [
+            {
+              heading: "E. Supplier / client response",
+              rows: [
+                { label: "Response / Proposed Action", value: clip(editRow.supplier_response), step: "cause" },
+                { label: "Acknowledgement / Contact", value: clip(editRow.supplier_acknowledgement), step: "cause" },
+              ],
+            },
+          ]
+        : []),
+      ...(includeEvidenceListInPdf
+        ? [
+            {
+              heading: "F. Evidence list",
+              rows: [
+                {
+                  label: "Attached Evidence",
+                  value:
+                    selectedNcrPdfEvidence.length === 0
+                      ? "No evidence files listed for this export."
+                      : `${selectedNcrPdfEvidence.length} file${selectedNcrPdfEvidence.length === 1 ? "" : "s"} listed`,
+                },
+              ],
+            },
+          ]
+        : []),
+    ];
+
+    return (
+      <SectionCard title="NCR Record" subtitle="Work through the four steps. Every section of the NCR is still here under All sections.">
+        <div ref={ncrWorkbenchRef}>
+          <RecordWorkbench
+            key={editRow.id}
+            header={
+              <RecordHeader
+                id={editRow.number}
+                title={editRow.title}
+                status={{ label: editRow.status, tone: toneForStatus(editRow.status) }}
+                actions={
+                  <>
+                    {isClosed ? null : (
+                      <ImsButton
+                        onClick={() => closeNcrRecord(editRow, missingLabels)}
+                        disabled={saving || !canEditNcr}
+                        title={canEditNcr ? "Set the status to Closed and save" : "Closing needs Edit permission for this IMS area"}
+                      >
+                        Close NCR
+                      </ImsButton>
+                    )}
+                    <ImsButton
+                      variant="secondary"
+                      onClick={() => {
+                        setSelectedRow(null);
+                        setEditRow(null);
+                      }}
+                    >
+                      Hide Panel
+                    </ImsButton>
+                  </>
+                }
+                note={
+                  <>
+                    Closing is always a manual decision.{" "}
+                    {missing.length === 0
+                      ? "Nothing is missing."
+                      : `${missing.length} item${missing.length === 1 ? " is" : "s are"} still missing.`}
+                    {canEditNcr ? "" : " You have read-only access to this record."}
+                  </>
+                }
+              />
+            }
+            steps={steps}
+            initialStep={initialStep}
+            missing={missing}
+            gate="closing this NCR"
+            reportLabel="Word report"
+            side={<DocPreview title="NCR report" sections={reportSections} onJump={jumpToNcrStep} />}
+          >
+            <WorkbenchStep stepKey="describe">
+              <div style={detailSectionStyle}>
+                <div style={ncrStepGridStyle}>
+                  <div style={formSectionTitleStyle}>A. Core NCR Information</div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Title</label>
+                    <input
+                      style={inputStyle}
+                      value={editRow.title}
+                      onChange={(e) => setEditRow({ ...editRow, title: e.target.value })}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Description</label>
+                    <textarea
+                      style={textareaStyle}
+                      value={editRow.description}
+                      onChange={(e) => setEditRow({ ...editRow, description: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Status</label>
+                    <select
+                      style={inputStyle}
+                      value={editRow.status}
+                      onChange={(e) => setEditRow({ ...editRow, status: e.target.value })}
+                    >
+                      {statusOptions.map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Owner</label>
+                    <select
+                      style={inputStyle}
+                      value={editRow.owner}
+                      onChange={(e) => setEditRow({ ...editRow, owner: e.target.value })}
+                    >
+                      <option value="">Select owner</option>
+                      {editOwnerOptions.map((owner) => (
+                        <option key={owner} value={owner}>
+                          {owner}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Project</label>
+                    <input
+                      style={inputStyle}
+                      value={editRow.project}
+                      onChange={(e) => setEditRow({ ...editRow, project: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Due Date</label>
+                    <input
+                      type="date"
+                      style={inputStyle}
+                      value={editRow.due_date ? editRow.due_date.slice(0, 10) : ""}
+                      onChange={(e) => setEditRow({ ...editRow, due_date: e.target.value })}
+                    />
+                  </div>
+                      <div>
+                        <label style={labelStyle}>Severity</label>
+                        <select
+                          style={inputStyle}
+                          value={editRow.severity}
+                          onChange={(e) => setEditRow({ ...editRow, severity: e.target.value })}
+                        >
+                          {severityOptions.map((option) => (
+                            <option key={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={labelStyle}>Source Type</label>
+                        <select
+                          style={inputStyle}
+                          value={editRow.source_type}
+                          onChange={(e) => setEditRow({ ...editRow, source_type: e.target.value })}
+                        >
+                          {sourceOptions.map((option) => (
+                            <option key={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Area</label>
+                        <input
+                          style={inputStyle}
+                          value={editRow.area}
+                          onChange={(e) => setEditRow({ ...editRow, area: e.target.value })}
+                        />
+                      </div>
+                </div>
+              </div>
+              <div style={detailSectionStyle}>
+                <div style={formSectionTitleStyle}>Evidence and attachments</div>
+                {renderEvidenceBody()}
+              </div>
+            </WorkbenchStep>
+
+            <WorkbenchStep stepKey="contain">
+              <div style={detailSectionStyle}>
+                <div style={ncrStepGridStyle}>
+                  <div style={formSectionTitleStyle}>B. Containment Action</div>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Containment Action</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.containment_action}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, containment_action: e.target.value })
+                          }
+                        />
+                      </div>
+                </div>
+              </div>
+            </WorkbenchStep>
+
+            <WorkbenchStep stepKey="cause">
+              <div style={detailSectionStyle}>
+                <div style={ncrStepGridStyle}>
+                  <div style={formSectionTitleStyle}>C. Root Cause</div>
+                      <div>
+                        <label style={labelStyle}>Root Cause Category</label>
+                        <select
+                          style={inputStyle}
+                          value={getRootCauseCategorySelectValue(editRow.root_cause_category)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setEditRow({ ...editRow, root_cause_category: value });
+                            if (value !== "Other") setEditRootCauseOther("");
+                          }}
+                        >
+                          <option value="">Select category</option>
+                          {rootCauseOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {getRootCauseCategorySelectValue(editRow.root_cause_category) === "Other" ? (
+                        <div>
+                          <label style={labelStyle}>Other Root Cause Category</label>
+                          <input
+                            style={inputStyle}
+                            value={editRootCauseOther}
+                            onChange={(e) => setEditRootCauseOther(e.target.value)}
+                            placeholder="Type the root cause category"
+                          />
+                        </div>
+                      ) : null}
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Root Cause Description</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.root_cause_description}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, root_cause_description: e.target.value })
+                          }
+                        />
+                      </div>
+
+                  <div style={formSectionTitleStyle}>D. Corrective Action</div>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Corrective Action</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.corrective_action}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, corrective_action: e.target.value })
+                          }
+                        />
+                      </div>
+
+                  <div style={formSectionTitleStyle}>E. Supplier / Client Response</div>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Response / Proposed Action</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.supplier_response}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, supplier_response: e.target.value })
+                          }
+                          placeholder="The supplier / client's proposed or completed action, from their returned response"
+                        />
+                      </div>
+
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Acknowledgement / Responsible Contact</label>
+                        <textarea
+                          style={textareaStyle}
+                          value={editRow.supplier_acknowledgement}
+                          onChange={(e) =>
+                            setEditRow({ ...editRow, supplier_acknowledgement: e.target.value })
+                          }
+                          placeholder="Who at the supplier / client acknowledged this, and their role"
+                        />
+                      </div>
+                </div>
+              </div>
+                  <div style={linkedActionsPanelStyle}>
+                    <div style={pdfExportHeaderStyle}>
+                      <div>
+                        <div style={pdfExportTitleStyle}>Linked Actions</div>
+                        <div style={pdfExportSubtitleStyle}>
+                          Central Action Management items linked to this NCR.
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedLinkedActions.length === 0 ? (
+                      <div style={emptyBoardStyle}>No central actions are linked to this NCR yet.</div>
+                    ) : (
+                      <div style={linkedActionListStyle}>
+                        {selectedLinkedActions.map((action) => (
+                          <div key={action.id} style={linkedActionItemStyle}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={linkedActionTitleStyle}>
+                                {action.action_number || "Action"} - {action.title || "Untitled action"}
+                              </div>
+                              <div style={linkedActionMetaStyle}>
+                                Status: <strong>{action.status || "-"}</strong> | Owner:{" "}
+                                <strong>{action.owner || "-"}</strong> | Due:{" "}
+                                <strong>{formatDate(action.due_date)}</strong>
+                              </div>
+                            </div>
+                            <Link
+                              href={
+                                action.id
+                                  ? `/actions?actionId=${encodeURIComponent(action.id)}`
+                                  : `/actions?action=${encodeURIComponent(action.action_number || "")}`
+                              }
+                              style={{ ...secondaryButtonSmall, textDecoration: "none", whiteSpace: "nowrap" }}
+                            >
+                              Open Linked Action
+                            </Link>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+            </WorkbenchStep>
+
+            <WorkbenchStep stepKey="verify">
+              <div style={detailSectionStyle}>
+                <div style={ncrStepGridStyle}>
+                  <div style={formSectionTitleStyle}>Verification and closure</div>
+
+                  <div>
+                    <label style={labelStyle}>Closure date</label>
+                    <div style={ncrReadOnlyValueStyle}>
+                      {closedAt ? formatDate(closedAt) : "Not closed yet"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Status</label>
+                    <div style={ncrReadOnlyValueStyle}>
+                      <StatusPill label={editRow.status} tone={toneForStatus(editRow.status)} />
+                    </div>
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Linked CAPA effectiveness</label>
+                    {linkedCapaList.length === 0 ? (
+                      <div style={emptyTextStyle}>
+                        No CAPA records are linked to this NCR, so there is no effectiveness review to wait for.
+                      </div>
+                    ) : (
+                      <div style={linkedActionListStyle}>
+                        {linkedCapaList.map((capa) => {
+                          const effectiveness = normaliseEffectivenessStatus(capa.effectiveness_status);
+                          return (
+                            <div key={capa.id} style={linkedActionItemStyle}>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={linkedActionTitleStyle}>
+                                  {capa.capa_number || "CAPA"} - {capa.title || "Untitled CAPA"}
+                                </div>
+                                <div style={linkedActionMetaStyle}>
+                                  Status: <strong>{capa.status || "-"}</strong> | Reviewed:{" "}
+                                  <strong>{capa.effectiveness_review_date ? formatDate(capa.effectiveness_review_date) : "-"}</strong>
+                                </div>
+                              </div>
+                              <StatusPill label={effectiveness} tone={toneForStatus(effectiveness)} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ gridColumn: "1 / -1", ...ncrHintStyle }}>
+                    The closure date is stamped when the status is set to Closed and saved. Use Close NCR above, or set the
+                    status in step 1.
+                  </div>
+                </div>
+              </div>
+
+                  <div style={pdfExportPanelStyle}>
+                    <div style={pdfExportHeaderStyle}>
+                      <div>
+                        <div style={pdfExportTitleStyle}>Report Export</div>
+                        <div style={pdfExportSubtitleStyle}>
+                          Generate matching PDF and Word NCR forms for internal use or external supplier / client response.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={pdfOptionsGridStyle}>
+                      <label style={checkboxCardStyle}>
+                        <input
+                          type="checkbox"
+                          checked={includeEvidenceListInPdf}
+                          onChange={(e) => setIncludeEvidenceListInPdf(e.target.checked)}
+                        />
+                        <span>
+                          Include evidence list
+                          <small style={checkboxHintStyle}>
+                            List uploaded NCR evidence without embedding files
+                          </small>
+                        </span>
+                      </label>
+
+                      <label style={checkboxCardStyle}>
+                        <input
+                          type="checkbox"
+                          checked={externalFacingPdf}
+                          onChange={(e) => setExternalFacingPdf(e.target.checked)}
+                        />
+                        <span>
+                          Supplier / Client facing issue
+                          <small style={checkboxHintStyle}>
+                            Adjust wording for external response and acknowledgement sections
+                          </small>
+                        </span>
+                      </label>
+                    </div>
+
+                    <div style={pdfSavedMetaStyle}>
+                      {latestSavedPdf ? (
+                        <>
+                          <span>
+                            Latest saved PDF: <strong>{formatDateTime(latestSavedPdf.generated_at)}</strong>
+                          </span>
+                          <span>
+                            History: <strong>{selectedSavedPdfHistory.length}</strong> saved version{selectedSavedPdfHistory.length === 1 ? "" : "s"}
+                          </span>
+                        </>
+                      ) : (
+                        <span>No saved PDF yet for this NCR.</span>
+                      )}
+                    </div>
+
+                    <div style={buttonRowStyle}>
+                      <button
+                        type="button"
+                        style={{ ...secondaryButton, border: "1px solid #D0D0CE", color: "#005670" }}
+                        onClick={() => void generateNcrPdf()}
+                        disabled={generatingPdf || !canEditNcr}
+                      >
+                        {generatingPdf
+                          ? "Generating PDF..."
+                          : latestSavedPdf
+                          ? "Regenerate PDF"
+                          : "Generate / Save PDF"}
+                      </button>
+
+                      <button
+                        type="button"
+                        style={secondaryButton}
+                        onClick={() => void generateNcrWord()}
+                        disabled={generatingWord}
+                      >
+                        {generatingWord ? "Generating Word..." : "Generate Word Report"}
+                      </button>
+
+                      {latestSavedPdf ? (
+                        <button
+                          type="button"
+                          style={secondaryButton}
+                          onClick={() => void openSavedPdf(latestSavedPdf)}
+                        >
+                          Open Saved PDF
+                        </button>
+                      ) : null}
+
+                      <label
+                        style={{
+                          ...secondaryButton,
+                          opacity: importingNcrWordId === editRow.id || !canEditNcr ? 0.6 : 1,
+                          cursor: importingNcrWordId === editRow.id || !canEditNcr ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {importingNcrWordId === editRow.id ? "Reading completed Word..." : "Upload Completed Word"}
+                        <input
+                          type="file"
+                          accept=".docx"
+                          style={hiddenFileInputStyle}
+                          disabled={Boolean(importingNcrWordId) || !canEditNcr}
+                          onChange={(event) => void handleCompletedNcrUpload(editRow, event)}
+                        />
+                      </label>
+                    </div>
+
+                    {renderNcrImportPreview(editRow)}
+                  </div>
+            </WorkbenchStep>
+          </RecordWorkbench>
+
+          <div style={buttonRowStyle}>
+            <button
+              type="button"
+              style={primaryButton}
+              onClick={() => void saveEdit()}
+              disabled={saving || !canEditNcr}
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+            <Link
+              href={buildNcrLinkedActionHref(editRow)}
+              style={{ ...secondaryButton, border: "1px solid #D0D0CE", color: "#005670", textDecoration: "none" }}
+            >
+              Generate Linked Action
+            </Link>
+            <button
+              type="button"
+              style={{
+                ...secondaryButton,
+                border: "1px solid #ECECE7",
+                color: "#F93822",
+                background: "#ECECE7",
+              }}
+              onClick={() => void deleteSelected()}
+              disabled={saving || !canEditNcr}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </SectionCard>
+    );
+  }
+
+  // The workbook holds exactly the rows the register is showing, with the filters that produced them printed on the sheet.
+  async function exportNcrRegisterExcel() {
+    if (filteredRows.length === 0) {
+      setMessage("There are no records to export for the current filters.");
+      return;
+    }
+    try {
+      const isNcrTab = activeLogTab === "NCR";
+      const closedIncluded =
+        showClosedNcrs ||
+        statusFilter === "Closed" ||
+        ncrQuickFilter === "Closed" ||
+        ncrQuickFilter === "All" ||
+        Boolean(linkedClosedMonth) ||
+        Boolean(directNcrNumber) ||
+        Boolean(directNcrId) ||
+        search.trim().length > 0;
+      const filters = [
+        `Register: ${isNcrTab ? "NCR" : "CAPA"}`,
+        `Year: ${yearFilter}`,
+        ...(statusFilter !== "All" ? [`Status: ${statusFilter}`] : []),
+        ...(isNcrTab && severityFilter !== "All" ? [`Severity: ${severityFilter}`] : []),
+        ...(isNcrTab && sourceFilter !== "All" ? [`Source type: ${sourceFilter}`] : []),
+        ...(projectFilter !== "All" ? [`Project: ${projectFilter}`] : []),
+        ...(ncrQuickFilter ? [`Quick filter: ${ncrQuickFilter}`] : []),
+        ...(showAttentionOnly ? ["Needs attention only"] : []),
+        ...(linkedOverdueOnly ? ["Overdue only"] : []),
+        ...(linkedDueWindow > 0 ? [`Due within ${linkedDueWindow} days`] : []),
+        ...(linkedCreatedMonth ? [`Created: ${linkedCreatedMonth}`] : []),
+        ...(linkedClosedMonth ? [`Closed: ${linkedClosedMonth}`] : []),
+        ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+        closedIncluded ? "Closed records included" : "Closed records hidden",
+      ];
+      const dateOrBlank = (value: string) => (value ? formatDate(value) : "");
+
+      if (isNcrTab) {
+        await downloadRegisterExcel<CombinedRow>({
+          fileName: `ncr-register${projectFilter !== "All" ? `-${projectFilter.replace(/[^A-Za-z0-9._-]+/g, "-")}` : ""}-${excelDateStamp()}.xlsx`,
+          sheetName: "NCR Register",
+          title: "NCR Register - Enshore IMS",
+          filters,
+          rows: filteredRows,
+          columns: [
+            { header: "NCR No.", width: 14, value: (row) => row.number },
+            { header: "Title", width: 40, value: (row) => row.title },
+            { header: "Status", width: 13, value: (row) => row.status },
+            { header: "Severity", width: 11, value: (row) => getSeverityDisplay(row.severity) },
+            { header: "Source Type", width: 14, value: (row) => row.source_type },
+            { header: "Project", width: 22, value: (row) => row.project },
+            { header: "Area", width: 20, value: (row) => row.area },
+            { header: "Owner", width: 20, value: (row) => row.owner },
+            { header: "Due Date", width: 13, value: (row) => dateOrBlank(row.due_date) },
+            { header: "Overdue Days", width: 12, value: (row) => (rowDueState(row) === "overdue" ? getOverdueDays(row.due_date) ?? "" : "") },
+            { header: "Created", width: 13, value: (row) => dateOrBlank(row.created_at) },
+            { header: "Closed On", width: 13, value: (row) => dateOrBlank(row.closed_at) },
+            { header: "Description", width: 60, value: (row) => row.description },
+            { header: "Containment Action", width: 50, value: (row) => row.containment_action },
+            { header: "Root Cause Category", width: 24, value: (row) => row.root_cause_category },
+            { header: "Root Cause Description", width: 50, value: (row) => row.root_cause_description },
+            { header: "Corrective Action", width: 50, value: (row) => row.corrective_action },
+            { header: "Supplier / Client Response", width: 50, value: (row) => row.supplier_response },
+            { header: "Acknowledgement / Contact", width: 36, value: (row) => row.supplier_acknowledgement },
+            { header: "Evidence Files", width: 10, value: (row) => evidenceCountMap.get(`${row.type}-${row.id}`) || 0 },
+          ],
+        });
+      } else {
+        await downloadRegisterExcel<CombinedRow>({
+          fileName: `capa-register-${excelDateStamp()}.xlsx`,
+          sheetName: "CAPA Register",
+          title: "CAPA Register - Enshore IMS",
+          filters,
+          rows: filteredRows,
+          columns: [
+            { header: "CAPA No.", width: 14, value: (row) => row.number },
+            { header: "Title", width: 40, value: (row) => row.title },
+            { header: "Status", width: 13, value: (row) => row.status },
+            { header: "Owner", width: 20, value: (row) => row.owner },
+            { header: "Due Date", width: 13, value: (row) => dateOrBlank(row.due_date) },
+            { header: "Linked NCRs", width: 24, value: (row) => row.linked_to },
+            { header: "Project", width: 22, value: (row) => row.project },
+            { header: "Created", width: 13, value: (row) => dateOrBlank(row.created_at) },
+            { header: "Description", width: 60, value: (row) => row.description },
+            { header: "Correction", width: 50, value: (row) => row.correction_description },
+            { header: "Corrective Action", width: 50, value: (row) => row.corrective_action_description },
+            { header: "Effectiveness Status", width: 18, value: (row) => row.effectiveness_status },
+            { header: "Effectiveness Due", width: 16, value: (row) => dateOrBlank(row.effectiveness_due_date) },
+            { header: "Effectiveness Reviewed", width: 18, value: (row) => dateOrBlank(row.effectiveness_review_date) },
+            { header: "Effectiveness Reviewer", width: 22, value: (row) => row.effectiveness_reviewer },
+            { header: "Effectiveness Comments", width: 50, value: (row) => row.effectiveness_comments },
+            { header: "Evidence Files", width: 10, value: (row) => evidenceCountMap.get(`${row.type}-${row.id}`) || 0 },
+          ],
+        });
+      }
+      setMessage(`Excel export created: ${filteredRows.length} record${filteredRows.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      console.error(error);
+      setMessage("The Excel export could not be created.");
+    }
+  }
+
   return (
     <main>
       <QualityPageHero
@@ -4342,115 +5184,124 @@ function NcrCapaPageContent() {
       {activeWorkspaceView === "register" ? (
       <section style={workspaceGridStyle}>
         <SectionCard title="NCR Register" subtitle="Table-led working register for day-to-day review, update, evidence handling, linked actions, and PDF reporting.">
-          <div className="ims-filter-panel" style={toolbarStyle}>
-            <input
-              style={toolbarSearchStyle}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search NCR number, title, owner, project..."
-            />
-
-            <button
-              type="button"
-              style={showRegisterFilters ? secondaryButton : primaryButton}
-              onClick={() => setShowRegisterFilters((current) => !current)}
-            >
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-          </div>
-
-          {showRegisterFilters ? (
-            <div className="ims-filter-panel" style={toolbarFiltersStyle}>
-              <div style={toolbarLabeledControlStyle}>
-                <label style={toolbarLabelStyle}>Status</label>
-                <select style={toolbarSelectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                  <option>All</option>
-                  {statusOptions.map((option) => (
-                    <option key={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-
-              {activeLogTab === "NCR" ? (
-                <>
-                  <div style={toolbarLabeledControlStyle}>
-                    <label style={toolbarLabelStyle}>Severity</label>
-                    <select
-                      style={toolbarSelectStyle}
-                      value={severityFilter}
-                      onChange={(e) => setSeverityFilter(e.target.value)}
-                    >
-                      <option>All</option>
-                      {severityOptions.map((option) => (
-                        <option key={option}>{option}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={toolbarLabeledControlStyle}>
-                    <label style={toolbarLabelStyle}>Source Type</label>
-                    <select
-                      style={toolbarSelectStyle}
-                      value={sourceFilter}
-                      onChange={(e) => setSourceFilter(e.target.value)}
-                    >
-                      <option>All</option>
-                      {sourceOptions.map((option) => (
-                        <option key={option}>{option}</option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              ) : null}
-
-              <div style={toolbarLabeledControlStyle}>
-                <label style={toolbarLabelStyle}>Year</label>
-                <select style={toolbarSelectStyle} value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
-                  {yearOptions.map((option) => (
-                    <option key={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={toolbarLabeledControlStyle}>
-                <label style={toolbarLabelStyle}>Project</label>
-                <select style={toolbarSelectStyle} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
-                  {projectOptions.map((option) => (
-                    <option key={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-
-              <button type="button" style={toolbarButtonStyle} onClick={clearFilters}>
-                Clear Filters
-              </button>
-
-              {activeLogTab === "NCR" ? (
-                <button
-                  type="button"
-                  style={{ ...toolbarButtonStyle, border: "1px solid #ECECE7", color: "#005670" }}
-                  onClick={() => void generateFilteredNcrReport()}
-                  disabled={generatingFilteredNcrReport || filteredRows.filter((row) => row.type === "NCR").length === 0}
+          <ImsFilterPanel
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search NCR number, title, owner, project..."
+            showFilters={showRegisterFilters}
+            onToggleFilters={() => setShowRegisterFilters((current) => !current)}
+            actions={
+              <>
+                <ImsButton
+                  variant={showClosedNcrs ? "secondary" : "primary"}
+                  onClick={() => {
+                    if (!showClosedNcrs) {
+                      setShowClosedNcrs(true);
+                      return;
+                    }
+                    setShowClosedNcrs(false);
+                    if (statusFilter === "Closed") setStatusFilter("All");
+                    if (ncrQuickFilter === "Closed" || ncrQuickFilter === "All") setNcrQuickFilter("");
+                  }}
+                  title={
+                    showClosedNcrs
+                      ? `Closed ${activeLogTab === "NCR" ? "NCRs" : "CAPAs"} are showing. Press to hide them.`
+                      : `Closed ${activeLogTab === "NCR" ? "NCRs" : "CAPAs"} are hidden. Press to show them.`
+                  }
                 >
-                  {generatingFilteredNcrReport ? "Generating PDF Report..." : "Generate PDF Report"}
-                </button>
-              ) : null}
+                  {showClosedNcrs ? "Hide Closed" : "Show Closed"}
+                </ImsButton>
+                <ImsButton variant="secondary" onClick={clearFilters}>
+                  Clear Filters
+                </ImsButton>
+                {activeLogTab === "NCR" ? (
+                  <ImsButton
+                    variant="primary"
+                    onClick={() => void generateFilteredNcrReport()}
+                    disabled={generatingFilteredNcrReport || filteredRows.filter((row) => row.type === "NCR").length === 0}
+                    title="Create a PDF of the NCRs currently shown"
+                  >
+                    {generatingFilteredNcrReport ? "Exporting PDF..." : "Export PDF"}
+                  </ImsButton>
+                ) : null}
+                <ImsButton
+                  variant="secondary"
+                  onClick={() => void exportNcrRegisterExcel()}
+                  disabled={filteredRows.length === 0}
+                  title="Download an Excel workbook of the records currently shown"
+                >
+                  Export Excel
+                </ImsButton>
+              </>
+            }
+          >
+            <div style={toolbarLabeledControlStyle}>
+              <label style={toolbarLabelStyle}>Status</label>
+              <select style={toolbarSelectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option>All</option>
+                {statusOptions.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
             </div>
-          ) : null}
+
+            {activeLogTab === "NCR" ? (
+              <>
+                <div style={toolbarLabeledControlStyle}>
+                  <label style={toolbarLabelStyle}>Severity</label>
+                  <select
+                    style={toolbarSelectStyle}
+                    value={severityFilter}
+                    onChange={(e) => setSeverityFilter(e.target.value)}
+                  >
+                    <option>All</option>
+                    {severityOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={toolbarLabeledControlStyle}>
+                  <label style={toolbarLabelStyle}>Source Type</label>
+                  <select
+                    style={toolbarSelectStyle}
+                    value={sourceFilter}
+                    onChange={(e) => setSourceFilter(e.target.value)}
+                  >
+                    <option>All</option>
+                    {sourceOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            ) : null}
+
+            <div style={toolbarLabeledControlStyle}>
+              <label style={toolbarLabelStyle}>Year</label>
+              <select style={toolbarSelectStyle} value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                {yearOptions.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={toolbarLabeledControlStyle}>
+              <label style={toolbarLabelStyle}>Project</label>
+              <select style={toolbarSelectStyle} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+                {projectOptions.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+          </ImsFilterPanel>
 
           <div style={tableInfoRowStyle}>
-            Showing <strong>{filteredRows.length}</strong> of{" "}
-            <strong>{kpis.totalNcrs}</strong> NCR records for {yearFilter}
+            Showing <strong>{filteredRows.length}</strong> of <strong>{kpis.totalNcrs}</strong> NCR records for {yearFilter}
             {(() => {
               const hiddenClosed =
                 activeLogTab === "NCR" ? kpis.closed : combinedRows.filter((row) => row.type === "CAPA" && row.status === "Closed").length;
-              return (
-                <label style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginLeft: "14px", cursor: "pointer", color: "#000000" }}>
-                  <input type="checkbox" checked={showClosedNcrs} onChange={(event) => setShowClosedNcrs(event.target.checked)} />
-                  Show closed {activeLogTab === "NCR" ? "NCRs" : "CAPAs"}
-                  {!showClosedNcrs && hiddenClosed ? ` (${hiddenClosed} hidden)` : ""}
-                </label>
-              );
+              return !showClosedNcrs && hiddenClosed ? ` (${hiddenClosed} closed hidden)` : "";
             })()}
           </div>
 
@@ -4492,7 +5343,6 @@ function NcrCapaPageContent() {
 
               <div style={registerBodyStyle}>
                 {filteredRows.map((row) => {
-                  const statusTone = getStatusTone(row.status);
                   const severityTone = getSeverityTone(getSeverityDisplay(row.severity));
                   const dueTone = rowDueState(row);
                   const dueColour = row.status === "Closed" ? "#53565A" : dueTone === "overdue" ? "#F93822" : "#000000";
@@ -4556,29 +5406,13 @@ function NcrCapaPageContent() {
                         </div>
                       ) : (
                         <div>
-                          <span
-                            style={{
-                              ...badgeStyle,
-                              background: statusTone.bg,
-                              color: statusTone.color,
-                            }}
-                          >
-                            {row.status}
-                          </span>
+                          <StatusPill label={row.status} tone={toneForStatus(row.status)} />
                         </div>
                       )}
 
                       {activeLogTab === "NCR" ? (
                         <div>
-                          <span
-                            style={{
-                              ...badgeStyle,
-                              background: statusTone.bg,
-                              color: statusTone.color,
-                            }}
-                          >
-                            {row.status}
-                          </span>
+                          <StatusPill label={row.status} tone={toneForStatus(row.status)} />
                         </div>
                       ) : (
                         <div style={registerSimpleTextStyle}>{row.linked_to || "-"}</div>
@@ -4591,7 +5425,11 @@ function NcrCapaPageContent() {
           )}
         </SectionCard>
 
-        {selectedRow && editRow ? (
+        {selectedRow && editRow ? (editRow.type === "NCR" ? (
+          <div ref={selectedDetailRef} style={sidePanelStackStyle}>
+            {renderNcrWorkbench(editRow)}
+          </div>
+        ) : (
           <div ref={selectedDetailRef} style={sidePanelStackStyle}>
             <SectionCard title="Detail Panel" subtitle="Review and update the selected record.">
               <div>
@@ -4682,141 +5520,6 @@ function NcrCapaPageContent() {
                     />
                   </div>
 
-                  {editRow.type === "NCR" && (
-                    <>
-                      <div>
-                        <label style={labelStyle}>Severity</label>
-                        <select
-                          style={inputStyle}
-                          value={editRow.severity}
-                          onChange={(e) => setEditRow({ ...editRow, severity: e.target.value })}
-                        >
-                          {severityOptions.map((option) => (
-                            <option key={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label style={labelStyle}>Source Type</label>
-                        <select
-                          style={inputStyle}
-                          value={editRow.source_type}
-                          onChange={(e) => setEditRow({ ...editRow, source_type: e.target.value })}
-                        >
-                          {sourceOptions.map((option) => (
-                            <option key={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Area</label>
-                        <input
-                          style={inputStyle}
-                          value={editRow.area}
-                          onChange={(e) => setEditRow({ ...editRow, area: e.target.value })}
-                        />
-                      </div>
-
-                      <div style={formSectionTitleStyle}>B. Containment Action</div>
-
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Containment Action</label>
-                        <textarea
-                          style={textareaStyle}
-                          value={editRow.containment_action}
-                          onChange={(e) =>
-                            setEditRow({ ...editRow, containment_action: e.target.value })
-                          }
-                        />
-                      </div>
-
-                      <div style={formSectionTitleStyle}>C. Root Cause</div>
-
-                      <div>
-                        <label style={labelStyle}>Root Cause Category</label>
-                        <select
-                          style={inputStyle}
-                          value={getRootCauseCategorySelectValue(editRow.root_cause_category)}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setEditRow({ ...editRow, root_cause_category: value });
-                            if (value !== "Other") setEditRootCauseOther("");
-                          }}
-                        >
-                          <option value="">Select category</option>
-                          {rootCauseOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {getRootCauseCategorySelectValue(editRow.root_cause_category) === "Other" ? (
-                        <div>
-                          <label style={labelStyle}>Other Root Cause Category</label>
-                          <input
-                            style={inputStyle}
-                            value={editRootCauseOther}
-                            onChange={(e) => setEditRootCauseOther(e.target.value)}
-                            placeholder="Type the root cause category"
-                          />
-                        </div>
-                      ) : null}
-
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Root Cause Description</label>
-                        <textarea
-                          style={textareaStyle}
-                          value={editRow.root_cause_description}
-                          onChange={(e) =>
-                            setEditRow({ ...editRow, root_cause_description: e.target.value })
-                          }
-                        />
-                      </div>
-
-                      <div style={formSectionTitleStyle}>D. Corrective Action</div>
-
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Corrective Action</label>
-                        <textarea
-                          style={textareaStyle}
-                          value={editRow.corrective_action}
-                          onChange={(e) =>
-                            setEditRow({ ...editRow, corrective_action: e.target.value })
-                          }
-                        />
-                      </div>
-
-                      <div style={formSectionTitleStyle}>E. Supplier / Client Response</div>
-
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Response / Proposed Action</label>
-                        <textarea
-                          style={textareaStyle}
-                          value={editRow.supplier_response}
-                          onChange={(e) =>
-                            setEditRow({ ...editRow, supplier_response: e.target.value })
-                          }
-                          placeholder="The supplier / client's proposed or completed action, from their returned response"
-                        />
-                      </div>
-
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Acknowledgement / Responsible Contact</label>
-                        <textarea
-                          style={textareaStyle}
-                          value={editRow.supplier_acknowledgement}
-                          onChange={(e) =>
-                            setEditRow({ ...editRow, supplier_acknowledgement: e.target.value })
-                          }
-                          placeholder="Who at the supplier / client acknowledged this, and their role"
-                        />
-                      </div>
-                    </>
-                  )}
 
                   {editRow.type === "CAPA" && (
                     <>
@@ -4976,160 +5679,7 @@ function NcrCapaPageContent() {
                 </div>
                 </div>
 
-                {editRow.type === "NCR" ? (
-                  <div style={pdfExportPanelStyle}>
-                    <div style={pdfExportHeaderStyle}>
-                      <div>
-                        <div style={pdfExportTitleStyle}>Report Export</div>
-                        <div style={pdfExportSubtitleStyle}>
-                          Generate matching PDF and Word NCR forms for internal use or external supplier / client response.
-                        </div>
-                      </div>
-                    </div>
 
-                    <div style={pdfOptionsGridStyle}>
-                      <label style={checkboxCardStyle}>
-                        <input
-                          type="checkbox"
-                          checked={includeEvidenceListInPdf}
-                          onChange={(e) => setIncludeEvidenceListInPdf(e.target.checked)}
-                        />
-                        <span>
-                          Include evidence list
-                          <small style={checkboxHintStyle}>
-                            List uploaded NCR evidence without embedding files
-                          </small>
-                        </span>
-                      </label>
-
-                      <label style={checkboxCardStyle}>
-                        <input
-                          type="checkbox"
-                          checked={externalFacingPdf}
-                          onChange={(e) => setExternalFacingPdf(e.target.checked)}
-                        />
-                        <span>
-                          Supplier / Client facing issue
-                          <small style={checkboxHintStyle}>
-                            Adjust wording for external response and acknowledgement sections
-                          </small>
-                        </span>
-                      </label>
-                    </div>
-
-                    <div style={pdfSavedMetaStyle}>
-                      {latestSavedPdf ? (
-                        <>
-                          <span>
-                            Latest saved PDF: <strong>{formatDateTime(latestSavedPdf.generated_at)}</strong>
-                          </span>
-                          <span>
-                            History: <strong>{selectedSavedPdfHistory.length}</strong> saved version{selectedSavedPdfHistory.length === 1 ? "" : "s"}
-                          </span>
-                        </>
-                      ) : (
-                        <span>No saved PDF yet for this NCR.</span>
-                      )}
-                    </div>
-
-                    <div style={buttonRowStyle}>
-                      <button
-                        type="button"
-                        style={{ ...secondaryButton, border: "1px solid #D0D0CE", color: "#005670" }}
-                        onClick={() => void generateNcrPdf()}
-                        disabled={generatingPdf || !canEditNcr}
-                      >
-                        {generatingPdf
-                          ? "Generating PDF..."
-                          : latestSavedPdf
-                          ? "Regenerate PDF"
-                          : "Generate / Save PDF"}
-                      </button>
-
-                      <button
-                        type="button"
-                        style={secondaryButton}
-                        onClick={() => void generateNcrWord()}
-                        disabled={generatingWord}
-                      >
-                        {generatingWord ? "Generating Word..." : "Generate Word Report"}
-                      </button>
-
-                      {latestSavedPdf ? (
-                        <button
-                          type="button"
-                          style={secondaryButton}
-                          onClick={() => void openSavedPdf(latestSavedPdf)}
-                        >
-                          Open Saved PDF
-                        </button>
-                      ) : null}
-
-                      <label
-                        style={{
-                          ...secondaryButton,
-                          opacity: importingNcrWordId === editRow.id || !canEditNcr ? 0.6 : 1,
-                          cursor: importingNcrWordId === editRow.id || !canEditNcr ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        {importingNcrWordId === editRow.id ? "Reading completed Word..." : "Upload Completed Word"}
-                        <input
-                          type="file"
-                          accept=".docx"
-                          style={hiddenFileInputStyle}
-                          disabled={Boolean(importingNcrWordId) || !canEditNcr}
-                          onChange={(event) => void handleCompletedNcrUpload(editRow, event)}
-                        />
-                      </label>
-                    </div>
-
-                    {renderNcrImportPreview(editRow)}
-                  </div>
-                ) : null}
-
-                {editRow.type === "NCR" ? (
-                  <div style={linkedActionsPanelStyle}>
-                    <div style={pdfExportHeaderStyle}>
-                      <div>
-                        <div style={pdfExportTitleStyle}>Linked Actions</div>
-                        <div style={pdfExportSubtitleStyle}>
-                          Central Action Management items linked to this NCR.
-                        </div>
-                      </div>
-                    </div>
-
-                    {selectedLinkedActions.length === 0 ? (
-                      <div style={emptyBoardStyle}>No central actions are linked to this NCR yet.</div>
-                    ) : (
-                      <div style={linkedActionListStyle}>
-                        {selectedLinkedActions.map((action) => (
-                          <div key={action.id} style={linkedActionItemStyle}>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={linkedActionTitleStyle}>
-                                {action.action_number || "Action"} - {action.title || "Untitled action"}
-                              </div>
-                              <div style={linkedActionMetaStyle}>
-                                Status: <strong>{action.status || "-"}</strong> | Owner:{" "}
-                                <strong>{action.owner || "-"}</strong> | Due:{" "}
-                                <strong>{formatDate(action.due_date)}</strong>
-                              </div>
-                            </div>
-                            <Link
-                              href={
-                                action.id
-                                  ? `/actions?actionId=${encodeURIComponent(action.id)}`
-                                  : `/actions?action=${encodeURIComponent(action.action_number || "")}`
-                              }
-                              style={{ ...secondaryButtonSmall, textDecoration: "none", whiteSpace: "nowrap" }}
-                            >
-                              Open Linked Action
-                            </Link>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
 
                 <div style={buttonRowStyle}>
                   <button
@@ -5140,14 +5690,6 @@ function NcrCapaPageContent() {
                   >
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
-                  {editRow.type === "NCR" ? (
-                    <Link
-                      href={buildNcrLinkedActionHref(editRow)}
-                      style={{ ...secondaryButton, border: "1px solid #D0D0CE", color: "#005670", textDecoration: "none" }}
-                    >
-                      Generate Linked Action
-                    </Link>
-                  ) : null}
                   <button
                     type="button"
                     style={secondaryButton}
@@ -5194,83 +5736,11 @@ function NcrCapaPageContent() {
                   </span>
                 </div>
 
-                <div style={detailFormGridStyle}>
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <label style={labelStyle}>Select Files</label>
-                    <input
-                      type="file"
-                      multiple
-                      style={inputStyle}
-                      onChange={handleSelectedEvidenceFileChange}
-                      disabled={!canEditNcr}
-                    />
-                  </div>
-
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <label style={labelStyle}>Evidence Notes (optional)</label>
-                    <textarea
-                      style={textareaStyle}
-                      value={selectedEvidenceNotes}
-                      onChange={(e) => setSelectedEvidenceNotes(e.target.value)}
-                      placeholder="Add a note for the uploaded evidence"
-                    />
-                  </div>
-                </div>
-
-                <SelectedFilesList files={selectedEvidenceFiles} />
-
-                <div style={buttonRowStyle}>
-                  <button
-                    type="button"
-                    style={{ ...primaryButton, background: "#53565A" }}
-                    onClick={() => void uploadEvidenceToSelected()}
-                    disabled={uploadingEvidence || !canEditNcr}
-                  >
-                    {uploadingEvidence ? "Uploading..." : "Upload Evidence"}
-                  </button>
-                </div>
-
-                <div style={evidenceListStyle}>
-                  {selectedRowEvidence.length === 0 ? (
-                    <div style={emptyBoardStyle}>No evidence attached yet.</div>
-                  ) : (
-                    selectedRowEvidence.map((file) => (
-                      <div key={file.id} style={evidenceItemStyle}>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={evidenceFileNameStyle}>{file.file_name}</div>
-                          <div style={evidenceMetaTextStyle}>
-                            {formatFileSize(file.file_size)} | {file.content_type || "Unknown type"} | Uploaded{" "}
-                            {formatDateTime(file.uploaded_at)}
-                          </div>
-                          {file.notes ? <div style={evidenceNoteStyle}>Note: {file.notes}</div> : null}
-                        </div>
-
-                        <div style={actionButtonsWrapStyle}>
-                          <button type="button" style={secondaryButtonSmall} onClick={() => void openEvidence(file)}>
-                            Open
-                          </button>
-                          <button
-                            type="button"
-                            style={{
-                              ...secondaryButtonSmall,
-                              border: "1px solid #ECECE7",
-                              color: "#F93822",
-                              background: "#ECECE7",
-                            }}
-                            onClick={() => void deleteEvidence(file)}
-                            disabled={!canEditNcr}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                {renderEvidenceBody()}
               </div>
             </SectionCard>
           </div>
-        ) : null}
+        )) : null}
       </section>
       ) : null}
 
@@ -5371,7 +5841,7 @@ function NcrCapaPageContent() {
                   onClick={() => void generateFilteredNcrReport()}
                   disabled={generatingFilteredNcrReport || filteredRows.filter((row) => row.type === "NCR").length === 0}
                 >
-                  {generatingFilteredNcrReport ? "Generating PDF Report..." : "Generate PDF Report"}
+                  {generatingFilteredNcrReport ? "Exporting PDF..." : "Export PDF"}
                 </button>
               </div>
 
@@ -6134,6 +6604,27 @@ const formSectionTitleStyle: CSSProperties = {
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   paddingTop: 4,
+};
+
+// Fields inside a workbench step: one column on a phone, two when the form column is wide enough.
+const ncrStepGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "12px",
+};
+
+const ncrReadOnlyValueStyle: CSSProperties = {
+  minHeight: 42,
+  display: "flex",
+  alignItems: "center",
+  fontSize: 14,
+  color: "#000000",
+};
+
+const ncrHintStyle: CSSProperties = {
+  fontSize: 13,
+  color: "#53565A",
+  lineHeight: 1.45,
 };
 
 const pickerRowStyle: CSSProperties = {

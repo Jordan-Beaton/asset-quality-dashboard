@@ -20,6 +20,21 @@ const approvedColours = new Set([
   "#10262D",
   "#234049",
   "#AEC4C9",
+  // Approved status tints (success, needs attention, overdue, neutral) in light and dark. See globals.css "Status tints".
+  "#E4F1E8",
+  "#1E6B3A",
+  "#FFF1CC",
+  "#8A5A00",
+  "#FDE3DF",
+  "#B3200F",
+  "#E6E6E1",
+  "#8FD6A9",
+  "#16382A",
+  "#FFD36B",
+  "#3D3010",
+  "#FF9C8E",
+  "#42201B",
+  "#1C3640",
 ]);
 
 const failures = [];

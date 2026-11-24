@@ -6,6 +6,7 @@ import Link from "next/link";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
+import { imsButtonBaseStyle } from "../../src/components/imsTheme";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
@@ -1549,6 +1550,9 @@ const inputStyle: React.CSSProperties = {
   minWidth: "180px",
   background: "white",
   color: "#000000",
+  minHeight: "42px",
+  boxSizing: "border-box",
+  fontSize: "14px",
 };
 
 const textareaStyle: React.CSSProperties = {
@@ -1559,33 +1563,21 @@ const textareaStyle: React.CSSProperties = {
 };
 
 const primaryButtonStyle: React.CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#005670",
   color: "white",
-  border: "none",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: 700,
 };
 
 const secondaryButtonStyle: React.CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#D0D0CE",
   color: "#000000",
-  border: "none",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: 700,
 };
 
 const pdfButtonStyle: React.CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#005670",
   color: "white",
-  border: "none",
-  padding: "10px 16px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: 700,
 };
 
 const buttonRowStyle: React.CSSProperties = {
@@ -1706,7 +1698,8 @@ const miniButtonStyle: React.CSSProperties = {
   padding: "8px 12px",
   borderRadius: "8px",
   cursor: "pointer",
-  fontWeight: 700,
+  fontWeight: 800,
+  minHeight: "32px",
 };
 
 const miniButtonDeleteStyle: React.CSSProperties = {
@@ -1716,5 +1709,6 @@ const miniButtonDeleteStyle: React.CSSProperties = {
   padding: "8px 12px",
   borderRadius: "8px",
   cursor: "pointer",
-  fontWeight: 700,
+  fontWeight: 800,
+  minHeight: "32px",
 };

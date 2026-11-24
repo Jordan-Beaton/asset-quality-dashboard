@@ -8,6 +8,7 @@ import autoTable from "jspdf-autotable";
 import { ImsPermissionNotice, useImsPermissions } from "../../../src/components/ImsPermissions";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
+import { imsButtonBaseStyle, imsInputStyle } from "../../../src/components/imsTheme";
 import { supabase } from "../../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../../src/lib/useUrlState";
 
@@ -782,7 +783,7 @@ export default function RiskRegisterPage() {
             onClick={() => void generateRiskRegisterPdf()}
             disabled={isGeneratingPdf}
           >
-            {isGeneratingPdf ? "Generating PDF..." : "Generate Risk Register PDF"}
+            {isGeneratingPdf ? "Creating PDF..." : "Export PDF"}
           </button>
         </div>
 
@@ -1259,7 +1260,7 @@ const formSectionTitleStyle: CSSProperties = { margin: "0 0 14px", color: "#0000
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "14px" };
 const fieldWrapStyle: CSSProperties = { display: "grid", gap: "6px" };
 const fieldLabelStyle: CSSProperties = { fontSize: "13px", fontWeight: 700, color: "#53565A" };
-const inputStyle: CSSProperties = { padding: "11px 12px", borderRadius: "10px", border: "1px solid #D0D0CE", background: "white", color: "#000000", width: "100%", boxSizing: "border-box" };
+const inputStyle: CSSProperties = { ...imsInputStyle };
 const textAreaStyle: CSSProperties = { ...inputStyle, minHeight: "96px", resize: "vertical", fontFamily: "\"Azo Sans\", \"Segoe UI\", Arial, Helvetica, sans-serif" };
 const largeTextAreaStyle: CSSProperties = { ...textAreaStyle, minHeight: "124px" };
 const scoreCardStyle: CSSProperties = { borderRadius: "12px", border: "1px solid #D0D0CE", background: "#ECECE7", padding: "10px 12px", minHeight: "68px", display: "flex", flexDirection: "column", justifyContent: "space-between" };
@@ -1268,9 +1269,9 @@ const scoreValueStyle: CSSProperties = { color: "#000000", fontSize: "24px", lin
 const checkboxCardStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "10px", border: "1px solid #D0D0CE", borderRadius: "12px", padding: "12px 14px", background: "#ECECE7", color: "#53565A", fontWeight: 700 };
 const formFooterStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginTop: "16px" };
 const helperTextStyle: CSSProperties = { color: "#53565A", fontSize: "13px" };
-const primaryButtonStyle: CSSProperties = { background: "#005670", color: "white", border: "none", padding: "11px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
-const secondaryButtonStyle: CSSProperties = { background: "#D0D0CE", color: "#000000", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
-const deleteButtonStyle: CSSProperties = { background: "#F93822", color: "white", border: "none", padding: "10px 16px", borderRadius: "10px", cursor: "pointer", fontWeight: 700 };
+const primaryButtonStyle: CSSProperties = { ...imsButtonBaseStyle, background: "#005670", color: "#ffffff" };
+const secondaryButtonStyle: CSSProperties = { ...imsButtonBaseStyle, background: "#D0D0CE", color: "#000000" };
+const deleteButtonStyle: CSSProperties = { ...imsButtonBaseStyle, background: "#F93822", color: "#ffffff" };
 const filterGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",

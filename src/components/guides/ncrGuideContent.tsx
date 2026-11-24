@@ -5,16 +5,17 @@ import {
   eyebrow, h2Style, h3Style, pStyle, codeStyle,
   stepList, Step, callout,
   mockPanel, mockHero, mockHeroEyebrow, mockLabel,
-  mockInput, mockFieldLabel, mockRow, mockField, btn, pill,
+  mockInput, mockFieldLabel, mockRow, mockField, btn, tintPill, RecordScreenMock,
 } from "./guideKit";
 
 type SectionKey =
-  | "overview" | "register" | "raise" | "containment" | "rootcause"
+  | "overview" | "register" | "recordscreen" | "raise" | "containment" | "rootcause"
   | "evidence" | "linkedaction" | "import" | "supplier" | "reports" | "statuses";
 
 const sections: GuideSectionDef[] = [
   { key: "overview",     label: "Overview",                  group: "Getting Started" },
   { key: "register",     label: "Dashboard & Register",      group: "Getting Started" },
+  { key: "recordscreen", label: "The record screen",          group: "Core Workflows" },
   { key: "raise",        label: "Raising an NCR",             group: "Core Workflows" },
   { key: "containment",  label: "Containment & Correction",   group: "Core Workflows" },
   { key: "rootcause",    label: "Root Cause",                 group: "Core Workflows" },
@@ -27,13 +28,12 @@ const sections: GuideSectionDef[] = [
 ];
 
 function badge(status: string): CSSProperties {
-  const map: Record<string, { bg: string; color: string }> = {
-    open:        { bg: imsColours.danger,     color: "#ffffff" },
-    "in progress": { bg: imsColours.warning,  color: "#ffffff" },
-    closed:      { bg: imsColours.brand,      color: "#ffffff" },
+  const map: Record<string, "ok" | "warn" | "bad" | "neu" | "brand"> = {
+    open: "warn",
+    "in progress": "brand",
+    closed: "ok",
   };
-  const t = map[status.toLowerCase()] || map.open;
-  return pill(t.bg, t.color);
+  return tintPill(map[status.toLowerCase()] || "warn");
 }
 
 function SectionOverview() {
@@ -42,7 +42,7 @@ function SectionOverview() {
       <div style={eyebrow}>Getting Started</div>
       <h2 style={h2Style}>Overview</h2>
       <p style={pStyle}>The NCR (Non-Conformance Report) register is the central record of quality non-conformances raised against Enshore work, suppliers, or documentation. Every NCR captures the non-conformance itself, the containment put in place, the root cause, and the corrective action taken — all in one traceable record, with its evidence and any supplier or client response alongside.</p>
-      <p style={pStyle}>The NCR page has five tabs: <strong>Dashboard</strong>, <strong>NCR Register</strong>, <strong>Create NCR</strong>, <strong>Import</strong>, and <strong>Reports</strong>.</p>
+      <p style={pStyle}>The NCR page has five tabs: <strong>Dashboard</strong>, <strong>NCR Register</strong>, <strong>Create NCR</strong>, <strong>Import</strong>, and <strong>Reports</strong>. Opening an NCR from the register shows the <strong>record screen</strong>, which walks you through four steps (see The record screen).</p>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>NCR is the only workflow offered in this module. There is no CAPA tab or Create CAPA form on screen, and new NCRs do not use CAPA language. Older CAPA records are kept in the data for history only.</div>
@@ -75,7 +75,7 @@ function SectionRegister() {
             </div>
           ))}
         </div>
-        <div style={{ fontSize: 12, color: imsColours.muted, marginBottom: 8 }}>Showing 21 of 40 NCR records for 2026 &nbsp;☐ Show closed NCRs (19 hidden)</div>
+        <div style={{ fontSize: 12, color: imsColours.muted, marginBottom: 8 }}>Showing 21 of 40 NCR records for 2026 (19 closed hidden)</div>
         <table style={imsTableStyle}>
           <thead>
             <tr>
@@ -97,15 +97,64 @@ function SectionRegister() {
         </table>
       </div>
       <h3 style={h3Style}>NCR Register tab</h3>
-      <p style={pStyle}>Use <strong>Show Filters</strong> to filter by Status, Severity, Source Type, Year, and Project, and the search box to find an NCR by number, title, owner, or project. Click the <strong>NCR No.</strong>, <strong>Severity</strong>, <strong>Due Date</strong>, or <strong>Status</strong> column heading to sort (click again to reverse). <strong>Clear Filters</strong> resets everything, including the year back to the current year. Click a row to open its detail panel beside the register.</p>
+      <p style={pStyle}>The toolbar above the table runs left to right: the search box (number, title, owner, or project), <strong>Show Closed</strong>, <strong>Clear Filters</strong>, <strong>Export PDF</strong>, <strong>Export Excel</strong>, and <strong>Show Filters</strong>. Show Filters opens Status, Severity, Source Type, Year, and Project. Click the <strong>NCR No.</strong>, <strong>Severity</strong>, <strong>Due Date</strong>, or <strong>Status</strong> column heading to sort (click again to reverse). <strong>Clear Filters</strong> resets everything, including the year back to the current year. Click a row to open its record screen beside the register.</p>
+      <p style={pStyle}><strong>Export PDF</strong> makes a PDF of the NCRs currently shown. <strong>Export Excel</strong> downloads a workbook of the records currently shown. Both follow your filters and search.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
-        <div><strong>Closed NCRs are hidden by default</strong> so the register shows live work. Tick <strong>Show closed NCRs</strong> above the table to include them — it shows how many are hidden, for example &ldquo;19 hidden&rdquo;. Closed NCRs also appear automatically when you click the Closed NCRs or Total NCRs tile, set Status to Closed, or type in the search box. (The same tick box reads <strong>Show closed CAPAs</strong> on the legacy CAPA list, which is not offered as a tab on screen.)</div>
+        <div><strong>Closed NCRs are hidden by default</strong> so the register shows live work. Press <strong>Show Closed</strong> in the toolbar to include them; the button then reads <strong>Hide Closed</strong>. The line above the table shows how many are hidden, for example &ldquo;19 closed hidden&rdquo;. Closed NCRs also appear automatically when you click the Closed NCRs or Total NCRs tile, set Status to Closed, or type in the search box.</div>
       </div>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>The year filter uses the year the NCR was raised and defaults to this year. Choose <strong>All Years</strong> to see older NCRs.</div>
       </div>
+    </>
+  );
+}
+
+function SectionRecordScreen() {
+  return (
+    <>
+      <div style={eyebrow}>Core Workflows</div>
+      <h2 style={h2Style}>The record screen</h2>
+      <p style={pStyle}>Click a row in the NCR Register and the NCR opens on the <strong>record screen</strong> beside the register. It shows the same fields as before, grouped into four steps so you can work through them in order.</p>
+      <RecordScreenMock
+        id="NCR-032"
+        title="Incorrect torque values recorded on inspection sheet"
+        status="Open"
+        tone="warn"
+        nextButton="Close NCR"
+        steps={[
+          { label: "Describe", pct: 100 },
+          { label: "Contain", pct: 0 },
+          { label: "Cause & actions", pct: 40 },
+          { label: "Verify & close", pct: 0 },
+        ]}
+        active={1}
+        missing={["Containment action", "Root cause category", "Corrective action linked and closed"]}
+        gate="closing this NCR"
+        summaryTitle="NCR report"
+        summaryRows={[["NCR Number", "NCR-032"], ["Severity", "High"], ["Containment Action", null]]}
+      />
+      <h3 style={h3Style}>The header</h3>
+      <p style={pStyle}>The top shows the NCR number, title and status, then the <strong>Close NCR</strong> button and <strong>Hide Panel</strong>. A line underneath reads &ldquo;Closing is always a manual decision&rdquo; and says how many items are still missing. <strong>Close NCR</strong> disappears once the NCR is Closed, and it needs Edit permission.</p>
+      <h3 style={h3Style}>The four steps</h3>
+      <div style={stepList}>
+        <Step n={1}><strong>Describe</strong> (Section A and evidence): title, description, owner, project, due date, status, and Evidence and attachments.</Step>
+        <Step n={2}><strong>Contain</strong> (Section B): the containment action.</Step>
+        <Step n={3}><strong>Cause &amp; actions</strong> (Sections C, D, E, linked actions): root cause, corrective action, supplier / client response, and the Linked Actions panel.</Step>
+        <Step n={4}><strong>Verify &amp; close</strong> (effectiveness, closure, reports): closure date, status, any linked CAPA effectiveness, and Report Export.</Step>
+      </div>
+      <p style={pStyle}>Each step shows a percentage: the share of its checks that are done. The screen opens on the first step that is below 100%. Click any step to go to it.</p>
+      <h3 style={h3Style}>Still missing</h3>
+      <p style={pStyle}>A box lists what is still missing before closing, as small chips such as Title, Containment action, or Root cause category. Click a chip to jump to the step that holds it. The checks are: Title, Description, Owner, Project and Due date; Containment action; Root cause category (and the other-category text if you chose Other), Root cause description, Corrective action written, and Corrective action linked and closed; a Supplier / client response when the Source Type is Supplier or External; and, only if a CAPA is linked, that its effectiveness is Effective.</p>
+      <div style={callout("info")}>
+        <span>ℹ</span>
+        <div>The chips warn, they never block. If you click <strong>Close NCR</strong> with items missing, you are asked &ldquo;N items are still missing: ... Close anyway?&rdquo; and can choose to go ahead. Close NCR sets the status to Closed and saves, the same as choosing Closed and clicking Save Changes.</div>
+      </div>
+      <h3 style={h3Style}>Form, Split and Word report</h3>
+      <p style={pStyle}>The buttons above the steps change the layout. <strong>Form</strong> shows only the fields, <strong>Split</strong> (the default) shows the fields with the live <strong>NCR report</strong> summary on the right, and <strong>Word report</strong> shows the summary on its own. The summary lists the report headings with your entries filled in. Anything not yet filled in shows as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
+      <h3 style={h3Style}>All sections</h3>
+      <p style={pStyle}>The <strong>All sections</strong> button shows every section on one long page, as the NCR screen used to. Click it again to go back to one step at a time. <strong>Save Changes</strong> and <strong>Generate Linked Action</strong> stay below the steps whichever way you view it.</p>
     </>
   );
 }
@@ -153,20 +202,20 @@ function SectionContainment() {
     <>
       <div style={eyebrow}>Core Workflows</div>
       <h2 style={h2Style}>Containment & Corrective Action</h2>
-      <p style={pStyle}>Every NCR captures two distinct actions, recorded as free text on the Create NCR form and in the detail panel:</p>
+      <p style={pStyle}>Every NCR captures two distinct actions, recorded as free text on the Create NCR form and on the record screen:</p>
       <h3 style={h3Style}>B. Containment Action</h3>
       <p style={pStyle}>The immediate action taken to stop the non-conformance affecting anything further — for example, quarantining a batch or stopping a task. Record this as soon as it&apos;s known.</p>
       <h3 style={h3Style}>D. Corrective Action</h3>
       <p style={pStyle}>The action taken to prevent the non-conformance recurring — this addresses the root cause, not just the immediate symptom.</p>
       <div style={stepList}>
-        <Step n={1}>Open the NCR from the <strong>NCR Register</strong> (tick <strong>Show closed NCRs</strong> if it is already closed).</Step>
-        <Step n={2}>In the detail panel, enter or update <code style={codeStyle}>Containment Action</code> and <code style={codeStyle}>Corrective Action</code>.</Step>
-        <Step n={3}>Move <code style={codeStyle}>Status</code> to <span style={badge("in progress")}>In Progress</span> once containment is underway.</Step>
-        <Step n={4}>Click <strong>Save Changes</strong>.</Step>
+        <Step n={1}>Open the NCR from the <strong>NCR Register</strong> (press <strong>Show Closed</strong> if it is already closed). The record screen opens.</Step>
+        <Step n={2}>Enter or update <code style={codeStyle}>Containment Action</code> in step 2 <strong>Contain</strong>, and <code style={codeStyle}>Corrective Action</code> in step 3 <strong>Cause &amp; actions</strong>.</Step>
+        <Step n={3}>Set <code style={codeStyle}>Status</code> to <span style={badge("in progress")}>In Progress</span> once containment is underway (the Status field is in step 1 <strong>Describe</strong>).</Step>
+        <Step n={4}>Click <strong>Save Changes</strong>, below the steps.</Step>
       </div>
       <div style={callout("warning")}>
         <span>⚠</span>
-        <div>Moving an NCR to <span style={badge("closed")}>Closed</span> without a recorded corrective action is possible but not recommended — it leaves no evidence the root cause was actually addressed. Saving as Closed records the close date; moving it back out of Closed clears that date.</div>
+        <div>Moving an NCR to <span style={badge("closed")}>Closed</span> without a recorded corrective action is possible but not recommended — it leaves no evidence the root cause was actually addressed. Saving as Closed records the close date; moving it back out of Closed clears that date. The record screen warns you about missing items first: see <strong>Close NCR</strong> in The record screen.</div>
       </div>
     </>
   );
@@ -178,11 +227,11 @@ function SectionRootCause() {
       <div style={eyebrow}>Core Workflows</div>
       <h2 style={h2Style}>Root Cause Analysis</h2>
       <div style={stepList}>
-        <Step n={1}>Open the NCR and scroll to <strong>C. Root Cause</strong> in the detail panel (it is also on the Create NCR form).</Step>
+        <Step n={1}>Open the NCR and go to step 3 <strong>Cause &amp; actions</strong>, where <strong>C. Root Cause</strong> sits (it is also on the Create NCR form).</Step>
         <Step n={2}>Select a <code style={codeStyle}>Root Cause Category</code>: Human Error, Procedure Gap, Training / Competence, Supplier Issue, Design Issue, Equipment Failure, or Other.</Step>
         <Step n={3}>If <strong>Other</strong> is selected, an <strong>Other Root Cause Category</strong> text field appears to describe the category.</Step>
         <Step n={4}>Enter the full <code style={codeStyle}>Root Cause Description</code> explaining why the non-conformance actually happened.</Step>
-        <Step n={5}>Click <strong>Save Changes</strong>.</Step>
+        <Step n={5}>Click <strong>Save Changes</strong>, below the steps.</Step>
       </div>
       <div style={callout("info")}>
         <span>ℹ</span>
@@ -199,7 +248,7 @@ function SectionEvidence() {
       <h2 style={h2Style}>Evidence</h2>
       <p style={pStyle}>Photos, inspection sheets, correspondence, or any other supporting file can be attached directly to the NCR — PDF, Word, Excel, PowerPoint, and photos are all supported. You can add files when creating the NCR (the optional Evidence Files box) or at any time afterwards.</p>
       <div style={stepList}>
-        <Step n={1}>Open the NCR and find the <strong>Evidence</strong> card below the detail panel.</Step>
+        <Step n={1}>Open the NCR and, in step 1 <strong>Describe</strong>, find <strong>Evidence and attachments</strong>.</Step>
         <Step n={2}>Click <strong>Select Files</strong> and choose one or more files — on a phone you can pick from your files or photo library. Optionally add <strong>Evidence Notes</strong>, which are stored against each file in this upload.</Step>
         <Step n={3}>Click <strong>Upload Evidence</strong>.</Step>
         <Step n={4}>Each file appears in the evidence list with its size, type, upload date, any note, an <strong>Open</strong> button and a <strong>Delete</strong> button. Open works on phones as well as desktops.</Step>
@@ -219,10 +268,10 @@ function SectionLinkedAction() {
       <h2 style={h2Style}>Generating a Linked Action</h2>
       <p style={pStyle}>When an NCR needs a tracked follow-up task with its own owner, priority, and due date — separate from the NCR&apos;s own closure — generate a linked central Action directly from it.</p>
       <div style={stepList}>
-        <Step n={1}>Open the NCR and click <strong>Generate Linked Action</strong> at the bottom of the detail panel.</Step>
+        <Step n={1}>Open the NCR and click <strong>Generate Linked Action</strong>, which sits beside <strong>Save Changes</strong> below the steps.</Step>
         <Step n={2}>The Action page opens on <strong>Create Action</strong> with Source set to <code style={codeStyle}>NCR/CAPA</code>, the project and owner carried over from the NCR, and the NCR linked. Add the title, description, priority, and target date.</Step>
         <Step n={3}>Click <strong>Add Action</strong>. The new Action appears in central <strong>Actions</strong> with a chip linking back to this NCR.</Step>
-        <Step n={4}>The NCR&apos;s <strong>Linked Actions</strong> panel lists each linked Action with its status, owner and due date, and an <strong>Open Linked Action</strong> button. The Action also shows in the assigned person&apos;s <strong>My Actions</strong> view.</Step>
+        <Step n={4}>The NCR&apos;s <strong>Linked Actions</strong> panel (in step 3 <strong>Cause &amp; actions</strong>) lists each linked Action with its status, owner and due date, and an <strong>Open Linked Action</strong> button. The Action also shows in the assigned person&apos;s <strong>My Actions</strong> view.</Step>
       </div>
     </>
   );
@@ -262,7 +311,7 @@ function SectionSupplier() {
       <h2 style={h2Style}>Supplier / Client Response</h2>
       <p style={pStyle}>When an NCR involves a supplier or client, send them the NCR form to complete and bring their answer back into the record without retyping it.</p>
       <div style={stepList}>
-        <Step n={1}>Open the NCR and, in <strong>Report Export</strong>, tick <strong>Supplier / Client facing issue</strong>.</Step>
+        <Step n={1}>Open the NCR and, in <strong>Report Export</strong> (step 4 <strong>Verify &amp; close</strong>), tick <strong>Supplier / Client facing issue</strong>.</Step>
         <Step n={2}>Click <strong>Generate Word Report</strong> (or Generate / Save PDF) and send it. The form is titled &ldquo;Supplier / Client NCR Response Form&rdquo; and includes section E for their response and acknowledgement.</Step>
         <Step n={3}>When the completed Word document comes back, click <strong>Upload Completed Word</strong> and choose it. Only <strong>.docx</strong> files made by the IMS, up to 15 MB, are accepted, and the NCR number in the document must match the NCR you have open.</Step>
         <Step n={4}>Review <strong>Returned NCR response review</strong>, which shows Current IMS against Returned Word for each field that differs: Containment Action, Corrective Action, Root Cause Category and Description, Response / Proposed Action, and Acknowledgement / Responsible Contact.</Step>
@@ -274,9 +323,9 @@ function SectionSupplier() {
       </div>
       <div style={callout("warning")}>
         <span>⚠</span>
-        <div>Status is never changed by a returned document. Closing or reopening an NCR is always a manual decision made in the detail panel.</div>
+        <div>Status is never changed by a returned document. Closing or reopening an NCR is always a manual decision made on the record screen.</div>
       </div>
-      <p style={pStyle}>You can also type the response straight into <strong>E. Supplier / Client Response</strong> in the detail panel and click <strong>Save Changes</strong>.</p>
+      <p style={pStyle}>You can also type the response straight into <strong>E. Supplier / Client Response</strong> in step 3 <strong>Cause &amp; actions</strong> and click <strong>Save Changes</strong>. That section only appears when the Source Type is Supplier or External.</p>
     </>
   );
 }
@@ -296,7 +345,7 @@ function SectionReports() {
       <div style={eyebrow}>Reports & Import</div>
       <h2 style={h2Style}>NCR Forms & Filtered Reports</h2>
       <h3 style={h3Style}>Individual NCR Form</h3>
-      <p style={pStyle}>Open an NCR and use the <strong>Report Export</strong> panel to produce a matching PDF or Word form. <strong>Generate / Save PDF</strong> (shown as <strong>Regenerate PDF</strong> once one exists) builds the PDF and saves it to the NCR — the panel shows the latest saved time and version count, and <strong>Open Saved PDF</strong> reopens the latest. <strong>Generate Word Report</strong> downloads a .docx to your device and does not keep a saved copy. Both work on phones.</p>
+      <p style={pStyle}>Open an NCR and use the <strong>Report Export</strong> panel in step 4 <strong>Verify &amp; close</strong> to produce a matching PDF or Word form. <strong>Generate / Save PDF</strong> (shown as <strong>Regenerate PDF</strong> once one exists) builds the PDF and saves it to the NCR — the panel shows the latest saved time and version count, and <strong>Open Saved PDF</strong> reopens the latest. <strong>Generate Word Report</strong> downloads a .docx to your device and does not keep a saved copy. Both work on phones.</p>
       <p style={pStyle}>The report is built from what is on screen, so text you have typed but not yet saved is included. Sections are lettered the same way as the NCR form:</p>
       <div style={{ overflowX: "auto" }}>
         <table style={imsTableStyle}>
@@ -320,12 +369,12 @@ function SectionReports() {
       <h3 style={h3Style}>Filtered Register Report</h3>
       <div style={stepList}>
         <Step n={1}>Apply any combination of filters on the NCR Register or the <strong>Reports</strong> tab — status, severity, source type, year, project, or search.</Step>
-        <Step n={2}>Click <strong>Generate PDF Report</strong>. The Reports tab shows how many NCRs will be included.</Step>
+        <Step n={2}>Click <strong>Export PDF</strong>, on the NCR Register toolbar or on the Reports tab. The Reports tab shows how many NCRs will be included.</Step>
         <Step n={3}>The landscape PDF lists exactly the NCRs matching the current filters, with a filter summary, overdue days, the containment, root cause and corrective action text, the Enshore branded header, and page numbering.</Step>
       </div>
       <div style={callout("warning")}>
         <span>⚠</span>
-        <div>Closed NCRs are left out of the filtered report unless they are shown in the register — tick <strong>Show closed NCRs</strong> on the NCR Register tab, or set Status to Closed, before generating if you want them included.</div>
+        <div>Closed NCRs are left out of the filtered report unless they are shown in the register — press <strong>Show Closed</strong> on the NCR Register tab, or set Status to Closed, before exporting if you want them included.</div>
       </div>
     </>
   );
@@ -335,7 +384,7 @@ function SectionStatuses() {
   const rows: [string, string, string][] = [
     ["open", "Open", "Raised, not yet actioned. Containment and corrective action still pending."],
     ["in progress", "In Progress", "Containment and/or corrective action underway."],
-    ["closed", "Closed", "Corrective action complete. Hidden from the register unless Show closed NCRs is ticked. Closing is always a manual decision."],
+    ["closed", "Closed", "Corrective action complete. Hidden from the register unless Show Closed is pressed. Closing is always a manual decision."],
   ];
   return (
     <>
@@ -363,6 +412,7 @@ function SectionStatuses() {
 const sectionComponents: Record<SectionKey, () => ReactElement> = {
   overview:     SectionOverview,
   register:     SectionRegister,
+  recordscreen: SectionRecordScreen,
   raise:        SectionRaise,
   containment:  SectionContainment,
   rootcause:    SectionRootCause,

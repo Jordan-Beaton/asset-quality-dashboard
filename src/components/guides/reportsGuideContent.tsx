@@ -445,7 +445,7 @@ function SectionQualityDash() {
           <tr>
             <td style={tdBold()}>Operational control score (circle)</td>
             <td style={imsTableCellStyle}>A score out of 100 weighted from NCR closure (30%), audit finding closure (30%), MOC closure (20%) and Quality action pressure (20%). A control with no records for the year is left out rather than scored as zero. The circle is teal at 75 or above, amber from 50, and red below that.</td>
-            <td style={imsTableCellStyle}>Management Review</td>
+            <td style={imsTableCellStyle}>Not clickable. It is a summary only.</td>
           </tr>
           <tr>
             <td style={tdBold()}>Critical pressure</td>
@@ -525,7 +525,7 @@ function SectionHseDash() {
           <tr>
             <td style={tdBold()}>Control health (circle)</td>
             <td style={imsTableCellStyle}>A percentage weighted from AINM closure (28%), inspection completion (24%), HSE action pressure (24%) and calendar discipline (24%).</td>
-            <td style={imsTableCellStyle}>Management Review</td>
+            <td style={imsTableCellStyle}>Not clickable. It is a summary only.</td>
           </tr>
           <tr>
             <td style={tdBold()}>Critical pressure</td>

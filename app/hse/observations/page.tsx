@@ -26,6 +26,15 @@ import {
 } from "../../../src/components/ImsPrimitives";
 import { imsColours, imsInputStyle, imsTableCellStyle, imsTableHeadStyle, imsTableInfoRowStyle, imsTableStyle } from "../../../src/components/imsTheme";
 import { useImsPermissions } from "../../../src/components/ImsPermissions";
+import {
+  DocPreview,
+  RecordHeader,
+  RecordWorkbench,
+  StatusPill as WorkbenchStatusPill,
+  WorkbenchStep,
+  toneForStatus,
+  type WorkbenchStepDef,
+} from "../../../src/components/RecordWorkbench";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
 import { supabase } from "../../../src/lib/supabase";
@@ -671,7 +680,7 @@ export default function HseObservationsPage() {
                   title={hideClosed ? "Closed observations are hidden. Press to show them." : "Closed observations are showing. Press to hide them."}
                 >{hideClosed ? "Show Closed" : "Hide Closed"}</ImsButton>
                 <ImsButton variant="secondary" onClick={() => { setSearch(""); setStatusFilter(""); setTypeFilter(""); setRiskFilter(""); setReporterTypeFilter(""); setProjectFilter(""); setShowClosed(false); }}>Clear Filters</ImsButton>
-                <ImsButton variant={showExport ? "secondary" : "primary"} onClick={() => setShowExport((value) => !value)} disabled={!filteredRecords.length} title="Create a PDF of the observations currently shown">{showExport ? "Hide PDF options" : "Export PDF"}</ImsButton>
+                <ImsButton variant={showExport ? "secondary" : "primary"} onClick={() => setShowExport((value) => !value)} disabled={!filteredRecords.length} title="Create a PDF of the observations currently shown">Export PDF</ImsButton>
                 <ImsButton variant="secondary" onClick={() => void exportExcel()} disabled={!filteredRecords.length} title="Download an Excel workbook of the observations currently shown">Export Excel</ImsButton>
               </>}
             >
@@ -779,6 +788,7 @@ export default function HseObservationsPage() {
               canCreateAction={canCreateObservation}
               canEdit={canEditObservation}
               onCreateActionBlocked={() => requireCreatePermission("Generating central actions")}
+              onClose={() => setSelectedId("")}
             />
             </div>
           ) : null}
@@ -829,6 +839,7 @@ function ObservationDetail({
   canCreateAction,
   canEdit,
   onCreateActionBlocked,
+  onClose,
 }: {
   record: ObservationRecord | null;
   evidence: EvidenceRecord[];
@@ -841,6 +852,7 @@ function ObservationDetail({
   canCreateAction: boolean;
   canEdit: boolean;
   onCreateActionBlocked: () => void;
+  onClose: () => void;
 }) {
   const [draftStatus, setDraftStatus] = useState(record?.status || "New");
   const [draftAssigned, setDraftAssigned] = useState(record?.assigned_to || "");
@@ -854,105 +866,188 @@ function ObservationDetail({
 
   if (!record) return null;
 
+  const currentStatus = record.status || "New";
+  const closed = isClosed(record.status);
+
+  // What is still missing before the card can be closed. This only warns: Close Out stays usable.
+  // The review note and the close-out note are one saved field (closeout_notes), so they share one chip.
+  const openLinkedActions = linkedActions.filter((action) => !isClosed(action.status));
+  const missing: Array<{ label: string; step?: string }> = [];
+  if (!draftCloseout.trim()) missing.push({ label: "Review / close-out note", step: "closeout" });
+  if (openLinkedActions.length) {
+    missing.push({ label: openLinkedActions.length === 1 ? "Linked action closed" : `${openLinkedActions.length} linked actions closed`, step: "actions" });
+  }
+  const outstanding = closed ? [] : missing;
+
+  function closeOut() {
+    if (!canEdit || closed || !record) return;
+    // The same save as "Save Review", with the status set to Closed. Warn about gaps, never block.
+    const prompt = outstanding.length
+      ? `${outstanding.length} item${outstanding.length === 1 ? " is" : "s are"} still missing: ${outstanding.map((item) => item.label).join(", ")}. Close anyway?`
+      : `Close ${record.observation_number}?`;
+    if (!window.confirm(prompt)) return;
+    setDraftStatus("Closed");
+    onUpdate({ status: "Closed", assigned_to: draftAssigned || null, closeout_notes: draftCloseout || null });
+  }
+
+  const steps: WorkbenchStepDef[] = [
+    { key: "card", label: "Card", sub: "As submitted", state: "Received" },
+    { key: "review", label: "Review", sub: "Assign and assess", state: record.assigned_to ? "Assigned" : "Unassigned" },
+    { key: "actions", label: "Actions", sub: "Linked HSE actions", state: `${linkedActions.length} linked` },
+    { key: "closeout", label: "Close-out", sub: "Notes, evidence", state: closed ? "Closed" : record.closeout_notes ? "Notes added" : "Not started" },
+  ];
+
+  const historyRows = [
+    { label: "Submitted", value: record.created_at ? formatDateTime(record.created_at) : "" },
+    { label: "Last updated", value: record.updated_at ? formatDateTime(record.updated_at) : "" },
+    { label: "Closed", value: record.closed_at ? `${formatDateTime(record.closed_at)}${record.closed_by ? ` by ${record.closed_by}` : ""}` : "" },
+  ].filter((row) => row.value);
+
+  const createActionControl = canCreateAction ? (
+    <ImsLinkButton href={createActionHref}>Create HSE Action</ImsLinkButton>
+  ) : (
+    <ImsButton variant="secondary" onClick={onCreateActionBlocked} disabled>
+      Create HSE Action
+    </ImsButton>
+  );
+
+  const saveReviewButton = (
+    <ImsButton
+      onClick={() => onUpdate({ status: draftStatus, assigned_to: draftAssigned || null, closeout_notes: draftCloseout || null })}
+      disabled={!canEdit}
+    >
+      Save Review
+    </ImsButton>
+  );
+
+  const notesField = (
+    <Field label="Close-out / Review Notes">
+      <textarea style={{ ...imsInputStyle, minHeight: 96, resize: "vertical" }} value={draftCloseout} onChange={(event) => setDraftCloseout(event.target.value)} />
+    </Field>
+  );
+
   return (
-    <ImsPanel title={`Observation Detail - ${record.observation_number}`} subtitle="Review the submitted card, open evidence, assign owner, and manage status.">
-      <div className="observation-detail-grid" style={detailGridStyle}>
-        <Info label="Submitted As" value={record.reporter_type || "Quick Fill"} />
-        <Info label="Submitted By" value={record.reporter_name || "Not provided"} />
-        <Info label="Company / Organisation" value={record.reporter_company} />
-        <Info label="Contact" value={record.reporter_contact} />
-        <Info label="Type" value={record.observation_type} />
-        <Info label="Risk / Attention" value={record.risk_level} />
-        <Info label="Project" value={record.project} />
-        <Info label="Vessel / Worksite" value={record.vessel_worksite} />
-        <Info label="Location" value={record.site_location} />
-        <Info label="Date" value={`${formatDate(record.observation_date)}${record.observation_time ? ` ${record.observation_time}` : ""}`} />
-      </div>
-      <div style={narrativeGridStyle}>
-        <Info label="Title" value={record.title} large />
-        <Info label="Observation" value={record.description} large />
-        <Info label="Immediate Action" value={record.immediate_action} large />
-        <Info label="Suggested Action" value={record.suggested_action} large />
-      </div>
+    <ImsPanel>
+      <RecordWorkbench
+        key={record.id}
+        gate="this card can be closed"
+        steps={steps}
+        missing={outstanding}
+        reportLabel="History"
+        side={historyRows.length ? <DocPreview title="History" sections={[{ heading: "Timeline", rows: historyRows }]} /> : undefined}
+        header={
+          <RecordHeader
+            id={record.observation_number}
+            title={record.title || "Untitled observation"}
+            status={{ label: currentStatus, tone: toneForStatus(currentStatus) }}
+            track={{ steps: statusOptions, current: currentStatus }}
+            note="Status is set by hand in the Review step. The track shows where the card is now."
+            actions={
+              <>
+                {createActionControl}
+                <ImsButton variant="secondary" onClick={closeOut} disabled={!canEdit || closed} title="Sets the status to Closed and saves the review">Close Out</ImsButton>
+                <ImsButton variant="secondary" onClick={onClose} title="Close this panel">Hide Panel</ImsButton>
+              </>
+            }
+          />
+        }
+      >
+        <WorkbenchStep stepKey="card">
+          <div className="observation-detail-grid" style={kvGridStyle}>
+            <KeyValue label="Submitted As" value={record.reporter_type || "Quick Fill"} />
+            <KeyValue label="Submitted By" value={record.reporter_name || "Not provided"} />
+            <KeyValue label="Company / Organisation" value={record.reporter_company} />
+            <KeyValue label="Contact" value={record.reporter_contact} />
+            <KeyValue label="Type" value={record.observation_type} />
+            <KeyValue label="Risk / Attention" value={record.risk_level} />
+            <KeyValue label="Project" value={record.project} />
+            <KeyValue label="Vessel / Worksite" value={record.vessel_worksite} />
+            <KeyValue label="Location" value={record.site_location} />
+            <KeyValue label="Date" value={`${formatDate(record.observation_date)}${record.observation_time ? ` ${record.observation_time}` : ""}`} />
+            <KeyValue label="Title" value={record.title} wide />
+            <KeyValue label="Observation" value={record.description} wide />
+            <KeyValue label="Immediate Action" value={record.immediate_action} wide />
+            <KeyValue label="Suggested Action" value={record.suggested_action} wide />
+          </div>
+        </WorkbenchStep>
 
-      <div className="observation-edit-panel" style={editPanelStyle}>
-        <Field label="Status">
-          <select style={imsInputStyle} value={draftStatus} onChange={(event) => setDraftStatus(event.target.value)}>
-            {statusOptions.map((status) => <option key={status}>{status}</option>)}
-          </select>
-        </Field>
-        <Field label="Assigned To">
-          <select style={imsInputStyle} value={draftAssigned} onChange={(event) => setDraftAssigned(event.target.value)}>
-            <option value="">Unassigned</option>
-            {people.map((person) => <option key={person.id} value={person.name}>{person.name}{person.role ? ` - ${person.role}` : ""}</option>)}
-          </select>
-        </Field>
-        <div style={{ gridColumn: "1 / -1" }}>
-          <Field label="Close-out / Review Notes">
-            <textarea style={{ ...imsInputStyle, minHeight: 96, resize: "vertical" }} value={draftCloseout} onChange={(event) => setDraftCloseout(event.target.value)} />
-          </Field>
-        </div>
-        <div style={buttonRowStyle}>
-          <ImsButton
-            onClick={() => onUpdate({ status: draftStatus, assigned_to: draftAssigned || null, closeout_notes: draftCloseout || null })}
-            disabled={!canEdit}
-          >
-            Save Review
-          </ImsButton>
-          {canCreateAction ? (
-            <ImsLinkButton href={createActionHref}>Generate Central Action</ImsLinkButton>
-          ) : (
-            <ImsButton variant="secondary" onClick={onCreateActionBlocked} disabled>
-              Generate Central Action
-            </ImsButton>
-          )}
-          <ImsButton variant="danger" onClick={() => onDelete(record)} disabled={!canEdit}>Delete Observation</ImsButton>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: "14px" }}>
-        <h3 style={subHeadingStyle}>Linked Actions</h3>
-        <div style={evidenceListStyle}>
-          {linkedActions.map((action) => (
-            <div key={action.id} style={evidenceItemStyle}>
-              <div>
-                <strong>{action.action_number || "Action"} - {action.title || "Untitled action"}</strong>
-                <small>
-                  {[action.owner ? `Owner: ${action.owner}` : "", action.due_date ? `Due: ${formatDate(action.due_date)}` : ""]
-                    .filter(Boolean)
-                    .join(" | ") || "No owner or due date"}
-                </small>
-              </div>
-              <div style={linkedActionButtonGroupStyle}>
-                <StatusPill status={action.status || "Open"} />
-                <ImsLinkButton
-                  href={action.id ? `/actions?actionId=${encodeURIComponent(action.id)}` : `/actions?action=${encodeURIComponent(action.action_number || "")}`}
-                  variant="secondary"
-                >
-                  Open Linked Action
-                </ImsLinkButton>
-              </div>
+        <WorkbenchStep stepKey="review">
+          <div className="observation-edit-panel" style={editPanelStyle}>
+            <Field label="Status">
+              <select style={imsInputStyle} value={draftStatus} onChange={(event) => setDraftStatus(event.target.value)}>
+                {statusOptions.map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </Field>
+            <Field label="Assigned To">
+              <select style={imsInputStyle} value={draftAssigned} onChange={(event) => setDraftAssigned(event.target.value)}>
+                <option value="">Unassigned</option>
+                {people.map((person) => <option key={person.id} value={person.name}>{person.name}{person.role ? ` - ${person.role}` : ""}</option>)}
+              </select>
+            </Field>
+            <div style={{ gridColumn: "1 / -1" }}>{notesField}</div>
+            <div style={buttonRowStyle}>
+              {saveReviewButton}
+              <ImsButton variant="danger" onClick={() => onDelete(record)} disabled={!canEdit}>Delete Observation</ImsButton>
             </div>
-          ))}
-          {!linkedActions.length ? <div style={emptyStateStyle}>No central actions are linked to this observation yet.</div> : null}
-        </div>
-      </div>
+          </div>
+        </WorkbenchStep>
 
-      <div>
-        <h3 style={subHeadingStyle}>Evidence</h3>
-        <div style={evidenceListStyle}>
-          {evidence.map((item) => (
-            <div key={item.id} style={evidenceItemStyle}>
-              <div>
-                <strong>{item.file_name}</strong>
-                <small>{fileSize(item.file_size)} | Uploaded {formatDateTime(item.uploaded_at)}</small>
-              </div>
-              <ImsButton variant="secondary" onClick={() => onOpenEvidence(item.file_path)}>Open Evidence</ImsButton>
+        <WorkbenchStep stepKey="actions">
+          <div>
+            <h3 style={subHeadingStyle}>Linked Actions</h3>
+            <div style={evidenceListStyle}>
+              {linkedActions.map((action) => (
+                <div key={action.id} style={evidenceItemStyle}>
+                  <div>
+                    <strong>{action.action_number || "Action"} - {action.title || "Untitled action"}</strong>
+                    <small>
+                      {[action.owner ? `Owner: ${action.owner}` : "", action.due_date ? `Due: ${formatDate(action.due_date)}` : ""]
+                        .filter(Boolean)
+                        .join(" | ") || "No owner or due date"}
+                    </small>
+                  </div>
+                  <div style={linkedActionButtonGroupStyle}>
+                    <StatusPill status={action.status || "Open"} />
+                    <ImsLinkButton
+                      href={action.id ? `/actions?actionId=${encodeURIComponent(action.id)}` : `/actions?action=${encodeURIComponent(action.action_number || "")}`}
+                      variant="secondary"
+                    >
+                      Open Linked Action
+                    </ImsLinkButton>
+                  </div>
+                </div>
+              ))}
+              {!linkedActions.length ? <div style={emptyStateStyle}>No central actions are linked to this observation yet. Create HSE Action opens the Action form with this card already linked.</div> : null}
             </div>
-          ))}
-          {!evidence.length ? <div style={emptyStateStyle}>No evidence was uploaded with this observation.</div> : null}
-        </div>
-      </div>
+            <div style={{ ...buttonRowStyle, marginTop: "12px" }}>{createActionControl}</div>
+          </div>
+        </WorkbenchStep>
+
+        <WorkbenchStep stepKey="closeout">
+          <div className="observation-edit-panel" style={editPanelStyle}>
+            <div style={{ gridColumn: "1 / -1" }}>{notesField}</div>
+            <KeyValue label="Status" value={currentStatus} />
+            <KeyValue label="Closed By" value={record.closed_by} />
+            <KeyValue label="Closed On" value={record.closed_at ? formatDateTime(record.closed_at) : ""} />
+            <div style={buttonRowStyle}>{saveReviewButton}</div>
+          </div>
+          <div>
+            <h3 style={subHeadingStyle}>Evidence</h3>
+            <div style={evidenceListStyle}>
+              {evidence.map((item) => (
+                <div key={item.id} style={evidenceItemStyle}>
+                  <div>
+                    <strong>{item.file_name}</strong>
+                    <small>{fileSize(item.file_size)} | Uploaded {formatDateTime(item.uploaded_at)}</small>
+                  </div>
+                  <ImsButton variant="secondary" onClick={() => onOpenEvidence(item.file_path)}>Open Evidence</ImsButton>
+                </div>
+              ))}
+              {!evidence.length ? <div style={emptyStateStyle}>No evidence was uploaded with this observation.</div> : null}
+            </div>
+          </div>
+        </WorkbenchStep>
+      </RecordWorkbench>
     </ImsPanel>
   );
 }
@@ -969,24 +1064,17 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label style={fieldStyle}><span style={labelStyle}>{label}</span>{children}</label>;
 }
 
-function Info({ label, value, large = false }: { label: string; value: ReactNode; large?: boolean }) {
+function KeyValue({ label, value, wide = false }: { label: string; value: ReactNode; wide?: boolean }) {
   return (
-    <div style={infoStyle}>
+    <div style={{ ...kvStyle, ...(wide ? { gridColumn: "1 / -1" } : {}) }}>
       <span style={infoLabelStyle}>{label}</span>
-      <span style={{ ...infoValueStyle, whiteSpace: large ? "pre-wrap" : "normal" }}>{value || "-"}</span>
+      <span style={{ ...infoValueStyle, whiteSpace: wide ? "pre-wrap" : "normal", overflowWrap: "anywhere" }}>{value || "-"}</span>
     </div>
   );
 }
 
 function StatusPill({ status }: { status: string }) {
-  const colour = isClosed(status)
-    ? { background: "#ECECE7", color: "#005670" }
-    : normalise(status) === "new"
-    ? { background: "#ECECE7", color: "#005670" }
-    : normalise(status) === "action required"
-    ? { background: "#ECECE7", color: "#F93822" }
-    : { background: "#ECECE7", color: "#000000" };
-  return <span style={{ ...pillStyle, ...colour }}>{status || "New"}</span>;
+  return <WorkbenchStatusPill label={status || "New"} tone={toneForStatus(status || "New")} />;
 }
 
 const yearSelectStyle: CSSProperties = {
@@ -1017,9 +1105,8 @@ const emptyCellStyle: CSSProperties = { padding: "28px 14px", textAlign: "center
 const emptyStateStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "16px", color: imsColours.slate, background: imsColours.page, lineHeight: 1.45 };
 const latestListStyle: CSSProperties = { display: "grid", gap: "10px" };
 const latestItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #D0D0CE", borderRadius: "14px", padding: "12px", background: "#ffffff", textAlign: "left", cursor: "pointer" };
-const detailGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px", marginBottom: "12px" };
-const narrativeGridStyle: CSSProperties = { display: "grid", gap: "10px", marginBottom: "14px" };
-const infoStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "13px", background: "#ECECE7", padding: "12px", display: "grid", gap: "5px" };
+const kvGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0 24px" };
+const kvStyle: CSSProperties = { borderBottom: `1px solid ${imsColours.border}`, padding: "8px 0", display: "grid", gap: "3px", minWidth: 0 };
 const infoLabelStyle: CSSProperties = { color: imsColours.muted, fontSize: "11px", fontWeight: 900, letterSpacing: "0.06em", textTransform: "uppercase" };
 const infoValueStyle: CSSProperties = { color: imsColours.ink, fontSize: "13px", lineHeight: 1.45 };
 const editPanelStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "12px", border: "1px solid #D0D0CE", borderRadius: "18px", background: "linear-gradient(180deg, #ffffff 0%, #ECECE7 100%)", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.06)", padding: "18px", marginBottom: "14px" };
@@ -1028,7 +1115,6 @@ const subHeadingStyle: CSSProperties = { margin: "0 0 10px", color: imsColours.i
 const evidenceListStyle: CSSProperties = { display: "grid", gap: "10px" };
 const evidenceItemStyle: CSSProperties = { display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", border: "1px solid #D0D0CE", borderRadius: "13px", background: "#ECECE7", padding: "12px" };
 const linkedActionButtonGroupStyle: CSSProperties = { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" };
-const pillStyle: CSSProperties = { display: "inline-flex", alignItems: "center", borderRadius: "999px", padding: "5px 9px", fontSize: "12px", fontWeight: 900 };
 const qrGridStyle: CSSProperties = { display: "grid", gap: "16px" };
 const qrCardStyle: CSSProperties = { display: "grid", gridTemplateColumns: "110px minmax(0, 1fr)", gap: "18px", alignItems: "center", border: "1px solid #D0D0CE", background: "#ECECE7", borderRadius: "18px", padding: "18px" };
 const qrImageStyle: CSSProperties = { width: "132px", height: "132px", borderRadius: "14px", background: "#ffffff", border: `1px solid ${imsColours.brandBorder}`, padding: "8px", objectFit: "contain", boxSizing: "border-box" };

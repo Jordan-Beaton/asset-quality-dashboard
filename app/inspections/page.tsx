@@ -5,12 +5,12 @@ import type { ChangeEvent, CSSProperties, FormEvent } from "react";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
-import { ImsButton, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
+import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../src/components/ImsPrimitives";
+import { downloadRegisterExcel } from "../../src/lib/registerExcel";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { ReviewPointsPanel } from "../../src/components/ReviewPointsPanel";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
-import { imsColours, imsFieldStyle, imsFilterGridStyle, imsInputStyle, imsLabelStyle, imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../src/components/imsTheme";
+import { imsColours, imsFieldStyle, imsInputStyle, imsLabelStyle, imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../src/components/imsTheme";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlFlag, useUrlState } from "../../src/lib/useUrlState";
@@ -181,6 +181,7 @@ export default function OverallInspectionsPage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const formAttachmentInputRef = useRef<HTMLInputElement>(null);
 
+  const [showFilters, setShowFilters] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingManualId, setEditingManualId] = useState<string | null>(null);
   const [form, setForm] = useState<ManualFormState>(blankForm());
@@ -357,8 +358,17 @@ export default function OverallInspectionsPage() {
     return [...keys].sort((a, b) => (getProject(a).label || a).localeCompare(getProject(b).label || b));
   }, [knownProjects]);
 
+  // The lookahead grid follows the same filters as the register below it, including Project and Attendee.
+  const visibleGridProjects = useMemo(
+    () => (projectFilter === "All" ? gridProjects : gridProjects.filter((key) => key === projectFilter)),
+    [gridProjects, projectFilter]
+  );
+
   const gridEvents = useMemo(() => {
+    const search = attendeeSearch.trim().toLowerCase();
     return events.filter((event) => {
+      if (projectFilter !== "All" && event.projectKey !== projectFilter) return false;
+      if (search && !event.attendees.some((person) => person.name.toLowerCase().includes(search) || person.company.toLowerCase().includes(search))) return false;
       if (sourceFilter !== "All" && event.source !== sourceFilter) return false;
       if (statusFilter !== "All" && event.status !== statusFilter) return false;
       if (supplierFilter !== "All" && event.supplier.trim().toLowerCase() !== supplierFilter) return false;
@@ -367,7 +377,7 @@ export default function OverallInspectionsPage() {
       const date = parseDate(event.date);
       return date && date >= lookaheadStart && date < lookaheadEnd;
     });
-  }, [events, sourceFilter, statusFilter, supplierFilter, typeFilter, clientVisibleOnly, lookaheadStart, lookaheadEnd]);
+  }, [events, projectFilter, attendeeSearch, sourceFilter, statusFilter, supplierFilter, typeFilter, clientVisibleOnly, lookaheadStart, lookaheadEnd]);
 
   function eventsFor(projectKey: string, weekStart: Date) {
     const weekEnd = addDays(weekStart, 7);
@@ -619,23 +629,56 @@ export default function OverallInspectionsPage() {
     }
   }
 
-  function exportExcel() {
-    const rows = filteredEvents.map((event) => ({
-      Project: event.projectLabel,
-      Date: displayDate(event.date),
-      Reference: event.noiNumber || event.sectionNumber || "-",
-      Activity: event.title,
-      "ITP Reference": event.itpReference || "-",
-      Supplier: event.supplier || "-",
-      Type: event.interventionType || "-",
-      Attendees: attendeeSummary(event.attendees).join(", ") || "-",
-      Status: event.status,
-      Source: event.source,
-    }));
-    const sheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, "Inspections");
-    XLSX.writeFile(workbook, `Overall-Inspections-${formatInputDate(new Date())}.xlsx`);
+  function clearFilters() {
+    setProjectFilter("All");
+    setSourceFilter("All");
+    setStatusFilter("All");
+    setSupplierFilter("All");
+    setTypeFilter("All");
+    setClientVisibleOnly(false);
+    setAttendeeSearch("");
+  }
+
+  // The workbook holds exactly the inspections the register is showing, with the filters that produced them.
+  function registerFilterDescriptions() {
+    const projectLabel = projectFilter === "All" ? "All" : knownProjects.find(([key]) => key === projectFilter)?.[1] || projectFilter;
+    const supplierLabel = supplierFilter === "All" ? "All" : supplierOptions.find(([key]) => key === supplierFilter)?.[1] || supplierFilter;
+    return [
+      view === "lookahead" ? `8-week lookahead: ${displayDate(formatInputDate(lookaheadStart))} - ${displayDate(formatInputDate(addDays(lookaheadEnd, -1)))}` : "Full register",
+      `Project: ${projectLabel}`,
+      `Source: ${sourceFilter}`,
+      `Supplier: ${supplierLabel}`,
+      `Status: ${statusFilter}`,
+      `Witness / Hold: ${typeFilter}`,
+      ...(clientVisibleOnly ? ["Client-visible only"] : []),
+      ...(attendeeSearch.trim() ? [`Attendee / company: "${attendeeSearch.trim()}"`] : []),
+    ];
+  }
+
+  async function exportExcel() {
+    try {
+      await downloadRegisterExcel<InspectionEvent>({
+        fileName: `Overall-Inspections-${formatInputDate(new Date())}.xlsx`,
+        sheetName: "Inspections",
+        title: "Overall Inspections - Enshore IMS",
+        filters: registerFilterDescriptions(),
+        rows: filteredEvents,
+        columns: [
+          { header: "Project", width: 24, value: (event) => event.projectLabel },
+          { header: "Date", width: 13, value: (event) => displayDate(event.date) },
+          { header: "Reference", width: 18, value: (event) => event.noiNumber || event.sectionNumber || "-" },
+          { header: "Activity", width: 44, value: (event) => event.title },
+          { header: "ITP Reference", width: 20, value: (event) => event.itpReference || "-" },
+          { header: "Supplier", width: 24, value: (event) => event.supplier || "-" },
+          { header: "Type", width: 10, value: (event) => event.interventionType || "-" },
+          { header: "Attendees", width: 40, value: (event) => attendeeSummary(event.attendees).join(", ") || "-" },
+          { header: "Status", width: 16, value: (event) => event.status },
+          { header: "Source", width: 10, value: (event) => event.source },
+        ],
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? `The Excel export could not be created: ${error.message}` : "The Excel export could not be created.");
+    }
   }
 
   async function exportPdf() {
@@ -775,8 +818,19 @@ export default function OverallInspectionsPage() {
         <QualityKpiCard title="Filtered Results" value={filteredEvents.length} accent="#53565A" />
       </section>
 
-      <ImsPanel title="Filters" style={panelSpacingStyle}>
-        <div style={imsFilterGridStyle}>
+      <div style={panelSpacingStyle}>
+        <ImsFilterPanel
+          search={attendeeSearch}
+          onSearchChange={setAttendeeSearch}
+          searchPlaceholder="Search attendee or company..."
+          showFilters={showFilters}
+          onToggleFilters={() => setShowFilters((current) => !current)}
+          actions={<>
+            <ImsButton variant="secondary" onClick={clearFilters}>Clear Filters</ImsButton>
+            <ImsButton variant="primary" onClick={() => void exportPdf()} disabled={!filteredEvents.length} title="Create a PDF of the inspections currently shown">Export PDF</ImsButton>
+            <ImsButton variant="secondary" onClick={() => void exportExcel()} disabled={!filteredEvents.length} title="Download an Excel workbook of the inspections currently shown">Export Excel</ImsButton>
+          </>}
+        >
           <label style={imsFieldStyle}>
             <span style={imsLabelStyle}>Project</span>
             <select style={imsInputStyle} value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
@@ -814,16 +868,12 @@ export default function OverallInspectionsPage() {
               <option value="H">Hold</option>
             </select>
           </label>
-          <label style={imsFieldStyle}>
-            <span style={imsLabelStyle}>Attendee / company</span>
-            <input style={imsInputStyle} value={attendeeSearch} onChange={(event) => setAttendeeSearch(event.target.value)} placeholder="Search attendees" />
-          </label>
           <label style={{ ...imsFieldStyle, flexDirection: "row", alignItems: "center", gap: 8, display: "flex" }}>
             <input type="checkbox" checked={clientVisibleOnly} onChange={(event) => setClientVisibleOnly(event.target.checked)} />
             <span style={imsLabelStyle}>Client-visible only</span>
           </label>
-        </div>
-      </ImsPanel>
+        </ImsFilterPanel>
+      </div>
 
       {view === "lookahead" ? (
         <ImsPanel title="8-Week Lookahead by Project" subtitle={`${displayDate(formatInputDate(lookaheadStart))} - ${displayDate(formatInputDate(addDays(lookaheadEnd, -1)))}`} style={panelSpacingStyle}>
@@ -834,7 +884,7 @@ export default function OverallInspectionsPage() {
                 <div key={weekStart.toISOString()} style={gridWeekHeaderCell}>W/C {weekStart.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</div>
               ))}
             </div>
-            {gridProjects.map((projectKey) => (
+            {visibleGridProjects.map((projectKey) => (
               <div key={projectKey} style={gridRowStyle}>
                 <div style={gridProjectCell}>{getProject(projectKey).label}</div>
                 {weekStarts.map((weekStart) => {
@@ -863,7 +913,7 @@ export default function OverallInspectionsPage() {
                 })}
               </div>
             ))}
-            {!gridProjects.length ? <div style={emptyCellStyle}>No projects yet.</div> : null}
+            {!visibleGridProjects.length ? <div style={emptyCellStyle}>No projects yet.</div> : null}
           </div>
         </ImsPanel>
       ) : null}
@@ -873,8 +923,6 @@ export default function OverallInspectionsPage() {
         subtitle={`${filteredEvents.length} matching inspection${filteredEvents.length === 1 ? "" : "s"}`}
         actions={
           <>
-            <ImsButton variant="secondary" onClick={exportExcel}>Export Excel</ImsButton>
-            <ImsButton variant="secondary" onClick={() => void exportPdf()}>Export PDF</ImsButton>
             {canWrite ? <ImsButton variant="secondary" onClick={() => openCreateForm()}>New Manual Inspection</ImsButton> : null}
           </>
         }

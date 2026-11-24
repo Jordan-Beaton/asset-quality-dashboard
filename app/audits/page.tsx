@@ -31,6 +31,18 @@ import { ModuleSectionHeader } from "../../src/components/ModuleSectionHeader";
 import { QualityKpiCard } from "../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
+import { ImsButton, ImsFilterPanel } from "../../src/components/ImsPrimitives";
+import {
+  DocPreview,
+  RecordHeader,
+  RecordWorkbench,
+  StatusPill,
+  WorkbenchStep,
+  percentDone,
+  toneForStatus,
+} from "../../src/components/RecordWorkbench";
+import type { DocPreviewSection, WorkbenchStepDef, WorkbenchTone } from "../../src/components/RecordWorkbench";
+import { downloadRegisterExcel, excelDateStamp } from "../../src/lib/registerExcel";
 import { supabase } from "../../src/lib/supabase";
 import { openFileUrl, saveBlobAsFile } from "../../src/lib/fileOpen";
 import { IMS_DOCUMENT_ACCEPT, uploadContentType } from "../../src/lib/fileTypes";
@@ -358,6 +370,18 @@ function getFrequencyBadgeStyle(frequency: "Reduce" | "Maintain" | "Increase"): 
   return { ...badgeStyle, background: "#ECECE7", color: "#000000" };
 }
 
+function frequencyTone(frequency: "Reduce" | "Maintain" | "Increase"): WorkbenchTone {
+  if (frequency === "Increase") return "bad";
+  if (frequency === "Reduce") return "ok";
+  return "neu";
+}
+
+function findingCategoryTone(category: FindingSeverity): WorkbenchTone {
+  if (category === "Major") return "bad";
+  if (category === "Minor") return "warn";
+  return "neu";
+}
+
 function countFindingsForAudit(auditId: string, findings: FindingRecord[]) {
   const scoped = findings.filter((finding) => finding.audit_id === auditId);
 
@@ -671,6 +695,7 @@ function AuditsPageContent() {
   );
   const [openFindingTypeFilter, setOpenFindingTypeFilter] = useUrlState<AuditType | "All">("ftype", "All", AUDIT_TYPE_FILTER_VALUES);
   const [openFindingAuditTitleFilter, setOpenFindingAuditTitleFilter] = useUrlState("faudit", "All");
+  const [findingSearch, setFindingSearch] = useUrlState("fq", "");
   const [showFindingsFilters, setShowFindingsFilters] = useState(
     linkedView === "open-findings" ||
       linkedView === "closed-findings" ||
@@ -1082,6 +1107,21 @@ function AuditsPageContent() {
       });
   }, [audits, findings]);
 
+  function findingMatchesSearch(finding: OpenFindingRow) {
+    const needle = findingSearch.trim().toLowerCase();
+    if (!needle) return true;
+    return [
+      finding.reference,
+      finding.audit_number,
+      finding.audit_title,
+      finding.clause,
+      finding.description,
+      finding.owner,
+      finding.root_cause,
+      finding.corrective_action,
+    ].some((value) => (value || "").toLowerCase().includes(needle));
+  }
+
   const filteredOpenFindings = useMemo(() => {
     return openFindings.filter((finding) => {
       const matchesCategory =
@@ -1089,9 +1129,9 @@ function AuditsPageContent() {
       const matchesType = openFindingTypeFilter === "All" || finding.audit_type === openFindingTypeFilter;
       const matchesTitle =
         openFindingAuditTitleFilter === "All" || finding.audit_title === openFindingAuditTitleFilter;
-      return matchesCategory && matchesType && matchesTitle;
+      return matchesCategory && matchesType && matchesTitle && findingMatchesSearch(finding);
     });
-  }, [openFindings, openFindingAuditTitleFilter, openFindingCategoryFilter, openFindingTypeFilter]);
+  }, [openFindings, openFindingAuditTitleFilter, openFindingCategoryFilter, openFindingTypeFilter, findingSearch]);
 
   const filteredClosedFindings = useMemo(() => {
     return closedFindings.filter((finding) => {
@@ -1100,9 +1140,9 @@ function AuditsPageContent() {
       const matchesType = openFindingTypeFilter === "All" || finding.audit_type === openFindingTypeFilter;
       const matchesTitle =
         openFindingAuditTitleFilter === "All" || finding.audit_title === openFindingAuditTitleFilter;
-      return matchesCategory && matchesType && matchesTitle;
+      return matchesCategory && matchesType && matchesTitle && findingMatchesSearch(finding);
     });
-  }, [closedFindings, openFindingAuditTitleFilter, openFindingCategoryFilter, openFindingTypeFilter]);
+  }, [closedFindings, openFindingAuditTitleFilter, openFindingCategoryFilter, openFindingTypeFilter, findingSearch]);
 
   const findingAuditTitleOptions = useMemo(() => {
     const sourceRows = isClosedFindingsView ? closedFindings : openFindings;
@@ -1541,6 +1581,187 @@ function AuditsPageContent() {
     }));
   }, [riskAreaReview]);
 
+  // A returned Word response is saved by "Upload completed Word" under findings/<ref>/returned and named "<ref> completed response - ...".
+  function hasReturnedWord(finding: FindingRecord) {
+    const returnedFolder = `/findings/${sanitizeFileName(finding.reference || "finding")}/returned/`;
+    const returnedPrefix = `${finding.reference || "Finding"} completed response -`;
+    return auditFiles.some(
+      (file) =>
+        file.audit_id === finding.audit_id &&
+        Boolean(file.file_path?.includes(returnedFolder) || file.file_name?.startsWith(returnedPrefix))
+    );
+  }
+
+  // Everything the audit record screen needs, worked out from the saved audit, its findings and its files.
+  // The audit has no checklist-sent, frequency-outcome or closure-date column of its own: the frequency outcome is worked out
+  // from the findings, the Word loop is tracked per finding, and closure dates live on the findings.
+  const auditWorkbench = (() => {
+    const audit = selectedAudit;
+    const scoped = selectedFindings;
+    const openRows = scoped.filter((finding) => finding.status !== "Closed");
+    const closedRows = scoped.filter((finding) => finding.status === "Closed");
+    const closedWithoutDate = closedRows.filter((finding) => !finding.closure_date);
+    const openWithoutWord = openRows.filter((finding) => !hasReturnedWord(finding));
+    const returnedWordCount = scoped.filter((finding) => hasReturnedWord(finding)).length;
+    // Documents uploaded against the audit itself, not evidence or returned Word files that belong to a finding.
+    const reportDocs = selectedAuditFiles.filter((file) => !(file.file_path || "").includes("/findings/"));
+    const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
+    const base = { openRows, closedRows, closedWithoutDate, openWithoutWord, returnedWordCount, reportDocs };
+
+    if (!audit) {
+      return {
+        ...base,
+        steps: [] as WorkbenchStepDef[],
+        missing: [] as Array<{ label: string; step?: string }>,
+        initialStep: "plan",
+        sections: [] as DocPreviewSection[],
+      };
+    }
+
+    const risk = auditRiskById[audit.id];
+    const missing: Array<{ label: string; step?: string }> = [];
+    if (!audit.title.trim()) missing.push({ label: "Audit title", step: "plan" });
+    if (!audit.auditee.trim()) missing.push({ label: "Auditee", step: "plan" });
+    if (!audit.lead_auditor.trim()) missing.push({ label: "Lead auditor", step: "plan" });
+    if (!audit.audit_date) missing.push({ label: "Audit date", step: "plan" });
+    if (audit.standards.length === 0) missing.push({ label: "Standards", step: "plan" });
+    if (openWithoutWord.length > 0) {
+      missing.push({
+        label: `Completed Word not returned for ${openWithoutWord.length} open ${plural(openWithoutWord.length, "finding", "findings")}`,
+        step: "conduct",
+      });
+    }
+    if (openRows.length > 0) {
+      missing.push({
+        label: `${openRows.length} ${plural(openRows.length, "finding", "findings")} still open`,
+        step: "findings",
+      });
+    }
+    if (closedWithoutDate.length > 0) {
+      missing.push({
+        label: `Closure date required on ${closedWithoutDate.length} closed ${plural(closedWithoutDate.length, "finding", "findings")}`,
+        step: "findings",
+      });
+    }
+    if (reportDocs.length === 0) missing.push({ label: "Audit report not uploaded", step: "closeout" });
+
+    const conductChecks = [audit.status === "In Progress" || audit.status === "Completed"];
+    if (scoped.length > 0) conductChecks.push(openWithoutWord.length === 0);
+
+    const steps: WorkbenchStepDef[] = [
+      {
+        key: "plan",
+        label: "Plan",
+        sub: "Type, lead, dates, status",
+        pct: percentDone([
+          Boolean(audit.title.trim()),
+          Boolean(audit.auditee.trim()),
+          Boolean(audit.lead_auditor.trim()),
+          Boolean(audit.audit_date),
+          audit.standards.length > 0,
+        ]),
+      },
+      {
+        key: "conduct",
+        label: "Conduct",
+        sub: scoped.length > 0 ? `Word returned ${returnedWordCount} of ${scoped.length}` : "Word loop, evidence",
+        pct: percentDone(conductChecks),
+      },
+      scoped.length === 0
+        ? { key: "findings", label: "Findings", sub: "Classes, owners, status", pct: null, state: "None raised" }
+        : {
+            key: "findings",
+            label: "Findings",
+            sub: `${openRows.length} open, ${closedRows.length} closed`,
+            pct: percentDone(scoped.map((finding) => finding.status === "Closed" && Boolean(finding.closure_date))),
+          },
+      {
+        key: "closeout",
+        label: "Close-out",
+        sub: "Report, links, frequency",
+        pct: percentDone([
+          audit.status === "Completed",
+          openRows.length === 0,
+          reportDocs.length > 0,
+          closedWithoutDate.length === 0,
+        ]),
+      },
+    ];
+
+    const initialStep = steps.find((step) => step.pct != null && step.pct < 100)?.key || "plan";
+    const effectiveStatus = getEffectiveAuditStatus(audit);
+    const clip = (value: string, length: number) => (value.length > length ? `${value.slice(0, length - 1)}...` : value);
+
+    const sections: DocPreviewSection[] = [
+      {
+        heading: "Audit details",
+        rows: [
+          { label: "Number", value: audit.audit_number },
+          { label: "Title", value: audit.title, step: "plan" },
+          { label: "Type", value: audit.audit_type },
+          { label: "Status", value: effectiveStatus },
+          { label: "Auditee", value: audit.auditee, step: "plan" },
+          { label: "Lead auditor", value: audit.lead_auditor, step: "plan" },
+          { label: "Audit date", value: audit.audit_date ? formatDate(audit.audit_date) : "", step: "plan" },
+          { label: "Audit month", value: formatMonth(audit.audit_month) },
+          { label: "Standards", value: audit.standards.length ? buildStandardsLabel(audit) : "", step: "plan" },
+          { label: "Location", value: audit.location || "-" },
+          ...(audit.audit_type === "Internal" ? [{ label: "Procedure", value: audit.procedure_reference || "-" }] : []),
+          ...(audit.audit_type === "External" ? [{ label: "Certification body", value: audit.certification_body || "-" }] : []),
+          { label: "Report upload", value: audit.report_file_name || "", step: "closeout" },
+          { label: "Form ref", value: getAuditDocumentNumber(audit.audit_type) },
+        ],
+      },
+      {
+        heading: "Findings summary",
+        rows: [
+          { label: "Major", value: String(audit.findings.major) },
+          { label: "Minor", value: String(audit.findings.minor) },
+          { label: "OFI", value: String(audit.findings.ofi) },
+          { label: "OBS", value: String(audit.findings.obs) },
+          { label: "Open", value: String(openRows.length) },
+          { label: "Closed", value: String(closedRows.length) },
+          ...(scoped.length === 0
+            ? [{ label: "Findings", value: "No findings raised against this audit." }]
+            : scoped.map((finding) => ({
+                label: `${finding.reference} ${finding.category}`,
+                value: [
+                  clip(finding.description || "No description", 80),
+                  finding.owner ? `Owner ${finding.owner}` : "No owner",
+                  finding.status,
+                  finding.due_date ? `Due ${formatDate(finding.due_date)}` : "",
+                  finding.status === "Closed" ? (finding.closure_date ? `Closed ${formatDate(finding.closure_date)}` : "No closure date") : "",
+                ]
+                  .filter(Boolean)
+                  .join(" | "),
+                step: "findings",
+              }))),
+        ],
+      },
+      {
+        heading: "Outcome",
+        rows: [
+          { label: "Frequency outcome", value: risk?.frequency || "Maintain" },
+          { label: "Risk score", value: String(risk?.riskScore ?? 1) },
+          { label: "Repeat findings", value: String(risk?.repeatFindings ?? 0) },
+          {
+            label: "Closure",
+            value:
+              openRows.length > 0
+                ? `${openRows.length} ${plural(openRows.length, "finding", "findings")} still open`
+                : closedWithoutDate.length > 0
+                  ? `Closure date required on ${closedWithoutDate.length} closed ${plural(closedWithoutDate.length, "finding", "findings")}`
+                  : scoped.length > 0
+                    ? "All findings closed with a closure date"
+                    : "No findings to close",
+          },
+        ],
+      },
+    ];
+
+    return { ...base, steps, missing, initialStep, sections };
+  })();
+
   function setSort(nextKey: SortKey) {
     if (sortKey === nextKey) {
       setSortAsc((prev) => !prev);
@@ -1734,50 +1955,78 @@ function AuditsPageContent() {
     setMessage(`${newAuditNumber} created successfully.`);
   }
 
-  async function saveAuditChanges() {
-    if (!requireEditPermission("Saving audit changes")) return;
+  // Saves the given form to the selected audit. The Save button passes the form on screen; Mark Completed passes the same
+  // form with the status set to Completed. Returns true when the audit was saved.
+  async function persistAudit(targetForm: AuditForm): Promise<boolean> {
+    if (!requireEditPermission("Saving audit changes")) return false;
 
     if (!selectedAudit) {
       setMessage("Select an audit first.");
-      return;
+      return false;
     }
 
-    const validationError = validateAuditForm(detailForm);
+    const validationError = validateAuditForm(targetForm);
     if (validationError) {
       setMessage(validationError);
-      return;
+      return false;
     }
 
-    const nextAuditDate = detailForm.audit_date;
+    const nextAuditDate = targetForm.audit_date;
     const parsedDate = new Date(nextAuditDate);
     const nextMonth = Number.isNaN(parsedDate.getTime())
-      ? detailForm.audit_month
+      ? targetForm.audit_month
       : `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, "0")}`;
 
     const { error } = await supabase
       .from("audits")
       .update({
-        title: detailForm.title.trim(),
-        audit_type: detailForm.audit_type,
-        auditee: detailForm.auditee.trim(),
-        lead_auditor: detailForm.lead_auditor.trim(),
+        title: targetForm.title.trim(),
+        audit_type: targetForm.audit_type,
+        auditee: targetForm.auditee.trim(),
+        lead_auditor: targetForm.lead_auditor.trim(),
         audit_date: nextAuditDate || null,
         audit_month: nextMonth,
-        status: detailForm.status,
-        standards: detailForm.standards,
-        procedure_reference: detailForm.procedure_reference.trim() || null,
-        certification_body: detailForm.certification_body.trim() || null,
-        location: detailForm.location.trim() || null,
+        status: targetForm.status,
+        standards: targetForm.standards,
+        procedure_reference: targetForm.procedure_reference.trim() || null,
+        certification_body: targetForm.certification_body.trim() || null,
+        location: targetForm.location.trim() || null,
       })
       .eq("id", selectedAudit.id);
 
     if (error) {
       setMessage(`Update failed: ${error.message}`);
-      return;
+      return false;
     }
 
     await loadAudits(false);
     setMessage(`${selectedAudit.audit_number} updated successfully.`);
+    return true;
+  }
+
+  async function saveAuditChanges() {
+    await persistAudit(detailForm);
+  }
+
+  // Header button. It saves the audit with the status Completed through the same save as the Save Audit Changes button.
+  // Missing items are listed in a confirm box but never block it. Keep that choice here.
+  async function markAuditCompleted() {
+    if (!selectedAudit) return;
+    if (!requireEditPermission("Completing audits")) return;
+
+    const outstanding = auditWorkbench.missing.map((item) => item.label);
+    if (outstanding.length > 0) {
+      const proceed = window.confirm(
+        `${outstanding.length} item${outstanding.length === 1 ? " is" : "s are"} still missing: ${outstanding.join(", ")}. Mark completed anyway?`
+      );
+      if (!proceed) return;
+    }
+
+    const previousForm = detailForm;
+    const completedForm: AuditForm = { ...detailForm, status: "Completed" };
+    setDetailForm(completedForm);
+    const saved = await persistAudit(completedForm);
+    if (!saved) setDetailForm(previousForm);
   }
 
   async function saveLinkedItems(nextNcrs: string[], nextActions: string[]) {
@@ -3967,9 +4216,15 @@ function AuditsPageContent() {
       doc.setTextColor(83, 86, 90);
       doc.text(`${filteredAudits.length} audit${filteredAudits.length !== 1 ? "s" : ""}`, margin, 41);
       doc.text(`Generated: ${formatDateTime(new Date().toISOString())}`, pageWidth - margin, 41, { align: "right" });
+      const programmeFilters = programmeFilterDescriptions();
+      doc.text(
+        doc.splitTextToSize(`Filters: ${programmeFilters.length ? programmeFilters.join(" | ") : "none"}`, pageWidth - margin * 2)[0],
+        margin,
+        45.5
+      );
 
       autoTable(doc, {
-        startY: 47,
+        startY: 49,
         theme: "grid",
         margin: { left: margin, right: margin, bottom: 15 },
         head: [["Audit No.", "Title / Function", "Type", "Scheduled", "Audit Date", "Lead Auditor", "Major", "Minor", "OFI/OBS", "Status"]],
@@ -4026,6 +4281,122 @@ function AuditsPageContent() {
     } catch (error) {
       const err = error as Error;
       setMessage(`Audit Programme PDF generation failed: ${err.message}`);
+    }
+  }
+
+  // The filters that produced the Audit Programme on screen, in words, for the PDF and Excel exports.
+  function programmeFilterDescriptions() {
+    return [
+      ...(search.trim() ? [`Search: "${search.trim()}"`] : []),
+      ...(statusFilter !== "All" ? [`Status: ${statusFilter}`] : []),
+      ...(typeFilter !== "All" ? [`Type: ${typeFilter}`] : []),
+      ...(monthFilter !== "All" ? [`Month: ${formatMonth(monthFilter)}`] : []),
+      ...(auditQuickFilter === "Major" ? ["Audits with Major findings"] : []),
+      ...(linkedFindingStatus !== "All" ? [`Finding status: ${linkedFindingStatus}`] : []),
+      ...(linkedFindingCategory !== "All" ? [`Finding category: ${linkedFindingCategory}`] : []),
+    ];
+  }
+
+  function clearProgrammeFilters() {
+    setSearch("");
+    setStatusFilter("All");
+    setTypeFilter("All");
+    setMonthFilter("All");
+    setAuditQuickFilter("");
+    if (linkedFindingStatus !== "All" || linkedFindingCategory !== "All" || linkedSearch) {
+      // These come from the address (a link from a dashboard or another page), so the address is cleared too.
+      const params = new URLSearchParams(searchParams.toString());
+      ["findingStatus", "findingCategory", "search", "status", "type", "month", "quick", "q"].forEach((key) => params.delete(key));
+      router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+    }
+  }
+
+  async function exportProgrammeExcel() {
+    if (filteredAudits.length === 0) {
+      setMessage("There are no audits in the current filtered view to export.");
+      return;
+    }
+    try {
+      await downloadRegisterExcel<AuditRecord>({
+        fileName: `audit-programme-${excelDateStamp()}.xlsx`,
+        sheetName: "Audit Programme",
+        title: "Audit Programme - Enshore IMS",
+        filters: programmeFilterDescriptions(),
+        rows: filteredAudits,
+        columns: [
+          { header: "Audit No.", width: 14, value: (audit) => audit.audit_number },
+          { header: "Title / Function", width: 40, value: (audit) => audit.title },
+          { header: "Type", width: 11, value: (audit) => audit.audit_type },
+          { header: "Auditee", width: 24, value: (audit) => audit.auditee },
+          { header: "Scheduled", width: 16, value: (audit) => formatMonth(audit.audit_month) },
+          { header: "Audit Date", width: 13, value: (audit) => (audit.audit_date ? formatDate(audit.audit_date) : "") },
+          { header: "Lead Auditor", width: 22, value: (audit) => audit.lead_auditor },
+          { header: "Location", width: 20, value: (audit) => audit.location },
+          { header: "Standards", width: 30, value: (audit) => (audit.standards.length ? buildStandardsLabel(audit) : "") },
+          { header: "Major", width: 8, value: (audit) => audit.findings.major },
+          { header: "Minor", width: 8, value: (audit) => audit.findings.minor },
+          { header: "OFI", width: 8, value: (audit) => audit.findings.ofi },
+          { header: "OBS", width: 8, value: (audit) => audit.findings.obs },
+          { header: "Risk Score", width: 11, value: (audit) => auditRiskById[audit.id]?.riskScore ?? 1 },
+          { header: "Frequency Outcome", width: 18, value: (audit) => auditRiskById[audit.id]?.frequency || "Maintain" },
+          { header: "Status", width: 14, value: (audit) => getEffectiveAuditStatus(audit) },
+        ],
+      });
+      setMessage(`Audit Programme Excel report created with ${filteredAudits.length} audit${filteredAudits.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? `The Excel report could not be created: ${error.message}` : "The Excel report could not be created.");
+    }
+  }
+
+  function findingsRegisterFilterDescriptions() {
+    return [
+      `View: ${isClosedFindingsView ? "Closed findings" : "Open findings"}`,
+      ...(findingSearch.trim() ? [`Search: "${findingSearch.trim()}"`] : []),
+      ...(openFindingTypeFilter !== "All" ? [`Audit type: ${openFindingTypeFilter}`] : []),
+      ...(openFindingCategoryFilter !== "All" ? [`Category: ${openFindingCategoryFilter}`] : []),
+      ...(openFindingAuditTitleFilter !== "All" ? [`Audit title: ${openFindingAuditTitleFilter}`] : []),
+    ];
+  }
+
+  function clearFindingsFilters() {
+    setFindingSearch("");
+    setOpenFindingTypeFilter("All");
+    setOpenFindingCategoryFilter("All");
+    setOpenFindingAuditTitleFilter("All");
+  }
+
+  async function exportFindingsExcel() {
+    if (activeFindingsWorkspaceRows.length === 0) {
+      setMessage("There are no findings in the current view to export.");
+      return;
+    }
+    try {
+      await downloadRegisterExcel<OpenFindingRow>({
+        fileName: `audit-findings-${isClosedFindingsView ? "closed" : "open"}-${excelDateStamp()}.xlsx`,
+        sheetName: isClosedFindingsView ? "Closed Findings" : "Open Findings",
+        title: `${isClosedFindingsView ? "Closed" : "Open"} Audit Findings - Enshore IMS`,
+        filters: findingsRegisterFilterDescriptions(),
+        rows: activeFindingsWorkspaceRows,
+        columns: [
+          { header: "Finding Ref", width: 12, value: (finding) => finding.reference },
+          { header: "Audit Number", width: 14, value: (finding) => finding.audit_number },
+          { header: "Audit Title", width: 34, value: (finding) => finding.audit_title },
+          { header: "Audit Type", width: 11, value: (finding) => finding.audit_type },
+          { header: "Category", width: 10, value: (finding) => finding.category },
+          { header: "Clause", width: 14, value: (finding) => finding.clause },
+          { header: "Description", width: 60, value: (finding) => finding.description },
+          { header: "Owner", width: 20, value: (finding) => finding.owner },
+          { header: "Due Date", width: 13, value: (finding) => (finding.due_date ? formatDate(finding.due_date) : "") },
+          { header: "Status", width: 12, value: (finding) => finding.status },
+          { header: "Closure Date", width: 13, value: (finding) => (finding.closure_date ? formatDate(finding.closure_date) : "") },
+          { header: "Root Cause", width: 44, value: (finding) => finding.root_cause },
+          { header: "Containment Action", width: 44, value: (finding) => finding.containment_action },
+          { header: "Corrective Action", width: 44, value: (finding) => finding.corrective_action },
+        ],
+      });
+      setMessage(`Audit findings Excel report created with ${activeFindingsWorkspaceRows.length} finding${activeFindingsWorkspaceRows.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? `The Excel report could not be created: ${error.message}` : "The Excel report could not be created.");
     }
   }
 
@@ -4338,92 +4709,83 @@ function AuditsPageContent() {
               }
             >
               <div style={openFindingsHeaderStyle}>
-                <div style={openFindingsHeaderMetaStyle}>
-                  <div style={openFindingsSummaryStyle}>
-                    Showing <strong>{activeFindingsWorkspaceRows.length}</strong>{" "}
-                    {isClosedFindingsView ? "closed" : "open"} audit finding
-                    {activeFindingsWorkspaceRows.length === 1 ? "" : "s"} across <strong>{audits.length}</strong>{" "}
-                    audit{audits.length === 1 ? "" : "s"}.
-                  </div>
-                  <button
-                    type="button"
-                    style={showFindingsFilters ? secondaryButtonStyle : primaryButtonStyle}
-                    onClick={() => setShowFindingsFilters((prev) => !prev)}
-                  >
-                    {showFindingsFilters ? "Hide Filters" : "Show Filters"}
-                  </button>
+                <div style={openFindingsSummaryStyle}>
+                  Showing <strong>{activeFindingsWorkspaceRows.length}</strong> of{" "}
+                  <strong>{directFindingId ? openFindings.length + closedFindings.length : isClosedFindingsView ? closedFindings.length : openFindings.length}</strong>{" "}
+                  {isClosedFindingsView ? "closed" : "open"} audit finding
+                  {activeFindingsWorkspaceRows.length === 1 ? "" : "s"} across <strong>{audits.length}</strong>{" "}
+                  audit{audits.length === 1 ? "" : "s"}.
                 </div>
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                  <button
-                    type="button"
-                    style={primaryButtonStyle}
-                    onClick={() =>
-                      isClosedFindingsView ? generateClosedAuditNcrReport() : generateOpenAuditNcrReport()
-                    }
-                    disabled={generatingOpenFindingsReport}
-                  >
-                    {generatingOpenFindingsReport
-                      ? "Generating Report..."
-                      : isClosedFindingsView
-                        ? "Generate Closed Audit NCR Report"
-                        : "Generate Open Audit NCR Report"}
-                  </button>
-                  <button type="button" style={secondaryButtonStyle} onClick={() => setAuditView(null)}>
-                    Back to Audit Register
-                  </button>
-                </div>
+                <ImsButton variant="secondary" onClick={() => setAuditView(null)}>
+                  Back to Audit Register
+                </ImsButton>
               </div>
 
-              {showFindingsFilters ? (
-                <div className="ims-filter-panel" style={toolbarFiltersStyle}>
-                  <select
-                    value={openFindingTypeFilter}
-                    onChange={(e) => setOpenFindingTypeFilter(e.target.value as AuditType | "All")}
-                    style={{ ...toolbarSelectStyle, minWidth: "150px" }}
-                  >
-                    <option value="All">All Audit Types</option>
-                    <option value="Internal">Internal</option>
-                    <option value="External">External</option>
-                    <option value="Supplier">Supplier</option>
-                  </select>
-                  <select
-                    value={openFindingCategoryFilter}
-                    onChange={(e) =>
-                      setOpenFindingCategoryFilter(e.target.value as FindingSeverity | "All")
-                    }
-                    style={{ ...toolbarSelectStyle, minWidth: "150px" }}
-                  >
-                    <option value="All">All Categories</option>
-                    <option value="Major">Major</option>
-                    <option value="Minor">Minor</option>
-                    <option value="OFI">OFI</option>
-                    <option value="OBS">OBS</option>
-                  </select>
-                  <select
-                    value={openFindingAuditTitleFilter}
-                    onChange={(e) => setOpenFindingAuditTitleFilter(e.target.value)}
-                    style={{ ...toolbarSelectStyle, minWidth: "220px" }}
-                  >
-                    <option value="All">All Audit Titles</option>
-                    {findingAuditTitleOptions.map((title) => (
-                      <option key={title} value={title}>
-                        {title}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    style={secondaryButtonStyle}
-                    onClick={() => {
-                      setOpenFindingTypeFilter("All");
-                      setOpenFindingCategoryFilter("All");
-                      setOpenFindingAuditTitleFilter("All");
-                    }}
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              ) : null}
+              <ImsFilterPanel
+                search={findingSearch}
+                onSearchChange={setFindingSearch}
+                searchPlaceholder="Search finding ref, audit, description, owner, root cause..."
+                showFilters={showFindingsFilters}
+                onToggleFilters={() => setShowFindingsFilters((prev) => !prev)}
+                actions={
+                  <>
+                    <ImsButton variant="secondary" onClick={clearFindingsFilters}>Clear Filters</ImsButton>
+                    <ImsButton
+                      variant="primary"
+                      onClick={() => (isClosedFindingsView ? generateClosedAuditNcrReport() : generateOpenAuditNcrReport())}
+                      disabled={generatingOpenFindingsReport || activeFindingsWorkspaceRows.length === 0}
+                      title="Create a PDF of the findings currently shown"
+                    >
+                      {generatingOpenFindingsReport ? "Creating PDF..." : "Export PDF"}
+                    </ImsButton>
+                    <ImsButton
+                      variant="secondary"
+                      onClick={() => void exportFindingsExcel()}
+                      disabled={activeFindingsWorkspaceRows.length === 0}
+                      title="Download an Excel workbook of the findings currently shown"
+                    >
+                      Export Excel
+                    </ImsButton>
+                  </>
+                }
+              >
+                <select
+                  value={openFindingTypeFilter}
+                  onChange={(e) => setOpenFindingTypeFilter(e.target.value as AuditType | "All")}
+                  style={inputStyle}
+                  aria-label="Audit type"
+                >
+                  <option value="All">All Audit Types</option>
+                  <option value="Internal">Internal</option>
+                  <option value="External">External</option>
+                  <option value="Supplier">Supplier</option>
+                </select>
+                <select
+                  value={openFindingCategoryFilter}
+                  onChange={(e) => setOpenFindingCategoryFilter(e.target.value as FindingSeverity | "All")}
+                  style={inputStyle}
+                  aria-label="Category"
+                >
+                  <option value="All">All Categories</option>
+                  <option value="Major">Major</option>
+                  <option value="Minor">Minor</option>
+                  <option value="OFI">OFI</option>
+                  <option value="OBS">OBS</option>
+                </select>
+                <select
+                  value={openFindingAuditTitleFilter}
+                  onChange={(e) => setOpenFindingAuditTitleFilter(e.target.value)}
+                  style={inputStyle}
+                  aria-label="Audit title"
+                >
+                  <option value="All">All Audit Titles</option>
+                  {findingAuditTitleOptions.map((title) => (
+                    <option key={title} value={title}>
+                      {title}
+                    </option>
+                  ))}
+                </select>
+              </ImsFilterPanel>
 
               <div className="ims-register-shell" style={openFindingsTableWrapStyle}>
                 <div className="ims-register-head" style={openFindingsHeadStyle}>
@@ -4448,7 +4810,6 @@ function AuditsPageContent() {
                     </div>
                   ) : (
                     activeFindingsWorkspaceRows.map((finding) => {
-                      const tone = getFindingTone(finding.category);
                       const active = selectedOpenFindingId === finding.id;
 
                       return (
@@ -4468,9 +4829,7 @@ function AuditsPageContent() {
                           <div style={openFindingsCellMutedStyle}>{finding.audit_number}</div>
                           <div style={openFindingsTitleCellStyle}><span style={openFindingsClampStyle} title={finding.audit_title || undefined}>{finding.audit_title}</span></div>
                           <div>
-                            <span style={{ ...badgeStyle, background: tone.bg, color: tone.color }}>
-                              {finding.category}
-                            </span>
+                            <StatusPill label={finding.category} tone={findingCategoryTone(finding.category)} />
                           </div>
                           <div style={openFindingsBodyTextStyle}><span style={openFindingsClampStyle} title={finding.description || undefined}>{finding.description || "-"}</span></div>
                           <div style={openFindingsBodyTextStyle}><span style={openFindingsClampStyle} title={finding.owner || undefined}>{finding.owner || "-"}</span></div>
@@ -4479,15 +4838,7 @@ function AuditsPageContent() {
                             <div style={openFindingsCellMutedStyle}>{formatDate(finding.closure_date)}</div>
                           ) : (
                             <div>
-                              <span
-                                style={{
-                                  ...badgeStyle,
-                                  background: getStatusTone(finding.status).bg,
-                                  color: getStatusTone(finding.status).color,
-                                }}
-                              >
-                                {finding.status}
-                              </span>
+                              <StatusPill label={finding.status} tone={toneForStatus(finding.status)} />
                             </div>
                           )}
                           <div style={openFindingsBodyTextStyle}><span style={openFindingsClampStyle} title={finding.root_cause || undefined}>{finding.root_cause || "-"}</span></div>
@@ -4837,66 +5188,58 @@ function AuditsPageContent() {
       {activeView === "programme" ? (
       <section style={tableLayoutStyle}>
         <SectionCard title="Audit Programme" subtitle="Main working view with schedule, findings summary, and risk-based frequency outcome.">
-          <div className="ims-filter-panel" style={toolbarStyle}>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={toolbarSearchStyle}
-              placeholder="Search audit number, title, auditor, standard, linked NCR/action..."
-            />
-
-            <button
-              type="button"
-              onClick={() => setShowProgrammeFilters((current) => !current)}
-              style={showProgrammeFilters ? secondaryButtonStyle : primaryButtonStyle}
+          <ImsFilterPanel
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search audit number, title, auditor, standard, linked NCR/action..."
+            showFilters={showProgrammeFilters}
+            onToggleFilters={() => setShowProgrammeFilters((current) => !current)}
+            actions={
+              <>
+                <ImsButton variant="secondary" onClick={clearProgrammeFilters}>Clear Filters</ImsButton>
+                <ImsButton variant="primary" onClick={generateProgrammePdf} disabled={filteredAudits.length === 0} title="Create a PDF of the audits currently shown">Export PDF</ImsButton>
+                <ImsButton variant="secondary" onClick={() => void exportProgrammeExcel()} disabled={filteredAudits.length === 0} title="Download an Excel workbook of the audits currently shown">Export Excel</ImsButton>
+              </>
+            }
+          >
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as AuditStatus | "All");
+                setAuditQuickFilter("");
+              }}
+              style={inputStyle}
+              aria-label="Status"
             >
-              {showProgrammeFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-          </div>
+              <option value="All">All Status</option>
+              <option value="Planned">Planned</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Overdue">Overdue</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
 
-          {showProgrammeFilters ? (
-            <div className="ims-filter-panel" style={toolbarFiltersStyle}>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as AuditStatus | "All");
-                  setAuditQuickFilter("");
-                }}
-                style={toolbarSelectStyle}
-              >
-                <option value="All">All Status</option>
-                <option value="Planned">Planned</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Overdue">Overdue</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as AuditType | "All")}
+              style={inputStyle}
+              aria-label="Type"
+            >
+              <option value="All">All Types</option>
+              <option value="Internal">Internal</option>
+              <option value="External">External</option>
+              <option value="Supplier">Supplier</option>
+            </select>
 
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as AuditType | "All")}
-                style={toolbarSelectStyle}
-              >
-                <option value="All">All Types</option>
-                <option value="Internal">Internal</option>
-                <option value="External">External</option>
-                <option value="Supplier">Supplier</option>
-              </select>
-
-              <select
-                value={monthFilter}
-                onChange={(e) => setMonthFilter(e.target.value)}
-                style={toolbarSelectStyle}
-              >
-                <option value="All">All Months</option>
-                {monthOptions.map((month) => (
-                  <option key={month} value={month}>
-                    {formatMonth(month)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
+            <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} style={inputStyle} aria-label="Month">
+              <option value="All">All Months</option>
+              {monthOptions.map((month) => (
+                <option key={month} value={month}>
+                  {formatMonth(month)}
+                </option>
+              ))}
+            </select>
+          </ImsFilterPanel>
 
           <div style={sortChipRowStyle}>
             <SortChip label="Scheduled" active={sortKey === "audit_month"} asc={sortAsc} onClick={() => setSort("audit_month")} />
@@ -4909,9 +5252,6 @@ function AuditsPageContent() {
 
           <div style={programmeInfoStyle}>
             <span>Showing <strong>{filteredAudits.length}</strong> of <strong>{audits.length}</strong> audits</span>
-            <button type="button" onClick={generateProgrammePdf} style={pdfButtonStyle}>
-              Download PDF
-            </button>
           </div>
 
           <div ref={programmeSectionRef} tabIndex={-1} className="ims-register-shell" style={programmeTableWrapStyle}>
@@ -4971,20 +5311,13 @@ function AuditsPageContent() {
                     <div style={programmeFindingsStyle}>{audit.findings.ofi + audit.findings.obs}</div>
                     <div style={programmeRiskCellStyle}>{auditRiskById[audit.id]?.riskScore ?? 1}</div>
                     <div>
-                      <span style={getFrequencyBadgeStyle(auditRiskById[audit.id]?.frequency || "Maintain")}>
-                        {auditRiskById[audit.id]?.frequency || "Maintain"}
-                      </span>
+                      <StatusPill
+                        label={auditRiskById[audit.id]?.frequency || "Maintain"}
+                        tone={frequencyTone(auditRiskById[audit.id]?.frequency || "Maintain")}
+                      />
                     </div>
                     <div>
-                      <span
-                        style={{
-                          ...badgeStyle,
-                          background: getStatusTone(effectiveStatus).bg,
-                          color: getStatusTone(effectiveStatus).color,
-                        }}
-                      >
-                        {effectiveStatus}
-                      </span>
+                      <StatusPill label={effectiveStatus} tone={toneForStatus(effectiveStatus)} />
                     </div>
                   </button>
                 );
@@ -4996,108 +5329,42 @@ function AuditsPageContent() {
         {selectedAudit ? (
           <div ref={auditDetailPanelRef}>
             <SectionCard title="Audit Detail" subtitle="Editable workspace for the selected audit.">
-              <div style={detailWorkspaceStyle}>
-              <div style={detailTopBarStyle}>
-                <div>
-                  <div style={detailAuditNumberStyle}>{selectedAudit.audit_number}</div>
-                  <h3 style={detailAuditTitleStyle}>{selectedAudit.title}</h3>
-                </div>
-
-                <div style={detailTopActionsStyle}>
-                  <span
-                    style={{
-                      ...badgeStyle,
-                      background: getStatusTone(selectedAudit.status).bg,
-                      color: getStatusTone(selectedAudit.status).color,
-                    }}
-                  >
-                    {selectedAudit.status}
-                  </span>
-                  <button type="button" style={secondaryButtonStyle} onClick={hideDetailPanel}>
-                    Hide Panel
-                  </button>
-                </div>
-              </div>
-
-              <div style={topUploadStripStyle}>
-                <div style={topUploadMetaStyle}>
-                  <div style={topUploadTitleStyle}>Audit Documents</div>
-                  <div style={topUploadFileStyle}>
-                    {selectedAuditFiles.length === 0
-                      ? "No audit documents uploaded"
-                      : `${selectedAuditFiles.length} audit document${selectedAuditFiles.length === 1 ? "" : "s"} linked`}
-                  </div>
-                  <div style={topUploadSubStyle}>
-                    {selectedAuditFiles.length > 0
-                      ? `${formatFileSize(selectedAudit.report_file_size)} • Uploaded ${formatDateTime(
-                          selectedAudit.report_uploaded_at
-                        )}`
-                      : "Upload the signed or issued report here so it is visible straight away."}
-                  </div>
-                </div>
-
-                <div style={topUploadButtonsStyle}>
-                  <label style={uploadButtonStyle}>
-                    <span style={{ color: "#ffffff", fontWeight: 700, pointerEvents: "none" }}>
-                      {isUploadingReport ? "Uploading..." : "Upload document"}
-                    </span>
-                    <input
-                      type="file"
-                      accept={IMS_DOCUMENT_ACCEPT}
-                      onChange={handleReportUpload}
-                      style={{ display: "none" }}
-                      disabled={isUploadingReport || !canEditAudit}
-                    />
-                  </label>
-
-                </div>
-              </div>
-
-              <div style={auditDocumentListStyle}>
-                {selectedAuditFiles.length > 0 ? (
-                  selectedAuditFiles.map((file) => (
-                    <div key={file.id} style={auditDocumentRowStyle}>
-                      <div style={auditDocumentMetaStyle}>
-                        <div style={auditDocumentNameStyle}>{file.file_name || "Unnamed file"}</div>
-                        <div style={auditDocumentSubStyle}>
-                          {[formatFileSize(file.file_size), `Uploaded ${formatDateTime(file.uploaded_at || "")}`]
-                            .filter((value) => value && value !== "-")
-                            .join(" • ") || "Uploaded file"}
-                        </div>
-                      </div>
-                      <div style={auditDocumentActionsStyle}>
-                        <button
-                          type="button"
-                          onClick={() => void openAuditFile(file)}
-                          style={reportLinkButtonStyle}
-                        >
-                          Open / View
-                        </button>
-                        <button
-                          type="button"
-                          style={secondaryButtonStyle}
-                          onClick={() => void removeAuditFile(file)}
-                          disabled={!canEditAudit}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div style={auditDocumentEmptyStyle}>
-                    No audit documents linked yet. Upload the PDF and Word versions here as separate files.
-                  </div>
-                )}
-              </div>
-
-              <div style={miniKpiGridStyle}>
-                <MiniStat label="Major" value={selectedAudit.findings.major} tone="#F93822" bg="#ECECE7" />
-                <MiniStat label="Minor" value={selectedAudit.findings.minor} tone="#000000" bg="#ECECE7" />
-                <MiniStat label="OFI" value={selectedAudit.findings.ofi} tone="#005670" bg="#ECECE7" />
-                <MiniStat label="OBS" value={selectedAudit.findings.obs} tone="#005670" bg="#ECECE7" />
-              </div>
-
+              <RecordWorkbench
+                key={selectedAudit.id}
+                header={
+                  <RecordHeader
+                    id={selectedAudit.audit_number}
+                    title={selectedAudit.title}
+                    status={{ label: getEffectiveAuditStatus(selectedAudit), tone: toneForStatus(getEffectiveAuditStatus(selectedAudit)) }}
+                    track={{ steps: ["Planned", "In Progress", "Completed"], current: selectedAudit.status }}
+                    note={canEditAudit ? undefined : "You can view this audit but not change it."}
+                    actions={
+                      <>
+                        {selectedAudit.status !== "Completed" && selectedAudit.status !== "Cancelled" ? (
+                          <ImsButton
+                            variant="primary"
+                            onClick={() => void markAuditCompleted()}
+                            disabled={!canEditAudit}
+                            title="Saves this audit with the status Completed. Anything still missing is listed first, and you can carry on."
+                          >
+                            Mark Completed
+                          </ImsButton>
+                        ) : null}
+                        <ImsButton variant="secondary" onClick={hideDetailPanel}>
+                          Hide Panel
+                        </ImsButton>
+                      </>
+                    }
+                  />
+                }
+                steps={auditWorkbench.steps}
+                initialStep={auditWorkbench.initialStep}
+                missing={auditWorkbench.missing}
+                gate="this audit is completed"
+                reportLabel="Audit report"
+                side={<DocPreview title="Audit report" sections={auditWorkbench.sections} />}
+              >
+              <WorkbenchStep stepKey="plan">
                 <div style={detailSectionStyle}>
                   <ModuleSectionHeader title="Audit Record" />
 
@@ -5233,91 +5500,87 @@ function AuditsPageContent() {
                 </div>
 
                 <div style={detailButtonRowStyle}>
-                  <button type="button" style={primaryButtonStyle} onClick={saveAuditChanges} disabled={!canEditAudit}>
+                  <button type="button" style={primaryButtonStyle} onClick={() => void saveAuditChanges()} disabled={!canEditAudit}>
                     Save Audit Changes
-                  </button>
-                  <button type="button" style={secondaryButtonStyle} onClick={() => void generateAuditPdf()} disabled={generatingAuditPdf}>
-                    {generatingAuditPdf ? "Generating PDF..." : "Generate PDF Report"}
-                  </button>
-                  <button type="button" style={secondaryButtonStyle} onClick={openRaiseFinding} disabled={!canCreateAudit}>
-                    Raise Finding
                   </button>
                   <button type="button" style={dangerButtonStyle} onClick={deleteSelectedAudit} disabled={!canEditAudit}>
                     Delete Audit
                   </button>
                 </div>
               </div>
+              </WorkbenchStep>
 
+              <WorkbenchStep stepKey="conduct">
                 <div style={detailSectionStyle}>
-                  <ModuleSectionHeader title="Linked Items" />
-
-                <div style={linkPickerGridStyle}>
-                  <Field label="Add Linked NCR">
-                    <div style={pickerRowStyle}>
-                      <select
-                        value={selectedNcrToAdd}
-                        onChange={(e) => setSelectedNcrToAdd(e.target.value)}
-                        style={inputStyle}
-                      >
-                        <option value="">Select NCR</option>
-                        {ncrOptions.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        style={secondaryButtonStyle}
-                        onClick={() => void addLinkedNcr()}
-                        disabled={isSavingLinks || !canEditAudit}
-                      >
-                        + Add
-                      </button>
+                  <ModuleSectionHeader title="Word loop" />
+                  <p style={emptyTextStyle}>
+                    Send each finding to its owner as a Word document, then upload the completed copy when it comes back. You review what changed before anything is applied.
+                  </p>
+                  {selectedFindings.length === 0 ? (
+                    <p style={{ ...emptyTextStyle, marginTop: "10px" }}>No findings raised yet, so there is nothing to send. Raise findings in the Findings step.</p>
+                  ) : (
+                    <div style={{ ...findingListStyle, marginTop: "12px" }}>
+                      {selectedFindings.map((finding) => {
+                        const returned = hasReturnedWord(finding);
+                        return (
+                          <div key={finding.id} style={findingCardStyle}>
+                            <div style={findingHeadStyle}>
+                              <div>
+                                <div style={findingRefStyle}>{finding.reference}</div>
+                                <div style={findingClauseStyle}>{finding.clause}</div>
+                              </div>
+                              <div style={findingBadgeWrapStyle}>
+                                <StatusPill label={finding.category} tone={findingCategoryTone(finding.category)} />
+                                <StatusPill label={returned ? "Word returned" : "Word not returned"} tone={returned ? "ok" : "warn"} />
+                              </div>
+                            </div>
+                            <div style={findingCardActionsStyle}>
+                              <button
+                                type="button"
+                                style={secondaryButtonStyle}
+                                onClick={() => void generateFindingWord(finding)}
+                                disabled={Boolean(generatingFindingWordId)}
+                              >
+                                {generatingFindingWordId === finding.id ? "Generating Word..." : "Generate Word report"}
+                              </button>
+                              <label style={uploadButtonStyle}>
+                                <span style={{ color: "#ffffff", fontWeight: 700, pointerEvents: "none" }}>
+                                  {importingFindingWordId === finding.id ? "Reading completed Word..." : "Upload completed Word"}
+                                </span>
+                                <input
+                                  type="file"
+                                  accept=".docx"
+                                  style={{ display: "none" }}
+                                  disabled={Boolean(importingFindingWordId) || !canEditAudit}
+                                  onChange={(event) => void handleCompletedFindingUpload(finding, event)}
+                                />
+                              </label>
+                            </div>
+                            {renderFindingImportPreview(finding)}
+                          </div>
+                        );
+                      })}
                     </div>
-                  </Field>
-
-                  <Field label="Add Linked Action">
-                    <div style={pickerRowStyle}>
-                      <select
-                        value={selectedActionToAdd}
-                        onChange={(e) => setSelectedActionToAdd(e.target.value)}
-                        style={inputStyle}
-                      >
-                        <option value="">Select Action</option>
-                        {actionOptions.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        style={secondaryButtonStyle}
-                        onClick={() => void addLinkedAction()}
-                        disabled={isSavingLinks || !canEditAudit}
-                      >
-                        + Add
-                      </button>
-                    </div>
-                  </Field>
+                  )}
                 </div>
+              </WorkbenchStep>
 
-                <div style={linkedBlocksGridStyle}>
-                  <EditableLinkGroup
-                    title="Linked NCRs"
-                    items={selectedAudit.linked_ncrs}
-                    hrefBuilder={(item) => `/ncr-capa?search=${encodeURIComponent(item)}`}
-                    onRemove={(item) => void removeLinkedNcr(item)}
-                  />
-                  <EditableLinkGroup
-                    title="Linked Actions"
-                    items={selectedAudit.linked_actions}
-                    hrefBuilder={(item) => `/actions?search=${encodeURIComponent(item)}`}
-                    onRemove={(item) => void removeLinkedAction(item)}
-                  />
-                </div>
+              <WorkbenchStep stepKey="findings">
+              <div style={miniKpiGridStyle}>
+                <MiniStat label="Major" value={selectedAudit.findings.major} tone="#F93822" bg="#ECECE7" />
+                <MiniStat label="Minor" value={selectedAudit.findings.minor} tone="#000000" bg="#ECECE7" />
+                <MiniStat label="OFI" value={selectedAudit.findings.ofi} tone="#005670" bg="#ECECE7" />
+                <MiniStat label="OBS" value={selectedAudit.findings.obs} tone="#005670" bg="#ECECE7" />
               </div>
+
+                <div style={detailButtonRowStyle}>
+                  <button type="button" style={secondaryButtonStyle} onClick={openRaiseFinding} disabled={!canCreateAudit}>
+                    Raise Finding
+                  </button>
+                  <button type="button" style={secondaryButtonStyle} onClick={() => switchAuditWorkspaceView("findings")}>
+                    Open Findings tab (all audits)
+                  </button>
+                </div>
 
               {showFindingForm && (
                   <div style={detailSectionStyle}>
@@ -5470,8 +5733,6 @@ function AuditsPageContent() {
                 ) : (
                   <div style={findingListStyle}>
                     {selectedFindings.map((finding) => {
-                      const tone = getFindingTone(finding.category);
-
                       return (
                         <div key={finding.id} style={findingCardStyle}>
                           <div style={findingHeadStyle}>
@@ -5481,18 +5742,8 @@ function AuditsPageContent() {
                             </div>
 
                             <div style={findingBadgeWrapStyle}>
-                              <span style={{ ...badgeStyle, background: tone.bg, color: tone.color }}>
-                                {finding.category}
-                              </span>
-                              <span
-                                style={{
-                                  ...badgeStyle,
-                                  background: getStatusTone(finding.status).bg,
-                                  color: getStatusTone(finding.status).color,
-                                }}
-                              >
-                                {finding.status}
-                              </span>
+                              <StatusPill label={finding.category} tone={findingCategoryTone(finding.category)} />
+                              <StatusPill label={finding.status} tone={toneForStatus(finding.status)} />
                             </div>
                           </div>
 
@@ -5617,7 +5868,198 @@ function AuditsPageContent() {
                   </div>
                 )}
               </div>
-            </div>
+              </WorkbenchStep>
+
+              <WorkbenchStep stepKey="closeout">
+                <div style={detailSectionStyle}>
+                  <ModuleSectionHeader title="Outcome" />
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "10px" }}>
+                    <MiniStat label="Risk score" value={auditRiskById[selectedAudit.id]?.riskScore ?? 1} tone="#005670" bg="#ECECE7" />
+                    <MiniStat label="Repeat findings" value={auditRiskById[selectedAudit.id]?.repeatFindings ?? 0} tone="#000000" bg="#ECECE7" />
+                    <MiniStat label="Open findings" value={auditWorkbench.openRows.length} tone={auditWorkbench.openRows.length > 0 ? "#F93822" : "#005670"} bg="#ECECE7" />
+                    <MiniStat label="Closed findings" value={auditWorkbench.closedRows.length} tone="#005670" bg="#ECECE7" />
+                  </div>
+                  <div style={{ display: "grid", gap: "8px", marginTop: "12px" }}>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                      <strong>Frequency outcome</strong>
+                      <StatusPill
+                        label={auditRiskById[selectedAudit.id]?.frequency || "Maintain"}
+                        tone={frequencyTone(auditRiskById[selectedAudit.id]?.frequency || "Maintain")}
+                      />
+                      <span style={emptyTextStyle}>Worked out from this audit&apos;s findings and repeats.</span>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                      <strong>Closure dates</strong>
+                      <StatusPill
+                        label={auditWorkbench.closedWithoutDate.length > 0 ? "Missing" : "Complete"}
+                        tone={auditWorkbench.closedWithoutDate.length > 0 ? "warn" : "ok"}
+                      />
+                      <span style={emptyTextStyle}>
+                        {auditWorkbench.closedWithoutDate.length > 0
+                          ? `A closure date is required on ${auditWorkbench.closedWithoutDate.length} closed finding${auditWorkbench.closedWithoutDate.length === 1 ? "" : "s"}.`
+                          : "Every closed finding has a closure date."}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={detailButtonRowStyle}>
+                    <button type="button" style={primaryButtonStyle} onClick={() => void saveAuditChanges()} disabled={!canEditAudit}>
+                      Save Audit Changes
+                    </button>
+                    <button type="button" style={secondaryButtonStyle} onClick={() => void generateAuditPdf()} disabled={generatingAuditPdf}>
+                      {generatingAuditPdf ? "Generating PDF..." : "Generate PDF Report"}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={detailSectionStyle}>
+                  <ModuleSectionHeader title="Audit Documents" />
+                  <div style={{ display: "grid", gap: "16px" }}>
+              <div style={topUploadStripStyle}>
+                <div style={topUploadMetaStyle}>
+                  <div style={topUploadTitleStyle}>Audit Documents</div>
+                  <div style={topUploadFileStyle}>
+                    {selectedAuditFiles.length === 0
+                      ? "No audit documents uploaded"
+                      : `${selectedAuditFiles.length} audit document${selectedAuditFiles.length === 1 ? "" : "s"} linked`}
+                  </div>
+                  <div style={topUploadSubStyle}>
+                    {selectedAuditFiles.length > 0
+                      ? `${formatFileSize(selectedAudit.report_file_size)} • Uploaded ${formatDateTime(
+                          selectedAudit.report_uploaded_at
+                        )}`
+                      : "Upload the signed or issued report here so it is visible straight away."}
+                  </div>
+                </div>
+
+                <div style={topUploadButtonsStyle}>
+                  <label style={uploadButtonStyle}>
+                    <span style={{ color: "#ffffff", fontWeight: 700, pointerEvents: "none" }}>
+                      {isUploadingReport ? "Uploading..." : "Upload document"}
+                    </span>
+                    <input
+                      type="file"
+                      accept={IMS_DOCUMENT_ACCEPT}
+                      onChange={handleReportUpload}
+                      style={{ display: "none" }}
+                      disabled={isUploadingReport || !canEditAudit}
+                    />
+                  </label>
+
+                </div>
+              </div>
+
+              <div style={auditDocumentListStyle}>
+                {selectedAuditFiles.length > 0 ? (
+                  selectedAuditFiles.map((file) => (
+                    <div key={file.id} style={auditDocumentRowStyle}>
+                      <div style={auditDocumentMetaStyle}>
+                        <div style={auditDocumentNameStyle}>{file.file_name || "Unnamed file"}</div>
+                        <div style={auditDocumentSubStyle}>
+                          {[formatFileSize(file.file_size), `Uploaded ${formatDateTime(file.uploaded_at || "")}`]
+                            .filter((value) => value && value !== "-")
+                            .join(" • ") || "Uploaded file"}
+                        </div>
+                      </div>
+                      <div style={auditDocumentActionsStyle}>
+                        <button
+                          type="button"
+                          onClick={() => void openAuditFile(file)}
+                          style={reportLinkButtonStyle}
+                        >
+                          Open / View
+                        </button>
+                        <button
+                          type="button"
+                          style={secondaryButtonStyle}
+                          onClick={() => void removeAuditFile(file)}
+                          disabled={!canEditAudit}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={auditDocumentEmptyStyle}>
+                    No audit documents linked yet. Upload the PDF and Word versions here as separate files.
+                  </div>
+                )}
+              </div>
+                  </div>
+                </div>
+
+                <div style={detailSectionStyle}>
+                  <ModuleSectionHeader title="Linked Items" />
+
+                <div style={linkPickerGridStyle}>
+                  <Field label="Add Linked NCR">
+                    <div style={pickerRowStyle}>
+                      <select
+                        value={selectedNcrToAdd}
+                        onChange={(e) => setSelectedNcrToAdd(e.target.value)}
+                        style={inputStyle}
+                      >
+                        <option value="">Select NCR</option>
+                        {ncrOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={() => void addLinkedNcr()}
+                        disabled={isSavingLinks || !canEditAudit}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </Field>
+
+                  <Field label="Add Linked Action">
+                    <div style={pickerRowStyle}>
+                      <select
+                        value={selectedActionToAdd}
+                        onChange={(e) => setSelectedActionToAdd(e.target.value)}
+                        style={inputStyle}
+                      >
+                        <option value="">Select Action</option>
+                        {actionOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        style={secondaryButtonStyle}
+                        onClick={() => void addLinkedAction()}
+                        disabled={isSavingLinks || !canEditAudit}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </Field>
+                </div>
+
+                <div style={linkedBlocksGridStyle}>
+                  <EditableLinkGroup
+                    title="Linked NCRs"
+                    items={selectedAudit.linked_ncrs}
+                    hrefBuilder={(item) => `/ncr-capa?search=${encodeURIComponent(item)}`}
+                    onRemove={(item) => void removeLinkedNcr(item)}
+                  />
+                  <EditableLinkGroup
+                    title="Linked Actions"
+                    items={selectedAudit.linked_actions}
+                    hrefBuilder={(item) => `/actions?search=${encodeURIComponent(item)}`}
+                    onRemove={(item) => void removeLinkedAction(item)}
+                  />
+                </div>
+              </div>
+              </WorkbenchStep>
+              </RecordWorkbench>
           </SectionCard>
           </div>
         ) : null}
@@ -6569,13 +7011,6 @@ const openFindingsHeaderStyle: CSSProperties = {
   marginBottom: "14px",
 };
 
-const openFindingsHeaderMetaStyle: CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-  alignItems: "center",
-};
-
 const openFindingsSummaryStyle: CSSProperties = {
   color: "#53565A",
   fontSize: "14px",
@@ -7157,31 +7592,6 @@ const compactProblemMetaStyle: CSSProperties = {
   lineHeight: 1.4,
 };
 
-const toolbarStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
-  alignItems: "end",
-  marginBottom: "14px",
-  padding: "12px",
-  border: "1px solid #D0D0CE",
-  borderRadius: "16px",
-  background: "rgba(248,250,252,0.92)",
-  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
-};
-
-const toolbarSearchStyle: CSSProperties = {
-  ...inputStyle,
-  maxWidth: "460px",
-  flex: "1 1 340px",
-};
-
-const toolbarFiltersStyle: CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-};
-
 const toolbarSelectStyle: CSSProperties = {
   ...inputStyle,
   minWidth: "150px",
@@ -7214,18 +7624,6 @@ const programmeInfoStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 700,
   margin: "0 0 12px",
-};
-
-const pdfButtonStyle: CSSProperties = {
-  padding: "6px 14px",
-  borderRadius: 999,
-  border: "none",
-  background: "#005670",
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: "12px",
-  cursor: "pointer",
-  flexShrink: 0,
 };
 
 const programmeTableWrapStyle: CSSProperties = {
@@ -7333,41 +7731,6 @@ const programmeRiskCellStyle: CSSProperties = {
   fontWeight: 800,
   color: "#000000",
   textAlign: "center",
-};
-
-const detailWorkspaceStyle: CSSProperties = {
-  display: "grid",
-  gap: "16px",
-  maxHeight: "1320px",
-  overflowY: "auto",
-  paddingRight: "4px",
-};
-
-const detailTopBarStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "10px",
-  alignItems: "flex-start",
-  flexWrap: "wrap",
-};
-
-const detailTopActionsStyle: CSSProperties = {
-  display: "flex",
-  gap: "8px",
-  flexWrap: "wrap",
-  alignItems: "center",
-};
-
-const detailAuditNumberStyle: CSSProperties = {
-  fontSize: "13px",
-  fontWeight: 800,
-  color: "#53565A",
-};
-
-const detailAuditTitleStyle: CSSProperties = {
-  margin: "4px 0 0 0",
-  fontSize: "20px",
-  color: "#000000",
 };
 
 const topUploadStripStyle: CSSProperties = {

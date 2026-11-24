@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import * as XLSX from "xlsx";
 import { QualityPageHero } from "../../src/components/QualityPageHero";
-import { imsBackLinkStyle } from "../../src/components/imsTheme";
+import { imsBackLinkStyle, imsButtonBaseStyle } from "../../src/components/imsTheme";
 import { supabase } from "../../src/lib/supabase";
 import { useUrlState } from "../../src/lib/useUrlState";
 
@@ -929,14 +929,9 @@ const filterChipActiveStyle: CSSProperties = {
 };
 
 const addPersonButtonStyle: CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#005670",
   color: "#ffffff",
-  border: "none",
-  borderRadius: "10px",
-  padding: "10px 12px",
-  fontWeight: 800,
-  fontSize: "13px",
-  cursor: "pointer",
   width: "100%",
 };
 
@@ -1090,7 +1085,7 @@ const fieldLabelStyle: CSSProperties = {
 
 const inputStyle: CSSProperties = {
   width: "100%",
-  height: "46px",
+  minHeight: "42px",
   borderRadius: "10px",
   border: "1px solid #D0D0CE",
   padding: "10px 12px",
@@ -1122,58 +1117,35 @@ const buttonRowStyleTight: CSSProperties = {
 };
 
 const primaryButtonStyle: CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#005670",
   color: "#ffffff",
-  border: "none",
-  borderRadius: "10px",
-  padding: "10px 16px",
-  fontWeight: 800,
-  fontSize: "13px",
-  cursor: "pointer",
 };
 
 const secondaryButtonStyle: CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#D0D0CE",
   color: "#000000",
-  border: "none",
-  borderRadius: "10px",
-  padding: "9px 12px",
-  fontWeight: 700,
-  fontSize: "12px",
-  cursor: "pointer",
 };
 
 const miniButtonStyle: CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#005670",
   color: "#ffffff",
-  border: "none",
-  borderRadius: "10px",
-  padding: "9px 12px",
-  fontWeight: 700,
-  fontSize: "12px",
-  cursor: "pointer",
 };
 
 const dangerButtonStyle: CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#ECECE7",
   color: "#F93822",
   border: "1px solid #ECECE7",
-  borderRadius: "10px",
-  padding: "9px 12px",
-  fontWeight: 700,
-  fontSize: "12px",
-  cursor: "pointer",
 };
 
 const deleteButtonStyle: CSSProperties = {
+  ...imsButtonBaseStyle,
   background: "#F93822",
   color: "#ffffff",
   border: "1px solid #F93822",
-  borderRadius: "10px",
-  padding: "9px 12px",
-  fontWeight: 700,
-  fontSize: "12px",
-  cursor: "pointer",
 };
 
 const importPanelStyle: CSSProperties = {

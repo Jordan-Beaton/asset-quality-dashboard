@@ -3069,7 +3069,7 @@ function DocumentsPageContent() {
           {missingReviewDate > 0 && (
             <div
               style={{
-                background: "#FFF8E6",
+                background: "var(--ims-warn-bg)",
                 border: "1px solid #FFAD00",
                 borderRadius: "10px",
                 padding: "12px 16px",
@@ -3082,12 +3082,12 @@ function DocumentsPageContent() {
             >
               <span style={{ fontSize: "15px", flexShrink: 0 }}>⚠</span>
               <span style={{ color: "#000000" }}>
-                <strong style={{ color: "#996600" }}>{missingReviewDate} live document{missingReviewDate !== 1 ? "s" : ""}</strong>
+                <strong style={{ color: "var(--ims-warn-ink)" }}>{missingReviewDate} live document{missingReviewDate !== 1 ? "s" : ""}</strong>
                 {" "}have no review date set — they will never appear as overdue without one.
               </span>
               <button
                 type="button"
-                style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 700, color: "#996600", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "2px", whiteSpace: "nowrap" }}
+                style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 700, color: "var(--ims-warn-ink)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "2px", whiteSpace: "nowrap" }}
                 onClick={() => applySnapshotFilter({ missingReviewDate: true })}
               >
                 Filter &amp; fix →
@@ -3162,11 +3162,11 @@ function DocumentsPageContent() {
               <SectionCard title="Workflow Queue" subtitle="Documents moving through review and approval.">
                 <div style={{ display: "grid", gap: "0" }}>
                   {[
-                    { label: "Pending Review", count: pendingReviewCount, pillColor: "#FFAD00", pillBg: "#FFF8E6", onClick: () => switchWorkspaceView("workflow") },
-                    { label: "Reviewed — awaiting approval", count: reviewedCount, pillColor: "#FFAD00", pillBg: "#FFF8E6", onClick: () => switchWorkspaceView("workflow") },
-                    { label: "Pending Approval", count: pendingApprovalCount, pillColor: "#F93822", pillBg: "#FEF0EE", onClick: () => switchWorkspaceView("workflow") },
-                    { label: "Rejected — needs rework", count: rejectedCount, pillColor: "#F93822", pillBg: "#FEF0EE", onClick: () => switchWorkspaceView("workflow") },
-                    { label: "Archived / Superseded", count: archiveDocuments.length, pillColor: "#53565A", pillBg: "#ECECE7", onClick: () => switchWorkspaceView("archive") },
+                    { label: "Pending Review", count: pendingReviewCount, pillColor: "var(--ims-warn-ink)", pillBg: "var(--ims-warn-bg)", onClick: () => switchWorkspaceView("workflow") },
+                    { label: "Reviewed — awaiting approval", count: reviewedCount, pillColor: "var(--ims-warn-ink)", pillBg: "var(--ims-warn-bg)", onClick: () => switchWorkspaceView("workflow") },
+                    { label: "Pending Approval", count: pendingApprovalCount, pillColor: "var(--ims-bad-ink)", pillBg: "var(--ims-bad-bg)", onClick: () => switchWorkspaceView("workflow") },
+                    { label: "Rejected — needs rework", count: rejectedCount, pillColor: "var(--ims-bad-ink)", pillBg: "var(--ims-bad-bg)", onClick: () => switchWorkspaceView("workflow") },
+                    { label: "Archived / Superseded", count: archiveDocuments.length, pillColor: "var(--ims-neu-ink)", pillBg: "var(--ims-neu-bg)", onClick: () => switchWorkspaceView("archive") },
                   ].map(({ label, count, pillColor, pillBg, onClick }, i, arr) => (
                     <button
                       key={label}
@@ -3771,16 +3771,16 @@ function DocumentsPageContent() {
                         width: "28px", height: "28px", borderRadius: "50%",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "11px", fontWeight: 700,
-                        background: i < stageIndex ? "#63B1BC" : i === stageIndex ? "#005670" : "#F4F3F0",
-                        color: i <= stageIndex ? "#ffffff" : "#8A8E91",
+                        background: i < stageIndex ? "#63B1BC" : i === stageIndex ? "#005670" : "var(--ims-neu-bg)",
+                        color: i <= stageIndex ? "#ffffff" : "var(--ims-neu-ink)",
                         border: i > stageIndex ? "1px solid #D0D0CE" : "none",
-                        boxShadow: i === stageIndex ? "0 0 0 4px #EAF3F6" : "none",
+                        boxShadow: i === stageIndex ? "0 0 0 4px var(--enshore-tint)" : "none",
                       }}>
                         {i < stageIndex ? "✓" : i + 1}
                       </div>
                       <div style={{
                         fontSize: "10.5px", fontWeight: i === stageIndex ? 700 : 600,
-                        color: i < stageIndex ? "#63B1BC" : i === stageIndex ? "#005670" : "#8A8E91",
+                        color: i < stageIndex ? "#63B1BC" : i === stageIndex ? "#005670" : "#53565A",
                         whiteSpace: "nowrap",
                       }}>
                         {stage}
@@ -4017,7 +4017,7 @@ function DocumentsPageContent() {
                       <div style={drSbStatLabelStyle}>Controlled File</div>
                       {selectedDocument.file_name ? (
                         <div style={drFileChipStyle}>
-                          <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#065F46", flexShrink: 0, marginTop: "2px" }} />
+                          <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: "var(--ims-ok-ink)", flexShrink: 0, marginTop: "2px" }} />
                           <span style={{ flex: 1, fontSize: "12px", color: "#53565A", wordBreak: "break-all", overflowWrap: "anywhere" }}>
                             {selectedDocument.file_name}
                           </span>
@@ -4028,7 +4028,7 @@ function DocumentsPageContent() {
                           ) : null}
                         </div>
                       ) : (
-                        <div style={{ fontSize: "12px", color: "#8A8E91" }}>No file uploaded</div>
+                        <div style={{ fontSize: "12px", color: "#53565A" }}>No file uploaded</div>
                       )}
                     </div>
                   </div>
@@ -4204,7 +4204,7 @@ function DocumentsPageContent() {
                         {selectedDocument.workflow_status === "Approved" ? (
                           <button
                             type="button"
-                            style={{ ...secondaryButtonStyle, color: "#1A6B3C", borderColor: "#A3C9B3" }}
+                            style={{ ...secondaryButtonStyle, color: "#1E6B3A", borderColor: "color-mix(in srgb, #1E6B3A 35%, #FFFFFF)" }}
                             onClick={markReviewedNoChanges}
                             disabled={!canEditDocument}
                             title="Record that this document has been reviewed and requires no changes — updates the next review date without up-revving"
@@ -4222,13 +4222,13 @@ function DocumentsPageContent() {
                           Update responsible persons
                         </button>
                         {selectedDocument.file_name ? (
-                          <button type="button" style={{ ...secondaryButtonStyle, color: "#B83232", borderColor: "#E4AEAE" }} onClick={removeControlledFile} disabled={!canEditDocument}>
+                          <button type="button" style={{ ...secondaryButtonStyle, color: "#B3200F", borderColor: "color-mix(in srgb, #B3200F 35%, #FFFFFF)" }} onClick={removeControlledFile} disabled={!canEditDocument}>
                             Remove file
                           </button>
                         ) : null}
                       </div>
 
-                      <div style={{ fontSize: "12px", color: "#8A8E91", lineHeight: 1.5 }}>
+                      <div style={{ fontSize: "12px", color: "#53565A", lineHeight: 1.5 }}>
                         Files are view / download only — no editing in the system. Upload new version to replace the current file on this revision. Up-rev creates a new formal revision and resets the workflow. Mark reviewed — no changes records the review date and adds a history entry without incrementing the revision.
                       </div>
                     </div>
@@ -5704,7 +5704,7 @@ const drDocNumberStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 700,
   letterSpacing: ".09em",
-  color: "#8A8E91",
+  color: "#53565A",
   marginBottom: "3px",
   fontVariantNumeric: "tabular-nums",
 };
@@ -5733,7 +5733,7 @@ const drDocHeaderRightStyle: CSSProperties = {
 };
 
 const drRevChipStyle: CSSProperties = {
-  background: "#F4F3F0",
+  background: "#ECECE7",
   border: "1px solid #D0D0CE",
   borderRadius: "5px",
   padding: "3px 9px",
@@ -5748,7 +5748,7 @@ const drStageRailStyle: CSSProperties = {
   alignItems: "center",
   padding: "16px 28px",
   borderBottom: "1px solid #D0D0CE",
-  background: "#F4F3F0",
+  background: "#ECECE7",
 };
 
 const drBodyStyle: CSSProperties = {
@@ -5760,7 +5760,7 @@ const drBodyStyle: CSSProperties = {
 
 const drSidebarStyle: CSSProperties = {
   borderRight: "1px solid #D0D0CE",
-  background: "#F9F8F6",
+  background: "#F4F8F8",
   padding: "18px 16px",
   display: "flex",
   flexDirection: "column",
@@ -5776,7 +5776,7 @@ const drSidebarDividerStyle: CSSProperties = {
 };
 
 const drActionBoxStyle: CSSProperties = {
-  background: "#EAF3F6",
+  background: "var(--enshore-tint)",
   border: "1px solid #63B1BC",
   borderLeft: "3px solid #005670",
   borderRadius: "7px",
@@ -5797,7 +5797,7 @@ const drSbStatLabelStyle: CSSProperties = {
   fontWeight: 700,
   letterSpacing: ".09em",
   textTransform: "uppercase",
-  color: "#8A8E91",
+  color: "#53565A",
   marginBottom: "4px",
 };
 
@@ -5885,7 +5885,7 @@ const drTabStyle: CSSProperties = {
 const drTabCountStyle: CSSProperties = {
   fontSize: "10.5px",
   fontWeight: 600,
-  background: "#F4F3F0",
+  background: "#ECECE7",
   border: "1px solid #D0D0CE",
   borderRadius: "999px",
   padding: "0 6px",
@@ -5906,7 +5906,7 @@ const drCurFileStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "12px",
-  background: "#F4F3F0",
+  background: "#ECECE7",
   border: "1px solid #D0D0CE",
   borderRadius: "8px",
   padding: "12px 14px",
@@ -5916,7 +5916,7 @@ const drFileIconStyle: CSSProperties = {
   width: "36px",
   height: "36px",
   borderRadius: "7px",
-  background: "#EAF3F6",
+  background: "var(--enshore-tint)",
   color: "#005670",
   display: "flex",
   alignItems: "center",
@@ -5928,7 +5928,7 @@ const drFileIconStyle: CSSProperties = {
 const drPanelFooterStyle: CSSProperties = {
   padding: "12px 18px",
   borderTop: "1px solid #D0D0CE",
-  background: "#F4F3F0",
+  background: "#ECECE7",
   display: "flex",
   alignItems: "center",
   gap: "10px",

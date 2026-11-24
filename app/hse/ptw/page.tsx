@@ -23,7 +23,10 @@ import {
   VerticalAlign,
   WidthType,
 } from "docx";
-import { ImsButton, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { ImsButton, ImsFilterPanel, ImsPanel, ImsTabs, ImsTopMetaRow } from "../../../src/components/ImsPrimitives";
+import { DocPreview, RecordHeader, RecordWorkbench, StatusPill, StatusTrack, WorkbenchStep, percentDone, toneForStatus } from "../../../src/components/RecordWorkbench";
+import type { DocPreviewSection, WorkbenchStepDef } from "../../../src/components/RecordWorkbench";
+import { downloadRegisterExcel, excelDateStamp } from "../../../src/lib/registerExcel";
 import { imsColours, imsPanelStyle, imsTableCellStyle, imsTableHeadStyle, imsTableStyle } from "../../../src/components/imsTheme";
 import { QualityKpiCard } from "../../../src/components/QualityKpiCard";
 import { QualityPageHero } from "../../../src/components/QualityPageHero";
@@ -420,6 +423,7 @@ export default function HsePermitToWorkPage() {
   const issuedCount = records.filter((record) => ["Issued", "Extended"].includes(record.status || "")).length;
   const awaitingIssueCount = records.filter((record) => record.status === "Awaiting Issue").length;
   const closedCount = records.filter((record) => record.status === "Closed").length;
+  const draftCount = records.filter((record) => (record.status || "Draft") === "Draft").length;
   const extensionCount = records.filter((record) => (record.extensions || []).some((extension) => clean(extension.extendedToDate) || clean(extension.extendedToTime))).length;
   const registerWorkTypeOptions = useMemo(() => {
     return Array.from(new Set(records.flatMap((record) => record.work_types || []).filter(Boolean))).sort((a, b) => a.localeCompare(b));
@@ -592,28 +596,30 @@ export default function HsePermitToWorkPage() {
     };
   }
 
-  async function savePtw() {
-    const payload = buildPayload({ ...draft, ptwNumber: clean(draft.ptwNumber) || nextPtwNumber(records) });
+  // overrides lets the "Issue Permit" button save with the status set to Issued: the same as choosing Issued in the Status box and pressing Save PTW.
+  async function savePtw(overrides: Partial<PtwForm> = {}): Promise<boolean> {
+    const payload = buildPayload({ ...draft, ...overrides, ptwNumber: clean(draft.ptwNumber) || nextPtwNumber(records) });
 
     if (selectedId || draft.id) {
       const targetId = selectedId || draft.id;
       const { error } = await supabase.from("hse_ptw_records").update(payload).eq("id", targetId);
       if (error) {
         setStatusMessage(`PTW update failed: ${error.message}`);
-        return;
+        return false;
       }
+      if (Object.keys(overrides).length) setDraft((current) => ({ ...current, ...overrides }));
       if (targetId && pendingAttachments.length) {
         await uploadPendingAttachments(targetId);
       }
       setStatusMessage(`${payload.ptw_number} updated successfully.`);
       await loadRecords();
-      return;
+      return true;
     }
 
     const { data, error } = await supabase.from("hse_ptw_records").insert([payload]).select("*").single();
     if (error) {
       setStatusMessage(`PTW save failed: ${error.message}`);
-      return;
+      return false;
     }
 
     const created = data as HsePtwRecord;
@@ -625,6 +631,7 @@ export default function HsePermitToWorkPage() {
     setActiveView("create");
     setStatusMessage(`${created.ptw_number} saved successfully.`);
     await loadRecords();
+    return true;
   }
 
   async function deletePtw() {
@@ -1653,15 +1660,211 @@ export default function HsePermitToWorkPage() {
     setStatusMessage(`Generated Word report for ${draft.ptwNumber || "PTW"}.`);
   }
 
+  // The register exports hold exactly the rows on screen, with the filters that produced them.
+  function registerFilterSummary() {
+    return [
+      ...(registerStatusFilter ? [`Status: ${registerStatusFilter}`] : []),
+      ...(registerWorkTypeFilter ? [`Work type: ${registerWorkTypeFilter}`] : []),
+      ...(registerSearch.trim() ? [`Search: "${registerSearch.trim()}"`] : []),
+    ];
+  }
+
+  async function exportRegisterExcel() {
+    if (!filteredRecords.length) {
+      setStatusMessage("There are no permits to export for the current filters.");
+      return;
+    }
+    try {
+      await downloadRegisterExcel<HsePtwRecord>({
+        fileName: `ptw-register-${excelDateStamp()}.xlsx`,
+        sheetName: "PTW Register",
+        title: "Permit to Work Register - Enshore IMS",
+        filters: registerFilterSummary(),
+        rows: filteredRecords,
+        columns: [
+          { header: "PTW No.", width: 14, value: (record) => record.ptw_number || "" },
+          { header: "Status", width: 16, value: (record) => record.status || "" },
+          { header: "Work Type", width: 30, value: (record) => (record.work_types || []).join(", ") },
+          { header: "Location / System", width: 36, value: (record) => record.exact_location || "" },
+          { header: "Description of Work", width: 60, value: (record) => record.description_of_work || "" },
+          { header: "Start", width: 18, value: (record) => [record.start_date ? displayDate(record.start_date) : "", record.start_time || ""].filter(Boolean).join(" ") },
+          { header: "End", width: 18, value: (record) => [record.end_date ? displayDate(record.end_date) : "", record.end_time || ""].filter(Boolean).join(" ") },
+          { header: "Issued By", width: 22, value: (record) => record.issued_by?.name || "" },
+          { header: "Accepted By", width: 22, value: (record) => record.accepted_by?.name || "" },
+        ],
+      });
+      setStatusMessage(`PTW Excel register created with ${filteredRecords.length} permit${filteredRecords.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? `The Excel register could not be created: ${error.message}` : "The Excel register could not be created.");
+    }
+  }
+
+  async function exportRegisterPdf() {
+    if (!filteredRecords.length) {
+      setStatusMessage("There are no permits to export for the current filters.");
+      return;
+    }
+    try {
+      const logoDataUrl = await getLogoDataUrl();
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      doc.addImage(logoDataUrl, "PNG", 14, 8, 32, 16);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("Permit to Work Register", 283, 16, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      const filters = registerFilterSummary();
+      doc.text(`Generated ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} - ${filteredRecords.length} permit${filteredRecords.length === 1 ? "" : "s"}`, 283, 22, { align: "right" });
+      doc.text(filters.length ? `Filters: ${filters.join(" - ")}` : "Filters: none", 14, 31);
+      autoTable(doc, {
+        startY: 35,
+        head: [["PTW No.", "Status", "Work Type", "Location / System", "Start", "End", "Issued By"]],
+        body: filteredRecords.map((record) => [
+          record.ptw_number || "",
+          record.status || "",
+          (record.work_types || []).join(", "),
+          record.exact_location || "",
+          [record.start_date ? displayDate(record.start_date) : "", record.start_time || ""].filter(Boolean).join(" "),
+          [record.end_date ? displayDate(record.end_date) : "", record.end_time || ""].filter(Boolean).join(" "),
+          record.issued_by?.name || "",
+        ]),
+        theme: "grid",
+        styles: { fontSize: 8, cellPadding: 2, lineColor: pdfLine, lineWidth: 0.2, textColor: pdfInk, valign: "middle" },
+        headStyles: { fillColor: pdfBrand, textColor: [255, 255, 255], fontStyle: "bold" },
+        columnStyles: { 0: { fontStyle: "bold" } },
+        margin: { left: 14, right: 14 },
+      });
+      const pages = doc.getNumberOfPages();
+      for (let page = 1; page <= pages; page += 1) {
+        doc.setPage(page);
+        doc.setFontSize(8);
+        doc.setTextColor(83, 86, 90);
+        doc.text("ENS-HSEQ-FRM-010", 14, 203);
+        doc.text(`Page ${page} of ${pages}`, 283, 203, { align: "right" });
+      }
+      doc.save(`ptw-register-${excelDateStamp()}.pdf`);
+      setStatusMessage(`PTW register PDF created with ${filteredRecords.length} permit${filteredRecords.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? `The PDF could not be created: ${error.message}` : "The PDF could not be created.");
+    }
+  }
+
+  // ---- Permit record workbench: percentages come from the real field values. ----
+  const signedOff = (block: SignatureBlock) => Boolean(clean(block.name)) && Boolean(clean(block.signature));
+  const workTypeChecks = [draft.workTypes.length > 0, !draft.workTypes.includes("Other") || Boolean(clean(draft.otherWorkType))];
+  const descriptionChecks = [clean(draft.descriptionOfWork), clean(draft.equipmentTools), clean(draft.exactLocation)].map(Boolean);
+  const precautionChecks = [
+    Boolean(clean(draft.riskAssessment)),
+    ...(draft.workTypes.includes("Lifting Operations") ? [Boolean(clean(draft.liftPlan))] : []),
+    Boolean(draft.isolationRequired),
+    ...(draft.isolationRequired === "Yes" ? [Boolean(clean(draft.isolationDescription))] : []),
+    draft.precautions.length > 0,
+    !draft.precautions.includes("Other") || Boolean(clean(draft.otherPrecaution)),
+    Boolean(draft.checklistUsed),
+    Boolean(clean(draft.pteCondition)),
+  ];
+  const issueChecks = [
+    Boolean(draft.startDate),
+    Boolean(draft.startTime),
+    Boolean(draft.endDate),
+    Boolean(draft.endTime),
+    Boolean(clean(draft.issuedBy.name)),
+    Boolean(clean(draft.issuedBy.signature)),
+    Boolean(clean(draft.acceptedBy.name)),
+    Boolean(clean(draft.acceptedBy.signature)),
+  ];
+  const extensionsUsed = draft.extensions.filter((extension) => clean(extension.extendedToDate) || clean(extension.extendedToTime) || clean(extension.extensionBy.name) || clean(extension.acceptedBy.name)).length;
+  const closureChecks = [
+    Boolean(clean(draft.closurePerson.name)),
+    Boolean(clean(draft.closurePerson.signature)),
+    Boolean(clean(draft.closureAuthority.name)),
+    Boolean(clean(draft.closureAuthority.signature)),
+  ];
+  const ptwSteps: WorkbenchStepDef[] = [
+    { key: "worktype", label: "Work type", sub: "Section 1", pct: percentDone(workTypeChecks) },
+    { key: "description", label: "Description", sub: "Section 2", pct: percentDone(descriptionChecks) },
+    { key: "precautions", label: "Precautions", sub: "Section 3 and attachments", pct: percentDone(precautionChecks) },
+    { key: "issue", label: "Issue / acceptance", sub: "Section 4", pct: percentDone(issueChecks) },
+    { key: "extensions", label: "Extensions", sub: "Section 5A-D", state: `${extensionsUsed} of ${draft.extensions.length} used` },
+    { key: "closure", label: "Closure", sub: "Section 5E", pct: percentDone(closureChecks) },
+  ];
+  // Items shown as "still missing before the permit can be issued". They warn only; Issue Permit stays usable.
+  const issueMissing: Array<{ label: string; step: string }> = [
+    ...(draft.workTypes.length ? [] : [{ label: "Work type", step: "worktype" }]),
+    ...(clean(draft.descriptionOfWork) ? [] : [{ label: "Description of work", step: "description" }]),
+    ...(clean(draft.exactLocation) ? [] : [{ label: "Exact location", step: "description" }]),
+    ...(clean(draft.riskAssessment) ? [] : [{ label: "Risk assessment", step: "precautions" }]),
+    ...(draft.isolationRequired ? [] : [{ label: "Isolation required answer", step: "precautions" }]),
+    ...(draft.startDate && draft.startTime ? [] : [{ label: "Start date and time", step: "issue" }]),
+    ...(draft.endDate && draft.endTime ? [] : [{ label: "End date and time", step: "issue" }]),
+    ...(signedOff(draft.issuedBy) ? [] : [{ label: "Issued by (name and signature)", step: "issue" }]),
+    ...(signedOff(draft.acceptedBy) ? [] : [{ label: "Accepted by (name and signature)", step: "issue" }]),
+  ];
+
+  async function issuePermit() {
+    if (draft.status !== "Awaiting Issue") return;
+    if (issueMissing.length) {
+      const proceed = window.confirm(`${issueMissing.length} item${issueMissing.length === 1 ? " is" : "s are"} still missing: ${issueMissing.map((item) => item.label).join(", ")}. Issue anyway?`);
+      if (!proceed) return;
+    }
+    await savePtw({ status: "Issued" });
+  }
+
+  const ptwTitle = [draft.workTypes.join(", "), clean(draft.exactLocation)].filter(Boolean).join(": ") || "Permit to Work";
+  const ptwPreviewSections: DocPreviewSection[] = [
+    {
+      heading: "1. WORK TYPE",
+      rows: [
+        { label: "Work type", value: [...draft.workTypes, ...(draft.workTypes.includes("Other") && clean(draft.otherWorkType) ? [`(${clean(draft.otherWorkType)})`] : [])].join(", "), step: "worktype" },
+      ],
+    },
+    {
+      heading: "2. DESCRIPTION OF WORK",
+      rows: [
+        { label: "Description", value: draft.descriptionOfWork, step: "description" },
+        { label: "Equipment / tools", value: draft.equipmentTools, step: "description" },
+        { label: "Location / system", value: draft.exactLocation, step: "description" },
+      ],
+    },
+    {
+      heading: "3. PRECAUTIONS",
+      rows: [
+        { label: "Risk assessment", value: draft.riskAssessment, step: "precautions" },
+        { label: "Isolation required", value: draft.isolationRequired, step: "precautions" },
+        { label: "Precautions", value: [...draft.precautions, ...(draft.precautions.includes("Other") && clean(draft.otherPrecaution) ? [`(${clean(draft.otherPrecaution)})`] : [])].join(", "), step: "precautions" },
+        { label: "Check list used", value: draft.checklistUsed, step: "precautions" },
+        { label: "Condition of PTE", value: draft.pteCondition, step: "precautions" },
+      ],
+    },
+    {
+      heading: "4. ISSUE / ACCEPTANCE",
+      rows: [
+        { label: "Start", value: [formatDateForReport(draft.startDate), draft.startTime].filter(Boolean).join(" "), step: "issue" },
+        { label: "End", value: [formatDateForReport(draft.endDate), draft.endTime].filter(Boolean).join(" "), step: "issue" },
+        { label: "Issued by", value: draft.issuedBy.name, step: "issue" },
+        { label: "Accepted by", value: draft.acceptedBy.name, step: "issue" },
+      ],
+    },
+    {
+      heading: "5. EXTENSIONS AND CLOSURE",
+      rows: [
+        { label: "Extensions used", value: `${extensionsUsed} of ${draft.extensions.length}` },
+        { label: "Closed by (person doing work)", value: draft.closurePerson.name, step: "closure" },
+        { label: "Closed by (issuing authority)", value: draft.closureAuthority.name, step: "closure" },
+      ],
+    },
+  ];
+
   return (
     <main>
       <QualityPageHero
         label="HSE MANAGEMENT"
         title="Permit to Work"
-        description="Controlled Permit to Work workspace for planning, issuing, extending, closing, and later generating ENS-HSEQ-FRM-010 outputs."
+        description="Plan, issue, extend and close permits to work on form ENS-HSEQ-FRM-010."
         contextCards={[
-          { label: "Last Refreshed", value: "Layout build" },
-          { label: "Template", value: "ENS-HSEQ-FRM-010" },
+          { label: "Permits", value: String(records.length) },
+          { label: "Form", value: "ENS-HSEQ-FRM-010" },
         ]}
       />
 
@@ -1683,11 +1886,11 @@ export default function HsePermitToWorkPage() {
             <QualityKpiCard title="Active Work" value={issuedCount} accent={imsColours.brand} onClick={() => setActiveView("register")} />
             <QualityKpiCard title="Extensions" value={extensionCount} accent={imsColours.purple} onClick={() => setActiveView("register")} />
             <QualityKpiCard title="Closed PTWs" value={closedCount} accent={imsColours.success} onClick={() => setActiveView("register")} />
-            <QualityKpiCard title="Reports Ready" value="Pending" accent={imsColours.slate} onClick={() => setActiveView("template")} />
+            <QualityKpiCard title="Draft PTWs" value={draftCount} accent={imsColours.slate} onClick={() => setActiveView("register")} />
           </section>
 
           <section style={dashboardGridStyle}>
-            <ImsPanel title="PTW Workflow" subtitle="Screen structure mirrors ENS-HSEQ-FRM-010 before database and report generation are wired.">
+            <ImsPanel title="PTW Workflow" subtitle="The six sections of form ENS-HSEQ-FRM-010.">
               <div style={workflowGridStyle}>
                 {["Work type", "Description", "Precautions", "Issue / acceptance", "Extensions", "Closure"].map((step, index) => (
                   <div key={step} style={workflowStepStyle}>
@@ -1697,9 +1900,16 @@ export default function HsePermitToWorkPage() {
                 ))}
               </div>
             </ImsPanel>
-            <ImsPanel title="Mobile Readiness" subtitle="The create form uses stacked cards and touch-friendly controls for field completion.">
-              <div style={noticeStyle}>
-                Once the layout is approved, the next pass can add Supabase persistence, evidence upload, then Word and PDF generation from the same captured fields.
+            <ImsPanel title="How a permit moves" subtitle="Every permit passes through these statuses, in this order.">
+              <div style={{ display: "grid", gap: "12px" }}>
+                <StatusTrack steps={["Draft", "Awaiting Issue", "Issued", "Extended", "Closed"]} current="" />
+                <div style={{ display: "grid", gap: "6px", color: imsColours.slate, fontSize: "13px", lineHeight: 1.5 }}>
+                  <div><strong style={{ color: imsColours.ink }}>Draft:</strong> the applicant is still filling in the permit.</div>
+                  <div><strong style={{ color: imsColours.ink }}>Awaiting Issue:</strong> the permit is complete and waits for the issuing authority.</div>
+                  <div><strong style={{ color: imsColours.ink }}>Issued:</strong> the permit is signed and work can start.</div>
+                  <div><strong style={{ color: imsColours.ink }}>Extended:</strong> the permit has been extended with the conditions unchanged.</div>
+                  <div><strong style={{ color: imsColours.ink }}>Closed:</strong> the work is finished and the area is checked as safe and tidy.</div>
+                </div>
               </div>
             </ImsPanel>
           </section>
@@ -1708,30 +1918,15 @@ export default function HsePermitToWorkPage() {
 
       {activeView === "register" ? (
         <ImsPanel title="PTW Register" subtitle="Saved permits. Click a row to open the PTW form for edit.">
-          <div className="ims-filter-panel" style={registerToolbarStyle}>
-            <input
-              style={registerSearchStyle}
-              value={registerSearch}
-              onChange={(event) => setRegisterSearch(event.target.value)}
-              placeholder="Search PTW no., location, work type, issuer..."
-            />
-            <button type="button" style={showRegisterFilters ? registerSecondaryButtonStyle : registerPrimaryButtonStyle} onClick={() => setShowRegisterFilters((current) => !current)}>
-              {showRegisterFilters ? "Hide Filters" : "Show Filters"}
-            </button>
-          </div>
-          {showRegisterFilters ? (
-            <div className="ims-filter-panel" style={registerExpandedFiltersStyle}>
-              <select style={registerFilterStyle} value={registerStatusFilter} onChange={(event) => setRegisterStatusFilter(event.target.value)}>
-                <option value="">All Statuses</option>
-                {["Draft", "Awaiting Issue", "Issued", "Extended", "Closed"].map((status) => <option key={status} value={status}>{status}</option>)}
-              </select>
-              <select style={registerFilterStyle} value={registerWorkTypeFilter} onChange={(event) => setRegisterWorkTypeFilter(event.target.value)}>
-                <option value="">All Work Types</option>
-                {registerWorkTypeOptions.map((workType) => <option key={workType} value={workType}>{workType}</option>)}
-              </select>
-              <button
-                type="button"
-                style={registerSecondaryButtonStyle}
+          <ImsFilterPanel
+            search={registerSearch}
+            onSearchChange={setRegisterSearch}
+            searchPlaceholder="Search PTW no., location, work type, issuer..."
+            showFilters={showRegisterFilters}
+            onToggleFilters={() => setShowRegisterFilters((current) => !current)}
+            actions={<>
+              <ImsButton
+                variant="secondary"
                 onClick={() => {
                   setRegisterSearch("");
                   setRegisterStatusFilter("");
@@ -1739,9 +1934,24 @@ export default function HsePermitToWorkPage() {
                 }}
               >
                 Clear Filters
-              </button>
-            </div>
-          ) : null}
+              </ImsButton>
+              <ImsButton variant="primary" onClick={() => void exportRegisterPdf()} disabled={!filteredRecords.length} title="Create a PDF of the permits currently shown">Export PDF</ImsButton>
+              <ImsButton variant="secondary" onClick={() => void exportRegisterExcel()} disabled={!filteredRecords.length} title="Download an Excel workbook of the permits currently shown">Export Excel</ImsButton>
+            </>}
+          >
+            <Field label="Status">
+              <select style={inputStyle} value={registerStatusFilter} onChange={(event) => setRegisterStatusFilter(event.target.value)}>
+                <option value="">All Statuses</option>
+                {["Draft", "Awaiting Issue", "Issued", "Extended", "Closed"].map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </Field>
+            <Field label="Work type">
+              <select style={inputStyle} value={registerWorkTypeFilter} onChange={(event) => setRegisterWorkTypeFilter(event.target.value)}>
+                <option value="">All Work Types</option>
+                {registerWorkTypeOptions.map((workType) => <option key={workType} value={workType}>{workType}</option>)}
+              </select>
+            </Field>
+          </ImsFilterPanel>
           <div style={registerCountStyle}>Showing {filteredRecords.length} of {records.length} PTWs</div>
           {!records.length ? (
             <div style={emptyStateStyle}>No PTWs logged yet. Use Create PTW to start the first permit.</div>
@@ -1763,7 +1973,7 @@ export default function HsePermitToWorkPage() {
                   {filteredRecords.map((record) => (
                     <tr key={record.id} aria-selected={record.id === selectedId} data-selected={record.id === selectedId ? "true" : "false"} onClick={() => selectRecord(record)} style={{ cursor: "pointer", background: record.id === selectedId ? "#ECECE7" : "#ffffff" }}>
                       <td style={{ ...imsTableCellStyle, fontWeight: 900, color: imsColours.brandDark }}>{record.ptw_number}</td>
-                      <td style={imsTableCellStyle}>{record.status || "-"}</td>
+                      <td style={imsTableCellStyle}>{record.status ? <StatusPill label={record.status} tone={toneForStatus(record.status)} /> : "-"}</td>
                       <td style={imsTableCellStyle}>{record.work_types?.join(", ") || "-"}</td>
                       <td style={imsTableCellStyle}>{record.exact_location || "-"}</td>
                       <td style={imsTableCellStyle}>{displayDate(record.start_date)}</td>
@@ -1796,14 +2006,27 @@ export default function HsePermitToWorkPage() {
 
       {activeView === "create" ? (
         <div style={detailSectionStyle}>
-          <div style={recordHeaderStyle}>
-            <div>
-              <h2 style={recordTitleStyle}>{draft.ptwNumber} - Permit to Work</h2>
-              <p style={recordSubtitleStyle}>ENS-HSEQ-FRM-010 Permit to Work Form. Screen layout only; save/report generation will be wired after approval.</p>
-            </div>
-            <span style={statusPillStyle}>{draft.status}</span>
-          </div>
-
+          <RecordWorkbench
+            key={selectedId || draft.id || "new-ptw"}
+            gate="the permit can be issued"
+            steps={ptwSteps}
+            missing={issueMissing}
+            reportLabel="Permit form"
+            header={
+              <RecordHeader
+                id={draft.ptwNumber || "PTW"}
+                title={ptwTitle}
+                status={{ label: draft.status || "Draft", tone: toneForStatus(draft.status) }}
+                track={{ steps: ["Draft", "Awaiting Issue", "Issued", "Extended", "Closed"], current: draft.status }}
+                note="Set the status to Awaiting Issue when the permit is complete. The issuing authority then issues it."
+                actions={<>
+                  {draft.status === "Awaiting Issue" ? <ImsButton onClick={() => void issuePermit()} title="Sets the status to Issued and saves the permit">Issue Permit</ImsButton> : null}
+                  <ImsButton variant="secondary" onClick={() => setActiveView("register")} title="Back to the PTW register">Hide Panel</ImsButton>
+                </>}
+              />
+            }
+            side={<DocPreview title="Form ENS-HSEQ-FRM-010" sections={ptwPreviewSections} />}
+          >
           <section style={formGridStyle}>
             <Field label="PTW No.">
               <input style={inputStyle} value={draft.ptwNumber} onChange={(event) => update("ptwNumber", event.target.value)} />
@@ -1819,6 +2042,7 @@ export default function HsePermitToWorkPage() {
             </Field>
           </section>
 
+          <WorkbenchStep stepKey="worktype">
           <PtwSection title="Section 1 - Work Type" subtitle="To be completed by PTW Applicant. Tick as applicable.">
             <CheckGrid values={workTypeOptions} selected={draft.workTypes} onToggle={(value) => update("workTypes", toggleValue(draft.workTypes, value))} />
             {draft.workTypes.includes("Other") ? (
@@ -1827,13 +2051,17 @@ export default function HsePermitToWorkPage() {
               </Field>
             ) : null}
           </PtwSection>
+          </WorkbenchStep>
 
+          <WorkbenchStep stepKey="description">
           <PtwSection title="Section 2 - Description of Work">
             <TextAreaField label="Description of Work" value={draft.descriptionOfWork} onChange={(value) => update("descriptionOfWork", value)} />
             <TextAreaField label="Equipment / Tools to be Used" value={draft.equipmentTools} onChange={(value) => update("equipmentTools", value)} />
             <TextAreaField label="Exact Location of Work / System to be Worked On" value={draft.exactLocation} onChange={(value) => update("exactLocation", value)} />
           </PtwSection>
+          </WorkbenchStep>
 
+          <WorkbenchStep stepKey="precautions">
           <PtwSection title="Section 3 - Preparation and Precautions to be Undertaken">
             <section style={formGridStyle}>
               <TextAreaField label="Risk Assessment" value={draft.riskAssessment} onChange={(value) => update("riskAssessment", value)} />
@@ -1860,7 +2088,9 @@ export default function HsePermitToWorkPage() {
               </Field>
             </section>
           </PtwSection>
+          </WorkbenchStep>
 
+          <WorkbenchStep stepKey="issue">
           <PtwSection title="Section 4 - Permit to Work Issue / Acceptance" subtitle="Maximum 12 hours or to shift change.">
             <section style={formGridStyle}>
               <Field label="Start Time"><input type="time" style={inputStyle} value={draft.startTime} onChange={(event) => update("startTime", event.target.value)} /></Field>
@@ -1883,7 +2113,9 @@ export default function HsePermitToWorkPage() {
               onChange={(key, value) => updateSignature("acceptedBy", key, value)}
             />
           </PtwSection>
+          </WorkbenchStep>
 
+          <WorkbenchStep stepKey="extensions">
           <PtwSection title="Section 5A-D - Permit Extensions" subtitle="Only if conditions of PTW have not changed.">
             {draft.extensions.map((extension, index) => (
               <div key={extension.id} style={extensionCardStyle}>
@@ -1913,7 +2145,9 @@ export default function HsePermitToWorkPage() {
               </div>
             ))}
           </PtwSection>
+          </WorkbenchStep>
 
+          <WorkbenchStep stepKey="closure">
           <PtwSection title="Section 5E - Permit Closure by Site Manager / Designate" subtitle="All work completed / suspended. Tags and key returned and area checked as safe and tidy.">
             <SignatureFields
               title="Person Performing the Work"
@@ -1930,7 +2164,9 @@ export default function HsePermitToWorkPage() {
               onChange={(key, value) => updateSignature("closureAuthority", key, value)}
             />
           </PtwSection>
+          </WorkbenchStep>
 
+          <WorkbenchStep stepKey="precautions">
           <PtwSection title="Attachments and Distribution" subtitle="Checklists to be attached to original PTW. All copies returned to Issuing Authority on completion.">
             <CheckGrid values={attachmentOptions} selected={draft.attachments} onToggle={(value) => update("attachments", toggleValue(draft.attachments, value))} />
             {draft.attachments.length ? (
@@ -1983,6 +2219,7 @@ export default function HsePermitToWorkPage() {
               PTW Distribution: Original - Issuing Authority, 1st Copy - Displayed at Work Location, 2nd Copy - At Isolation Point.
             </div>
           </PtwSection>
+          </WorkbenchStep>
 
           <div style={actionRowStyle}>
             <ImsButton onClick={() => void savePtw()}>Save PTW</ImsButton>
@@ -1990,12 +2227,13 @@ export default function HsePermitToWorkPage() {
             <ImsButton variant="secondary" onClick={() => setDraft(selectedRecord ? hydrateRecord(selectedRecord) : { ...emptyForm, ptwNumber: nextPtwNumber(records) })}>Reset Form</ImsButton>
             <ImsButton variant="danger" disabled={!selectedRecord} onClick={() => void deletePtw()}>Delete PTW</ImsButton>
             <ImsButton variant="secondary" onClick={() => void generateWord()}>Generate Word</ImsButton>
-            <ImsButton variant="secondary" onClick={() => void generatePdf()}>Generate PDF</ImsButton>
+            <ImsButton variant="secondary" onClick={() => void generatePdf()}>Export PDF</ImsButton>
           </div>
 
           <section style={mobileSummaryStyle}>
             <strong>Current PTW setup:</strong> {selectedWorkTypes} work type(s), {selectedPrecautions} precaution(s), status {draft.status}.
           </section>
+          </RecordWorkbench>
         </div>
       ) : null}
     </main>
@@ -2106,20 +2344,6 @@ const detailSectionStyle: CSSProperties = {
   gap: "16px",
   boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
 };
-const recordHeaderStyle: CSSProperties = {
-  background: imsColours.brand,
-  color: "#ffffff",
-  borderRadius: "12px",
-  padding: "14px 16px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "12px",
-  flexWrap: "wrap",
-};
-const recordTitleStyle: CSSProperties = { margin: 0, fontSize: "18px", fontWeight: 800, lineHeight: 1.25 };
-const recordSubtitleStyle: CSSProperties = { margin: "4px 0 0", color: "rgba(255,255,255,0.88)", fontSize: "12px", lineHeight: 1.4, fontWeight: 700 };
-const statusPillStyle: CSSProperties = { borderRadius: "999px", background: "rgba(255,255,255,0.16)", border: "1px solid rgba(255,255,255,0.28)", padding: "7px 10px", fontSize: "12px", fontWeight: 900 };
 const formGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "14px" };
 const signatureGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" };
 const labelStyle: CSSProperties = { color: "#53565A", fontSize: "12px", fontWeight: 900, lineHeight: 1.2 };
@@ -2139,17 +2363,10 @@ const extensionCardStyle: CSSProperties = { border: "1px solid #D0D0CE", borderR
 const smallHeadingStyle: CSSProperties = { margin: 0, color: imsColours.ink, fontSize: "15px", fontWeight: 900 };
 const actionRowStyle: CSSProperties = { display: "flex", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap" };
 const emptyStateStyle: CSSProperties = { border: "1px dashed #D0D0CE", borderRadius: "14px", padding: "18px", background: imsColours.page, color: imsColours.slate };
-const noticeStyle: CSSProperties = { ...emptyStateStyle, borderStyle: "solid", lineHeight: 1.55 };
 const workflowGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" };
 const workflowStepStyle: CSSProperties = { ...imsPanelStyle, padding: "14px", display: "grid", gap: "8px" };
 const templateGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" };
 const templateTileStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "16px", background: imsColours.page, color: imsColours.ink, fontWeight: 900 };
-const registerToolbarStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", background: "#ffffff", padding: "10px", display: "grid", gridTemplateColumns: "minmax(220px, 1fr) minmax(180px, 420px)", gap: "12px", alignItems: "center", marginBottom: "12px" };
-const registerExpandedFiltersStyle: CSSProperties = { ...registerToolbarStyle, gridTemplateColumns: "minmax(180px, 1fr) minmax(180px, 1fr) auto" };
-const registerSearchStyle: CSSProperties = { width: "100%", minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", padding: "10px 12px", fontSize: "14px", lineHeight: 1.35, boxSizing: "border-box", color: imsColours.ink, background: imsColours.panel };
-const registerFilterStyle: CSSProperties = { ...registerSearchStyle };
-const registerPrimaryButtonStyle: CSSProperties = { minHeight: "42px", border: `1px solid ${imsColours.brandBorder}`, borderRadius: "10px", background: imsColours.brand, color: "#ffffff", fontWeight: 900, fontSize: "14px", cursor: "pointer", padding: "9px 14px" };
-const registerSecondaryButtonStyle: CSSProperties = { minHeight: "42px", border: "1px solid #D0D0CE", borderRadius: "10px", background: imsColours.border, color: imsColours.ink, fontWeight: 900, fontSize: "14px", cursor: "pointer", padding: "9px 14px" };
 const registerCountStyle: CSSProperties = { color: imsColours.ink, fontSize: "12px", fontWeight: 800, lineHeight: 1.4, margin: "0 0 10px" };
 const distributionStyle: CSSProperties = { border: "1px solid #D0D0CE", borderRadius: "14px", padding: "14px", background: imsColours.brandSoft, color: imsColours.brandDark, fontWeight: 800, lineHeight: 1.45 };
 const attachmentUploadGridStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" };

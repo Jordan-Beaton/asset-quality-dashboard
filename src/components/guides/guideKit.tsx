@@ -309,3 +309,115 @@ export const emailHeader: CSSProperties = {
 };
 
 export const emailBody: CSSProperties = { padding: "14px 16px" };
+
+// ── Status tints and the shared record screen ─────────────────────────────────
+
+export type TintTone = "ok" | "warn" | "bad" | "neu" | "brand";
+
+// Soft status pill matching the app's status tints (green, amber, red, grey, plus the teal tint used for in-flight states).
+export function tintPill(tone: TintTone): CSSProperties {
+  const bg = tone === "brand" ? "var(--enshore-tint)" : `var(--ims-${tone}-bg)`;
+  const color = tone === "brand" ? "var(--ims-brand-ink)" : `var(--ims-${tone}-ink)`;
+  return {
+    display: "inline-block",
+    fontSize: 10,
+    fontWeight: 800,
+    padding: "2px 9px",
+    borderRadius: 999,
+    background: bg,
+    color,
+    whiteSpace: "nowrap" as const,
+  };
+}
+
+export type RecordMockStep = { label: string; pct?: number; state?: string };
+
+// A small picture of the shared record screen: header with the next-step button, progress steps,
+// the "still missing" chips and the live summary on the right. Every record guide uses it.
+export function RecordScreenMock({
+  id, title, status, tone, nextButton, track, steps, active, missing, gate, summaryTitle, summaryRows,
+}: {
+  id: string;
+  title: string;
+  status: string;
+  tone: TintTone;
+  nextButton: string;
+  track?: string[];
+  steps: RecordMockStep[];
+  active: number;
+  missing: string[];
+  gate: string;
+  summaryTitle: string;
+  summaryRows: [string, string | null][];
+}) {
+  return (
+    <div style={mockPanel}>
+      <div style={mockLabel}>The record screen</div>
+      <div style={{ background: "#fff", border: `1px solid ${imsColours.border}`, borderRadius: 8, padding: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: imsColours.brandAccent }}>{id}</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: imsColours.ink }}>{title}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={tintPill(tone)}>{status}</span>
+            <span style={btn("primary")}>{nextButton}</span>
+            <span style={btn("ghost")}>Hide Panel</span>
+          </div>
+        </div>
+        {track ? (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 8 }}>
+            {track.map((t) => (
+              <span key={t} style={{ ...flowStep(t === status), padding: "3px 10px", fontSize: 10 }}>{t}</span>
+            ))}
+          </div>
+        ) : null}
+        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+          <span style={{ ...btn("ghost"), padding: "3px 9px", fontSize: 11 }}>All sections</span>
+          <span style={{ ...btn("ghost"), padding: "3px 9px", fontSize: 11 }}>Form</span>
+          <span style={{ ...btn("primary"), padding: "3px 9px", fontSize: 11 }}>Split</span>
+          <span style={{ ...btn("ghost"), padding: "3px 9px", fontSize: 11 }}>Report</span>
+        </div>
+        <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+          {steps.map((s, i) => (
+            <div key={s.label} style={{ flex: 1, minWidth: 110, border: `1px solid ${i === active ? imsColours.brand : imsColours.border}`, borderRadius: 8, padding: "6px 9px", background: i === active ? imsColours.brandSoft : "#fff" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 6, fontSize: 11, fontWeight: 800, color: imsColours.ink }}>
+                <span>{i + 1}  {s.label}</span>
+                <span style={{ color: imsColours.muted }}>{s.pct == null ? s.state : `${s.pct}%`}</span>
+              </div>
+              {s.pct == null ? null : (
+                <div style={{ height: 4, borderRadius: 2, background: imsColours.border, marginTop: 5 }}>
+                  <div style={{ width: `${s.pct}%`, height: 4, borderRadius: 2, background: imsColours.brand }} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+          <div style={{ flex: 2, minWidth: 200, fontSize: 11, color: imsColours.muted, lineHeight: 1.6, border: `1px dashed ${imsColours.border}`, borderRadius: 8, padding: 10 }}>
+            The fields for the step you are on appear here.
+          </div>
+          <div style={{ flex: 1, minWidth: 200, display: "grid", gap: 8 }}>
+            <div style={{ background: "var(--ims-warn-bg)", color: "var(--ims-warn-ink)", borderRadius: 8, padding: "7px 10px", fontSize: 11 }}>
+              <strong>{missing.length} item{missing.length === 1 ? "" : "s"} still missing before {gate}</strong>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                {missing.map((m) => (
+                  <span key={m} style={{ background: "#fff", borderRadius: 999, padding: "1px 8px", fontSize: 10, fontWeight: 700 }}>{m}</span>
+                ))}
+              </div>
+            </div>
+            <div style={{ background: "#fff", border: `1px solid ${imsColours.border}`, borderRadius: 8, fontSize: 11 }}>
+              <div style={{ background: imsColours.brand, color: "#fff", fontWeight: 800, padding: "5px 10px", borderRadius: "8px 8px 0 0" }}>{summaryTitle}</div>
+              {summaryRows.map(([label, value]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 10px", borderTop: `1px solid ${imsColours.border}` }}>
+                  <span style={{ color: imsColours.muted, fontWeight: 700 }}>{label}</span>
+                  <span style={value ? undefined : { color: "var(--ims-warn-ink)", background: "var(--ims-warn-bg)", borderRadius: 4, padding: "0 5px" }}>{value || "to be completed"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

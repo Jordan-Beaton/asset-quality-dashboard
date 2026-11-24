@@ -1404,8 +1404,8 @@ function QualityDashboardContent() {
               Weighted from NCR closure, audit finding closure, MOC closure, and Quality action pressure.
             </p>
           </div>
-          <Link
-            href="/management-review"
+          {/* Management Review is hidden for now, so the score no longer links to it. */}
+          <div
             className="quality-score-orb"
             style={{
               ...scoreOrbStyle,
@@ -1416,7 +1416,7 @@ function QualityDashboardContent() {
               <strong style={scoreValueStyle}>{isLoading ? "-" : qualityPulse.score}</strong>
               <small style={scoreSubLabelStyle}>/ 100</small>
             </span>
-          </Link>
+          </div>
         </div>
 
         <div className="quality-signal-grid" style={signalGridStyle}>

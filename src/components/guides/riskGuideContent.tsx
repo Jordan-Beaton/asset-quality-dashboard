@@ -288,7 +288,7 @@ function SectionOtherPages() {
     <>
       <div style={eyebrow}>Other Pages</div>
       <h2 style={h2Style}>Pages Still Being Built</h2>
-      <p style={pStyle}>These pages are placeholders. Their counters show &ldquo;-&rdquo;, their status bar says the data has not been configured yet, and nothing you do there is saved. Do not rely on them yet.</p>
+      <p style={pStyle}>These pages are placeholders and are not in the Risk menu, so you will not normally reach them. If you open one from a saved link, its counters show &ldquo;-&rdquo;, their status bar says the data has not been configured yet, and nothing you do there is saved. Do not rely on them yet.</p>
       <table style={imsTableStyle}>
         <thead><tr>{["Page", "Address", "Planned purpose"].map(h => <th key={h} style={imsTableHeadStyle}>{h}</th>)}</tr></thead>
         <tbody>

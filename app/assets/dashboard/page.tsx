@@ -805,8 +805,8 @@ function DashboardContent() {
             <MiniMetric label="Actions" value={openAssetActions.length} tone="#ECECE7" />
             <MiniMetric label="Files" value={fileCoveragePercent} suffix="%" />
           </div>
-          <Link
-            href="/management-review"
+          {/* Management Review is hidden for now, so the score no longer links to it. */}
+          <div
             className="asset-score-orb"
             style={{
               ...scoreOrbStyle,
@@ -817,7 +817,7 @@ function DashboardContent() {
               <strong style={scoreValueStyle}>{assetControlScore}%</strong>
               <small style={scoreSubLabelStyle}>CONTROL HEALTH</small>
             </span>
-          </Link>
+          </div>
         </div>
 
         <div style={pressurePanelStyle}>

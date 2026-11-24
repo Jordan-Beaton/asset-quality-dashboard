@@ -5,16 +5,17 @@ import {
   eyebrow, h2Style, h3Style, pStyle, codeStyle,
   stepList, Step, callout,
   mockPanel, mockHero, mockHeroEyebrow, mockLabel, flowWrap, flowStep, arrow,
-  mockInput, mockFieldLabel, mockRow, mockField, btn, pill,
+  mockInput, mockFieldLabel, mockRow, mockField, btn, pill, tintPill, RecordScreenMock,
 } from "./guideKit";
 
 type SectionKey =
-  | "overview" | "register" | "notification" | "mobile" | "part1" | "part2"
+  | "overview" | "register" | "recordscreen" | "notification" | "mobile" | "part1" | "part2"
   | "linkedaction" | "signoff" | "external" | "reports" | "statuses";
 
 const sections: GuideSectionDef[] = [
   { key: "overview",     label: "Overview",               group: "Getting Started" },
   { key: "register",     label: "Dashboard & Register",   group: "Getting Started" },
+  { key: "recordscreen",  label: "The record screen",     group: "Core Workflows" },
   { key: "notification", label: "Raising a Notification", group: "Core Workflows" },
   { key: "mobile",       label: "Phone Entry & Evidence", group: "Core Workflows" },
   { key: "part1",        label: "Part 1 — Immediate Response", group: "Core Workflows" },
@@ -27,17 +28,16 @@ const sections: GuideSectionDef[] = [
 ];
 
 function badge(status: string): CSSProperties {
-  const map: Record<string, { bg: string; color: string }> = {
-    open:          { bg: imsColours.danger,     color: "#ffffff" },
-    "in progress": { bg: imsColours.warning,    color: "#ffffff" },
-    closed:        { bg: imsColours.brand,      color: "#ffffff" },
-    "not started": { bg: imsColours.page,       color: imsColours.muted },
-    draft:         { bg: imsColours.page,       color: imsColours.muted },
-    issued:        { bg: imsColours.brandAccent, color: "#ffffff" },
-    complete:      { bg: imsColours.brand,      color: "#ffffff" },
+  const map: Record<string, "ok" | "warn" | "bad" | "neu" | "brand"> = {
+    open: "warn",
+    "in progress": "brand",
+    closed: "ok",
+    "not started": "neu",
+    draft: "neu",
+    issued: "ok",
+    complete: "ok",
   };
-  const t = map[status.toLowerCase()] || map.open;
-  return pill(t.bg, t.color);
+  return tintPill(map[status.toLowerCase()] || "warn");
 }
 
 function SectionOverview() {
@@ -52,7 +52,7 @@ function SectionOverview() {
         <div style={flowStep(true)}>Part 2 — Investigation</div>
       </div>
       <h3 style={h3Style}>The AINM workspace</h3>
-      <p style={pStyle}>The page has six tabs: <strong>Dashboard</strong>, <strong>AINM Register</strong>, <strong>Create AINM</strong>, <strong>External AINM</strong>, <strong>Import Tracker</strong> (loads the AINM Action Tracker workbook; AINM numbers that already exist are skipped), and <strong>Reports</strong>. An AINM is opened from the register, where it has its own <strong>Notification</strong>, <strong>Part 1</strong>, <strong>Part 2</strong>, <strong>Actions</strong>, <strong>Evidence</strong> and <strong>Reports</strong> tabs.</p>
+      <p style={pStyle}>The page has six tabs: <strong>Dashboard</strong>, <strong>AINM Register</strong>, <strong>Create AINM</strong>, <strong>External AINM</strong>, <strong>Import Tracker</strong> (loads the AINM Action Tracker workbook; AINM numbers that already exist are skipped), and <strong>Reports</strong>. An AINM is opened from the register on the <strong>record screen</strong>, which has six steps: <strong>Notification</strong>, <strong>Part 1</strong>, <strong>Part 2</strong>, <strong>Actions</strong>, <strong>Evidence</strong> and <strong>Reports</strong> (see The record screen).</p>
       <h3 style={h3Style}>Internal vs External</h3>
       <p style={pStyle}><strong>Internal AINM</strong> — a full event that Enshore is directly investigating, using the Notification / Part 1 / Part 2 structure below.<br /><strong>External AINM</strong> — an event reported by a third party (supplier, client, contractor) where Enshore is tracking status and any resulting actions without running the full internal investigation. See <strong>External AINM</strong> in this guide.</p>
       <div style={callout("info")}>
@@ -103,8 +103,60 @@ function SectionRegister() {
           </tbody>
         </table>
       </div>
-      <p style={pStyle}>The register also shows Event Date and Notification status columns. Search covers AINM number, title, project, location, classification and owner. Click <strong>Show Filters</strong> for the filter box: <strong>Project</strong> (every project that has an AINM), <strong>Status</strong>, <strong>Stage Status</strong>, <strong>Report Type</strong> (Incident or Accident) and <strong>Classification</strong>. <strong>Clear Filters</strong> resets them all. The line above the table says how many of the AINMs are showing. Click a row to scroll straight to its detail panel.</p>
-      <p style={pStyle}>Two buttons sit beside Clear Filters: <strong>Export PDF</strong> and <strong>Export Excel</strong>. Both export exactly the AINMs the register is showing under the current search and filters. See <strong>Reports & Exports</strong>.</p>
+      <p style={pStyle}>The register also shows Event Date and Notification status columns. Search covers AINM number, title, project, location, classification and owner. Click <strong>Show Filters</strong> for the filter box: <strong>Project</strong> (every project that has an AINM), <strong>Status</strong>, <strong>Stage Status</strong>, <strong>Report Type</strong> (Incident or Accident) and <strong>Classification</strong>. <strong>Clear Filters</strong> resets them all. The line above the table says how many of the AINMs are showing. Click a row to scroll straight to its record screen.</p>
+      <p style={pStyle}>The toolbar runs left to right: search, <strong>Clear Filters</strong>, <strong>Export PDF</strong>, <strong>Export Excel</strong> and <strong>Show Filters</strong>. Export PDF and Export Excel both export exactly the AINMs the register is showing under the current search and filters. See <strong>Reports & Exports</strong>.</p>
+    </>
+  );
+}
+
+function SectionRecordScreen() {
+  return (
+    <>
+      <div style={eyebrow}>Core Workflows</div>
+      <h2 style={h2Style}>The record screen</h2>
+      <p style={pStyle}>Click an AINM in the register and it opens on the <strong>record screen</strong>. The six old tabs are now six steps along the top, with a live <strong>AINM report</strong> summary beside the form.</p>
+      <RecordScreenMock
+        id="IR041"
+        title="Dropped object during lifting operation"
+        status="In Progress"
+        tone="brand"
+        nextButton="Close AINM"
+        steps={[
+          { label: "Notification", pct: 100 },
+          { label: "Part 1", pct: 75 },
+          { label: "Part 2", pct: 22 },
+          { label: "Actions", state: "2 linked" },
+          { label: "Evidence", state: "3 files" },
+          { label: "Reports", state: "No PDF yet" },
+        ]}
+        active={1}
+        missing={["Part 1 status: Complete", "Root cause: process", "Part 2 status: Complete"]}
+        gate="this AINM can be closed"
+        summaryTitle="AINM report"
+        summaryRows={[["AINM Ref", "IR041"], ["Classification", "Near Miss"], ["Event details", null]]}
+      />
+      <h3 style={h3Style}>The header</h3>
+      <p style={pStyle}>The top shows the AINM number, title and Overall Status, with <strong>Close AINM</strong> and <strong>Hide Panel</strong>. Under it sit the four status boxes: <strong>Notification Status</strong>, <strong>Part 1 Status</strong>, <strong>Part 2 Status</strong> and <strong>Overall Status</strong>. They are still set by hand. <strong>Save AINM</strong> and <strong>Delete AINM</strong> are at the bottom of the screen, whichever step you are on.</p>
+      <h3 style={h3Style}>The six steps</h3>
+      <div style={stepList}>
+        <Step n={1}><strong>Notification</strong>: the event facts, initial response and Notification Evidence. It shows a percentage.</Step>
+        <Step n={2}><strong>Part 1</strong>: the immediate response, containment and first root cause thinking. It shows a percentage.</Step>
+        <Step n={3}><strong>Part 2</strong>: the investigation, findings, references and sign-off. It shows a percentage.</Step>
+        <Step n={4}><strong>Actions</strong>: linked central Actions and older tracker actions. It shows a count, for example <em>2 linked</em>.</Step>
+        <Step n={5}><strong>Evidence</strong>: files for every stage. It shows a count, for example <em>3 files</em>.</Step>
+        <Step n={6}><strong>Reports</strong>: the Word reports and the compiled PDF. It shows <em>No PDF yet</em> or the number of stored PDFs.</Step>
+      </div>
+      <p style={pStyle}>A link ending <code style={codeStyle}>tab=part1</code> (or notification, part2, actions, evidence, reports) opens the AINM on that step.</p>
+      <h3 style={h3Style}>Still missing</h3>
+      <p style={pStyle}>A box lists what is still missing before the AINM can be closed. It includes the stage statuses (<em>Notification status: Issued or Complete</em>, <em>Part 1 status: Complete</em>, <em>Part 2 status: Complete</em>), the key fields of each stage (for example Title, Location / site, Root cause: people, Investigation team member, Location sign-off and HSEQ sign-off), and <em>Linked action closed</em> while a linked central Action is still open. Click a chip to jump to its step.</p>
+      <div style={callout("info")}>
+        <span>ℹ</span>
+        <div>The chips warn, they never block. If you click <strong>Close AINM</strong> with items missing you are asked &ldquo;N items are still missing: ... Close anyway?&rdquo; (the first eight are named), or &ldquo;Close IR041?&rdquo; when nothing is missing. Close AINM sets Overall Status to Closed and saves, the same as Save AINM. It is greyed out once the AINM is Closed or if you do not have Edit permission. Nothing else changes the Overall Status for you.</div>
+      </div>
+      <h3 style={h3Style}>Form, Split and PDF report</h3>
+      <p style={pStyle}><strong>Form</strong> shows only the fields, <strong>Split</strong> (the default) shows them beside the <strong>AINM report</strong> summary, and <strong>PDF report</strong> shows the summary on its own. The summary follows the report headings (AINM Summary, Initial Notification and so on), and anything not yet filled in shows as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
+      <h3 style={h3Style}>All sections</h3>
+      <p style={pStyle}>The <strong>All sections</strong> button shows every step on one long page, as the AINM detail panel used to. Click it again to return to one step at a time.</p>
     </>
   );
 }
@@ -120,8 +172,8 @@ function SectionNotification() {
         <Step n={2}>Enter <code style={codeStyle}>Title</code>, <code style={codeStyle}>Project</code>, <code style={codeStyle}>Location / Site</code>, <code style={codeStyle}>Date of Event</code> and <code style={codeStyle}>Time of Event</code>.</Step>
         <Step n={3}>Select the <code style={codeStyle}>Event Classification</code> and enter <code style={codeStyle}>Brief Event Details</code>. A type, number and title are required.</Step>
         <Step n={4}>Click <strong>Create AINM</strong>. The record opens in the register with Notification, Part 1 and Part 2 all <span style={badge("not started")}>Not Started</span> and Overall Status Open.</Step>
-        <Step n={5}>On the <strong>Notification</strong> tab complete <code style={codeStyle}>Brief details of the injury/release/damage</code> and the initial response: <code style={codeStyle}>Casualty Management</code>, <code style={codeStyle}>Site/Location Management</code>, <code style={codeStyle}>Cause Identification</code> and <code style={codeStyle}>Additional information</code>. Keep names out of the text — use job titles or &quot;IP&quot; (Injured Person).</Step>
-        <Step n={6}>Upload any photographs or documents under <strong>Notification Evidence</strong>, set <code style={codeStyle}>Notification Status</code> at the top of the tab (for example Issued once it has gone out), and click <strong>Save AINM</strong>.</Step>
+        <Step n={5}>On the <strong>Notification</strong> step of the record screen complete <code style={codeStyle}>Brief details of the injury/release/damage</code> and the initial response: <code style={codeStyle}>Casualty Management</code>, <code style={codeStyle}>Site/Location Management</code>, <code style={codeStyle}>Cause Identification</code> and <code style={codeStyle}>Additional information</code>. Keep names out of the text — use job titles or &quot;IP&quot; (Injured Person).</Step>
+        <Step n={6}>Upload any photographs or documents under <strong>Notification Evidence</strong>, set <code style={codeStyle}>Notification Status</code> in the row of status boxes under the header (for example Issued once it has gone out), and click <strong>Save AINM</strong> at the bottom of the record screen.</Step>
       </div>
       <p style={pStyle}><strong>Generate Initial Notification</strong> downloads the Notification as a Word document (ENS-HSEQ-FRM-027). Project, location, date, time and classification carry forward into the Part 1 and Part 2 tabs.</p>
     </>
@@ -134,7 +186,7 @@ function SectionMobile() {
       <div style={eyebrow}>Core Workflows</div>
       <h2 style={h2Style}>Phone Entry & Evidence</h2>
       <h3 style={h3Style}>The AINM phone page</h3>
-      <p style={pStyle}>The Notification can be raised from a phone at the point of contact. Scan the QR code on the Dashboard, or open <strong>Open Mobile AINM</strong> (<code style={codeStyle}>/hse/ainm/field</code>), and sign in to the IMS as usual. Part 1 and Part 2 are completed later from the desktop register.</p>
+      <p style={pStyle}>The Notification can be raised from a phone at the point of contact. Scan the QR code on the Dashboard, or open <strong>Open Mobile AINM</strong> (<code style={codeStyle}>/hse/ainm/field</code>), and sign in to the IMS as usual. Part 1 and Part 2 are completed later from the record screen on the desktop register.</p>
       <div style={stepList}>
         <Step n={1}>Under <strong>Start New AINM</strong> choose <strong>Incident / Near Miss</strong> or <strong>Accident</strong>. To carry on with an existing record, search under <strong>Continue Existing</strong> by AINM number, title or project and tap it (the 20 best matches are listed).</Step>
         <Step n={2}>Complete the <strong>Initial Notification</strong> form: Title, Project / Work Title, Location / Site, Date and Time of Event, Classification, the brief details of the event and of injury / release / damage, Casualty Management, Site / Location Management, Cause Identification and Additional Information. The AINM No. is generated from the type.</Step>
@@ -142,7 +194,7 @@ function SectionMobile() {
         <Step n={4}>Once the AINM is saved, tap <strong>Upload Evidence</strong> under Notification Evidence. Tap a file in the list to open it.</Step>
       </div>
       <h3 style={h3Style}>Evidence uploads</h3>
-      <p style={pStyle}>Evidence can be uploaded to Notification, Part 1 and Part 2, or from the <strong>Evidence</strong> tab where you choose the stage (General, Notification, Part 1, Part 2 or Action Evidence) first. On desktop you can drag files onto the upload box. External AINMs have their own documentation upload.</p>
+      <p style={pStyle}>Evidence can be uploaded to Notification, Part 1 and Part 2, or from the <strong>Evidence</strong> step where you choose the stage (General, Notification, Part 1, Part 2 or Action Evidence) first. On desktop you can drag files onto the upload box. External AINMs have their own documentation upload.</p>
       <p style={pStyle}>Photos, PDF, Word, Excel and PowerPoint files are all accepted, and the phone page&apos;s file picker offers the camera and those same file types. Each file is stored with the correct file type, even when a phone does not report one, so Word, Excel and PowerPoint files open in the right app afterwards. <strong>Open / Preview</strong> opens the file in a new tab; if the phone blocks the new tab it opens in the same tab and the Back button returns you to the IMS. <strong>Delete</strong> asks for confirmation.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
@@ -157,20 +209,20 @@ function SectionPart1() {
     <>
       <div style={eyebrow}>Core Workflows</div>
       <h2 style={h2Style}>Part 1 — Immediate Response</h2>
-      <p style={pStyle}>Part 1 captures what happened immediately after the event, the containment put in place, and the first root-cause thinking — completed as soon as practical after the Notification. The Part 1 tab is designed for the desktop.</p>
+      <p style={pStyle}>Part 1 captures what happened immediately after the event, the containment put in place, and the first root-cause thinking — completed as soon as practical after the Notification. The Part 1 step is designed for the desktop.</p>
       <div style={stepList}>
-        <Step n={1}>Open the AINM and go to the <strong>Part 1</strong> tab. The event summary from the Notification is shown at the top.</Step>
+        <Step n={1}>Open the AINM and go to the <strong>Part 1</strong> step. The event summary from the Notification is shown at the top.</Step>
         <Step n={2}>Enter <code style={codeStyle}>Company in Control</code> and check the <code style={codeStyle}>Event Details</code>, then build the <strong>Timeline of Events</strong> with <strong>Add Timeline Entry</strong> (a date/time and a description for each point).</Step>
         <Step n={3}>If there was an environmental release, record its <code style={codeStyle}>Type</code> and <code style={codeStyle}>Quantity</code>.</Step>
         <Step n={4}>Record every <strong>Immediate Containment Action</strong> taken. Each gets its own numbered row; use <strong>Add Row</strong> for more.</Step>
         <Step n={5}>Record the <strong>Event investigation and root cause analysis</strong> against each of <strong>People</strong>, <strong>Equipment</strong>, <strong>Environment/Conditions</strong>, and <strong>Process</strong>.</Step>
         <Step n={6}>Tick the relevant items in the attachments checklist (witness statements, toolbox talk, risk assessment, photographs, permit to work, and so on). Selecting <strong>Other</strong> reveals a free-text box to describe what else is attached.</Step>
         <Step n={7}>Add <code style={codeStyle}>Additional Comments</code>, choose the <code style={codeStyle}>Reviewed / Accepted By</code> person from People (or <strong>Add New Person...</strong>) and check their <code style={codeStyle}>Reviewer Position</code>.</Step>
-        <Step n={8}>Upload Part 1 evidence, set <code style={codeStyle}>Part 1 Status</code> (on the Notification tab) to Complete when finished, and click <strong>Save AINM</strong>. <strong>Generate Part 1 Report</strong> downloads the Word report (ENS-HSEQ-FRM-028).</Step>
+        <Step n={8}>Upload Part 1 evidence, set <code style={codeStyle}>Part 1 Status</code> (in the status boxes under the header) to Complete when finished, and click <strong>Save AINM</strong>. <strong>Generate Part 1 Report</strong> downloads the Word report (ENS-HSEQ-FRM-028).</Step>
       </div>
       <div style={callout("info")}>
         <span>ℹ</span>
-        <div>The Part 1 tab includes the <strong>Corrective Actions / Recommendations</strong> panel, where you can create a central Action for any item that needs its own tracked owner and due date — see <strong>Linked Actions</strong> in this guide.</div>
+        <div>The Part 1 step includes the <strong>Corrective Actions / Recommendations</strong> panel, where you can create a central Action for any item that needs its own tracked owner and due date — see <strong>Linked Actions</strong> in this guide.</div>
       </div>
     </>
   );
@@ -183,7 +235,7 @@ function SectionPart2() {
       <h2 style={h2Style}>Part 2 — Investigation</h2>
       <p style={pStyle}>Part 2 is the full investigation, signed off by the reviewers listed in <strong>Sign-off</strong>. It is typically completed by the investigation team.</p>
       <div style={stepList}>
-        <Step n={1}>Open the AINM and go to the <strong>Part 2</strong> tab.</Step>
+        <Step n={1}>Open the AINM and go to the <strong>Part 2</strong> step.</Step>
         <Step n={2}>List the <strong>Investigation Team Members</strong> — name, company, position and investigation role — with <strong>Add Team Member</strong>.</Step>
         <Step n={3}>Record <strong>Investigation Findings</strong> against each of <strong>People</strong>, <strong>Equipment</strong>, <strong>Environment/Conditions</strong>, and <strong>Process</strong> — this structure keeps root-cause analysis consistent across every AINM.</Step>
         <Step n={4}>List the <strong>Reference documentation</strong> used (document title and number) with <strong>Add Reference Document</strong>, and add <code style={codeStyle}>Further comments</code>.</Step>
@@ -200,7 +252,7 @@ function SectionSignoff() {
     <>
       <div style={eyebrow}>Core Workflows</div>
       <h2 style={h2Style}>Sign-off</h2>
-      <p style={pStyle}>At the bottom of the Part 2 tab, the investigation is reviewed by up to four people, each with a name, position, and date:</p>
+      <p style={pStyle}>At the bottom of the Part 2 step, the investigation is reviewed by up to four people, each with a name, position, and date:</p>
       <div style={stepList}>
         <Step n={1}><strong>Location/Senior Representative</strong> — the site or vessel representative.</Step>
         <Step n={2}><strong>HSEQ Representative</strong>.</Step>
@@ -236,7 +288,7 @@ function SectionLinkedAction() {
         <Step n={3}>Click <strong>Add Corrective Action</strong>. It is created in central <strong>Actions</strong> with source <code style={codeStyle}>AINM</code>, the AINM&apos;s project, and a link back to this AINM, and it is listed under the panel with an <strong>Open</strong> link.</Step>
         <Step n={4}>To open the full Action form instead — for a case needing more detail — use <strong>Open Full Action Form</strong>; it keeps the AINM link and project context but leaves title, description, department, and owner for manual entry.</Step>
       </div>
-      <p style={pStyle}>The AINM&apos;s own <strong>Actions</strong> tab lists <strong>Linked Central Actions</strong> (with owner, due date, priority and status) and any older <strong>AINM Tracker Actions</strong>, and has a <strong>Create Central Action</strong> shortcut. Adding actions needs Edit permission.</p>
+      <p style={pStyle}>The AINM&apos;s own <strong>Actions</strong> step lists <strong>Linked Central Actions</strong> (with owner, due date, priority and status) and any older <strong>AINM Tracker Actions</strong>, and has a <strong>Create Central Action</strong> shortcut. Adding actions needs Edit permission.</p>
     </>
   );
 }
@@ -267,7 +319,7 @@ function SectionReports() {
       <h2 style={h2Style}>Reports & Exports</h2>
       <h3 style={h3Style}>Reports for one AINM</h3>
       <div style={stepList}>
-        <Step n={1}>Open the AINM and go to its <strong>Reports</strong> tab.</Step>
+        <Step n={1}>Open the AINM and go to its <strong>Reports</strong> step.</Step>
         <Step n={2}>Click <strong>Generate Initial Notification</strong>, <strong>Generate Part 1 Report</strong> or <strong>Generate Part 2 Report</strong> to download that stage as a Word document. These Word files download to your device and are not kept in the report history.</Step>
         <Step n={3}>Click <strong>Generate Complete AINM PDF</strong> for the full record in one document. It downloads and a copy is also stored. This needs Edit permission.</Step>
         <Step n={4}>The compiled PDF mirrors the Word report structure — labelled Part 1 and Part 2 subsections, corrective actions/recommendations, findings, references, sign-off, and comments — and includes both legacy tracker actions and any linked central Actions with their title, description, and target date. It also lists the evidence files with an <strong>Open Evidence</strong> link for each.</Step>
@@ -299,7 +351,7 @@ function SectionStatuses() {
       <div style={eyebrow}>Reference</div>
       <h2 style={h2Style}>Status Reference</h2>
       <h3 style={h3Style}>Stage status (Notification / Part 1 / Part 2)</h3>
-      <p style={pStyle}>Chosen from the drop-downs at the top of the Notification tab (the phone page sets the Notification status).</p>
+      <p style={pStyle}>Chosen from the Notification Status, Part 1 Status and Part 2 Status boxes under the header of the record screen (the phone page sets the Notification status).</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {stageRows.map(([key, label]) => <span key={label} style={badge(key)}>{label}</span>)}
       </div>
@@ -336,6 +388,7 @@ function SectionStatuses() {
 const sectionComponents: Record<SectionKey, () => ReactElement> = {
   overview:     SectionOverview,
   register:     SectionRegister,
+  recordscreen: SectionRecordScreen,
   notification: SectionNotification,
   mobile:       SectionMobile,
   part1:        SectionPart1,
