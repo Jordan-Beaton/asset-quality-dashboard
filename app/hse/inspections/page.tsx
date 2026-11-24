@@ -2719,7 +2719,6 @@ function inspectionChecklistStats(draft: HseInspectionRecord) {
     answered: answeredFlags.filter(Boolean).length,
     answeredFlags,
     findings,
-    findingsWithoutNote: findings.filter((finding) => !finding.note).length,
   };
 }
 
@@ -2781,7 +2780,7 @@ function InspectionWorkbench({
     {
       key: "checklist",
       label: "Checklist",
-      sub: `${stats.answered} of ${stats.total} answered${stats.findingsWithoutNote ? ` - ${stats.findingsWithoutNote} note${stats.findingsWithoutNote === 1 ? "" : "s"} needed` : ""}`,
+      sub: `${stats.answered} of ${stats.total} answered`,
       pct: percentDone(stats.answeredFlags),
     },
     { key: "comments", label: "Comments", sub: "Overall remarks", ...(hasComments ? { pct: 100 } : { state: "Optional" }) },
@@ -2794,7 +2793,6 @@ function InspectionWorkbench({
     ...(draft.inspection_date ? [] : [{ label: "Inspection date", step: "details" }]),
     ...(clean(draft.inspector_name) ? [] : [{ label: "Inspector", step: "details" }]),
     ...(unanswered > 0 ? [{ label: `${unanswered} checklist item${unanswered === 1 ? "" : "s"} unanswered`, step: "checklist" }] : []),
-    ...(stats.findingsWithoutNote > 0 ? [{ label: `${stats.findingsWithoutNote} finding${stats.findingsWithoutNote === 1 ? "" : "s"} marked No without a comment`, step: "checklist" }] : []),
     ...(clean(draft.signoff_name) ? [] : [{ label: "Sign-off name", step: "signoff" }]),
     ...(draft.signoff_date ? [] : [{ label: "Sign-off date", step: "signoff" }]),
   ];
@@ -2829,7 +2827,7 @@ function InspectionWorkbench({
       heading: "OPEN FINDINGS",
       rows: stats.findings.length
         ? [
-            ...shownFindings.map((finding) => ({ label: `Item ${finding.number}`, value: finding.note ? `${finding.text} - ${finding.note}` : "", step: "checklist" })),
+            ...shownFindings.map((finding) => ({ label: `Item ${finding.number}`, value: finding.note ? `${finding.text} - ${finding.note}` : finding.text, step: "checklist" })),
             ...(stats.findings.length > shownFindings.length ? [{ label: "More findings", value: `${stats.findings.length - shownFindings.length} more in the checklist` }] : []),
           ]
         : [{ label: "Findings", value: "None marked No" }],

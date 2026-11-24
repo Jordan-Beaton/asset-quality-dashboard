@@ -214,7 +214,7 @@ function SectionRecordScreen() {
           { label: "Sign-off", pct: 33 },
         ]}
         active={1}
-        missing={["12 checklist items unanswered", "1 finding marked No without a comment", "Sign-off date"]}
+        missing={["12 checklist items unanswered", "Inspector", "Sign-off date"]}
         gate="this inspection can be completed"
         summaryTitle="Inspection report (PDF)"
         summaryRows={[["Answered", "18 of 30"], ["Evidence files", "3"], ["Signed by", null]]}
@@ -229,13 +229,13 @@ function SectionRecordScreen() {
         <Step n={4}><strong>Sign-off</strong> (name and date): the sign-off name, position, company and date. Percentage.</Step>
       </div>
       <h3 style={h3Style}>Still missing</h3>
-      <p style={pStyle}>A box lists what is still missing before the inspection can be completed: Title, Inspection date, Inspector, <em>N checklist items unanswered</em>, <em>N findings marked No without a comment</em>, Sign-off name and Sign-off date. Click a chip to jump to its step.</p>
+      <p style={pStyle}>A box lists what is still missing before the inspection can be completed: Title, Inspection date, Inspector, <em>N checklist items unanswered</em>, Sign-off name and Sign-off date. A comment on a No answer is optional, so a No without a comment is never listed as missing. Click a chip to jump to its step.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>The chips warn, they never block. If you click <strong>Complete Inspection</strong> with items missing you are asked &ldquo;N items are still missing: ... Complete anyway?&rdquo; and can carry on. A title is still needed to save.</div>
       </div>
       <h3 style={h3Style}>Form, Split and PDF</h3>
-      <p style={pStyle}><strong>Form</strong> shows only the fields, <strong>Split</strong> shows them beside the live <strong>Inspection report (PDF)</strong> summary, and <strong>PDF</strong> shows that summary on its own. The summary shows the report details, how many items are answered, the open findings (items marked No, with their comments) and the sign-off. Gaps show as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
+      <p style={pStyle}><strong>Form</strong> shows only the fields, <strong>Split</strong> shows them beside the live <strong>Inspection report (PDF)</strong> summary, and <strong>PDF</strong> shows that summary on its own. The summary shows the report details, how many items are answered, the open findings (every item marked No, with its comment if you wrote one) and the sign-off. Gaps in the report details and sign-off show as an amber &ldquo;to be completed&rdquo; that you can click to jump to the right step.</p>
       <h3 style={h3Style}>All sections</h3>
       <p style={pStyle}>The <strong>All sections</strong> button shows the whole inspection on one long page, as it used to be. Click it again to return to one step at a time. At the bottom of a saved inspection, <strong>Export PDF</strong>, <strong>Save Inspection</strong> and <strong>Delete Inspection</strong> stay in place whichever step you are on; a new inspection shows only <strong>Save Inspection</strong>.</p>
     </>
