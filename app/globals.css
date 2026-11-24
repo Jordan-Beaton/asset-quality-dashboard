@@ -1917,3 +1917,116 @@ textarea {
 
 /* Short label under each icon: phone bottom bar only (see the phone block above). */
 .ims-rail-phone-label { display: none; }
+
+/* ===== Document Control register on a phone (app/documents/page.tsx, PhoneDocumentTable) =====
+   One short row per document, in a real table that scrolls sideways. The document number stays pinned on the left. */
+.ims-page-container .ims-doc-phone {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--enshore-border);
+  border-radius: 12px;
+  background: #FFFFFF;
+}
+
+.ims-page-container .ims-doc-phone table {
+  width: 720px !important;
+  min-width: 720px;
+  margin: 0 !important;
+  table-layout: fixed;
+  /* The global phone rules make tables their own scroll box, which stops the pinned column working.
+     The wrapper above is the one scroll container. */
+  display: table !important;
+  overflow: visible !important;
+  max-width: none !important;
+}
+
+.ims-page-container .ims-doc-phone table thead th,
+.ims-page-container .ims-doc-phone table tbody td {
+  padding: 0 8px !important;
+}
+
+.ims-page-container .ims-doc-phone table thead th {
+  height: 32px;
+}
+
+.ims-page-container .ims-doc-phone table tbody tr {
+  cursor: pointer;
+}
+
+.ims-page-container .ims-doc-phone table tbody td {
+  height: 34px;
+  font-size: 12px !important;
+}
+
+/* Pin the first column so the document number stays visible while swiping. */
+.ims-page-container .ims-doc-phone table thead th:first-child,
+.ims-page-container .ims-doc-phone table tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 1px 0 0 var(--enshore-border);
+}
+
+.ims-page-container .ims-doc-phone table tbody td:first-child {
+  background: #FFFFFF;
+}
+
+.ims-page-container .ims-doc-phone table tbody tr[data-selected="true"] td {
+  background: #EEF7F8;
+}
+
+.ims-page-container .ims-doc-phone table tbody tr[data-selected="true"] td:first-child {
+  box-shadow: inset 4px 0 0 var(--enshore-brand), 1px 0 0 var(--enshore-border);
+}
+
+.ims-page-container .ims-doc-phone table tbody tr:focus-visible {
+  outline: 3px solid var(--enshore-accent);
+  outline-offset: -3px;
+}
+
+.ims-doc-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--ims-neu-ink);
+}
+.ims-doc-dot--ok { background: var(--ims-ok-ink); }
+.ims-doc-dot--warn { background: var(--ims-warn-ink); }
+.ims-doc-dot--bad { background: var(--ims-bad-ink); }
+
+.ims-page-container .ims-doc-phone table tbody td.ims-doc-date--bad,
+.ims-page-container .ims-doc-phone table tbody td.ims-doc-date--bad * {
+  color: #B3200F !important;
+  font-weight: 800 !important;
+}
+
+.ims-page-container .ims-doc-phone table tbody td.ims-doc-date--warn,
+.ims-page-container .ims-doc-phone table tbody td.ims-doc-date--warn * {
+  color: #8A5A00 !important;
+  font-weight: 800 !important;
+}
+
+.ims-doc-phone-more,
+.ims-doc-phone-back {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  border: 1px solid var(--enshore-brand);
+  border-radius: 10px;
+  background: var(--enshore-brand);
+  color: #FFFFFF;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ims-doc-phone-back {
+  margin: 0 0 10px;
+  background: #FFFFFF;
+  color: var(--enshore-brand);
+}

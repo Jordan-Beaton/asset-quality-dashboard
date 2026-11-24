@@ -12,6 +12,7 @@ import { QualityPageHero } from "../../src/components/QualityPageHero";
 import { useImsPermissions } from "../../src/components/ImsPermissions";
 import { supabase } from "../../src/lib/supabase";
 import { openFileUrl } from "../../src/lib/fileOpen";
+import { usePhoneLayout } from "../../src/lib/usePhoneLayout";
 import { IMS_DOCUMENT_ACCEPT, uploadContentType } from "../../src/lib/fileTypes";
 
 type DocumentStatus =
@@ -842,6 +843,13 @@ function DocumentsPageContent() {
       );
     });
   }, [documents, search, statusFilter, typeFilter, ownerFilter, approvalFilter, reviewFilter]);
+
+  // On a phone the register is a short condensed table that shows PHONE_ROW_BATCH rows at a time.
+  const isPhone = usePhoneLayout();
+  const [phoneLimit, setPhoneLimit] = useState(PHONE_ROW_BATCH);
+  useEffect(() => {
+    setPhoneLimit(PHONE_ROW_BATCH);
+  }, [filteredDocuments]);
 
   const dueSoonDocuments = useMemo(
     () => documents.filter((doc) => getReviewTone(doc.next_review_date).label === "Due soon"),
@@ -3557,6 +3565,24 @@ function DocumentsPageContent() {
             documents
           </div>
 
+          {isPhone ? (
+            <>
+              {filteredDocuments.length === 0 ? (
+                <div style={emptyRegisterStyle}>No documents match the current filters.</div>
+              ) : (
+                <PhoneDocumentTable
+                  docs={filteredDocuments.slice(0, phoneLimit)}
+                  selectedId={selectedDocumentId}
+                  onSelect={handleSelectDocument}
+                />
+              )}
+              {filteredDocuments.length > phoneLimit ? (
+                <button type="button" className="ims-doc-phone-more" onClick={() => setPhoneLimit((current) => current + PHONE_ROW_BATCH)}>
+                  Show {Math.min(PHONE_ROW_BATCH, filteredDocuments.length - phoneLimit)} more ({filteredDocuments.length - phoneLimit} not shown)
+                </button>
+              ) : null}
+            </>
+          ) : (
           <div className="ims-register-shell" style={registerTableWrapStyle}>
             <div className="ims-register-head" style={registerHeadStyle}>
               <div>Document No.</div>
@@ -3631,6 +3657,7 @@ function DocumentsPageContent() {
               )}
             </div>
           </div>
+          )}
         </SectionCard>
         </section>
 
@@ -3738,6 +3765,17 @@ function DocumentsPageContent() {
 
         return (
           <section id="document-detail-panel" ref={detailPanelRef} style={{ marginTop: "20px" }}>
+            {isPhone && activeView === "register" ? (
+              <button
+                type="button"
+                className="ims-doc-phone-back"
+                onClick={() =>
+                  (document.getElementById(`doc-row-${selectedDocument.id}`) || document.querySelector(".ims-doc-phone"))?.scrollIntoView({ behavior: "smooth", block: "center" })
+                }
+              >
+                Back to the list
+              </button>
+            ) : null}
             <div style={drNewPanelStyle}>
 
               {/* Doc header */}
@@ -5438,6 +5476,77 @@ const registerHeadStyle: CSSProperties = {
 const registerBodyStyle: CSSProperties = {
   overflowY: "visible",
 };
+
+const PHONE_ROW_BATCH = 50;
+
+function workflowDotClass(workflow: WorkflowStatus) {
+  if (workflow === "Approved") return "ims-doc-dot--ok";
+  if (workflow === "Pending Review" || workflow === "Reviewed" || workflow === "Pending Approval") return "ims-doc-dot--warn";
+  if (workflow === "Rejected") return "ims-doc-dot--bad";
+  return "";
+}
+
+// Condensed phone register: one short row per document, six key columns, scrolls sideways, document number pinned.
+function PhoneDocumentTable({ docs, selectedId, onSelect }: { docs: DocumentRow[]; selectedId: string; onSelect: (id: string) => void }) {
+  return (
+    <div className="ims-doc-phone" role="region" aria-label="Document register. Swipe sideways for more columns.">
+      <table data-mobile-table="scroll">
+        <colgroup>
+          <col style={{ width: "150px" }} />
+          <col style={{ width: "200px" }} />
+          <col style={{ width: "44px" }} />
+          <col style={{ width: "120px" }} />
+          <col style={{ width: "96px" }} />
+          <col style={{ width: "110px" }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Doc no.</th>
+            <th>Title</th>
+            <th>Rev</th>
+            <th>Workflow</th>
+            <th>Next review</th>
+            <th>Owner</th>
+          </tr>
+        </thead>
+        <tbody>
+          {docs.map((doc) => {
+            const workflow = normalizeWorkflowStatus(doc.workflow_status, doc.review_approval_status, doc.status);
+            const review = getReviewTone(doc.next_review_date);
+            const dateClass = review.label === "Overdue" ? "ims-doc-date--bad" : review.label === "Due soon" ? "ims-doc-date--warn" : "";
+            const selected = selectedId === doc.id;
+            return (
+              <tr
+                key={doc.id}
+                id={`doc-row-${doc.id}`}
+                tabIndex={0}
+                aria-selected={selected}
+                data-selected={selected ? "true" : "false"}
+                onClick={() => onSelect(doc.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(doc.id);
+                  }
+                }}
+              >
+                <td title={doc.document_number}>{doc.document_number}</td>
+                <td title={doc.title || undefined}>{doc.title || "-"}</td>
+                <td>{doc.current_revision || "-"}</td>
+                <td>
+                  <span className={`ims-doc-dot ${workflowDotClass(workflow)}`} aria-hidden="true" />
+                  {workflow}
+                </td>
+                <td className={dateClass}>{doc.next_review_date ? formatDate(doc.next_review_date) : "-"}</td>
+                <td title={doc.department_owner || undefined}>{doc.department_owner || "-"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 const registerRowStyle: CSSProperties = {
   width: "100%",
