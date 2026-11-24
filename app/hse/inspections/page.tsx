@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 type InspectionView = "dashboard" | "register" | "create";
 type InspectionStatus = "Draft" | "Open" | "Complete" | "Closed";
-type ChecklistAnswer = "N/A" | "Yes" | "No" | "";
+type ChecklistAnswer = "N/A" | "OK" | "NOK" | "";
 
 type InspectionTemplate = {
   id: string;
@@ -782,10 +782,11 @@ const droppedObjectsChecklist: ChecklistSection[] = [
   },
 ];
 
-// Which answer is a finding. On most questions a NO is the finding ("Lighting satisfactory?"). On the questions below the
-// wording asks whether something bad is there ("Trip hazards present?"), so a YES is the finding and a No is the good answer.
-// This includes every "Other ... observations" line. Reviewed and approved by the IMS admin on 24 Nov 2026 (30 questions).
-// Counts are worked out from the saved answers each time, so changing this list changes finding counts on past inspections.
+// Inspectors now answer OK or NOK. OK is the good answer and NOK is the finding, whatever the wording of the question.
+// Inspections saved earlier hold Yes / No. On most questions a NO was the finding ("Lighting satisfactory?"). On the 30
+// questions below the wording asks whether something bad is there ("Trip hazards present?", every "Other ... observations"
+// line), so a YES was the finding. Reviewed and approved by the IMS admin on 24 Nov 2026. This list is only used to turn old
+// Yes / No answers into OK / NOK when a record loads; new answers are saved as OK / NOK.
 const YES_IS_FINDING: Record<string, string[]> = {
   "workplace-office": ["1.4", "2.15", "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "4.8", "5.6"],
   "vessel-pre-sail": ["6.1", "6.2", "14.3"],
@@ -794,14 +795,37 @@ const YES_IS_FINDING: Record<string, string[]> = {
   [defaultTemplateId]: ["1.6", "2.40", "3.13", "4.11"],
 };
 
-function isFindingAnswer(templateId: string | null | undefined, itemId: string, answer: string | null | undefined) {
+// Turns a saved answer into N/A, OK, NOK or empty. Yes / No from before OK / NOK existed are converted with the rule above.
+function toChecklistAnswer(templateId: string | null | undefined, itemId: string, raw: unknown): ChecklistAnswer {
+  if (raw === "N/A" || raw === "OK" || raw === "NOK") return raw;
+  if (raw !== "Yes" && raw !== "No") return "";
   const formId = templateId && YES_IS_FINDING[templateId] ? templateId : defaultTemplateId;
-  const yesIsFinding = YES_IS_FINDING[formId].includes(itemId);
-  return answer === (yesIsFinding ? "Yes" : "No");
+  const yesWasFinding = YES_IS_FINDING[formId].includes(itemId);
+  const wasFinding = raw === (yesWasFinding ? "Yes" : "No");
+  return wasFinding ? "NOK" : "OK";
 }
 
-function countFindings(record: Pick<HseInspectionRecord, "form_id" | "checklist_responses">) {
-  return Object.entries(record.checklist_responses || {}).filter(([itemId, response]) => isFindingAnswer(record.form_id, itemId, response?.answer)).length;
+// A finding is a NOK answer.
+function countFindings(record: Pick<HseInspectionRecord, "checklist_responses">) {
+  return Object.values(record.checklist_responses || {}).filter((response) => response?.answer === "NOK").length;
+}
+
+// "Create action" next to Evidence on a finding. Opens the HSE Actions create form already filled in and linked to this
+// inspection. The item number is in the action title and description, so the action can be traced back to the item.
+function findingActionHref(draft: HseInspectionRecord, item: ChecklistItem, comment: string) {
+  const text = clean(item.text);
+  const note = clean(comment);
+  const title = `Item ${item.number}: ${note || text}`.slice(0, 120);
+  const description = `${draft.inspection_number} item ${item.number}: ${text}${note ? ` Finding: ${note}` : ""}`;
+  return (
+    `/hse/actions?view=create&prefill_source=${encodeURIComponent("HSE Inspection")}` +
+    `&prefill_department=HSEQ` +
+    `&prefill_project=${encodeURIComponent(draft.project_work_scope || draft.vessel_spread || "")}` +
+    `&prefill_title=${encodeURIComponent(title)}` +
+    `&prefill_description=${encodeURIComponent(description)}` +
+    `&linked_hse_inspection_id=${encodeURIComponent(draft.id)}` +
+    `&linked_hse_inspection_number=${encodeURIComponent(draft.inspection_number)}`
+  );
 }
 
 function getChecklistForTemplateId(templateId: string | null | undefined) {
@@ -919,11 +943,11 @@ function normalizeActions(value: unknown): InspectionAction[] {
   });
 }
 
-function normalizeChecklist(value: unknown): Record<string, ChecklistResponse> {
+function normalizeChecklist(value: unknown, formId?: string | null): Record<string, ChecklistResponse> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const next: Record<string, ChecklistResponse> = {};
   Object.entries(value as Record<string, Partial<ChecklistResponse>>).forEach(([key, row]) => {
-    const answer = row.answer === "N/A" || row.answer === "Yes" || row.answer === "No" ? row.answer : "";
+    const answer = toChecklistAnswer(formId, key, row.answer);
     next[key] = { answer, comments: clean(row.comments) };
   });
   return next;
@@ -1141,7 +1165,7 @@ export default function HseInspectionsPage() {
     const nextRecords = ((recordRes.data || []) as HseInspectionRecord[]).map((record) => ({
       ...record,
       status: (record.status || "Draft") as InspectionStatus,
-      checklist_responses: normalizeChecklist(record.checklist_responses),
+      checklist_responses: normalizeChecklist(record.checklist_responses, record.form_id),
       actions: normalizeActions(record.actions),
     }));
     setRecords(nextRecords);
@@ -1205,7 +1229,7 @@ export default function HseInspectionsPage() {
     setSelectedId(record.id);
     setDraft({
       ...record,
-      checklist_responses: normalizeChecklist(record.checklist_responses),
+      checklist_responses: normalizeChecklist(record.checklist_responses, record.form_id),
       actions: normalizeActions(record.actions),
     });
     setSelectedTemplateId(record.form_id || defaultTemplateId);
@@ -1246,7 +1270,7 @@ export default function HseInspectionsPage() {
     if (!selected || draft.id === selected.id) return;
     setDraft({
       ...selected,
-      checklist_responses: normalizeChecklist(selected.checklist_responses),
+      checklist_responses: normalizeChecklist(selected.checklist_responses, selected.form_id),
       actions: normalizeActions(selected.actions),
     });
     setSelectedTemplateId(selected.form_id || defaultTemplateId);
@@ -1536,15 +1560,15 @@ export default function HseInspectionsPage() {
         tableWidth: 186,
         styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.6, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0], overflow: "linebreak" },
         headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
-        head: [["Item", "Description", "N/A", "Yes", "No", "Comments"]],
+        head: [["Item", "Description", "N/A", "OK", "NOK", "Comments"]],
         body: section.items.map((item) => {
           const response = record.checklist_responses?.[item.id] || { answer: "", comments: "" };
           return [
             item.number,
             item.text,
             response.answer === "N/A" ? "X" : "",
-            response.answer === "Yes" ? "X" : "",
-            response.answer === "No" ? "X" : "",
+            response.answer === "OK" ? "X" : "",
+            response.answer === "NOK" ? "X" : "",
             response.comments || "",
           ];
         }),
@@ -1767,7 +1791,7 @@ export default function HseInspectionsPage() {
           tableWidth: 186,
           styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.8, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0], overflow: "linebreak" },
           headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
-          head: [["Item", "Description", "N/A", "Yes", "No", "Comments / Action Notes"]],
+          head: [["Item", "Description", "N/A", "OK", "NOK", "Comments / Action Notes"]],
           body: section.items.map((item) => [item.number, item.text, "", "", "", ""]),
           columnStyles: {
             0: { cellWidth: 15, fontStyle: "bold" },
@@ -1795,7 +1819,7 @@ export default function HseInspectionsPage() {
           tableWidth: 186,
           styles: { font: "helvetica", fontSize: 8, cellPadding: 2, lineColor: [208, 208, 206], lineWidth: 0.2, textColor: [0, 0, 0] },
           headStyles: { fillColor: [236, 236, 231], textColor: [0, 0, 0], fontStyle: "bold" },
-          head: [["Item", "Check / Requirement", "N/A", "Yes", "No", "Comments"]],
+          head: [["Item", "Check / Requirement", "N/A", "OK", "NOK", "Comments"]],
           body: Array.from({ length: 5 }, (_, rowIndex) => [`${index + 1}.${rowIndex + 1}`, "", "", "", "", ""]),
           columnStyles: {
             0: { cellWidth: 15, fontStyle: "bold" },
@@ -2556,6 +2580,7 @@ function InspectionForm({
   onPersonSelect,
   onChecklistChange,
   canUploadEvidence,
+  canCreateAction = false,
   uploading,
   onUploadEvidenceForItem,
   isMobile = false,
@@ -2570,10 +2595,35 @@ function InspectionForm({
   onPersonSelect: (value: string, target: "inspector" | "signoff") => void;
   onChecklistChange: (itemId: string, field: keyof ChecklistResponse, value: string) => void;
   canUploadEvidence: boolean;
+  /** Allows the Create action button on a finding. */
+  canCreateAction?: boolean;
   uploading: boolean;
   onUploadEvidenceForItem: (itemNumber: string, event: ChangeEvent<HTMLInputElement>) => void;
   isMobile?: boolean;
 }) {
+  // A finding is a NOK answer. The action links to the saved inspection, so the inspection must be saved first.
+  function renderCreateAction(item: ChecklistItem, response: ChecklistResponse, style: CSSProperties) {
+    if (response.answer !== "NOK") return null;
+    if (canCreateAction && draft.id) {
+      return (
+        <a
+          href={findingActionHref(draft, item, response.comments)}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ ...style, textDecoration: "none", background: "#005670", color: "#ffffff", border: "1px solid #005670" }}
+          title="Opens the Actions form already linked to this inspection, in a new tab"
+        >
+          Create action
+        </a>
+      );
+    }
+    return (
+      <span style={{ ...style, opacity: 0.55, cursor: "not-allowed" }} title={draft.id ? "You do not have permission to create actions" : "Save the inspection first so the action can link to it"}>
+        Create action
+      </span>
+    );
+  }
+
   return (
     <div style={compact && !workbench ? (isMobile ? mobileCompactFormStyle : compactFormStyle) : undefined}>
       <WorkbenchStep stepKey="details">
@@ -2613,7 +2663,7 @@ function InspectionForm({
                       <span>{item.text}</span>
                     </div>
                     <div style={mobileAnswerGridStyle}>
-                      {(["N/A", "Yes", "No"] as ChecklistAnswer[]).map((answer) => (
+                      {(["N/A", "OK", "NOK"] as ChecklistAnswer[]).map((answer) => (
                         <label
                           key={answer}
                           style={{
@@ -2651,6 +2701,7 @@ function InspectionForm({
                         onChange={(event) => onUploadEvidenceForItem(item.id, event)}
                       />
                     </label>
+                    {renderCreateAction(item, response, mobileItemUploadButtonStyle)}
                   </div>
                 );
               })}
@@ -2661,8 +2712,8 @@ function InspectionForm({
                 <span>Item</span>
                 <span>Description</span>
               <span style={centerHeaderCellStyle}>N/A</span>
-              <span style={centerHeaderCellStyle}>Yes</span>
-              <span style={centerHeaderCellStyle}>No</span>
+              <span style={centerHeaderCellStyle}>OK</span>
+              <span style={centerHeaderCellStyle}>NOK</span>
                 <span>Comments / action notes</span>
                 <span>Evidence</span>
               </div>
@@ -2672,7 +2723,7 @@ function InspectionForm({
                 <div key={item.id} className="ims-register-row" style={checklistRowStyle}>
                   <strong style={centeredChecklistCellStyle}>{item.number}</strong>
                   <span style={centeredChecklistCellStyle}>{item.text}</span>
-                    {(["N/A", "Yes", "No"] as ChecklistAnswer[]).map((answer) => (
+                    {(["N/A", "OK", "NOK"] as ChecklistAnswer[]).map((answer) => (
                       <label key={answer} style={radioCellStyle}>
                         <input
                           type="radio"
@@ -2683,18 +2734,23 @@ function InspectionForm({
                       </label>
                     ))}
                     <textarea style={smallTextareaStyle} value={response.comments} onChange={(event) => onChecklistChange(item.id, "comments", event.target.value)} />
-                    <label style={{ ...itemUploadButtonStyle, opacity: canUploadEvidence ? 1 : 0.55 }}>
-                      {uploading ? "..." : "Upload"}
-                      <input
-                        type="file"
-                        multiple
-                        accept={IMS_EVIDENCE_ACCEPT}
+                    <div style={{ display: "grid", alignContent: "center" }}>
+                    <div style={{ display: "grid", gap: "4px" }}>
+                      <label style={{ ...itemUploadButtonStyle, margin: "8px 8px 0", opacity: canUploadEvidence ? 1 : 0.55 }}>
+                        {uploading ? "..." : "Upload"}
+                        <input
+                          type="file"
+                          multiple
+                          accept={IMS_EVIDENCE_ACCEPT}
                        
-                        style={{ display: "none" }}
-                        disabled={!canUploadEvidence || uploading}
-                        onChange={(event) => onUploadEvidenceForItem(item.id, event)}
-                      />
-                    </label>
+                          style={{ display: "none" }}
+                          disabled={!canUploadEvidence || uploading}
+                          onChange={(event) => onUploadEvidenceForItem(item.id, event)}
+                        />
+                      </label>
+                      {renderCreateAction(item, response, { ...itemUploadButtonStyle, margin: "0 8px 8px" })}
+                    </div>
+                    </div>
                   </div>
                 );
               })}
@@ -2732,7 +2788,7 @@ function inspectionChecklistStats(draft: HseInspectionRecord) {
   const items = getChecklistForTemplateId(draft.form_id).flatMap((section) => section.items);
   const answeredFlags = items.map((item) => Boolean(draft.checklist_responses[item.id]?.answer));
   const findings = items
-    .filter((item) => isFindingAnswer(draft.form_id, item.id, draft.checklist_responses[item.id]?.answer))
+    .filter((item) => draft.checklist_responses[item.id]?.answer === "NOK")
     .map((item) => ({ number: item.number, text: item.text, note: clean(draft.checklist_responses[item.id]?.comments) }));
   return {
     total: items.length,
@@ -2893,6 +2949,7 @@ function InspectionWorkbench({
         onPersonSelect={onPersonSelect}
         onChecklistChange={onChecklistChange}
         canUploadEvidence={canUploadEvidence}
+        canCreateAction={canEdit}
         uploading={uploading}
         onUploadEvidenceForItem={onUploadEvidenceForItem}
         isMobile={isMobile}
@@ -3247,8 +3304,8 @@ const inspectionSectionStyle: CSSProperties = { border: "1px solid #D0D0CE", bor
 const inspectionSectionTitleStyle: CSSProperties = { margin: 0, background: "#005670", color: "white", padding: "12px 14px", fontSize: "16px", fontWeight: 900 };
 const inspectionSectionBodyStyle: CSSProperties = { padding: "14px" };
 const checklistShellStyle: CSSProperties = { display: "grid", gap: "0", border: "1px solid #D0D0CE", borderRadius: "10px", overflow: "hidden" };
-const checklistHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "center", padding: "9px 10px", background: "#005670", fontWeight: 800, color: "#ffffff", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" };
-const checklistRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 74px", gap: 0, alignItems: "stretch", borderTop: "1px solid #D0D0CE", fontSize: "12px" };
+const checklistHeaderStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 112px", gap: 0, alignItems: "center", padding: "9px 10px", background: "#005670", fontWeight: 800, color: "#ffffff", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em" };
+const checklistRowStyle: CSSProperties = { display: "grid", gridTemplateColumns: "60px minmax(220px, 1fr) 48px 48px 48px minmax(160px, 0.62fr) 112px", gap: 0, alignItems: "stretch", borderTop: "1px solid #D0D0CE", fontSize: "12px" };
 const centerHeaderCellStyle: CSSProperties = { textAlign: "center", justifySelf: "center", width: "100%" };
 const centeredChecklistCellStyle: CSSProperties = { display: "flex", alignItems: "center", padding: "8px 8px 8px 0", lineHeight: 1.35 };
 const radioCellStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid #D0D0CE" };

@@ -111,7 +111,7 @@ function SectionHseStart() {
         <tbody>
           <tr><td style={nowrapCell}><strong>Open Inspections</strong></td><td style={imsTableCellStyle}>Every inspection that is not Complete or Closed (so Draft and Open ones). Click it to open the register filtered to <strong>Open</strong>.</td></tr>
           <tr><td style={nowrapCell}><strong>Completed / Closed</strong></td><td style={imsTableCellStyle}>Inspections that are Complete or Closed. Click it to open the register filtered to <strong>Complete</strong>.</td></tr>
-          <tr><td style={nowrapCell}><strong>Open Findings</strong></td><td style={imsTableCellStyle}>The total number of findings across all inspections. On most questions a <strong>No</strong> is a finding. On the few questions that ask whether something bad is there, a <strong>Yes</strong> is the finding (see Checklist answers).</td></tr>
+          <tr><td style={nowrapCell}><strong>Open Findings</strong></td><td style={imsTableCellStyle}>The total number of checklist items marked <strong>NOK</strong> across all inspections.</td></tr>
           <tr><td style={nowrapCell}><strong>Evidence Files</strong></td><td style={imsTableCellStyle}>The total number of evidence files uploaded.</td></tr>
         </tbody>
       </table>
@@ -164,21 +164,21 @@ function SectionHseFill() {
         </div>
         <div style={mockLabel}>2.0 Working Area</div>
         <table style={imsTableStyle}>
-          <thead><tr>{["Item", "Description", "N/A", "Yes", "No", "Comments / action notes", "Evidence"].map(h => <th key={h} style={imsTableHeadStyle}>{h}</th>)}</tr></thead>
+          <thead><tr>{["Item", "Description", "N/A", "OK", "NOK", "Comments / action notes", "Evidence"].map(h => <th key={h} style={imsTableHeadStyle}>{h}</th>)}</tr></thead>
           <tbody>
             <tr>
               <td style={cellStrong}>2.1</td>
               <td style={imsTableCellStyle}>Housekeeping is satisfactory?</td>
               <td style={imsTableCellStyle}>○</td><td style={imsTableCellStyle}>○</td><td style={imsTableCellStyle}>●</td>
               <td style={imsTableCellStyle}>Pallets blocking walkway</td>
-              <td style={imsTableCellStyle}><span style={btn("ghost")}>Upload</span></td>
+              <td style={imsTableCellStyle}><span style={btn("ghost")}>Upload</span> <span style={btn("ghost")}>Create action</span></td>
             </tr>
           </tbody>
         </table>
       </div>
       <div style={stepList}>
         <Step n={1}>Fill in <code style={codeStyle}>Title</code> (required), <code style={codeStyle}>Department</code>, <code style={codeStyle}>Inspection Date</code>, <code style={codeStyle}>Project / Work Scope</code>, <code style={codeStyle}>Vessel / Spread</code> and <code style={codeStyle}>Area / Zone</code>. Pick the <code style={codeStyle}>Inspector</code> from the list; their position is filled in for you and you can change it.</Step>
-        <Step n={2}>Work through each checklist section. For every item choose <strong>N/A</strong>, <strong>Yes</strong> or <strong>No</strong>, and type anything useful in <strong>Comments / action notes</strong>. Answers that count as a finding are added to <strong>Open Findings</strong> on the Dashboard. On most questions that is a <strong>No</strong>, but not on every question, so read the wording.</Step>
+        <Step n={2}>Work through each checklist section. For every item choose <strong>N/A</strong>, <strong>OK</strong> or <strong>NOK</strong>, and type anything useful in <strong>Comments / action notes</strong>. <strong>NOK</strong> means not OK: it is a finding and is added to <strong>Open Findings</strong> on the Dashboard. On a NOK item a <strong>Create action</strong> button appears next to <strong>Upload</strong>.</Step>
         <Step n={3}>Use <strong>Upload</strong> on an item row to attach a photo or file to that exact item (see <strong>Register, Evidence &amp; PDF</strong>).</Step>
         <Step n={4}>Add overall remarks under <strong>Additional Comments</strong> (the last numbered section on every form).</Step>
         <Step n={5}>In <strong>Sign-Off</strong>, choose the <code style={codeStyle}>Name</code> from the list, check <code style={codeStyle}>Position</code>, <code style={codeStyle}>Company</code> (defaults to Enshore Subsea) and set the <code style={codeStyle}>Date</code>.</Step>
@@ -311,7 +311,7 @@ function SectionHseRegister() {
       <h3 style={h3Style}>Linked Actions</h3>
       <p style={pStyle}>Findings that need follow-up are handled as central Actions. In a saved inspection, the <strong>Linked Actions</strong> panel (in step 3 <strong>Comments</strong>) has a <strong>Create Linked HSE Action</strong> button. It opens the central Action form with the source set to HSE Inspection, department HSEQ, and the project and inspection number filled in. Linked actions are listed in the panel (action number, title, owner, status, due date), each with an <strong>Open Action</strong> link.</p>
       <h3 style={h3Style}>The PDF report</h3>
-      <p style={pStyle}>Click <strong>PDF</strong> on a register row, or <strong>Export PDF</strong> at the bottom of the open record. The report contains the header details, every checklist section with N/A / Yes / No ticks and comments, <strong>Additional Comments</strong>, <strong>Actions</strong> (the linked central actions), <strong>Sign-Off</strong>, and an <strong>Evidence Register</strong> with an <strong>Open Evidence</strong> link for each file. PNG, JPG and WEBP photos are also placed in an <strong>Evidence Photos</strong> section.</p>
+      <p style={pStyle}>Click <strong>PDF</strong> on a register row, or <strong>Export PDF</strong> at the bottom of the open record. The report contains the header details, every checklist section with N/A / OK / NOK ticks and comments, <strong>Additional Comments</strong>, <strong>Actions</strong> (the linked central actions), <strong>Sign-Off</strong>, and an <strong>Evidence Register</strong> with an <strong>Open Evidence</strong> link for each file. PNG, JPG and WEBP photos are also placed in an <strong>Evidence Photos</strong> section.</p>
       <p style={pStyle}>The PDF opens in a new tab. If your browser or phone does not allow that, the file is saved to your device instead, so it is never lost. The file name is the inspection number followed by the form title.</p>
     </>
   );
@@ -324,7 +324,7 @@ function SectionPhone() {
     <>
       <div style={eyebrow}>HSE Inspections</div>
       <h2 style={h2Style}>Completing an Inspection on a Phone</h2>
-      <p style={pStyle}>The same inspection page works on a phone. On a narrow screen the checklist changes to one card per item with large <strong>N/A</strong>, <strong>Yes</strong> and <strong>No</strong> buttons, so it is easy to use with one hand.</p>
+      <p style={pStyle}>The same inspection page works on a phone. On a narrow screen the checklist changes to one card per item with large <strong>N/A</strong>, <strong>OK</strong> and <strong>NOK</strong> buttons, so it is easy to use with one hand.</p>
       <h3 style={h3Style}>Getting there</h3>
       <div style={stepList}>
         <Step n={1}>On a computer, open <strong>HSE Inspections</strong> and find <strong>Mobile QR Access</strong> on the Dashboard. Scan the QR code with your phone camera, or use <strong>Open mobile inspection page</strong>.</Step>
@@ -337,7 +337,7 @@ function SectionPhone() {
         <div style={{ background: "#fff", border: `1px solid ${imsColours.border}`, borderRadius: 10, padding: 12, maxWidth: 360 }}>
           <div style={{ fontSize: 13, marginBottom: 8 }}><strong>2.13</strong> PPE arrangements are complied with?</div>
           <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-            {["N/A", "Yes", "No"].map((a, i) => (
+            {["N/A", "OK", "NOK"].map((a, i) => (
               <div key={a} style={{ flex: 1, textAlign: "center", padding: "8px 0", borderRadius: 8, border: `1px solid ${i === 1 ? imsColours.brand : imsColours.border}`, background: i === 1 ? imsColours.page : "#fff", color: i === 1 ? imsColours.brand : imsColours.ink, fontWeight: 700 }}>{a}</div>
             ))}
           </div>
@@ -347,7 +347,7 @@ function SectionPhone() {
       </div>
       <div style={stepList}>
         <Step n={1}>Complete <strong>Report Details</strong> (title, date, area, inspector).</Step>
-        <Step n={2}>For each item, tap <strong>N/A</strong>, <strong>Yes</strong> or <strong>No</strong> and add <strong>Comments / action notes</strong> if needed.</Step>
+        <Step n={2}>For each item, tap <strong>N/A</strong>, <strong>OK</strong> or <strong>NOK</strong> and add <strong>Comments / action notes</strong> if needed. On a NOK item a <strong>Create action</strong> button appears under <strong>Upload evidence</strong>.</Step>
         <Step n={3}>Add <strong>Additional Comments</strong> and the <strong>Sign-Off</strong> details at the bottom.</Step>
         <Step n={4}>Tap <strong>Save Inspection</strong>. The record then opens in the register, where it is shown as a card with its status and a <strong>PDF</strong> button. The steps (Report details, Checklist, Comments, Sign-off) and the live <strong>Inspection report (PDF)</strong> summary are on the phone too: the steps sit in two columns above the form, and the still-missing box and summary appear below it.</Step>
       </div>
@@ -560,11 +560,14 @@ function SectionStatuses() {
       <h3 style={h3Style}>Checklist answers</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         <span style={pill(imsColours.page, imsColours.muted)}>N/A</span>
-        <span style={pill(imsColours.brand, "#ffffff")}>Yes</span>
-        <span style={pill(imsColours.danger, "#ffffff")}>No</span>
+        <span style={pill(imsColours.brand, "#ffffff")}>OK</span>
+        <span style={pill(imsColours.danger, "#ffffff")}>NOK</span>
       </div>
-      <p style={pStyle}>A <strong>finding</strong> is the bad answer to a question. On most questions that is <strong>No</strong>, for example &ldquo;Lighting satisfactory?&rdquo;.</p>
-      <p style={pStyle}>Some questions ask whether something bad is there, for example &ldquo;Trip hazards present?&rdquo; or &ldquo;Is there evidence of waste cross-contamination?&rdquo;. On those a <strong>Yes</strong> is the finding and a No is the good answer. Every <strong>&ldquo;Other &hellip; observations&rdquo;</strong> line works this way too: choose <strong>Yes</strong> if you have something else to report and write it in the comment. There are 30 such questions across the six forms. Findings show in Open Findings on the Dashboard, the Open findings column of the register, and the report summary beside the form.</p>
+      <p style={pStyle}><strong>OK</strong> is the good answer and <strong>NOK</strong> means not OK. A <strong>NOK</strong> is a <strong>finding</strong>. Choose by what you found, not by how the question is worded. For &ldquo;Lighting satisfactory?&rdquo; choose NOK if the lighting is not satisfactory. For &ldquo;Trip hazards present?&rdquo; choose NOK if there are trip hazards and OK if there are none.</p>
+      <p style={pStyle}>On every <strong>&ldquo;Other &hellip; observations&rdquo;</strong> line choose <strong>NOK</strong> if you have something else to report, and write it in the comment. Findings show in Open Findings on the Dashboard, the Open findings column of the register, and the report summary beside the form.</p>
+      <p style={pStyle}>Inspections saved before OK and NOK existed used Yes and No. They are converted automatically when opened, so a No on &ldquo;Lighting satisfactory?&rdquo; shows as NOK and a Yes on &ldquo;Trip hazards present?&rdquo; also shows as NOK. Finding counts do not change.</p>
+      <h3 style={h3Style}>Create action</h3>
+      <p style={pStyle}>On a <strong>NOK</strong> item a <strong>Create action</strong> button appears next to <strong>Upload</strong> (under <strong>Upload evidence</strong> on a phone). It opens the HSE Actions form in a new tab with the source set to HSE Inspection and the action already linked to this inspection. The title and description are filled in from the item number, the question and your comment, so you only need to set the owner and due date. The inspection must be saved first, so that the action has something to link to. The action then shows under <strong>Linked Actions</strong> on the inspection.</p>
       <h3 style={h3Style}>Overall Inspections status (manual entries)</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         {["Planned", "Confirmed", "Completed", "Cancelled"].map(s => <span key={s} style={badge(s)}>{s}</span>)}
