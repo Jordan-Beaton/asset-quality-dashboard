@@ -298,11 +298,6 @@ function rowDueState(row: { status: string; due_date: string | null | undefined 
   return (row.status || "") === "Closed" ? "none" : dueState(row.due_date);
 }
 
-// A central action counts as finished when it is closed or completed (the same words the Actions page treats as closed).
-function isClosedActionStatus(status: string | null | undefined) {
-  return ["closed", "complete", "completed"].includes((status || "").trim().toLowerCase());
-}
-
 function getSeverityTone(severity: string) {
   const value = (severity || "").toLowerCase();
   if (value.includes("high") || value.includes("major") || value.includes("critical")) {
@@ -3639,12 +3634,9 @@ function NcrCapaPageContent() {
     const externalSource = editRow.source_type === "Supplier" || editRow.source_type === "External";
 
     // What each step needs, taken from the values on screen (typed but unsaved text counts).
-    const linkedActionList = selectedLinkedActions;
     const rootCategoryRecorded =
       filled(editRow.root_cause_category) &&
       (getRootCauseCategorySelectValue(editRow.root_cause_category) !== "Other" || filled(editRootCauseOther));
-    const linkedActionsClosed =
-      linkedActionList.length > 0 && linkedActionList.every((action) => isClosedActionStatus(action.status));
 
     type NcrCheck = { label: string; ok: boolean };
     const describeChecks: NcrCheck[] = [
@@ -3659,7 +3651,6 @@ function NcrCapaPageContent() {
       { label: "Root cause category", ok: rootCategoryRecorded },
       { label: "Root cause description", ok: filled(editRow.root_cause_description) },
       { label: "Corrective action written", ok: filled(editRow.corrective_action) },
-      { label: "Corrective action linked and closed", ok: linkedActionsClosed },
       ...(externalSource
         ? [{ label: "Supplier / client response", ok: filled(editRow.supplier_response) || filled(editRow.supplier_acknowledgement) }]
         : []),

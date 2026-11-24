@@ -130,7 +130,7 @@ function SectionRecordScreen() {
           { label: "Verify & close", pct: 0 },
         ]}
         active={1}
-        missing={["Containment action", "Root cause category", "Corrective action linked and closed"]}
+        missing={["Containment action", "Root cause category", "Root cause description"]}
         gate="closing this NCR"
         summaryTitle="NCR report"
         summaryRows={[["NCR Number", "NCR-032"], ["Severity", "High"], ["Containment Action", null]]}
@@ -146,7 +146,7 @@ function SectionRecordScreen() {
       </div>
       <p style={pStyle}>Each step shows a percentage: the share of its checks that are done. For step 4 that means the status is Closed and the closure date has been stamped. The Status box in step 1 and the one in step 4 are the same field, so changing either updates both. The screen opens on the first step that is below 100%. Click any step to go to it.</p>
       <h3 style={h3Style}>Still missing</h3>
-      <p style={pStyle}>A box lists what is still missing before closing, as small chips such as Title, Containment action, or Root cause category. Click a chip to jump to the step that holds it. The checks are: Title, Description, Owner, Project and Due date; Containment action; Root cause category (and the other-category text if you chose Other), Root cause description, Corrective action written, and Corrective action linked and closed; a Supplier / client response when the Source Type is Supplier or External. Sections D and E are the boxes you fill in to record the corrective action and the supplier or client response; NCRs no longer link CAPA effectiveness records.</p>
+      <p style={pStyle}>A box lists what is still missing before closing, as small chips such as Title, Containment action, or Root cause category. Click a chip to jump to the step that holds it. The checks are: Title, Description, Owner, Project and Due date; Containment action; Root cause category (and the other-category text if you chose Other), Root cause description, and Corrective action written; a Supplier / client response when the Source Type is Supplier or External. Sections D and E are the boxes you fill in to record the corrective action and the supplier or client response; NCRs no longer link CAPA effectiveness records.</p>
       <div style={callout("info")}>
         <span>ℹ</span>
         <div>The chips warn, they never block. If you click <strong>Close NCR</strong> with items missing, you are asked &ldquo;N items are still missing: ... Close anyway?&rdquo; and can choose to go ahead. Close NCR sets the status to Closed and saves, the same as choosing Closed and clicking Save Changes.</div>
