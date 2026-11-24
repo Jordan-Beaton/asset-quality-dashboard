@@ -2,8 +2,9 @@
 
 import { ImsBackNav } from "../../../src/components/ImsBackNav";
 import type { ChangeEvent, CSSProperties, ReactNode, RefObject } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
@@ -810,9 +811,16 @@ function countFindings(record: Pick<HseInspectionRecord, "checklist_responses">)
   return Object.values(record.checklist_responses || {}).filter((response) => response?.answer === "NOK").length;
 }
 
+// Gives the form and the record header the autosave status and the "Create action" handler without passing props through every view.
+const InspectionPageContext = createContext<{
+  autosaveLabel: string;
+  createActionForFinding: (item: ChecklistItem, comment: string) => void;
+}>({ autosaveLabel: "", createActionForFinding: () => undefined });
+
 // "Create action" next to Evidence on a finding. Opens the HSE Actions create form already filled in and linked to this
 // inspection. The item number is in the action title and description, so the action can be traced back to the item.
-function findingActionHref(draft: HseInspectionRecord, item: ChecklistItem, comment: string) {
+// returnTo is where the Actions page sends you after the action is saved: this inspection, on this item.
+function findingActionHref(draft: HseInspectionRecord, item: ChecklistItem, comment: string, returnTo: string) {
   const text = clean(item.text);
   const note = clean(comment);
   const title = `Item ${item.number}: ${note || text}`.slice(0, 120);
@@ -824,7 +832,8 @@ function findingActionHref(draft: HseInspectionRecord, item: ChecklistItem, comm
     `&prefill_title=${encodeURIComponent(title)}` +
     `&prefill_description=${encodeURIComponent(description)}` +
     `&linked_hse_inspection_id=${encodeURIComponent(draft.id)}` +
-    `&linked_hse_inspection_number=${encodeURIComponent(draft.inspection_number)}`
+    `&linked_hse_inspection_number=${encodeURIComponent(draft.inspection_number)}` +
+    `&return_to=${encodeURIComponent(returnTo)}`
   );
 }
 
@@ -1002,6 +1011,45 @@ async function imageUrlToDataUrl(url: string) {
   });
 }
 
+function buildPayload(record: HseInspectionRecord) {
+  return {
+    inspection_number: record.inspection_number,
+    form_id: record.form_id,
+    form_number: record.form_number,
+    form_revision: record.form_revision || null,
+    form_revision_date: record.form_revision_date || null,
+    form_title: record.form_title,
+    title: record.title,
+    department: record.department || null,
+    project_work_scope: record.project_work_scope || null,
+    vessel_spread: record.vessel_spread || null,
+    area_zone: record.area_zone || null,
+    inspection_date: record.inspection_date || null,
+    inspector_name: record.inspector_name || null,
+    inspector_position: record.inspector_position || null,
+    status: record.status || "Draft",
+    checklist_responses: record.checklist_responses || {},
+    additional_comments: record.additional_comments || null,
+    actions: record.actions.map((row) => ({
+      action: clean(row.action),
+      action_by: clean(row.action_by),
+      target_date: clean(row.target_date),
+    })).filter((row) => row.action || row.action_by || row.target_date),
+    signoff_name: record.signoff_name || null,
+    signoff_position: record.signoff_position || null,
+    signoff_company: record.signoff_company || null,
+    signoff_date: record.signoff_date || null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// What was last loaded or saved, as text. Autosave compares the form with this so only real changes are saved.
+function snapshotOf(record: HseInspectionRecord) {
+  const payload: Record<string, unknown> = { ...buildPayload(record) };
+  delete payload.updated_at;
+  return JSON.stringify(payload);
+}
+
 export default function HseInspectionsPage() {
   const imsPermissions = useImsPermissions();
   const [records, setRecords] = useState<HseInspectionRecord[]>([]);
@@ -1030,6 +1078,15 @@ export default function HseInspectionsPage() {
   const [uploadItemNumber, setUploadItemNumber] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [isFieldCreateMode, setIsFieldCreateMode] = useState(false);
+  const router = useRouter();
+
+  // Autosave bookkeeping. savedSnapshotRef holds what was last loaded or saved, so only real changes are saved.
+  const draftRef = useRef(draft);
+  const selectedIdRef = useRef("");
+  const savedSnapshotRef = useRef("");
+  const userEditedRef = useRef(false);
+  const autosavingRef = useRef(false);
+  const [autosave, setAutosave] = useState<{ state: "idle" | "pending" | "saving" | "saved" | "error"; at: string }>({ state: "idle", at: "" });
 
   const selectedTemplate = useMemo(
     () => inspectionTemplates.find((template) => template.id === selectedTemplateId) ?? inspectionTemplates.find((template) => template.id === defaultTemplateId)!,
@@ -1181,6 +1238,7 @@ export default function HseInspectionsPage() {
   }, []);
 
   function updateDraft<K extends keyof HseInspectionRecord>(key: K, value: HseInspectionRecord[K]) {
+    userEditedRef.current = true;
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
@@ -1196,6 +1254,7 @@ export default function HseInspectionsPage() {
   }
 
   function updateChecklist(itemId: string, field: keyof ChecklistResponse, value: string) {
+    userEditedRef.current = true;
     setDraft((current) => ({
       ...current,
       checklist_responses: {
@@ -1210,6 +1269,7 @@ export default function HseInspectionsPage() {
   }
 
   function updateAction(index: number, field: keyof InspectionAction, value: string) {
+    userEditedRef.current = true;
     setDraft((current) => {
       const rows = current.actions.length ? [...current.actions] : [{ action: "", action_by: "", target_date: "" }];
       rows[index] = { ...rows[index], [field]: value };
@@ -1218,20 +1278,26 @@ export default function HseInspectionsPage() {
   }
 
   function addAction() {
+    userEditedRef.current = true;
     setDraft((current) => ({ ...current, actions: [...current.actions, { action: "", action_by: "", target_date: "" }] }));
   }
 
   function removeAction(index: number) {
+    userEditedRef.current = true;
     setDraft((current) => ({ ...current, actions: current.actions.filter((_, rowIndex) => rowIndex !== index) }));
   }
 
   function selectRecord(record: HseInspectionRecord) {
     setSelectedId(record.id);
-    setDraft({
+    const loaded = {
       ...record,
       checklist_responses: normalizeChecklist(record.checklist_responses, record.form_id),
       actions: normalizeActions(record.actions),
-    });
+    };
+    savedSnapshotRef.current = snapshotOf(loaded);
+    userEditedRef.current = false;
+    setAutosave({ state: "idle", at: "" });
+    setDraft(loaded);
     setSelectedTemplateId(record.form_id || defaultTemplateId);
     setActiveView("register");
   }
@@ -1268,11 +1334,15 @@ export default function HseInspectionsPage() {
   // A record restored from the address (?selected=) needs its form filled in, exactly as clicking the row does.
   useEffect(() => {
     if (!selected || draft.id === selected.id) return;
-    setDraft({
+    const loaded = {
       ...selected,
       checklist_responses: normalizeChecklist(selected.checklist_responses, selected.form_id),
       actions: normalizeActions(selected.actions),
-    });
+    };
+    savedSnapshotRef.current = snapshotOf(loaded);
+    userEditedRef.current = false;
+    setAutosave({ state: "idle", at: "" });
+    setDraft(loaded);
     setSelectedTemplateId(selected.form_id || defaultTemplateId);
   }, [selected]);
 
@@ -1283,40 +1353,12 @@ export default function HseInspectionsPage() {
     setSelectedId("");
     setPendingEvidence([]);
     setUploadItemNumber("");
-    setDraft({ ...makeDraft(template), inspection_number: nextInspectionNumber(records) });
+    const fresh = { ...makeDraft(template), inspection_number: nextInspectionNumber(records) };
+    savedSnapshotRef.current = snapshotOf(fresh);
+    userEditedRef.current = false;
+    setAutosave({ state: "idle", at: "" });
+    setDraft(fresh);
     setActiveView("create");
-  }
-
-  function buildPayload(record: HseInspectionRecord) {
-    return {
-      inspection_number: record.inspection_number,
-      form_id: record.form_id,
-      form_number: record.form_number,
-      form_revision: record.form_revision || null,
-      form_revision_date: record.form_revision_date || null,
-      form_title: record.form_title,
-      title: record.title,
-      department: record.department || null,
-      project_work_scope: record.project_work_scope || null,
-      vessel_spread: record.vessel_spread || null,
-      area_zone: record.area_zone || null,
-      inspection_date: record.inspection_date || null,
-      inspector_name: record.inspector_name || null,
-      inspector_position: record.inspector_position || null,
-      status: record.status || "Draft",
-      checklist_responses: record.checklist_responses || {},
-      additional_comments: record.additional_comments || null,
-      actions: record.actions.map((row) => ({
-        action: clean(row.action),
-        action_by: clean(row.action_by),
-        target_date: clean(row.target_date),
-      })).filter((row) => row.action || row.action_by || row.target_date),
-      signoff_name: record.signoff_name || null,
-      signoff_position: record.signoff_position || null,
-      signoff_company: record.signoff_company || null,
-      signoff_date: record.signoff_date || null,
-      updated_at: new Date().toISOString(),
-    };
   }
 
   // overrides lets the "Complete Inspection" button save with the status set to Complete: the same as choosing Complete in the Status box and pressing Save Inspection.
@@ -1344,6 +1386,9 @@ export default function HseInspectionsPage() {
         return;
       }
       if (Object.keys(overrides).length) setDraft((current) => ({ ...current, ...overrides }));
+      savedSnapshotRef.current = snapshotOf({ ...draft, ...overrides });
+      userEditedRef.current = false;
+      setAutosave({ state: "idle", at: "" });
       setMessage(`${draft.inspection_number} saved.`);
       await loadData();
       return;
@@ -1356,6 +1401,8 @@ export default function HseInspectionsPage() {
       return;
     }
     const created = data as HseInspectionRecord;
+    savedSnapshotRef.current = snapshotOf({ ...draft, ...overrides, id: created.id, inspection_number: created.inspection_number });
+    userEditedRef.current = false;
     setSelectedId(created.id);
     setMessage(`${created.inspection_number} created.`);
     if (pendingEvidence.length) {
@@ -1364,6 +1411,125 @@ export default function HseInspectionsPage() {
     }
     await loadData();
     setActiveView("register");
+  }
+
+  // ---- Autosave and "Create action" ----
+  // A saved inspection that is still a Draft or Open saves itself about 1.5 seconds after the last change, and as soon as the
+  // page is hidden (switching apps on a phone). It writes exactly what Save Inspection writes. A brand-new inspection that has
+  // never been saved is created by its first Save, because creating one moves you to the register. Complete and Closed
+  // inspections are only saved with Save Inspection.
+  // Saves the form to an inspection that already exists, without messages or reloading. Returns an error message, or null.
+  async function persistExisting(current: HseInspectionRecord, id: string): Promise<string | null> {
+    const payload = buildPayload({ ...current, inspection_number: current.inspection_number || nextInspectionNumber(records) });
+    const { error } = await supabase.from("hse_inspection_records").update(payload).eq("id", id);
+    if (error) return error.message;
+    savedSnapshotRef.current = snapshotOf(current);
+    setRecords((rows) => rows.map((row) => (row.id === id ? { ...row, ...current, updated_at: payload.updated_at } : row)));
+    return null;
+  }
+
+  async function autosaveNow() {
+    const current = draftRef.current;
+    const id = selectedIdRef.current;
+    if (!id || current.id !== id || autosavingRef.current || !userEditedRef.current || !canEditInspection) return;
+    if (current.status !== "Draft" && current.status !== "Open") return;
+    if (!current.title.trim() || !selectedTemplate.enabled) return;
+    if (snapshotOf(current) === savedSnapshotRef.current) return;
+    autosavingRef.current = true;
+    setAutosave({ state: "saving", at: "" });
+    const problem = await persistExisting(current, id);
+    autosavingRef.current = false;
+    if (problem) {
+      setAutosave({ state: "error", at: "" });
+      return;
+    }
+    setAutosave({ state: "saved", at: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) });
+    // Anything typed while this save was running is picked up straight away.
+    if (snapshotOf(draftRef.current) !== savedSnapshotRef.current) window.setTimeout(() => void autosaveNowRef.current(), 600);
+  }
+  const autosaveNowRef = useRef(autosaveNow);
+
+  useEffect(() => {
+    draftRef.current = draft;
+    selectedIdRef.current = selectedId;
+    autosaveNowRef.current = autosaveNow;
+  });
+
+  useEffect(() => {
+    if (!userEditedRef.current || !selectedId || !canEditInspection) return;
+    if (draft.status !== "Draft" && draft.status !== "Open") return;
+    if (snapshotOf(draft) === savedSnapshotRef.current) return;
+    setAutosave((current) => (current.state === "saving" ? current : { state: "pending", at: current.at }));
+    const timer = window.setTimeout(() => void autosaveNowRef.current(), 1500);
+    return () => window.clearTimeout(timer);
+  }, [draft, selectedId, canEditInspection]);
+
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === "hidden") void autosaveNowRef.current();
+    };
+    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, []);
+
+  const autosaveLabel = !selectedId
+    ? "Autosave starts after the first save"
+    : draft.status === "Complete" || draft.status === "Closed"
+    ? "Autosave is off for Complete and Closed inspections: use Save Inspection"
+    : !canEditInspection
+    ? ""
+    : autosave.state === "saving"
+    ? "Saving..."
+    : autosave.state === "pending"
+    ? "Unsaved changes"
+    : autosave.state === "error"
+    ? "Autosave failed: check your connection, then press Save Inspection"
+    : autosave.state === "saved"
+    ? `Autosaved ${autosave.at}`
+    : "Autosave on";
+
+  // "Create action" on a finding: save the inspection first (creating it if it is new), then open the Actions form linked to it.
+  // The Actions page sends you back to this inspection and item after the action is saved.
+  async function createActionForFinding(item: ChecklistItem, comment: string) {
+    const current = draftRef.current;
+    let id = selectedIdRef.current;
+    let number = current.inspection_number;
+    if (id) {
+      if (canEditInspection && snapshotOf(current) !== savedSnapshotRef.current) {
+        const problem = await persistExisting(current, id);
+        if (problem) {
+          setMessage(`The inspection could not be saved, so the action was not started: ${problem}`);
+          return;
+        }
+      }
+    } else {
+      if (!requireCreatePermission("create HSE inspections")) return;
+      if (!current.title.trim()) {
+        setMessage("Inspection title is required before an action can be created.");
+        return;
+      }
+      setSaving(true);
+      const payload = buildPayload({ ...current, inspection_number: current.inspection_number || nextInspectionNumber(records) });
+      const { data, error } = await supabase.from("hse_inspection_records").insert([payload]).select("*").single();
+      setSaving(false);
+      if (error) {
+        setMessage(`Create failed: ${error.message}`);
+        return;
+      }
+      const created = data as HseInspectionRecord;
+      if (pendingEvidence.length) {
+        await uploadEvidenceFiles(created.id, pendingEvidence.map((entry) => ({ file: entry.file, itemNumber: entry.item_number })));
+        setPendingEvidence([]);
+      }
+      id = created.id;
+      number = created.inspection_number;
+    }
+    const returnTo = `/hse/inspections?view=register&selected=${encodeURIComponent(id)}&step=checklist&item=${encodeURIComponent(item.id)}`;
+    router.push(findingActionHref({ ...current, id, inspection_number: number }, item, comment, returnTo));
   }
 
   async function deleteInspection(record: HseInspectionRecord) {
@@ -1990,6 +2156,7 @@ export default function HseInspectionsPage() {
   }
 
   return (
+    <InspectionPageContext.Provider value={{ autosaveLabel, createActionForFinding: (item, comment) => void createActionForFinding(item, comment) }}>
     <main style={isMobile ? mobileMainStyle : undefined}>
       {!isFieldCreateMode ? <ImsPermissionNotice /> : null}
       {isMobile && !isFieldCreateMode ? (
@@ -2093,6 +2260,7 @@ export default function HseInspectionsPage() {
         />
       ) : null}
     </main>
+    </InspectionPageContext.Provider>
   );
 }
 
@@ -2601,26 +2769,32 @@ function InspectionForm({
   onUploadEvidenceForItem: (itemNumber: string, event: ChangeEvent<HTMLInputElement>) => void;
   isMobile?: boolean;
 }) {
-  // A finding is a NOK answer. The action links to the saved inspection, so the inspection must be saved first.
+  const { createActionForFinding } = useContext(InspectionPageContext);
+
+  // A finding is a NOK answer. Clicking saves the inspection (creating it if it is new), then opens the Actions form linked
+  // to it. After the action is saved the Actions page brings you back to this inspection and item.
   function renderCreateAction(item: ChecklistItem, response: ChecklistResponse, style: CSSProperties) {
     if (response.answer !== "NOK") return null;
-    if (canCreateAction && draft.id) {
-      return (
-        <a
-          href={findingActionHref(draft, item, response.comments)}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ ...style, textDecoration: "none", background: "#005670", color: "#ffffff", border: "1px solid #005670" }}
-          title="Opens the Actions form already linked to this inspection, in a new tab"
-        >
-          Create action
-        </a>
-      );
-    }
     return (
-      <span style={{ ...style, opacity: 0.55, cursor: "not-allowed" }} title={draft.id ? "You do not have permission to create actions" : "Save the inspection first so the action can link to it"}>
+      <button
+        type="button"
+        disabled={!canCreateAction}
+        onClick={() => createActionForFinding(item, response.comments)}
+        style={{
+          ...style,
+          background: "#005670",
+          color: "#ffffff",
+          border: "1px solid #005670",
+          font: "inherit",
+          fontWeight: 900,
+          fontSize: "11px",
+          opacity: canCreateAction ? 1 : 0.55,
+          cursor: canCreateAction ? "pointer" : "not-allowed",
+        }}
+        title={canCreateAction ? "Saves this inspection, opens the Actions form linked to it, and brings you back here after you save the action" : "You do not have permission to create actions"}
+      >
         Create action
-      </span>
+      </button>
     );
   }
 
@@ -2657,7 +2831,7 @@ function InspectionForm({
               {section.items.map((item) => {
                 const response = draft.checklist_responses[item.id] || { answer: "", comments: "" };
                 return (
-                  <div key={item.id} style={mobileChecklistCardStyle}>
+                  <div key={item.id} id={`insp-item-${item.id}`} style={mobileChecklistCardStyle}>
                     <div style={mobileChecklistItemHeaderStyle}>
                       <strong>{item.number}</strong>
                       <span>{item.text}</span>
@@ -2720,7 +2894,7 @@ function InspectionForm({
               {section.items.map((item) => {
                 const response = draft.checklist_responses[item.id] || { answer: "", comments: "" };
                 return (
-                <div key={item.id} className="ims-register-row" style={checklistRowStyle}>
+                <div key={item.id} id={`insp-item-${item.id}`} className="ims-register-row" style={checklistRowStyle}>
                   <strong style={centeredChecklistCellStyle}>{item.number}</strong>
                   <span style={centeredChecklistCellStyle}>{item.text}</span>
                     {(["N/A", "OK", "NOK"] as ChecklistAnswer[]).map((answer) => (
@@ -2839,6 +3013,22 @@ function InspectionWorkbench({
   commentsExtras?: ReactNode;
   footer?: ReactNode;
 }) {
+  const { autosaveLabel } = useContext(InspectionPageContext);
+  // Coming back from the Actions form: open on the checklist step and scroll to the item, once. The address is then tidied.
+  const [requestedStep] = useState(() => (typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("step") || ""));
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const item = params.get("item") || "";
+    if (!params.has("step") && !item) return;
+    const timer = window.setTimeout(() => {
+      if (item) document.getElementById(`insp-item-${item}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      params.delete("step");
+      params.delete("item");
+      const query = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, []);
   const stats = inspectionChecklistStats(draft);
   const detailChecks = [
     Boolean(clean(draft.title)),
@@ -2925,12 +3115,13 @@ function InspectionWorkbench({
       steps={steps}
       missing={missing}
       reportLabel="PDF"
+      initialStep={requestedStep || undefined}
       header={
         <RecordHeader
           id={draft.inspection_number || "New inspection"}
           title={draft.title || draft.form_title}
           status={{ label: draft.status || "Draft", tone: toneForStatus(draft.status) }}
-          note={`${draft.form_number} ${recordRevisionLabel(draft)}`}
+          note={`${draft.form_number} ${recordRevisionLabel(draft)}${autosaveLabel ? ` · ${autosaveLabel}` : ""}`}
           actions={<>
             {canComplete ? <ImsButton onClick={handleComplete} disabled={!canEdit || saving} title="Sets the status to Complete and saves the inspection">Complete Inspection</ImsButton> : null}
             <ImsButton variant="secondary" onClick={onSave} disabled={!canEdit || saving}>{saving ? "Saving..." : "Save Inspection"}</ImsButton>

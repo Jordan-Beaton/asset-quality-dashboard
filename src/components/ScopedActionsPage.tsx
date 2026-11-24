@@ -520,6 +520,8 @@ function ScopedActionsPageContent({ scope }: { scope: ScopedActionsScope }) {
   const [assetCalibrationOptions, setAssetCalibrationOptions] = useState<AssetCalibrationOption[]>([]);
   const [hseInspectionOptions, setHseInspectionOptions] = useState<HseInspectionOption[]>([]);
   const [activeView, setActiveView] = useUrlState<ActionView>("view", "dashboard", ["dashboard", "register", "create"]);
+  // Set when the inspection page sends you here to raise an action: after saving, you go back to that inspection.
+  const [returnTo, setReturnTo] = useState("");
   const [selectedId, setSelectedId] = useUrlState("selected", "");
   const [search, setSearch] = useUrlState("search", "");
   const [statusFilter, setStatusFilter] = useUrlState("status", "");
@@ -702,6 +704,9 @@ function ScopedActionsPageContent({ scope }: { scope: ScopedActionsScope }) {
     const prefillSource = params.get("prefill_source") || "";
     const linkedHseInspectionId = params.get("linked_hse_inspection_id") || "";
     const linkedHseInspectionNumber = params.get("linked_hse_inspection_number") || "";
+    // Only an inspection page address is accepted, so the link cannot send anyone to another site.
+    const returnParam = params.get("return_to") || "";
+    if (returnParam.startsWith("/hse/inspections") && !returnParam.includes("//")) setReturnTo(returnParam);
     if (view === "create" || prefillSource || linkedHseInspectionId || linkedHseInspectionNumber) {
       setActiveView("create");
       setForm((current) => ({
@@ -946,6 +951,11 @@ function ScopedActionsPageContent({ scope }: { scope: ScopedActionsScope }) {
     }
     setForm(emptyForm);
     setMessage(`${nextNumber} created in central Action Management as ${scope.article} ${dept} action.`);
+    if (returnTo) {
+      // Raised from an inspection item: go straight back to that inspection and item.
+      router.push(returnTo);
+      return;
+    }
     setActiveView("register");
     await loadData();
   }
@@ -1711,6 +1721,16 @@ function ScopedActionsPageContent({ scope }: { scope: ScopedActionsScope }) {
 
       {activeView === "create" ? (
         <SectionCard title={`Create ${dept} Action`} subtitle={`Creates a central Action Management record with department ${dept}.`}>
+          {returnTo ? (
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px", justifyContent: "space-between", border: "1px solid #D0D0CE", borderRadius: "12px", background: "#EEF7F8", padding: "10px 14px", marginBottom: "14px", fontSize: "13px" }}>
+              <span>
+                After you save, you go back to {form.linked_hse_inspection_number ? `inspection ${form.linked_hse_inspection_number}` : "the inspection"}.
+              </span>
+              <button type="button" onClick={() => router.push(returnTo)} style={{ minHeight: "40px", border: "1px solid #005670", borderRadius: "10px", background: "#ffffff", color: "#005670", fontWeight: 800, padding: "0 14px", cursor: "pointer" }}>
+                Back to the inspection without saving
+              </button>
+            </div>
+          ) : null}
           {scope.bulkUpload ? (
             <ScopedActionsBulkUpload
               canCreateAction={canCreateAction}
