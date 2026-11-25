@@ -65,6 +65,9 @@ type InspectionRecord = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Manual inspections have no ITP section number.
+const sectionLabel = (section: string | null | undefined) => (section ? `§${section}` : "Manual");
+
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
@@ -248,12 +251,17 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
       .eq("project_key", projectKey)
       .not("noi_number", "is", null)
       .order("noi_number", { ascending: false });
-    if (data) {
-      const unique = Array.from(new Set(
-        data.map((r: { noi_number: string }) => r.noi_number).filter(Boolean)
-      ));
-      setNoiNumbers(unique);
-    }
+    // NOIs raised from a manual inspection on Overall Inspections count too.
+    const { data: manual } = await supabase
+      .from("project_manual_inspections")
+      .select("noi_number")
+      .eq("project_key", projectKey)
+      .not("noi_number", "is", null);
+    const all = [
+      ...(data || []).map((r: { noi_number: string }) => r.noi_number),
+      ...(manual || []).map((r: { noi_number: string | null }) => r.noi_number || ""),
+    ].map(n => String(n || "").trim()).filter(Boolean);
+    setNoiNumbers(Array.from(new Set(all)).sort((a, b) => b.localeCompare(a, undefined, { numeric: true })));
   }, [projectKey]);
 
   useEffect(() => { loadRecords(); loadNoiNumbers(); }, [loadRecords, loadNoiNumbers]);
@@ -268,8 +276,17 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
       .in("noi_number", addNois)
       .order("noi_number")
       .order("section_number")
-      .then(({ data }) => {
-        if (data) setNoiPoints(data as NoiPoint[]);
+      .then(async ({ data }) => {
+        const fromItps = (data || []) as NoiPoint[];
+        const { data: manual } = await supabase
+          .from("project_manual_inspections")
+          .select("id, title, intervention_type, noi_number, status")
+          .eq("project_key", projectKey)
+          .in("noi_number", addNois);
+        const fromManual: NoiPoint[] = (manual || []).map((m: { id: string; title: string; intervention_type: string | null; noi_number: string; status: string }) => ({
+          id: `manual-${m.id}`, section_number: "", activity_description: m.title, intervention_type: m.intervention_type || "", noi_number: m.noi_number, status: m.status,
+        }));
+        setNoiPoints([...fromItps, ...fromManual]);
         setLoadingPoints(false);
       });
   }, [addNois, projectKey]);
@@ -542,7 +559,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
                       </td>
                       <td style={imsTableCellStyle}>
                         {points.slice(0, 4).map((p, i) => (
-                          <span key={i} style={tagStyle(p.intervention_type)}>§{p.section_number} {p.intervention_type}</span>
+                          <span key={i} style={tagStyle(p.intervention_type)}>{sectionLabel(p.section_number)} {p.intervention_type}</span>
                         ))}
                         {points.length > 4 && <span style={{ fontSize: 10, color: imsColours.muted }}>+{points.length - 4} more</span>}
                       </td>
@@ -656,7 +673,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
                                     onClick={e => e.stopPropagation()} />
                                   <div style={{ flex: 1 }}>
                                     <div style={{ fontSize: 10, fontWeight: 800, color: imsColours.muted, marginBottom: 2 }}>
-                                      §{point.section_number} <span style={tagStyle(point.intervention_type)}>{point.intervention_type}</span>
+                                      {sectionLabel(point.section_number)} <span style={tagStyle(point.intervention_type)}>{point.intervention_type}</span>
                                     </div>
                                     <div style={{ fontSize: 12 }}>{point.activity_description}</div>
                                   </div>
@@ -760,7 +777,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
                   <span style={evLbl}>ITP Points</span>
                   <span style={evVal}>
                     {(Array.isArray(evidenceRecord.point_snapshots) ? evidenceRecord.point_snapshots : []).map((p, i) => (
-                      <span key={i} style={tagStyle(p.intervention_type)}>{p.noi_number ? `NOI-${p.noi_number} ` : ""}§{p.section_number} {p.intervention_type}</span>
+                      <span key={i} style={tagStyle(p.intervention_type)}>{p.noi_number ? `NOI-${p.noi_number} ` : ""}{sectionLabel(p.section_number)} {p.intervention_type}</span>
                     ))}
                   </span>
                 </div>

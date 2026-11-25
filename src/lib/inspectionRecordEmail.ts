@@ -33,7 +33,7 @@ export function buildInspectionEmailHtml({
   const pointRows = points
     .map(p => `
       <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #D0D0CE;font-size:13px;font-weight:700;color:#005670;white-space:nowrap;">${p.noi_number ? `NOI-${e(p.noi_number)} ` : ""}§${e(p.section_number)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #D0D0CE;font-size:13px;font-weight:700;color:#005670;white-space:nowrap;">${p.noi_number ? `NOI-${e(p.noi_number)} ` : ""}${p.section_number ? `§${e(p.section_number)}` : "Manual"}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #D0D0CE;font-size:13px;">
           <span style="display:inline-block;background:#ECECE7;color:${p.intervention_type === "H" ? "#F93822" : "#005670"};font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;margin-right:6px;">${e(p.intervention_type)}</span>
           ${e(p.activity_description)}

@@ -71,11 +71,12 @@ export async function POST(request: Request) {
     let supplier = "—";
 
     if (points.length > 0) {
-      const pointIds = points.map((p) => p.id);
-      const { data: noiRows } = await supabase
-        .from("project_noi_points")
-        .select("itp_id")
-        .in("id", pointIds);
+      // Points from a manual inspection (Overall Inspections) are stored as "manual-<id>".
+      const pointIds = points.map((p) => p.id).filter((id) => !String(id).startsWith("manual-"));
+      const manualIds = points.map((p) => String(p.id)).filter((id) => id.startsWith("manual-")).map((id) => id.slice(7));
+      const { data: noiRows } = pointIds.length
+        ? await supabase.from("project_noi_points").select("itp_id").in("id", pointIds)
+        : { data: [] as Array<{ itp_id: string | null }> };
 
       const itpIds = Array.from(new Set((noiRows || []).map((r: { itp_id: string | null }) => r.itp_id).filter(Boolean))) as string[];
       if (itpIds.length > 0) {
@@ -89,6 +90,14 @@ export async function POST(request: Request) {
           itpNumber = unique(itps.map((i: { document_number: string | null }) => i.document_number));
           itpTitle = unique(itps.map((i: { title: string | null }) => i.title));
           supplier = unique(itps.map((i: { supplier: string | null }) => i.supplier));
+        }
+      }
+      if (manualIds.length && itpNumber === "—") {
+        const { data: manualRows } = await supabase.from("project_manual_inspections").select("itp_reference, supplier").in("id", manualIds);
+        const pick = (values: Array<string | null | undefined>) => Array.from(new Set(values.map((v) => String(v || "").trim()).filter(Boolean))).join(", ") || "—";
+        if (manualRows && manualRows.length) {
+          itpNumber = pick(manualRows.map((m: { itp_reference: string | null }) => m.itp_reference));
+          supplier = pick(manualRows.map((m: { supplier: string | null }) => m.supplier));
         }
       }
     }
