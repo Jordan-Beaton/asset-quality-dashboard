@@ -190,3 +190,9 @@ At phone widths the workspace inherits the whole-IMS bottom navigation, one-colu
 - The recipient must verify access to the intended mailbox with a six-digit, ten-minute one-time code before the decision is accepted. After the decision, the IMS generates an immutable PDF certificate, stores its SHA-256 hash and storage path, attaches it to a confirmation email sent to recipient and originator, and retains the request, verification and confirmation provider message IDs.
 - Database setup: `scripts/sql/project_itp_sign_off.sql`. Apply through the Supabase SQL editor before live testing; it has not been applied from the repository.
 - Validate extraction against the complete controlled Baltic Power ITP, especially continuation rows and surveillance columns, before relying on the issued phase record.
+
+## Inspection Records covering several NOIs
+
+- One Inspection Record can cover several NOIs from the same project (`src/components/InspectionRecordsPage.tsx`). The NOIs are stored together in the existing `inspection_records.noi_number` text column as `004, 005, 006` (helpers in `src/lib/inspectionNoi.ts`: `splitNoiList`, `joinNoiList`, `formatNoiRefs`), so single-NOI records are unchanged and nothing is converted. Each point snapshot now also carries its `noi_number`. The NOI list only offers NOIs from the page's own project, so projects cannot be mixed.
+- Files can be tagged to particular NOIs with the optional `inspection_record_files.noi_numbers` text column (empty = every NOI on the record). Run `scripts/sql/inspection_record_file_nois.sql` once in the Supabase SQL editor; until it is run, saving still works and tagged files simply apply to every NOI.
+- The notification route resolves ITP number, title and supplier across every point's ITP (joined when there is more than one), the email and subject list every NOI, and the pack file name shortens to `NOI-004 and 7 more Document Pack.zip` above three NOIs.

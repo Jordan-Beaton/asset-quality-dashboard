@@ -1,6 +1,7 @@
 import { formatBytes } from "./inspectionPack";
+import { formatNoiRefs } from "./inspectionNoi";
 
-type PointSnapshot = { id: string; section_number: string; activity_description: string; intervention_type: string };
+type PointSnapshot = { id: string; section_number: string; noi_number?: string; activity_description: string; intervention_type: string };
 
 function e(v: string) {
   return String(v || "")
@@ -32,7 +33,7 @@ export function buildInspectionEmailHtml({
   const pointRows = points
     .map(p => `
       <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #D0D0CE;font-size:13px;font-weight:700;color:#005670;white-space:nowrap;">§${e(p.section_number)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #D0D0CE;font-size:13px;font-weight:700;color:#005670;white-space:nowrap;">${p.noi_number ? `NOI-${e(p.noi_number)} ` : ""}§${e(p.section_number)}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #D0D0CE;font-size:13px;">
           <span style="display:inline-block;background:#ECECE7;color:${p.intervention_type === "H" ? "#F93822" : "#005670"};font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;margin-right:6px;">${e(p.intervention_type)}</span>
           ${e(p.activity_description)}
@@ -76,7 +77,7 @@ export function buildInspectionEmailHtml({
   <!-- Header -->
   <div style="background:linear-gradient(135deg,#005670 0%,#005670 64%,#63B1BC 160%);border-radius:12px 12px 0 0;padding:22px 28px;margin-bottom:0;">
     <div style="font-size:11px;font-weight:800;letter-spacing:0.08em;color:#63B1BC;text-transform:uppercase;margin-bottom:4px;">Enshore IMS · Inspection Records</div>
-    <div style="font-size:20px;font-weight:700;color:#ffffff;">Inspection records available — NOI ${e(noiNumber)}</div>
+    <div style="font-size:20px;font-weight:700;color:#ffffff;">Inspection records available — ${e(formatNoiRefs(noiNumber))}</div>
   </div>
 
   <!-- Body -->
@@ -86,7 +87,7 @@ export function buildInspectionEmailHtml({
     <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
       <tr>
         <td style="padding:8px 12px;background:#ECECE7;border-radius:8px 0 0 8px;font-size:11px;font-weight:800;color:#53565A;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap;width:1%;">NOI Reference</td>
-        <td style="padding:8px 12px;background:#ECECE7;border-radius:0 8px 8px 0;font-size:14px;font-weight:700;color:#005670;">NOI-${e(noiNumber)}</td>
+        <td style="padding:8px 12px;background:#ECECE7;border-radius:0 8px 8px 0;font-size:14px;font-weight:700;color:#005670;">${e(formatNoiRefs(noiNumber))}</td>
       </tr>
     </table>
 

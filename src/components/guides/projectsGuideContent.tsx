@@ -598,10 +598,10 @@ function SectionRecords() {
       <h3 style={h3Style}>Adding a record</h3>
       <div style={stepList}>
         <Step n={1}>Open the <strong>Inspection Records</strong> tab and click <strong>＋ Add Inspection Record</strong>. On a pending record you can click <strong>＋ Add Records</strong> instead, which pre-selects that NOI.</Step>
-        <Step n={2}>Choose the <Code>NOI Reference</Code>. Only NOIs already issued on this project are listed.</Step>
-        <Step n={3}>Under <strong>ITP Points Called Up</strong> tick which points this record covers (all are ticked to start).</Step>
+        <Step n={2}>Tick the <Code>NOI references</Code> this record covers. Tick one, or several when one set of paperwork covers more than one NOI (for example eight NOIs issued to the same supplier). Only NOIs already issued on this project are listed, so a record never mixes projects.</Step>
+        <Step n={3}>Under <strong>ITP Points Called Up</strong> the points are grouped by NOI. Tick which points this record covers (all are ticked to start), or use <strong>Clear all</strong> / <strong>Select all</strong> for a whole NOI.</Step>
         <Step n={4}>Add <strong>Recipients</strong>: name and email, then <strong>Add</strong>.</Step>
-        <Step n={5}>Under <strong>Attach Records</strong> choose the files. PDF, Word, Excel, PowerPoint files and photos can all be attached, and several at once. Add optional <strong>Notes</strong>.</Step>
+        <Step n={5}>Under <strong>Attach Records</strong> choose the files. PDF, Word, Excel, PowerPoint files and photos can all be attached, and several at once. Files can be added in more than one go and removed again. When the record covers several NOIs each file has <strong>Applies to</strong> tick boxes (all ticked means it applies to every NOI). Add optional <strong>Notes</strong>.</Step>
         <Step n={6}>Click <strong>Save Record</strong>. If you added recipients the button reads <strong>Save &amp; Send Notification</strong> and they are emailed as long as there is at least one file.</Step>
       </div>
       <div style={mockPanel}>

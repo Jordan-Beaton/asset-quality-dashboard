@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { formatNoiRefs, joinNoiList, splitNoiList } from "../lib/inspectionNoi";
 import type { CSSProperties, ChangeEvent } from "react";
 import { QualityPageHero } from "./QualityPageHero";
 import { ImsTopMetaRow } from "./ImsPrimitives";
@@ -38,6 +39,7 @@ type RecordFile = {
   file_path: string;
   file_size: number | null;
   uploaded_at: string;
+  noi_numbers?: string | null; // NOIs this file belongs to; empty = all NOIs on the record
 };
 
 type Notification = {
@@ -206,8 +208,9 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
   const [loadingPoints, setLoadingPoints] = useState(false);
 
   const [showAdd, setShowAdd] = useState(false);
-  const [addNoi, setAddNoi] = useState("");
-  const [addPoints, setAddPoints] = useState<Set<string>>(new Set());
+  const [addNois, setAddNois] = useState<string[]>([]);
+  const [unticked, setUnticked] = useState<Set<string>>(new Set());
+  const [fileNois, setFileNois] = useState<Record<string, string[]>>({});
   const [addRecipients, setAddRecipients] = useState<Recipient[]>([]);
   const [addRecipName, setAddRecipName] = useState("");
   const [addRecipEmail, setAddRecipEmail] = useState("");
@@ -256,22 +259,20 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
   useEffect(() => { loadRecords(); loadNoiNumbers(); }, [loadRecords, loadNoiNumbers]);
 
   useEffect(() => {
-    if (!addNoi) { setNoiPoints([]); setAddPoints(new Set()); return; }
+    if (addNois.length === 0) { setNoiPoints([]); return; }
     setLoadingPoints(true);
     supabase
       .from("project_noi_points")
       .select("id, section_number, activity_description, intervention_type, noi_number, status")
       .eq("project_key", projectKey)
-      .eq("noi_number", addNoi)
+      .in("noi_number", addNois)
+      .order("noi_number")
       .order("section_number")
       .then(({ data }) => {
-        if (data) {
-          setNoiPoints(data as NoiPoint[]);
-          setAddPoints(new Set((data as NoiPoint[]).map(p => p.id)));
-        }
+        if (data) setNoiPoints(data as NoiPoint[]);
         setLoadingPoints(false);
       });
-  }, [addNoi, projectKey]);
+  }, [addNois, projectKey]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -310,7 +311,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
       const result = await response.json().catch(() => ({})) as { url?: string; error?: string };
       if (!response.ok || !result.url) throw new Error(result.error || "The document pack could not be prepared.");
       window.location.assign(result.url);
-      showMsg(`Downloading the document pack for NOI-${record.noi_number}.`);
+      showMsg(`Downloading the document pack for ${formatNoiRefs(record.noi_number)}.`);
     } catch (err) {
       showMsg(err instanceof Error ? err.message : "The document pack could not be prepared.", "err");
     } finally {
@@ -323,12 +324,35 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
   // ── Add modal ─────────────────────────────────────────────────────────────
 
   function openAdd(prefillNoi?: string) {
-    setAddNoi(prefillNoi || ""); setAddPoints(new Set()); setAddRecipients([]);
+    setAddNois(splitNoiList(prefillNoi)); setUnticked(new Set()); setFileNois({}); setAddRecipients([]);
     setAddRecipName(""); setAddRecipEmail(""); setAddNotes(""); setAddFiles([]); setShowAdd(true);
   }
 
   function togglePoint(id: string) {
-    setAddPoints(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setUnticked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+
+  function toggleNoi(n: string) {
+    setAddNois(prev => (prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n]));
+  }
+
+  function toggleGroup(noi: string, on: boolean) {
+    setUnticked(prev => {
+      const next = new Set(prev);
+      noiPoints.filter(p => p.noi_number === noi).forEach(p => (on ? next.delete(p.id) : next.add(p.id)));
+      return next;
+    });
+  }
+
+  function fileKey(f: File) { return `${f.name}|${f.size}|${f.lastModified}`; }
+
+  function toggleFileNoi(f: File, noi: string) {
+    setFileNois(prev => {
+      const key = fileKey(f);
+      const current = prev[key] && prev[key].length ? prev[key] : [...addNois];
+      const next = current.includes(noi) ? current.filter(x => x !== noi) : [...current, noi];
+      return { ...prev, [key]: next };
+    });
   }
 
   function addRecipient() {
@@ -339,23 +363,26 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
   }
 
   async function saveRecord() {
-    if (!addNoi) { showMsg("Select an NOI reference.", "err"); return; }
-    if (addPoints.size === 0) { showMsg("Select at least one ITP point.", "err"); return; }
+    if (addNois.length === 0) { showMsg("Select at least one NOI reference.", "err"); return; }
+    const chosenPoints = noiPoints.filter(p => !unticked.has(p.id) && addNois.includes(p.noi_number));
+    if (chosenPoints.length === 0) { showMsg("Select at least one ITP point.", "err"); return; }
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const userName = user?.user_metadata?.full_name || user?.email || "Unknown";
-      const selectedPoints = noiPoints.filter(p => addPoints.has(p.id));
+      const selectedPoints = chosenPoints;
       const pointSnapshots = selectedPoints.map(p => ({
-        id: p.id, section_number: p.section_number,
+        id: p.id, section_number: p.section_number, noi_number: p.noi_number,
         activity_description: p.activity_description, intervention_type: p.intervention_type,
       }));
+      // Only the NOIs that still have a ticked point belong on the record.
+      const coveredNois = addNois.filter(n => selectedPoints.some(p => p.noi_number === n)).sort();
       const noiDesc = selectedPoints.map(p => p.activity_description).join("; ").slice(0, 200) || null;
 
       const { data: newRecord, error: insertErr } = await supabase
         .from("inspection_records")
         .insert({
-          project_key: projectKey, noi_number: addNoi, noi_description: noiDesc,
+          project_key: projectKey, noi_number: joinNoiList(coveredNois), noi_description: noiDesc,
           point_snapshots: pointSnapshots, recipients: addRecipients,
           notes: addNotes.trim() || null, uploaded_by_name: userName,
         })
@@ -366,9 +393,13 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
         const path = `${projectKey}/inspection-records/${newRecord.id}/${Date.now()}-${file.name}`;
         const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: uploadContentType(file) });
         if (upErr) throw upErr;
-        await supabase.from("inspection_record_files").insert({
-          record_id: newRecord.id, file_name: file.name, file_path: path, file_size: file.size,
-        });
+        const picked = (fileNois[fileKey(file)] || []).filter(n => coveredNois.includes(n));
+        const tagged = picked.length > 0 && picked.length < coveredNois.length ? joinNoiList([...picked].sort()) : null;
+        const baseRow = { record_id: newRecord.id, file_name: file.name, file_path: path, file_size: file.size };
+        let { error: rowErr } = await supabase.from("inspection_record_files").insert(tagged ? { ...baseRow, noi_numbers: tagged } : baseRow);
+        // If the noi_numbers column has not been added yet, keep the file (it then applies to every NOI).
+        if (rowErr && tagged) ({ error: rowErr } = await supabase.from("inspection_record_files").insert(baseRow));
+        if (rowErr) throw rowErr;
       }
 
       if (addRecipients.length > 0 && addFiles.length > 0) {
@@ -495,8 +526,19 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
                   const recipients: Recipient[] = Array.isArray(record.recipients) ? record.recipients : [];
                   return (
                     <tr key={record.id}>
-                      <td style={{ ...imsTableCellStyle, fontWeight: 800, color: imsColours.brand, whiteSpace: "nowrap" }}>
-                        NOI-{record.noi_number}
+                      <td style={{ ...imsTableCellStyle, fontWeight: 800, color: imsColours.brand }}>
+                        {(() => {
+                          const nois = splitNoiList(record.noi_number);
+                          return (
+                            <div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                                {nois.slice(0, 3).map(n => <span key={n} style={recipChip}>NOI-{n}</span>)}
+                                {nois.length > 3 && <span style={{ fontSize: 11, color: imsColours.muted, alignSelf: "center" }}>+{nois.length - 3} more</span>}
+                              </div>
+                              {nois.length > 1 && <div style={{ fontSize: 11, fontWeight: 600, color: imsColours.muted, marginTop: 3 }}>{nois.length} NOIs</div>}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td style={imsTableCellStyle}>
                         {points.slice(0, 4).map((p, i) => (
@@ -566,35 +608,61 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
             </div>
             <div style={modalBody}>
               <div style={imsFieldStyle}>
-                <label style={{ ...imsLabelStyle, fontSize: 11, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>NOI Reference</label>
-                <select style={imsInputStyle} value={addNoi} onChange={e => setAddNoi(e.target.value)}>
-                  <option value="">— Select NOI —</option>
-                  {noiNumbers.map(n => <option key={n} value={n}>NOI-{n}</option>)}
-                </select>
+                <label style={{ ...imsLabelStyle, fontSize: 11, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>NOI references: tick every NOI this record covers</label>
+                {noiNumbers.length === 0 ? (
+                  <p style={{ color: imsColours.muted, fontSize: 13 }}>No NOIs have been issued for this project yet.</p>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 6 }}>
+                    {noiNumbers.map(n => {
+                      const on = addNois.includes(n);
+                      return (
+                        <label key={n} style={{ display: "flex", alignItems: "center", gap: 8, border: `1px solid ${on ? imsColours.brand : imsColours.border}`, background: on ? "#ECECE7" : "#fff", borderRadius: 8, padding: "7px 10px", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+                          <input type="checkbox" checked={on} onChange={() => toggleNoi(n)} style={{ accentColor: imsColours.brand }} />
+                          NOI-{n}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {addNoi && (
+              {addNois.length > 0 && (
                 <div>
-                  <div style={sectionTitle}>ITP Points Called Up — tick which this record covers</div>
+                  <div style={sectionTitle}>ITP Points Called Up: tick which this record covers ({noiPoints.filter(p => !unticked.has(p.id) && addNois.includes(p.noi_number)).length} selected across {addNois.length} NOI{addNois.length === 1 ? "" : "s"})</div>
                   {loadingPoints ? (
                     <p style={{ color: imsColours.muted, fontSize: 13 }}>Loading points…</p>
                   ) : noiPoints.length === 0 ? (
-                    <p style={{ color: imsColours.muted, fontSize: 13 }}>No W/H points found for this NOI.</p>
+                    <p style={{ color: imsColours.muted, fontSize: 13 }}>No W/H points found for the selected NOIs.</p>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {noiPoints.map(point => {
-                        const checked = addPoints.has(point.id);
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {[...addNois].sort().map(noi => {
+                        const group = noiPoints.filter(p => p.noi_number === noi);
+                        const allOn = group.length > 0 && group.every(p => !unticked.has(p.id));
                         return (
-                          <div key={point.id} style={pointRow(checked)} onClick={() => togglePoint(point.id)}>
-                            <input type="checkbox" checked={checked} onChange={() => togglePoint(point.id)}
-                              style={{ marginTop: 2, accentColor: imsColours.brand, width: 14, height: 14, flexShrink: 0, cursor: "pointer" }}
-                              onClick={e => e.stopPropagation()} />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 10, fontWeight: 800, color: imsColours.muted, marginBottom: 2 }}>
-                                §{point.section_number} <span style={tagStyle(point.intervention_type)}>{point.intervention_type}</span>
-                              </div>
-                              <div style={{ fontSize: 12 }}>{point.activity_description}</div>
+                          <div key={noi} style={{ border: `1px solid ${imsColours.border}`, borderRadius: 8, padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontWeight: 800, fontSize: 13, color: imsColours.brand }}>
+                              <span>NOI-{noi}</span>
+                              <button type="button" style={{ background: "none", border: "none", color: imsColours.brand, fontWeight: 700, fontSize: 12, cursor: "pointer" }} onClick={() => toggleGroup(noi, !allOn)}>
+                                {allOn ? "Clear all" : "Select all"}
+                              </button>
                             </div>
+                            {group.length === 0 && <p style={{ color: imsColours.muted, fontSize: 12, margin: 0 }}>No W/H points found for this NOI.</p>}
+                            {group.map(point => {
+                              const checked = !unticked.has(point.id);
+                              return (
+                                <div key={point.id} style={pointRow(checked)} onClick={() => togglePoint(point.id)}>
+                                  <input type="checkbox" checked={checked} onChange={() => togglePoint(point.id)}
+                                    style={{ marginTop: 2, accentColor: imsColours.brand, width: 14, height: 14, flexShrink: 0, cursor: "pointer" }}
+                                    onClick={e => e.stopPropagation()} />
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 10, fontWeight: 800, color: imsColours.muted, marginBottom: 2 }}>
+                                      §{point.section_number} <span style={tagStyle(point.intervention_type)}>{point.intervention_type}</span>
+                                    </div>
+                                    <div style={{ fontSize: 12 }}>{point.activity_description}</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })}
@@ -626,15 +694,36 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
               <div style={imsFieldStyle}>
                 <label style={{ ...imsLabelStyle, fontSize: 11, textTransform: "uppercase" as const, letterSpacing: "0.05em" }}>Attach Records</label>
                 <div style={uploadZone} onClick={() => fileInputRef.current?.click()}>
-                  📁 Click to select files
-                  {addFiles.length > 0 && (
-                    <div style={{ marginTop: 8, fontSize: 12 }}>
-                      {addFiles.map((f, i) => <div key={i} style={{ color: imsColours.brand, fontWeight: 600 }}>{f.name}</div>)}
-                    </div>
-                  )}
+                  📁 Click to add files (you can add more than once)
                 </div>
                 <input ref={fileInputRef} type="file" multiple style={{ display: "none" }}
-                  onChange={e => e.target.files && setAddFiles(Array.from(e.target.files))} />
+                  onChange={e => { const picked = e.target.files ? Array.from(e.target.files) : []; setAddFiles(prev => [...prev, ...picked.filter(p => !prev.some(x => fileKey(x) === fileKey(p)))]); e.target.value = ""; }} />
+                {addFiles.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                    {addFiles.map(f => {
+                      const chosen = fileNois[fileKey(f)] && fileNois[fileKey(f)].length ? fileNois[fileKey(f)] : addNois;
+                      return (
+                        <div key={fileKey(f)} style={{ border: `1px solid ${imsColours.border}`, borderRadius: 8, padding: "6px 10px", fontSize: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                            <span style={{ color: imsColours.brand, fontWeight: 700, wordBreak: "break-all" }}>{f.name}</span>
+                            <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setAddFiles(prev => prev.filter(x => fileKey(x) !== fileKey(f)))} style={{ background: "none", border: "none", cursor: "pointer", color: imsColours.muted }}>✕</button>
+                          </div>
+                          {addNois.length > 1 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 4, color: imsColours.muted }}>
+                              <span>Applies to:</span>
+                              {[...addNois].sort().map(n => (
+                                <label key={n} style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                                  <input type="checkbox" checked={chosen.includes(n)} onChange={() => toggleFileNoi(f, n)} style={{ accentColor: imsColours.brand }} />
+                                  NOI-{n}
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div style={imsFieldStyle}>
@@ -658,12 +747,12 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
         <div style={overlay} onClick={e => e.target === e.currentTarget && closeEvidence()}>
           <div style={modal(560)}>
             <div style={modalHeader}>
-              <span style={{ fontWeight: 800, fontSize: 14 }}>Inspection Evidence — NOI-{evidenceRecord.noi_number}</span>
+              <span style={{ fontWeight: 800, fontSize: 14 }}>Inspection Evidence: {formatNoiRefs(evidenceRecord.noi_number)}</span>
               <button onClick={closeEvidence} style={{ background: "none", border: "none", color: "#fff", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
             </div>
             <div style={modalBody}>
               <div style={evMetaBox}>
-                <div style={evRow}><span style={evLbl}>NOI Reference</span><span style={evVal}>NOI-{evidenceRecord.noi_number}</span></div>
+                <div style={evRow}><span style={evLbl}>NOI Reference</span><span style={evVal}>{formatNoiRefs(evidenceRecord.noi_number)}</span></div>
                 {evidenceRecord.noi_description && (
                   <div style={evRow}><span style={evLbl}>Description</span><span style={evVal}>{evidenceRecord.noi_description}</span></div>
                 )}
@@ -671,7 +760,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
                   <span style={evLbl}>ITP Points</span>
                   <span style={evVal}>
                     {(Array.isArray(evidenceRecord.point_snapshots) ? evidenceRecord.point_snapshots : []).map((p, i) => (
-                      <span key={i} style={tagStyle(p.intervention_type)}>§{p.section_number} {p.intervention_type}</span>
+                      <span key={i} style={tagStyle(p.intervention_type)}>{p.noi_number ? `NOI-${p.noi_number} ` : ""}§{p.section_number} {p.intervention_type}</span>
                     ))}
                   </span>
                 </div>
@@ -696,7 +785,7 @@ export function InspectionRecordsPage({ projectKey }: { projectKey: string }) {
                       <div style={fileIcon}>📄</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 12, fontWeight: 700 }}>{f.file_name}</div>
-                        <div style={{ fontSize: 11, color: imsColours.muted }}>{fmtSize(f.file_size)} · {fmtDate(f.uploaded_at)}</div>
+                        <div style={{ fontSize: 11, color: imsColours.muted }}>{fmtSize(f.file_size)} · {fmtDate(f.uploaded_at)}{f.noi_numbers ? ` · ${formatNoiRefs(f.noi_numbers)} only` : ""}</div>
                       </div>
                       {signedUrls[f.id] && (
                         <a href={signedUrls[f.id]} target="_blank" rel="noreferrer"

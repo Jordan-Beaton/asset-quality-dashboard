@@ -36,3 +36,23 @@ People Management is the source of person records and dropdown values across the
 - If imported names are bad extraction placeholders, such as `Checker`, blank them unless they match People Management.
 - Preserve People as a stable source for dropdowns before changing module-specific person fields.
 
+## Parked Work: Deactivated People Can Still Sign In
+
+Status: **paused by Jordan Beaton on 24 Nov 2026. Nothing has been built.** Pick this up before relying on Deactivate as a security control.
+
+What was found (read from the code, not tested against a live deactivated account):
+
+- A deactivated person can still sign in and hold a valid session. `app/api/auth/login/route.ts` only checks the password (`signInWithPassword`), and `src/lib/supabase/middleware.ts` lets any signed-in user through.
+- The only block is client-side. `src/components/AppShell.tsx` (the `isPersonDeactivated` check, around line 988) removes the person's role and module access in the browser. The server never refuses them and their session is never ended.
+- Server routes that do refuse deactivated people: `app/api/admin-settings/route.ts`, `src/lib/requireAdmin.ts`, `app/api/invite-link/route.ts`, and the Speak Up admin check in `src/lib/speakUpServer.ts`. **Not checked:** every other API route, and what the database's row-level security lets a still-signed-in deactivated person read or write.
+- The two ways of deactivating do different things. People Management's Deactivate button (`toggleSelectedPerson` in `app/people/page.tsx`) only sets `people.active = false` and leaves `access_status` alone. Admin Access's `Deactivated` setting (`updatePersonAccess` in `app/api/admin-settings/route.ts`) sets both (`active = accessStatus !== "Deactivated"`). The master admin account cannot be deactivated.
+
+Proposed fix (agreed in principle):
+
+1. Refuse sign-in for a deactivated person in the login route, with a clear message.
+2. End their live sessions when someone is deactivated (use the Supabase admin API from a server route).
+3. Make the People Management Deactivate and Reactivate buttons do exactly what Admin Access does, through the same server route, so there is one way to deactivate.
+4. Add a server-side deactivated check to the data routes, and review row-level security for the same gap.
+
+Cautions: this changes how everyone signs in, so test it with a throwaway deactivated account and show Jordan the behaviour before pushing. Do not deactivate or edit real people while testing.
+

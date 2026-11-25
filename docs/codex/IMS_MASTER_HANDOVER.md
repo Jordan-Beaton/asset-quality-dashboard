@@ -67,6 +67,10 @@ This is the permanent entry point for Codex work on the IMS web app. Keep this f
 - Lessons Learnt central knowledge repository
 - Admin / Settings
 
+## Parked Work
+
+- **Deactivated people can still sign in** (paused 24 Nov 2026). The block is browser-only, the sign-in route does not check it, and People Management's Deactivate button does not match Admin Access's Deactivated setting. Full finding and the proposed fix are in `PEOPLE_MANAGEMENT_HANDOVER.md` ("Parked Work"). Not started.
+
 ## Latest Workflow Note
 
 - Wadden Sea MOC Register annex: new Project Reports tab that reads the SharePoint MOC register workbook in the browser and produces a per-project (BA3, LW2, LW4) Word/PDF annex. No database changes. See `PROJECT_MANAGEMENT_HANDOVER.md` (MOC Register annex). Update: MOC numbers are now per series (ENS-MOC-nnn for company-wide, NEX-MOC-nnn for Wadden Sea) allocated by the database, the Create MOC flow asks project and parts, and the annex reads the IMS MOCs live. Apply `scripts/sql/moc_project_series.sql` before deploying.

@@ -55,7 +55,10 @@ export function uniqueZipNames(names: string[]) {
 }
 
 export function packFileName(noiNumber: string) {
-  return `NOI-${String(noiNumber || "").replace(/[^A-Za-z0-9._-]+/g, "-")} Document Pack.zip`;
+  const nois = String(noiNumber || "").split(/[,;]+/).map((n) => n.trim().replace(/^NOI-?/i, "")).filter(Boolean);
+  const clean = (n: string) => n.replace(/[^A-Za-z0-9._-]+/g, "-");
+  const label = nois.length > 3 ? `NOI-${clean(nois[0])} and ${nois.length - 1} more` : nois.map((n) => `NOI-${clean(n)}`).join(" ");
+  return `${label || "NOI"} Document Pack.zip`;
 }
 
 export function formatBytes(bytes: number | null | undefined) {

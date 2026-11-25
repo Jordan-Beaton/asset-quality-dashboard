@@ -5,11 +5,12 @@ import { createClient as createServerClient } from "../../../../src/lib/supabase
 import { buildPackUrl } from "../../../../src/lib/inspectionPack";
 import { describePack, ensureStoredPack } from "../../../../src/lib/inspectionPackStorage";
 import { buildInspectionEmailHtml } from "../../../../src/lib/inspectionRecordEmail";
+import { formatNoiRefs } from "../../../../src/lib/inspectionNoi";
 
 const STORAGE_BUCKET = "project-documents";
 
 type Recipient = { name: string; email: string };
-type PointSnapshot = { id: string; section_number: string; activity_description: string; intervention_type: string };
+type PointSnapshot = { id: string; section_number: string; noi_number?: string; activity_description: string; intervention_type: string };
 
 export const maxDuration = 300;
 
@@ -70,24 +71,24 @@ export async function POST(request: Request) {
     let supplier = "—";
 
     if (points.length > 0) {
-      const firstPointId = points[0].id;
-      const { data: noi } = await supabase
+      const pointIds = points.map((p) => p.id);
+      const { data: noiRows } = await supabase
         .from("project_noi_points")
         .select("itp_id")
-        .eq("id", firstPointId)
-        .maybeSingle();
+        .in("id", pointIds);
 
-      if (noi?.itp_id) {
-        const { data: itp } = await supabase
+      const itpIds = Array.from(new Set((noiRows || []).map((r: { itp_id: string | null }) => r.itp_id).filter(Boolean))) as string[];
+      if (itpIds.length > 0) {
+        const { data: itps } = await supabase
           .from("project_itps")
           .select("document_number, title, supplier")
-          .eq("id", noi.itp_id)
-          .maybeSingle();
+          .in("id", itpIds);
 
-        if (itp) {
-          itpNumber = itp.document_number || "—";
-          itpTitle = itp.title || "—";
-          supplier = itp.supplier || "—";
+        const unique = (values: Array<string | null | undefined>) => Array.from(new Set(values.map((v) => String(v || "").trim()).filter(Boolean))).join(", ") || "—";
+        if (itps && itps.length) {
+          itpNumber = unique(itps.map((i: { document_number: string | null }) => i.document_number));
+          itpTitle = unique(itps.map((i: { title: string | null }) => i.title));
+          supplier = unique(itps.map((i: { supplier: string | null }) => i.supplier));
         }
       }
     }
@@ -110,7 +111,7 @@ export async function POST(request: Request) {
     const result = await resend.emails.send({
       from: fromEmail,
       to: toEmails,
-      subject: `Inspection records — NOI ${record.noi_number} (${itpNumber})`,
+      subject: `Inspection records — ${formatNoiRefs(record.noi_number)} (${itpNumber})`,
       html: buildInspectionEmailHtml({
         noiNumber: record.noi_number,
         itpNumber,
